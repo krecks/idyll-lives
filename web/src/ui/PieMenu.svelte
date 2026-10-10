@@ -30,7 +30,7 @@
         style={position(i, menu.items.length)}
         disabled={item.disabled || poor}
         title={poor ? `Can't afford — costs ${money(item.cost ?? 0)}` : undefined}
-        onclick={() => services.controls.useObject(menu.objectId, item.index)}
+        onclick={() => (menu.itemId !== undefined ? services.controls.useItem(menu.itemId, item.index === 0 ? 'eat' : 'clear') : services.controls.useObject(menu.objectId, item.index))}
       >
         {item.label}{#if item.cost !== undefined}<span class="cost tabular" class:short={poor}> · {money(item.cost)}</span>{/if}
       </button>

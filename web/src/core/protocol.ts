@@ -14,6 +14,8 @@ export type Command =
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number }
+  /** Eat a serving of food (an item), or clear it away to the sink. */
+  | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
   | { type: 'moveTo'; sim: number; x: number; z: number }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
@@ -229,6 +231,28 @@ export interface MeshArrays {
   normals: Float32Array;
   uvs: Float32Array;
   indices: Uint32Array;
+}
+
+/**
+ * Food and dishes (`sim-core/src/items.rs`, `view::items_json`): sent on their own (`items`
+ * message) whenever they change, which is far more often than the furniture.
+ */
+export interface ItemPlacement {
+  /** Stable for the item's life. */
+  id: number;
+  /** Content `items` id; its `model` is drawn. */
+  def: string;
+  /** Where it stands, in tiles (`z` on the lot's rows, like objects). */
+  x: number;
+  z: number;
+  /** Height above its storey's floor (m): the top it stands on. */
+  y: number;
+  /** Turned like what it stands on (radians). */
+  yaw: number;
+  servings: number;
+  /** `stored` items are in a fridge (not drawn). */
+  state: 'fresh' | 'spoiled' | 'dirty' | 'stored';
+  household: number;
 }
 
 export interface ObjectPlacement {
@@ -648,6 +672,8 @@ export type FromWorker =
   | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
   /** `full`: with the lot; otherwise a `LeanWorld` (the lot is as last sent). */
   | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
+  /** Food and dishes, whenever they change (`ItemPlacement`). */
+  | { type: 'items'; items: ItemPlacement[] }
   | { type: 'ui'; ui: UiUpdate }
   | { type: 'saved'; requestId: number; data: string }
   | { type: 'socialOptions'; requestId: number; options: SocialOption[] }

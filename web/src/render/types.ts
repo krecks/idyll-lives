@@ -6,7 +6,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import type { WorldStructure } from '../core/protocol';
+import type { ItemPlacement, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -48,6 +48,8 @@ export interface PickResult {
   ground: { x: number; z: number } | null;
   /** Object id under the cursor, if any. */
   objectId: number | null;
+  /** Food or a dish (item id) under the cursor, if any (picked before what it stands on). */
+  itemId?: number | null;
 }
 
 export interface RendererDeps {
@@ -191,6 +193,8 @@ export interface Renderer {
    * switches and on build-mode edits.
    */
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void>;
+  /** Food and dishes (sent apart from the world: they change far more often). */
+  setItems(items: readonly ItemPlacement[]): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /** Canvas-relative CSS pixel coordinates. */

@@ -25,7 +25,7 @@ const SOCIAL_RANGE: f32 = 45.0;
 pub const TICKS_PER_DAY: u64 = (24.0 * 60.0 / MINUTES_PER_TICK) as u64;
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
-const ROOM_REFRESH_TICKS: u64 = (10.0 / MINUTES_PER_TICK) as u64;
+pub(crate) const ROOM_REFRESH_TICKS: u64 = (10.0 / MINUTES_PER_TICK) as u64;
 /// How far (centimetres, per axis) an object can stand off the middle of its footprint: half a
 /// tile, so its middle stays on its tile (see `ObjectInstance::offset`).
 pub const MAX_OFFSET: i8 = 50;
@@ -97,12 +97,12 @@ impl ObjectInstance {
         self.users[..slots as usize].iter().any(Option::is_none)
     }
 
-    fn slot_of(&self, sim: u32) -> Option<usize> {
+    pub(crate) fn slot_of(&self, sim: u32) -> Option<usize> {
         self.users.iter().position(|u| *u == Some(sim))
     }
 
     /// Takes a slot for `sim` (keeps the one it already has).
-    fn reserve(&mut self, sim: u32, slots: u8) -> bool {
+    pub(crate) fn reserve(&mut self, sim: u32, slots: u8) -> bool {
         if self.slot_of(sim).is_some() {
             return true;
         }
@@ -259,6 +259,34 @@ pub enum TaskKind {
     Spot {
         accident: usize,
     },
+    /// Cooking a recipe (`cooking.rs`; index into `Content::recipes`): at step `step`, at
+    /// `station` once one is found, started from `origin` (the object whose interaction it was;
+    /// its skills and feeling count). `servings` is 0 until the ingredients are paid for (at
+    /// the first step), then how many it makes; `skipped` counts steps done without their
+    /// station; `minutes` is how long the current step takes.
+    Cook {
+        recipe: usize,
+        step: u8,
+        station: Option<u32>,
+        origin: Option<u32>,
+        servings: u8,
+        skipped: u8,
+        minutes: u16,
+    },
+    /// Eating: first fetching a serving of `item` (none: they hold their plate already), then
+    /// at `seat` (none: standing), the plate put down there as item `plate` (none: in hand).
+    Eat {
+        item: Option<u32>,
+        seat: Option<u32>,
+        plate: Option<u32>,
+        stage: u8,
+    },
+    /// Washing up: picking up `item` (and dirty things next to it), then at `station`.
+    Dishes {
+        item: u32,
+        station: Option<u32>,
+        stage: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -285,6 +313,10 @@ pub enum Phase {
     Conversing {
         elapsed: f32,
         success: bool,
+    },
+    /// Waiting for a busy station (a cook or someone washing up; see `cooking.rs`).
+    Queued {
+        ticks: u32,
     },
     /// A visitor at the front door, waiting to be let in (`visits.door`, run by `life`).
     Knocking {
@@ -373,6 +405,12 @@ pub struct Sim {
     pub age: f32,
     /// No longer in town (the slot stays, so ids don't change; see `World::depart`).
     pub gone: Option<Gone>,
+    /// What they carry (ingredients, a plate, dirty dishes; see `cooking.rs`).
+    pub held: Option<crate::items::Held>,
+    /// Told dinner's ready: keener to eat until this tick.
+    pub(crate) invited_until: u64,
+    /// A dish they served this tick (an item; the household is told after the step).
+    pub(crate) served: Option<u32>,
     /// The last day they went to (or skipped) school.
     pub school_day: u32,
     /// How they do at school, 0..100 (pupils; see `SchoolRules::letter`).
@@ -510,8 +548,10 @@ impl Sim {
             return false;
         }
         match (act.task.kind, &act.phase) {
-            // People on their way somewhere don't stop to chat (it would strand them).
+            // People on their way somewhere don't stop to chat (it would strand them), nor do
+            // cooks halfway through a recipe or people eating or washing up.
             (TaskKind::Work | TaskKind::Visit { .. } | TaskKind::GoHome | TaskKind::Answer { .. }, _) => false,
+            (TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }, _) => false,
             (TaskKind::Social { .. }, Phase::Conversing { .. }) => false,
             (_, Phase::Routing { .. }) => true,
             _ => act.tags & content.social_rules.busy_tags == 0,
@@ -669,6 +709,8 @@ pub struct World {
     pub mode: GameMode,
     pub lot: Lot,
     pub objects: Vec<ObjectInstance>,
+    /// Food, plates and pots (see `items.rs`).
+    pub items: crate::items::Items,
     /// Plot index per object (`None` when outside every plot).
     pub(crate) object_plot: Vec<Option<u32>>,
     /// Objects by plot, for decisions (see `index.rs`); kept up to date by `refresh_index`.
@@ -777,6 +819,10 @@ impl Ctx<'_> {
 #[derive(Debug, Clone, Copy)]
 enum Choice {
     Object(u32, usize),
+    /// A serving of food (an item).
+    Eat(u32),
+    /// Washing up, starting with this item.
+    Dishes(u32),
     Clean(i32, i32),
     Repair(u32),
     Social(u32, usize),
@@ -895,6 +941,7 @@ impl World {
             mode: GameMode::Living,
             lot,
             objects: Vec::new(),
+            items: Default::default(),
             object_plot: Vec::new(),
             object_index: ObjectIndex::default(),
             sims: Vec::new(),
@@ -1274,6 +1321,9 @@ impl World {
             empty_since: [0; crate::content::MAX_ACCIDENTS],
             age,
             gone: None,
+            held: None,
+            invited_until: 0,
+            served: None,
             retired: false,
             pension: 0,
             school_day: 0,
@@ -1701,6 +1751,7 @@ impl World {
                 content,
                 lot,
                 objects,
+                items,
                 sims,
                 blocked,
                 rng,
@@ -1737,7 +1788,7 @@ impl World {
             };
             // (In lots nobody watches, only those whose turn it is; see `lod.rs`.)
             for sim in sims.iter_mut().filter(|s| s.here() && s.steps > 0) {
-                step_sim(sim, &ctx, objects, rng);
+                step_sim(sim, &ctx, objects, items, rng);
             }
         }
         self.apply_messes();
@@ -1745,6 +1796,7 @@ impl World {
         crate::life::update(self);
         crate::lifecycle::update(self);
         crate::planner::update(self);
+        crate::cooking::after_step(self);
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }
@@ -1943,6 +1995,34 @@ impl World {
                         interaction,
                     },
                 )?;
+            }
+            Command::UseItem { sim, item, action } => {
+                let household = self.sim(sim)?.household;
+                let it = self
+                    .items
+                    .get(item)
+                    .filter(|it| it.household == household)
+                    .ok_or_else(|| Error::new("that isn't theirs"))?;
+                let kind = match action {
+                    crate::command::ItemAction::Eat => {
+                        if !it.edible() {
+                            return Err(Error::new(if it.spoiled { "that's gone off" } else { "there's nothing left to eat" }));
+                        }
+                        TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 }
+                    }
+                    crate::command::ItemAction::Clear => {
+                        let dishes = self.content.cooking.dishes;
+                        let home = self.households[household as usize].plot;
+                        let sink = self.objects.iter().any(|o| {
+                            self.content.objects[o.def].stations & dishes != 0 && !o.broken() && self.object_plot[o.id as usize] == home
+                        });
+                        if !sink {
+                            return Err(Error::new("there's nowhere to wash up: buy a sink or a dishwasher"));
+                        }
+                        TaskKind::Dishes { item, station: None, stage: 0 }
+                    }
+                };
+                self.enqueue(sim, kind)?;
             }
             Command::MoveTo { sim, x, z } => {
                 if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
@@ -2223,7 +2303,7 @@ pub(crate) fn practise(sim: &mut Sim, content: &Content, skill: usize, per_hour:
     }
 }
 
-fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut Rng) {
+fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items, rng: &mut Rng) {
     let content = ctx.content;
     let minutes = sim.minutes();
     let rhythm = &content.day_rhythm;
@@ -2231,8 +2311,15 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
     let night = !asleep && rhythm.sleep_tags != 0 && is_night(sim, ctx);
     let practising = sim.current.as_ref().is_some_and(|a| {
         matches!(a.phase, Phase::Using { .. })
-            && matches!(a.task.kind, TaskKind::Use { object, interaction }
-                if content.objects[objects[object as usize].def].interactions[interaction].trains_skills())
+            && match a.task.kind {
+                TaskKind::Use { object, interaction } => {
+                    content.objects[objects[object as usize].def].interactions[interaction].trains_skills()
+                }
+                TaskKind::Cook { recipe, origin, .. } => {
+                    crate::cooking::origin_interaction(content, objects, origin, recipe).is_some_and(|i| i.trains_skills())
+                }
+                _ => false,
+            }
     });
     let skill_rules = &content.skill_rules;
     sim.practice_fatigue = if practising {
@@ -2286,7 +2373,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
     // floor, takeout). Not for babies: that's what carers are for.
     let baby = content.life.baby(sim.age);
     for (a, def) in content.accidents.iter().enumerate().filter(|_| !baby) {
-        if sim.needs[def.need] > 0.0 || filling(sim, content, objects, def.need) {
+        if sim.needs[def.need] > 0.0 || filling(sim, content, objects, items, def.need) {
             sim.empty_since[a] = 0;
             continue;
         }
@@ -2324,13 +2411,13 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
     let mut ticks = sim.steps;
     if sim.current.is_none() {
         if let Some(task) = sim.queue.pop_front() {
-            start_task(sim, task, ctx, objects);
+            start_task(sim, task, ctx, objects, items);
         } else {
             sim.idle_ticks += sim.steps;
             // Babies don't choose anything: they lie in a crib and are cared for.
             if content.life.baby(sim.age) {
                 if let Some(task) = crib_for(sim, ctx, objects) {
-                    start_task(sim, task, ctx, objects);
+                    start_task(sim, task, ctx, objects, items);
                 }
                 return;
             }
@@ -2338,8 +2425,8 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
             if free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
                 let since = sim.idle_ticks - AUTONOMY_DELAY_TICKS;
                 sim.idle_ticks = 0;
-                if let Some(task) = pick_autonomous(sim, ctx, objects, rng) {
-                    start_task(sim, task, ctx, objects);
+                if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng) {
+                    start_task(sim, task, ctx, objects, items);
                     // Catching up on a turn (`lod.rs`): they were idle until it was time to
                     // choose, so what they chose has only had the ticks since.
                     ticks = ticks.min(since + 1);
@@ -2348,19 +2435,19 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
         }
     }
 
-    progress(sim, ctx, objects, rng, ticks);
+    progress(sim, ctx, objects, items, rng, ticks);
 }
 
 /// What a Sim may use on a plot: everything at home or in public places; as a guest,
 /// anything that isn't private (bed, bathroom...); nothing on other people's lots.
 #[derive(PartialEq)]
-enum Access {
+pub(crate) enum Access {
     Full,
     Guest,
     None,
 }
 
-fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
+pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
     let home = ctx.households[sim.household as usize].plot;
     // A guest stays at the host's place until it's time to go home.
     if let Some(visit) = sim.visiting {
@@ -2382,6 +2469,7 @@ fn pick_autonomous(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
+    items: &crate::items::Items,
     rng: &mut Rng,
 ) -> Option<Task> {
     let content = ctx.content;
@@ -2412,6 +2500,9 @@ fn pick_autonomous(
         Some(visit) => ctx.index.on(visit.plot),
         None => ctx.index.usable_from(ctx.households[sim.household as usize].plot),
     };
+    // Cooking: the stations they have (recipes need theirs), and whether food is ready.
+    let stations = crate::cooking::station_mask(sim, ctx, objects);
+    let fresh = items.list.iter().any(|it| it.household == sim.household && it.edible());
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -2488,7 +2579,24 @@ fn pick_autonomous(
             // Better objects and more skilled Sims get more out of it, and know it.
             let boost = object_rules.quality_factor(obj.quality)
                 * inter.skill_factor(&content.skill_rules, &sim.skills);
-            let mut s = ai::score_gains(needs, &inter.total_gain.map(|g| g * boost), distance) + care;
+            let gains = ai::score_gains(needs, &inter.total_gain.map(|g| g * boost), distance);
+            let mut s = match inter.recipe {
+                // A recipe: only at home with every station it needs. Long ones tempt less, a
+                // hungry family more, and with food ready hardly at all.
+                Some(r) => {
+                    let r = &content.recipes[r];
+                    let at_home = ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == ctx.households[sim.household as usize].plot);
+                    // (Nobody starts on a long recipe with something else urgent.)
+                    let urgent = (0..content.needs.len()).any(|n| !content.needs[n].room && needs[n] < 0.1 && r.effects[n] <= 0.0);
+                    if urgent || !at_home || allowed != Access::Full || !r.possible(stations) {
+                        continue;
+                    }
+                    let hungry = crate::cooking::hungry_housemates(sim, ctx, r) as f32;
+                    let s = gains / (1.0 + r.minutes_with(stations) / 60.0) + content.cooking.feed_family * hungry;
+                    if fresh { s * 0.2 } else { s }
+                }
+                None => gains,
+            } + care;
             if inter.trains_skills() && allowed == Access::Full {
                 s += training_interest(sim, content, inter) * boost / (1.0 + distance * 0.08);
             }
@@ -2585,6 +2693,52 @@ fn pick_autonomous(
         }
     }
 
+    // Food at home: a serving of what's been cooked (leftovers, or the dinner they were called
+    // to), and washing up where there's a sink or dishwasher.
+    if home.is_some_and(|p| here == Some(p)) {
+        let rules = &content.cooking;
+        let invited = if sim.invited_until > ctx.tick { rules.invited_boost } else { 1.0 };
+        let mut best: Option<(f32, u32)> = None;
+        for it in items.list.iter().filter(|it| it.household == sim.household && it.edible()) {
+            let Some(r) = it.recipe else { continue };
+            let distance = ctx.nav.stairs.distance(it.at.centre(), sim.pos);
+            let gains = content.recipes[r].effects.map(|g| g * it.quality);
+            let s = ai::score_gains(needs, &gains, distance) * rules.leftover_preference * invited;
+            if best.is_none_or(|b| s > b.0) {
+                best = Some((s, it.id));
+            }
+        }
+        if let Some((s, item)) = best {
+            let (plan, floor) = crate::planner::tags_factor(content, sim, rules.eat_tags);
+            let s = s.max(floor) * feel(rules.eat_tags) * plan;
+            if s > MIN_AUTONOMY_SCORE {
+                candidates.push((s, Choice::Eat(item)));
+            }
+        }
+        if stations & rules.dishes != 0 {
+            let mut best: Option<(f32, u32)> = None;
+            let mut count = 0;
+            for it in items.list.iter().filter(|it| it.household == sim.household && it.to_clear(content)) {
+                count += 1;
+                let distance = ctx.nav.stairs.distance(it.at.centre(), sim.pos);
+                if best.is_none_or(|b| distance < b.0) {
+                    best = Some((distance, it.id));
+                }
+            }
+            if let Some((distance, item)) = best {
+                let (plan, floor) = crate::planner::tags_factor(content, sim, rules.dishes_tags);
+                // The bigger the pile, the keener (a plate or two can wait).
+                let pile = (count as f32 / f32::from(rules.carry_dishes)).clamp(0.4, 3.0);
+                let s = (rules.dishes_interest * pile * (1.5 - environment) / (1.0 + distance * 0.08)).max(floor)
+                    * feel(rules.dishes_tags)
+                    * plan;
+                if s > MIN_AUTONOMY_SCORE {
+                    candidates.push((s, Choice::Dishes(item)));
+                }
+            }
+        }
+    }
+
     // Residents visit friends who are home.
     let household = &ctx.households[sim.household as usize];
     let visits = &content.visits;
@@ -2632,6 +2786,8 @@ fn pick_autonomous(
             Choice::Visit(plot) => TaskKind::Visit { plot },
             Choice::Clean(x, z) => TaskKind::Clean { x, z },
             Choice::Repair(object) => TaskKind::Repair { object },
+            Choice::Eat(item) => TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 },
+            Choice::Dishes(item) => TaskKind::Dishes { item, station: None, stage: 0 },
         },
         directed: false,
     })
@@ -2654,10 +2810,24 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
     }
 }
 
-fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]) {
+fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
+    // A recipe isn't made where it was picked: the cook goes round its stations, starting with
+    // the first (see `cooking.rs`).
+    if let TaskKind::Use { object, interaction } = task.kind
+        && let Some(recipe) = objects
+            .get(object as usize)
+            .and_then(|o| content.objects[o.def].interactions.get(interaction))
+            .and_then(|i| i.recipe)
+    {
+        let kind = TaskKind::Cook { recipe, step: 0, station: None, origin: Some(object), servings: 0, skipped: 0, minutes: 0 };
+        return crate::cooking::start(sim, Task { kind, ..task }, ctx, objects, items);
+    }
     let (target, goal, tags) = match task.kind {
+        TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
+            return crate::cooking::start(sim, task, ctx, objects, items);
+        }
         TaskKind::Use {
             object,
             interaction,
@@ -2783,7 +2953,7 @@ pub(crate) fn route(
     Some(waypoints)
 }
 
-fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut Rng, ticks: u32) {
+fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items, rng: &mut Rng, ticks: u32) {
     let content = ctx.content;
     let minutes = MINUTES_PER_TICK * ticks as f32;
     let Some(act) = sim.current.as_mut() else {
@@ -2794,6 +2964,12 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
         Phase::Knocking { ticks: waited, .. } => {
             *waited += ticks;
             false
+        }
+        // Waiting for a busy station: try again.
+        Phase::Queued { ticks: waited } => {
+            *waited += ticks;
+            let waited = *waited;
+            return crate::cooking::queued(sim, ctx, objects, items, waited);
         }
         Phase::Routing { waypoints, next } => {
             let per_tick = WALK_SPEED * sim.mods.walk_speed;
@@ -2824,13 +3000,13 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
                 }
             }
             if *next >= waypoints.len() {
-                arrive(sim, ctx, objects);
+                arrive(sim, ctx, objects, items);
                 // Catching up on a turn (`lod.rs`): they got there partway through it, and
                 // what they came for gets the rest.
                 let rest = ((budget / per_tick) as u32).min(ticks - 1);
                 let using = sim.current.as_ref().is_some_and(|a| matches!(a.phase, Phase::Using { .. }));
                 if rest > 0 && using {
-                    progress(sim, ctx, objects, rng, rest);
+                    progress(sim, ctx, objects, items, rng, rest);
                 }
             }
             false
@@ -2893,14 +3069,25 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], rng: &mut 
                     }
                     done
                 }
-                _ => unreachable!("only Use, Repair, Spot and Clean tasks have a Using phase"),
+                TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
+                    crate::cooking::using(sim, ctx, objects, items, elapsed, minutes)
+                }
+                _ => unreachable!("only Use, Repair, Spot, Clean, Cook, Eat and Dishes tasks have a Using phase"),
             }
         }
         // Conversations are driven by `conversation::update`, which sees both Sims.
         Phase::Waiting { .. } | Phase::Conversing { .. } => false,
     };
     if finished {
-        end_activity(sim, content, objects);
+        // A recipe's step, eating, washing up: on to what comes next.
+        if sim.current.as_ref().is_some_and(|a| crate::cooking::chain(&a.task.kind)) {
+            crate::cooking::step_done(sim, ctx, objects, items);
+            if sim.current.is_some() {
+                return;
+            }
+        } else {
+            end_activity(sim, content, objects);
+        }
         // Catching up on a turn: it ended partway through, on average half a turn ago.
         sim.idle_ticks = (ticks - 1) / 2;
     }
@@ -2976,7 +3163,7 @@ fn use_object(
     done
 }
 
-fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]) {
+fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     // Paid on arrival; if the money ran out on the way, never mind.
     if let Some(TaskKind::Use {
@@ -3036,6 +3223,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]) {
             sim.transition = Some(crate::life::Transition::Home);
         }
         TaskKind::Social { .. } => act.phase = Phase::Waiting { ticks: 0 },
+        TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => crate::cooking::arrive(sim, ctx, objects, items),
         TaskKind::Use {
             object,
             interaction,
@@ -3067,20 +3255,24 @@ fn home_fills(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], n: usize) -> boo
     })
 }
 
-/// Whether what they're doing right now fills need `n` (on the toilet, in bed, eating).
-fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], n: usize) -> bool {
-    let Some(act) = sim.current.as_ref().filter(|a| matches!(a.phase, Phase::Using { .. })) else {
+/// Whether what they're doing right now fills need `n` (on the toilet, in bed, eating). A meal
+/// on its way counts all along: while it cooks, while they fetch it and sit down.
+fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &crate::items::Items, n: usize) -> bool {
+    let Some(act) = sim.current.as_ref() else {
         return false;
     };
+    let using = matches!(act.phase, Phase::Using { .. });
     match act.task.kind {
-        TaskKind::Use { object, interaction } => objects
+        TaskKind::Use { object, interaction } if using => objects
             .get(object as usize)
             .and_then(|o| content.objects[o.def].interactions.get(interaction))
             .is_some_and(|i| i.total_gain[n] > 0.0),
-        TaskKind::Spot { accident } => content.accidents[accident]
+        TaskKind::Spot { accident } if using => content.accidents[accident]
             .rest
             .as_ref()
             .is_some_and(|r| r.gain_per_minute[n] > 0.0),
+        TaskKind::Cook { recipe, .. } => content.recipes[recipe].effects[n] > 0.0,
+        TaskKind::Eat { .. } => crate::cooking::eating(sim, items).is_some_and(|r| content.recipes[r].effects[n] > 0.0),
         _ => false,
     }
 }
@@ -3120,14 +3312,20 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
     }
 }
 
+/// Stops what they're doing: the object they used (or cooked at, sat at to eat, washed up at)
+/// is free again, and they stand up in front of it. What they carry is put down after the step
+/// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
-    if let Some(act) = sim.current.take()
-        && let TaskKind::Use { object, .. } = act.task.kind
-    {
-        let obj = &mut objects[object as usize];
-        obj.release(sim.id);
+    let held = sim.current.take().and_then(|act| match act.task.kind {
+        TaskKind::Use { object, .. } => Some(object),
+        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
+        TaskKind::Eat { seat, .. } => seat,
+        _ => None,
+    });
+    if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
+        objects[o].release(sim.id);
         if sim.pose != Pose::Stand {
-            let (fx, fz) = sim.seated_from.unwrap_or_else(|| obj.front_tile(content));
+            let (fx, fz) = sim.seated_from.unwrap_or_else(|| objects[o].front_tile(content));
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
     }

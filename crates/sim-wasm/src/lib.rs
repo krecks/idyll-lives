@@ -109,6 +109,16 @@ impl Game {
         self.world.set_view(None);
     }
 
+    /// Food and dishes on tables, counters and floors (JSON; see `sim_core::view::items_json`).
+    pub fn items(&self) -> String {
+        view::items_json(&self.world)
+    }
+
+    /// Bumped whenever food or dishes change (also in the snapshot header, `itemsVersion`).
+    pub fn items_version(&self) -> u32 {
+        self.world.items.version
+    }
+
     /// Changes whenever the lot (walls, floors, fences...) does; see `World::lot_version`.
     pub fn lot_version(&self) -> u32 {
         self.world.lot_version()

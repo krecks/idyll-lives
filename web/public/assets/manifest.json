@@ -6,6 +6,7 @@
     "catalog/manifest.json",
     "community/manifest.json",
     "catalog2/manifest.json",
+    "items/manifest.json",
     "packs/foodie/manifest.json",
     "packs/bookworm/manifest.json",
     "packs/couchPotato/manifest.json",

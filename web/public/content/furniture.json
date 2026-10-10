@@ -147,6 +147,10 @@
       "id": "fridgeMini",
       "name": "Mini fridge",
       "model": "model.fridgeMini",
+      "stations": [
+        "ingredients"
+      ],
+      "stores": true,
       "footprint": [
         1,
         1
@@ -171,10 +175,9 @@
         {
           "id": "meal",
           "label": "Make a simple meal",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.75,
             "fun": 0.05
           },
           "tags": [
@@ -191,6 +194,10 @@
       "id": "fridgeBuiltIn",
       "name": "Built-in fridge",
       "model": "model.fridgeBuiltIn",
+      "stations": [
+        "ingredients"
+      ],
+      "stores": true,
       "footprint": [
         1,
         1
@@ -215,10 +222,9 @@
         {
           "id": "meal",
           "label": "Make a meal",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.9,
             "fun": 0.05
           },
           "tags": [
@@ -232,11 +238,10 @@
         {
           "id": "gourmet",
           "label": "Cook a gourmet meal",
+          "recipe": "gourmet",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 0.95,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -268,6 +273,10 @@
       "id": "stoveElectric",
       "name": "Electric cooker",
       "model": "model.stoveElectric",
+      "stations": [
+        "stove",
+        "oven"
+      ],
       "footprint": [
         1,
         1
@@ -280,10 +289,9 @@
         {
           "id": "cook",
           "label": "Cook dinner",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 45,
           "effects": {
-            "hunger": 0.9,
             "fun": 0.05
           },
           "tags": [
@@ -298,11 +306,10 @@
         {
           "id": "bake",
           "label": "Bake treats",
+          "recipe": "bakedTreats",
           "anim": "cook",
-          "minutes": 60,
           "effects": {
-            "hunger": 0.5,
-            "fun": 0.25
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -321,6 +328,10 @@
       "id": "stoveGas",
       "name": "Gas range",
       "model": "model.stoveGas",
+      "stations": [
+        "stove",
+        "oven"
+      ],
       "footprint": [
         1,
         1
@@ -333,10 +344,9 @@
         {
           "id": "cook",
           "label": "Cook dinner",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 45,
           "effects": {
-            "hunger": 0.95,
             "fun": 0.05
           },
           "tags": [
@@ -351,11 +361,10 @@
         {
           "id": "gourmet",
           "label": "Cook a gourmet meal",
+          "recipe": "gourmet",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 1.0,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -373,11 +382,10 @@
         {
           "id": "bake",
           "label": "Bake treats",
+          "recipe": "bakedTreats",
           "anim": "cook",
-          "minutes": 60,
           "effects": {
-            "hunger": 0.5,
-            "fun": 0.25
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -396,6 +404,9 @@
       "id": "microwave",
       "name": "Microwave counter",
       "model": "model.microwave",
+      "stations": [
+        "microwave"
+      ],
       "footprint": [
         1,
         1
@@ -453,6 +464,9 @@
       "id": "breakfastCounter",
       "name": "Breakfast counter",
       "model": "model.breakfastCounter",
+      "stations": [
+        "prep"
+      ],
       "footprint": [
         1,
         1
@@ -505,6 +519,9 @@
       "id": "dishwasher",
       "name": "Dishwasher",
       "model": "model.dishwasher",
+      "stations": [
+        "dishes"
+      ],
       "footprint": [
         1,
         1
@@ -526,7 +543,8 @@
           "tags": [
             "chores",
             "cleaning"
-          ]
+          ],
+          "autonomous": false
         }
       ]
     },
@@ -534,6 +552,9 @@
       "id": "counter",
       "name": "Kitchen counter",
       "model": "model.counter",
+      "stations": [
+        "prep"
+      ],
       "footprint": [
         1,
         1
@@ -558,11 +579,8 @@
         {
           "id": "sandwich",
           "label": "Make a sandwich",
+          "recipe": "sandwich",
           "anim": "cook",
-          "minutes": 15,
-          "effects": {
-            "hunger": 0.4
-          },
           "tags": [
             "food"
           ]
@@ -573,6 +591,9 @@
       "id": "counterCorner",
       "name": "Corner counter",
       "model": "model.counterCorner",
+      "stations": [
+        "prep"
+      ],
       "footprint": [
         1,
         1
@@ -589,11 +610,8 @@
         {
           "id": "sandwich",
           "label": "Make a sandwich",
+          "recipe": "sandwich",
           "anim": "cook",
-          "minutes": 15,
-          "effects": {
-            "hunger": 0.4
-          },
           "tags": [
             "food"
           ]
@@ -604,6 +622,9 @@
       "id": "farmhouseSink",
       "name": "Farmhouse sink",
       "model": "model.farmhouseSink",
+      "stations": [
+        "dishes"
+      ],
       "footprint": [
         1,
         1
@@ -636,7 +657,8 @@
           "tags": [
             "chores",
             "cleaning"
-          ]
+          ],
+          "autonomous": false
         }
       ]
     },
@@ -644,6 +666,9 @@
       "id": "pantry",
       "name": "Pantry cupboard",
       "model": "model.pantry",
+      "stations": [
+        "ingredients"
+      ],
       "footprint": [
         1,
         1
@@ -703,6 +728,9 @@
       "id": "kitchenIsland",
       "name": "Kitchen island",
       "model": "model.kitchenIsland",
+      "stations": [
+        "prep"
+      ],
       "footprint": [
         2,
         1
@@ -728,11 +756,8 @@
         {
           "id": "sandwich",
           "label": "Make a sandwich",
+          "recipe": "sandwich",
           "anim": "cook",
-          "minutes": 15,
-          "effects": {
-            "hunger": 0.4
-          },
           "tags": [
             "food"
           ]
@@ -4120,6 +4145,9 @@
       "id": "grill",
       "name": "Charcoal grill",
       "model": "model.grill",
+      "stations": [
+        "grill"
+      ],
       "footprint": [
         1,
         1
@@ -4133,11 +4161,10 @@
         {
           "id": "cook",
           "label": "Grill dinner",
+          "recipe": "bbq",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.85,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -4155,6 +4182,22 @@
       "id": "grillStation",
       "name": "Gas grill station",
       "model": "model.grillStation",
+      "stations": [
+        "grill",
+        "prep"
+      ],
+      "surface": {
+        "height": 0.9,
+        "kind": "counter",
+        "size": [
+          0.7,
+          0.55
+        ],
+        "at": [
+          0.55,
+          0.0
+        ]
+      },
       "footprint": [
         2,
         1
@@ -4168,11 +4211,10 @@
         {
           "id": "cook",
           "label": "Grill dinner",
+          "recipe": "bbq",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.9,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -4187,11 +4229,10 @@
         {
           "id": "feast",
           "label": "Grill a barbecue feast",
+          "recipe": "bbqFeast",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 1.0,
-            "fun": 0.2
+            "fun": 0.1
           },
           "tags": [
             "food",

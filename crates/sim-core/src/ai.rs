@@ -68,6 +68,7 @@ mod tests {
             dirt: 0.0,
             baby: false,
             needs_table: false,
+            recipe: None,
             homework: 0.0,
             care: [0.0; MAX_NEEDS],
         }

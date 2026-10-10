@@ -68,6 +68,7 @@ import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, resetAddit
 import { textureWithFallback, type MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
+import { buildModel, type ModelTemplate } from './models';
 
 /** Rows in the pose texture (= Sim capacity). */
 export const MAX_CHARACTERS = 64;
@@ -321,7 +322,20 @@ const ACTIONS: Record<string, ActionAnim> = {
   idle: { stand: ['idle'], hands: HANDS.relaxed },
   // A visitor at the front door: a knock, then waiting.
   knock: { stand: ['interact', 'idle'], hands: HANDS.relaxed },
+  // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
+  // stirring the pan, turning things on the grill, putting a dish down.
+  fetch: { stand: ['interact', 'pickUp', 'idle'], hands: HANDS.hold },
+  chop: { stand: ['spell', 'interact', 'spell'], hands: HANDS.grip },
+  stir: { stand: ['spell', 'idle', 'spell', 'interact'], hands: HANDS.hold },
+  flip: { stand: ['interact', 'spell', 'pickUp'], hands: HANDS.grip },
+  serve: { stand: ['pickUp', 'idle'], hands: HANDS.hold },
 };
+
+/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). */
+const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood' };
+/** How far (m) below the hand a carried thing's base hangs, and how far ahead of the body. */
+const HOLD_DROP = 0.05;
+const HOLD_AHEAD = 0.12;
 /** Clips that may be missing from older asset builds, and their stand-ins. */
 const CLIP_FALLBACK: Record<string, string> = {
   spell: 'interact',
@@ -666,6 +680,14 @@ export class Characters {
   private readonly faceTmp: Face = { ...NEUTRAL };
   /** Gaze yaw / pitch (head-relative) from `gazeAt`. */
   private readonly gaze = new Float32Array(2);
+  /**
+   * Things Sims carry (content `items`, by model) and tools on the station they cook at (`tool.*`):
+   * one template per model, one thin instance (matrix) per Sim row; null while loading.
+   */
+  private readonly props = new Map<string, { meshes: Mesh[]; matrices: Float32Array } | null>();
+  /** Per Sim row: the model of what it carries and of the tool in front of it, as last drawn. */
+  private readonly heldProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  private readonly toolProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   /** Blankets: one quilt mesh per body, one thin instance (matrix) per Sim row. */
   private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array }>();
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
@@ -1194,6 +1216,96 @@ export class Characters {
     this.visible.fill(0);
     for (const p of this.meshes.values()) p.mesh.setEnabled(false);
     for (const b of this.blankets.values()) b.mesh.setEnabled(false);
+    for (let i = 0; i < MAX_CHARACTERS; i++) {
+      this.writeProp(this.heldProp, i, null);
+      this.writeProp(this.toolProp, i, null);
+    }
+  }
+
+  // --- carried things and tools ------------------------------------------------------------
+
+  /** A prop's template and matrices; starts loading it the first time (null until loaded). */
+  private prop(key: string): { meshes: Mesh[]; matrices: Float32Array } | null {
+    const known = this.props.get(key);
+    if (known !== undefined) return known;
+    this.props.set(key, null);
+    void buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { radius: 0.1 }).then((t: ModelTemplate) => {
+      const matrices = new Float32Array(MAX_CHARACTERS * 16);
+      for (const mesh of t.meshes) {
+        mesh.isPickable = false;
+        mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
+        mesh.alwaysSelectAsActiveMesh = true;
+      }
+      this.props.set(key, { meshes: t.meshes, matrices });
+    });
+    return null;
+  }
+
+  /** Sim row `i` draws prop `key` (null: none) in `slot`; the old one's matrix is cleared. */
+  private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
+    const old = slot[i];
+    if (old && old !== key) this.props.get(old)?.matrices.fill(0, i * 16, i * 16 + 16);
+    slot[i] = key;
+    return key ? (this.prop(key)?.matrices ?? null) : null;
+  }
+
+  /** Writes a level prop (turned to `yaw`) at a point into row `i` of `m`. */
+  private placeProp(m: Float32Array, i: number, x: number, y: number, z: number, yaw: number, scale: number): void {
+    const c = Math.cos(yaw) * scale;
+    const s = Math.sin(yaw) * scale;
+    const o = i * 16;
+    m.fill(0, o, o + 16);
+    m[o] = c;
+    m[o + 2] = -s;
+    m[o + 5] = scale;
+    m[o + 8] = s;
+    m[o + 10] = c;
+    m[o + 12] = x;
+    m[o + 13] = y;
+    m[o + 14] = z;
+    m[o + 15] = 1;
+  }
+
+  /**
+   * What Sim row `i` carries (snapshot `held`: an index into `items` + 1): in the right hand, or
+   * held in front between both hands (content `hold`), level and facing the way they face.
+   */
+  private writeCarried(rig: SimRig, i: number, held: number, items: readonly string[] | undefined): void {
+    const def = held > 0 && items ? this.content?.item(items[held - 1] ?? '') : undefined;
+    const key = def ? (def.model ?? `item.${def.id}`) : null;
+    const m = this.writeProp(this.heldProp, i, key);
+    if (!m || !def || !this.set) return;
+    const B = this.set.bone;
+    const t = this.scratch.worldT;
+    const r = (B.hand_r ?? B.lowerarm_r) * 3;
+    const l = (B.hand_l ?? B.lowerarm_l) * 3;
+    let [x, y, z] = [t[r], t[r + 1], t[r + 2]];
+    if (def.hold === 'both') {
+      x = (x + t[l]) / 2 + Math.sin(rig.yaw) * HOLD_AHEAD * 0.5;
+      y = (y + t[l + 1]) / 2;
+      z = (z + t[l + 2]) / 2 + Math.cos(rig.yaw) * HOLD_AHEAD * 0.5;
+    } else {
+      x += Math.sin(rig.yaw) * HOLD_AHEAD * 0.3;
+      z += Math.cos(rig.yaw) * HOLD_AHEAD * 0.3;
+    }
+    this.placeProp(m, i, x, y - HOLD_DROP * rig.scale, z, rig.yaw, Math.min(1, rig.scale));
+  }
+
+  /**
+   * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
+   * action tag): on its top, a little towards the cook.
+   */
+  private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
+    const key = station ? (STATION_PROPS[tag] ?? null) : null;
+    const m = this.writeProp(this.toolProp, i, key);
+    if (!m || !station) return;
+    const def = this.content?.object(station.def);
+    const top = def?.surface?.height ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
+    const dx = rig.x - station.cx;
+    const dz = rig.z - station.cz;
+    const d = Math.hypot(dx, dz) || 1;
+    const toward = Math.min(0.15, d * 0.3);
+    this.placeProp(m, i, station.cx + (dx / d) * toward, rig.floorY + top + 0.005, station.cz + (dz / d) * toward, rig.yaw, 1);
   }
 
   /** Head-top position of Sim `i` (false if not drawn). */
@@ -1264,6 +1376,8 @@ export class Characters {
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
         if (rig) rig.visible = false;
+        this.writeProp(this.heldProp, i, null);
+        this.writeProp(this.toolProp, i, null);
         continue;
       }
       const dir = (rig.dir = this.directions[i] ?? null);
@@ -1403,6 +1517,8 @@ export class Characters {
       pl.head = rig.head;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       this.writeBlanket(rig, i, pose, dt);
+      this.writeCarried(rig, i, k.held !== undefined ? curr[o + k.held] | 0 : 0, layout.items);
+      this.writeTool(rig, i, moving ? '' : tag, useObj);
 
       // Head top (speech bubbles, selection marker): a little above the head joint.
       const hs = rig.scale * rig.head;
@@ -1434,6 +1550,9 @@ export class Characters {
     for (const b of this.blankets.values()) {
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
+    }
+    for (const p of this.props.values()) {
+      if (p) for (const mesh of p.meshes) mesh.thinInstanceBufferUpdated('matrix');
     }
     this.texture.update(this.data);
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;

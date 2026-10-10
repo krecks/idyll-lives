@@ -3,7 +3,7 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
+import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
 import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
 
 /** What the renderer needs each frame. Reused; do not keep references across frames. */
@@ -53,6 +53,9 @@ export class SimBridge {
   /** The worker's latest report on how it keeps up (null until the first, after a second). */
   threadStats: SimThreadStats | null = null;
   private worldListeners: Listener<WorldStructure>[] = [];
+  /** Food and dishes, as last sent. */
+  private items: ItemPlacement[] | null = null;
+  private itemListeners: Listener<ItemPlacement[]>[] = [];
   private uiListeners: Listener<UiUpdate>[] = [];
   private errorListeners: Listener<string>[] = [];
   private nextRequest = 1;
@@ -144,6 +147,17 @@ export class SimBridge {
     if (this.world) fn(this.world);
   }
 
+  /** Food and dishes whenever they change; the latest are replayed to late subscribers. */
+  onItems(fn: Listener<ItemPlacement[]>): void {
+    this.itemListeners.push(fn);
+    if (this.items) fn(this.items);
+  }
+
+  /** The item `id` as last sent. */
+  item(id: number): ItemPlacement | undefined {
+    return this.items?.find((it) => it.id === id);
+  }
+
   /** UI updates carry changes only; a late subscriber gets a full one (`resyncUi`). */
   onUi(fn: Listener<UiUpdate>): void {
     this.uiListeners.push(fn);
@@ -230,6 +244,10 @@ export class SimBridge {
         for (const fn of this.worldListeners) fn(world);
         break;
       }
+      case 'items':
+        this.items = msg.items;
+        for (const fn of this.itemListeners) fn(msg.items);
+        break;
       case 'ui':
         this.uiSeen = true;
         for (const fn of this.uiListeners) fn(msg.ui);

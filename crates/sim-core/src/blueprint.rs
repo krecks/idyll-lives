@@ -605,6 +605,9 @@ impl World {
                 placed.offset = o.offset;
                 placed.wear = o.wear;
             }
+            // Food and dishes in the room move with it.
+            let room: Vec<(i32, i32)> = tiles.iter().copied().collect();
+            self.shift_items(&room, dx, dz);
             if unreachable(self) > shut_in {
                 return Err(Error::new("that would shut someone or something in"));
             }

@@ -506,3 +506,42 @@ fn surfaces_seats_and_tabletop_things_are_consistent() {
         }
     }
 }
+
+#[test]
+fn recipes_are_cookable_and_every_home_can_make_a_meal() {
+    let content = Content::from_json(&content()).unwrap();
+    // Every step names stations some object is, and what it leaves resolves (content
+    // validates the names); every dish has servings to take and something left to wash.
+    let all = content.objects.iter().fold(0, |m, o| m | o.stations);
+    for r in &content.recipes {
+        assert!(r.possible(all), "nothing in the catalogue can make {}", r.id);
+        assert!(r.steps.iter().all(|s| s.anim.is_some()), "{}: a step without an animation", r.id);
+        let dish = &content.items[r.item];
+        if !r.eat_now {
+            assert!(dish.empty_as.is_some_and(|e| content.items[e].dirty), "{}: the empty {} isn't washed up", r.id, dish.id);
+        }
+        let plate = dish.serving.unwrap_or(r.item);
+        assert!(content.items[plate].empty_as.is_some_and(|e| content.items[e].dirty), "{}: no dirty plate", r.id);
+    }
+    // Interactions with a recipe keep their tags (kitchen rooms, plans and traits go by them).
+    for o in &content.objects {
+        for i in o.interactions.iter().filter(|i| i.recipe.is_some()) {
+            assert!(i.tags != 0, "{}.{} has no tags", o.id, i.id);
+        }
+    }
+    // The town's houses and the starter lot can make a meal (it needs only the fridge).
+    let meal = &content.recipes[content.recipe_index("meal").unwrap()];
+    let houses: serde_json::Value =
+        serde_json::from_str(include_str!("../../../web/public/content/houses.json")).unwrap();
+    let defs = |list: &serde_json::Value| -> Vec<String> {
+        list.as_array().unwrap().iter().map(|o| o["def"].as_str().unwrap().to_owned()).collect()
+    };
+    let mut homes: Vec<(String, Vec<String>)> =
+        houses["houses"].as_array().unwrap().iter().map(|h| (h["id"].to_string(), defs(&h["objects"]))).collect();
+    let starter: serde_json::Value = serde_json::from_str(STARTER_LOT).unwrap();
+    homes.push(("starter".into(), defs(&starter["objects"])));
+    for (name, defs) in homes {
+        let mask = defs.iter().filter_map(|d| content.object_index(d)).fold(0, |m, d| m | content.objects[d].stations);
+        assert!(meal.possible(mask), "{name} can't make a meal");
+    }
+}

@@ -161,7 +161,7 @@ pub(crate) fn update(w: &mut World) {
             },
             Phase::Waiting { ticks } => State::Waiting(*ticks),
             Phase::Conversing { elapsed, success } => State::Conversing(*elapsed, *success),
-            Phase::Using { .. } | Phase::Knocking { .. } => continue,
+            Phase::Using { .. } | Phase::Knocking { .. } | Phase::Queued { .. } => continue,
         };
         let s = &content.socials[social];
         let gap = dist(sims[i].pos, sims[t].pos);

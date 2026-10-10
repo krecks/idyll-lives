@@ -145,11 +145,8 @@
         {
           "id": "sandwich",
           "label": "Make a sandwich",
+          "recipe": "sandwich",
           "anim": "cook",
-          "minutes": 15,
-          "effects": {
-            "hunger": 0.4
-          },
           "tags": [
             "food"
           ]
@@ -188,11 +185,8 @@
         {
           "id": "sandwich",
           "label": "Make a sandwich",
+          "recipe": "sandwich",
           "anim": "cook",
-          "minutes": 15,
-          "effects": {
-            "hunger": 0.4
-          },
           "tags": [
             "food"
           ]
@@ -239,7 +233,8 @@
           "tags": [
             "chores",
             "cleaning"
-          ]
+          ],
+          "autonomous": false
         }
       ]
     },
@@ -395,11 +390,10 @@
         {
           "id": "roast",
           "label": "Roast dinner",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 60,
           "effects": {
-            "hunger": 0.9,
-            "fun": 0.1
+            "fun": 0.05
           },
           "tags": [
             "food",
@@ -413,11 +407,10 @@
         {
           "id": "bake",
           "label": "Bake treats",
+          "recipe": "bakedTreats",
           "anim": "cook",
-          "minutes": 60,
           "effects": {
-            "hunger": 0.5,
-            "fun": 0.25
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -453,10 +446,9 @@
         {
           "id": "cook",
           "label": "Cook dinner",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 45,
           "effects": {
-            "hunger": 0.9,
             "fun": 0.05
           },
           "tags": [
@@ -471,11 +463,10 @@
         {
           "id": "gourmet",
           "label": "Cook a gourmet meal",
+          "recipe": "gourmet",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 1.0,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -493,11 +484,10 @@
         {
           "id": "bake",
           "label": "Bake treats",
+          "recipe": "bakedTreats",
           "anim": "cook",
-          "minutes": 60,
           "effects": {
-            "hunger": 0.5,
-            "fun": 0.25
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -543,10 +533,9 @@
         {
           "id": "cook",
           "label": "Cook dinner",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 45,
           "effects": {
-            "hunger": 0.9,
             "fun": 0.05
           },
           "tags": [
@@ -564,6 +553,7 @@
       "id": "fridgeFrenchDoor",
       "name": "French-door fridge",
       "model": "model.fridgeFrenchDoor",
+      "stores": true,
       "footprint": [
         1,
         1
@@ -591,10 +581,9 @@
         {
           "id": "meal",
           "label": "Make a meal",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.9,
             "fun": 0.05
           },
           "tags": [
@@ -608,11 +597,10 @@
         {
           "id": "gourmet",
           "label": "Cook a gourmet meal",
+          "recipe": "gourmet",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 0.95,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -644,6 +632,7 @@
       "id": "fridgeRetro",
       "name": "Retro fridge",
       "model": "model.fridgeRetro",
+      "stores": true,
       "footprint": [
         1,
         1
@@ -672,10 +661,9 @@
         {
           "id": "meal",
           "label": "Make a meal",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.85,
             "fun": 0.05
           },
           "tags": [
@@ -781,7 +769,8 @@
           "tags": [
             "chores",
             "cleaning"
-          ]
+          ],
+          "autonomous": false
         }
       ]
     },

@@ -51,7 +51,7 @@ import {
   type AbstractEngine,
 } from './core';
 import type { FrameState } from '../../core/bridge';
-import { groundDepth, objectCentre, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type ItemPlacement, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -82,6 +82,7 @@ import { MaterialLibrary } from './materials';
 import { buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
+import { ItemLayer } from './items';
 import { installNature, Landscape, natureDecor, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
@@ -257,6 +258,8 @@ export class BabylonRenderer implements Renderer {
   private cutLook = -1;
   private placed: PlacedObject[] = [];
   private characters!: Characters;
+  /** Food and dishes (`items.ts`). */
+  private items!: ItemLayer;
   private cursor!: Mesh;
   private selectedSim: number | null = null;
   private cameraPlaced = false;
@@ -418,6 +421,8 @@ export class BabylonRenderer implements Renderer {
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
+    this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
+    this.items.onChange = () => this.resetSnapshot();
     this.applyLook();
     window.addEventListener('resize', this.onResize);
   }
@@ -537,6 +542,7 @@ export class BabylonRenderer implements Renderer {
     for (const mesh of [...this.worldMeshes, ...templates]) mesh.freezeWorldMatrix();
     this.applyWallMode();
     this.applyStoreys();
+    this.showItems();
     this.lastLightMinute = -1;
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0)).map((o) => this.objectModel(o));
@@ -596,6 +602,15 @@ export class BabylonRenderer implements Renderer {
   private readonly pickOrigin = new Vector3();
   private readonly pickDir = new Vector3();
 
+  setItems(items: readonly ItemPlacement[]): void {
+    this.items.set(items);
+  }
+
+  /** Food and dishes for the lot and storeys in view. */
+  private showItems(): void {
+    this.items.show({ storey: this.storey, depth: this.storeys.depth, storeyHeight: WALL_HEIGHT, inView: (x, z) => this.inView(x, z, 0) });
+  }
+
   pick(x: number, y: number): PickResult {
     const ray = this.scene.createPickingRay(x, y, null, this.camera);
     const o = ray.origin;
@@ -619,7 +634,17 @@ export class BabylonRenderer implements Renderer {
         objectId = p.id;
       }
     }
-    return { ground, objectId };
+    // A plate on a table is picked before the table.
+    let itemId: number | null = null;
+    let nearestItem = Infinity;
+    for (const p of this.items.placed) {
+      const t = rayBox(o, d, p.minX, p.y0, p.minZ, p.maxX, p.y0 + p.height, p.maxZ);
+      if (t < nearestItem && t <= nearest + 0.3) {
+        nearestItem = t;
+        itemId = p.id;
+      }
+    }
+    return { ground, objectId, itemId };
   }
 
   pickPlane(height: number): { x: number; z: number } | null {
@@ -1333,6 +1358,7 @@ export class BabylonRenderer implements Renderer {
     this.wallItemsHidden.clear();
     this.held = null;
     this.characters?.clear();
+    this.items?.clear();
     this.simCount = 0;
     this.selectedSim = null;
     this.onFrame = null;

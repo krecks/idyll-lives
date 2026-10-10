@@ -98,6 +98,8 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `bunk` | Bunk beds (2 `slots`): both sleepers lie in the middle of the bed's width, the second on the upper bunk (heights per object in `render/babylon/characters.ts`, `BUNKS`). |
 | `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width. Default 1. |
 | `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55}` makes it a light at night (reach in metres, relative brightness, bulb height). |
+| `stations` | Cooking stations it is (see [Cooking](#cooking)): `["ingredients"]` for a fridge or pantry, `["prep"]` for a counter or island, `["stove", "oven"]` for a cooker, `["grill"]`, `["microwave"]`, `["dishes"]` for a sink or dishwasher. Recipe steps happen at stations. |
+| `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
 | `freeRotation` | `true` lets the player turn it to any angle in 15° steps and stand it anywhere on its tile (quarter tiles, or to the centimetre with Shift); both only for looks. Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
 | `decor` | Decor points it gives the room it stands in (see [Rooms](#rooms-wear-and-accidents)). Default: by category, `roomRules.decorByCategory`. |
 | `wearPerUse` | Wear added by each completed use; at 1 it breaks. Default: by category, `objectRules.wear` (nothing wears out that nobody uses). |
@@ -135,6 +137,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `pose` | `stand` (default), `sit` or `lie`. |
 | `autonomous` | `false` = only when the player asks. Default `true`. |
 | `needsTable` | Only offered while the seat faces a table it tucks under (its `seatAt`): dining at a table. A chair alone offers only its other interactions; the player's order fails with "needs a table". Needs a `seatAt`. Default `false`. |
+| `recipe` | Starts a recipe (`recipes` id; see [Cooking](#cooking)) instead of being used here alone: the resident goes round the recipe's stations (fridge, counter, stove), from whichever one they clicked, and serves a dish. `minutes` isn't needed (the steps take theirs); `effects` are then only what cooking does for the cook (`{"fun": 0.05}`), the meal's own are the recipe's. Keep the `tags` (`food`, `cooking`): kitchens, plans and traits go by them. `cost` comes from the recipe. |
 | `cost` | Dollars charged from the resident's household each time a resident **starts** using it (on arrival). Default 0. Only for real consumables bought from outside (takeout, deliveries, a rented movie, donations); owning and running an item costs money through the weekly bills instead. Residents never choose something their household can't afford, and the player's order fails with "not enough money". Guests pay from their own household. |
 | `skill` | Skill id that makes this interaction better: need gains and skill gains are multiplied by `1 + skillRules.effectPerLevel × level` (0.05 per whole level: level 4 = ×1.2, level 8 = ×1.4). Autonomy knows this, so good cooks prefer cooking. |
 | `feeling` | Feeling id granted when the interaction finishes after at least half its `minutes` (not when cancelled early). |
@@ -266,6 +269,11 @@ voices pick their lines by them.
 | `phone` | calls and video calls, radio chats |
 | `meditate` | breathing, counting to ten |
 | `idle` | standing at an object with nothing better to show (donation jar) |
+| `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
+| `chop` | preparing food on a counter (a chopping board is drawn on its top) |
+| `stir` | cooking on the stove or baking (a pan is drawn on it) |
+| `flip` | grilling (food is drawn on the grill) |
+| `serve` | putting a dish down |
 
 **Adding an animation:** reuse a tag whenever one is close enough; the characters need a
 clip for every tag. If you must add one, append it to a top-level `"animations"` list in
@@ -545,6 +553,73 @@ in the journal. `anotherRoom` (a room kind id): residents who badly need it and 
 it taken, on two different days within a week, wish for another room of that kind (the base
 game's `wetSelf`: a second bathroom). `crowdedGraceMinutes` also lets it happen when the home has the essential but it's
 taken. At most 8.
+
+## Cooking
+
+Cooking makes food. A recipe (top-level `recipes`) is a chain of steps, each at a kind of
+**station**: the fridge for ingredients, a counter to prep on, the stove to cook. Clicking the
+stove's "Cook dinner" sends the resident to the fridge first, then a counter, then back to that
+stove; between steps they carry what the step leaves (`holds`: the ingredients, a prepped bowl).
+The last step serves the dish (an item with servings) on a free surface near the cook, outdoors
+for outdoor recipes, else in the fridge: one serving for each of the household at home, within
+the recipe's `servings`. The ingredients are paid at the first step (`costPerServing` × servings).
+Housemates are told dinner's ready (a thought bubble); whoever's hungry takes a serving, sits
+down with it (a chair at a table, then a table with seats of its own, then any seat in
+`cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table. Someone
+washes up later at a sink or dishwasher (a chore, like tidying up), carrying up to
+`carryDishes` at a time. Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
+dirty or spoilt things slowly make their room dirty. The player can order any of it: clicking a
+dish offers **Eat** and **Clear away**.
+
+```json
+"recipes": [{
+  "id": "meal", "label": "Make a meal", "item": "mealPot", "servings": [1, 4], "costPerServing": 3,
+  "effects": { "hunger": 1.0 },
+  "steps": [
+    { "label": "Get ingredients", "at": ["ingredients"], "minutes": 5, "anim": "fetch", "holds": "ingredients" },
+    { "label": "Prep", "at": ["prep"], "minutes": 10, "anim": "chop", "optional": true, "holds": "prepBowl" },
+    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir", "optional": true }
+  ]
+}]
+```
+
+| Recipe field | Meaning |
+|---|---|
+| `item` | The dish it serves (an `items` id with a `serving`, or a plate itself for `eatNow`). |
+| `servings` | `[fewest, most]` servings it makes. Default `[1, 1]`. |
+| `costPerServing` | Dollars per serving, paid when the cook takes the ingredients. |
+| `effects` | What eating one serving gives (times the dish's quality: the cook's skill in the interaction's `skill`, the station's quality, and a little less per step done without its station). |
+| `eatFeeling` | Feeling for eating a serving of good quality (1 or better). |
+| `eatMinutes` | How long eating a serving takes (default `cooking.eatMinutes`). |
+| `eatNow` | The cook eats it at once (a sandwich): no dish is served. |
+| `outdoor` | A barbecue: outdoor stations first, served on an outdoor table. |
+| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the step before) and `holds` (an item carried away from it). |
+
+Residents choose a recipe only if their home has a station for every step that isn't
+optional; a long recipe tempts them less, a hungry family more, and food already made hardly
+at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
+keep the prep and cooking steps of everyday recipes optional. A station that's busy is waited
+for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
+(a snack, toast, a coffee, reheating) stays a plain interaction.
+
+**`items`**: `{ "id": "mealPot", "label": "Home-cooked meal", "model": "item.mealPot", "hold": "both", "serving": "mealPlate", "emptyAs": "potDirty", "radius": 0.16 }`.
+`label` names it ("Eat Home-cooked meal"); `model` is its asset key; `hold` is `hand` or
+`both`; taking a serving gives a `serving` (a plate) and an empty dish becomes `emptyAs`;
+`dirty` things are washed up; `radius` is the disc it takes on a surface. Ingredients and bowls
+are only carried (they're used up). Items aren't objects: they belong to a household, keep
+their place on the surface they stand on (moving the table carries them, selling it throws
+them away) and are saved with the game.
+
+**`cooking`** rules (all optional): `stations` (the station kinds, at most 16; default
+`ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`), `spoilHours` 8,
+`storedSpoilHours` 72, `eatMinutes` 25, `dishesMinutes` 5 (per thing washed), `carryDishes` 3,
+`leftoverPreference` 1.3, `feedFamily` 0.15 (extra pull per hungry housemate), `hungryBelow` 0.5,
+`invitedBoost` 2.5 and `inviteMinutes` 60 (dinner's ready), `stationWaitMinutes` 10,
+`dirtyDirtPerHour` 0.02, `skipPenalty` 0.05, `seatTags` (`lounge`, `food`) and `seatAvoid`
+(`spa`, `hygiene`, `bathroom`), `defaultSurfaceHeight` 0.9 (where tools are drawn on a station
+without a `surface`), `serveRange` 6 (m), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
+`dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6.
+Packs merge `cooking` key by key and append to `items` and `recipes`.
 
 ## Balance guidance
 

@@ -94,6 +94,11 @@ pub struct Interaction {
     pub needs_table: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
+    /// Starts this recipe (index into `Content::recipes`): the resident goes round the
+    /// recipe's stations (see `cooking.rs`) instead of using this object on its own. Its
+    /// `total_gain` is then what a serving gives plus its own effects (what cooking gives the
+    /// cook, spread over `minutes`, the whole recipe's time).
+    pub recipe: Option<usize>,
     /// Needs this fills for the baby lying in the object, over the whole interaction (feeding,
     /// changing); only with a baby there, and only grown-ups do it.
     pub care: [f32; MAX_NEEDS],
@@ -169,6 +174,12 @@ pub struct ObjectDef {
     /// Seats: the kinds of surface it tucks under (content `seatAt`, a mask of
     /// `SurfaceKind::bit`). Facing one of those it is a seat at that table.
     pub seat_at: u8,
+    /// The cooking stations it is (content `stations`, a mask of `cooking.stations`): the
+    /// fridge for ingredients, a counter to prep on, a stove, a sink to wash up (`cooking.rs`).
+    pub stations: crate::cooking::StationMask,
+    /// Keeps leftovers (content `stores`: fridges); food served where there's no free
+    /// surface goes in.
+    pub stores: bool,
 }
 
 /// Radius of a thing on the `Surface` layer when content gives none (m).
@@ -1097,6 +1108,11 @@ pub struct Content {
     pub activities: Vec<crate::planner::ActivityDef>,
     pub planner: crate::planner::PlannerRules,
     pub goals: Vec<crate::planner::GoalDef>,
+    /// Stations, eating and washing up (content `cooking`), the things residents carry and
+    /// put down (`items`) and what they cook (`recipes`); see `cooking.rs`.
+    pub cooking: crate::cooking::CookingRules,
+    pub items: Vec<crate::cooking::ItemDef>,
+    pub recipes: Vec<crate::cooking::RecipeDef>,
     object_index: HashMap<String, usize>,
 }
 
@@ -1186,6 +1202,12 @@ struct ContentFile {
     planner: crate::planner::PlannerRaw,
     #[serde(default)]
     goals: Vec<crate::planner::GoalRaw>,
+    #[serde(default)]
+    cooking: crate::cooking::CookingRaw,
+    #[serde(default)]
+    items: Vec<crate::cooking::ItemRaw>,
+    #[serde(default)]
+    recipes: Vec<crate::cooking::RecipeRaw>,
 }
 
 #[derive(Deserialize)]
@@ -1736,6 +1758,11 @@ struct ObjectRaw {
     approach: Option<String>,
     #[serde(default, rename = "seatAt")]
     seat_at: Vec<String>,
+    /// Cooking stations (`cooking.stations`).
+    #[serde(default)]
+    stations: Vec<String>,
+    #[serde(default)]
+    stores: bool,
 }
 
 #[derive(Deserialize)]
@@ -1763,7 +1790,11 @@ fn one_slot() -> u8 {
 struct InteractionRaw {
     id: String,
     label: String,
+    /// Not needed with a `recipe` (its steps take their own time).
+    #[serde(default)]
     minutes: f32,
+    #[serde(default)]
+    recipe: Option<String>,
     /// Mess it leaves (default: by its tags, `roomRules.dirt`).
     #[serde(default)]
     dirt: Option<f32>,
@@ -2076,6 +2107,13 @@ impl Content {
             skills: &skill_index,
         };
 
+        let (cooking, items, recipes) = crate::cooking::parse(
+            &raw.cooking,
+            &raw.items,
+            &raw.recipes,
+            &crate::cooking::Lookups { needs: &need_index, tags: &tag_index, feelings: &feeling_index, animations: &animations },
+        )?;
+
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
         for obj in &raw.objects {
@@ -2088,12 +2126,27 @@ impl Content {
             let mut interactions = Vec::with_capacity(obj.interactions.len());
             for it in &obj.interactions {
                 let ctx = format!("{}.{}", obj.id, it.id);
-                if it.minutes <= 0.0 {
+                let recipe = it
+                    .recipe
+                    .as_deref()
+                    .map(|r| recipes.iter().position(|d| d.id == r).ok_or_else(|| Error::new(format!("{ctx}: unknown recipe '{r}'"))))
+                    .transpose()?;
+                // A recipe takes as long as its steps.
+                let minutes = recipe.map_or(it.minutes, |r| recipes[r].minutes);
+                if minutes <= 0.0 {
                     return Err(Error::new(format!("{ctx}: minutes must be > 0")));
                 }
-                let mut total_gain = [0.0; MAX_NEEDS];
+                let mut own_gain = [0.0; MAX_NEEDS];
                 for (need, gain) in &it.effects {
-                    total_gain[lookup(&need_index, need, &ctx, "need")?] = *gain;
+                    own_gain[lookup(&need_index, need, &ctx, "need")?] = *gain;
+                }
+                // With a recipe, residents weigh it by what a serving gives, plus what cooking
+                // itself does for the cook.
+                let mut total_gain = own_gain;
+                if let Some(r) = recipe {
+                    for (t, e) in total_gain.iter_mut().zip(recipes[r].effects) {
+                        *t += e;
+                    }
                 }
                 let mut care = [0.0; MAX_NEEDS];
                 for (need, gain) in &it.care {
@@ -2137,14 +2190,16 @@ impl Content {
                 interactions.push(Interaction {
                     id: it.id.clone(),
                     label: it.label.clone(),
-                    minutes: it.minutes,
+                    minutes,
                     total_gain,
-                    gain_per_minute: total_gain.map(|g| g / it.minutes),
+                    gain_per_minute: own_gain.map(|g| g / minutes),
                     pose: it.pose,
                     autonomous: it.autonomous,
                     tags: mask,
                     skill_gain: skill_array(&it.skills, &ctx)?,
-                    cost: it.cost,
+                    // A recipe costs its ingredients (for its fewest servings; it charges for as
+                    // many as it makes).
+                    cost: recipe.map_or(it.cost, |r| recipes[r].cost(recipes[r].servings[0])),
                     skill,
                     feeling,
                     feeling_min_skill: it.feeling_min_skill,
@@ -2154,6 +2209,7 @@ impl Content {
                     needs_table: it.needs_table,
                     homework: it.homework.max(0.0),
                     care,
+                    recipe,
                 });
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
@@ -2239,6 +2295,12 @@ impl Content {
                     obj.id
                 )));
             }
+            let mut stations = 0;
+            for name in &obj.stations {
+                stations |= cooking.station(name).ok_or_else(|| {
+                    Error::new(format!("object '{}': unknown station '{name}' (see cooking.stations)", obj.id))
+                })?;
+            }
             if obj.bunk && (obj.slots != 2 || layer.mounted()) {
                 return Err(Error::new(format!(
                     "object '{}': a bunk bed has 2 slots and stands on the floor",
@@ -2292,6 +2354,8 @@ impl Content {
                 radius: obj.radius.unwrap_or(DEFAULT_RADIUS).clamp(0.02, 0.45),
                 approach,
                 seat_at,
+                stations,
+                stores: obj.stores,
             });
         }
 
@@ -2912,12 +2976,23 @@ impl Content {
             activities,
             planner,
             goals,
+            cooking,
+            items,
+            recipes,
             object_index,
         })
     }
 
     pub fn object_index(&self, id: &str) -> Option<usize> {
         self.object_index.get(id).copied()
+    }
+
+    pub fn recipe_index(&self, id: &str) -> Option<usize> {
+        self.recipes.iter().position(|r| r.id == id)
+    }
+
+    pub fn item_index(&self, id: &str) -> Option<usize> {
+        self.items.iter().position(|i| i.id == id)
     }
 
     pub fn feeling_index(&self, id: &str) -> Option<usize> {

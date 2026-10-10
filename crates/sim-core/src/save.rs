@@ -25,7 +25,10 @@
 //! for visitors at the door (`turnedAway`, `nobodyHome`). Answering the door isn't saved: a
 //! visitor knocking when the game was saved knocks again; 17 = storeys (`storeys`; the lot's rows
 //! hold every storey, see `storeys.rs`; absent: one, and the lot grows to the content's count);
-//! 18 = objects placed off the middle of their tile (`offset`, centimetres; absent: centred).
+//! 18 = objects placed off the middle of their tile (`offset`, centimetres; absent: centred);
+//! 19 = cooking makes food: food and dishes (`items`, by content id, and `nextItem`), what
+//! residents carry (`sims[].held`) and recipes in progress (`Cook` tasks; eating and washing up
+//! aren't saved, they start again from what's there; absent: none of it).
 //! Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
@@ -34,6 +37,7 @@ use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::content::{Content, Pose};
+use crate::items::{Held, ItemAt, ItemInstance};
 use crate::life::{Job, Visit};
 use crate::lot::{DiagDir, Diagonal, Edge, EdgeLook, EdgeRef, Lot, SimSpawn};
 use crate::rng::Rng;
@@ -42,7 +46,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 18;
+pub const SAVE_VERSION: u32 = 19;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,6 +92,48 @@ pub struct SaveFile {
     /// People whose slot someone new took (events name them with `social::FORMER`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub former: Vec<crate::world::Former>,
+    /// Food and dishes (absent before v19: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub items: Vec<ItemSave>,
+    /// The next item's id (ids are never reused).
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub next_item: u32,
+}
+
+/// Food or a dish somewhere, by content id (unknown ones are dropped on load).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemSave {
+    pub id: u32,
+    pub def: String,
+    /// `surface`, `stored` or `floor` (see `items::ItemAt`).
+    pub at: String,
+    pub x: i32,
+    pub z: i32,
+    #[serde(default, skip_serializing_if = "crate::world::centred")]
+    pub offset: [i8; 2],
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub servings: u8,
+    pub quality: f32,
+    pub made_at: u64,
+    pub household: u32,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub spoiled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<String>,
+}
+
+/// What a resident carries, by content id.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeldSave {
+    pub def: String,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub servings: u8,
+    pub quality: f32,
+    pub made_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -231,6 +277,9 @@ pub struct SimSave {
     /// Routines and goals (absent before v9). A block in progress starts over on load.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planner: Option<PlannerSave>,
+    /// What they carry (absent before v19: nothing).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held: Option<HeldSave>,
 }
 
 /// A resident's planner, by content id.
@@ -410,6 +459,19 @@ pub enum TaskSave {
     Spot {
         accident: String,
     },
+    /// Cooking a recipe (by id), at step `step` (from 0), started from object `origin`;
+    /// `servings` paid for (0: not yet), `skipped` steps done without their station (v19).
+    Cook {
+        recipe: String,
+        step: u8,
+        #[serde(default)]
+        origin: Option<u32>,
+        #[serde(default)]
+        servings: u8,
+        #[serde(default)]
+        skipped: u8,
+        directed: bool,
+    },
     /// Old saves only (upgrades are instant now); dropped on load.
     Upgrade {
         #[allow(dead_code)]
@@ -489,7 +551,7 @@ impl World {
                 let mut pos = s.pos;
                 // A Sim on a bed or chair stands back up where they sat down from.
                 if let (Pose::Sit | Pose::Lie, Some(act)) = (s.pose, s.current())
-                    && let TaskKind::Use { object, .. } = act.task.kind
+                    && let TaskKind::Use { object, .. } | TaskKind::Eat { seat: Some(object), .. } = act.task.kind
                 {
                     let (fx, fz) = s.seated_from.unwrap_or_else(|| self.approach_tile(&self.objects[object as usize]));
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
@@ -554,6 +616,13 @@ impl World {
                         .map(|v| (v.plot, Some(minutes_left(v.until)))),
                     tasks,
                     planner: planner_save(content, &s.planner),
+                    held: s.held.map(|h| HeldSave {
+                        def: content.items[h.def].id.clone(),
+                        servings: h.servings,
+                        quality: h.quality,
+                        made_at: h.made_at,
+                        recipe: h.recipe.map(|r| content.recipes[r].id.clone()),
+                    }),
                 }
             })
             .collect();
@@ -652,6 +721,34 @@ impl World {
                 .collect(),
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
+            items: self
+                .items
+                .list
+                .iter()
+                .map(|it| {
+                    let (at, offset) = match it.at {
+                        ItemAt::Surface { offset, .. } => ("surface", offset),
+                        ItemAt::Stored { .. } => ("stored", [0, 0]),
+                        ItemAt::Floor { offset, .. } => ("floor", offset),
+                    };
+                    let (x, z) = it.at.tile();
+                    ItemSave {
+                        id: it.id,
+                        def: content.items[it.def].id.clone(),
+                        at: at.to_owned(),
+                        x,
+                        z,
+                        offset,
+                        servings: it.servings,
+                        quality: it.quality,
+                        made_at: it.made_at,
+                        household: it.household,
+                        spoiled: it.spoiled,
+                        recipe: it.recipe.map(|r| content.recipes[r].id.clone()),
+                    }
+                })
+                .collect(),
+            next_item: self.items.next_id,
         }
     }
 
@@ -858,6 +955,15 @@ impl World {
             if let Some(p) = &s.planner {
                 sim.planner = planner_load(content, p);
             }
+            sim.held = s.held.as_ref().and_then(|h| {
+                Some(Held {
+                    def: content.item_index(&h.def)?,
+                    servings: h.servings,
+                    quality: h.quality,
+                    made_at: h.made_at,
+                    recipe: h.recipe.as_deref().and_then(|r| content.recipe_index(r)),
+                })
+            });
             // At work, or a pupil at school.
             let pupil = content.life.stage_at(s.age.unwrap_or(30.0)).is_some_and(|st| st.school);
             sim.away_until = s.away_minutes.filter(|_| sim.job.is_some() || pupil).map(after);
@@ -950,6 +1056,26 @@ impl World {
                     }
                     // Upgrades used to be a Sim task; they are instant purchases now.
                     TaskSave::Upgrade { .. } => continue,
+                    TaskSave::Cook { recipe, step, origin, servings, skipped, directed } => {
+                        let Some(recipe) = content.recipe_index(recipe) else {
+                            continue;
+                        };
+                        if *step as usize >= content.recipes[recipe].steps.len() {
+                            continue;
+                        }
+                        Task {
+                            kind: TaskKind::Cook {
+                                recipe,
+                                step: *step,
+                                station: None,
+                                origin: origin.and_then(|o| object_ids.get(&o).copied()),
+                                servings: *servings,
+                                skipped: *skipped,
+                                minutes: 0,
+                            },
+                            directed: *directed,
+                        }
+                    }
                 };
                 sim.queue.push_back(task);
             }
@@ -995,8 +1121,39 @@ impl World {
                 world.dirt[i] = (f32::from(d) / 255.0).min(1.0);
             }
         }
+        let households = world.households.len();
+        let content = &world.content;
+        world.items.list = save
+            .items
+            .iter()
+            .filter_map(|it| {
+                let at = match it.at.as_str() {
+                    "surface" => ItemAt::Surface { x: it.x, z: it.z, offset: it.offset },
+                    "stored" => ItemAt::Stored { x: it.x, z: it.z },
+                    "floor" => ItemAt::Floor { x: it.x, z: it.z, offset: it.offset },
+                    _ => return None,
+                };
+                ((it.household as usize) < households).then_some(())?;
+                Some(ItemInstance {
+                    id: it.id,
+                    def: content.item_index(&it.def)?,
+                    at,
+                    servings: it.servings,
+                    quality: it.quality,
+                    made_at: it.made_at,
+                    household: it.household,
+                    spoiled: it.spoiled,
+                    recipe: it.recipe.as_deref().and_then(|r| content.recipe_index(r)),
+                })
+            })
+            .collect();
+        world.items.list.sort_by_key(|it| it.id);
+        world.items.list.dedup_by_key(|it| it.id);
+        world.items.next_id = save.next_item.max(world.items.list.last().map_or(0, |it| it.id + 1));
         world.make_storeys();
         world.refresh_rooms();
+        // What someone was eating or washing up is put down (those don't go on after loading).
+        crate::cooking::settle(&mut world);
         Ok(world)
     }
 
@@ -1045,7 +1202,16 @@ impl World {
             TaskKind::Spot { accident } => TaskSave::Spot {
                 accident: content.accidents[accident].id.clone(),
             },
-            TaskKind::Answer { .. } => return None,
+            TaskKind::Cook { recipe, step, origin, servings, skipped, .. } => TaskSave::Cook {
+                recipe: content.recipes[recipe].id.clone(),
+                step,
+                origin,
+                servings,
+                skipped,
+                directed: t.directed,
+            },
+            // (Eating and washing up start again from what's there after loading.)
+            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => return None,
         })
     }
 }

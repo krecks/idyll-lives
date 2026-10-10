@@ -869,7 +869,18 @@ fn host_name(world: &World, plot: u32) -> String {
         .map_or_else(|| world.plots[plot as usize].name.clone(), |h| format!("the {}s", h.name))
 }
 
-fn task_view(world: &World, task: &Task, phase: Option<&Phase>) -> ActionView {
+/// The recipe of what's being eaten (the dish's name is the pot's, not the plate's: "Eat
+/// Home-cooked meal").
+fn dish(world: &World, held: Option<crate::items::Held>, item: Option<u32>, plate: Option<u32>) -> Option<usize> {
+    [plate, item]
+        .into_iter()
+        .flatten()
+        .find_map(|i| world.items.get(i).and_then(|it| it.recipe))
+        .or_else(|| held.and_then(|h| h.recipe))
+}
+
+/// One of a resident's actions (`held`: what they carry, for the current one).
+fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<crate::items::Held>) -> ActionView {
     let content = &world.content;
     let (label, object, target, minutes) = match task.kind {
         TaskKind::Use { object, interaction } => {
@@ -901,6 +912,37 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>) -> ActionView {
             let rules = &content.object_rules.repair;
             let name = &content.objects[world.objects[object as usize].def].name;
             (format!("{} the {}", rules.label, name.to_lowercase()), Some(object), None, rules.minutes)
+        }
+        // "Make a meal · Prep (2/3)": the whole recipe's progress.
+        TaskKind::Cook { recipe, step, station, origin, minutes, .. } => {
+            let r = &content.recipes[recipe];
+            let label = crate::cooking::origin_interaction(content, &world.objects, origin, recipe).map_or(&r.label, |i| &i.label);
+            let i = (step as usize).min(r.steps.len() - 1);
+            let label = format!("{label} · {} ({}/{})", r.steps[i].label, i + 1, r.steps.len());
+            let done: f32 = r.steps[..i].iter().map(|s| s.minutes).sum();
+            let elapsed = match phase {
+                Some(Phase::Using { elapsed }) => elapsed.min(f32::from(minutes)) / f32::from(minutes.max(1)) * r.steps[i].minutes,
+                _ => 0.0,
+            };
+            let progress = ((done + elapsed) / r.minutes).min(1.0);
+            return ActionView {
+                label,
+                object: station.or(origin),
+                target: None,
+                progress: round_to(progress, PERCENT),
+                directed: task.directed,
+                active: phase.is_some(),
+            };
+        }
+        TaskKind::Eat { item, plate, .. } => {
+            let rules = &content.cooking;
+            let r = dish(world, held, item, plate).map(|r| &content.recipes[r]);
+            let food = r.map_or("something", |r| &content.items[r.item].label);
+            (format!("{} {food}", rules.eat_label), None, None, r.map_or(rules.eat_minutes, |r| r.eat_minutes))
+        }
+        TaskKind::Dishes { .. } => {
+            let rules = &content.cooking;
+            (rules.dishes_label.clone(), None, None, rules.dishes_minutes)
         }
     };
     let progress = match phase {
@@ -949,8 +991,8 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             active: true,
         });
     }
-    actions.extend(s.current().map(|a| task_view(world, &a.task, Some(&a.phase))));
-    actions.extend(s.queue().map(|t| task_view(world, t, None)));
+    actions.extend(s.current().map(|a| task_view(world, &a.task, Some(&a.phase), s.held)));
+    actions.extend(s.queue().map(|t| task_view(world, t, None, None)));
     actions
 }
 
@@ -1359,6 +1401,63 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
 
 pub fn structure_json(world: &World) -> String {
     structure_json_with(world, true)
+}
+
+/// Food and dishes for the renderer (`ItemPlacement` in protocol.ts).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ItemView<'a> {
+    id: u32,
+    def: &'a str,
+    /// Where it stands, in tiles (`z` on the lot's rows, like objects; see `storeys.rs`).
+    x: f32,
+    z: f32,
+    /// Height above its storey's floor (m): the top it stands on.
+    y: f32,
+    /// Turned like what it stands on (radians).
+    yaw: f32,
+    servings: u8,
+    /// `fresh`, `spoiled`, `dirty` (a dirty plate or pot), or `stored` (in a fridge: not drawn).
+    state: &'static str,
+    household: u32,
+}
+
+/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id).
+pub fn items_json(world: &World) -> String {
+    let content = &world.content;
+    let items: Vec<ItemView> = world
+        .items
+        .list
+        .iter()
+        .map(|it| {
+            let [x, z] = it.at.centre();
+            let holder = crate::items::holder(content, &world.objects, &it.at).map(|o| &world.objects[o as usize]);
+            let y = match it.at {
+                crate::items::ItemAt::Surface { .. } => holder
+                    .and_then(|o| content.objects[o.def].surface)
+                    .map_or(content.cooking.default_surface_height, |s| s.height),
+                _ => 0.0,
+            };
+            let state = match it.at {
+                crate::items::ItemAt::Stored { .. } => "stored",
+                _ if it.spoiled => "spoiled",
+                _ if content.items[it.def].dirty => "dirty",
+                _ => "fresh",
+            };
+            ItemView {
+                id: it.id,
+                def: &content.items[it.def].id,
+                x: round_to(x, 100.0),
+                z: round_to(z, 100.0),
+                y: round_to(y, 100.0),
+                yaw: holder.map_or(0.0, |o| round_to(o.yaw() + f32::from(o.turn).to_radians(), 1000.0)),
+                servings: it.servings,
+                state,
+                household: it.household,
+            }
+        })
+        .collect();
+    serde_json::to_string(&items).expect("items serialize")
 }
 
 /// The world structure; without `lot`, leaves out the lot itself (rooms, walls, openings,

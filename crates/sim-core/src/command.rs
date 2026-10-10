@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+/// What a resident can do with an item (`Command::UseItem`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ItemAction {
+    Eat,
+    Clear,
+}
+
 /// Player commands. Serialized as `{"type": "...", ...}` from the UI.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -75,6 +83,13 @@ pub enum Command {
         sim: u32,
         object: u32,
         interaction: usize,
+    },
+    /// Do something with food or a dish (an item, see `items.rs`): eat a serving, or clear it
+    /// away to the sink.
+    UseItem {
+        sim: u32,
+        item: u32,
+        action: ItemAction,
     },
     MoveTo {
         sim: u32,

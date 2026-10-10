@@ -46,6 +46,13 @@ fn generated_houses_are_livable() {
                 failures.push(format!("{label}: no {what} indoors"));
             }
         }
+        // Dinner can be made (a meal needs only somewhere to get ingredients: the rest of its
+        // steps are done without when there's no counter or stove).
+        let stations = w.objects.iter().fold(0, |m, o| m | w.content.objects[o.def].stations);
+        let meal = w.content.recipe_index("meal").map(|r| &w.content.recipes[r]);
+        if meal.is_some_and(|r| !r.possible(stations)) {
+            failures.push(format!("{label}: can't make a meal"));
+        }
         if bed.is_some() && (bed == toilet || bed == fridge) || fridge == toilet {
             failures.push(format!("{label}: bedroom, kitchen and bathroom share a room"));
         }

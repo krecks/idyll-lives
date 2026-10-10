@@ -36,6 +36,8 @@ pub(crate) struct HomeSnapshot {
     sims: Vec<crate::world::Sim>,
     households: Vec<crate::world::Household>,
     plots: Vec<crate::world::Plot>,
+    /// Food and dishes (they move and go with the furniture they're on).
+    items: crate::items::Items,
 }
 
 fn edge_kind(kind: EdgeKind) -> Edge {
@@ -59,17 +61,36 @@ fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
     }
 }
 
-fn task_object(t: &Task) -> Option<u32> {
+/// Whether a task is at object `id` (using it, repairing it, cooking at it, sitting at it to
+/// eat, washing up at it): it stops when the object goes.
+fn uses_object(t: &Task, id: u32) -> bool {
     match t.kind {
-        TaskKind::Use { object, .. } => Some(object),
-        _ => None,
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == id,
+        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
+        TaskKind::Eat { seat, .. } => seat == Some(id),
+        _ => false,
     }
 }
 
-fn task_object_mut(t: &mut Task) -> Option<&mut u32> {
+/// Object `id` is gone: the task's object ids after it shift down by one (a recipe started
+/// from it goes on without).
+fn shift_objects(t: &mut Task, id: u32) {
+    let shift = |o: &mut u32| {
+        if *o > id {
+            *o -= 1;
+        }
+    };
     match &mut t.kind {
-        TaskKind::Use { object, .. } => Some(object),
-        _ => None,
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => shift(object),
+        TaskKind::Cook { station, origin, .. } => {
+            if *origin == Some(id) {
+                *origin = None;
+            }
+            station.iter_mut().chain(origin.iter_mut()).for_each(shift);
+        }
+        TaskKind::Dishes { station, .. } => station.iter_mut().for_each(shift),
+        TaskKind::Eat { seat, .. } => seat.iter_mut().for_each(shift),
+        _ => {}
     }
 }
 
@@ -86,6 +107,7 @@ impl World {
             sims: self.sims.clone(),
             households: self.households.clone(),
             plots: self.plots.clone(),
+            items: self.items.clone(),
         })
     }
 
@@ -161,6 +183,10 @@ impl World {
         self.sims = s.sims;
         self.households = s.households;
         self.plots = s.plots;
+        // (Bumped past both, so views send them again.)
+        let version = self.items.version.max(s.items.version) + 1;
+        self.items = s.items;
+        self.items.version = version;
         self.refresh_stairs();
         self.structure_version += 1;
     }
@@ -553,6 +579,9 @@ impl World {
         if self.content.objects[obj.def].price.is_none() {
             return Err(Error::new("that can't be sold"));
         }
+        // Food and dishes on it (or kept in it) go too.
+        let host = obj.clone();
+        self.drop_items_with(&host);
         let mut sold = crate::surface::riders(&self.content, &self.objects, object);
         sold.push(object);
         sold.sort_unstable();
@@ -636,6 +665,9 @@ impl World {
                 placed.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
                 placed.wear = r.wear;
             }
+            // Food and dishes on it (or kept in it) come along.
+            let new = self.objects[id as usize].clone();
+            self.carry_items(&old, &new);
             Ok(id)
         })();
         if result.is_err() {
@@ -1070,21 +1102,13 @@ impl World {
             ..
         } = self;
         for sim in sims.iter_mut() {
-            if sim
-                .current
-                .as_ref()
-                .is_some_and(|a| task_object(&a.task) == Some(id))
-            {
+            if sim.current.as_ref().is_some_and(|a| uses_object(&a.task, id)) {
                 end_activity(sim, content, objects);
             }
-            sim.queue.retain(|t| task_object(t) != Some(id));
+            sim.queue.retain(|t| !uses_object(t, id));
             let current = sim.current.as_mut().map(|a| &mut a.task);
             for t in current.into_iter().chain(sim.queue.iter_mut()) {
-                if let Some(o) = task_object_mut(t)
-                    && *o > id
-                {
-                    *o -= 1;
-                }
+                shift_objects(t, id);
             }
         }
         let obj = self.objects.remove(id as usize);

@@ -7,7 +7,7 @@
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
 import { SimBridge } from '../core/bridge';
-import type { GameKind, GameSource, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
+import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
@@ -440,6 +440,11 @@ export async function startSession(
       bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });
       game.menu = null;
     },
+    useItem(itemId, action) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
+      game.menu = null;
+    },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
     },
@@ -674,8 +679,11 @@ export async function startSession(
     },
   };
   services.controls = controls;
-  // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`).
-  if (params.has('debug')) Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world });
+  // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`;
+  // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
+  if (params.has('debug')) {
+    Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+  }
   game.sharedMemory = bridge.sharedMemory;
   game.household = household;
 
@@ -734,6 +742,11 @@ export async function startSession(
     if (!document.hidden) bridge.resyncUi();
   };
   document.addEventListener('visibilitychange', onVisibility);
+  let itemsSeen: ItemPlacement[] = [];
+  bridge.onItems((items) => {
+    itemsSeen = items;
+    if (!disposed) renderer.setItems(items);
+  });
   bridge.onWorld((w) => {
     if (disposed) return;
     // Newcomers and babies the simulation made up carry an appearance seed: give them their
@@ -902,6 +915,20 @@ export async function startSession(
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
   };
 
+  /** Food or a dish: eat a serving, or clear it away (to the sink). */
+  const openItemMenu = (itemId: number, x: number, y: number) => {
+    const it = bridge.item(itemId);
+    const def = it && content.item(it.def);
+    if (!it || !def) return;
+    const edible = it.state === 'fresh' && it.servings > 0;
+    const servings = it.servings > 1 ? ` (${it.servings} servings)` : '';
+    const items = [
+      { label: 'Eat', index: 0, disabled: !edible },
+      { label: 'Clear away', index: 1 },
+    ];
+    game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
+  };
+
   let pointer: PointerInput | null = null;
   const attachPointer = () => new PointerInput(canvas, {
     click(x, y) {
@@ -942,6 +969,7 @@ export async function startSession(
         return;
       }
       const hit = renderer.pick(x, y);
+      if (hit.itemId != null) return openItemMenu(hit.itemId, x, y);
       if (hit.objectId !== null) return openMenu(hit.objectId, x, y);
       if (actor !== null && hit.ground && inLot(hit.ground.x, hit.ground.z)) {
         bridge.send({ type: 'moveTo', sim: actor, x: hit.ground.x, z: hit.ground.z });

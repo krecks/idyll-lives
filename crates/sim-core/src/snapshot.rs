@@ -7,9 +7,9 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 8;
-/// Floats per Sim (all 21 used).
-pub const SIM_STRIDE: usize = 21;
+pub const HEADER_LEN: usize = 9;
+/// Floats per Sim (all 23 used).
+pub const SIM_STRIDE: usize = 23;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -24,6 +24,8 @@ pub mod header {
     pub const CALM: usize = 6;
     /// Id of the latest milestone event (importance 2) modulo 2^24, 0 if none yet.
     pub const MAJOR_EVENT: usize = 7;
+    /// `Items::version` modulo 2^24: food and dishes changed (fetch `items` again).
+    pub const ITEMS_VERSION: usize = 8;
 }
 
 pub mod sim {
@@ -60,10 +62,11 @@ pub mod sim {
     pub const MOOD: usize = 15;
     /// What the Sim is thinking about (a thought bubble): 0 nothing, 1 skipping a planned
     /// block, 2 wants somewhere to do one, 3 kept one, 4 reached a goal, 5 loves the room,
-    /// 6 dislikes it, 7 something broke, 8 had an accident, 9 a baby crying (`planner::ThoughtKind`).
+    /// 6 dislikes it, 7 something broke, 8 had an accident, 9 a baby crying, 10 dinner's ready
+    /// (`planner::ThoughtKind`).
     pub const THOUGHT: usize = 16;
     /// The thought's subject: activity index (1-3), goal definition (4), room
-    /// (`rooms::room_subject`, 5-6), object type (7), accident (8) or need (9).
+    /// (`rooms::room_subject`, 5-6), object type (7), accident (8), need (9) or recipe (10).
     pub const THOUGHT_SUBJECT: usize = 17;
     /// How high the Sim stands, in storeys: 0 on the ground, fractions on the stairs (`Z` is on
     /// the lot's rows, which hold every storey; see `storeys.rs`).
@@ -74,10 +77,17 @@ pub mod sim {
     pub const OBJECT_DEF: usize = 19;
     /// The interaction (index into that definition's `interactions`) with `OBJECT_DEF`, or -1.
     pub const INTERACTION: usize = 20;
+    /// What they carry: index into `Content::items` + 1 (ingredients, a plate, dirty dishes),
+    /// else 0.
+    pub const HELD: usize = 21;
+    /// The recipe they're cooking: index into `Content::recipes` + 1, else 0. While cooking,
+    /// `OBJECT` is the station they're at (or heading to) and `ACTION` the step's animation.
+    pub const RECIPE: usize = 22;
 }
 
 // Every field fits in a Sim's row.
-const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE);
+const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE);
+const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
 /// `sim::INTERACTION`.
@@ -113,6 +123,34 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // A visitor knocking at the door.
     if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
         return Doing::plain(-1.0, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
+    }
+    // Cooking: at the station, the step's animation while at it (the recipe was started from
+    // an interaction of `origin`: that's the interaction shown while at it).
+    if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
+        let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
+            return Doing::NOTHING;
+        };
+        let r = &world.content.recipes[*recipe];
+        let using = matches!(phase, Phase::Using { .. });
+        let interaction = (*origin == Some(o.id))
+            .then(|| world.content.objects[o.def].interactions.iter().position(|i| i.recipe == Some(*recipe)))
+            .flatten();
+        return Doing {
+            object: o.id as f32,
+            action: r.steps.get(*step as usize).and_then(|s| s.anim).filter(|_| using).map_or(-1.0, |a| a as f32),
+            def: o.def as f32,
+            interaction: interaction.map_or(-1.0, |i| i as f32),
+        };
+    }
+    // Eating: at the seat (or standing), the eat animation while at it.
+    if let Some(Activity { task: Task { kind: TaskKind::Eat { seat, .. }, .. }, phase, .. }) = s.current() {
+        let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
+        return Doing::plain(seat.map_or(-1.0, |o| o as f32), anim);
+    }
+    // Washing up: at the sink, the washing animation while at it.
+    if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, .. }, .. }, phase, .. }) = s.current() {
+        let anim = world.content.cooking.dishes_anim.filter(|_| matches!(phase, Phase::Using { .. }));
+        return Doing::plain(station.map_or(-1.0, |o| o as f32), anim);
     }
     // Tidying up: no object, the clean animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Clean { .. }, .. }, phase, .. }) = s.current() {
@@ -164,6 +202,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         .rev()
         .find(|e| e.kind.importance() >= 2)
         .map_or(0.0, |e| (e.id % (1 << 24)) as f32);
+    out[header::ITEMS_VERSION] = (world.items.version % (1 << 24)) as f32;
     for (i, s) in world.sims.iter().enumerate() {
         let o = &mut out[HEADER_LEN + i * SIM_STRIDE..HEADER_LEN + (i + 1) * SIM_STRIDE];
         o[sim::ID] = s.id as f32;
@@ -189,6 +228,11 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::THOUGHT] = thought.map_or(0.0, |t| t.kind as u8 as f32);
         o[sim::THOUGHT_SUBJECT] = thought.map_or(0.0, |t| t.subject as f32);
         o[sim::HEIGHT] = world.sim_height(s);
+        o[sim::HELD] = s.held.map_or(0.0, |h| h.def as f32 + 1.0);
+        o[sim::RECIPE] = match s.current().map(|a| a.task.kind) {
+            Some(TaskKind::Cook { recipe, .. }) => recipe as f32 + 1.0,
+            _ => 0.0,
+        };
     }
     // Conversations: write the shared state into both participants' rows.
     for (i, s) in world.sims.iter().enumerate() {
@@ -230,6 +274,7 @@ pub fn layout_json(content: &Content) -> String {
             "speed": header::SPEED, "simCount": header::SIM_COUNT,
             "structureVersion": header::STRUCTURE_VERSION,
             "calm": header::CALM, "majorEvent": header::MAJOR_EVENT,
+            "itemsVersion": header::ITEMS_VERSION,
         },
         "sim": {
             "id": sim::ID, "x": sim::X, "z": sim::Z, "yaw": sim::YAW,
@@ -238,8 +283,11 @@ pub fn layout_json(content: &Content) -> String {
             "role": sim::ROLE, "away": sim::AWAY, "object": sim::OBJECT, "action": sim::ACTION,
             "mood": sim::MOOD, "thought": sim::THOUGHT, "thoughtSubject": sim::THOUGHT_SUBJECT, "height": sim::HEIGHT,
             "objectDef": sim::OBJECT_DEF, "interaction": sim::INTERACTION,
+            "held": sim::HELD, "recipe": sim::RECIPE,
         },
         "actions": content.animations,
+        "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),
+        "recipes": content.recipes.iter().map(|r| &r.id).collect::<Vec<_>>(),
     })
     .to_string()
 }
