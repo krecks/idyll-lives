@@ -3,11 +3,11 @@
 import math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        OAK, OAKD, HONEY, CHROME, TEAL, MUSTARD, RUST, CREAM)
 from pack_foodie import run  # noqa: E402
+from furniture_prims import microwave  # noqa: E402
 
-LIB = '../../models/'
 E, FOOT = {}, {}
 POP = ['#E8473B', '#F2A541', '#3E8EDE', '#6CC27A', '#9B59B6', '#F2D14E']
 CYAN = '#3FD0E0'
@@ -27,7 +27,7 @@ def wrapper(x, z, c):
     return [part('blob', [0.08, 0.05, 0.07], [x, 0.035, z], c, 'satin', noise=0.35)]
 
 
-# ---- microwaveCart (1x1): rolling cart, microwave (Kenney, restyled), frozen-dinner stacks ------
+# ---- microwaveCart (1x1): rolling cart, microwave, frozen-dinner stacks ------------------------
 def microwave_cart():
     FR = '#D9533F'
     p = [box([0.7, 0.03, 0.46], [0, 0.8, -0.22], '#E9E4DA', 'satin', radius=0.01),
@@ -55,12 +55,7 @@ def microwave_cart():
           rod([0.28, 0.9, -0.38], [0.3, 1.0, -0.4], 0.012, CHROME, 'chrome'),
           rod([0.28, 0.9, -0.38], [0.26, 0.99, -0.36], 0.012, CHROME, 'chrome')]
     p += wrapper(0.3, 0.3, '#F2D14E') + wrapper(-0.25, 0.28, '#E8473B')
-    # Kenney kitchenMicrowave: carpetWhite = body, metalMedium = side panel, metalDark = display, glass = door
-    fb = [box([0.5, 0.3, 0.38], [0, 0.965, -0.24], '#F2EDE2', 'gloss', radius=0.02)] + p
-    return gltf(LIB + 'kenney/kitchenMicrowave.glb', [0.52, 0.32, 0.4], {
-        'carpetWhite': mat('gloss', '#F2EDE2'), 'metalMedium': mat('satin', '#C9CBCC'),
-        'metalDark': mat('gloss', '#2E3A46'), 'glass': mat('gloss', '#3A4652')},
-        align='back', offset=[-0.04, 0.815, 0.06], parts=p, placeholder=fb)
+    return placeholder(microwave(-0.02, 0.815, -0.42, 0.44, 0.29, 0.36) + p)
 
 
 E['model.slob.microwaveCart'] = microwave_cart(); FOOT['model.slob.microwaveCart'] = (1, 1)

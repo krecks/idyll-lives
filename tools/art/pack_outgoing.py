@@ -1,6 +1,5 @@
 # Outgoing pack models (`model.outgoing.*`): party bar, conversation sectional, karaoke stage,
-# video-call nook, light-up dance floor, party photo wall. Primitive parts plus the Poly Haven wine
-# bottles (CC0). Conventions as furniture.py: 1 unit = 1 m, origin at the footprint centre on the
+# video-call nook, light-up dance floor, party photo wall, all primitive parts. Conventions as furniture.py: 1 unit = 1 m, origin at the footprint centre on the
 # floor, front +Z, back against the wall at -Z; seats centred on z = 0 with tops at ~0.45 m
 # (characters.ts DEFAULT_SEAT).
 # Run: python3 -I pack_outgoing.py [out.json]  then  python3 -I apply_pack.py outgoing out.json
@@ -8,13 +7,13 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        validate_parts, CHROME, BRASS, OAK, OAKD, WHITE, CREAM)
+from furniture_prims import wine_bottles  # noqa: E402
 
 TRAIT = 'outgoing'
 FOOT = {o['model']: tuple(o['footprint']) for o in
         json.load(open(os.path.join(HERE, '..', '..', 'web', 'public', 'content', 'packs', TRAIT + '.json')))['objects']}
-LIB = '../../models/'
 E = {}
 
 CORAL, TURQ, SUNNY, MAGENTA, PLUM, MINT = '#E8735A', '#3FA9A5', '#F2C14E', '#D64B8A', '#6B4A7E', '#9ED9C8'
@@ -80,8 +79,8 @@ bar += [cyl([0.08, 0.2, 0.08], [0.45, 1.125, 0.02], CHROME, 'chrome', taper=0.75
         sph([0.06, 0.06, 0.06], [-0.07, 1.1, 0.04], '#9CCB4A', 'satin', segments=8),
         sph([0.06, 0.06, 0.06], [-0.1, 1.1, -0.02], SUNNY, 'satin', segments=8)]
 bar += stool(-0.5, 0.28) + stool(0.5, 0.28)
-E['model.outgoing.partyBar'] = gltf(LIB + 'ph/wine_bottles_01.glb', [0.5, 0.3, 0.1], align='centre',
-                                    offset=[0.2, 0.91, -0.31], parts=bar, placeholder=bar, footprint=(2, 1))
+bar += wine_bottles(-0.03, 0.91, -0.31, gap=0.12)                                # wine on the back bar
+E['model.outgoing.partyBar'] = placeholder(bar)
 
 # ---- Conversation sectional (2x2): L-sofa; Sims sit at x = +-0.5 on the centre line --------
 VEL, VEL2 = TURQ, '#4FB8B3'

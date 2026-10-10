@@ -1,6 +1,6 @@
 # Hot-headed pack models (`model.hotHeaded.*`): heavy punching bag, plate-smash crate, rock drum
-# kit, cool-down meditation cushion, grudge journal desk, cold-plunge tub. Primitive parts plus the
-# Poly Haven wooden crate (CC0). Fiery reds and oranges against light steel and cool calming blues.
+# kit, cool-down meditation cushion, grudge journal desk, cold-plunge tub, all primitive parts.
+# Fiery reds and oranges against light steel and cool calming blues.
 # Conventions as furniture.py: 1 unit = 1 m, origin at the footprint centre on the floor, front +Z,
 # back against the wall at -Z; seats centred on z = 0 with tops at ~0.45 m (DEFAULT_SEAT).
 # Run: python3 -I pack_hotHeaded.py [out.json]  then  python3 -I apply_pack.py hotHeaded out.json
@@ -8,13 +8,13 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        validate_parts, CHROME, BRASS, OAK, OAKD, WHITE, CREAM, HONEY)
+from furniture_prims import wooden_crate  # noqa: E402
 
 TRAIT = 'hotHeaded'
 FOOT = {o['model']: tuple(o['footprint']) for o in
         json.load(open(os.path.join(HERE, '..', '..', 'web', 'public', 'content', 'packs', TRAIT + '.json')))['objects']}
-LIB = '../../models/'
 E = {}
 
 FIRE, EMBER, FLAME, STEEL, STEELD, CALM, CALML, OAT = '#C8402F', '#E07A2E', '#F2B84B', '#AEB4BA', '#7E858C', '#5F7FA0', '#A9C2D6', '#E6DCC8'
@@ -52,7 +52,7 @@ for x in (-0.3, -0.18):                                                         
 hb.append(box([0.18, 0.02, 0.04], [-0.12, 1.32, -0.33], STEEL, 'metal', radius=0.008))
 E['model.hotHeaded.heavyBag'] = placeholder(hb)
 
-# ---- Plate-smash crate (1x1): padded crate (Poly Haven), stack of plates, goggles ------------
+# ---- Plate-smash crate (1x1): slatted crate, stack of plates, goggles ------------------------
 sm = [box([0.84, 0.012, 0.84], [0, 0.006, 0], '#3E4A55', 'fabric', radius=0.004),
       box([0.6, 0.05, 0.03], [-0.08, 0.26, 0.13], FLAME, 'gloss', radius=0.006),          # hazard tape
       box([0.6, 0.05, 0.031], [-0.08, 0.36, 0.13], '#2F3236', 'gloss', radius=0.006)]
@@ -69,8 +69,7 @@ for x, z, r in [(-0.3, 0.32, 20), (-0.15, 0.36, -40), (0.05, 0.38, 70), (-0.38, 
     sm.append(box([0.08, 0.012, 0.05], [x, 0.018, z], '#F4F1EA', 'gloss', radius=0.003, rotate=[0, r, 8]))  # shards
 sm += [torus([0.18, 0.025, 0.08], [-0.15, 0.62, -0.15], '#2F3236', 'satin'),               # goggles
        box([0.16, 0.05, 0.05], [-0.15, 0.62, -0.13], '#F2B84B', 'glass', radius=0.02)]
-E['model.hotHeaded.smashBin'] = gltf(LIB + 'ph/wooden_crate_01.glb', [0.66, 0.6, 0.52], align='back', offset=[-0.08, 0, 0.05],
-                                     parts=sm, placeholder=[box([0.66, 0.6, 0.52], [-0.08, 0.3, -0.19], '#9C6B43', 'wood', radius=0.02)] + sm)
+E['model.hotHeaded.smashBin'] = placeholder(wooden_crate(-0.08, -0.45, 0.66, 0.6, 0.565, wood='#A87547', dark='#7C5432') + sm)
 
 # ---- Thunder drum kit (2x1): drummer on a throne at z = 0, kit in front --------------------------
 SHELL, HOOP, HEAD, CYM = FIRE, CHROME, '#F4F1EA', '#C9A24A'

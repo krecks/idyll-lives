@@ -4,7 +4,8 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, on, CHROME  # noqa: E402
-from pack_shapes import LIB, JAR, BOWL, glass_with_drink, leafy, run  # noqa: E402
+from pack_shapes import JAR, BOWL, glass_with_drink, leafy, run  # noqa: E402
+from furniture_prims import side_table  # noqa: E402
 
 E = {}
 CLOUD, LILAC, SKY, BLUSH = '#F7F7FA', '#CFC6EA', '#B7CDEA', '#F2C6CF'
@@ -94,7 +95,7 @@ p = [box([0.62, 0.14, 0.6], [0, 0.07, 0.1], '#F2F2F0', 'gloss', radius=0.05),   
      cyl([0.07, 0.2, 0.07], [0.3, 0.1, -0.3], '#7FC4E8', 'gloss')]                                # water bottle
 E['model.lazy.vibePlate'] = {'type': 'model', 'placeholder': p}
 
-# ---- Smart hub (1x1): Poly Haven side table with a smart speaker, tablet dock and smart bulb -----
+# ---- Smart hub (1x1): wooden side table with a smart speaker, tablet dock and smart bulb --------
 parts = [cyl([0.13, 0.2, 0.13], [-0.12, 0.7, -0.22], '#BFC3C7', 'fabric', segments=20),      # smart speaker
          torus([0.13, 0.012, 0.13], [-0.12, 0.8, -0.22], '#4FD1C5', 'gloss', segments=20),     # glowing ring
          cyl([0.12, 0.012, 0.12], [-0.12, 0.806, -0.22], '#2B3440', 'satin', segments=20),
@@ -105,9 +106,7 @@ parts = [cyl([0.13, 0.2, 0.13], [-0.12, 0.7, -0.22], '#BFC3C7', 'fabric', segmen
          box([0.07, 0.05, 0.003], on([0.12, 0.7, -0.2], [-15, 0, 0], [0.04, 0.03, 0.009]), '#7FB800', 'gloss', rotate=[-15, 0, 0]),
          cyl([0.2, 0.06, 0.2], [0.0, 0.03, 0.26], '#F2F2F0', 'gloss', segments=24),             # robot vacuum
          cyl([0.06, 0.012, 0.06], [0.0, 0.066, 0.26], '#4FD1C5', 'gloss', segments=12)]
-E['model.lazy.smartHub'] = {
-    'type': 'model', 'url': LIB + 'ph/side_table_01.glb', 'fit': [0.6, 0.6, 0.44], 'align': 'back', 'offset': [0, 0, 0.04],
-    'parts': parts, 'placeholder': [box([0.6, 0.6, 0.44], [0, 0.3, -0.24], OAK, 'wood', radius=0.02)] + parts}
+E['model.lazy.smartHub'] = {'type': 'model', 'placeholder': side_table(0.6, 0.6, 0.44, z=-0.235, wood='#B07A4E') + parts}
 
 if __name__ == '__main__':
     sys.exit(1 if run('lazy', E) else 0)

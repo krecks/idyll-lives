@@ -3,8 +3,9 @@
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, on, CHROME, BRASS  # noqa: E402
-from pack_shapes import LIB, JAR, BOWL, glass_with_drink, leafy, sling, arc_beam, run  # noqa: E402
+from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, on, CHROME, BRASS  # noqa: E402
+from pack_shapes import JAR, BOWL, glass_with_drink, leafy, sling, arc_beam, run  # noqa: E402
+from furniture_prims import speaker_cabinet  # noqa: E402
 
 E = {}
 CHERRY, AMBER, MINT, CORAL, SUN, SKY, LAV = '#D7263D', '#F6A609', '#9ED8C6', '#F28D8D', '#F6C744', '#6EC1E4', '#B8A1E3'
@@ -49,10 +50,7 @@ parts = [box([0.46, 0.34, 0.04], [0, 1.08, -0.2], '#2B2433', 'satin', radius=0.0
          cone([0.16, 0.2, 0.16], [-0.3, 1.72, 0.24], '#EAEAEA', 'gloss', taper=0.55, rotate=[60, 30, 0]),
          cyl([0.12, 0.01, 0.12], on([-0.3, 1.72, 0.24], [60, 30, 0], [0, -0.1, 0]), '#FFF4B0', 'gloss', rotate=[60, 30, 0]),
          cyl([0.42, 0.004, 0.42], [0.0, 0.003, 0.18], '#F6E3A0', 'gloss', segments=24)]      # spotlight pool
-E['model.cheerful.karaokeMachine'] = {
-    'type': 'model', 'url': LIB + 'kenney/speaker.glb', 'fit': [0.5, 0.86, 0.42], 'align': 'back', 'offset': [0, 0, 0.04],
-    'materials': {'wood': mat('gloss', SPK), 'metalMedium': mat('satin', '#54456E')},
-    'parts': parts, 'placeholder': [box([0.5, 0.86, 0.42], [0, 0.43, -0.25], SPK, 'gloss', radius=0.03)] + parts}
+E['model.cheerful.karaokeMachine'] = {'type': 'model', 'placeholder': speaker_cabinet(body=SPK, trim='#54456E') + parts}
 
 # ---- Mocktail cart (1x1): brass bar cart under a striped canopy ---------------------------------
 p = []

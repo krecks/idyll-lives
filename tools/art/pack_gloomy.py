@@ -5,13 +5,14 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, on, CHROME, BRASS  # noqa: E402
-from pack_shapes import LIB, JAR, TUB, VASE, candle, leafy, run  # noqa: E402
+from pack_shapes import JAR, TUB, VASE, candle, leafy, run  # noqa: E402
+from furniture_prims import slatted_console  # noqa: E402
 
 E = {}
 PLUM, MAUVE, SLATE, SMOKE, INK = '#6B4A6E', '#9C7FA0', '#5E6F8C', '#A7A9B4', '#3A3550'
 WALNUT, ROSEWOOD = '#7A5234', '#8A4A35'
 
-# ---- Record cabinet (1x1): Poly Haven mid-century slatted console + turntable and sleeves --------
+# ---- Record cabinet (1x1): mid-century slatted walnut console + turntable and sleeves ------------
 TOP = 0.62
 parts = [box([0.4, 0.08, 0.32], [-0.14, TOP + 0.04, -0.2], '#8C6E8F', 'satin', radius=0.012),   # turntable plinth
          cyl([0.28, 0.02, 0.28], [-0.16, TOP + 0.09, -0.2], '#C9CCD0', 'metal', segments=28),     # platter
@@ -27,9 +28,7 @@ parts += candle(0.33, TOP, -0.1, h=0.1, d=0.06) + [
     rod([0.36, 0.18, 0.32], [0.33, 0.62, 0.3], 0.008, '#6E5A3E', 'matte'),                       # dried branches
     rod([0.36, 0.18, 0.32], [0.42, 0.55, 0.33], 0.008, '#6E5A3E', 'matte'),
     part('blob', [0.06, 0.05, 0.06], [0.33, 0.63, 0.3], '#C9A0B8', 'matte', noise=0.2)]
-E['model.gloomy.recordCabinet'] = {
-    'type': 'model', 'url': LIB + 'ph/modern_wooden_cabinet.glb', 'fit': [0.9, 0.62, 0.42], 'align': 'back', 'offset': [0, 0, 0.04],
-    'parts': parts, 'placeholder': [box([0.9, 0.62, 0.42], [0, 0.31, -0.25], WALNUT, 'wood', radius=0.02)] + parts}
+E['model.gloomy.recordCabinet'] = {'type': 'model', 'placeholder': slatted_console(0.9, TOP, 0.415, wood=WALNUT, slat='#8E6443', legs=INK) + parts}
 
 # ---- Cello (1x1): the Sim sits on the stool at the centre, cello leaning back between the knees ---
 TILT = [-14, 0, 0]

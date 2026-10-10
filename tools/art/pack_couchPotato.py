@@ -5,11 +5,11 @@
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, gltf, placeholder,  # noqa: E402
-                       OAK, OAKD, HONEY, BRASS, CHROME, TEAL, MUSTARD, SAGE, RUST, CREAM)
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
+                       OAK, OAKD, HONEY, BRASS, TEAL, MUSTARD, SAGE, RUST, CREAM)
 from pack_foodie import run  # noqa: E402
+from furniture_prims import mini_fridge, flat_tv  # noqa: E402
 
-LIB = '../../models/'
 E, FOOT = {}, {}
 CORD = '#8C6A4E'          # couch-potato corduroy brown
 PLUSH = '#C08A52'
@@ -114,7 +114,7 @@ def recliner():
 E['model.couchPotato.recliner'] = recliner(); FOOT['model.couchPotato.recliner'] = (1, 1)
 
 
-# ---- snackFridge (1x1): a mini-fridge ottoman (Kenney fridge restyled), padded lid, order screen -
+# ---- snackFridge (1x1): a mini-fridge ottoman, padded lid, order screen ------------------------
 def snack_fridge():
     MINT = '#9FD3C7'
     p = [cushion([0.58, 0.08, 0.5], [0, 0.41, -0.02], '#E9E4DA', radius=0.035),                 # padded lid (top 0.45)
@@ -125,17 +125,13 @@ def snack_fridge():
                [[0, -0.5], [0.3, -0.5], [0.5, 0.5], [0.45, 0.5], [0, -0.3]], segments=16),
          sph([0.2, 0.06, 0.2], [0.28, 0.54, -0.16], '#E9B54A', 'matte', segments=10),
          box([0.5, 0.02, 0.06], [0, 0.05, 0.22], '#5C6168', 'satin', radius=0.01)]              # kick plate
-    fb = [box([0.56, 0.37, 0.46], [0, 0.185, -0.02], MINT, 'gloss', radius=0.03)] + p
-    return gltf(LIB + 'kenney/kitchenFridgeSmall.glb', [0.56, 0.37, 0.46], {
-        'metalLight': mat('gloss', MINT), 'metalDark': mat('satin', '#7FB5A9'),
-        'metal': mat('chrome', CHROME), 'glass': mat('gloss', '#DDEDEA')}, align='centre', offset=[0, 0, -0.02],
-        parts=p, placeholder=fb)
+    return placeholder(mini_fridge(0, -0.02, 0.56, 0.37, 0.46, body=MINT, trim='#7FB5A9') + p)
 
 
 E['model.couchPotato.snackFridge'] = snack_fridge(); FOOT['model.couchPotato.snackFridge'] = (1, 1)
 
 
-# ---- fitnessGame (1x1): TV on a slim stand (Kenney TV restyled), sensor bar, step mat -----------
+# ---- fitnessGame (1x1): TV on a slim stand, sensor bar, step mat -------------------------------
 def fitness_game():
     p = [box([0.8, 0.04, 0.3], [0, 0.56, -0.3], OAK, 'wood', radius=0.01),                       # stand top
          box([0.8, 0.04, 0.3], [0, 0.2, -0.3], OAK, 'wood', radius=0.01)]
@@ -150,11 +146,7 @@ def fitness_game():
     p += [cyl([0.07, 0.2, 0.07], [0.3, 0.32, -0.25], '#3E8EDE', 'gloss', segments=12),           # water bottle
           box([0.3, 0.03, 0.2], [-0.2, 0.235, -0.3], '#E9B54A', 'fabric', radius=0.012),       # towel
           cyl([0.14, 0.14, 0.14], [0.36, 0.08, 0.38], '#C9483B', 'satin', rotate=[0, 0, 90], segments=12)]  # kettlebell-ish weight
-    # Kenney TV: metalDark = frame + stand, metal = screen
-    fb = [box([0.8, 0.5, 0.05], [0, 0.84, -0.33], BACK, 'satin', radius=0.012)] + p
-    return gltf(LIB + 'kenney/televisionModern.glb', [0.8, 0.53, 0.16], {
-        'metalDark': mat('satin', '#D5D6D4'), 'metal': mat('gloss', '#4FC3A1')}, align='back', offset=[0, 0.58, 0.07],
-        parts=p, placeholder=fb)
+    return placeholder(flat_tv(0.58, -0.43, 0.8, 0.53, frame='#D5D6D4', screen='#4FC3A1') + p)
 
 
 E['model.couchPotato.fitnessGame'] = fitness_game(); FOOT['model.couchPotato.fitnessGame'] = (1, 1)
