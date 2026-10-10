@@ -45,17 +45,6 @@ def mat(finish, color, **kw):
     return d
 
 
-def gltf(url, fit, materials=None, parts=None, align='back', offset=None, rotationY=None, placeholder=None, footprint=(1, 1)):
-    e = {'type': 'model', 'url': url, 'fit': [round(v, 4) for v in fit]}
-    if align != 'centre': e['align'] = align
-    if offset: e['offset'] = offset
-    if rotationY: e['rotationY'] = rotationY
-    if materials: e['materials'] = materials
-    if parts: e['parts'] = parts
-    e['placeholder'] = placeholder or [box([fit[0] * 0.95, fit[1], fit[2] * 0.95], [0, fit[1] / 2, -footprint[1] / 2 + 0.04 + fit[2] / 2 if align == 'back' else 0], LGREY, 'satin', radius=0.02)]
-    return e
-
-
 def placeholder(parts):
     return {'type': 'model', 'placeholder': parts}
 
