@@ -15,7 +15,7 @@ use crate::command::{EdgeAxis, EdgeEdit, EdgeKind, FacePaint, FloorPaint};
 use crate::lot::{Diagonal, Edge, EdgeLook, EdgeRef, FORM_HALF, OUTDOORS};
 use crate::path::NavGrid;
 use crate::social::EventKind;
-use crate::world::{GameMode, ObjectInstance, Task, TaskKind, World, end_activity};
+use crate::world::{GameMode, MAX_OFFSET, ObjectInstance, Task, TaskKind, World, end_activity};
 
 /// Tiles around a plot that still count when checking who can reach what (the path from the street).
 const REACH_MARGIN: i32 = 2;
@@ -221,6 +221,21 @@ impl World {
             Err(Error::new(format!("turn {turn}° is past the next facing")))
         } else {
             Ok(turn)
+        }
+    }
+
+    /// How far object type `def` stands off the middle of its footprint: only those that turn
+    /// freely can, by up to half a tile.
+    pub(crate) fn check_offset(&self, def: usize, offset: [i8; 2]) -> Result<[i8; 2], Error> {
+        let d = &self.content.objects[def];
+        if offset == [0, 0] {
+            Ok(offset)
+        } else if !d.turns {
+            Err(Error::new(format!("the {} stands square on its tiles", d.name)))
+        } else if offset.iter().any(|&o| o.unsigned_abs() > MAX_OFFSET as u8) {
+            Err(Error::new("that's off its tile"))
+        } else {
+            Ok(offset)
         }
     }
 
@@ -501,7 +516,8 @@ impl World {
         Ok(())
     }
 
-    /// Moves or rotates an object at home. Its look, quality and value stay.
+    /// Moves or rotates an object at home. Its look, quality and value stay. Returns its new id
+    /// (it's placed again at the end of the list, so the ids after it shift down).
     pub fn move_object(
         &mut self,
         household: u32,
@@ -509,7 +525,7 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
-    ) -> Result<(), Error> {
+    ) -> Result<u32, Error> {
         let (_, plot) = self.home_object(household, object)?;
         let old = self.remove_object(object);
         let moved = self.place_at_home(plot, old.def, x, z, rot, old.style, old.quality, old.value);
@@ -528,11 +544,13 @@ impl World {
                     )
                     .expect("the old spot is still free");
                 self.objects[id as usize].turn = old.turn;
+                self.objects[id as usize].offset = old.offset;
                 return Err(e);
             }
         };
         self.objects[id as usize].turn = old.turn;
-        Ok(())
+        self.objects[id as usize].offset = old.offset;
+        Ok(id)
     }
 
     pub fn restyle(&mut self, household: u32, object: u32, style: u8) -> Result<(), Error> {

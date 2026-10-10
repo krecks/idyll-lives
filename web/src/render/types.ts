@@ -89,6 +89,8 @@ export interface PlacementGhost {
   rot: number;
   /** Degrees past `rot` (objects that turn freely). */
   turn?: number;
+  /** Centimetres (x, z) its middle stands off the middle of the footprint (objects that turn freely). */
+  offset?: [number, number];
   w: number;
   d: number;
   /** The tile a Sim uses it from, marked with an arrow (must stay clear). */

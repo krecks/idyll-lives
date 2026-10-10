@@ -22,12 +22,15 @@ export type Command =
   | { type: 'goHome'; sim: number }
   | { type: 'cancel'; sim: number; index: number }
   /** Build and buy are addressed to a household: its home may have nobody living in it yet. */
-  /** `turn`: degrees past the facing, for objects that turn freely (0..89). */
-  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number }
+  /**
+   * `turn`: degrees past the facing, for objects that turn freely (0..89); `offset`: centimetres
+   * (x, z) off the middle of the footprint, for the same objects (up to `MAX_OFFSET` each way).
+   */
+  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number] }
   | { type: 'sell'; household: number; object: number }
   /** The paid quick fix for something worn or broken. */
   | { type: 'repair'; household: number; object: number }
-  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number }
+  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number] }
   | { type: 'restyle'; household: number; object: number; style: number }
   | { type: 'setStyle'; household: number; style: number }
   | { type: 'upgrade'; household: number; object: number }
@@ -236,6 +239,8 @@ export interface ObjectPlacement {
   rot: number;
   /** Degrees past `rot`, for objects that turn freely (0..89). */
   turn?: number;
+  /** Centimetres (x, z) its middle stands off the middle of its footprint (objects that turn freely). */
+  offset?: [number, number];
   /** Rotated footprint in tiles. */
   w: number;
   d: number;
@@ -661,4 +666,12 @@ export function groundDepth(world: { depth: number; storeyDepth?: number }): num
 /** The storey a lot row is on (0: the ground). */
 export function storeyOfRow(world: { depth: number; storeyDepth?: number; storeys?: number }, z: number): number {
   return (world.storeys ?? 1) > 1 ? Math.max(0, Math.floor(z / groundDepth(world))) : 0;
+}
+
+/** How far an object can stand off the middle of its footprint (centimetres per axis; sim-core `MAX_OFFSET`). */
+export const MAX_OFFSET = 50;
+
+/** Where an object's middle stands (tiles): the middle of its footprint, moved by its `offset`. */
+export function objectCentre(o: { x: number; z: number; w: number; d: number; offset?: [number, number] }): { x: number; z: number } {
+  return { x: o.x + o.w / 2 + (o.offset?.[0] ?? 0) / 100, z: o.z + o.d / 2 + (o.offset?.[1] ?? 0) / 100 };
 }

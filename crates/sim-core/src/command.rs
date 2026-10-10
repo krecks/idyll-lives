@@ -122,6 +122,10 @@ pub enum Command {
         /// Degrees past the facing, for objects that turn freely (0..90).
         #[serde(default)]
         turn: Option<u8>,
+        /// Centimetres (x, z) off the middle of its footprint, for objects that turn freely
+        /// (up to `MAX_OFFSET` each way).
+        #[serde(default)]
+        offset: Option<[i8; 2]>,
     },
     /// Sell an object at home for part of what was paid.
     Sell {
@@ -138,6 +142,10 @@ pub enum Command {
         /// Degrees past the facing (objects that turn freely); absent keeps the angle it had.
         #[serde(default)]
         turn: Option<u8>,
+        /// Centimetres (x, z) off the middle of its footprint (objects that turn freely); absent
+        /// keeps the offset it had.
+        #[serde(default)]
+        offset: Option<[i8; 2]>,
     },
     /// Change how an object looks (free; effects stay the same).
     Restyle {

@@ -55,7 +55,7 @@ import {
 import { BakedVertexAnimationManager } from '@babylonjs/core/BakedVertexAnimation/bakedVertexAnimationManager';
 import type { AssetRegistry } from '../../assets/registry';
 import type { FrameState } from '../../core/bridge';
-import type { ObjectPlacement, SimInfo, WorldStructure } from '../../core/protocol';
+import { objectCentre, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
 import { loadCharacterSet, loadPart, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
@@ -1056,7 +1056,9 @@ export class Characters {
     this.objectById.clear();
     this.objects = world.objects.map((o: ObjectPlacement) => {
       const z = this.groundRow(o.z);
-      return { def: o.def, rot: o.rot, cx: o.x + o.w / 2, cz: z + o.d / 2, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      // Its middle where it stands (things that stand anywhere on their tile); the bounds stay on tiles.
+      const centre = objectCentre(o);
+      return { def: o.def, rot: o.rot, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     for (const b of this.blankets.values()) {

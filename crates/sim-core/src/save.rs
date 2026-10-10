@@ -24,7 +24,8 @@
 //! are about by id (`events[].refs`), so a content change can't rename them; 16 = story events
 //! for visitors at the door (`turnedAway`, `nobodyHome`). Answering the door isn't saved: a
 //! visitor knocking when the game was saved knocks again; 17 = storeys (`storeys`; the lot's rows
-//! hold every storey, see `storeys.rs`; absent: one, and the lot grows to the content's count).
+//! hold every storey, see `storeys.rs`; absent: one, and the lot grows to the content's count);
+//! 18 = objects placed off the middle of their tile (`offset`, centimetres; absent: centred).
 //! Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
@@ -41,7 +42,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 17;
+pub const SAVE_VERSION: u32 = 18;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -167,6 +168,10 @@ pub struct ObjectSave {
     /// Degrees past the facing (objects that turn freely; absent before v11: 0).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub turn: u8,
+    /// Centimetres off the middle of its footprint (objects that turn freely; absent before
+    /// v18: centred).
+    #[serde(default, skip_serializing_if = "crate::world::centred")]
+    pub offset: [i8; 2],
     /// Wear, 0..1 (broken at 1; absent before v12: new).
     #[serde(default, skip_serializing_if = "is_unworn")]
     pub wear: f32,
@@ -473,6 +478,7 @@ impl World {
                 style: o.style,
                 value: Some(o.value),
                 turn: o.turn,
+                offset: o.offset,
                 wear: o.wear,
             })
             .collect();
@@ -771,7 +777,9 @@ impl World {
                 Ok(id) => {
                     let obj = &world.objects[id as usize];
                     let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
+                    let offset = world.check_offset(obj.def, o.offset).unwrap_or([0, 0]);
                     world.objects[id as usize].turn = turn;
+                    world.objects[id as usize].offset = offset;
                     world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
                     object_ids.insert(i as u32, id);
                 }

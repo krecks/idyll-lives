@@ -88,6 +88,9 @@ pub struct BlueprintObject {
     pub rot: u8,
     #[serde(default)]
     pub turn: u8,
+    /// Centimetres (x, z) off the middle of its footprint (things that turn freely).
+    #[serde(default, skip_serializing_if = "crate::world::centred")]
+    pub offset: [i8; 2],
     #[serde(default)]
     pub style: Option<String>,
     #[serde(default)]
@@ -279,6 +282,8 @@ impl World {
                 z,
                 rot,
                 turn: o.turn,
+                // Turned round, it stands off the other way.
+                offset: if f.flip { o.offset.map(|c| -c) } else { o.offset },
                 style: self.content.styles.get(o.style as usize).map(|s| s.id.clone()),
                 quality: o.quality,
             });
@@ -418,6 +423,9 @@ impl World {
             if self.content.objects[def].turns && o.turn < 90 {
                 self.objects[id as usize].turn = o.turn;
             }
+            // Turned round, it stands off the other way.
+            let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
+            self.objects[id as usize].offset = self.check_offset(def, offset).unwrap_or([0, 0]);
             for _ in 0..o.quality {
                 if self.upgrade(household, id).is_err() {
                     break;
@@ -576,6 +584,7 @@ impl World {
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
                 let placed = &mut self.objects[id as usize];
                 placed.turn = o.turn;
+                placed.offset = o.offset;
                 placed.wear = o.wear;
             }
             if unreachable(self) > shut_in {

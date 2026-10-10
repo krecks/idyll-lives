@@ -26,7 +26,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None, offset: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 

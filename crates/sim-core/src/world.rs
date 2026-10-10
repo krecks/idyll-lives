@@ -26,6 +26,14 @@ pub const TICKS_PER_DAY: u64 = (24.0 * 60.0 / MINUTES_PER_TICK) as u64;
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
 const ROOM_REFRESH_TICKS: u64 = (10.0 / MINUTES_PER_TICK) as u64;
+/// How far (centimetres, per axis) an object can stand off the middle of its footprint: half a
+/// tile, so its middle stays on its tile (see `ObjectInstance::offset`).
+pub const MAX_OFFSET: i8 = 50;
+
+/// No offset (for leaving it out of saves and views).
+pub(crate) fn centred(offset: &[i8; 2]) -> bool {
+    *offset == [0, 0]
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectInstance {
@@ -39,6 +47,10 @@ pub struct ObjectInstance {
     pub rot: u8,
     /// Degrees turned past `rot` (0..90), for objects that turn freely; only for looks.
     pub turn: u8,
+    /// Centimetres (x, z) its middle stands off the middle of its footprint (within
+    /// `MAX_OFFSET`), for objects that turn freely: they can stand anywhere on their tile.
+    /// Only for looks, like `turn`; the footprint stays on tiles.
+    pub offset: [i8; 2],
     /// Sims using or walking to this object, one per slot.
     pub users: [Option<u32>; MAX_SLOTS],
     /// Upgrade level: higher quality objects satisfy needs and teach skills faster.
@@ -978,6 +990,7 @@ impl World {
             z,
             rot: rot % 4,
             turn: 0,
+            offset: [0, 0],
             users: [None; MAX_SLOTS],
             quality: 0,
             style: 0,
@@ -1935,11 +1948,14 @@ impl World {
                 at,
                 style,
                 turn,
+                offset,
             } => {
                 let def = self.content.object_index(&object);
                 let turn = def.map(|d| self.check_turn(d, turn.unwrap_or(0))).transpose()?;
+                let offset = def.map(|d| self.check_offset(d, offset.unwrap_or([0, 0]))).transpose()?;
                 let id = self.buy(household, &object, at, style)?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
+                self.objects[id as usize].offset = offset.unwrap_or([0, 0]);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
             Command::MoveObject {
@@ -1949,15 +1965,24 @@ impl World {
                 z,
                 rot,
                 turn,
+                offset,
             } => {
                 let def = self.objects.get(object as usize).map(|o| o.def);
                 let turn = match (def, turn) {
                     (Some(d), Some(t)) => Some(self.check_turn(d, t)?),
                     _ => None,
                 };
-                self.move_object(household, object, x, z, rot)?;
+                let offset = match (def, offset) {
+                    (Some(d), Some(o)) => Some(self.check_offset(d, o)?),
+                    _ => None,
+                };
+                // Moving re-adds it at the end of the list (later ids shift down): set its new id's.
+                let id = self.move_object(household, object, x, z, rot)?;
                 if let Some(t) = turn {
-                    self.objects[object as usize].turn = t;
+                    self.objects[id as usize].turn = t;
+                }
+                if let Some(o) = offset {
+                    self.objects[id as usize].offset = o;
                 }
             }
             Command::Restyle {

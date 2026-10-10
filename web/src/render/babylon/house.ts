@@ -29,7 +29,7 @@
 
 import { Color3, type Material, type Mesh, type PBRMaterial, type Scene } from './core';
 import type { DoorStyleDef, FloorCoveringDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
-import type { DiagonalWall, Opening, WorldStructure } from '../../core/protocol';
+import { objectCentre, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { MaterialLibrary } from './materials';
@@ -182,7 +182,7 @@ export function placeLights(world: WorldStructure, view: ViewRect | null, rooms:
   const lamps: { x: number; z: number; room: number; light: LampLight }[] = [];
   for (const o of world.objects) {
     const light = inView(o.x, o.z) ? lightOf(o.def) : undefined;
-    if (light) lamps.push({ x: o.x + o.w / 2, z: o.z + o.d / 2, room: roomAt(o.x, o.z), light });
+    if (light) lamps.push({ ...objectCentre(o), room: roomAt(o.x, o.z), light });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
   return [

@@ -51,7 +51,7 @@ import {
   type AbstractEngine,
 } from './core';
 import type { FrameState } from '../../core/bridge';
-import { groundDepth, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -676,8 +676,9 @@ export class BabylonRenderer implements Renderer {
     }
     const fresh = !this.ghostShown || ghost.model !== this.ghostKey;
     if (ghost.model !== this.ghostKey) this.loadGhost(ghost.model);
-    // Rotate about the footprint centre, like placed objects. The turn takes the short way round.
-    this.ghostGoal.set(ghost.x + ghost.w / 2, 0, ghost.z + ghost.d / 2);
+    // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
+    const centre = objectCentre(ghost);
+    this.ghostGoal.set(centre.x, 0, centre.z);
     const yaw = (ghost.rot * Math.PI) / 2 + ((ghost.turn ?? 0) * Math.PI) / 180;
     const turn = Math.atan2(Math.sin(yaw - this.ghostYawGoal), Math.cos(yaw - this.ghostYawGoal));
     this.ghostYawGoal += turn;
@@ -1813,10 +1814,19 @@ export class BabylonRenderer implements Renderer {
     this.previewMeshes = { wall, door, window: pane, open };
     this.previewBuffers = { wall: wallBuf, door: doorBuf, window: paneBuf, open: openBuf };
 
-    // Tile grid: white lines on a transparent texture, repeated once per tile.
+    // Tile grid: white lines on a transparent texture, repeated once per tile, with fainter
+    // half- and quarter-tile lines inside for lining up small things (they fade out with distance).
     const gridTex = new DynamicTexture('grid', 128, this.scene, true);
     const gctx = gridTex.getContext();
     gctx.clearRect(0, 0, 128, 128);
+    gctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (const p of [32, 96]) {
+      gctx.fillRect(0, p, 128, 2);
+      gctx.fillRect(p, 0, 2, 128);
+    }
+    gctx.fillStyle = 'rgba(255,255,255,0.55)';
+    gctx.fillRect(0, 64, 128, 2);
+    gctx.fillRect(64, 0, 2, 128);
     gctx.fillStyle = 'rgba(255,255,255,1)';
     gctx.fillRect(0, 0, 128, 3);
     gctx.fillRect(0, 0, 3, 128);
@@ -2224,18 +2234,21 @@ export class BabylonRenderer implements Renderer {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const k = this.storeyOf(o.z);
         const [y0, z] = [k * WALL_HEIGHT, o.z - k * D];
+        // Things that stand anywhere on their tile are moved off its middle (picking and the shadow follow).
+        const centre = objectCentre(o);
+        const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
         Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.qTmp);
-        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(o.x + o.w / 2, y0, z + o.d / 2), this.mOut);
+        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(centre.x, y0, centre.z - k * D), this.mOut);
         this.mOut.copyToArray(matrices, i * 16);
         const layer = this.deps.content.object(o.def)?.layer;
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
         this.placed.push({
           id: o.id,
           y0,
-          minX: o.x,
-          minZ: z,
-          maxX: o.x + o.w,
-          maxZ: z + o.d,
+          minX: o.x + ox,
+          minZ: z + oz,
+          maxX: o.x + o.w + ox,
+          maxZ: z + o.d + oz,
           height: template.height,
           bottom,
           wallRot: layer === 'wall' ? o.rot % 4 : undefined,
@@ -2256,9 +2269,10 @@ export class BabylonRenderer implements Renderer {
       blobs[k] = o.w * 1.15 * flat;
       blobs[k + 5] = flat;
       blobs[k + 10] = o.d * 1.15 * flat;
-      blobs[k + 12] = o.x + o.w / 2;
+      const centre = objectCentre(o);
+      blobs[k + 12] = centre.x;
       blobs[k + 13] = 0.018 + s * WALL_HEIGHT;
-      blobs[k + 14] = o.z - s * D + o.d / 2;
+      blobs[k + 14] = centre.z - s * D;
       blobs[k + 15] = 1;
     });
     if (!shown.length) return;

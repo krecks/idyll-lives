@@ -1273,7 +1273,7 @@ export async function startSession(
       send: (command: Parameters<typeof bridge.send>[0]) => bridge.send(command),
       save: (id: string) => session.save(id, id),
       plan: (id: number) => game.sims.find((x) => x.id === id)?.plan ?? null,
-      objects: () => game.objects.map((o) => ({ id: o.id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn ?? 0 })),
+      objects: () => game.objects.map((o) => ({ id: o.id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn ?? 0, offset: o.offset ?? [0, 0] })),
       steps: () => ({ undo: game.undoSteps, redo: game.redoSteps }),
       watch: () => ({ mode: game.mode, watchMode: game.watchMode, watching: game.watching }),
       /** Doors, windows and wall looks (for checks that point at them). */

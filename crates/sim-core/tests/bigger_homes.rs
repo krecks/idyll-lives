@@ -59,7 +59,7 @@ fn build_room(w: &mut World, household: u32, x: i32, z: i32) {
     let tiles = (0..4).flat_map(|i| (0..3).map(move |j| FloorPaint { x: x + i, z: z + j, covering: 1 })).collect();
     w.apply(Command::PaintFloor { household, tiles }).unwrap();
     w.apply(Command::SetRoof { household, style: 1, color: 1 }).unwrap();
-    w.apply(Command::Buy { household, object: "chair".into(), at: Some([x + 1, z, 0]), style: Some(1), turn: None }).unwrap();
+    w.apply(Command::Buy { household, object: "chair".into(), at: Some([x + 1, z, 0]), style: Some(1), turn: None, offset: None }).unwrap();
     let chair = w.objects.len() as u32 - 1;
     w.apply(Command::Upgrade { household, object: chair }).unwrap();
 }

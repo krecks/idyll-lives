@@ -1216,6 +1216,9 @@ struct ObjectView<'a> {
     rot: u8,
     /// Degrees past `rot` (objects that turn freely).
     turn: u8,
+    /// Centimetres (x, z) off the middle of its footprint (objects that turn freely).
+    #[serde(skip_serializing_if = "crate::world::centred")]
+    offset: [i8; 2],
     /// Wear 0..1 (broken at 1).
     wear: f32,
     w: i32,
@@ -1335,6 +1338,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 z: o.z,
                 rot: o.rot,
                 turn: o.turn,
+                offset: o.offset,
                 wear: o.wear,
                 w,
                 d,

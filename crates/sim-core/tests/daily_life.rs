@@ -226,6 +226,7 @@ fn buying_selling_and_moving_objects() {
         z: 3,
         rot: 2,
         turn: None,
+        offset: None,
     })
     .unwrap();
     let moved = w.objects.iter().find(|o| o.x == 4 && o.z == 3).unwrap();
@@ -343,6 +344,7 @@ fn garden_things_only_go_outdoors() {
         z: 5,
         rot: 0,
         turn: None,
+        offset: None,
     });
     assert!(moved.is_err());
     let o = w.objects.iter().find(|o| o.x == 6 && o.z == 8);

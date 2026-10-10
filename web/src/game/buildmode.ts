@@ -22,7 +22,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { groundDepth, MAX_OFFSET, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, Renderer, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
@@ -36,7 +36,18 @@ interface BuildPreview {
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
   setHeldObject(id: number | null, moved?: boolean): void;
   setPlacementGhost(
-    ghost: { model: string; x: number; z: number; rot: number; turn?: number; w: number; d: number; front?: { x: number; z: number }; valid: boolean } | null,
+    ghost: {
+      model: string;
+      x: number;
+      z: number;
+      rot: number;
+      turn?: number;
+      offset?: [number, number];
+      w: number;
+      d: number;
+      front?: { x: number; z: number };
+      valid: boolean;
+    } | null,
   ): void;
   setEdgePreview(edges: EdgeEdit[], valid: boolean): void;
   setBuildGrid(rect: ViewRect | null): void;
@@ -53,6 +64,13 @@ type Look = { faces?: [number, number]; form?: number; style?: number };
 /** What the eyedropper picked up: a build tool with its look set, or an object to buy again. */
 export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; style: number; rot: number; turn: number };
 
+/**
+ * Things that turn freely also stand anywhere on their tile: their middle snaps to quarter tiles
+ * (the build grid's finer lines), or with Shift held to the centimetre.
+ */
+const OFFSET_STEP = 0.25;
+const FREE_STEP = 0.01;
+
 /** The eyedropper takes a wall (rather than the floor) within this distance of it (tiles). */
 const PICK_WALL = 0.4;
 type EdgeState = EdgeEdit['kind'];
@@ -60,6 +78,11 @@ type Axis = EdgeEdit['axis'];
 
 /** A drag counts as diagonal within this angle of 45° (tan 22.5°: halfway to straight). */
 const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
+
+/** An object's offset (centimetres off the middle of its footprint) as a key; `0:0` when centred. */
+function offsetKey(offset: [number, number] | undefined): string {
+  return `${offset?.[0] ?? 0}:${offset?.[1] ?? 0}`;
+}
 
 /** The tile in front of a footprint (min corner, rotated size), where a Sim stands to use it. */
 function frontTile(x: number, z: number, w: number, d: number, rot: number): [number, number] {
@@ -102,6 +125,9 @@ export class BuildBuyInput {
     if (this.shift === e.shiftKey) return;
     this.shift = e.shiftKey;
     if (this.lastHover && game.mode === 'build' && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
+    // Shift lets go of the quarter-tile snap for things that stand anywhere on their tile.
+    const held = game.placing && this.content.object(game.placing.def);
+    if (held && this.content.turns(held)) this.rehover();
   };
   private lastHover: Point | null = null;
   /** A wall/remove press is held (the gesture belongs to drawing until release). */
@@ -341,12 +367,18 @@ export class BuildBuyInput {
     const def = placing && this.content.object(placing.def);
     if (!placing || !def) return null;
     const [fw, fd] = def.footprint ?? [1, 1];
+    // The middle goes under the pointer: on the tile grid, or (things that turn freely) off it.
+    const step = this.content.turns(def) ? (this.shift ? FREE_STEP : OFFSET_STEP) : 0;
+    const cx = step ? Math.round(ground.x / step) * step : ground.x;
+    const cz = step ? Math.round(ground.z / step) * step : ground.z;
     const at = (rot: number) => {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
-      const x = Math.floor(ground.x - w / 2 + 0.5);
-      const z = Math.floor(ground.z - d / 2 + 0.5);
+      const x = Math.floor(cx - w / 2 + 0.5);
+      const z = Math.floor(cz - d / 2 + 0.5);
+      const cm = (c: number) => Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, Math.round(c * 100)));
+      const offset: [number, number] | undefined = step ? [cm(cx - x - w / 2), cm(cz - z - d / 2)] : undefined;
       const fit = this.fits(x, z, w, d, rot, placing.objectId, def);
-      return { def, rot, turn: placing.turn, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit };
+      return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit };
     };
     const p = at(placing.rot);
     // Things on a wall turn to face away from the wall they're pointed at.
@@ -423,7 +455,7 @@ export class BuildBuyInput {
     if (!p) return this.preview.setPlacementGhost?.(null);
     const style = p && game.placing?.objectId != null ? (game.objects.find((o) => o.id === game.placing!.objectId)?.style ?? 0) : (game.placing?.style ?? game.householdStyle);
     const [fx, fz] = frontTile(p.x, p.z, p.w, p.d, p.rot);
-    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, w: p.w, d: p.d, front: { x: fx, z: fz }, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, w: p.w, d: p.d, front: { x: fx, z: fz }, valid: p.valid });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -441,15 +473,15 @@ export class BuildBuyInput {
       if (placing.objectId !== null) {
         // Put down where it was: nothing to send (a move renumbers it and is an undo step).
         const was = game.objects.find((o) => o.id === placing.objectId);
-        const same = was && was.x === p.x && was.z === p.z && was.rot === p.rot && (was.turn ?? 0) === p.turn;
-        if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn });
+        const same = was && was.x === p.x && was.z === p.z && was.rot === p.rot && (was.turn ?? 0) === p.turn && offsetKey(was.offset) === offsetKey(p.offset);
+        if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
         // Moved: the original stays hidden until it shows up in its new place.
         this.preview.setHeldObject?.(null, !same);
         game.placing = null;
         this.preview.setPlacementGhost?.(null);
       } else {
         // New purchases stay on the cursor so several can be placed in a row.
-        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], style: placing.style ?? game.householdStyle, ...(p.turn ? { turn: p.turn } : {}) });
+        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], style: placing.style ?? game.householdStyle, ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}) });
       }
       return true;
     }
@@ -1073,7 +1105,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   // the rest (moved, turned, restyled or upgraded); the same id wins a tie.
   const before = new Map<number, ObjectPlacement>();
   const left = new Set(prev.objects);
-  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${o.rot}:${o.turn ?? 0}:${o.style}:${o.quality}`;
+  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${o.style}:${o.quality}`;
   const byKey = Map.groupBy(prev.objects, key);
   for (const o of next.objects) {
     const same = byKey.get(key(o));
@@ -1090,7 +1122,8 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
     before.set(o.id, old);
     left.delete(old);
   }
-  const rect = (o: { x: number; z: number; w: number; d: number }) => ({ x: o.x, z: o.z, w: o.w, d: o.d });
+  // Around where it stands (off the middle of its footprint, for things that stand anywhere on their tile).
+  const rect = (o: ObjectPlacement) => ({ x: o.x + (o.offset?.[0] ?? 0) / 100, z: o.z + (o.offset?.[1] ?? 0) / 100, w: o.w, d: o.d });
   const added = next.objects.filter((o) => !before.has(o.id));
   const removed = [...left];
   if (added.length + removed.length <= MAX_EDIT_OBJECTS) {
@@ -1108,9 +1141,9 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
       if (o.quality > old.quality) {
         effects.push({ kind: 'upgrade', ...rect(o), objectId: o.id });
         sounds.add('upgrade');
-      } else if (o.x !== old.x || o.z !== old.z || o.rot !== old.rot || o.turn !== old.turn || o.style !== old.style) {
+      } else if (o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) || o.rot !== old.rot || o.turn !== old.turn || o.style !== old.style) {
         effects.push({ kind: 'place', ...rect(o), objectId: o.id });
-        sounds.add(o.x !== old.x || o.z !== old.z ? 'place' : 'rotate');
+        sounds.add(o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) ? 'place' : 'rotate');
       }
     }
   }

@@ -164,7 +164,7 @@
       <ItemDetail def={movingDef} owned={moving} />
     </div>
     <footer class="muted">
-      Click on your lot to put it down · <kbd>R</kbd> rotate{#if content.turns(movingDef)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15°{/if} · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> put back
+      Click on your lot to put it down · <kbd>R</kbd> rotate{#if content.turns(movingDef)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15° · hold <kbd>Shift</kbd> to place freely{/if} · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> put back
     </footer>
   </section>
 {:else if game.mode === 'buy'}
@@ -292,7 +292,7 @@
     <footer class="muted">
       {#if game.placing}
         {@const def = content.object(game.placing.def)}
-        Click on your lot to place · <kbd>R</kbd> rotate{#if def && content.turns(def)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15°{/if} · <kbd>Esc</kbd> put back{#if folded}<span class="peek">&nbsp;· point here for the catalog</span>{/if}
+        Click on your lot to place · <kbd>R</kbd> rotate{#if def && content.turns(def)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15° · hold <kbd>Shift</kbd> to place freely{/if} · <kbd>Esc</kbd> put back{#if folded}<span class="peek">&nbsp;· point here for the catalog</span>{/if}
       {:else if selected}
         Upgrade, restyle or move it · <kbd>R</kbd> rotate · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> deselect
       {:else}
