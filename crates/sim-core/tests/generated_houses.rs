@@ -1,7 +1,9 @@
 //! Generated houses (web/src/game/housegen.ts) checked by the simulation: each loads, has a
 //! bed, a fridge and a toilet in rooms of their own, and everything in it can be reached from the
 //! front door, upstairs too. Chairs face tables and things on tops stand on one; most houses have
-//! somewhere to sit down at a table and small things on their tops.
+//! somewhere to sit down at a table and small things on their tops. No room is bigger than its
+//! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
+//! good share of houses on large lots have a kitchen island with stools pulled up to it.
 //!
 //! Make the houses first: `node --experimental-strip-types tools/housegen/sample.ts houses.json`,
 //! then `HOUSES=houses.json cargo test -p sim-core --test generated_houses -- --ignored --nocapture`.
@@ -9,7 +11,7 @@
 mod common;
 
 use sim_core::World;
-use sim_core::content::Layer;
+use sim_core::content::{Layer, SurfaceKind};
 use sim_core::lot::OUTDOORS;
 use sim_core::path::NavGrid;
 use sim_core::surface;
@@ -23,8 +25,11 @@ fn generated_houses_are_livable() {
     };
     let houses: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");
+    let config: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("housegen.json")).unwrap()).unwrap();
     let mut failures = Vec::new();
     let (mut dining, mut tops) = (0, 0);
+    let (mut large, mut islands) = (0, 0);
     for h in &houses {
         let label = format!("{} {} ({})", h["size"], h["seed"], h["description"]);
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
@@ -36,6 +41,22 @@ fn generated_houses_are_livable() {
         };
         // Things on tops stand on one listed before them.
         common::check(&w);
+        // Rooms as planned: no bigger than their kind may be, walled off (or open to the next).
+        for r in h["rooms"].as_array().into_iter().flatten() {
+            let kind = r["kind"].as_str().unwrap();
+            let [x, z, rw, rd] = ["x", "z", "w", "d"].map(|k| r[k].as_i64().unwrap() as i32);
+            if let Some(cap) = config["rooms"][kind]["maxSide"].as_array() {
+                let (short, long) = (cap[0].as_i64().unwrap() as i32, cap[1].as_i64().unwrap() as i32);
+                if rw.min(rd) > short || rw.max(rd) > long {
+                    failures.push(format!("{label}: a {kind} of {rw}×{rd}, more than {short}×{long}"));
+                }
+            }
+            let id = w.lot.room_at(x, z);
+            let whole = (z..z + rd).all(|tz| (x..x + rw).all(|tx| w.lot.room_at(tx, tz) == id));
+            if id == OUTDOORS || !whole {
+                failures.push(format!("{label}: the {kind} at {x},{z} isn't a room of its own"));
+            }
+        }
         let room_of = |is: &dyn Fn(&sim_core::content::ObjectDef) -> bool| {
             w.objects.iter().find(|o| is(&w.content.objects[o.def])).map(|o| w.lot.room_at(o.x, o.z))
         };
@@ -82,14 +103,29 @@ fn generated_houses_are_livable() {
             }
         }
         dining += usize::from(seated >= 2);
+        // An island: a counter or bar with two stools or more facing it.
+        if h["size"] == "large" {
+            large += 1;
+            let mut at = std::collections::HashMap::new();
+            for o in &w.objects {
+                if let Some(t) = surface::faced_table(&w.content, &w.objects, &nav, o.id) {
+                    let kind = w.content.objects[w.objects[t as usize].def].surface.map(|s| s.kind);
+                    if matches!(kind, Some(SurfaceKind::Counter | SurfaceKind::Bar)) {
+                        *at.entry(t).or_insert(0) += 1;
+                    }
+                }
+            }
+            islands += usize::from(at.values().any(|&n| n >= 2));
+        }
         tops += usize::from(w.objects.iter().any(|o| w.content.objects[o.def].layer == Layer::Surface));
     }
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
-    eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops");
+    eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
     }
     assert!(failures.is_empty());
     assert!(dining * 10 >= houses.len() * 8, "most houses have a table to sit at");
     assert!(tops * 10 >= houses.len() * 9, "most houses have things on their tops");
+    assert!(islands * 4 >= large, "a good share of large houses have a kitchen island with stools");
 }

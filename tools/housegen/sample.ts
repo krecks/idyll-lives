@@ -37,7 +37,9 @@ const info = objectInfos({ object: (id) => byId.get(id), radius: (d) => Math.max
 const out = process.argv[2] ?? 'houses.json';
 const perSize = Number(process.argv[3] ?? 60);
 const towns: unknown[] = [];
-const stats = { tried: 0, made: 0, two: 0, value: 0, seats: 0, dining: 0, tops: 0 };
+const stats = { tried: 0, made: 0, two: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0 };
+// Per room kind: how many, their floor in all, the biggest (tiles).
+const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
 for (const [size, lot] of Object.entries(houses.lotSizes)) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
@@ -51,6 +53,11 @@ for (const [size, lot] of Object.entries(houses.lotSizes)) {
     stats.seats += seats;
     if (seats) stats.dining++;
     stats.tops += all.filter((o) => byId.get(o.def)?.layer === 'surface').length;
+    for (const r of [...(h.rooms ?? []), ...(h.upper?.rooms ?? [])]) {
+      const k = kinds.get(r.kind) ?? { n: 0, area: 0, most: 0, long: 0 };
+      kinds.set(r.kind, { n: k.n + 1, area: k.area + r.w * r.d, most: Math.max(k.most, r.w * r.d), long: Math.max(k.long, r.w, r.d) });
+      stats.rooms++;
+    }
     // Back on the lot (the layouts' frame is a medium lot's).
     const dx = Math.floor((lot.width - houses.plot.width) / 2);
     const depth = lot.depth;
@@ -64,6 +71,8 @@ for (const [size, lot] of Object.entries(houses.lotSizes)) {
       seed: seed * 7919,
       name: h.name,
       description: h.description,
+      // The rooms as planned, on the lot (the storey above `depth` rows down, like the town).
+      rooms: [...(h.rooms ?? []).map((r) => ({ ...r, x: r.x + dx })), ...(h.upper?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + depth }))],
       town: {
         width: lot.width,
         depth,
@@ -83,4 +92,6 @@ writeFileSync(out, JSON.stringify(towns));
 console.log(`${stats.made} of ${stats.tried} houses made (${stats.two} with two storeys) → ${out}`);
 const per = (n: number) => (n / Math.max(1, stats.made)).toFixed(1);
 console.log(`  per house: $${per(stats.value)} of things, ${per(stats.seats)} chairs at tables (${stats.dining} houses with some), ${per(stats.tops)} things on tops`);
+console.log(`  ${per(stats.rooms)} rooms per house; by kind (count, mean and largest floor, longest side):`);
+for (const [k, v] of [...kinds].sort((a, b) => b[1].n - a[1].n)) console.log(`    ${k}: ${v.n}, ${(v.area / v.n).toFixed(1)} m², up to ${v.most} m², ${v.long} m long`);
 for (const t of towns.slice(0, 8) as { size: string; name: string; description: string }[]) console.log(`  ${t.size}: ${t.name} — ${t.description}`);

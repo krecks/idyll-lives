@@ -44,7 +44,18 @@ export interface HouseTemplate {
   objects: Placement[];
   spawns: [number, number][];
   /** The storey above (generated two-storey houses), laid out like the ground. */
-  upper?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[] };
+  upper?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] };
+  /** Generated houses: the rooms as planned (for checking them; the game finds rooms from the walls). */
+  rooms?: PlannedRoom[];
+}
+
+/** A room of a generated house: what it's for and the rectangle it takes. */
+export interface PlannedRoom {
+  kind: string;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
 }
 
 /**
