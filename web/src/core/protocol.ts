@@ -241,6 +241,8 @@ export interface ObjectPlacement {
   turn?: number;
   /** Centimetres (x, z) its middle stands off the middle of its footprint (objects that turn freely). */
   offset?: [number, number];
+  /** Things on the `surface` layer: the height (m) of the top they stand on. */
+  lift?: number;
   /** Rotated footprint in tiles. */
   w: number;
   d: number;

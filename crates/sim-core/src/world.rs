@@ -1554,6 +1554,7 @@ impl World {
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.structure_version {
             self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.structure_version);
+            self.object_index.links = crate::surface::Links::new(&self.content, &self.objects);
         }
     }
 

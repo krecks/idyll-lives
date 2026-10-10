@@ -29,6 +29,7 @@ pub mod save;
 pub mod snapshot;
 pub mod storeys;
 pub mod social;
+pub mod surface;
 pub mod view;
 pub mod world;
 

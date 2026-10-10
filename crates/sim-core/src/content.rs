@@ -21,8 +21,9 @@ pub const MAX_TAGS: usize = 64;
 pub type TagMask = u64;
 /// Upper bound on the number of skills, so per-Sim skills fit in a fixed array.
 pub const MAX_SKILLS: usize = 16;
-/// Most Sims that can use one object at once (two in a double bed or on a sofa).
-pub const MAX_SLOTS: usize = 2;
+/// Most Sims that can use one object at once (two in a double bed, three on a long sofa, four
+/// round a merry-go-round).
+pub const MAX_SLOTS: usize = 4;
 /// Built-in tag for visiting another household.
 pub const VISIT_TAG: &str = "visit";
 /// Animation shown during conversations (when content declares it).
@@ -88,6 +89,9 @@ pub struct Interaction {
     pub dirt: f32,
     /// The place a baby lies (only babies use it; nobody else ever).
     pub baby: bool,
+    /// Only offered while the seat faces a table it tucks under (content `needsTable`; see
+    /// `ObjectDef::seat_at` and `surface.rs`): dining at a table.
+    pub needs_table: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
     /// Needs this fills for the baby lying in the object, over the whole interaction (feeding,
@@ -153,6 +157,71 @@ pub struct ObjectDef {
     /// Its two slots are bunks, one above the other (content `bunk`): both users lie in the
     /// middle of its width, and the renderer lifts the second to the upper bunk.
     pub bunk: bool,
+    /// A top that small things stand on (content `surface`): tables, counters, desks,
+    /// nightstands, shelves. Things on the `Surface` layer stand on it; plated food too.
+    pub surface: Option<Surface>,
+    /// Things on the `Surface` layer: the radius (m) of the disc they take on their host's top
+    /// (content `radius`, default `DEFAULT_RADIUS`).
+    pub radius: f32,
+    /// Where it is used from (content `approach`): the tile in front, or (chairs pushed under a
+    /// table) any free tile around it.
+    pub approach: Approach,
+    /// Seats: the kinds of surface it tucks under (content `seatAt`, a mask of
+    /// `SurfaceKind::bit`). Facing one of those it is a seat at that table.
+    pub seat_at: u8,
+}
+
+/// Radius of a thing on the `Surface` layer when content gives none (m).
+pub const DEFAULT_RADIUS: f32 = 0.12;
+
+/// A top that small things stand on (content `surface`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Surface {
+    /// Height of the top above the floor (m).
+    pub height: f32,
+    pub kind: SurfaceKind,
+    /// Margin (m) kept clear along the top's edges.
+    pub inset: f32,
+}
+
+/// What kind of top a surface is: which seats tuck under it (content `surface.kind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceKind {
+    Table,
+    Bar,
+    Counter,
+    Desk,
+    Low,
+    Shelf,
+}
+
+impl SurfaceKind {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "table" => Self::Table,
+            "bar" => Self::Bar,
+            "counter" => Self::Counter,
+            "desk" => Self::Desk,
+            "low" => Self::Low,
+            "shelf" => Self::Shelf,
+            _ => return None,
+        })
+    }
+
+    /// Its bit in `ObjectDef::seat_at`.
+    pub fn bit(self) -> u8 {
+        1 << self as u8
+    }
+}
+
+/// Where an object is used from (content `approach`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Approach {
+    /// The tile centred in front of it (`ObjectInstance::front_tile`).
+    #[default]
+    Front,
+    /// Any free tile beside it, the front first (chairs pushed under a table).
+    Around,
 }
 
 /// Where an object goes (content `layer`). Things on a wall, the ceiling or the floor's surface
@@ -169,6 +238,8 @@ pub enum Layer {
     Ceiling,
     /// Lies flat on the floor: rugs.
     Rug,
+    /// Stands on another object's `surface` (a table, counter, shelf): vases, books, lamps.
+    Surface,
 }
 
 impl Layer {
@@ -1650,6 +1721,27 @@ struct ObjectRaw {
     /// Bunk beds: the two slots lie one above the other.
     #[serde(default)]
     bunk: bool,
+    #[serde(default)]
+    surface: Option<SurfaceRaw>,
+    #[serde(default)]
+    radius: Option<f32>,
+    /// `front` (default) or `around`.
+    #[serde(default)]
+    approach: Option<String>,
+    #[serde(default, rename = "seatAt")]
+    seat_at: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct SurfaceRaw {
+    height: f32,
+    kind: String,
+    #[serde(default = "surface_inset")]
+    inset: f32,
+}
+
+fn surface_inset() -> f32 {
+    0.04
 }
 
 fn one_slot() -> u8 {
@@ -1667,6 +1759,8 @@ struct InteractionRaw {
     dirt: Option<f32>,
     #[serde(default)]
     baby: bool,
+    #[serde(default)]
+    needs_table: bool,
     #[serde(default)]
     homework: f32,
     #[serde(default)]
@@ -2047,6 +2141,7 @@ impl Content {
                     anim,
                     dirt: it.dirt.unwrap_or(-1.0),
                     baby: it.baby,
+                    needs_table: it.needs_table,
                     homework: it.homework.max(0.0),
                     care,
                 });
@@ -2070,13 +2165,65 @@ impl Content {
                 Some("wall") => Layer::Wall,
                 Some("ceiling") => Layer::Ceiling,
                 Some("rug") => Layer::Rug,
+                Some("surface") => Layer::Surface,
                 Some(other) => {
                     return Err(Error::new(format!(
-                        "object '{}': unknown layer '{other}' (floor, wall, ceiling or rug)",
+                        "object '{}': unknown layer '{other}' (floor, wall, ceiling, rug or surface)",
                         obj.id
                     )));
                 }
             };
+            if layer == Layer::Surface
+                && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
+            {
+                return Err(Error::new(format!(
+                    "object '{}': things on a surface are 1×1, with one slot and no interactions",
+                    obj.id
+                )));
+            }
+            let surface = match &obj.surface {
+                None => None,
+                Some(_) if layer != Layer::Floor => {
+                    return Err(Error::new(format!(
+                        "object '{}': only furniture on the floor has a surface",
+                        obj.id
+                    )));
+                }
+                Some(s) => Some(Surface {
+                    height: s.height.max(0.0),
+                    kind: SurfaceKind::parse(&s.kind).ok_or_else(|| {
+                        Error::new(format!(
+                            "object '{}': unknown surface kind '{}' (table, bar, counter, desk, low or shelf)",
+                            obj.id, s.kind
+                        ))
+                    })?,
+                    inset: s.inset.max(0.0),
+                }),
+            };
+            let approach = match obj.approach.as_deref() {
+                None | Some("front") => Approach::Front,
+                Some("around") => Approach::Around,
+                Some(other) => {
+                    return Err(Error::new(format!(
+                        "object '{}': unknown approach '{other}' (front or around)",
+                        obj.id
+                    )));
+                }
+            };
+            let mut seat_at = 0;
+            for k in &obj.seat_at {
+                seat_at |= SurfaceKind::parse(k)
+                    .ok_or_else(|| {
+                        Error::new(format!("object '{}': unknown seatAt kind '{k}'", obj.id))
+                    })?
+                    .bit();
+            }
+            if interactions.iter().any(|i| i.needs_table) && seat_at == 0 {
+                return Err(Error::new(format!(
+                    "object '{}': needsTable interactions need a seatAt",
+                    obj.id
+                )));
+            }
             if obj.bunk && (obj.slots != 2 || layer.mounted()) {
                 return Err(Error::new(format!(
                     "object '{}': a bunk bed has 2 slots and stands on the floor",
@@ -2095,9 +2242,10 @@ impl Content {
                 slots: obj.slots,
                 outdoors: obj.outdoors,
                 stairs: obj.stairs,
-                // Things on a wall hang square to it.
+                // Things on a wall hang square to it; things on a surface always turn.
                 turns: obj.free_rotation.unwrap_or_else(|| {
-                    layer != Layer::Wall
+                    layer == Layer::Surface
+                        || layer != Layer::Wall
                         && obj.footprint == [1, 1]
                         && obj.category.as_ref().is_some_and(|c| {
                             raw.object_rules.free_rotation.iter().flatten().any(|f| f == c)
@@ -2125,6 +2273,10 @@ impl Content {
                 tags: offered,
                 layer,
                 bunk: obj.bunk,
+                surface,
+                radius: obj.radius.unwrap_or(DEFAULT_RADIUS).clamp(0.02, 0.45),
+                approach,
+                seat_at,
             });
         }
 

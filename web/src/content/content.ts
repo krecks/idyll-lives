@@ -37,7 +37,12 @@ export interface InteractionDef {
    * Without one the simulation derives a tag from `tags`, `pose` and `effects`.
    */
   anim?: string;
+  /** Only offered while the seat faces a table it tucks under (`seatAt`): dining at a table. */
+  needsTable?: boolean;
 }
+
+/** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
+export type SurfaceKind = 'table' | 'bar' | 'counter' | 'desk' | 'low' | 'shelf';
 
 export interface ObjectDef {
   id: string;
@@ -70,11 +75,22 @@ export interface ObjectDef {
   /**
    * Where it goes (sim-core `content::Layer`): furniture on the floor (default), on a `wall` (its
    * back against one), from the `ceiling` (indoors) or flat on the floor as a `rug`. Off the floor
-   * layer it takes no floor space; only things on the same layer can't overlap.
+   * layer it takes no floor space; only things on the same layer can't overlap. On a `surface`
+   * it stands on another object's top (a vase on a table).
    */
-  layer?: 'floor' | 'wall' | 'ceiling' | 'rug';
+  layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
+  /** A top small things stand on: its height (m), kind, and the margin kept clear along its edges (m, default 0.04). */
+  surface?: { height: number; kind: SurfaceKind; inset?: number };
+  /** Things on the `surface` layer: the radius (m) of the disc they take on their host's top (default 0.12). */
+  radius?: number;
+  /** Where it is used from: the tile in front (default), or any free tile `around` it (chairs pushed under a table). */
+  approach?: 'front' | 'around';
+  /** Seats: the kinds of surface they tuck under; facing one, they are a seat at that table. */
+  seatAt?: SurfaceKind[];
+  /** Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m). */
+  seat?: { height: number; forward?: number };
 }
 
 export interface SkillDef {
@@ -438,11 +454,11 @@ export class Content {
   /** Whether an object turns freely (sim-core `ObjectDef::turns`): at any angle past its facing. */
   turns(def: ObjectDef): boolean {
     const [w, d] = def.footprint ?? [1, 1];
-    return def.freeRotation ?? (def.layer !== 'wall' && w === 1 && d === 1 && def.category !== undefined && this.freeRotation.has(def.category));
+    return def.freeRotation ?? (def.layer === 'surface' || (def.layer !== 'wall' && w === 1 && d === 1 && def.category !== undefined && this.freeRotation.has(def.category)));
   }
 
   /** Its layer (`floor` for furniture): only things on the same layer take each other's place. */
-  layer(def: ObjectDef | undefined): 'floor' | 'wall' | 'ceiling' | 'rug' {
+  layer(def: ObjectDef | undefined): NonNullable<ObjectDef['layer']> {
     return def?.layer ?? 'floor';
   }
 

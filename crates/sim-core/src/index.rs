@@ -18,6 +18,8 @@ pub(crate) struct ObjectIndex {
     usable: Vec<Vec<u32>>,
     /// What people with no home may use: public places' and off-plot objects.
     shared: Vec<u32>,
+    /// Seats at tables and the like (`surface::Links`), set by `World::refresh_index`.
+    pub links: crate::surface::Links,
     /// The `World::structure_version` it was built for.
     pub version: u32,
 }
@@ -28,6 +30,7 @@ impl ObjectIndex {
             on: vec![Vec::new(); plots.len()],
             usable: vec![Vec::new(); plots.len()],
             shared: Vec::new(),
+            links: Default::default(),
             version,
         };
         for (id, plot) in object_plot.iter().enumerate() {
