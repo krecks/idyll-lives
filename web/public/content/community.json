@@ -1,0 +1,1009 @@
+{
+  "$comment": "Town things: street furniture, playground, food carts and machines, and shop fittings for the public places in houses.json (parks, the market, the café and the shops), all in the `community` buy category. Models are in assets/community/manifest.json (tools/art/community.py). Per-use `cost` is what a passer-by pays at a cart, a machine or a counter. Feelings are prefixed `community.`.",
+  "feelings": [
+    {
+      "id": "community.iceCream",
+      "label": "Ice cream in the sun",
+      "emotion": "happy",
+      "mood": 0.06,
+      "hours": 3
+    }
+  ],
+  "objects": [
+    {
+      "id": "streetLamp",
+      "name": "Street lamp",
+      "model": "model.streetLamp",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 350,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.4,
+      "light": {
+        "range": 8.0,
+        "intensity": 1.3,
+        "height": 3.5
+      },
+      "description": "A tall cast-iron lantern that lights the pavement at night.",
+      "interactions": []
+    },
+    {
+      "id": "parkBench",
+      "name": "Long park bench",
+      "model": "model.parkBench",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 380,
+      "category": "community",
+      "group": "street",
+      "slots": 3,
+      "outdoors": true,
+      "decor": 0.3,
+      "seat": {
+        "height": 0.45,
+        "forward": 0.0
+      },
+      "description": "Three seats of slatted wood on iron legs: room to sit, rest and watch the world go by.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit on the bench",
+          "anim": "sit",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        },
+        {
+          "id": "feedBirds",
+          "label": "Feed the pigeons",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "nature",
+            "outdoors"
+          ],
+          "cost": 1
+        }
+      ]
+    },
+    {
+      "id": "drinkingFountain",
+      "name": "Drinking fountain",
+      "model": "model.drinkingFountain",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 300,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "description": "A stone pillar with a cold-water spout, for thirsty walkers and players.",
+      "interactions": [
+        {
+          "id": "drink",
+          "label": "Have a drink of water",
+          "anim": "drink",
+          "minutes": 3,
+          "effects": {
+            "comfort": 0.05,
+            "hunger": 0.02
+          },
+          "tags": [
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "litterBin",
+      "name": "Litter bin",
+      "model": "model.litterBin",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "description": "A green steel bin on a post. Keeps the park tidy.",
+      "interactions": []
+    },
+    {
+      "id": "busStop",
+      "name": "Bus shelter",
+      "model": "model.busStop",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 650,
+      "category": "community",
+      "group": "street",
+      "slots": 3,
+      "outdoors": true,
+      "seat": {
+        "height": 0.46,
+        "forward": -0.16
+      },
+      "description": "A glass shelter with a bench for three and the timetable on the wall.",
+      "interactions": [
+        {
+          "id": "wait",
+          "label": "Sit in the shelter",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        },
+        {
+          "id": "timetable",
+          "label": "Read the timetable",
+          "anim": "read",
+          "minutes": 5,
+          "effects": {
+            "fun": 0.03
+          },
+          "tags": [
+            "reading"
+          ],
+          "autonomous": false
+        }
+      ]
+    },
+    {
+      "id": "postBox",
+      "name": "Post box",
+      "model": "model.postBox",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 220,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.2,
+      "description": "A red pillar box. Post a card to a friend: it cheers both of you up a little.",
+      "interactions": [
+        {
+          "id": "post",
+          "label": "Post a card to a friend",
+          "anim": "write",
+          "minutes": 6,
+          "effects": {
+            "social": 0.08,
+            "fun": 0.03
+          },
+          "tags": [
+            "outdoors"
+          ],
+          "cost": 1
+        }
+      ]
+    },
+    {
+      "id": "noticeBoard",
+      "name": "Notice board",
+      "model": "model.noticeBoard",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "community",
+      "group": "street",
+      "decor": 0.2,
+      "description": "Lost cats, choir practice and a bake sale on Saturday: what is going on in town.",
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read the notices",
+          "anim": "read",
+          "minutes": 10,
+          "effects": {
+            "fun": 0.08,
+            "social": 0.04
+          },
+          "tags": [
+            "reading",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phoneBooth",
+      "name": "Phone box",
+      "model": "model.phoneBooth",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 750,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A red telephone box with a working phone. A call costs a dollar.",
+      "interactions": [
+        {
+          "id": "call",
+          "label": "Call a friend",
+          "anim": "phone",
+          "minutes": 20,
+          "effects": {
+            "social": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "cost": 1
+        }
+      ]
+    },
+    {
+      "id": "fountainTown",
+      "name": "Town fountain",
+      "model": "model.fountainTown",
+      "footprint": [
+        3,
+        3
+      ],
+      "price": 2600,
+      "category": "community",
+      "group": "street",
+      "slots": 4,
+      "outdoors": true,
+      "decor": 1.5,
+      "seat": {
+        "height": 0.5,
+        "forward": 1.3
+      },
+      "description": "A round stone basin with a fountain in the middle. Sit on the rim, or toss in a coin and make a wish.",
+      "interactions": [
+        {
+          "id": "wish",
+          "label": "Toss a coin and make a wish",
+          "anim": "look",
+          "minutes": 5,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "outdoors"
+          ],
+          "cost": 1,
+          "feeling": "garden.wish"
+        },
+        {
+          "id": "sitBy",
+          "label": "Sit on the rim",
+          "anim": "relax",
+          "minutes": 25,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.2,
+            "fun": 0.08
+          },
+          "tags": [
+            "lounge",
+            "nature",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "townStatue",
+      "name": "Founder's statue",
+      "model": "model.townStatue",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 1800,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 1.2,
+      "description": "The town's founder in bronze on a granite plinth, pointing at something only she can see.",
+      "interactions": [
+        {
+          "id": "admire",
+          "label": "Admire the statue",
+          "anim": "admire",
+          "minutes": 8,
+          "effects": {
+            "fun": 0.08
+          },
+          "tags": [
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slide",
+      "name": "Playground slide",
+      "model": "model.slide",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 520,
+      "category": "community",
+      "group": "play",
+      "outdoors": true,
+      "description": "Up the ladder, down the slide. And again. And again.",
+      "interactions": [
+        {
+          "id": "slide",
+          "label": "Go down the slide",
+          "anim": "play",
+          "minutes": 15,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "climbingFrame",
+      "name": "Climbing frame",
+      "model": "model.climbingFrame",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "play",
+      "slots": 2,
+      "outdoors": true,
+      "description": "A wooden fort with a rope net, a tower and a fireman's pole.",
+      "interactions": [
+        {
+          "id": "climb",
+          "label": "Climb the frame",
+          "anim": "exercise",
+          "minutes": 25,
+          "effects": {
+            "fun": 0.4,
+            "energy": -0.08,
+            "hygiene": -0.06
+          },
+          "tags": [
+            "entertainment",
+            "fitness",
+            "outdoors"
+          ],
+          "skills": {
+            "strength": 0.04,
+            "dexterity": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "seesaw",
+      "name": "Seesaw",
+      "model": "model.seesaw",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 340,
+      "category": "community",
+      "group": "play",
+      "slots": 2,
+      "outdoors": true,
+      "seat": {
+        "height": 0.56,
+        "forward": 0.0
+      },
+      "description": "Up you go, down they come. Much better with two.",
+      "interactions": [
+        {
+          "id": "seesaw",
+          "label": "Ride the seesaw",
+          "anim": "play",
+          "minutes": 15,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.4,
+            "social": 0.1
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "springRider",
+      "name": "Spring rider",
+      "model": "model.springRider",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "community",
+      "group": "play",
+      "outdoors": true,
+      "seat": {
+        "height": 0.78,
+        "forward": -0.04
+      },
+      "description": "A cheerful horse on a big spring. Rock and bounce.",
+      "interactions": [
+        {
+          "id": "ride",
+          "label": "Bounce on the spring rider",
+          "anim": "play",
+          "minutes": 10,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.3
+          },
+          "tags": [
+            "toys",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "merryGoRound",
+      "name": "Merry-go-round",
+      "model": "model.merryGoRound",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 780,
+      "category": "community",
+      "group": "play",
+      "slots": 4,
+      "outdoors": true,
+      "seat": {
+        "height": 0.26,
+        "forward": 0.5
+      },
+      "description": "A round platform with rails to hold on to: push off, jump on, spin. Room for four.",
+      "interactions": [
+        {
+          "id": "spin",
+          "label": "Spin round",
+          "anim": "play",
+          "minutes": 15,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.45,
+            "social": 0.08
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "basketballHoop",
+      "name": "Basketball hoop",
+      "model": "model.basketballHoop",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "community",
+      "group": "play",
+      "slots": 2,
+      "outdoors": true,
+      "description": "A hoop on a steel pole with a proper backboard. Shoot around alone or with a friend.",
+      "interactions": [
+        {
+          "id": "shoot",
+          "label": "Shoot some hoops",
+          "anim": "exercise",
+          "minutes": 40,
+          "effects": {
+            "fun": 0.4,
+            "social": 0.08,
+            "energy": -0.15,
+            "hygiene": -0.15
+          },
+          "tags": [
+            "fitness",
+            "sport",
+            "outdoors"
+          ],
+          "skills": {
+            "dexterity": 0.06,
+            "strength": 0.03
+          }
+        }
+      ]
+    },
+    {
+      "id": "pingPongTable",
+      "name": "Ping-pong table",
+      "model": "model.pingPongTable",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 650,
+      "category": "community",
+      "group": "play",
+      "slots": 2,
+      "outdoors": true,
+      "description": "A weatherproof concrete table with a steel net. Fast, silly and a little social.",
+      "interactions": [
+        {
+          "id": "pingPong",
+          "label": "Play ping-pong",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.45,
+            "social": 0.12,
+            "energy": -0.06
+          },
+          "tags": [
+            "entertainment",
+            "sport",
+            "outdoors"
+          ],
+          "skills": {
+            "dexterity": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "id": "parkChessTable",
+      "name": "Park chess table",
+      "model": "model.parkChessTable",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 480,
+      "category": "community",
+      "group": "play",
+      "slots": 2,
+      "outdoors": true,
+      "seat": {
+        "height": 0.47,
+        "forward": -0.27
+      },
+      "description": "A stone table with the board inlaid and a stool either side. Builds Intelligence.",
+      "interactions": [
+        {
+          "id": "chess",
+          "label": "Play chess in the park",
+          "anim": "play",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.3,
+            "social": 0.08
+          },
+          "tags": [
+            "training",
+            "entertainment",
+            "outdoors"
+          ],
+          "skills": {
+            "intelligence": 0.12,
+            "perception": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "iceCreamCart",
+      "name": "Ice cream cart",
+      "model": "model.iceCreamCart",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "food",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A striped parasol over a freezer full of cones. Four dollars a scoop.",
+      "interactions": [
+        {
+          "id": "iceCream",
+          "label": "Buy an ice cream",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.2,
+            "fun": 0.25
+          },
+          "tags": [
+            "food",
+            "outdoors"
+          ],
+          "cost": 4,
+          "feeling": "community.iceCream"
+        }
+      ]
+    },
+    {
+      "id": "hotDogStand",
+      "name": "Hot dog stand",
+      "model": "model.hotDogStand",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1100,
+      "category": "community",
+      "group": "food",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A steaming cart under an awning: hot dogs with everything for six dollars.",
+      "interactions": [
+        {
+          "id": "hotDog",
+          "label": "Buy a hot dog",
+          "anim": "eat",
+          "minutes": 15,
+          "effects": {
+            "hunger": 0.5,
+            "fun": 0.08
+          },
+          "tags": [
+            "food",
+            "outdoors"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "vendingSnack",
+      "name": "Snack machine",
+      "model": "model.vendingSnack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 800,
+      "category": "community",
+      "group": "food",
+      "description": "Crisps, chocolate and biscuits behind glass, four dollars each.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Buy a snack",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.3,
+            "fun": 0.05
+          },
+          "tags": [
+            "food"
+          ],
+          "cost": 4
+        }
+      ]
+    },
+    {
+      "id": "vendingDrink",
+      "name": "Drinks machine",
+      "model": "model.vendingDrink",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 800,
+      "category": "community",
+      "group": "food",
+      "description": "Cold cans and bottles, lit up at night.",
+      "interactions": [
+        {
+          "id": "drink",
+          "label": "Buy a cold drink",
+          "anim": "drink",
+          "minutes": 8,
+          "effects": {
+            "energy": 0.06,
+            "comfort": 0.08,
+            "hunger": 0.04
+          },
+          "tags": [
+            "food"
+          ],
+          "cost": 4
+        }
+      ]
+    },
+    {
+      "id": "marketStall",
+      "name": "Market stall",
+      "model": "model.marketStall",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 700,
+      "category": "community",
+      "group": "food",
+      "slots": 2,
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A striped awning over crates of fresh fruit and vegetables.",
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the stall",
+          "anim": "look",
+          "minutes": 15,
+          "effects": {
+            "fun": 0.15,
+            "social": 0.05
+          },
+          "tags": [
+            "outdoors"
+          ]
+        },
+        {
+          "id": "fruit",
+          "label": "Buy a bag of fruit",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.3,
+            "comfort": 0.04
+          },
+          "tags": [
+            "food",
+            "outdoors"
+          ],
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "id": "shopCounter",
+      "name": "Shop counter",
+      "model": "model.shopCounter",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 600,
+      "category": "community",
+      "group": "shops",
+      "slots": 2,
+      "decor": 0.3,
+      "description": "A wooden counter with a till, a jar of sweets and a rack of magazines.",
+      "interactions": [
+        {
+          "id": "treat",
+          "label": "Buy a little something",
+          "anim": "idle",
+          "minutes": 6,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.05
+          },
+          "tags": [
+            "entertainment"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "bakeryCase",
+      "name": "Bakery case",
+      "model": "model.bakeryCase",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "shops",
+      "slots": 2,
+      "decor": 0.4,
+      "description": "A glass case of buns, tarts and loaves, still warm.",
+      "interactions": [
+        {
+          "id": "pastry",
+          "label": "Buy a pastry",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.35,
+            "fun": 0.1
+          },
+          "tags": [
+            "food"
+          ],
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "id": "groceryShelf",
+      "name": "Grocery shelves",
+      "model": "model.groceryShelf",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 450,
+      "category": "community",
+      "group": "shops",
+      "slots": 2,
+      "decor": 0.2,
+      "description": "Tins, packets and jars on four shelves, and sandwiches on the bottom one.",
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the shelves",
+          "anim": "look",
+          "minutes": 10,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "entertainment"
+          ]
+        },
+        {
+          "id": "sandwich",
+          "label": "Grab a sandwich",
+          "anim": "eat",
+          "minutes": 15,
+          "effects": {
+            "hunger": 0.5
+          },
+          "tags": [
+            "food"
+          ],
+          "cost": 7
+        }
+      ]
+    },
+    {
+      "id": "cafeTable",
+      "name": "Café table",
+      "model": "model.cafeTable",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 220,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.745,
+        "kind": "table",
+        "size": [
+          0.56,
+          0.56
+        ]
+      },
+      "description": "A little round marble table on an iron foot, for two café chairs.",
+      "interactions": []
+    },
+    {
+      "id": "cafeChair",
+      "name": "Café chair",
+      "model": "model.cafeChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "community",
+      "group": "shops",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.02
+      },
+      "description": "A bentwood chair. Pulled up to a café table, it serves coffee and cake.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ],
+          "cost": 4,
+          "needsTable": true
+        },
+        {
+          "id": "cake",
+          "label": "Have a slice of cake",
+          "anim": "eat",
+          "minutes": 15,
+          "pose": "sit",
+          "effects": {
+            "hunger": 0.3,
+            "fun": 0.1
+          },
+          "tags": [
+            "food"
+          ],
+          "cost": 5,
+          "needsTable": true
+        }
+      ]
+    }
+  ]
+}

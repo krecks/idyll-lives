@@ -31,6 +31,7 @@ Run Python with `-I` (isolated mode); downloads are treated as data only.
 | `nature_entries.py <manifest>` | Points `model.tree` / `pine` / `bush` / `grassTuft` / `flowers` at the nature glbs and adds the species and `.far` keys (placed trees get `vary`) |
 | `garden_entries.py <manifest>` | Adds `model.garden.<name>` for every garden model (loose plants get `vary`) and points `model.flowerbed` at the new bed |
 | `catalog.py` | The 0.20 catalogue's models (`content/furniture.json`): kit and Poly Haven models restyled per style plus primitive-part models; writes its own compact manifest `web/public/assets/catalog/manifest.json` (listed in the base manifest's `packs`; one entry per line). Things on a wall hang with their back on the wall face (`z = -0.43`), ceiling things hang from 2.8 m. Validates footprints and finishes |
+| `community.py` | The town's community things (`content/community.json`: street furniture, playground, food carts and vending machines, shop and café fittings) and the street dressing props (`model.street.*`, drawn as thin instances by `render/babylon/street.ts`), all primitive parts with at most four finishes each; writes `web/public/assets/community/manifest.json` (in the base manifest's `packs`). Validates footprints and finishes |
 | `apply_pack.py <trait> <entries.json>` | Merges entries into `web/public/assets/packs/<trait>/manifest.json` in place |
 
 Nature and garden flow: `foliage_atlas.py` → `nature_models.py` / `garden_models.py` → `nature_entries.py` /

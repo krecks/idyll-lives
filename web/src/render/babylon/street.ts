@@ -4,7 +4,10 @@
  * a dashed centre line, streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
  * picket fences or hedges around neighbours' back gardens, and flower beds along their house
- * fronts.
+ * fronts, with pots by the door and little lights along the garden path. The town's public places
+ * seen from another lot: shops as silhouettes with an awning, and the park, playground and market
+ * things standing in the open. At the ends of the street a bus stop and street signs; benches,
+ * planters and bins along the kerb in front of the public places.
  *
  * Rules:
  * - Visual only, and kept off where Sims walk: front lawns (Sims cut across them on their way
@@ -14,19 +17,20 @@
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk).
  * - Static: generated once per town layout and kept across structure versions of the viewed
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
- *   plus thin-instanced foliage, about a dozen draw calls for the whole street.
+ *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the community
+ *   things, see `assets/community/manifest.json`), a few dozen draw calls for the whole street.
  * - Primitive builds only (no downloads), plus a CC0 concrete texture for the sidewalks.
  */
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
-import { groundDepth, type PlotInfo, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
-import { buildModel, type ModelTemplate } from './models';
+import { buildModel, placementVariation, type ModelTemplate } from './models';
 
 interface Rect {
   x: number;
@@ -55,6 +59,24 @@ const FENCE_WHITE = '#F2F0EA';
 /** Model keys of the thin-instanced foliage (street pack, see `assets/street/manifest.json`). */
 const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
 type FoliageKind = keyof typeof FOLIAGE;
+/** Props drawn from manifest models (community pack); a missing one is left out. */
+const PROP = {
+  bench: 'model.street.bench',
+  planter: 'model.street.planter',
+  flowerTub: 'model.street.flowerTub',
+  sign: 'model.street.sign',
+  busSign: 'model.street.busSign',
+  shelter: 'model.busStop',
+  pot: 'model.street.pot',
+  pathLight: 'model.street.pathLight',
+  litterBin: 'model.litterBin',
+} as const;
+/** A thin instance: x, z, scale across, scale up, yaw. */
+type Inst = [number, number, number, number, number];
+/** Shop awnings: stripe colours. */
+const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
+/** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */
+export type ObjectLook = (def: string) => { model: string; footprint: [number, number] } | undefined;
 
 function hash(x: number, z: number, salt: number): number {
   let h = (Math.imul(Math.round(x * 10) | 0, 374761393) + Math.imul(Math.round(z * 10) | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
@@ -377,7 +399,8 @@ function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: number,
 
 interface PlotLayout {
   plot: PlotInfo;
-  kind: 'home' | 'house' | 'park' | 'empty';
+  /** `shop`: a public place with walls; `park`: one in the open. */
+  kind: 'home' | 'house' | 'park' | 'shop' | 'empty';
   /** +1: the street is on the plot's max-z side; -1: on its min-z side. */
   front: 1 | -1;
   /** z of the plot edge on the street. */
@@ -394,7 +417,10 @@ export class Street {
   private key = '';
   private meshes: Mesh[] = [];
   private casters: Mesh[] = [];
-  private readonly foliage = new Map<FoliageKind, Promise<ModelTemplate>>();
+  /** Thin-instanced models by key (foliage, props, public places' things), kept hidden between builds. */
+  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  /** Footprints of public places' things by model key (see `look`). */
+  private readonly footprints = new Map<string, [number, number]>();
   private readonly glowMat: StandardMaterial;
   private readonly poolMat: StandardMaterial;
   private lamps = -1;
@@ -409,6 +435,8 @@ export class Street {
     private readonly house: HouseBuilder,
     /** Camera layer of everything this street draws (see layers.ts); default: the game world. */
     private readonly layerMask?: number,
+    /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
+    private readonly look?: ObjectLook,
   ) {
     this.lib = MaterialLibrary.for(scene);
     const glow = (this.glowMat = new StandardMaterial('streetLampGlass', scene));
@@ -472,7 +500,14 @@ export class Street {
     const pools = new Geo();
     const shadows = new Geo().color('#000000');
     const walk = new Geo();
-    const plants: Record<FoliageKind, [number, number, number, number, number][]> = { bush: [], flowers: [], hedge: [] };
+    const plants: Record<FoliageKind, Inst[]> = { bush: [], flowers: [], hedge: [] };
+    const things = new Map<string, Inst[]>();
+    const put = (key: string, x: number, z: number, yaw: number, s = 1, sy = s) => {
+      if (!this.assets.has(key, 'model')) return;
+      let list = things.get(key);
+      if (!list) things.set(key, (list = []));
+      list.push([x, z, s, sy, yaw]);
+    };
 
     // Footprints Sims and props must not share: objects, paths, the viewed lot.
     const blocked: Rect[] = outside.map((o) => ({ x: o.x, z: o.z, w: o.w, d: o.d }));
@@ -481,8 +516,8 @@ export class Street {
     // ---- neighbour houses -------------------------------------------------------------
     const specs: SilhouetteSpec[] = [];
     for (const L of plots) {
-      if (L.kind !== 'house' || !L.house) continue;
-      specs.push({ ...L.house, front: L.front, door: L.door, garage: this.garage(L, blocked), roof: L.plot.roof, storeys: L.plot.storeys });
+      if ((L.kind !== 'house' && L.kind !== 'shop') || !L.house) continue;
+      specs.push({ ...L.house, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
     }
     const sil = this.house.silhouettes(specs, world.openings ?? [], (world.storeys ?? 1) > 1 ? groundDepth(world) : 0);
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
@@ -571,6 +606,56 @@ export class Street {
             blob(shadows, x, binZ, 0.36, 0.4, 0, 0.4, WALK_Y + 0.004);
           }
         }
+        // In front of the public places: planters with a little tree, benches facing the place
+        // (backs to the road), a litter bin by each bench.
+        for (const L of row) {
+          if (L.kind !== 'park' && L.kind !== 'shop') continue;
+          let k = Math.floor(hash(L.plot.x, edge, 70) * 2);
+          for (let x0 = L.plot.x + 2.2; x0 < L.plot.x + L.plot.w - 2; x0 += 3.6) {
+            const bench = k++ % 2 === 1;
+            const x = [0, 0.6, -0.6].map((d) => x0 + d).find((x) => clear(x, bench ? 1.3 : 0.8) && !near(x, bench ? 1.5 : 1.0));
+            if (x === undefined) continue;
+            used.push(x);
+            if (bench) {
+              put(PROP.bench, x, kerbZ, yaw + Math.PI);
+              blob(shadows, x, kerbZ, 0.95, 0.3, 0, 0.35, WALK_Y + 0.004);
+              const bx = x + (hash(x, edge, 71) < 0.5 ? -1.2 : 1.2);
+              if (clear(bx, 0.3) && !near(bx, 0.5)) {
+                used.push(bx);
+                put(PROP.litterBin, bx, kerbZ, yaw + (hash(bx, edge, 72) - 0.5) * 0.5, 0.9);
+              }
+            } else {
+              put(hash(x, edge, 73) < 0.75 ? PROP.planter : PROP.flowerTub, x, kerbZ, hash(x, edge, 74) * 6.28, 0.9 + hash(x, edge, 75) * 0.15);
+              blob(shadows, x, kerbZ, 0.5, 0.5, 0, 0.4, WALK_Y + 0.004);
+            }
+          }
+        }
+        // At the ends of the street (past the last lots): a bus shelter facing the road, its stop
+        // sign at the kerb, and a street-name sign on the corner.
+        if (row.length) {
+          const west = side < 0;
+          const corner = west ? row[0].plot.x : row[row.length - 1].plot.x + row[row.length - 1].plot.w;
+          const out = west ? -1 : 1;
+          const cx = corner + out * 4;
+          const cz = edge - into * 0.62;
+          const shelter = { x: cx - 1.55, z: cz - 0.55, w: 3.1, d: 1.1 };
+          if (clear(cx, 1.6) && free(shelter, 0.2)) {
+            put(PROP.shelter, cx, cz, yaw);
+            blob(shadows, cx, cz, 1.7, 0.6, 0, 0.35, 0.02);
+            const sx = cx - out * 2.1;
+            if (clear(sx, 0.3) && !near(sx, 0.6)) {
+              used.push(sx);
+              put(PROP.busSign, sx, kerbZ, yaw);
+            }
+          }
+          // Street-name signs at both ends, on one side of the street.
+          const ends = west ? [row[0].plot.x - 0.9, row[row.length - 1].plot.x + row[row.length - 1].plot.w + 0.9] : [];
+          for (const x of ends) {
+            if (!clear(x, 0.3) || near(x, 0.8)) continue;
+            used.push(x);
+            put(PROP.sign, x, kerbZ, yaw + Math.PI / 4);
+          }
+        }
       }
       // Dashed centre line.
       props.at(0, 0).paint('#E8E2CC', 0.6, 0);
@@ -647,6 +732,60 @@ export class Street {
         const r = { x: cx - 0.5, z: cz - 0.5, w: 1, d: 1 };
         if (free(r) && !(L.drive && overlaps(r, L.drive, 0.2))) plants.bush.push([cx, cz, 0.7, 0.75, hash(cx, cz, 45) * 6.28]);
       }
+      // Pots either side of the front door, and on some plots little lights along the garden path.
+      if (L.door !== null && hash(plot.x, plot.z, 46) < 0.8) {
+        for (const dx of [-0.85, 0.85]) {
+          const [px, pz] = [L.door + dx, frontWall + front * 0.32];
+          if (free({ x: px - 0.2, z: pz - 0.2, w: 0.4, d: 0.4 })) put(PROP.pot, px, pz, hash(px, pz, 47) * 6.28, 0.85 + hash(px, pz, 48) * 0.3);
+        }
+      }
+      const path = L.door === null ? undefined : paths.find((r) => r.w < DRIVEWAY_MIN_WIDTH && Math.abs(r.x + r.w / 2 - L.door!) < 0.01);
+      if (path && hash(plot.x, plot.z, 49) < 0.55) {
+        const [a, b] = [Math.min(L.edge, frontWall) + 1.0, Math.max(L.edge, frontWall) - 1.0];
+        for (let z = a, i = 0; z <= b; z += 2.2, i++) {
+          const px = i % 2 ? path.x - 0.22 : path.x + path.w + 0.22;
+          if (free({ x: px - 0.1, z: z - 0.1, w: 0.2, d: 0.2 })) put(PROP.pathLight, px, z, 0);
+        }
+      }
+    }
+
+    // ---- public places seen from another lot: shops' awnings, the things in the open ------
+    for (const L of plots) {
+      if (L.kind === 'shop' && L.house) {
+        // A striped awning along the shop front, over the windows and the door.
+        const h = L.house;
+        const frontWall = L.front > 0 ? h.z1 + T : h.z0 - T;
+        const [x0, x1] = [h.x0 + 0.5, h.x1 - 0.5];
+        const [a, b] = pick(AWNINGS, L.plot.x, L.plot.z, 76);
+        props.at((x0 + x1) / 2, frontWall, L.front > 0 ? 0 : Math.PI);
+        const half = (x1 - x0) / 2;
+        const n = Math.max(2, Math.round((x1 - x0) / 0.5));
+        for (let i = 0; i < n; i++) {
+          const [u0, u1] = [-half + ((x1 - x0) * i) / n, -half + ((x1 - x0) * (i + 1)) / n];
+          props.paint(i % 2 ? b : a, 0.85, 0);
+          props.poly([[u0, 2.55, 0], [u1, 2.55, 0], [u1, 2.2, 0.95], [u0, 2.2, 0.95]], [0, 0.94, 0.35]);
+          props.poly([[u0, 2.04, 0.95], [u0, 2.2, 0.95], [u1, 2.2, 0.95], [u1, 2.04, 0.95]], [0, 0, 1]);
+          props.poly([[u0, 2.04, 0.95], [u1, 2.04, 0.95], [u1, 2.55, 0.0], [u0, 2.55, 0.0]], [0, -0.94, -0.35]);
+        }
+        props.paint('#3A3D41', 0.5, 0.5);
+        for (const u of [-half, half]) props.box(u - 0.02, 2.2, 0, u + 0.02, 2.24, 0.95);
+        blob(shadows, (x0 + x1) / 2, frontWall + L.front * 0.6, half, 0.6, 0, 0.25, 0.02);
+      }
+      // The outdoor things of a public place (the overview draws every lot's things itself).
+      if (!view || !this.look || L.kind === 'home' || L.kind === 'house' || L.kind === 'empty') continue;
+      const W = world.width;
+      const D = groundDepth(world);
+      for (const o of outside) {
+        if (o.x < L.plot.x || o.z < L.plot.z || o.x >= L.plot.x + L.plot.w || o.z >= L.plot.z + L.plot.d || o.z + o.d > D) continue;
+        let indoors = false;
+        for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) indoors ||= !!world.rooms[z * W + x];
+        const look = this.look(o.def);
+        if (indoors || !look) continue;
+        this.footprints.set(look.model, look.footprint);
+        const c = objectCentre(o);
+        const { turn, size } = placementVariation(this.assets.get(look.model, 'model')?.vary ?? 0, o.x, o.z);
+        put(look.model, c.x, c.z, (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, size);
+      }
     }
 
     // ---- meshes ---------------------------------------------------------------------------
@@ -678,11 +817,17 @@ export class Street {
     const interior = this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
     this.lib.excludeFromLights(interior, new Set(this.meshes));
     const foliage: Mesh[] = [];
-    for (const kind of Object.keys(FOLIAGE) as FoliageKind[]) {
-      const meshes = await this.instances(kind, plants[kind]);
+    const batches: [string, Inst[], boolean][] = [
+      ...(Object.keys(FOLIAGE) as FoliageKind[]).map((kind): [string, Inst[], boolean] => [FOLIAGE[kind], plants[kind], kind === 'hedge']),
+      ...[...things].map(([key, list]): [string, Inst[], boolean] => [key, list, true]),
+    ];
+    // Models from the last build that aren't used now are hidden.
+    for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => t.meshes.forEach((m) => m.setEnabled(false)));
+    for (const [key, items, cast] of batches) {
+      const meshes = await this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key));
       this.lib.excludeFromLights(interior, new Set(meshes));
       foliage.push(...meshes);
-      if (kind === 'hedge') this.casters.push(...meshes);
+      if (cast) this.casters.push(...meshes);
     }
     for (const mesh of this.meshes) mesh.freezeWorldMatrix();
     this.drawn = [...this.meshes, ...foliage];
@@ -707,7 +852,7 @@ export class Street {
     this.casters = [];
     this.drawn = [];
     this.key = '';
-    for (const template of this.foliage.values()) {
+    for (const template of this.templates.values()) {
       void template.then((t) => {
         if (this.key === '') for (const mesh of t.meshes) mesh.setEnabled(false);
       });
@@ -748,7 +893,7 @@ export class Street {
       const [x0, z0, x1, z1] = plot.house ?? [0, 0, 0, 0];
       out.push({
         plot,
-        kind: home ? 'home' : plot.public ? 'park' : plot.house ? 'house' : 'empty',
+        kind: home ? 'home' : plot.public ? (plot.house ? 'shop' : 'park') : plot.house ? 'house' : 'empty',
         front,
         edge,
         house: plot.house ? { x0, z0, x1, z1 } : null,
@@ -825,18 +970,17 @@ export class Street {
     g.poly([[x - r, y, z - r], [x + r, y, z - r], [x + r, y, z + r], [x - r, y, z + r]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }
 
-  /** Thin instances of a foliage model: [x, z, scale xz, scale y, yaw]. */
-  private async instances(kind: FoliageKind, items: [number, number, number, number, number][]): Promise<Mesh[]> {
-    let template = this.foliage.get(kind);
+  /** Thin instances of a model (`flat`: not scaled along z, hedges stretched along their run). */
+  private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1]): Promise<Mesh[]> {
+    let template = this.templates.get(key);
     if (!template) {
-      const key = FOLIAGE[kind];
-      template = buildModel(this.scene, `street:${kind}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, [1, 1]);
-      this.foliage.set(kind, template);
+      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint);
+      this.templates.set(key, template);
     }
     const t = await template;
     const buf = new Float32Array(Math.max(1, items.length) * 16);
     items.forEach(([x, z, s, sy, yaw], i) => {
-      Matrix.ComposeToRef(this.tmpS.set(s, sy, kind === 'hedge' ? 1 : s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.tmpQ), this.tmpT.set(x, 0, z), this.tmpM);
+      Matrix.ComposeToRef(this.tmpS.set(s, sy, flat ? 1 : s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.tmpQ), this.tmpT.set(x, 0, z), this.tmpM);
       this.tmpM.copyToArray(buf, i * 16);
     });
     for (const mesh of t.meshes) {

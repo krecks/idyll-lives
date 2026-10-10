@@ -674,8 +674,8 @@ export async function startSession(
     },
   };
   services.controls = controls;
-  // `?debug`: drive the game from the console / test harness.
-  if (params.has('debug')) Object.assign(window, { __controls: controls });
+  // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`).
+  if (params.has('debug')) Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world });
   game.sharedMemory = bridge.sharedMemory;
   game.household = household;
 

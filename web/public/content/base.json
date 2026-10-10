@@ -3180,7 +3180,7 @@
     "wakeBeforeWorkMinutes": 75
   },
   "objectRules": {
-    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids"],
+    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
     "maxQuality": 3,
@@ -3454,12 +3454,24 @@
         {"id": "lights", "label": "Lights", "outside": true},
         {"id": "decor", "label": "Garden decor", "outside": true}
       ]
+    },
+    {
+      "id": "community",
+      "label": "Community",
+      "icon": "icon.category.community", "outside": true,
+      "groups": [
+        {"id": "play", "label": "Playground", "outside": true},
+        {"id": "street", "label": "Street & square", "outside": true},
+        {"id": "food", "label": "Carts & machines", "outside": true},
+        {"id": "shops", "label": "Shop & café", "outside": false}
+      ]
     }
   ],
   "include": [
     "careers.json",
     "garden.json",
     "furniture.json",
+    "community.json",
     "packs/example.json",
     "packs/foodie.json",
     "packs/bookworm.json",

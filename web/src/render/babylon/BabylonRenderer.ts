@@ -398,7 +398,11 @@ export class BabylonRenderer implements Renderer {
       roofs: c.roofStyles,
       roofColors: c.roofColors,
     });
-    this.street = new Street(scene, this.deps.assets, this.house);
+    // Public places seen from another lot show their things in the open (as the overview does).
+    this.street = new Street(scene, this.deps.assets, this.house, undefined, (def) => {
+      const d = this.deps.content.object(def);
+      return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1] };
+    });
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
     await this.setupEnvironment();

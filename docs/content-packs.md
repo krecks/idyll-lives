@@ -98,7 +98,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `bunk` | Bunk beds (2 `slots`): both sleepers lie in the middle of the bed's width, the second on the upper bunk (heights per object in `render/babylon/characters.ts`, `BUNKS`). |
 | `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width. Default 1. |
 | `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55}` makes it a light at night (reach in metres, relative brightness, bulb height). |
-| `freeRotation` | `true` lets the player turn it to any angle in 15° steps and stand it anywhere on its tile (quarter tiles, or to the centimetre with Shift); both only for looks. Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`). |
+| `freeRotation` | `true` lets the player turn it to any angle in 15° steps and stand it anywhere on its tile (quarter tiles, or to the centimetre with Shift); both only for looks. Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
 | `decor` | Decor points it gives the room it stands in (see [Rooms](#rooms-wear-and-accidents)). Default: by category, `roomRules.decorByCategory`. |
 | `wearPerUse` | Wear added by each completed use; at 1 it breaks. Default: by category, `objectRules.wear` (nothing wears out that nobody uses). |
 | `description` | Catalog text: say what it's for and what makes it special. |
@@ -461,13 +461,16 @@ id) and `last` (household names).
   `fitness`, `hobbies` (`music`, `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`),
   `lighting` (`ceiling`, `wall`, `floor`, `table`), `outdoor` (`seating`, `cooking`, `play`,
   `lights`, `decor`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
-  `houseplants`), `wellness` (example pack). An object without a `group` shows under its
+  `houseplants`), `community` (`play`, `street`, `food`, `shops`: the town's playground,
+  street furniture, carts and vending machines, shop fittings; `content/community.json`),
+  `wellness` (example pack). An object without a `group` shows under its
   category's *All*. Add a category with
   `"buyCategories": [{ "id": "...", "label": "...", "icon": "icon.category.<id>" }]` only if
   none fits (`icon` is optional: the catalog tab's icon, an `icon` asset key; `groups`
   optional: `[{ "id": "...", "label": "..." }]`, chips that objects pick with `group`;
   `"outside": true` on a category or group marks garden things, which wishes for a room don't
-  offer: base game `outdoor` and the garden's `trees`, `shrubs`, `flowers`, `edibles`).
+  offer: base game `outdoor` and `community` (except its `shops` group, `"outside": false`)
+  and the garden's `trees`, `shrubs`, `flowers`, `edibles`).
 - **Activities** (routine blocks): `sleep`, `eat`, `cook`, `wash`, `train` (names a skill),
   `workout`, `read`, `create`, `fun`, `relax`, `garden`, `chores`, `social`, `visit`.
 - **Traits** (for `traitPatches`): `foodie`, `bookworm`, `couchPotato`, `neat`, `slob`,
@@ -559,6 +562,7 @@ careers go) for the base game, so run it after changing prices, pay or rent.
 |---|---|---|
 | decor | $40–150 | plant 40, lamp 120 |
 | outdoor | $40–250 | bush 40, flowerbed 60, bench 200 |
+| community | $60–2,600 | litter bin 60, café chair 160, park bench 380, slide 520, vending machine 800, town fountain 2,600 |
 | bathroom | $180–650 | sink 180, toilet 300, shower 650 |
 | kitchen | $350–600 | dining table 350, fridge 600 |
 | bedroom | $180–750 | mirror 180, bed 750 |
@@ -594,6 +598,41 @@ interaction above 1.0 is wasted (needs cap at 1).
 
 **Feelings:** `mood` +0.05..+0.12 for everyday treats, up to +0.2 for big events; `hours`
 2–8 for everyday treats. Gate the nice ones behind `feelingMinSkill` so skill matters.
+
+## Towns: houses and public places
+
+`content/houses.json` holds the house layouts a town is built from and, under `parks`, its
+public places. Everything is drawn for a medium lot (`plot`, 26×22 tiles) with the street
+along z = 0; plots across the street are the same layout turned round 180°.
+
+```json
+{
+  "id": "cafe", "name": "Corner Café", "kind": "shop", "description": "Coffee, cake and a terrace in the sun.",
+  "walls": [[7, 6, 19, 6], [7, 13, 19, 13], [7, 6, 7, 13], [19, 6, 19, 13]],
+  "doors": [{"x": 12, "z": 6, "axis": "x"}],
+  "windows": [{"x": 8, "z": 6, "axis": "x"}],
+  "paths": [{"x": 1, "z": 1, "w": 24, "d": 5}],
+  "entry": [12.5, 4.5],
+  "objects": [{"def": "cafeTable", "x": 9, "z": 8, "rot": 0, "turn": 30}, {"def": "cafeChair", "x": 8, "z": 8, "rot": 1}]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` | `park` (default: laid out in the open) or `shop` (a small shell with `walls`, `doors` and `windows`, placed like a house's). |
+| `walls`, `doors`, `windows` | As in house layouts (optional). A shop's first door gets a garden path to the street. |
+| `paths` | Paved ground in plot tiles (`x`, `z`, `w`, `d`, any size): walks, squares, terraces. Only drawn. |
+| `entry` | Where visitors arrive (default: the middle of the street front, 1.5 m in). |
+| `objects` | Placements: `def`, `x`, `z` (the footprint's corner), `rot` (0 = facing +z, away from the street; 2 = facing the street), and for things that turn freely (`freeRotation`) `turn` (degrees past `rot`, 0..89) and `offset` (`[x, z]` off the middle of the tile in hundredths of a tile, up to ±50; turned round with the plot it points the other way). |
+
+Every town has the first entry (the Town Park) in the middle of one row and gets more public
+places round it by size (small 1, medium 2, large 3), picked at random from the rest. Everyone in
+town may use what stands on a public place; residents walk there on their own when it's worth
+the walk (food carts and machines when hungry, a bench, the playground). Town files are loaded
+strictly: one thing that doesn't fit (overlaps, faces off the lot, a wall in the way, a turn on
+something that doesn't turn) and the town doesn't load, so `cargo test -p sim-core --test
+public_places` loads every place on both sides of the street and checks that everything in it
+can be reached from the street.
 
 ## Checking a pack
 

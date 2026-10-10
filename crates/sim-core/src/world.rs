@@ -860,7 +860,17 @@ impl World {
             )));
         }
         for p in &lot_file.objects {
-            world.place_object(&p.def, p.x, p.z, p.rot)?;
+            let def = world
+                .content
+                .object_index(&p.def)
+                .ok_or_else(|| Error::new(format!("unknown object '{}'", p.def)))?;
+            // Turned or set off its tile's middle: only what turns freely may be.
+            let at = |e: Error| Error::new(format!("'{}' at {},{}: {e}", p.def, p.x, p.z));
+            let turn = world.check_turn(def, p.turn).map_err(at)?;
+            let offset = world.check_offset(def, p.offset).map_err(at)?;
+            let value = world.content.objects[def].price.unwrap_or(0);
+            let id = world.place(def, p.x, p.z, p.rot, offset, 0, 0, value)?;
+            world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
             return Err(Error::new(format!("at most {MAX_SIMS} residents per town")));

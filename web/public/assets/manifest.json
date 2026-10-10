@@ -4,6 +4,7 @@
   "packs": [
     "street/manifest.json",
     "catalog/manifest.json",
+    "community/manifest.json",
     "packs/foodie/manifest.json",
     "packs/bookworm/manifest.json",
     "packs/couchPotato/manifest.json",

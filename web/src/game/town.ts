@@ -1,7 +1,8 @@
 /**
  * Neighbourhood generation and assembly. A town is a row of plots on each side of a
- * street; each plot is small, medium or large and gets a house layout (or the park) from
- * `content/houses.json`. Layouts are drawn for a medium lot and sit centred on the others, with
+ * street; each plot is small, medium or large and gets a house layout (or a public place: the
+ * park, a playground, a square, a shop) from `content/houses.json`. Layouts are drawn for a
+ * medium lot and sit centred on the others, with
  * the front door towards the street; a small lot only takes a house that fits.
  * Plots on the south side are rotated 180° so every front door faces the street.
  * The result is one town file the simulation loads like any lot.
@@ -25,6 +26,10 @@ export interface Placement {
   x: number;
   z: number;
   rot: number;
+  /** Degrees past `rot` (0..90), for things that turn freely (sim-core `check_turn`). */
+  turn?: number;
+  /** Off the middle of its footprint in hundredths of a tile ([x, z], up to ±50), for things that turn freely. */
+  offset?: [number, number];
 }
 
 export interface HouseTemplate {
@@ -42,11 +47,25 @@ export interface HouseTemplate {
   upper?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[] };
 }
 
-interface ParkTemplate {
+/**
+ * A public place (`parks` in `content/houses.json`): a park or square laid out in the open, or a
+ * shop, a small shell with walls, doors and windows like a house's. Everyone in town may use what
+ * is there. The first one is the town park every town has.
+ */
+export interface PublicTemplate {
   id: string;
   name: string;
   description: string;
+  /** `park` (default) or `shop` (labels, and which ones a town gets). */
+  kind?: 'park' | 'shop';
+  walls?: Wall[];
+  doors?: Door[];
+  windows?: Door[];
   objects: Placement[];
+  /** Paved ground (plot coordinates, any size): walks, squares, terraces. Only drawn. */
+  paths?: Rect[];
+  /** Where visitors arrive (plot coordinates); default: the middle of the street front. */
+  entry?: [number, number];
 }
 
 export type LotSize = 'small' | 'medium' | 'large';
@@ -58,7 +77,7 @@ export interface Templates {
   /** Lot sizes (missing in older files: every lot is `plot`). */
   lotSizes?: Partial<Record<LotSize, { width: number; depth: number }>>;
   houses: HouseTemplate[];
-  parks: ParkTemplate[];
+  parks: PublicTemplate[];
   /** How houses are generated (`content/housegen.json`; absent: only the fixed layouts above). */
   gen?: HouseGenConfig;
   /** Object footprints from the game's content (for furnishing generated houses). */
@@ -67,10 +86,13 @@ export interface Templates {
 
 export type TownSize = 'small' | 'medium' | 'large';
 export const TOWN_COLUMNS: Record<TownSize, number> = { small: 3, medium: 4, large: 5 };
+/** Public places besides the town park, by town size (from the other `parks` layouts, picked at random). */
+const MORE_PLACES: Record<TownSize, number> = { small: 1, medium: 2, large: 3 };
 
 export interface PlotSlot {
   index: number;
-  kind: 'house' | 'park';
+  /** `park` and `shop` are public places (see `PublicTemplate`). */
+  kind: 'house' | 'park' | 'shop';
   template: string;
   /** Address or place name. */
   name: string;
@@ -259,7 +281,13 @@ export function generateNeighbourhood(
 ): NeighbourhoodDraft {
   const cols = TOWN_COLUMNS[size];
   const street = pick(content.names.streets ?? ['Main Street']);
-  const parkIndex = cols + Math.floor(cols / 2); // middle of the north row
+  // The park in the middle of the north row; the other public places gather round it (across the
+  // street first, then beside it), so the town has a little centre.
+  const half = Math.floor(cols / 2);
+  const parkIndex = cols + half;
+  const others = [...t.parks.slice(1)].sort(() => Math.random() - 0.5).slice(0, MORE_PLACES[size]);
+  const spots = [half, parkIndex + 1, half + 1, parkIndex - 1].filter((i) => i >= 0 && i < cols * 2);
+  const places = new Map<number, PublicTemplate>([[parkIndex, t.parks[0]], ...others.map((p, i) => [spots[i], p] as [number, PublicTemplate])]);
   // Mostly medium lots, some small and some large (when the layouts say how big they are).
   const lotSize = (): LotSize => {
     if (!t.lotSizes) return 'medium';
@@ -272,13 +300,13 @@ export function generateNeighbourhood(
   for (let row = 0; row < 2; row++) {
     for (let col = 0; col < cols; col++) {
       const index = unplaced.length;
-      const park = index === parkIndex;
-      const lot = park ? 'medium' : lotSize();
+      const place = places.get(index);
+      const lot = place ? 'medium' : lotSize();
       unplaced.push({
         index,
-        kind: park ? 'park' : 'house',
-        template: park ? t.parks[0].id : houseFor(t, lot),
-        name: park ? t.parks[0].name : `${number++ * 2 - row} ${street}`,
+        kind: place ? (place.kind ?? 'park') : 'house',
+        template: place ? place.id : houseFor(t, lot),
+        name: place ? place.name : `${number++ * 2 - row} ${street}`,
         x: 0,
         z: 0,
         rotated: row === 0,
@@ -357,7 +385,7 @@ export interface TownLayout {
 }
 
 /**
- * Stamps every plot's house layout (or the park) onto the town. `playerSlot` is left without a
+ * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town. `playerSlot` is left without a
  * driveway (it stays open for building); null gives every house one.
  */
 export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null): TownLayout {
@@ -378,66 +406,75 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     for (const o of list) {
       const [fw, fd] = footprint(o.def);
       const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      // Turned round with the plot, a thing set off its tile's middle stands off the other way.
+      const extra = { ...(o.turn ? { turn: o.turn } : {}), ...(o.offset ? { offset: (s.rotated ? [-o.offset[0], -o.offset[1]] : o.offset) as [number, number] } : {}) };
       objects.push(
         s.rotated
-          ? { def: o.def, x: s.x + pw - o.x - w, z: s.z + pd - o.z - d + lift, rot: (o.rot + 2) % 4 }
-          : { def: o.def, x: s.x + o.x, z: s.z + o.z + lift, rot: o.rot },
+          ? { def: o.def, x: s.x + pw - o.x - w, z: s.z + pd - o.z - d + lift, rot: (o.rot + 2) % 4, ...extra }
+          : { def: o.def, x: s.x + o.x, z: s.z + o.z + lift, rot: o.rot, ...extra },
       );
     }
+  };
+  /** Walls, doors and windows of a layout (a house or a shop), `lift` rows up (see `TownLayout.storeys`). */
+  const shell = (s: PlotSlot, f: { walls?: Wall[]; doors?: Door[]; windows?: Door[] }, lift = 0) => {
+    const { width: pw, depth: pd } = lotDims(t, s.lot);
+    for (const [x0, z0, x1, z1] of f.walls ?? []) {
+      const [a, b] = [point(s, [x0, z0]), point(s, [x1, z1])];
+      walls.push([a[0], a[1] + lift, b[0], b[1] + lift]);
+    }
+    // Doors and windows sit on wall edges; rotating the plot moves an edge's start corner.
+    const edge = (d: Door): Door =>
+      !s.rotated
+        ? { x: s.x + d.x, z: s.z + d.z + lift, axis: d.axis }
+        : d.axis === 'x'
+          ? { x: s.x + pw - 1 - d.x, z: s.z + pd - d.z + lift, axis: 'x' }
+          : { x: s.x + pw - d.x, z: s.z + pd - 1 - d.z + lift, axis: 'z' };
+    doors.push(...(f.doors ?? []).map(edge));
+    windows.push(...(f.windows ?? []).map(edge));
+  };
+  /** A garden path from a front door (plot coordinates) to the street. */
+  const pathTo = (s: PlotSlot, front: Door) => {
+    const { depth: pd } = lotDims(t, s.lot);
+    const [px, pz] = point(s, [front.x, front.z]);
+    const doorX = s.rotated ? px - 1 : px;
+    paths.push(s.rotated ? { x: doorX, z: pz, w: 1, d: s.z + pd - pz } : { x: doorX, z: s.z, w: 1, d: pz - s.z });
   };
   const layoutOf = (s: PlotSlot) => {
     const h = houseTemplate(t, s.template);
     return h && onLot(t, h, s.lot, footprint);
   };
+  const placeOf = (s: PlotSlot) => (s.kind === 'house' ? undefined : t.parks.find((p) => p.id === s.template));
 
   const plots = town.slots.map((s) => {
     const { width: pw, depth: pd } = lotDims(t, s.lot);
     // Visitors arrive in front of the door (the first spawn point of the house layout).
-    const spawn = layoutOf(s)?.spawns[0];
+    const spawn = layoutOf(s)?.spawns[0] ?? placeOf(s)?.entry;
     const entry: [number, number] = spawn ? point(s, spawn) : [s.x + pw / 2, s.rotated ? s.z + pd - 1.5 : s.z + 1.5];
-    return { name: s.name, x: s.x, z: s.z, w: pw, d: pd, public: s.kind === 'park', entry, storeys: layoutOf(s)?.upper ? 2 : 1 };
+    return { name: s.name, x: s.x, z: s.z, w: pw, d: pd, public: s.kind !== 'house', entry, storeys: layoutOf(s)?.upper ? 2 : 1 };
   });
   for (const s of town.slots) {
-    if (s.kind === 'park') {
-      placeAll(s, t.parks.find((p) => p.id === s.template)?.objects ?? []);
+    if (s.kind !== 'house') {
+      const place = placeOf(s);
+      if (!place) continue;
+      const { width: pw, depth: pd } = lotDims(t, s.lot);
+      shell(s, place);
+      placeAll(s, place.objects);
+      if (place.doors?.[0]) pathTo(s, place.doors[0]);
+      for (const r of place.paths ?? []) paths.push(s.rotated ? { x: s.x + pw - r.x - r.w, z: s.z + pd - r.z - r.d, w: r.w, d: r.d } : { x: s.x + r.x, z: s.z + r.z, w: r.w, d: r.d });
       continue;
     }
     const h = layoutOf(s);
     if (!h) continue;
     const { width: pw, depth: pd } = lotDims(t, s.lot);
-    for (const [x0, z0, x1, z1] of h.walls) {
-      const [a, b] = [point(s, [x0, z0]), point(s, [x1, z1])];
-      walls.push([a[0], a[1], b[0], b[1]]);
-    }
-    // Doors and windows sit on wall edges; rotating the plot moves an edge's start corner.
-    const edge = (d: Door): Door =>
-      !s.rotated
-        ? { x: s.x + d.x, z: s.z + d.z, axis: d.axis }
-        : d.axis === 'x'
-          ? { x: s.x + pw - 1 - d.x, z: s.z + pd - d.z, axis: 'x' }
-          : { x: s.x + pw - d.x, z: s.z + pd - 1 - d.z, axis: 'z' };
-    doors.push(...h.doors.map(edge));
-    windows.push(...(h.windows ?? []).map(edge));
+    shell(s, h);
     placeAll(s, h.objects);
     // The storey above, on its own rows of the lot.
     if (h.upper) {
-      const lift = town.depth;
-      for (const [x0, z0, x1, z1] of h.upper.walls) {
-        const [a, b] = [point(s, [x0, z0]), point(s, [x1, z1])];
-        walls.push([a[0], a[1] + lift, b[0], b[1] + lift]);
-      }
-      const up = (d: Door): Door => ({ ...edge(d), z: edge(d).z + lift });
-      doors.push(...h.upper.doors.map(up));
-      windows.push(...(h.upper.windows ?? []).map(up));
-      placeAll(s, h.upper.objects, lift);
+      shell(s, h.upper, town.depth);
+      placeAll(s, h.upper.objects, town.depth);
     }
     // A garden path from the front door to the street.
-    const front = h.doors[0];
-    if (front) {
-      const [px, pz] = point(s, [front.x, front.z]);
-      const doorX = s.rotated ? px - 1 : px;
-      paths.push(s.rotated ? { x: doorX, z: pz, w: 1, d: s.z + pd - pz } : { x: doorX, z: s.z, w: 1, d: pz - s.z });
-    }
+    if (h.doors[0]) pathTo(s, h.doors[0]);
     // Neighbours get a driveway beside the house (the renderer parks a car on it); the player's
     // plot stays open for building.
     const drive = s.index === playerSlot ? null : driveway(h, pw, pd, footprint);
