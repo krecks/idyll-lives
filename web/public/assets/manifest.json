@@ -5,6 +5,7 @@
     "street/manifest.json",
     "catalog/manifest.json",
     "community/manifest.json",
+    "catalog2/manifest.json",
     "packs/foodie/manifest.json",
     "packs/bookworm/manifest.json",
     "packs/couchPotato/manifest.json",
@@ -8913,6 +8914,10 @@
     "icon.category.kids": {
       "type": "icon",
       "url": "icons/blocks.svg"
+    },
+    "icon.category.tabletop": {
+      "type": "icon",
+      "url": "icons/vase.svg"
     },
     "icon.ui.upgrade": {
       "type": "icon",

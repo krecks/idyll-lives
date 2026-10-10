@@ -455,12 +455,14 @@ id) and `last` (household names).
 - **Emotions:** `happy`, `flirty`, `angry`, `sad`, `embarrassed`, `focused` (likes
   `training`), `inspired` (likes `creative`), `energized` (likes `fitness`), `relaxed`
   (likes `rest`, `lounge`, `spa`). Icons are `icon.emotion.<id>`.
-- **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `dining`),
-  `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom` (`beds`, `storage`,
-  `dressing`), `kids`, `living` (`seating`, `tables`, `media`, `shelves`), `office`,
-  `fitness`, `hobbies` (`music`, `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`),
-  `lighting` (`ceiling`, `wall`, `floor`, `table`), `outdoor` (`seating`, `cooking`, `play`,
-  `lights`, `decor`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
+- **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `islands`,
+  `dining`, `cabinets`), `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom`
+  (`beds`, `nightstands`, `storage`, `dressing`), `kids`, `living` (`seating`, `sectionals`,
+  `tables`, `media`, `shelves`), `office` (`desks`, `chairs`), `fitness`, `hobbies` (`music`,
+  `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`), `tabletop` (things on the
+  `surface` layer: `kitchenware`, `tableware`, `books`, `plants`, `ornaments`, `bath`, `desk`,
+  `toys`), `lighting` (`ceiling`, `wall`, `floor`, `table`), `outdoor` (`seating`, `cooking`,
+  `play`, `lights`, `decor`, `yard`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
   `houseplants`), `community` (`play`, `street`, `food`, `shops`: the town's playground,
   street furniture, carts and vending machines, shop fittings; `content/community.json`),
   `wellness` (example pack). An object without a `group` shows under its
@@ -570,6 +572,25 @@ careers go) for the base game, so run it after changing prices, pay or rent.
 | fitness | $480–650 | weight bench 480, treadmill 650 |
 | hobbies | $300–1,400 | easel 300, chess 350, telescope 900, piano 1,400 |
 | office | ~$1,100 | computer desk 1,100 |
+
+The second catalogue (`content/catalog2/*.json`, separate pieces: a table and its chairs are
+bought one by one) fills in below and between those:
+
+| Category / group | Range | Examples |
+|---|---|---|
+| tabletop (all groups) | $10–80, decor 0.2–0.5 | toy blocks 12, mugs 15, vase of flowers 40, stand mixer 80 |
+| kitchen counters, islands | $110–520 (long island 1,100) | counter end 140, butcher block 260, double sink 520 |
+| kitchen appliances | $380–1,600 | dishwasher 380, oven tower 900, French-door fridge 1,500, range cooker 1,600 |
+| kitchen dining: tables | $90–620 | bistro table 90, table for four 260, farmhouse table 520, banquet table 620 |
+| kitchen dining: chairs, stools | $30–160 | folding chair 30, wooden chair 55, carver chair 160 |
+| kitchen cabinets | $180–650 | bar cart 180, sideboard 380, china cabinet 650 |
+| living sectionals | $280–420 a piece | middle, arm or corner seat 280, chaise 420 |
+| living seating, tables, shelves | $35–980 | floor cushion 35, coffee table 180, recliner 650, three-seater 980 |
+| bedroom nightstands, storage | $45–900 | nightstand 95, dresser 360, armoire 900 |
+| bedroom beds | $480–2,200 | daybed 480, double 900, four-poster 2,200 |
+| office desks, chairs | $160–1,200 | desk chair 160, desk 180, standing desk 650, executive desk 1,200 |
+| lighting: table lamps (on tops) | $45–90 | lantern 45, banker's lamp 90 |
+| outdoor yard | $70–2,400 | rain barrel 70, raised bed 160, shed 900, greenhouse 2,400 |
 
 Something clearly better than the basic version (bigger gains, a buff, two slots) costs
 2–3× the basic item; luxury items $1,500–3,000. Per-use `cost` ($4–15) only for

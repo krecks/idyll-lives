@@ -1,0 +1,641 @@
+{
+  "$comment": "Catalogue 2: Patio tables and chairs, garden benches, sheds, beds and garden decor. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "patioTableRound",
+      "name": "Round patio table",
+      "model": "model.patioTableRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 140,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "surface": {
+        "height": 0.72,
+        "kind": "table",
+        "size": [
+          0.566,
+          0.566
+        ]
+      },
+      "description": "A teal metal table with a mosaic of yellow tiles.",
+      "interactions": []
+    },
+    {
+      "id": "patioTable4",
+      "name": "Teak patio table",
+      "model": "model.patioTable4",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 320,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "surface": {
+        "height": 0.74,
+        "kind": "table",
+        "size": [
+          1.6,
+          0.78
+        ],
+        "at": [
+          0.0,
+          -0.04
+        ]
+      },
+      "description": "A slatted teak table for four outdoors.",
+      "interactions": []
+    },
+    {
+      "id": "patioChair",
+      "name": "Patio chair",
+      "model": "model.patioChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.49,
+        "forward": 0.05
+      },
+      "description": "A green metal garden chair with a cushion. Facing a table, it is a seat at it.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adirondackChair",
+      "name": "Adirondack chair",
+      "model": "model.adirondackChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "seat": {
+        "height": 0.42,
+        "forward": 0.04
+      },
+      "description": "A fan-backed garden chair with wide arms for a drink.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax in the sun",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.45,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "benchGarden3",
+      "name": "Garden bench",
+      "model": "model.benchGarden3",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 280,
+      "category": "outdoor",
+      "group": "seating",
+      "slots": 3,
+      "outdoors": true,
+      "seat": {
+        "height": 0.47,
+        "forward": 0.02
+      },
+      "description": "A long slatted bench on cast-iron ends: three can sit.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit on the bench",
+          "anim": "sit",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "porchSwing",
+      "name": "Porch swing",
+      "model": "model.porchSwing",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 420,
+      "category": "outdoor",
+      "group": "seating",
+      "slots": 2,
+      "outdoors": true,
+      "decor": 0.3,
+      "seat": {
+        "height": 0.55,
+        "forward": 0.04
+      },
+      "description": "A swing seat for two hanging from a wooden frame.",
+      "interactions": [
+        {
+          "id": "swing",
+          "label": "Swing on the porch swing",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.45,
+            "fun": 0.1
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "parasol",
+      "name": "Parasol",
+      "model": "model.parasol",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A big canvas parasol on a weighted base.",
+      "interactions": []
+    },
+    {
+      "id": "outdoorBar",
+      "name": "Outdoor bar",
+      "model": "model.outdoorBar",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 650,
+      "category": "outdoor",
+      "group": "seating",
+      "outdoors": true,
+      "decor": 0.3,
+      "surface": {
+        "height": 1.06,
+        "kind": "bar",
+        "size": [
+          2.0,
+          0.88
+        ],
+        "at": [
+          0.0,
+          -0.04
+        ]
+      },
+      "description": "A teak bar for the garden; pull up bar stools.",
+      "interactions": []
+    },
+    {
+      "id": "planterBox",
+      "name": "Planter box",
+      "model": "model.planterBox",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "outdoor",
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.6,
+      "description": "A wooden planter full of flowers.",
+      "interactions": [
+        {
+          "id": "water",
+          "label": "Water the flowers",
+          "anim": "water",
+          "minutes": 5,
+          "effects": {
+            "fun": 0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "raisedBed",
+      "name": "Raised vegetable bed",
+      "model": "model.raisedBed",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 160,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "Lettuces, carrots and tomatoes in a raised bed. Harvest a fresh, free meal; good gardeners get more out of it.",
+      "interactions": [
+        {
+          "id": "tend",
+          "label": "Weed and water",
+          "anim": "tend",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.1,
+            "hygiene": -0.1
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.35
+          }
+        },
+        {
+          "id": "harvest",
+          "label": "Harvest vegetables",
+          "anim": "harvest",
+          "minutes": 20,
+          "effects": {
+            "hunger": 0.45,
+            "hygiene": -0.05
+          },
+          "tags": [
+            "food",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skill": "gardening",
+          "skills": {
+            "gardening": 0.15
+          },
+          "feeling": "garden.homegrown",
+          "feelingMinSkill": 2
+        }
+      ]
+    },
+    {
+      "id": "shedSmall",
+      "name": "Garden shed",
+      "model": "model.shedSmall",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 900,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A sage-green shed with a window box. Pottering in it trains Handiness.",
+      "interactions": [
+        {
+          "id": "potter",
+          "label": "Potter in the shed",
+          "anim": "tinker",
+          "minutes": 45,
+          "effects": {
+            "fun": 0.15
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse",
+      "model": "model.greenhouse",
+      "footprint": [
+        2,
+        3
+      ],
+      "price": 2400,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.6,
+      "description": "A glasshouse with benches of seedlings: tending them trains Gardening, and good gardeners pick their own tomatoes.",
+      "interactions": [
+        {
+          "id": "tend",
+          "label": "Tend the seedlings",
+          "anim": "tend",
+          "minutes": 45,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.05
+          },
+          "tags": [
+            "nature",
+            "garden",
+            "outdoors",
+            "training"
+          ],
+          "skills": {
+            "gardening": 0.3
+          }
+        },
+        {
+          "id": "harvest",
+          "label": "Pick tomatoes",
+          "anim": "harvest",
+          "minutes": 20,
+          "effects": {
+            "hunger": 0.4
+          },
+          "tags": [
+            "food",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skill": "gardening",
+          "skills": {
+            "gardening": 0.15
+          },
+          "feeling": "garden.homegrown",
+          "feelingMinSkill": 2
+        }
+      ]
+    },
+    {
+      "id": "compostBin",
+      "name": "Compost bin",
+      "model": "model.compostBin",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "description": "A slatted wooden bin of kitchen scraps turning into soil.",
+      "interactions": [
+        {
+          "id": "compost",
+          "label": "Turn the compost",
+          "anim": "tend",
+          "minutes": 15,
+          "effects": {
+            "hygiene": -0.05
+          },
+          "tags": [
+            "chores",
+            "garden",
+            "nature",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "rainBarrel",
+      "name": "Rain barrel",
+      "model": "model.rainBarrel",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.1,
+      "description": "A green barrel under the downpipe, with a brass tap.",
+      "interactions": []
+    },
+    {
+      "id": "clothesline",
+      "name": "Washing line",
+      "model": "model.clothesline",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 90,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "description": "Three lines between two posts, washing pegged out in the sun.",
+      "interactions": [
+        {
+          "id": "washing",
+          "label": "Hang out the washing",
+          "anim": "clean",
+          "minutes": 20,
+          "effects": {
+            "hygiene": 0.08,
+            "comfort": 0.04
+          },
+          "tags": [
+            "chores",
+            "cleaning",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "firewoodStack",
+      "name": "Log store",
+      "model": "model.firewoodStack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A black iron rack stacked with split logs.",
+      "interactions": []
+    },
+    {
+      "id": "birdhouse",
+      "name": "Birdhouse",
+      "model": "model.birdhouse",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 50,
+      "category": "outdoor",
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A little house with a red roof on a post.",
+      "interactions": []
+    },
+    {
+      "id": "birdFeederPole",
+      "name": "Bird feeders",
+      "model": "model.birdFeederPole",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "outdoor",
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "Two seed feeders on a shepherd’s hook. A robin is already there.",
+      "interactions": [
+        {
+          "id": "birdwatch",
+          "label": "Watch the birds",
+          "anim": "look",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.12,
+            "comfort": 0.06
+          },
+          "tags": [
+            "nature",
+            "outdoors"
+          ],
+          "skills": {
+            "perception": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "dogHouse",
+      "name": "Dog house",
+      "model": "model.dogHouse",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "outdoor",
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A red kennel with a name over the door and a water bowl.",
+      "interactions": []
+    },
+    {
+      "id": "sundial",
+      "name": "Sundial",
+      "model": "model.sundial",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "outdoor",
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.5,
+      "description": "A copper dial on a stone pedestal.",
+      "interactions": []
+    },
+    {
+      "id": "steppingStones",
+      "name": "Stepping stones",
+      "model": "model.steppingStones",
+      "footprint": [
+        1,
+        3
+      ],
+      "price": 60,
+      "category": "outdoor",
+      "group": "decor",
+      "layer": "rug",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "Four flat stones across the lawn.",
+      "interactions": []
+    }
+  ]
+}

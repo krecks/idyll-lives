@@ -1,0 +1,857 @@
+{
+  "$comment": "Catalogue 2: Chair-less dining tables, chairs, benches and stools that pull up to them (`approach: around`, `seatAt`), sideboards and cabinets. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "tableSquare2",
+      "name": "Square table for two",
+      "model": "model.tableSquare2",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "kitchen",
+      "group": "dining",
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          0.82,
+          0.82
+        ]
+      },
+      "description": "A small square table on tapered legs: room for two, one on each side. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableBistroRound",
+      "name": "Round bistro table",
+      "model": "model.tableBistroRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "kitchen",
+      "group": "dining",
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          0.509,
+          0.509
+        ]
+      },
+      "description": "A little round table on a single foot, for coffee for two. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableDining4",
+      "name": "Dining table for four",
+      "model": "model.tableDining4",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 260,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          1.84,
+          0.88
+        ]
+      },
+      "description": "An oak table for four: two chairs along each side. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableDining6",
+      "name": "Dining table for six",
+      "model": "model.tableDining6",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 420,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          2.84,
+          0.92
+        ]
+      },
+      "description": "A long walnut table on tapered legs for family dinners. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableBanquet8",
+      "name": "Banquet table",
+      "model": "model.tableBanquet8",
+      "footprint": [
+        4,
+        1
+      ],
+      "price": 620,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          3.84,
+          0.94
+        ]
+      },
+      "description": "Four metres of table on six legs: room for the whole family, and then some. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableRound4",
+      "name": "Round pedestal table",
+      "model": "model.tableRound4",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 340,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          1.075,
+          1.075
+        ]
+      },
+      "description": "A big round birch table on one pedestal: everyone can see everyone. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableSquare8",
+      "name": "Square table for eight",
+      "model": "model.tableSquare8",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 560,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          1.86,
+          1.86
+        ]
+      },
+      "description": "A large white square table on slim black legs, two chairs a side. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableFarmhouse6",
+      "name": "Farmhouse table",
+      "model": "model.tableFarmhouse6",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 520,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.4,
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          2.86,
+          0.94
+        ]
+      },
+      "description": "Thick planks on trestle legs: a table that has seen a lot of Sunday lunches. Chairs are sold separately: put them round it.",
+      "interactions": []
+    },
+    {
+      "id": "tableBarHigh",
+      "name": "High café table",
+      "model": "model.tableBarHigh",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "kitchen",
+      "group": "dining",
+      "surface": {
+        "height": 1.06,
+        "kind": "bar",
+        "size": [
+          0.495,
+          0.495
+        ]
+      },
+      "description": "A round table at bar height for standing or for bar stools.",
+      "interactions": []
+    },
+    {
+      "id": "chairWood",
+      "name": "Wooden chair",
+      "model": "model.chairWood",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 55,
+      "category": "kitchen",
+      "group": "dining",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.05
+      },
+      "description": "A spindle-back chair in warm wood. Facing a table, it is a seat at it.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairUpholstered",
+      "name": "Upholstered chair",
+      "model": "model.chairUpholstered",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.2,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.48,
+        "forward": 0.05
+      },
+      "description": "A padded dining chair in soft linen on walnut legs.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairModern",
+      "name": "Moulded chair",
+      "model": "model.chairModern",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "kitchen",
+      "group": "dining",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.05
+      },
+      "description": "A one-piece shell seat on a black sled frame.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairWindsor",
+      "name": "Windsor chair",
+      "model": "model.chairWindsor",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.2,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.05
+      },
+      "description": "A classic hoop-back chair with turned legs and a saddle seat.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairBentwood",
+      "name": "Bentwood chair",
+      "model": "model.chairBentwood",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 85,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.1,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.48,
+        "forward": 0.05
+      },
+      "description": "A café chair of steam-bent wood with a cane-red seat.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairFolding",
+      "name": "Folding chair",
+      "model": "model.chairFolding",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "kitchen",
+      "group": "dining",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.05
+      },
+      "description": "A metal folding chair: cheap extra seats for when everyone comes round.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.2
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chairArm",
+      "name": "Carver chair",
+      "model": "model.chairArm",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "kitchen",
+      "group": "dining",
+      "decor": 0.2,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.5,
+        "forward": 0.05
+      },
+      "description": "A dining chair with arms and a cushioned seat: for the head of the table.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.4
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "benchDining",
+      "name": "Dining bench",
+      "model": "model.benchDining",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 140,
+      "category": "kitchen",
+      "group": "dining",
+      "slots": 2,
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.47,
+        "forward": 0.05
+      },
+      "description": "A long oak bench for one side of a table: two can sit on it.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stoolCounter",
+      "name": "Counter stool",
+      "model": "model.stoolCounter",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "kitchen",
+      "group": "dining",
+      "approach": "around",
+      "seatAt": [
+        "counter",
+        "bar"
+      ],
+      "seat": {
+        "height": 0.68,
+        "forward": 0.05
+      },
+      "description": "A stool at counter height for the island or the bar.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit at the counter",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "drink",
+          "label": "Have a drink at the bar",
+          "anim": "drink",
+          "minutes": 15,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.15,
+            "energy": 0.05
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stoolBarHigh",
+      "name": "High bar stool",
+      "model": "model.stoolBarHigh",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 95,
+      "category": "kitchen",
+      "group": "dining",
+      "approach": "around",
+      "seatAt": [
+        "bar",
+        "counter"
+      ],
+      "seat": {
+        "height": 0.8,
+        "forward": 0.05
+      },
+      "description": "A tall stool with a low back and a footrest, for a bar or a high table.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit at the bar",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "drink",
+          "label": "Have a drink at the bar",
+          "anim": "drink",
+          "minutes": 15,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.15,
+            "energy": 0.05
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "highChair",
+      "name": "High chair",
+      "model": "model.highChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "kids",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
+      "seat": {
+        "height": 0.62,
+        "forward": 0.05
+      },
+      "description": "A tall chair for the littlest diner, with arms, a cushion and a footrest. Put it at a table.",
+      "interactions": []
+    },
+    {
+      "id": "sideboard",
+      "name": "Walnut sideboard",
+      "model": "model.sideboard",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 380,
+      "category": "kitchen",
+      "group": "cabinets",
+      "decor": 0.4,
+      "surface": {
+        "height": 0.8,
+        "kind": "low",
+        "size": [
+          1.82,
+          0.64
+        ],
+        "at": [
+          0.0,
+          -0.16
+        ]
+      },
+      "description": "A long, low sideboard with slatted doors: things stand on top.",
+      "interactions": []
+    },
+    {
+      "id": "buffet",
+      "name": "Painted buffet",
+      "model": "model.buffet",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 520,
+      "category": "kitchen",
+      "group": "cabinets",
+      "decor": 0.5,
+      "surface": {
+        "height": 0.9,
+        "kind": "low",
+        "size": [
+          1.88,
+          0.66
+        ],
+        "at": [
+          0.0,
+          -0.16
+        ]
+      },
+      "description": "A sage buffet with drawers over cupboards and an oak top.",
+      "interactions": []
+    },
+    {
+      "id": "chinaCabinet",
+      "name": "China cabinet",
+      "model": "model.chinaCabinet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 650,
+      "category": "kitchen",
+      "group": "cabinets",
+      "decor": 0.8,
+      "description": "A glazed hutch with the best plates on show over a cupboard.",
+      "interactions": []
+    },
+    {
+      "id": "barCart",
+      "name": "Bar cart",
+      "model": "model.barCart",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "kitchen",
+      "group": "cabinets",
+      "decor": 0.4,
+      "description": "Two glass tiers on brass castors with bottles and glasses.",
+      "interactions": [
+        {
+          "id": "mix",
+          "label": "Mix a drink",
+          "anim": "drink",
+          "minutes": 10,
+          "effects": {
+            "fun": 0.1,
+            "comfort": 0.05
+          },
+          "tags": [
+            "food",
+            "lounge",
+            "party"
+          ]
+        }
+      ]
+    }
+  ]
+}

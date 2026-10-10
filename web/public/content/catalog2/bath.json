@@ -1,0 +1,269 @@
+{
+  "$comment": "Catalogue 2: Toilets, baths, showers, sinks and bathroom bits. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "toiletClassic",
+      "name": "Classic toilet",
+      "model": "model.toiletClassic",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 260,
+      "category": "bathroom",
+      "group": "toilets",
+      "seat": {
+        "height": 0.45,
+        "forward": -0.02
+      },
+      "description": "A close-coupled toilet with a wooden seat.",
+      "interactions": [
+        {
+          "id": "use",
+          "label": "Use toilet",
+          "anim": "toilet",
+          "minutes": 8,
+          "pose": "sit",
+          "effects": {
+            "bladder": 1.0
+          },
+          "tags": [
+            "bathroom"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "toiletWallHung",
+      "name": "Wall-hung toilet",
+      "model": "model.toiletWallHung",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 600,
+      "category": "bathroom",
+      "group": "toilets",
+      "decor": 0.2,
+      "seat": {
+        "height": 0.45,
+        "forward": -0.1
+      },
+      "description": "A floating toilet with a hidden cistern behind a flush plate.",
+      "interactions": [
+        {
+          "id": "use",
+          "label": "Use toilet",
+          "anim": "toilet",
+          "minutes": 8,
+          "pose": "sit",
+          "effects": {
+            "bladder": 1.0
+          },
+          "tags": [
+            "bathroom"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bathtubFreestanding",
+      "name": "Freestanding bath",
+      "model": "model.bathtubFreestanding",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1600,
+      "category": "bathroom",
+      "group": "bathing",
+      "decor": 0.6,
+      "seat": {
+        "height": 0.28,
+        "forward": 0.0
+      },
+      "description": "A deep oval tub with a floor-standing tap. A long soak leaves residents pampered.",
+      "interactions": [
+        {
+          "id": "bath",
+          "label": "Take a bath",
+          "anim": "bath",
+          "minutes": 50,
+          "pose": "sit",
+          "effects": {
+            "hygiene": 1.0,
+            "comfort": 0.5,
+            "fun": 0.15
+          },
+          "tags": [
+            "hygiene",
+            "spa"
+          ],
+          "feeling": "home.pampered"
+        }
+      ]
+    },
+    {
+      "id": "showerRain",
+      "name": "Rain shower",
+      "model": "model.showerRain",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 950,
+      "category": "bathroom",
+      "group": "bathing",
+      "decor": 0.3,
+      "description": "A glass enclosure with a big square rain head. Leaves residents refreshed.",
+      "interactions": [
+        {
+          "id": "shower",
+          "label": "Take a shower",
+          "anim": "shower",
+          "minutes": 15,
+          "effects": {
+            "hygiene": 1.0,
+            "comfort": 0.05
+          },
+          "tags": [
+            "hygiene"
+          ],
+          "feeling": "home.refreshed"
+        }
+      ]
+    },
+    {
+      "id": "sinkVessel",
+      "name": "Vessel sink",
+      "model": "model.sinkVessel",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "bathroom",
+      "group": "sinks",
+      "decor": 0.3,
+      "description": "A bowl basin on a wooden vanity, towels on the shelf below.",
+      "interactions": [
+        {
+          "id": "wash",
+          "label": "Wash hands",
+          "anim": "wash",
+          "minutes": 4,
+          "effects": {
+            "hygiene": 0.15
+          },
+          "tags": [
+            "hygiene"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sinkConsole",
+      "name": "Console sink",
+      "model": "model.sinkConsole",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 260,
+      "category": "bathroom",
+      "group": "sinks",
+      "decor": 0.2,
+      "description": "A basin on brass legs with a towel bar.",
+      "interactions": [
+        {
+          "id": "wash",
+          "label": "Wash hands",
+          "anim": "wash",
+          "minutes": 4,
+          "effects": {
+            "hygiene": 0.15
+          },
+          "tags": [
+            "hygiene"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bathCabinetTall",
+      "name": "Tall bathroom cabinet",
+      "model": "model.bathCabinetTall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "bathroom",
+      "group": "sinks",
+      "decor": 0.1,
+      "description": "A slim cupboard with an open shelf for towels.",
+      "interactions": []
+    },
+    {
+      "id": "towelLadder",
+      "name": "Towel ladder",
+      "model": "model.towelLadder",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "bathroom",
+      "group": "laundry",
+      "decor": 0.3,
+      "description": "A birch ladder leaning on the wall, towels over its rungs.",
+      "interactions": []
+    },
+    {
+      "id": "bathMat",
+      "name": "Bath mat",
+      "model": "model.bathMat",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "bathroom",
+      "group": "laundry",
+      "layer": "rug",
+      "decor": 0.2,
+      "description": "A soft mat for wet feet.",
+      "interactions": []
+    },
+    {
+      "id": "mirrorRound",
+      "name": "Round mirror",
+      "model": "model.mirrorRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "bathroom",
+      "group": "sinks",
+      "layer": "wall",
+      "decor": 0.4,
+      "description": "A round mirror in a brass frame, hung from a strap.",
+      "interactions": []
+    },
+    {
+      "id": "laundryBasket",
+      "name": "Laundry basket",
+      "model": "model.laundryBasket",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "bathroom",
+      "group": "laundry",
+      "description": "A wicker basket of clean washing waiting to be folded.",
+      "interactions": []
+    }
+  ]
+}

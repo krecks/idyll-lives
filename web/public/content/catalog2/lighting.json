@@ -1,0 +1,217 @@
+{
+  "$comment": "Catalogue 2: Table lamps that stand on tops, floor lamps and ceiling lights. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "lampTableRound",
+      "name": "Ginger-jar lamp",
+      "model": "model.lampTableRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 75,
+      "category": "lighting",
+      "group": "table",
+      "layer": "surface",
+      "decor": 0.4,
+      "light": {
+        "range": 3.5,
+        "intensity": 0.8,
+        "height": 0.42
+      },
+      "radius": 0.23,
+      "description": "A blue ceramic lamp with a linen drum shade. It stands on a table, desk or nightstand and lights the room at night.",
+      "interactions": []
+    },
+    {
+      "id": "lampTableSquare",
+      "name": "Square table lamp",
+      "model": "model.lampTableSquare",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "lighting",
+      "group": "table",
+      "layer": "surface",
+      "decor": 0.35,
+      "light": {
+        "range": 3.5,
+        "intensity": 0.75,
+        "height": 0.4
+      },
+      "radius": 0.29,
+      "description": "A white block lamp with a square shade. It stands on a table, desk or nightstand and lights the room at night.",
+      "interactions": []
+    },
+    {
+      "id": "lampBanker",
+      "name": "Banker's lamp",
+      "model": "model.lampBanker",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "lighting",
+      "group": "table",
+      "layer": "surface",
+      "decor": 0.45,
+      "light": {
+        "range": 2.5,
+        "intensity": 0.6,
+        "height": 0.3
+      },
+      "radius": 0.17,
+      "description": "A brass desk lamp with a green glass shade. It stands on a table, desk or nightstand and lights the room at night.",
+      "interactions": []
+    },
+    {
+      "id": "lampMushroom",
+      "name": "Mushroom lamp",
+      "model": "model.lampMushroom",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "lighting",
+      "group": "table",
+      "layer": "surface",
+      "decor": 0.4,
+      "light": {
+        "range": 3.0,
+        "intensity": 0.7,
+        "height": 0.22
+      },
+      "radius": 0.21,
+      "description": "A little dome lamp in coral. It stands on a table, desk or nightstand and lights the room at night.",
+      "interactions": []
+    },
+    {
+      "id": "lampLantern",
+      "name": "Candle lantern",
+      "model": "model.lampLantern",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "lighting",
+      "group": "table",
+      "layer": "surface",
+      "decor": 0.3,
+      "light": {
+        "range": 2.5,
+        "intensity": 0.5,
+        "height": 0.15
+      },
+      "radius": 0.18,
+      "description": "A black metal lantern with a candle inside. It stands on a table, desk or nightstand and lights the room at night.",
+      "interactions": []
+    },
+    {
+      "id": "lampFloorArc",
+      "name": "Arc floor lamp",
+      "model": "model.lampFloorArc",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 260,
+      "category": "lighting",
+      "group": "floor",
+      "decor": 0.7,
+      "light": {
+        "range": 4.5,
+        "intensity": 1.0,
+        "height": 1.5
+      },
+      "description": "A brass arc reaching over the sofa from a marble base.",
+      "interactions": []
+    },
+    {
+      "id": "lampFloorTripod",
+      "name": "Tripod floor lamp",
+      "model": "model.lampFloorTripod",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "lighting",
+      "group": "floor",
+      "decor": 0.6,
+      "light": {
+        "range": 4.0,
+        "intensity": 0.9,
+        "height": 1.38
+      },
+      "description": "A drum shade on three walnut legs.",
+      "interactions": []
+    },
+    {
+      "id": "lampTorchiere",
+      "name": "Uplighter",
+      "model": "model.lampTorchiere",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "lighting",
+      "group": "floor",
+      "decor": 0.4,
+      "light": {
+        "range": 4.5,
+        "intensity": 0.9,
+        "height": 1.78
+      },
+      "description": "A tall uplighter washing the ceiling with light.",
+      "interactions": []
+    },
+    {
+      "id": "trackLights",
+      "name": "Track lights",
+      "model": "model.trackLights",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "lighting",
+      "group": "ceiling",
+      "layer": "ceiling",
+      "decor": 0.3,
+      "light": {
+        "range": 5.0,
+        "intensity": 1.0,
+        "height": 2.5
+      },
+      "description": "Three black spotlights on a white ceiling track.",
+      "interactions": []
+    },
+    {
+      "id": "paperLantern",
+      "name": "Paper lantern",
+      "model": "model.paperLantern",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "lighting",
+      "group": "ceiling",
+      "layer": "ceiling",
+      "decor": 0.4,
+      "light": {
+        "range": 4.5,
+        "intensity": 0.9,
+        "height": 2.05
+      },
+      "description": "A big round paper lantern on a cord.",
+      "interactions": []
+    }
+  ]
+}

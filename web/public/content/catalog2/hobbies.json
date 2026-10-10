@@ -1,0 +1,256 @@
+{
+  "$comment": "Catalogue 2: Music, games and crafts. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "drumKit",
+      "name": "Drum kit",
+      "model": "model.drumKit",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 900,
+      "category": "hobbies",
+      "group": "music",
+      "seat": {
+        "height": 0.52,
+        "forward": -0.3
+      },
+      "description": "A red five-piece kit with cymbals and a stool. Loud, and good for Dexterity.",
+      "interactions": [
+        {
+          "id": "drum",
+          "label": "Play the drums",
+          "anim": "music",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.45
+          },
+          "tags": [
+            "entertainment",
+            "music"
+          ],
+          "skills": {
+            "dexterity": 0.08,
+            "creativity": 0.05
+          }
+        },
+        {
+          "id": "practise",
+          "label": "Practise drum rolls",
+          "anim": "music",
+          "minutes": 60,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "training",
+            "music"
+          ],
+          "skills": {
+            "dexterity": 0.2,
+            "creativity": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "arcadeCabinet",
+      "name": "Arcade cabinet",
+      "model": "model.arcadeCabinet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 1100,
+      "category": "hobbies",
+      "group": "games",
+      "decor": 0.2,
+      "description": "A full-size arcade machine with a joystick and four buttons.",
+      "interactions": [
+        {
+          "id": "arcade",
+          "label": "Play arcade games",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.55
+          },
+          "tags": [
+            "entertainment",
+            "gaming"
+          ],
+          "skills": {
+            "dexterity": 0.06
+          }
+        }
+      ]
+    },
+    {
+      "id": "potteryWheel",
+      "name": "Pottery wheel",
+      "model": "model.potteryWheel",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 600,
+      "category": "hobbies",
+      "group": "crafts",
+      "seat": {
+        "height": 0.45,
+        "forward": -0.3
+      },
+      "description": "A wheel, a stool and a lump of clay: throwing pots trains Creativity.",
+      "interactions": [
+        {
+          "id": "throw",
+          "label": "Throw a pot",
+          "anim": "tinker",
+          "minutes": 60,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.15
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.2,
+            "dexterity": 0.06
+          }
+        }
+      ]
+    },
+    {
+      "id": "craftTable",
+      "name": "Craft table",
+      "model": "model.craftTable",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 340,
+      "category": "hobbies",
+      "group": "crafts",
+      "seat": {
+        "height": 0.48,
+        "forward": -0.25
+      },
+      "description": "A long table of paper, ribbons and glue, with a stool.",
+      "interactions": [
+        {
+          "id": "scrapbook",
+          "label": "Make a scrapbook",
+          "anim": "tinker",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.3
+          },
+          "tags": [
+            "entertainment",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "puzzleTable",
+      "name": "Jigsaw table",
+      "model": "model.puzzleTable",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 220,
+      "category": "hobbies",
+      "group": "games",
+      "seat": {
+        "height": 0.48,
+        "forward": -0.25
+      },
+      "description": "A little table with a half-done jigsaw and a stool.",
+      "interactions": [
+        {
+          "id": "jigsaw",
+          "label": "Do a jigsaw",
+          "anim": "play",
+          "minutes": 40,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.3,
+            "comfort": 0.05
+          },
+          "tags": [
+            "entertainment",
+            "gaming"
+          ],
+          "skills": {
+            "perception": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "guitarAcoustic",
+      "name": "Acoustic guitar",
+      "model": "model.guitarAcoustic",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 380,
+      "category": "hobbies",
+      "group": "music",
+      "description": "A warm-toned guitar on a stand: strumming builds Creativity; from Creativity 3 residents play so well they are in tune for hours.",
+      "interactions": [
+        {
+          "id": "strum",
+          "label": "Strum the guitar",
+          "anim": "music",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "music",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.1,
+            "dexterity": 0.04
+          }
+        },
+        {
+          "id": "practise",
+          "label": "Practise the guitar",
+          "anim": "music",
+          "minutes": 60,
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "training",
+            "music",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.2,
+            "dexterity": 0.06
+          },
+          "skill": "creativity",
+          "feeling": "home.inTune",
+          "feelingMinSkill": 3
+        }
+      ]
+    }
+  ]
+}

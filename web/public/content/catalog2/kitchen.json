@@ -1,0 +1,897 @@
+{
+  "$comment": "Catalogue 2: Counters (tops at 0.95 m, prep stations), islands and bars, cooking appliances and kitchen storage. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "counterEnd",
+      "name": "Counter end with shelves",
+      "model": "model.counterEnd",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 140,
+      "category": "kitchen",
+      "group": "counters",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "The last base unit of a run: a door at the front and open shelves on its end for bowls and jars.",
+      "interactions": []
+    },
+    {
+      "id": "counterCornerOuter",
+      "name": "Outer corner counter",
+      "model": "model.counterCornerOuter",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "kitchen",
+      "group": "counters",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          0.81,
+          0.79
+        ],
+        "at": [
+          -0.095,
+          -0.085
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "A counter with doors on two sides, for the corner where a run turns out into the room.",
+      "interactions": []
+    },
+    {
+      "id": "counterDrawers",
+      "name": "Drawer counter",
+      "model": "model.counterDrawers",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "kitchen",
+      "group": "counters",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "Four deep drawers under a worktop: pans, cutlery, tea towels.",
+      "interactions": []
+    },
+    {
+      "id": "counterOpenShelf",
+      "name": "Open-shelf counter",
+      "model": "model.counterOpenShelf",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 130,
+      "category": "kitchen",
+      "group": "counters",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "An oak base unit with open shelves: plates and bowls on show.",
+      "interactions": []
+    },
+    {
+      "id": "butcherBlock",
+      "name": "Butcher block",
+      "model": "model.butcherBlock",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 260,
+      "category": "kitchen",
+      "group": "counters",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.93,
+        "kind": "counter",
+        "size": [
+          0.9,
+          0.8
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "A thick end-grain top on sturdy legs, with a shelf and a basket below. The best place to chop.",
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "anim": "cook",
+          "minutes": 15,
+          "effects": {
+            "hunger": 0.4
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "counterMarble",
+      "name": "Marble counter",
+      "model": "model.counterMarble",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 380,
+      "category": "kitchen",
+      "group": "counters",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "Navy doors with brass handles under a white marble top.",
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "anim": "cook",
+          "minutes": 15,
+          "effects": {
+            "hunger": 0.4
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "counterSinkDouble",
+      "name": "Double sink",
+      "model": "model.counterSinkDouble",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 520,
+      "category": "kitchen",
+      "group": "counters",
+      "slots": 2,
+      "stations": [
+        "dishes"
+      ],
+      "description": "Two basins under two gooseneck taps: one for washing up, one for rinsing (or two people at once).",
+      "interactions": [
+        {
+          "id": "wash",
+          "label": "Wash hands",
+          "anim": "wash",
+          "minutes": 4,
+          "effects": {
+            "hygiene": 0.15
+          },
+          "tags": [
+            "hygiene"
+          ]
+        },
+        {
+          "id": "washUp",
+          "label": "Wash the dishes",
+          "anim": "wash",
+          "minutes": 15,
+          "effects": {
+            "comfort": 0.06
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "barSegment",
+      "name": "Bar counter",
+      "model": "model.barSegment",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "kitchen",
+      "group": "islands",
+      "surface": {
+        "height": 1.06,
+        "kind": "bar",
+        "size": [
+          1.0,
+          0.88
+        ],
+        "at": [
+          0.0,
+          -0.04
+        ]
+      },
+      "description": "A tall counter with a slatted front and a brass foot rail. Line a few up and pull up bar stools.",
+      "interactions": []
+    },
+    {
+      "id": "barEnd",
+      "name": "Bar end",
+      "model": "model.barEnd",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 200,
+      "category": "kitchen",
+      "group": "islands",
+      "surface": {
+        "height": 1.06,
+        "kind": "bar",
+        "size": [
+          1.0,
+          0.88
+        ],
+        "at": [
+          0.0,
+          -0.04
+        ]
+      },
+      "description": "The end of a bar, finished with a solid wooden side.",
+      "interactions": []
+    },
+    {
+      "id": "islandSmall",
+      "name": "Small island",
+      "model": "model.islandSmall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "kitchen",
+      "group": "islands",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          0.96,
+          0.94
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "A one-tile island with cupboards behind and an overhang in front for a stool or two.",
+      "interactions": []
+    },
+    {
+      "id": "islandLong",
+      "name": "Long island",
+      "model": "model.islandLong",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 1100,
+      "category": "kitchen",
+      "group": "islands",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          2.96,
+          0.94
+        ]
+      },
+      "stations": [
+        "prep"
+      ],
+      "description": "Three metres of worktop to cook on, with cupboards on one side and room for stools on the other.",
+      "interactions": []
+    },
+    {
+      "id": "pantryTall",
+      "name": "Tall larder",
+      "model": "model.pantryTall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "kitchen",
+      "group": "counters",
+      "stations": [
+        "ingredients"
+      ],
+      "description": "A floor-to-ceiling larder with drawers below, full of jars and tins.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Grab a snack",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.3
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wallOven",
+      "name": "Oven tower",
+      "model": "model.wallOven",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 900,
+      "category": "kitchen",
+      "group": "appliances",
+      "stations": [
+        "oven"
+      ],
+      "description": "Two ovens one above the other at a comfortable height: roasts and bakes. Baking trains Cooking.",
+      "interactions": [
+        {
+          "id": "roast",
+          "label": "Roast dinner",
+          "anim": "cook",
+          "minutes": 60,
+          "effects": {
+            "hunger": 0.9,
+            "fun": 0.1
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.15
+          },
+          "skill": "cooking"
+        },
+        {
+          "id": "bake",
+          "label": "Bake treats",
+          "anim": "cook",
+          "minutes": 60,
+          "effects": {
+            "hunger": 0.5,
+            "fun": 0.25
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
+        }
+      ]
+    },
+    {
+      "id": "rangeCooker",
+      "name": "Range cooker",
+      "model": "model.rangeCooker",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1600,
+      "category": "kitchen",
+      "group": "appliances",
+      "decor": 0.4,
+      "stations": [
+        "stove",
+        "oven"
+      ],
+      "description": "Six burners and two ovens in cream enamel: the heart of a big kitchen. Good cooks make gourmet meals that stay with them.",
+      "interactions": [
+        {
+          "id": "cook",
+          "label": "Cook dinner",
+          "anim": "cook",
+          "minutes": 45,
+          "effects": {
+            "hunger": 0.9,
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.15
+          },
+          "skill": "cooking"
+        },
+        {
+          "id": "gourmet",
+          "label": "Cook a gourmet meal",
+          "anim": "cook",
+          "minutes": 75,
+          "effects": {
+            "hunger": 1.0,
+            "fun": 0.15
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "training"
+          ],
+          "skills": {
+            "cooking": 0.25,
+            "creativity": 0.04
+          },
+          "skill": "cooking",
+          "feeling": "home.homeCooked",
+          "feelingMinSkill": 3
+        },
+        {
+          "id": "bake",
+          "label": "Bake treats",
+          "anim": "cook",
+          "minutes": 60,
+          "effects": {
+            "hunger": 0.5,
+            "fun": 0.25
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
+        }
+      ]
+    },
+    {
+      "id": "cooktopCounter",
+      "name": "Hob counter",
+      "model": "model.cooktopCounter",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 520,
+      "category": "kitchen",
+      "group": "appliances",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "stove"
+      ],
+      "description": "An induction hob set into a worktop, with pan drawers under it.",
+      "interactions": [
+        {
+          "id": "cook",
+          "label": "Cook dinner",
+          "anim": "cook",
+          "minutes": 45,
+          "effects": {
+            "hunger": 0.9,
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.15
+          },
+          "skill": "cooking"
+        }
+      ]
+    },
+    {
+      "id": "fridgeFrenchDoor",
+      "name": "French-door fridge",
+      "model": "model.fridgeFrenchDoor",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 1500,
+      "category": "kitchen",
+      "group": "appliances",
+      "stations": [
+        "ingredients"
+      ],
+      "description": "Two tall doors over a freezer drawer: room for everything, from snacks to a gourmet spread.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Grab a snack",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.35
+          },
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "meal",
+          "label": "Make a meal",
+          "anim": "cook",
+          "minutes": 40,
+          "effects": {
+            "hunger": 0.9,
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.12
+          }
+        },
+        {
+          "id": "gourmet",
+          "label": "Cook a gourmet meal",
+          "anim": "cook",
+          "minutes": 75,
+          "effects": {
+            "hunger": 0.95,
+            "fun": 0.15
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "training"
+          ],
+          "skills": {
+            "cooking": 0.25,
+            "creativity": 0.04
+          },
+          "skill": "cooking"
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fridgeRetro",
+      "name": "Retro fridge",
+      "model": "model.fridgeRetro",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 950,
+      "category": "kitchen",
+      "group": "appliances",
+      "decor": 0.4,
+      "stations": [
+        "ingredients"
+      ],
+      "description": "A rounded fifties fridge in mint green with a chrome lever handle.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Grab a snack",
+          "anim": "eat",
+          "minutes": 10,
+          "effects": {
+            "hunger": 0.3
+          },
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "meal",
+          "label": "Make a meal",
+          "anim": "cook",
+          "minutes": 40,
+          "effects": {
+            "hunger": 0.85,
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.12
+          }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wineFridge",
+      "name": "Wine fridge",
+      "model": "model.wineFridge",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 450,
+      "category": "kitchen",
+      "group": "appliances",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "description": "An under-counter wine cooler behind a smoked glass door, drawers beside it.",
+      "interactions": [
+        {
+          "id": "wine",
+          "label": "Pour a glass of wine",
+          "anim": "drink",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.1,
+            "fun": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dishwasherCompact",
+      "name": "Stainless dishwasher",
+      "model": "model.dishwasherCompact",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 380,
+      "category": "kitchen",
+      "group": "appliances",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.79
+        ],
+        "at": [
+          0.0,
+          -0.085
+        ]
+      },
+      "stations": [
+        "dishes"
+      ],
+      "description": "A dishwasher with a stainless door, under a worktop.",
+      "interactions": [
+        {
+          "id": "dishes",
+          "label": "Run the dishwasher",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trashCan",
+      "name": "Pedal bin",
+      "model": "model.trashCan",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "kitchen",
+      "group": "counters",
+      "description": "A stainless steel pedal bin.",
+      "interactions": []
+    },
+    {
+      "id": "recyclingBins",
+      "name": "Recycling bins",
+      "model": "model.recyclingBins",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "kitchen",
+      "group": "counters",
+      "description": "Three bins side by side: paper, glass and plastic.",
+      "interactions": []
+    },
+    {
+      "id": "wallCabinetGlass",
+      "name": "Glazed wall cabinet",
+      "model": "model.wallCabinetGlass",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 140,
+      "category": "kitchen",
+      "group": "counters",
+      "layer": "wall",
+      "decor": 0.35,
+      "description": "Wall cupboards with glass doors, glasses and plates on show.",
+      "interactions": []
+    },
+    {
+      "id": "wallCabinetCorner",
+      "name": "Wall cabinet with end shelves",
+      "model": "model.wallCabinetCorner",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "kitchen",
+      "group": "counters",
+      "layer": "wall",
+      "decor": 0.3,
+      "description": "A wall cupboard that finishes a run with open shelves on its end.",
+      "interactions": []
+    },
+    {
+      "id": "spiceRack",
+      "name": "Spice rack",
+      "model": "model.spiceRack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "kitchen",
+      "group": "counters",
+      "layer": "wall",
+      "decor": 0.3,
+      "description": "Three rows of little jars on the wall.",
+      "interactions": []
+    },
+    {
+      "id": "potRail",
+      "name": "Pot rail",
+      "model": "model.potRail",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "kitchen",
+      "group": "counters",
+      "layer": "wall",
+      "decor": 0.35,
+      "description": "A black rail with copper pans and ladles hanging from it.",
+      "interactions": []
+    },
+    {
+      "id": "kitchenShelfWall",
+      "name": "Kitchen wall shelves",
+      "model": "model.kitchenShelfWall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "kitchen",
+      "group": "counters",
+      "layer": "wall",
+      "decor": 0.4,
+      "description": "Two oak shelves with jars, plates and a pot of herbs.",
+      "interactions": []
+    }
+  ]
+}

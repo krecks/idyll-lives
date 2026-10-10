@@ -1,0 +1,925 @@
+{
+  "$comment": "Catalogue 2: Sectional sofa pieces, sofas, chairs, coffee and side tables, shelves. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "sectionalMiddle",
+      "name": "Sectional: middle seat",
+      "model": "model.sectionalMiddle",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 280,
+      "category": "living",
+      "group": "sectionals",
+      "seat": {
+        "height": 0.44,
+        "forward": 0.08
+      },
+      "description": "An armless seat of the sectional sofa. Put pieces side by side for a sofa of any length.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.6
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sectionalArmLeft",
+      "name": "Sectional: left arm",
+      "model": "model.sectionalArmLeft",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 280,
+      "category": "living",
+      "group": "sectionals",
+      "seat": {
+        "height": 0.44,
+        "forward": 0.08
+      },
+      "description": "A sectional seat with an arm on the left as you face it: the end of a run.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.6
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sectionalArmRight",
+      "name": "Sectional: right arm",
+      "model": "model.sectionalArmRight",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 280,
+      "category": "living",
+      "group": "sectionals",
+      "seat": {
+        "height": 0.44,
+        "forward": 0.08
+      },
+      "description": "A sectional seat with an arm on the right as you face it: the end of a run.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.6
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sectionalCorner",
+      "name": "Sectional: corner",
+      "model": "model.sectionalCorner",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 280,
+      "category": "living",
+      "group": "sectionals",
+      "seat": {
+        "height": 0.44,
+        "forward": 0.1
+      },
+      "description": "The corner of an L-shaped sectional, with backs on two sides.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.6
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chaise",
+      "name": "Sectional: chaise",
+      "model": "model.chaise",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 420,
+      "category": "living",
+      "group": "sectionals",
+      "seat": {
+        "height": 0.44,
+        "forward": -0.3
+      },
+      "description": "A long seat to put your feet up, with an arm along one side.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Put your feet up",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.7
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sofaBed",
+      "name": "Sofa bed",
+      "model": "model.sofaBed",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 620,
+      "category": "living",
+      "group": "seating",
+      "slots": 2,
+      "seat": {
+        "height": 0.44,
+        "forward": 0.08
+      },
+      "description": "A boxy two-seat sofa that folds out for guests.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.65
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sofaThreeSeat",
+      "name": "Three-seater sofa",
+      "model": "model.sofaThreeSeat",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 980,
+      "category": "living",
+      "group": "seating",
+      "slots": 3,
+      "decor": 0.2,
+      "seat": {
+        "height": 0.44,
+        "forward": 0.08
+      },
+      "description": "A long sage sofa with three seat cushions: three can sit side by side.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.65
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.15,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recliner",
+      "name": "Recliner",
+      "model": "model.recliner",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 650,
+      "category": "living",
+      "group": "seating",
+      "seat": {
+        "height": 0.44,
+        "forward": 0.0
+      },
+      "description": "A deep leather armchair with a footrest that pops up. Very hard to get out of.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Recline",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.75
+          },
+          "tags": [
+            "rest",
+            "lounge",
+            "cozy"
+          ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.18,
+            "comfort": 0.15
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rockingChair",
+      "name": "Rocking chair",
+      "model": "model.rockingChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 340,
+      "category": "living",
+      "group": "seating",
+      "decor": 0.3,
+      "seat": {
+        "height": 0.48,
+        "forward": 0.05
+      },
+      "description": "A spindle-back rocker with a cushion. Rock and read.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Rock gently",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.5
+          },
+          "tags": [
+            "rest",
+            "lounge",
+            "cozy"
+          ]
+        },
+        {
+          "id": "read",
+          "label": "Read in the rocker",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.35,
+            "comfort": 0.1
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "id": "beanBag",
+      "name": "Bean bag",
+      "model": "model.beanBag",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "living",
+      "group": "seating",
+      "seat": {
+        "height": 0.3,
+        "forward": 0.05
+      },
+      "description": "A big squashy bean bag to flop into.",
+      "interactions": [
+        {
+          "id": "flop",
+          "label": "Flop into the bean bag",
+          "anim": "relax",
+          "minutes": 25,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.45,
+            "fun": 0.05
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ottoman",
+      "name": "Tufted ottoman",
+      "model": "model.ottoman",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "living",
+      "group": "seating",
+      "decor": 0.2,
+      "seat": {
+        "height": 0.45,
+        "forward": 0.0
+      },
+      "description": "A round, buttoned footstool you can also sit on.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "floorCushion",
+      "name": "Floor cushion",
+      "model": "model.floorCushion",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "living",
+      "group": "seating",
+      "decor": 0.2,
+      "seat": {
+        "height": 0.14,
+        "forward": 0.0
+      },
+      "description": "A fat round cushion to sit on the floor.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.2
+          },
+          "tags": [
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "armchairWingback",
+      "name": "Wingback armchair",
+      "model": "model.armchairWingback",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 560,
+      "category": "living",
+      "group": "seating",
+      "decor": 0.4,
+      "seat": {
+        "height": 0.44,
+        "forward": 0.04
+      },
+      "description": "A high-backed armchair in bottle green: the reading chair.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.55
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.08,
+            "writing": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "coffeeTableRound",
+      "name": "Round coffee table",
+      "model": "model.coffeeTableRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "living",
+      "group": "tables",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.42,
+        "kind": "low",
+        "size": [
+          0.594,
+          0.594
+        ]
+      },
+      "description": "A drum-based round coffee table with a pale top.",
+      "interactions": []
+    },
+    {
+      "id": "coffeeTableLong",
+      "name": "Long coffee table",
+      "model": "model.coffeeTableLong",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 220,
+      "category": "living",
+      "group": "tables",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.42,
+        "kind": "low",
+        "size": [
+          1.66,
+          0.72
+        ]
+      },
+      "description": "A walnut coffee table with a shelf for magazines underneath.",
+      "interactions": []
+    },
+    {
+      "id": "nestingTables",
+      "name": "Nesting tables",
+      "model": "model.nestingTables",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "living",
+      "group": "tables",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.51,
+        "kind": "low",
+        "size": [
+          0.56,
+          0.46
+        ],
+        "at": [
+          0.0,
+          -0.02
+        ]
+      },
+      "description": "Two little tables, one tucked under the other.",
+      "interactions": []
+    },
+    {
+      "id": "sideTableRound",
+      "name": "Round side table",
+      "model": "model.sideTableRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 85,
+      "category": "living",
+      "group": "tables",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.56,
+        "kind": "low",
+        "size": [
+          0.368,
+          0.368
+        ]
+      },
+      "description": "A marble-look top on a brass stem, beside the sofa.",
+      "interactions": []
+    },
+    {
+      "id": "consoleTable",
+      "name": "Console table",
+      "model": "model.consoleTable",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 200,
+      "category": "living",
+      "group": "tables",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.8,
+        "kind": "low",
+        "size": [
+          1.8,
+          0.56
+        ],
+        "at": [
+          0.0,
+          -0.18
+        ]
+      },
+      "description": "A slim oak table for a hall or behind a sofa, baskets underneath.",
+      "interactions": []
+    },
+    {
+      "id": "tvStandLow",
+      "name": "Low TV bench",
+      "model": "model.tvStandLow",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 520,
+      "category": "living",
+      "group": "media",
+      "description": "A low white media bench with a flat-screen TV on it.",
+      "interactions": [
+        {
+          "id": "watch",
+          "label": "Watch TV",
+          "anim": "watch",
+          "minutes": 60,
+          "effects": {
+            "fun": 0.75
+          },
+          "tags": [
+            "entertainment",
+            "screen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bookcaseTall",
+      "name": "Tall bookcase",
+      "model": "model.bookcaseTall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 320,
+      "category": "living",
+      "group": "shelves",
+      "decor": 0.4,
+      "description": "Six shelves of books in walnut: a proper library wall.",
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.04
+          }
+        },
+        {
+          "id": "study",
+          "label": "Study",
+          "anim": "read",
+          "minutes": 60,
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "reading",
+            "training",
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.2,
+            "writing": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "bookcaseCorner",
+      "name": "Corner bookcase",
+      "model": "model.bookcaseCorner",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 240,
+      "category": "living",
+      "group": "shelves",
+      "decor": 0.4,
+      "description": "A narrow bookcase with open shelves on its end, for a corner.",
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "cubeShelf",
+      "name": "Cube shelf",
+      "model": "model.cubeShelf",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "living",
+      "group": "shelves",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.8,
+        "kind": "shelf",
+        "size": [
+          0.8,
+          0.4
+        ],
+        "at": [
+          0.0,
+          -0.27
+        ]
+      },
+      "description": "Four open cubes with fabric bins and books; things stand on top.",
+      "interactions": []
+    },
+    {
+      "id": "ladderShelf",
+      "name": "Ladder shelf",
+      "model": "model.ladderShelf",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "living",
+      "group": "shelves",
+      "decor": 0.4,
+      "description": "Shelves on a leaning ladder, for plants and books.",
+      "interactions": []
+    },
+    {
+      "id": "displayCabinet",
+      "name": "Display cabinet",
+      "model": "model.displayCabinet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 480,
+      "category": "living",
+      "group": "shelves",
+      "decor": 0.9,
+      "description": "A walnut vitrine with glass shelves for treasured ornaments.",
+      "interactions": []
+    },
+    {
+      "id": "fireplaceElectric",
+      "name": "Electric fireplace",
+      "model": "model.fireplaceElectric",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 650,
+      "category": "living",
+      "group": "media",
+      "decor": 0.8,
+      "light": {
+        "range": 3.5,
+        "intensity": 0.6,
+        "height": 0.45
+      },
+      "description": "A slim white surround with a flickering electric fire: no chimney needed. It lights the room at night.",
+      "interactions": [
+        {
+          "id": "relax",
+          "label": "Warm up by the fire",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "cozy"
+          ]
+        }
+      ]
+    }
+  ]
+}

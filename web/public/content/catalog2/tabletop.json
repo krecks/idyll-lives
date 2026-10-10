@@ -1,0 +1,668 @@
+{
+  "$comment": "Catalogue 2: Small things that stand on tops (the `surface` layer): kitchenware, tableware, books, plants, ornaments, bath and desk things, toys. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "kettle",
+      "name": "Electric kettle",
+      "model": "model.kettle",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.13,
+      "description": "A cream kettle on its base. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "toaster",
+      "name": "Toaster",
+      "model": "model.toaster",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 40,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.16,
+      "description": "A two-slice toaster with the toast just up. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "model": "model.blender",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 55,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.11,
+      "description": "A blender with a smoothie in the jug. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "standMixer",
+      "name": "Stand mixer",
+      "model": "model.standMixer",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.17,
+      "description": "A red stand mixer for serious bakers. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "espressoMachineSmall",
+      "name": "Espresso machine",
+      "model": "model.espressoMachineSmall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.23,
+      "description": "A little steel espresso machine with a cup under the spout. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "knifeBlock",
+      "name": "Knife block",
+      "model": "model.knifeBlock",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.14,
+      "description": "A wooden block of kitchen knives. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "utensilCrock",
+      "name": "Utensil pot",
+      "model": "model.utensilCrock",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.09,
+      "description": "A crock of wooden spoons, a whisk and a spatula. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "cuttingBoard",
+      "name": "Chopping board",
+      "model": "model.cuttingBoard",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 15,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.21,
+      "description": "A board with a loaf and some tomatoes. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "breadBin",
+      "name": "Bread bin",
+      "model": "model.breadBin",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.19,
+      "description": "A cream roll-top bread bin. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "spiceJars",
+      "name": "Spice jars",
+      "model": "model.spiceJars",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.16,
+      "description": "Five little jars of spices on a tray. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "cookieJar",
+      "name": "Cookie jar",
+      "model": "model.cookieJar",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.11,
+      "description": "A glass jar of biscuits with a red lid. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "fruitBowl",
+      "name": "Fruit bowl",
+      "model": "model.fruitBowl",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.19,
+      "description": "A bowl of apples, oranges and a banana. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "plateSet",
+      "name": "Place setting",
+      "model": "model.plateSet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.25,
+      "description": "A plate, a side plate, cutlery and a glass. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "cakeStand",
+      "name": "Cake on a stand",
+      "model": "model.cakeStand",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.19,
+      "description": "A layer cake on a white stand, cherry on top. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "teapotSet",
+      "name": "Tea set",
+      "model": "model.teapotSet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.23,
+      "description": "A teapot and two cups on a wooden tray. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "mugs",
+      "name": "Mugs",
+      "model": "model.mugs",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 15,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.15,
+      "description": "Three mugs of coffee. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "wineGlasses",
+      "name": "Wine and glasses",
+      "model": "model.wineGlasses",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 40,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.14,
+      "description": "A bottle of red and two glasses. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "candlesticks",
+      "name": "Candlesticks",
+      "model": "model.candlesticks",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "tabletop",
+      "group": "tableware",
+      "layer": "surface",
+      "decor": 0.5,
+      "radius": 0.09,
+      "description": "Two brass candlesticks with lit candles. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "bookStack",
+      "name": "Stack of books",
+      "model": "model.bookStack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "books",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.16,
+      "description": "A pile of books someone is halfway through. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "booksUpright",
+      "name": "Books and bookends",
+      "model": "model.booksUpright",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "tabletop",
+      "group": "books",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.17,
+      "description": "A row of books between brass bookends. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "vaseFlowers",
+      "name": "Vase of flowers",
+      "model": "model.vaseFlowers",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 40,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.5,
+      "radius": 0.13,
+      "description": "A bunch of fresh flowers in a blue vase. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "vaseSmall",
+      "name": "Bud vase",
+      "model": "model.vaseSmall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.06,
+      "description": "A red bud vase with a single white flower. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "potSucculent",
+      "name": "Succulent",
+      "model": "model.potSucculent",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 18,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.11,
+      "description": "A small rosette succulent in a pale pot. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "potCactus",
+      "name": "Cactus",
+      "model": "model.potCactus",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 18,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.1,
+      "description": "A little cactus in a terracotta pot, in flower. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "potSmall",
+      "name": "Small potted plant",
+      "model": "model.potSmall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 22,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.16,
+      "description": "A leafy plant in a white pot. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "photoFrame",
+      "name": "Photo frame",
+      "model": "model.photoFrame",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.1,
+      "description": "A framed photo of someone dear. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "tableClock",
+      "name": "Alarm clock",
+      "model": "model.tableClock",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.09,
+      "description": "A red twin-bell alarm clock. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "globe",
+      "name": "Globe",
+      "model": "model.globe",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.5,
+      "radius": 0.15,
+      "description": "A globe on a wooden stand. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "snowGlobe",
+      "name": "Snow globe",
+      "model": "model.snowGlobe",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 15,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.09,
+      "description": "A little tree in a snow globe. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "trophy",
+      "name": "Trophy",
+      "model": "model.trophy",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.09,
+      "description": "A gold cup for winning at something. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "sculptureSmall",
+      "name": "Small sculpture",
+      "model": "model.sculptureSmall",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 70,
+      "category": "tabletop",
+      "group": "ornaments",
+      "layer": "surface",
+      "decor": 0.5,
+      "radius": 0.1,
+      "description": "A black ring and a brass ball on a plinth. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "soapSet",
+      "name": "Soap set",
+      "model": "model.soapSet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "bath",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.14,
+      "description": "Soap, a dispenser and toothbrushes on a tray. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "towelStack",
+      "name": "Folded towels",
+      "model": "model.towelStack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 25,
+      "category": "tabletop",
+      "group": "bath",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.16,
+      "description": "Three fluffy towels, folded. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "perfumeTray",
+      "name": "Perfume tray",
+      "model": "model.perfumeTray",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "tabletop",
+      "group": "bath",
+      "layer": "surface",
+      "decor": 0.4,
+      "radius": 0.16,
+      "description": "Perfume bottles on a mirrored tray. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "deskOrganiser",
+      "name": "Desk organiser",
+      "model": "model.deskOrganiser",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "tabletop",
+      "group": "desk",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.17,
+      "description": "A pen pot and a letter tray. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "laptopClosed",
+      "name": "Laptop",
+      "model": "model.laptopClosed",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "tabletop",
+      "group": "desk",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.19,
+      "description": "A closed silver laptop. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "monitor",
+      "name": "Monitor and keyboard",
+      "model": "model.monitor",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "tabletop",
+      "group": "desk",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.3,
+      "description": "A flat monitor with a keyboard and mouse. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "stuffedToy",
+      "name": "Teddy",
+      "model": "model.stuffedToy",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 15,
+      "category": "tabletop",
+      "group": "toys",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.16,
+      "description": "A small, well-loved teddy bear. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    },
+    {
+      "id": "toyBlocks",
+      "name": "Toy blocks",
+      "model": "model.toyBlocks",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 12,
+      "category": "tabletop",
+      "group": "toys",
+      "layer": "surface",
+      "decor": 0.2,
+      "radius": 0.16,
+      "description": "A little tower of wooden blocks. It stands on a table, counter, desk or shelf.",
+      "interactions": []
+    }
+  ]
+}

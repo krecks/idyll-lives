@@ -1,0 +1,363 @@
+{
+  "$comment": "Catalogue 2: Kids' furniture and toys, with a low table and little chairs that pull up to it. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "kidsTable",
+      "name": "Kids' table",
+      "model": "model.kidsTable",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "kids",
+      "surface": {
+        "height": 0.5,
+        "kind": "low",
+        "size": [
+          0.64,
+          0.64
+        ]
+      },
+      "description": "A low table with legs in four colours; little chairs pull up to it.",
+      "interactions": []
+    },
+    {
+      "id": "kidsChair",
+      "name": "Kids' chair",
+      "model": "model.kidsChair",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 40,
+      "category": "kids",
+      "approach": "around",
+      "seatAt": [
+        "low"
+      ],
+      "seat": {
+        "height": 0.31,
+        "forward": 0.05
+      },
+      "description": "A small blue chair. At a low table it is for drawing and homework.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "draw",
+          "label": "Draw at the little table",
+          "anim": "write",
+          "minutes": 30,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "fun": 0.3
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.1
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework at the little table",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "needsTable": true,
+          "homework": 6,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "kidsBookshelf",
+      "name": "Picture-book shelf",
+      "model": "model.kidsBookshelf",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "kids",
+      "decor": 0.2,
+      "description": "Three slanted shelves with the covers facing out.",
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read a picture book",
+          "anim": "read",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "reading",
+            "toys"
+          ],
+          "skills": {
+            "intelligence": 0.06,
+            "writing": 0.03
+          }
+        }
+      ]
+    },
+    {
+      "id": "toyChest",
+      "name": "Toy chest",
+      "model": "model.toyChest",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "kids",
+      "description": "A yellow chest with its lid open: balls, blocks and a bear.",
+      "interactions": [
+        {
+          "id": "play",
+          "label": "Play with toys",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.45
+          },
+          "tags": [
+            "entertainment",
+            "toys"
+          ],
+          "skills": {
+            "creativity": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "playTent",
+      "name": "Play tent",
+      "model": "model.playTent",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 130,
+      "category": "kids",
+      "decor": 0.3,
+      "description": "A canvas teepee with bunting and a soft mat inside.",
+      "interactions": [
+        {
+          "id": "play",
+          "label": "Play in the tent",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.45,
+            "comfort": 0.05
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "kidsEasel",
+      "name": "Kids' easel",
+      "model": "model.kidsEasel",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 95,
+      "category": "kids",
+      "description": "A double-sided easel with paper and pots of paint.",
+      "interactions": [
+        {
+          "id": "paint",
+          "label": "Paint a picture",
+          "anim": "paint",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "creative"
+          ],
+          "skills": {
+            "creativity": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "trainTable",
+      "name": "Train table",
+      "model": "model.trainTable",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 260,
+      "category": "kids",
+      "slots": 2,
+      "description": "A low green table with a wooden track, a train and little trees. Two can play.",
+      "interactions": [
+        {
+          "id": "trains",
+          "label": "Play with the trains",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.45
+          },
+          "tags": [
+            "entertainment",
+            "toys"
+          ],
+          "skills": {
+            "creativity": 0.04,
+            "handiness": 0.03
+          }
+        }
+      ]
+    },
+    {
+      "id": "ballPit",
+      "name": "Ball pit",
+      "model": "model.ballPit",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "kids",
+      "description": "A round pit full of coloured balls.",
+      "interactions": [
+        {
+          "id": "jump",
+          "label": "Jump in the ball pit",
+          "anim": "play",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.5,
+            "energy": -0.05
+          },
+          "tags": [
+            "entertainment",
+            "toys"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "beanBagKids",
+      "name": "Kids' bean bag",
+      "model": "model.beanBagKids",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "kids",
+      "seat": {
+        "height": 0.24,
+        "forward": 0.05
+      },
+      "description": "A small bean bag with a star on it.",
+      "interactions": [
+        {
+          "id": "flop",
+          "label": "Flop into the bean bag",
+          "anim": "relax",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.4
+          },
+          "tags": [
+            "rest",
+            "toys"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kidsBedCar",
+      "name": "Race car bed",
+      "model": "model.kidsBedCar",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 420,
+      "category": "kids",
+      "decor": 0.3,
+      "description": "A bright red race car to sleep in, wheels and all.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 1.0,
+            "comfort": 0.4
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ]
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 60,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.25,
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    }
+  ]
+}

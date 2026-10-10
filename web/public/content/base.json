@@ -3362,7 +3362,9 @@
       "groups": [
         {"id": "appliances", "label": "Appliances"},
         {"id": "counters", "label": "Counters & storage"},
-        {"id": "dining", "label": "Dining"}
+        {"id": "islands", "label": "Islands & bars"},
+        {"id": "dining", "label": "Dining"},
+        {"id": "cabinets", "label": "Sideboards & cabinets"}
       ]
     },
     {
@@ -3382,6 +3384,7 @@
       "icon": "icon.category.bedroom",
       "groups": [
         {"id": "beds", "label": "Beds"},
+        {"id": "nightstands", "label": "Nightstands"},
         {"id": "storage", "label": "Storage"},
         {"id": "dressing", "label": "Dressing"}
       ]
@@ -3397,6 +3400,7 @@
       "icon": "icon.category.living",
       "groups": [
         {"id": "seating", "label": "Seating"},
+        {"id": "sectionals", "label": "Sectionals"},
         {"id": "tables", "label": "Tables"},
         {"id": "media", "label": "TV & music"},
         {"id": "shelves", "label": "Shelves"}
@@ -3405,7 +3409,11 @@
     {
       "id": "office",
       "label": "Office",
-      "icon": "icon.category.office"
+      "icon": "icon.category.office",
+      "groups": [
+        {"id": "desks", "label": "Desks"},
+        {"id": "chairs", "label": "Chairs"}
+      ]
     },
     {
       "id": "fitness",
@@ -3433,6 +3441,21 @@
       ]
     },
     {
+      "id": "tabletop",
+      "label": "Tabletop",
+      "icon": "icon.category.tabletop",
+      "groups": [
+        {"id": "kitchenware", "label": "Kitchenware"},
+        {"id": "tableware", "label": "Tableware"},
+        {"id": "books", "label": "Books"},
+        {"id": "plants", "label": "Small plants"},
+        {"id": "ornaments", "label": "Ornaments"},
+        {"id": "bath", "label": "Bath & dressing"},
+        {"id": "desk", "label": "Desk"},
+        {"id": "toys", "label": "Toys"}
+      ]
+    },
+    {
       "id": "lighting",
       "label": "Lighting",
       "icon": "icon.category.lighting",
@@ -3452,7 +3475,8 @@
         {"id": "cooking", "label": "Grills & fire", "outside": true},
         {"id": "play", "label": "Play", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
-        {"id": "decor", "label": "Garden decor", "outside": true}
+        {"id": "decor", "label": "Garden decor", "outside": true},
+        {"id": "yard", "label": "Sheds & garden work", "outside": true}
       ]
     },
     {
@@ -3472,6 +3496,17 @@
     "garden.json",
     "furniture.json",
     "community.json",
+    "catalog2/kitchen.json",
+    "catalog2/dining.json",
+    "catalog2/living.json",
+    "catalog2/bedroom.json",
+    "catalog2/bath.json",
+    "catalog2/kids.json",
+    "catalog2/office.json",
+    "catalog2/hobbies.json",
+    "catalog2/tabletop.json",
+    "catalog2/lighting.json",
+    "catalog2/outdoor.json",
     "packs/example.json",
     "packs/foodie.json",
     "packs/bookworm.json",
