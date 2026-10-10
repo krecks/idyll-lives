@@ -3,12 +3,12 @@
  * dome. Everything is static and instanced (one draw call per model type), generated
  * deterministically from the town's seed so a loaded game looks the same.
  *
- * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are low-poly leaf-card glbs
- * (`assets/nature/`, built by tools/art/nature_models.py and garden_models.py): ~1-1.5k triangles
- * per tree near the town, `*.far` LODs (~150-400) for the distant woods. `installNature` adds
- * vertex-shader wind, per-instance tint variation and camera-facing crown cards (foliageCards.ts)
- * to their `nature.*` materials; `natureDecor` turns the house builder's garden dressing into
- * species (hedges or mixed borders, mixed lot trees kept clear of the street and paths).
+ * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
+ * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
+ * ~1-1.5k triangles per tree near the town and `*.far` LODs (~100-250) for the distant woods.
+ * `installNature` adds vertex-shader wind and per-instance tint variation to those two finishes;
+ * `natureDecor` turns the house builder's garden dressing into species (hedges or mixed borders,
+ * mixed lot trees kept clear of the street and paths).
  */
 
 import {
@@ -26,7 +26,6 @@ import {
   VertexBuffer,
   VertexData,
   type AbstractEngine,
-  type AbstractMesh,
   type Material,
   type MaterialDefines,
   type Nullable,
@@ -37,7 +36,6 @@ import {
 import type { AssetRegistry } from '../../assets/registry';
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { Lighting } from './environment';
-import { foliageCardCode } from './foliageCards';
 import { MaterialLibrary } from './materials';
 import { buildModel } from './models';
 
@@ -197,8 +195,8 @@ export class Landscape {
 
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
-   * near the town are full leaf-card models that cast shadows; further ones use the `*.far` models
-   * (a few hundred triangles each), which don't.
+   * near the town are the full models and cast shadows; further ones use the `*.far` models (a few
+   * blobs each, built at the low level of detail), which don't.
    */
   private async forests(scene: Scene, assets: AssetRegistry): Promise<{ meshes: Mesh[]; casts: boolean }[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -268,7 +266,7 @@ export class Landscape {
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
         if (onPavement(x + 0.5, z + 0.5)) continue;
-        // Leaf-card tufts are a few triangles each: a denser, softer lawn than before.
+        // Tufts are a few thin blades each: a dense, soft lawn.
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n; k++) {
           tufts.push(scatter(x, z, rand, 0.7 + rand() * 0.6));
@@ -470,18 +468,19 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
 /** Wind shared by every foliage material of a scene; `time` advances per frame. */
 const windState = new WeakMap<Scene, { time: number; strength: number }>();
 
-/** Per material kind: x bend (per m^2 of height), y flutter amplitude (m), z flutter speed, w flutter ramp (1/m). */
+/**
+ * Per finish (placeholder parts' `material`): x bend (per m^2 of height), y flutter amplitude (m),
+ * z flutter speed, w flutter ramp (1/m).
+ */
 const WIND_KIND: Record<string, [number, number, number, number]> = {
-  'nature.bark': [0.0022, 0, 0, 0],
-  'nature.leaves': [0.0022, 0.014, 3.1, 1.5],
-  'nature.grass': [0.5, 0.004, 4.0, 6],
+  'material.finish.bark': [0.0022, 0, 0, 0],
+  'material.finish.foliage': [0.0022, 0.012, 3.1, 1.5],
 };
 
 /**
- * Vertex-shader wind for the nature models (materials named `nature.*` in the glbs): a slow
- * height-weighted bend with gusts plus leaf flutter, phased per instance; and a small per-instance
- * colour variation so repeated trees don't look stamped. Leaf normals are pre-bent towards the
- * canopy, so both faces of a card shade the same (no two-sided normal flip).
+ * Vertex-shader wind for plants (parts on the `bark` and `foliage` finishes): a slow
+ * height-weighted bend with gusts plus leaf flutter, phased per instance; and, on foliage, a small
+ * per-instance colour variation so repeated trees don't look stamped. Short plants hardly move.
  */
 class NatureWindPlugin extends MaterialPluginBase {
   constructor(
@@ -490,7 +489,7 @@ class NatureWindPlugin extends MaterialPluginBase {
     private readonly state: { time: number; strength: number },
     private readonly foliage: boolean,
   ) {
-    super(material, 'NatureWind', 230, { NATUREWIND: false, NATURETINT: false, NATUREBILLBOARD: false }, true, false);
+    super(material, 'NatureWind', 230, { NATUREWIND: false, NATURETINT: false }, true, false);
     this.registerForExtraEvents = true;
     this._enable(true);
   }
@@ -503,11 +502,9 @@ class NatureWindPlugin extends MaterialPluginBase {
     return true;
   }
 
-  override prepareDefines(defines: MaterialDefines, _scene: Scene, mesh: AbstractMesh): void {
+  override prepareDefines(defines: MaterialDefines): void {
     defines.NATUREWIND = true;
     defines.NATURETINT = this.foliage;
-    defines.NATUREBILLBOARD = this.foliage && mesh.isVerticesDataPresent(VertexBuffer.UV3Kind);
-    if (this.foliage) defines.TWOSIDEDLIGHTING = false;
   }
 
   override getUniforms(): { externalUniforms: string[] } {
@@ -561,15 +558,14 @@ class NatureWindPlugin extends MaterialPluginBase {
 `;
     return {
       CUSTOM_VERTEX_DEFINITIONS: definitions,
-      CUSTOM_VERTEX_UPDATE_POSITION: foliageCardCode(wgsl) + (wgsl ? body : body.replace(/vec4f/g, 'vec4')),
+      CUSTOM_VERTEX_UPDATE_POSITION: wgsl ? body : body.replace(/vec4f/g, 'vec4'),
     };
   }
 }
 
 /**
- * Hooks foliage materials as they are created (glTF `nature.*` materials, whoever loads them):
- * wind sway and the per-instance tint. Also advances the wind clock. Call once per scene, before
- * any nature model loads.
+ * Hooks the plant finishes as they are created (whoever builds the first plant): wind sway and the
+ * per-instance tint. Also advances the wind clock. Call once per scene, before any model loads.
  */
 export function installNature(scene: Scene): void {
   if (windState.has(scene)) return;
@@ -581,7 +577,7 @@ export function installNature(scene: Scene): void {
   scene.onNewMaterialAddedObservable.add((material) => {
     const kind = WIND_KIND[material.name];
     if (!kind || !(material instanceof PBRMaterial)) return;
-    new NatureWindPlugin(material, kind, state, material.name !== 'nature.bark');
+    new NatureWindPlugin(material, kind, state, material.name !== 'material.finish.bark');
   });
 }
 

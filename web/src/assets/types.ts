@@ -28,7 +28,7 @@ export interface PlaceholderPart {
   noise?: number;
   /** Rotation in degrees around x, y, z (applied before `at`). */
   rotate?: Vec3;
-  /** Tessellation override for round shapes (cylinder/cone sides, sphere segments). */
+  /** Tessellation override for round shapes (cylinder/cone sides, sphere segments, blob subdivisions: 1 = 20 triangles, 2 = 80, 3 = 180). */
   segments?: number;
   /**
    * Character parts only: the limb that moves this part (walk cycle, sitting, gestures).

@@ -1,7 +1,7 @@
 /**
  * Dev-only model gallery (`pnpm dev`, then /gallery.html): draws manifest models in a grid with the
- * game's own loader and foliage shader (wind, camera-facing cards) under a noon sun, to check art
- * without starting a game. Not part of the build.
+ * game's own loader, finishes and plant shader (wind, tint) under a noon sun, to check art without
+ * starting a game. Not part of the build.
  *
  * URL: `?keys=model.tree,model.pine` (default: every `model.tree*`, `model.garden.*` and nature key),
  * `?filter=garden` (keys containing it), `?cols=6`, `?gap=5`, `?alpha=-1.2&beta=1.1&radius=30`,
@@ -53,7 +53,9 @@ shadows.bias = 0.002;
 const base = import.meta.env.BASE_URL;
 const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
 const env = assets.get('environment.sky', 'image');
-if (env?.url) await MaterialLibrary.for(scene).loadEnvironment(env.url);
+// Finishes (fabric, wood, bark, foliage, ...) come from the manifest's material entries.
+const lib = MaterialLibrary.for(scene).setAssets(assets);
+if (env?.url) await lib.loadEnvironment(env.url);
 scene.environmentIntensity = 0.9;
 const manifest = (await (await fetch(`${base}assets/manifest.json`)).json()) as { entries: Record<string, { type: string }> };
 const filter = params.get('filter');
