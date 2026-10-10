@@ -54,6 +54,7 @@ import {
 } from './core';
 import { BakedVertexAnimationManager } from '@babylonjs/core/BakedVertexAnimation/bakedVertexAnimationManager';
 import type { AssetRegistry } from '../../assets/registry';
+import type { Content, ObjectDef } from '../../content/content';
 import type { FrameState } from '../../core/bridge';
 import { objectCentre, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
@@ -155,6 +156,12 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   swingSet: { h: 0.5, fwd: 0 },
 };
 const DEFAULT_SEAT = { h: 0.45, fwd: 0 };
+
+/** Where a Sim sits on an object: the table above, else the content's `seat`, else the default. */
+function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: number } {
+  const own = def?.seat;
+  return SEATS[id] ?? (own ? { h: own.height, fwd: own.forward ?? 0 } : DEFAULT_SEAT);
+}
 /** Mattress / bench top height (m) for lying. */
 const BEDS: Record<string, { h: number }> = {
   bed: { h: 0.58 },
@@ -564,6 +571,10 @@ interface PlacedObject {
   def: string;
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
+  /** Where Sims sit on it (see `seatOf`). */
+  seat: { h: number; fwd: number };
+  /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
+  restful: boolean;
   cx: number;
   cz: number;
   minX: number;
@@ -699,6 +710,8 @@ export class Characters {
     private readonly scene: Scene,
     private readonly assets: AssetRegistry,
     private readonly lib: MaterialLibrary,
+    /** For seats content describes (`seat`) and what can be sat or lain on. */
+    private readonly content?: Content,
   ) {}
 
   /** Loads the character set and creates the pose texture; false if unavailable. */
@@ -1058,7 +1071,9 @@ export class Characters {
       const z = this.groundRow(o.z);
       // Its middle where it stands (things that stand anywhere on their tile); the bounds stay on tiles.
       const centre = objectCentre(o);
-      return { def: o.def, rot: o.rot, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      const def = this.content?.object(o.def);
+      const restful = !!(SEATS[o.def] || BEDS[o.def]) || !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie');
+      return { def: o.def, rot: o.rot, seat: seatOf(def, o.def), restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     for (const b of this.blankets.values()) {
@@ -1501,7 +1516,7 @@ export class Characters {
       hands = tag === 'lift' ? HANDS.grip : HANDS.open;
     } else if (pose === Pose.Sit) {
       const obj = (known ? useObj : null) ?? this.objectAt(rig.x, rig.z);
-      const seat = (obj && SEATS[obj.def]) || DEFAULT_SEAT;
+      const seat = obj?.seat ?? DEFAULT_SEAT;
       const sp = this.sitPelvis.get(rig.body.name)!;
       rootY = seat.h - sp.y * rig.scale;
       rootFwd = seat.fwd - sp.z * rig.scale;
@@ -2404,7 +2419,7 @@ export class Characters {
     for (const o of this.objects) {
       if (x < o.minX - 0.05 || x > o.maxX + 0.05 || z < o.minZ - 0.05 || z > o.maxZ + 0.05) continue;
       const d = Math.abs(x - o.cx) + Math.abs(z - o.cz);
-      if ((SEATS[o.def] || BEDS[o.def]) && d < bestD) {
+      if (o.restful && d < bestD) {
         best = o;
         bestD = d;
       }

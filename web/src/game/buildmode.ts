@@ -27,6 +27,7 @@ import type { BuildEffect, Renderer, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
+import { approachCandidates, covers, facedTable, fitOnTop, frontTile, spotAt, topOf, type Top } from './surfaces';
 
 /** Preview calls the renderer offers in buy mode. */
 interface BuildPreview {
@@ -35,6 +36,8 @@ interface BuildPreview {
   /** Floor tool: the tiles a release would cover, laid with floor covering `floor` (null: hidden). */
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
   setHeldObject(id: number | null, moved?: boolean): void;
+  /** Where the pointer's ray meets the level `height` metres above the floor in view (a table top). */
+  pickPlane(height: number): Point | null;
   setPlacementGhost(
     ghost: {
       model: string;
@@ -43,6 +46,7 @@ interface BuildPreview {
       rot: number;
       turn?: number;
       offset?: [number, number];
+      lift?: number;
       w: number;
       d: number;
       front?: { x: number; z: number };
@@ -70,6 +74,8 @@ export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: 
  */
 const OFFSET_STEP = 0.25;
 const FREE_STEP = 0.01;
+/** Things on a top snap finer than that: tops are small. */
+const TOP_STEP = 0.05;
 
 /** The eyedropper takes a wall (rather than the floor) within this distance of it (tiles). */
 const PICK_WALL = 0.4;
@@ -82,19 +88,6 @@ const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
 /** An object's offset (centimetres off the middle of its footprint) as a key; `0:0` when centred. */
 function offsetKey(offset: [number, number] | undefined): string {
   return `${offset?.[0] ?? 0}:${offset?.[1] ?? 0}`;
-}
-
-/** The tile in front of a footprint (min corner, rotated size), where a Sim stands to use it. */
-function frontTile(x: number, z: number, w: number, d: number, rot: number): [number, number] {
-  const mx = x + Math.floor((w - 1) / 2);
-  const mz = z + Math.floor((d - 1) / 2);
-  const fronts: [number, number][] = [
-    [mx, z + d],
-    [x + w, mz],
-    [mx, z - 1],
-    [x - 1, mz],
-  ];
-  return fronts[rot % 4];
 }
 
 export class BuildBuyInput {
@@ -366,6 +359,7 @@ export class BuildBuyInput {
     const placing = game.placing;
     const def = placing && this.content.object(placing.def);
     if (!placing || !def) return null;
+    if (def.layer === 'surface') return this.placementOnTop(ground, def, placing);
     const [fw, fd] = def.footprint ?? [1, 1];
     // The middle goes under the pointer: on the tile grid, or (things that turn freely) off it.
     const step = this.content.turns(def) ? (this.shift ? FREE_STEP : OFFSET_STEP) : 0;
@@ -378,7 +372,7 @@ export class BuildBuyInput {
       const cm = (c: number) => Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, Math.round(c * 100)));
       const offset: [number, number] | undefined = step ? [cm(cx - x - w / 2), cm(cz - z - d / 2)] : undefined;
       const fit = this.fits(x, z, w, d, rot, placing.objectId, def);
-      return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit };
+      return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit, lift: 0 };
     };
     const p = at(placing.rot);
     // Things on a wall turn to face away from the wall they're pointed at.
@@ -388,7 +382,56 @@ export class BuildBuyInput {
         if (q.valid) return q;
       }
     }
+    // Chairs turn to face a table they're put beside.
+    if (def.seatAt?.length && !this.facesTable(p)) {
+      for (let k = 1; k < 4; k++) {
+        const q = at((placing.rot + k) % 4);
+        if (q.valid && this.facesTable(q)) return q;
+      }
+    }
     return p;
+  }
+
+  /** Whether seat `objectId` stands pulled up to a table (its `needsTable` interactions are offered). */
+  atTable(objectId: number): boolean {
+    const seat = game.objects.find((o) => o.id === objectId);
+    return !!seat && facedTable(this.content, game.objects, seat, (ax, az, bx, bz) => this.wallBetween(ax, az, bx, bz), this.storeyDepth) !== null;
+  }
+
+  /** Whether a seat placed as `p` faces a table it tucks under. */
+  private facesTable(p: { def: ObjectDef; x: number; z: number; rot: number }): boolean {
+    const others = game.objects.filter((o) => o.id !== game.placing?.objectId);
+    return facedTable(this.content, others, { def: p.def.id, x: p.x, z: p.z, rot: p.rot }, (ax, az, bx, bz) => this.wallBetween(ax, az, bx, bz), this.storeyDepth) !== null;
+  }
+
+  /**
+   * Something small going on a top: the highest top on the home plot under the pointer takes it
+   * (the pointer's ray meets the higher tops first), its middle snapped to 5 cm (with Shift, to
+   * the centimetre). Elsewhere it's shown on the floor, refused.
+   */
+  private placementOnTop(ground: Point, def: ObjectDef, placing: NonNullable<typeof game.placing>) {
+    const home = this.home();
+    const moving = placing.objectId;
+    const others = game.objects.filter((o) => o.id !== moving);
+    const onPlot = (o: { x: number; z: number }) => !!home && o.x >= home.x && o.z >= home.z && o.x < home.x + home.w && o.z < home.z + home.d;
+    const tops = others.filter(onPlot).map((o) => topOf(this.content, o)).filter((t): t is Top => t !== null).sort((a, b) => b.height - a.height);
+    let under: { top: Top; at: Point } | null = null;
+    for (const top of tops) {
+      const at = this.preview.pickPlane?.(top.height);
+      if (at && covers(top, at.x, at.z)) {
+        under = { top, at };
+        break;
+      }
+    }
+    const at = under?.at ?? ground;
+    const step = this.shift ? FREE_STEP : TOP_STEP;
+    const spot = spotAt(Math.round(at.x / step) * step, Math.round(at.z / step) * step);
+    const [cx, cz] = [spot.x + 0.5 + spot.offset[0] / 100, spot.z + 0.5 + spot.offset[1] / 100];
+    const fit = fitOnTop(this.content, others, cx, cz, this.content.radius(def));
+    const affordable = moving !== null || (def.price !== undefined && game.affords(def.price));
+    const valid = typeof fit !== 'string' && onPlot(fit.host) && onPlot(spot) && affordable;
+    const reason = valid ? null : fit === 'noTop' ? 'Goes on a table, counter, desk or shelf' : fit === 'overEdge' ? 'Too near the edge' : null;
+    return { def, rot: placing.rot, turn: placing.turn, offset: spot.offset, x: spot.x, z: spot.z, w: 1, d: 1, valid, reason, lift: typeof fit !== 'string' ? fit.height : (under?.top.height ?? 0) };
   }
 
   /** Whether a tile is indoors (a tile split by a diagonal wall is when either half is, as in the simulation). */
@@ -421,10 +464,14 @@ export class BuildBuyInput {
       for (let tz = z; tz < z + d; tz++) if (rot % 4 === 1 || rot % 4 === 3) backs.push({ axis: 'v', x: rot % 4 === 1 ? x : x + w, z: tz });
       if (!backs.every((e) => ['wall', 'window'].includes(this.edgeState(e)))) return 'Hangs on a wall';
     }
-    // Something on a wall, the ceiling or the floor that nobody uses needn't be reached.
-    const unused = layer !== 'floor' && def.interactions.length === 0;
+    // Something nobody uses needn't be reached (a picture, a rug, a table chairs go all round);
+    // a chair pulled up to a table is used from any free side.
+    const unused = def.interactions.length === 0;
     const front = frontTile(x, z, w, d, rot);
-    if (!onPlot(front[0], front[1]) || (!unused && takenOn('floor', front[0], front[1]))) return null;
+    if (!unused && !onPlot(front[0], front[1])) return null;
+    const free = ({ tile: [tx, tz], inner: [ix, iz] }: { tile: [number, number]; inner: [number, number] }) =>
+      onPlot(tx, tz) && !takenOn('floor', tx, tz) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+    if (!unused && !approachCandidates(def, x, z, rot).some(free)) return def.approach === 'around' ? 'No free side to sit down from' : null;
     // As the simulation: no wall through the footprint, or between it and where it's used from.
     for (let tz = z; tz < z + d; tz++) {
       for (let tx = x; tx < x + w; tx++) {
@@ -454,8 +501,10 @@ export class BuildBuyInput {
     const p = this.placement(ground);
     if (!p) return this.preview.setPlacementGhost?.(null);
     const style = p && game.placing?.objectId != null ? (game.objects.find((o) => o.id === game.placing!.objectId)?.style ?? 0) : (game.placing?.style ?? game.householdStyle);
+    // The arrow marks where it's used from: nothing for things nobody uses (or on a top).
+    const used = p.def.interactions.length > 0 && p.def.layer !== 'surface';
     const [fx, fz] = frontTile(p.x, p.z, p.w, p.d, p.rot);
-    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, w: p.w, d: p.d, front: { x: fx, z: fz }, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, front: used ? { x: fx, z: fz } : undefined, valid: p.valid });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }

@@ -81,8 +81,12 @@ export interface ObjectDef {
   layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
-  /** A top small things stand on: its height (m), kind, and the margin kept clear along its edges (m, default 0.04). */
-  surface?: { height: number; kind: SurfaceKind; inset?: number };
+  /**
+   * A top small things stand on: its height (m), kind, and the margin kept clear along its edges
+   * (m, default 0.04); its width and depth (m, default the footprint's) and where its middle is off
+   * the footprint's middle (m, to the object's right and front; default [0, 0]).
+   */
+  surface?: { height: number; kind: SurfaceKind; inset?: number; size?: [number, number]; at?: [number, number] };
   /** Things on the `surface` layer: the radius (m) of the disc they take on their host's top (default 0.12). */
   radius?: number;
   /** Where it is used from: the tile in front (default), or any free tile `around` it (chairs pushed under a table). */
@@ -455,6 +459,11 @@ export class Content {
   turns(def: ObjectDef): boolean {
     const [w, d] = def.footprint ?? [1, 1];
     return def.freeRotation ?? (def.layer === 'surface' || (def.layer !== 'wall' && w === 1 && d === 1 && def.category !== undefined && this.freeRotation.has(def.category)));
+  }
+
+  /** Things on the `surface` layer: the radius (m) of the disc they take on a top (sim-core `ObjectDef::radius`). */
+  radius(def: ObjectDef | undefined): number {
+    return Math.max(0.02, Math.min(0.45, def?.radius ?? 0.12));
   }
 
   /** Its layer (`floor` for furniture): only things on the same layer take each other's place. */

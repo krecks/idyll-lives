@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 use crate::command::{EdgeAxis, EdgeEdit, EdgeKind, FacePaint, FloorPaint};
 use crate::lot::{DiagDir, Diagonal, Edge, EdgeLook, EdgeRef, OUTDOORS};
-use crate::world::{Plot, World};
+use crate::content::Layer;
+use crate::world::{ObjectInstance, Plot, World};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -411,7 +412,10 @@ impl World {
         {
             self.set_roof(household, style as u8, color as u8)?;
         }
-        for o in &bp.objects {
+        // Things standing on tops go on once everything else stands.
+        let on_top = |o: &&BlueprintObject| self.content.object_index(&o.def).is_some_and(|d| self.content.objects[d].layer == Layer::Surface);
+        let (riders, rest): (Vec<&BlueprintObject>, Vec<&BlueprintObject>) = bp.objects.iter().partition(on_top);
+        for o in rest.into_iter().chain(riders) {
             let Some(def) = self.content.object_index(&o.def) else { continue };
             let [fw, fd] = self.content.objects[def].footprint;
             let (w, d) = if o.rot % 2 == 0 { (fw as i32, fd as i32) } else { (fd as i32, fw as i32) };
@@ -419,13 +423,13 @@ impl World {
             let Ok(up) = lift(o.storey) else { continue };
             let z = z + up;
             let style = o.style.as_ref().and_then(|s| self.content.styles.iter().position(|x| &x.id == s)).map(|s| s as u8);
-            let Ok(id) = self.buy(household, &o.def, Some([x, z, rot as i32]), style) else { continue };
+            // Turned round, it stands off the other way.
+            let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
+            let offset = self.check_offset(def, offset).unwrap_or([0, 0]);
+            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), style, offset) else { continue };
             if self.content.objects[def].turns && o.turn < 90 {
                 self.objects[id as usize].turn = o.turn;
             }
-            // Turned round, it stands off the other way.
-            let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
-            self.objects[id as usize].offset = self.check_offset(def, offset).unwrap_or([0, 0]);
             for _ in 0..o.quality {
                 if self.upgrade(household, id).is_err() {
                     break;
@@ -499,13 +503,24 @@ impl World {
                 return Err(Error::new("there's another room in the way"));
             }
         }
-        let carried: Vec<u32> = self
+        let content = &self.content;
+        let on_top = |o: &ObjectInstance| content.objects[o.def].layer == Layer::Surface;
+        let mut carried: Vec<u32> = self
             .objects
             .iter()
-            .filter(|o| self.object_plot[o.id as usize] == Some(plot) && o.tiles(&self.content).all(|t| ours(t)))
+            .filter(|o| !on_top(o) && self.object_plot[o.id as usize] == Some(plot) && o.tiles(content).all(&ours))
             .map(|o| o.id)
             .collect();
-        let in_the_way = self.objects.iter().any(|o| !carried.contains(&o.id) && o.tiles(&self.content).any(|t| target.contains(&t)));
+        // Things on tops go with what they stand on (and are never in the way themselves).
+        let riders: Vec<u32> = self
+            .objects
+            .iter()
+            .filter(|o| on_top(o) && crate::surface::host_of(content, &self.objects, o).is_some_and(|h| carried.contains(&h)))
+            .map(|o| o.id)
+            .collect();
+        carried.extend(riders);
+        carried.sort_unstable();
+        let in_the_way = self.objects.iter().any(|o| !on_top(o) && !carried.contains(&o.id) && o.tiles(content).any(|t| target.contains(&t)));
         if in_the_way {
             return Err(Error::new("something is standing where the room would go"));
         }
@@ -528,8 +543,8 @@ impl World {
                 .iter()
                 .filter(|o| w.object_plot[o.id as usize] == Some(plot))
                 .filter(|o| {
-                    let (fx, fz) = o.front_tile(&w.content);
-                    !w.lot.in_bounds(fx, fz) || !seen[w.lot.tile_index(fx, fz)]
+                    let used = !w.content.objects[o.def].interactions.is_empty();
+                    used && !w.approach_tiles(o).iter().any(|&(fx, fz)| w.lot.in_bounds(fx, fz) && seen[w.lot.tile_index(fx, fz)])
                 })
                 .count();
             let sims = w
@@ -577,10 +592,13 @@ impl World {
             self.lot.compute_rooms();
             self.structure_version += 1;
             self.refresh_rooms();
-            for o in lifted.iter().rev() {
+            // Everything else first, then what stands on tops.
+            let on_top = |o: &&ObjectInstance| self.content.objects[o.def].layer == Layer::Surface;
+            let (riders, rest): (Vec<&ObjectInstance>, Vec<&ObjectInstance>) = lifted.iter().rev().partition(on_top);
+            for o in rest.into_iter().chain(riders) {
                 let name = self.content.objects[o.def].name.to_lowercase();
                 let id = self
-                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, o.style, o.quality, o.value)
+                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, o.offset, o.style, o.quality, o.value)
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
                 let placed = &mut self.objects[id as usize];
                 placed.turn = o.turn;

@@ -461,6 +461,18 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "A counter with a toaster and a blender: toast for a quick bite, a smoothie for a little energy.",
+      "surface": {
+        "height": 0.96,
+        "kind": "bar",
+        "size": [
+          1.0,
+          0.62
+        ],
+        "at": [
+          0,
+          -0.15
+        ]
+      },
       "interactions": [
         {
           "id": "toast",
@@ -530,6 +542,18 @@
       "category": "kitchen",
       "group": "counters",
       "description": "A base cabinet with a worktop. Line them up for a proper kitchen; there's always room to make a sandwich.",
+      "surface": {
+        "height": 0.96,
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.62
+        ],
+        "at": [
+          0,
+          -0.15
+        ]
+      },
       "interactions": [
         {
           "id": "sandwich",
@@ -557,6 +581,10 @@
       "category": "kitchen",
       "group": "counters",
       "description": "A deep corner unit that joins two runs of counters into an L.",
+      "surface": {
+        "height": 0.96,
+        "kind": "counter"
+      },
       "interactions": [
         {
           "id": "sandwich",
@@ -684,6 +712,18 @@
       "group": "counters",
       "slots": 2,
       "description": "A freestanding island with two stools at its front: two residents can make a snack or have breakfast here at once.",
+      "surface": {
+        "height": 0.95,
+        "kind": "counter",
+        "size": [
+          1.94,
+          0.82
+        ],
+        "at": [
+          0,
+          -0.04
+        ]
+      },
       "interactions": [
         {
           "id": "sandwich",
@@ -725,6 +765,11 @@
       "category": "kitchen",
       "group": "dining",
       "description": "A tall stool for the counter or the island.",
+      "approach": "around",
+      "seatAt": [
+        "bar",
+        "counter"
+      ],
       "interactions": [
         {
           "id": "sit",
@@ -768,6 +813,18 @@
       "category": "kitchen",
       "group": "dining",
       "description": "A little round table with one chair: the cheapest place to sit down for breakfast or a coffee.",
+      "surface": {
+        "height": 0.75,
+        "kind": "table",
+        "size": [
+          0.44,
+          0.44
+        ],
+        "at": [
+          0,
+          0.17
+        ]
+      },
       "interactions": [
         {
           "id": "breakfast",
@@ -815,6 +872,18 @@
       "slots": 2,
       "decor": 0.3,
       "description": "A glass-topped table for two with chairs: breakfast and coffee in style.",
+      "surface": {
+        "height": 0.76,
+        "kind": "table",
+        "size": [
+          1.7,
+          0.62
+        ],
+        "at": [
+          0,
+          0.16
+        ]
+      },
       "interactions": [
         {
           "id": "breakfast",
@@ -862,6 +931,18 @@
       "slots": 2,
       "decor": 0.5,
       "description": "A solid oak table set for four. Lingering over a long meal here is the best part of the day.",
+      "surface": {
+        "height": 0.765,
+        "kind": "table",
+        "size": [
+          1.76,
+          0.66
+        ],
+        "at": [
+          0,
+          0.15
+        ]
+      },
       "interactions": [
         {
           "id": "breakfast",
@@ -923,6 +1004,10 @@
       "category": "kitchen",
       "group": "dining",
       "description": "A simple chair: extra seating anywhere.",
+      "approach": "around",
+      "seatAt": [
+        "table"
+      ],
       "interactions": [
         {
           "id": "sit",
@@ -934,6 +1019,22 @@
             "comfort": 0.3
           },
           "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "coffee",
+          "label": "Have a coffee",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.08
+          },
+          "tags": [
+            "food",
             "lounge"
           ]
         }
@@ -1237,6 +1338,14 @@
       "category": "living",
       "group": "tables",
       "description": "A low table with a few magazines on it.",
+      "surface": {
+        "height": 0.42,
+        "kind": "low",
+        "size": [
+          1.24,
+          0.7
+        ]
+      },
       "interactions": [
         {
           "id": "magazine",
@@ -1266,6 +1375,14 @@
       "group": "tables",
       "decor": 0.3,
       "description": "A glass-topped coffee table.",
+      "surface": {
+        "height": 0.42,
+        "kind": "low",
+        "size": [
+          1.24,
+          0.7
+        ]
+      },
       "interactions": [
         {
           "id": "magazine",
@@ -1295,6 +1412,14 @@
       "group": "tables",
       "decor": 0.5,
       "description": "A round marble top on bent steel legs.",
+      "surface": {
+        "height": 0.42,
+        "kind": "low",
+        "size": [
+          0.62,
+          0.62
+        ]
+      },
       "interactions": [
         {
           "id": "magazine",
@@ -1324,6 +1449,14 @@
       "group": "tables",
       "decor": 0.2,
       "description": "A small table for beside the sofa.",
+      "surface": {
+        "height": 0.55,
+        "kind": "low",
+        "size": [
+          0.52,
+          0.42
+        ]
+      },
       "interactions": []
     },
     {
@@ -1512,6 +1645,18 @@
       "group": "shelves",
       "decor": 0.2,
       "description": "Two shelves of paperbacks: a good read, but not for serious study.",
+      "surface": {
+        "height": 0.9,
+        "kind": "shelf",
+        "size": [
+          0.86,
+          0.38
+        ],
+        "at": [
+          0,
+          -0.25
+        ]
+      },
       "interactions": [
         {
           "id": "read",
@@ -1612,6 +1757,18 @@
       "group": "shelves",
       "decor": 0.6,
       "description": "Steel and wood shelves with books, plants and drawers.",
+      "surface": {
+        "height": 1.83,
+        "kind": "shelf",
+        "size": [
+          1.76,
+          0.54
+        ],
+        "at": [
+          0,
+          -0.18
+        ]
+      },
       "interactions": []
     },
     {
@@ -1813,6 +1970,18 @@
       "group": "storage",
       "decor": 0.15,
       "description": "A bedside table with a drawer.",
+      "surface": {
+        "height": 0.56,
+        "kind": "low",
+        "size": [
+          0.5,
+          0.42
+        ],
+        "at": [
+          0,
+          -0.24
+        ]
+      },
       "interactions": []
     },
     {
@@ -1848,6 +2017,18 @@
       "group": "storage",
       "decor": 0.2,
       "description": "Six drawers of clothes. Picking a good outfit makes residents more charming for a few hours.",
+      "surface": {
+        "height": 0.89,
+        "kind": "shelf",
+        "size": [
+          1.44,
+          0.52
+        ],
+        "at": [
+          0,
+          -0.17
+        ]
+      },
       "interactions": [
         {
           "id": "outfit",
@@ -2491,6 +2672,18 @@
       "price": 180,
       "category": "kids",
       "description": "A small desk and chair for homework and drawings.",
+      "surface": {
+        "height": 0.57,
+        "kind": "desk",
+        "size": [
+          0.76,
+          0.44
+        ],
+        "at": [
+          0,
+          0.2
+        ]
+      },
       "interactions": [
         {
           "id": "homework",
@@ -2570,6 +2763,18 @@
       "price": 260,
       "category": "office",
       "description": "A plain desk with a lamp, paper and pens: writing trains Writing, and pupils do their homework here.",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          1.54,
+          0.42
+        ],
+        "at": [
+          0,
+          0.24
+        ]
+      },
       "interactions": [
         {
           "id": "write",
@@ -2621,6 +2826,18 @@
       "price": 650,
       "category": "office",
       "description": "A small desk with a laptop: browse, write or code without the price of a full computer desk.",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          0.9,
+          0.42
+        ],
+        "at": [
+          0,
+          0.24
+        ]
+      },
       "interactions": [
         {
           "id": "browse",
@@ -2776,6 +2993,11 @@
       "price": 140,
       "category": "office",
       "description": "A swivel chair on castors.",
+      "approach": "around",
+      "seatAt": [
+        "desk",
+        "table"
+      ],
       "interactions": [
         {
           "id": "sit",
@@ -4037,6 +4259,18 @@
       "category": "outdoor",
       "group": "seating",
       "description": "A slatted folding table and chairs for a sunny corner.",
+      "surface": {
+        "height": 0.72,
+        "kind": "table",
+        "size": [
+          0.6,
+          0.6
+        ],
+        "at": [
+          0,
+          0.3
+        ]
+      },
       "interactions": [
         {
           "id": "coffee",
@@ -4083,6 +4317,14 @@
       "group": "seating",
       "slots": 2,
       "description": "A big wooden table with benches: picnics for two.",
+      "surface": {
+        "height": 0.63,
+        "kind": "table",
+        "size": [
+          2.4,
+          0.7
+        ]
+      },
       "interactions": [
         {
           "id": "picnic",

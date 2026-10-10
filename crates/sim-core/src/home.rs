@@ -12,6 +12,7 @@ use std::collections::VecDeque;
 
 use crate::Error;
 use crate::command::{EdgeAxis, EdgeEdit, EdgeKind, FacePaint, FloorPaint};
+use crate::content::Layer;
 use crate::lot::{Diagonal, Edge, EdgeLook, EdgeRef, FORM_HALF, OUTDOORS};
 use crate::path::NavGrid;
 use crate::social::EventKind;
@@ -258,12 +259,15 @@ impl World {
         Ok((h, plot))
     }
 
-    /// Whether every tile of `obj` and the tile in front of it lie on `plot`.
+    /// Whether every tile of `obj` and the tile in front of it lie on `plot` (nobody uses things
+    /// without interactions, like tables, or things standing on a top: their front can be off it).
     fn fits_on_plot(&self, obj: &ObjectInstance, plot: u32) -> bool {
         let p = &self.plots[plot as usize];
+        let def = &self.content.objects[obj.def];
         let (fx, fz) = obj.front_tile(&self.content);
         let on = |x: i32, z: i32| p.contains(x, self.ground_z(z));
-        on(fx, fz) && obj.tiles(&self.content).all(|(x, z)| on(x, z))
+        let used = !def.interactions.is_empty() && def.layer != Layer::Surface;
+        (!used || on(fx, fz)) && obj.tiles(&self.content).all(|(x, z)| on(x, z))
     }
 
     /// Tiles reachable on foot from the plot's entry (a mask over the whole lot).
@@ -309,12 +313,12 @@ impl World {
             .objects
             .iter()
             .map(|o| {
-                let (fx, fz) = o.front_tile(&self.content);
                 let def = &self.content.objects[o.def];
-                // Nobody needs to reach a picture or a rug nobody uses.
+                // Nobody needs to reach a picture, a rug or a table nobody uses; chairs pulled up
+                // to a table, from any side.
                 self.object_plot[o.id as usize] != Some(plot)
-                    || (def.layer.mounted() && def.interactions.is_empty())
-                    || (self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)])
+                    || def.interactions.is_empty()
+                    || self.approach_tiles(o).iter().any(|&(fx, fz)| self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)])
             })
             .collect();
         (fronts, seen)
@@ -342,13 +346,16 @@ impl World {
         objects_ok && sims_ok
     }
 
+    /// Whether a resident stands where `obj` would go (or would stand up there from a seat).
     fn sim_in_the_way(&self, obj: &ObjectInstance) -> bool {
-        self.sims
-            .iter()
-            .any(|s| s.away_until.is_none() && obj.tiles(&self.content).any(|t| t == s.tile()))
+        self.sims.iter().any(|s| {
+            let seated = s.seated_from.filter(|_| s.pose != crate::content::Pose::Stand);
+            s.away_until.is_none() && obj.tiles(&self.content).any(|t| t == s.tile() || Some(t) == seated)
+        })
     }
 
-    /// Places object `def` on the home plot if it fits there and blocks nothing.
+    /// Places object `def` on the home plot (standing `offset` off its tiles' middle) if it fits
+    /// there and blocks nothing.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn place_at_home(
         &mut self,
@@ -357,11 +364,12 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
+        offset: [i8; 2],
         style: u8,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
-        let obj = self.check_fit(def, x, z, rot).map_err(|e| {
+        let obj = self.check_fit(def, x, z, rot, offset).map_err(|e| {
             let e = e.to_string();
             Error::new(if e.contains("diagonal") {
                 "furniture can't stand on a tile with a diagonal wall"
@@ -369,6 +377,10 @@ impl World {
                 "that hangs on a wall: put its back to one"
             } else if e.contains("needs a ceiling") {
                 "that hangs from a ceiling: put it in a room"
+            } else if e.contains("nothing to stand on") {
+                "that goes on a table, a counter, a desk or a shelf"
+            } else if e.contains("over the edge") {
+                "that would hang over the edge"
             } else {
                 "there's no room for that here"
             })
@@ -385,8 +397,9 @@ impl World {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, style, quality, value)?;
-        let (fx, fz) = self.objects[id as usize].front_tile(&self.content);
+        let id = self.place(def, x, z, rot, offset, style, quality, value)?;
+        let approach = self.approach_tiles(&self.objects[id as usize]);
+        let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
         // Upstairs before there are stairs, nothing in the room can be reached yet anyway.
         let cut_off = || {
@@ -396,9 +409,11 @@ impl World {
             room != OUTDOORS
                 && !(p.z + k..p.z + p.d + k).any(|z| (p.x..p.x + p.w).any(|x| self.lot.room_at(x, z) == room && seen[self.lot.tile_index(x, z)]))
         };
-        // A picture or a rug nobody uses can go anywhere (over a bed, behind a sofa).
-        let unused = mounted && self.content.objects[def].interactions.is_empty();
-        let front_ok = unused || seen[self.lot.tile_index(fx, fz)] || (self.storey_of(fz) > 0 && cut_off());
+        // A picture, a rug or a table nobody uses can go anywhere (over a bed, behind a sofa,
+        // with chairs all round); a chair pulled up to a table needs one free side.
+        let unused = self.content.objects[def].interactions.is_empty();
+        let reached = approach.iter().any(|&(ax, az)| self.lot.in_bounds(ax, az) && seen[self.lot.tile_index(ax, az)]);
+        let front_ok = unused || reached || (!approach.is_empty() && self.storey_of(fz) > 0 && cut_off());
         if !front_ok || !self.keeps_reach(plot, &before, Some(id)) {
             self.remove_object(id);
             return Err(Error::new("that would block the way"));
@@ -413,9 +428,23 @@ impl World {
             .all(|(x, z)| self.lot.room_at(x, z) == OUTDOORS)
     }
 
-    /// A good free spot for `def` on the plot: indoors (outdoors for garden things), back to a
-    /// wall, away from doors.
-    fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8)> {
+    /// Good free spots for `def` on the plot, best first: indoors (outdoors for garden things),
+    /// back to a wall, away from doors. Things on a surface go on the first top with room for
+    /// them, in the middle if it's free.
+    fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8, [i8; 2])> {
+        if self.content.objects[def].layer == Layer::Surface {
+            let radius = self.content.objects[def].radius;
+            return self
+                .objects
+                .iter()
+                .filter(|o| self.object_plot[o.id as usize] == Some(plot))
+                .filter_map(|o| {
+                    let c = crate::surface::middle(&self.content, o);
+                    crate::surface::free_surface_spot_near(&self.content, &self.objects, &[o.id], c, f32::INFINITY, 0, radius, &[])
+                })
+                .map(|s| (s.x, s.z, 0, s.offset))
+                .collect();
+        }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
         let near_door = |x: i32, z: i32| {
@@ -429,7 +458,7 @@ impl World {
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
-                    let Ok(obj) = self.check_fit(def, x, z, rot) else {
+                    let Ok(obj) = self.check_fit(def, x, z, rot, [0, 0]) else {
                         continue;
                     };
                     if !self.fits_on_plot(&obj, plot)
@@ -453,7 +482,7 @@ impl World {
             }
         }
         spots.sort_by_key(|s| -s.0);
-        spots.into_iter().map(|(_, x, z, r)| (x, z, r)).collect()
+        spots.into_iter().map(|(_, x, z, r)| (x, z, r, [0, 0])).collect()
     }
 
     /// Buys an object for the household's home. Returns the new object's id.
@@ -463,6 +492,20 @@ impl World {
         def_id: &str,
         at: Option<[i32; 3]>,
         style: Option<u8>,
+    ) -> Result<u32, Error> {
+        self.buy_at(household, def_id, at, style, [0, 0])
+    }
+
+    /// Buys an object for the household's home, standing `offset` off its tiles' middle (where
+    /// it goes on a top, for things on a surface). Without `at`, it goes at the first good free
+    /// spot (`offset` kept unless it stands on a surface). Returns the new object's id.
+    pub fn buy_at(
+        &mut self,
+        household: u32,
+        def_id: &str,
+        at: Option<[i32; 3]>,
+        style: Option<u8>,
+        offset: [i8; 2],
     ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
         let def = self
@@ -475,14 +518,15 @@ impl World {
             .ok_or_else(|| Error::new(format!("{} isn't for sale", d.name)))?;
         self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
         let style = self.check_style(style.unwrap_or(self.households[h].style))?;
+        let on_top = d.layer == Layer::Surface;
         let id = match at {
-            Some([x, z, rot]) => self.place_at_home(plot, def, x, z, rot as u8, style, 0, price)?,
+            Some([x, z, rot]) => self.place_at_home(plot, def, x, z, rot as u8, offset, style, 0, price)?,
             None => self
                 .find_spot(plot, def)
                 .into_iter()
-                .find_map(|(x, z, rot)| {
-                    self.place_at_home(plot, def, x, z, rot, style, 0, price)
-                        .ok()
+                .find_map(|(x, z, rot, found)| {
+                    let offset = if on_top { found } else { offset };
+                    self.place_at_home(plot, def, x, z, rot, offset, style, 0, price).ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
@@ -498,20 +542,29 @@ impl World {
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot)| self.place_at_home(plot, def, x, z, rot, style, 0, value).ok())
+            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, offset, style, 0, value).ok())
     }
 
-    /// Sells an object at home for part of what was spent on it (nothing in Creative).
+    /// Sells an object at home for part of what was spent on it (nothing in Creative). What
+    /// stands on its top is sold with it.
     pub fn sell(&mut self, household: u32, object: u32) -> Result<(), Error> {
         let (h, _) = self.home_object(household, object)?;
         let obj = &self.objects[object as usize];
         if self.content.objects[obj.def].price.is_none() {
             return Err(Error::new("that can't be sold"));
         }
-        // Something broken brings back half.
-        let broken = if obj.broken() { 0.5 } else { 1.0 };
-        let refund = (obj.value as f32 * self.content.object_rules.resale * broken).round() as i64;
-        self.remove_object(object);
+        let mut sold = crate::surface::riders(&self.content, &self.objects, object);
+        sold.push(object);
+        sold.sort_unstable();
+        let mut refund = 0;
+        // Highest id first: the ids before it stay put.
+        for &id in sold.iter().rev() {
+            let obj = &self.objects[id as usize];
+            // Something broken brings back half.
+            let broken = if obj.broken() { 0.5 } else { 1.0 };
+            refund += (obj.value as f32 * self.content.object_rules.resale * broken).round() as i64;
+            self.remove_object(id);
+        }
         self.households[h].funds += self.build_price(refund);
         Ok(())
     }
@@ -526,31 +579,69 @@ impl World {
         z: i32,
         rot: u8,
     ) -> Result<u32, Error> {
+        self.move_object_to(household, object, x, z, rot, None, None)
+    }
+
+    /// Moves or rotates an object at home, with a new free turn and offset if given (else it
+    /// keeps its own). Things standing on its top go with it, turned with it. Its look, quality
+    /// and value stay. Returns its new id: it's placed again at the end of the list (its riders
+    /// after it), so the ids after it shift down. If anything doesn't fit, nothing moves.
+    #[allow(clippy::too_many_arguments)]
+    pub fn move_object_to(
+        &mut self,
+        household: u32,
+        object: u32,
+        x: i32,
+        z: i32,
+        rot: u8,
+        turn: Option<u8>,
+        offset: Option<[i8; 2]>,
+    ) -> Result<u32, Error> {
         let (_, plot) = self.home_object(household, object)?;
-        let old = self.remove_object(object);
-        let moved = self.place_at_home(plot, old.def, x, z, rot, old.style, old.quality, old.value);
-        let id = match moved {
-            Ok(id) => id,
-            Err(e) => {
-                let id = self
-                    .place(
-                        old.def,
-                        old.x,
-                        old.z,
-                        old.rot,
-                        old.style,
-                        old.quality,
-                        old.value,
-                    )
-                    .expect("the old spot is still free");
-                self.objects[id as usize].turn = old.turn;
-                self.objects[id as usize].offset = old.offset;
-                return Err(e);
+        let before = self.home_snapshot(household).expect("the household has a home");
+        let riders = crate::surface::riders(&self.content, &self.objects, object);
+        let old_top = crate::surface::Top::of(&self.content, &self.objects[object as usize]);
+        // Lift it and its riders out, highest id first (the ids before each stay put).
+        let mut ids = riders.clone();
+        ids.push(object);
+        ids.sort_unstable();
+        let mut lifted: Vec<ObjectInstance> = ids.iter().rev().map(|&id| self.remove_object(id)).collect();
+        lifted.reverse();
+        let old = lifted.iter().find(|o| o.id == object).expect("lifted it").clone();
+        let result = (|| {
+            let offset = offset.unwrap_or(old.offset);
+            let id = self.place_at_home(plot, old.def, x, z, rot, offset, old.style, old.quality, old.value)?;
+            let placed = &mut self.objects[id as usize];
+            placed.turn = turn.unwrap_or(old.turn);
+            placed.wear = old.wear;
+            let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
+            let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
+            let delta = turned(&self.objects[id as usize]) - turned(&old);
+            for r in lifted.iter().filter(|o| o.id != object) {
+                let (x, z, offset) = match (old_top, new_top) {
+                    (Some(a), Some(b)) => {
+                        // Where it stood on the old top, on the new one.
+                        let p = b.world(a.local(crate::surface::middle(&self.content, r)));
+                        let spot = crate::surface::SurfaceSpot::at(id, p, b.surface.height);
+                        (spot.x, spot.z, spot.offset)
+                    }
+                    _ => (r.x, r.z, r.offset),
+                };
+                let facing = (turned(r) + delta).rem_euclid(360);
+                let name = self.content.objects[r.def].name.to_lowercase();
+                let rid = self
+                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, offset, r.style, r.quality, r.value)
+                    .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
+                let placed = &mut self.objects[rid as usize];
+                placed.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
+                placed.wear = r.wear;
             }
-        };
-        self.objects[id as usize].turn = old.turn;
-        self.objects[id as usize].offset = old.offset;
-        Ok(id)
+            Ok(id)
+        })();
+        if result.is_err() {
+            self.restore(before);
+        }
+        result
     }
 
     pub fn restyle(&mut self, household: u32, object: u32, style: u8) -> Result<(), Error> {

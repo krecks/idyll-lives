@@ -1219,6 +1219,9 @@ struct ObjectView<'a> {
     /// Centimetres (x, z) off the middle of its footprint (objects that turn freely).
     #[serde(skip_serializing_if = "crate::world::centred")]
     offset: [i8; 2],
+    /// Things on the `surface` layer: the height (m) of the top they stand on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lift: Option<f32>,
     /// Wear 0..1 (broken at 1).
     wear: f32,
     w: i32,
@@ -1318,6 +1321,42 @@ fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i3
     b
 }
 
+/// Per object, the height of the top it stands on (things on the `surface` layer; None for the
+/// rest, or on a top at floor level).
+fn surface_lifts(world: &World) -> Vec<Option<f32>> {
+    let content = &world.content;
+    let on_top = |o: &crate::world::ObjectInstance| content.objects[o.def].layer == crate::content::Layer::Surface;
+    if !world.objects.iter().any(on_top) {
+        return Vec::new();
+    }
+    // The top over each tile (furniture never shares tiles), checked against where each thing's
+    // middle is; a thing over the edge of its tile's top looks through them all.
+    let lot = &world.lot;
+    let mut tops = vec![u32::MAX; lot.width * lot.depth];
+    for o in world.objects.iter().filter(|o| content.objects[o.def].surface.is_some()) {
+        for (x, z) in o.tiles(content).filter(|&(x, z)| lot.in_bounds(x, z)) {
+            tops[lot.tile_index(x, z)] = o.id;
+        }
+    }
+    world
+        .objects
+        .iter()
+        .map(|o| {
+            if !on_top(o) {
+                return None;
+            }
+            let p = crate::surface::middle(content, o);
+            let (x, z) = (p[0].floor() as i32, p[1].floor() as i32);
+            let near = lot.in_bounds(x, z).then(|| tops[lot.tile_index(x, z)]).filter(|&h| h != u32::MAX);
+            let top = near
+                .and_then(|h| crate::surface::Top::of(content, &world.objects[h as usize]))
+                .filter(|t| t.covers(p))
+                .or_else(|| crate::surface::host_of(content, &world.objects, o).and_then(|h| crate::surface::Top::of(content, &world.objects[h as usize])))?;
+            Some(top.surface.height).filter(|&h| h > 0.0)
+        })
+        .collect()
+}
+
 pub fn structure_json(world: &World) -> String {
     structure_json_with(world, true)
 }
@@ -1326,6 +1365,7 @@ pub fn structure_json(world: &World) -> String {
 /// diagonals, fences, floors) for a caller that has it at this `lotVersion` already.
 pub fn structure_json_with(world: &World, lot: bool) -> String {
     let content = &world.content;
+    let lifts = surface_lifts(world);
     let objects = world
         .objects
         .iter()
@@ -1339,6 +1379,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 rot: o.rot,
                 turn: o.turn,
                 offset: o.offset,
+                lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
                 w,
                 d,

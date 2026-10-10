@@ -892,8 +892,10 @@ export async function startSession(
     const def = placement && content.object(placement.def);
     if (!placement || !def) return;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
-    const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.map((it, index) =>
-      it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index },
+    // Dining at a table only at a chair pulled up to one.
+    const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
+    const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
+      it.needsTable && !atTable ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
     // Upgrades are bought in Buy mode, not from here.
     if (items.length === 0) return;

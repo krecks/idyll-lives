@@ -2711,6 +2711,18 @@
       "price": 1100,
       "category": "office",
       "description": "Builds Technology, Writing and Business.",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          1.54,
+          0.38
+        ],
+        "at": [
+          0,
+          0.26
+        ]
+      },
       "interactions": [
         {
           "id": "code",
@@ -2976,6 +2988,18 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "surface": {
+        "height": 0.765,
+        "kind": "table",
+        "size": [
+          1.62,
+          0.38
+        ],
+        "at": [
+          0,
+          0.26
+        ]
+      },
       "interactions": [
         {
           "id": "coffee",

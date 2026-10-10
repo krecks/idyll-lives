@@ -487,11 +487,11 @@ impl World {
             .iter()
             .map(|s| {
                 let mut pos = s.pos;
-                // A Sim on a bed or chair stands back up in front of it.
+                // A Sim on a bed or chair stands back up where they sat down from.
                 if let (Pose::Sit | Pose::Lie, Some(act)) = (s.pose, s.current())
                     && let TaskKind::Use { object, .. } = act.task.kind
                 {
-                    let (fx, fz) = self.objects[object as usize].front_tile(content);
+                    let (fx, fz) = s.seated_from.unwrap_or_else(|| self.approach_tile(&self.objects[object as usize]));
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
                 }
                 let tasks = s
@@ -761,15 +761,20 @@ impl World {
         };
 
         // Keep object ids stable: a removed object type would shift ids, so tasks are remapped.
+        // Things standing on tops go in once everything else stands.
         let mut object_ids = HashMap::new();
-        for (i, o) in save.objects.iter().enumerate() {
+        let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);
+        let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
+        let order: Vec<usize> = (0..tops.len()).filter(|&i| !tops[i]).chain((0..tops.len()).filter(|&i| tops[i])).collect();
+        for i in order {
+            let o = &save.objects[i];
             let placed = match world.content.object_index(&o.def) {
                 Some(def) => {
                     let value = o
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
                     let style = world.check_style(o.style).unwrap_or(0);
-                    world.place(def, o.x, o.z, o.rot, style, o.quality, value)
+                    world.place(def, o.x, o.z, o.rot, o.offset, style, o.quality, value)
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };
@@ -784,6 +789,7 @@ impl World {
                     object_ids.insert(i as u32, id);
                 }
                 Err(_) if world.content.object_index(&o.def).is_none() => {} // content no longer has it
+                Err(_) if tops[i] => {} // what it stood on is gone
                 Err(e) => return Err(e),
             }
         }

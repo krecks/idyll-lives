@@ -325,6 +325,9 @@ pub struct Sim {
     pub pos: [f32; 2],
     pub yaw: f32,
     pub pose: Pose,
+    /// The tile they sat or lay down from (where they stand back up): the tile an object is
+    /// used from can change while they're on it (see `surface::approach_tile`).
+    pub(crate) seated_from: Option<(i32, i32)>,
     pub needs: [f32; MAX_NEEDS],
     pub feelings: Vec<ActiveFeeling>,
     /// Set while another Sim is talking to this one.
@@ -419,6 +422,7 @@ impl Sim {
         self.transition = None;
         self.visiting = None;
         self.pose = Pose::Stand;
+        self.seated_from = None;
     }
 
     /// Grown up (may work, fall in love, move, have children).
@@ -971,17 +975,19 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, 0, 0, value)
+        self.place(def, x, z, rot, [0, 0], 0, 0, value)
     }
 
-    /// Checks that object `def` fits at `x, z, rot`: inside the lot, on free tiles without a
-    /// diagonal wall, facing a tile on the lot.
+    /// Checks that object `def` fits at `x, z, rot` (standing `offset` off its tiles' middle):
+    /// inside the lot, on free tiles without a diagonal wall, facing a tile on the lot. Things
+    /// on the `Surface` layer need a top to stand on instead (see `surface::fit_on_top`).
     pub(crate) fn check_fit(
         &self,
         def: usize,
         x: i32,
         z: i32,
         rot: u8,
+        offset: [i8; 2],
     ) -> Result<ObjectInstance, Error> {
         let obj = ObjectInstance {
             id: self.objects.len() as u32,
@@ -990,7 +996,7 @@ impl World {
             z,
             rot: rot % 4,
             turn: 0,
-            offset: [0, 0],
+            offset,
             users: [None; MAX_SLOTS],
             quality: 0,
             style: 0,
@@ -999,6 +1005,9 @@ impl World {
         };
         let name = &self.content.objects[def].id;
         let layer = self.content.objects[def].layer;
+        if layer == Layer::Surface {
+            return self.check_surface_fit(obj);
+        }
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
             // on their own layer.
@@ -1042,6 +1051,41 @@ impl World {
         Ok(obj)
     }
 
+    /// `check_fit` for a thing on the `Surface` layer: on the lot, its disc wholly on one top
+    /// with nothing else standing in it. It needs no front tile and no wall check.
+    fn check_surface_fit(&self, obj: ObjectInstance) -> Result<ObjectInstance, Error> {
+        use crate::surface::Misfit;
+        let name = &self.content.objects[obj.def].id;
+        let (x, z) = (obj.x, obj.z);
+        if !self.lot.in_bounds(x, z) {
+            return Err(Error::new(format!("'{name}' at {x},{z} overlaps or leaves the lot")));
+        }
+        let at = crate::surface::middle(&self.content, &obj);
+        let radius = self.content.objects[obj.def].radius;
+        match crate::surface::fit_on_top(&self.content, &self.objects, at, radius, &[]) {
+            Ok(_) => Ok(obj),
+            Err(Misfit::NoTop) => Err(Error::new(format!("'{name}' at {x},{z} has nothing to stand on"))),
+            Err(Misfit::OverEdge) => Err(Error::new(format!("'{name}' at {x},{z} would hang over the edge"))),
+            Err(Misfit::Crowded) => Err(Error::new(format!("'{name}' at {x},{z} overlaps or leaves the lot"))),
+        }
+    }
+
+    /// The tile a resident stands on to use `obj`, as things stand now (see
+    /// `surface::approach_tile`; residents deciding what to do use `Links`).
+    pub(crate) fn approach_tile(&self, obj: &ObjectInstance) -> (i32, i32) {
+        crate::surface::approach_tile(&self.content, &self.nav(), obj)
+    }
+
+    /// Every tile a resident may use `obj` from, as things stand now (see `surface::approach_tiles`).
+    pub(crate) fn approach_tiles(&self, obj: &ObjectInstance) -> Vec<(i32, i32)> {
+        crate::surface::approach_tiles(&self.content, &self.nav(), obj).collect()
+    }
+
+    /// What is walkable now.
+    pub(crate) fn nav(&self) -> NavGrid<'_> {
+        NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs }
+    }
+
     /// Whether a wall (plain or with a window) runs along the whole back edge of `obj`.
     fn backed_by_wall(&self, obj: &ObjectInstance) -> bool {
         use crate::lot::Edge;
@@ -1070,11 +1114,12 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
+        offset: [i8; 2],
         style: u8,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
-        let mut obj = self.check_fit(def, x, z, rot)?;
+        let mut obj = self.check_fit(def, x, z, rot, offset)?;
         obj.style = style;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
@@ -1192,6 +1237,7 @@ impl World {
             pos: [*x, *z],
             yaw: 0.0,
             pose: Pose::Stand,
+            seated_from: None,
             needs,
             feelings: Vec::new(),
             engaged_with: None,
@@ -1554,7 +1600,8 @@ impl World {
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.structure_version {
             self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.structure_version);
-            self.object_index.links = crate::surface::Links::new(&self.content, &self.objects);
+            let nav = NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs };
+            self.object_index.links = crate::surface::Links::new(&self.content, &self.objects, &nav);
         }
     }
 
@@ -1865,6 +1912,13 @@ impl World {
                         self.content.objects[obj.def].name
                     )));
                 }
+                if inter.needs_table && crate::surface::faced_table(&self.content, &self.objects, &self.nav(), object).is_none() {
+                    return Err(Error::new(format!(
+                        "{} needs a table: pull the {} up to one",
+                        inter.label,
+                        self.content.objects[obj.def].name.to_lowercase()
+                    )));
+                }
                 let household = self.sim(sim)?.household as usize;
                 if !affordable(inter.cost, self.households[household].funds) {
                     return Err(Error::new(format!(
@@ -1954,9 +2008,8 @@ impl World {
                 let def = self.content.object_index(&object);
                 let turn = def.map(|d| self.check_turn(d, turn.unwrap_or(0))).transpose()?;
                 let offset = def.map(|d| self.check_offset(d, offset.unwrap_or([0, 0]))).transpose()?;
-                let id = self.buy(household, &object, at, style)?;
+                let id = self.buy_at(household, &object, at, style, offset.unwrap_or([0, 0]))?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
-                self.objects[id as usize].offset = offset.unwrap_or([0, 0]);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
             Command::MoveObject {
@@ -1977,14 +2030,7 @@ impl World {
                     (Some(d), Some(o)) => Some(self.check_offset(d, o)?),
                     _ => None,
                 };
-                // Moving re-adds it at the end of the list (later ids shift down): set its new id's.
-                let id = self.move_object(household, object, x, z, rot)?;
-                if let Some(t) = turn {
-                    self.objects[id as usize].turn = t;
-                }
-                if let Some(o) = offset {
-                    self.objects[id as usize].offset = o;
-                }
+                self.move_object_to(household, object, x, z, rot, turn, offset)?;
             }
             Command::Restyle {
                 household,
@@ -2369,7 +2415,7 @@ fn pick_autonomous(
             // Broken things at home get repaired (handier residents are keener).
             if allowed == Access::Full {
                 let rules = &object_rules.repair;
-                let (fx, fz) = obj.front_tile(content);
+                let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
                 let distance = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
                 let level = rules.skill.map_or(0.0, |s| sim.skills[s]);
                 let (plan, floor) = crate::planner::tags_factor(content, sim, rules.tags);
@@ -2389,8 +2435,9 @@ fn pick_autonomous(
             }
             continue;
         }
-        let (fx, fz) = obj.front_tile(content);
+        let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
         let distance = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
+        let at_table = ctx.index.links.table_of(obj.id).is_some();
         // Nicer rooms draw residents, the more so the less they like their surroundings.
         let place = 1.0
             + content.room_rules.preference
@@ -2401,7 +2448,8 @@ fn pick_autonomous(
             // A baby's place is only ever a baby's; caring for one is for grown-ups at home with
             // a baby in it, the more the baby needs it.
             let mut care = 0.0;
-            if inter.baby {
+            // Dining at a table only with a table to dine at.
+            if inter.baby || (inter.needs_table && !at_table) {
                 continue;
             }
             if inter.homework > 0.0 {
@@ -2610,7 +2658,11 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if !obj.can_use(sim.id, content.objects[obj.def].slots) || obj.broken() {
                 return;
             }
-            let t = obj.front_tile(content);
+            let inter = &content.objects[obj.def].interactions[interaction];
+            if inter.needs_table && ctx.index.links.table_of(object).is_none() {
+                return;
+            }
+            let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
             let tags = content.objects[obj.def].interactions[interaction].tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
         }
@@ -2622,7 +2674,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(obj) = objects.get(object as usize).filter(|o| o.broken()) else {
                 return;
             };
-            let t = obj.front_tile(content);
+            let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, content.object_rules.repair.tags)
         }
         TaskKind::Work => {
@@ -2905,7 +2957,7 @@ fn use_object(
     }
     // A finished cook (or wash, or snack) leaves a mess around the object.
     if done && inter.dirt > 0.0 {
-        let (fx, fz) = obj.front_tile(content);
+        let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
         sim.mess = Some((fx, fz, inter.dirt));
     }
     if done && let Some(m) = inter.earns_feeling(elapsed, &sim.skills) {
@@ -2984,6 +3036,8 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]) {
             if inter.pose == Pose::Stand {
                 sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
             } else {
+                // They stand back up where they came from (see `end_activity`).
+                sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
                 sim.pos = obj.slot_position(content, obj.slot_of(sim.id).unwrap_or(0));
                 sim.yaw = obj.yaw();
             }
@@ -3063,10 +3117,11 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
         let obj = &mut objects[object as usize];
         obj.release(sim.id);
         if sim.pose != Pose::Stand {
-            let (fx, fz) = obj.front_tile(content);
+            let (fx, fz) = sim.seated_from.unwrap_or_else(|| obj.front_tile(content));
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
     }
+    sim.seated_from = None;
     sim.pose = Pose::Stand;
     sim.idle_ticks = 0;
 }
@@ -3241,7 +3296,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
         let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
         (!o.broken() && !taken && o.has_free_slot(def.slots)).then_some((o.id, i))
     })?;
-    let (fx, fz) = objects[object as usize].front_tile(content);
+    let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
     sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
     Some(Task { kind: TaskKind::Use { object, interaction }, directed: false })
 }

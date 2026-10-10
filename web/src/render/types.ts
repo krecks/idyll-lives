@@ -91,6 +91,8 @@ export interface PlacementGhost {
   turn?: number;
   /** Centimetres (x, z) its middle stands off the middle of the footprint (objects that turn freely). */
   offset?: [number, number];
+  /** Things on the `surface` layer: the height (m) of the top it's held over. */
+  lift?: number;
   w: number;
   d: number;
   /** The tile a Sim uses it from, marked with an arrow (must stay clear). */
@@ -193,6 +195,11 @@ export interface Renderer {
   update(frame: FrameState): void;
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
+  /**
+   * Where the ray of the last `pick` meets the level `height` metres above the floor in view (a
+   * table top), in the lot's rows like `PickResult.ground`; null if it doesn't.
+   */
+  pickPlane(height: number): { x: number; z: number } | null;
   /** Projects a world point to canvas CSS pixels into `out`; false if behind the camera. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */

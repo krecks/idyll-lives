@@ -182,6 +182,12 @@ pub struct Surface {
     pub kind: SurfaceKind,
     /// Margin (m) kept clear along the top's edges.
     pub inset: f32,
+    /// Width and depth of the top (m; content `size`, default the footprint's): a desk's top
+    /// is smaller than the floor it stands on.
+    pub size: [f32; 2],
+    /// Where the top's middle is off the footprint's middle (m; content `at`, to its right and
+    /// front): a counter's top is at the back of its tile.
+    pub at: [f32; 2],
 }
 
 /// What kind of top a surface is: which seats tuck under it (content `surface.kind`).
@@ -1738,6 +1744,10 @@ struct SurfaceRaw {
     kind: String,
     #[serde(default = "surface_inset")]
     inset: f32,
+    #[serde(default)]
+    size: Option<[f32; 2]>,
+    #[serde(default)]
+    at: [f32; 2],
 }
 
 fn surface_inset() -> f32 {
@@ -2198,6 +2208,11 @@ impl Content {
                         ))
                     })?,
                     inset: s.inset.max(0.0),
+                    size: s
+                        .size
+                        .unwrap_or(obj.footprint.map(|f| f as f32))
+                        .map(|v| v.max(0.0)),
+                    at: s.at,
                 }),
             };
             let approach = match obj.approach.as_deref() {

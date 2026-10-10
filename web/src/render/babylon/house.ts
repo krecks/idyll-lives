@@ -179,16 +179,17 @@ export function placeLights(world: WorldStructure, view: ViewRect | null, rooms:
   const W = world.width;
   const inView = (x: number, z: number) => !view || (x >= view.x && z >= view.z && x < view.x + view.w && z < view.z + view.d);
   const roomAt = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-  const lamps: { x: number; z: number; room: number; light: LampLight }[] = [];
+  const lamps: { x: number; z: number; lift: number; room: number; light: LampLight }[] = [];
   for (const o of world.objects) {
     const light = inView(o.x, o.z) ? lightOf(o.def) : undefined;
-    if (light) lamps.push({ ...objectCentre(o), room: roomAt(o.x, o.z), light });
+    // A lamp on a table shines from its own height above the top.
+    if (light) lamps.push({ ...objectCentre(o), lift: o.lift ?? 0, room: roomAt(o.x, o.z), light });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
   return [
     ...lamps
       .sort((a, b) => areaOf(b.room) - areaOf(a.room))
-      .map((l): RoomLight => ({ x: l.x, y: l.light.height ?? 1.55, z: l.z, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
+      .map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
     ...[...rooms.entries()]
       .filter(([r]) => !lamps.some((l) => l.room === r))
       .sort((a, b) => b[1].n - a[1].n)

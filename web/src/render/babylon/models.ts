@@ -58,6 +58,8 @@ export interface ModelTemplate {
 export interface BuildOptions {
   /** 0 = full detail, 1 = reduced tessellation for distant instances. */
   lod?: 0 | 1;
+  /** Things on a top: the radius (m) of the disc they take, for the stand-in when the model is missing. */
+  radius?: number;
 }
 
 export async function buildModel(
@@ -74,7 +76,7 @@ export async function buildModel(
       console.warn(`[render] failed to load ${entry.url}, using placeholder`, err);
     }
   }
-  return buildPlaceholder(scene, name, entry?.placeholder ?? fallbackParts(footprint), options.lod ?? 0);
+  return buildPlaceholder(scene, name, entry?.placeholder ?? fallbackParts(footprint, options.radius), options.lod ?? 0);
 }
 
 function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
@@ -435,8 +437,9 @@ function blobMesh(scene: Scene, sx: number, sy: number, sz: number, amount: numb
   return mesh;
 }
 
-/** A neutral box when a model key is missing entirely. */
-function fallbackParts([w, d]: [number, number]): PlaceholderPart[] {
+/** A neutral box when a model key is missing entirely (for something on a top, a small one its size). */
+function fallbackParts([w, d]: [number, number], radius?: number): PlaceholderPart[] {
+  if (radius) return [{ shape: 'cylinder', size: [radius * 1.8, radius * 1.6, radius * 1.8], at: [0, radius * 0.8, 0], color: '#B8B2AA' }];
   return [{ shape: 'box', size: [w * 0.8, 0.8, d * 0.8], at: [0, 0.4, 0], color: '#B8B2AA' }];
 }
 

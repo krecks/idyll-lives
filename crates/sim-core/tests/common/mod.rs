@@ -107,6 +107,13 @@ pub fn check(w: &World) {
             );
         }
     }
+    // Everything on a top stands on one, which comes before it in the list.
+    for o in &w.objects {
+        if w.content.objects[o.def].layer == sim_core::content::Layer::Surface {
+            let host = sim_core::surface::host_of(&w.content, &w.objects, o);
+            assert!(host.is_some_and(|h| h < o.id), "object {} stands on nothing before it ({host:?})", o.id);
+        }
+    }
     // Partners are mutual and one at a time.
     for a in 0..n {
         if let Some(b) = w.relationships.partner_of(a) {
