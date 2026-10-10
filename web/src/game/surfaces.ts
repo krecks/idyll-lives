@@ -10,7 +10,16 @@
  * from any free tile beside them.
  */
 
-import type { Content, ObjectDef } from '../content/content';
+import type { ObjectDef } from '../content/content';
+
+/** What these rules read of an object type. */
+export type Shape = Pick<ObjectDef, 'footprint' | 'layer' | 'surface' | 'radius' | 'approach' | 'seatAt'>;
+
+/** Object types by id, and the disc a thing on a top takes (the game's `Content`, or a house generator's view of it). */
+export interface Shapes {
+  object(id: string): Shape | undefined;
+  radius(def: Shape | undefined): number;
+}
 
 /** Something placed: as the structure lists it (`ObjectPlacement`) or as a house layout does. */
 export interface Placed {
@@ -46,19 +55,19 @@ export interface Top {
 }
 
 /** Rotated footprint (tiles) of a placed thing. */
-export function sizeOf(def: ObjectDef | undefined, rot: number): [number, number] {
+export function sizeOf(def: Shape | undefined, rot: number): [number, number] {
   const [w, d] = def?.footprint ?? [1, 1];
   return rot % 2 === 0 ? [w, d] : [d, w];
 }
 
 /** Where a placed thing's middle is, its offset included (tiles). */
-export function middleOf(content: Content, o: Placed): [number, number] {
+export function middleOf(content: Shapes, o: Placed): [number, number] {
   const [w, d] = sizeOf(content.object(o.def), o.rot);
   return [o.x + w / 2 + (o.offset?.[0] ?? 0) / 100, o.z + d / 2 + (o.offset?.[1] ?? 0) / 100];
 }
 
 /** The top of a placed thing with a `surface`. */
-export function topOf(content: Content, o: Placed): Top | null {
+export function topOf(content: Shapes, o: Placed): Top | null {
   const def = content.object(o.def);
   const s = def?.surface;
   if (!s) return null;
@@ -91,12 +100,12 @@ export function holds(top: Top, x: number, z: number, radius: number): boolean {
 
 
 /** Whether a placed thing stands on a top (the `surface` layer). */
-export function onTop(content: Content, o: Placed): boolean {
+export function onTop(content: Shapes, o: Placed): boolean {
   return content.object(o.def)?.layer === 'surface';
 }
 
 /** The top a thing on the `surface` layer stands on (from where it stands). */
-export function hostOf(content: Content, objects: readonly Placed[], o: Placed): Top | null {
+export function hostOf(content: Shapes, objects: readonly Placed[], o: Placed): Top | null {
   if (!onTop(content, o)) return null;
   const [x, z] = middleOf(content, o);
   for (const h of objects) {
@@ -114,7 +123,7 @@ export type Misfit = 'noTop' | 'overEdge' | 'crowded';
  * Where a thing of `radius` with its middle at `(x, z)` would stand: the top taking the whole
  * disc, with nothing else on a top in the way (`skip`: the thing being moved).
  */
-export function fitOnTop(content: Content, objects: readonly Placed[], x: number, z: number, radius: number, skip?: Placed | number | null): Top | Misfit {
+export function fitOnTop(content: Shapes, objects: readonly Placed[], x: number, z: number, radius: number, skip?: Placed | number | null): Top | Misfit {
   let under: Top | null = null;
   let host: Top | null = null;
   for (const o of objects) {
@@ -147,7 +156,7 @@ export function spotAt(x: number, z: number): { x: number; z: number; offset: [n
  * Free places on a top for a thing of `radius`, nearest its middle first, `step` metres apart:
  * for laying out tops (a vase in the middle of the table, books along a shelf).
  */
-export function freeSpots(content: Content, objects: readonly Placed[], top: Top, radius: number, step = 0.1): { x: number; z: number; offset: [number, number] }[] {
+export function freeSpots(content: Shapes, objects: readonly Placed[], top: Top, radius: number, step = 0.1): { x: number; z: number; offset: [number, number] }[] {
   const m = top.inset + radius;
   const [rx, rz] = [top.hw - m, top.hd - m];
   if (rx < 0 || rz < 0) return [];
@@ -185,7 +194,7 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
  * `approach_tiles`): the front, then (seats used from `around`) behind, left and right of its
  * middle. Each comes with the tile of its own it's next to; the caller checks it's free and open.
  */
-export function approachCandidates(def: ObjectDef | undefined, x: number, z: number, rot: number): { tile: [number, number]; inner: [number, number] }[] {
+export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number): { tile: [number, number]; inner: [number, number] }[] {
   const [w, d] = sizeOf(def, rot);
   const front = frontTile(x, z, w, d, rot);
   if (def?.approach !== 'around') {
@@ -209,7 +218,7 @@ export function approachCandidates(def: ObjectDef | undefined, x: number, z: num
  * it, of a kind it tucks under, on the same storey (`storeyDepth`: rows per storey, 0 for one)
  * with no wall between (`wallBetween`).
  */
-export function facedTable(content: Content, objects: readonly Placed[], seat: Placed, wallBetween: (ax: number, az: number, bx: number, bz: number) => boolean, storeyDepth = 0): Placed | null {
+export function facedTable(content: Shapes, objects: readonly Placed[], seat: Placed, wallBetween: (ax: number, az: number, bx: number, bz: number) => boolean, storeyDepth = 0): Placed | null {
   const def = content.object(seat.def);
   const kinds = def?.seatAt ?? [];
   if (!def || !kinds.length) return null;

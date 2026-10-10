@@ -9,14 +9,18 @@
  *    kitchen), the front door faces the street; kitchen and living room may share an open space;
  * 3. two-storey houses get stairs along an outside wall of the living room, an upstairs hall over
  *    them, and the bedrooms and a bathroom off that hall;
- * 4. windows go along the outside walls, furniture against the walls (doors and stairs kept clear,
- *    every piece reachable), and a few things into the garden.
+ * 4. windows go along the outside walls; kitchens get a counter run along one wall (sink, stove);
+ *    furniture goes against the walls (doors and stairs kept clear, every piece reachable), tables
+ *    stand free with chairs round them, small things go on tops (counters, tables, shelves),
+ *    and a few things (a patio set) into the garden.
  *
  * Seeded: the same seed, lot size and config always give the same house, so a town keeps only
  * `gen:<lot size>:<seed>` per lot (see `town.ts`). Output is a `HouseTemplate` in the layouts'
  * frame (drawn for a medium lot, front to the street at z = 0), with `upper` for storey 1.
  */
 
+import type { ObjectDef, SurfaceKind } from '../content/content';
+import { approachCandidates, covers, freeSpots, frontTile, middleOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, Wall } from './town';
 
 export interface HouseGenConfig {
@@ -28,7 +32,7 @@ export interface HouseGenConfig {
   openPlan: number;
   windows: { spacing: [number, number] };
   stairs: string;
-  garden: { objects: string[]; count: [number, number] };
+  garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
   names: { first: string[]; second: Record<string, string[]> };
 }
 
@@ -51,7 +55,13 @@ type Kind = 'bedroom' | 'kitchen' | 'bathroom' | 'living';
 interface RoomSpec {
   weight: number;
   minSide: number;
+  /** Kitchens: a counter run along one wall, placed before the furniture. */
+  run?: CounterRun;
   furniture: Slot[];
+  /** Tables with chairs round them (or desks with a chair), after the furniture that must come. */
+  dining?: TableSet[];
+  /** Small things on the tops of what's in the room (content `layer: "surface"`), after the furniture. */
+  surfaces?: TopSlot[];
   /**
    * Things that take no floor space (content `layer`), after the furniture: on the walls (their
    * back on a wall or a window), from the ceiling and rugs on the floor. Only things nobody uses
@@ -69,8 +79,59 @@ interface Slot {
   opposite?: string;
 }
 
-/** An object's footprint `[w, d]` (along x and z, facing +z), or undefined if it doesn't exist. */
-export type Footprints = (def: string) => [number, number] | undefined;
+/** Counter pieces side by side along a wall: each of `with` (one id per slot) among plain `segments`, `length` tiles in all. */
+interface CounterRun {
+  segments: string[];
+  with: Slot[];
+  length: [number, number];
+}
+
+/**
+ * A table and chairs facing it, all the same chair (`seats`: how many, as many as fit up to the
+ * most; fewer than the least and the set isn't placed). It stands free in the room, unless
+ * `wall` (desks): then against a wall with its chairs along its front.
+ */
+interface TableSet {
+  tables: string[];
+  chairs: string[];
+  seats: [number, number];
+  chance?: number;
+  wall?: boolean;
+}
+
+/** Things to put on tops of the given kinds (`minSide`: only tops at least this wide and deep, m). */
+interface TopSlot {
+  on: SurfaceKind[];
+  one: string[];
+  count?: [number, number];
+  chance?: number;
+  minSide?: number;
+}
+
+/** What the generator needs to know of an object type (from the game's content). */
+export interface ObjectInfo extends Shape {
+  /** `[w, d]` (along x and z, facing +z). */
+  footprint: [number, number];
+  /** The disc it takes on a top (m), its default and limits applied (`Content.radius`). */
+  radius: number;
+  /** Whether it has interactions: someone must be able to get to it. */
+  used: boolean;
+}
+
+/** An object type's details, or undefined if it doesn't exist. */
+export type ObjectInfos = (def: string) => ObjectInfo | undefined;
+
+/** The generator's view of the game's content (`Content`, or the content files read by a tool). */
+export function objectInfos(content: { object(id: string): ObjectDef | undefined; radius(def: ObjectDef | undefined): number }): ObjectInfos {
+  const known = new Map<string, ObjectInfo | undefined>();
+  return (def) => {
+    if (!known.has(def)) {
+      const o = content.object(def);
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 });
+    }
+    return known.get(def);
+  };
+}
 
 interface Rect {
   x: number;
@@ -89,8 +150,11 @@ interface Floor {
   /** Unit wall edges: `h:x:z` (along x on line z) and `v:x:z` (along z on line x) → what stands there. */
   edges: Map<string, 'wall' | 'door' | 'window'>;
   objects: Placement[];
-  /** Where each of `objects` is used from (null: nowhere that matters, garden things). */
-  fronts: ([number, number] | null)[];
+  /**
+   * Where each of `objects` is used from: its front tile, or (chairs) any of the tiles it may be
+   * approached from; null: nowhere that matters (garden things, things on walls and tops).
+   */
+  fronts: ([number, number][] | null)[];
   /** Tiles nothing may stand on (by doors, stairs, the landing). */
   keep: Set<string>;
   /** Tiles taken by furniture. */
@@ -113,10 +177,10 @@ function random(seed: number): () => number {
   };
 }
 
-export function generateHouse(cfg: HouseGenConfig, footprint: Footprints, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number): HouseTemplate | null {
+export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number): HouseTemplate | null {
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
-    const house = attemptHouse(cfg, footprint, lot, lotSize, random(seed * 31 + attempt));
+    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt));
     if (!house) continue;
     // Into the layouts' frame (centred on lots of other widths by `onLot`).
     const dx = -Math.floor((lot.width - medium.width) / 2);
@@ -151,7 +215,7 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
   return entries[entries.length - 1]?.[0] ?? null;
 }
 
-function attemptHouse(cfg: HouseGenConfig, footprint: Footprints, lot: { width: number; depth: number }, lotSize: string, rng: () => number): HouseTemplate | null {
+function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number): HouseTemplate | null {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -190,14 +254,14 @@ function attemptHouse(cfg: HouseGenConfig, footprint: Footprints, lot: { width: 
 
   let up: Floor | null = null;
   if (two) {
-    up = upperFloor(cfg, footprint, rng, house, g, upstairs);
+    up = upperFloor(cfg, info, rng, house, g, upstairs);
     if (!up) return null;
   }
   windows(cfg, rng, g, house);
   if (up) windows(cfg, rng, up, house);
-  if (!furnish(cfg, footprint, rng, g)) return null;
-  if (up && !furnish(cfg, footprint, rng, up)) return null;
-  garden(cfg, footprint, rng, g, house, lot);
+  if (!furnish(cfg, info, rng, g)) return null;
+  if (up && !furnish(cfg, info, rng, up)) return null;
+  garden(cfg, info, rng, g, house, lot);
 
   // Spawns in front of the front door.
   const door = [...g.edges].find(([k, v]) => v === 'door' && k === `h:${k.split(':')[1]}:${house.z}`);
@@ -387,8 +451,8 @@ function hasOpenPlan(f: Floor): boolean {
  * Stairs along an outside wall of the living room (climbing away from the street), and the
  * storey above: a hall over the stairs, the other rooms in a row off it, each with a door.
  */
-function upperFloor(cfg: HouseGenConfig, footprint: Footprints, rng: () => number, house: Rect, g: Floor, kinds: Kind[]): Floor | null {
-  const [, len] = footprint(cfg.stairs) ?? [1, 4];
+function upperFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[]): Floor | null {
+  const [, len] = info(cfg.stairs)?.footprint ?? [1, 4];
   const living = g.rooms.find((r) => r.kind === 'living');
   if (!living) return null;
   // A column on the left or right outside wall, with room for the stairs and their foot.
@@ -416,7 +480,7 @@ function upperFloor(cfg: HouseGenConfig, footprint: Footprints, rng: () => numbe
       }
       // Stairs below, their stairwell and landing above.
       g.objects.push({ def: cfg.stairs, x: c, z, rot: 2 });
-      g.fronts.push([c, z - 1]);
+      g.fronts.push([[c, z - 1]]);
       for (const t of [...tiles, foot]) g.keep.add(t);
       for (const t of tiles) g.taken.add(t);
       for (let i = 0; i < len; i++) up.taken.add(key(c, z + i));
@@ -473,22 +537,28 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect):
   }
 }
 
-/** Places each room's furniture against its walls; false if a required piece doesn't fit. */
-function furnish(cfg: HouseGenConfig, footprint: Footprints, rng: () => number, f: Floor): boolean {
+/**
+ * Furnishes each room: its counter run, the furniture that must come, its tables and chairs,
+ * the rest of its furniture, small things on the tops, then things on the walls, ceiling and
+ * floor. False if a piece that must come doesn't fit.
+ */
+function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor): boolean {
+  const shapes: Shapes = { object: info, radius: (d) => d?.radius ?? 0.12 };
   for (const r of f.rooms) {
     if (r.kind === 'hall') continue;
     const spec = cfg.rooms[r.kind];
+    if (spec.run && !counterRun(f, r, info, rng, spec.run)) return false;
     const sideOf = new Map<string, number>();
-    for (const slot of spec.furniture) {
-      const required = slot.chance === undefined || slot.chance >= 1;
+    const required = (slot: Slot) => slot.chance === undefined || slot.chance >= 1;
+    const furniture = (slot: Slot) => {
       const count = slot.count ? between(rng, slot.count) : 1;
       for (let n = 0; n < count; n++) {
-        if (!required && rng() >= (slot.chance ?? 1)) continue;
-        const options = slot.one.filter((d) => footprint(d)).sort(() => rng() - 0.5);
+        if (!required(slot) && rng() >= (slot.chance ?? 1)) continue;
+        const options = slot.one.filter((d) => info(d)).sort(() => rng() - 0.5);
         let done = false;
         for (const def of options) {
           const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
-          const side = place(f, r, def, footprint(def)!, rng, across === undefined ? undefined : (across + 2) % 4);
+          const side = place(f, r, def, info(def)!, rng, across === undefined ? undefined : (across + 2) % 4);
           if (side !== null) {
             sideOf.set(def, side);
             for (const o of slot.one) sideOf.set(o, side);
@@ -496,17 +566,23 @@ function furnish(cfg: HouseGenConfig, footprint: Footprints, rng: () => number, 
             break;
           }
         }
-        if (!done && required) return false;
+        if (!done && required(slot)) return false;
       }
-    }
+      return true;
+    };
+    // What must come first, then the tables (they want the middle of the room), then the rest.
+    for (const slot of spec.furniture) if (required(slot) && !furniture(slot)) return false;
+    for (const set of spec.dining ?? []) if (rng() < (set.chance ?? 1)) tableSet(f, r, info, rng, set);
+    for (const slot of spec.furniture) if (!required(slot)) furniture(slot);
+    for (const slot of spec.surfaces ?? []) onTops(f, r, shapes, info, rng, slot);
     for (const layer of ['wall', 'ceiling', 'rug'] as const) {
       for (const slot of spec[layer] ?? []) {
         const count = slot.count ? between(rng, slot.count) : 1;
         for (let n = 0; n < count; n++) {
           if (rng() >= (slot.chance ?? 1)) continue;
           const def = pick(rng, slot.one);
-          const fp = footprint(def);
-          if (fp) mount(cfg, footprint, f, r, def, fp, layer, rng);
+          const fp = info(def)?.footprint;
+          if (fp) mount(cfg, info, f, r, def, fp, layer, rng);
         }
       }
     }
@@ -514,17 +590,243 @@ function furnish(cfg: HouseGenConfig, footprint: Footprints, rng: () => number, 
   return true;
 }
 
+/** Tiles of a footprint (min corner, rotated size). */
+function tilesOf(x: number, z: number, w: number, d: number): string[] {
+  const tiles: string[] = [];
+  for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) tiles.push(key(x + dx, z + dz));
+  return tiles;
+}
+
+/** Takes back everything placed on `f` since it had `n` objects (their tiles too). */
+function undo(f: Floor, n: number, tiles: string[]): void {
+  f.objects.length = n;
+  f.fronts.length = n;
+  for (const t of tiles) f.taken.delete(t);
+}
+
+/**
+ * A kitchen's counter run: the pieces of `run.with` (one of each slot that comes; a sink, a
+ * stove, maybe a dishwasher) in a random order among plain segments, side by side along one wall,
+ * each used from the row in front (kept clear). Shorter if the walls are short; if no wall has
+ * room, the pieces go against the walls one by one. False if a piece that must come doesn't fit.
+ */
+function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run: CounterRun): boolean {
+  const pieces: { def: string; w: number; required: boolean }[] = [];
+  for (const slot of run.with) {
+    if (slot.chance !== undefined && rng() >= slot.chance) continue;
+    const def = slot.one.filter((d) => info(d)?.footprint[1] === 1).sort(() => rng() - 0.5)[0];
+    if (def) pieces.push({ def, w: info(def)!.footprint[0], required: slot.chance === undefined || slot.chance >= 1 });
+  }
+  const segments = run.segments.filter((d) => info(d)?.footprint.every((n) => n === 1));
+  const segment = segments.length ? pick(rng, segments) : null;
+  const least = pieces.reduce((n, p) => n + p.w, 0);
+  for (let len = Math.max(least, between(rng, run.length)); len >= Math.max(least, 1); len--) {
+    if (len > least && !segment) continue;
+    const order = [...pieces.map((p) => p.def), ...Array<string>(len - least).fill(segment ?? '')].sort(() => rng() - 0.5);
+    for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
+      // Back to the wall on `side` (0 the side towards the street, then clockwise), as in `place`.
+      const rot = [0, 3, 2, 1][side];
+      const along = side % 2 === 0;
+      if ((along ? r.d : r.w) < 2) continue;
+      const starts = Array.from({ length: (along ? r.w : r.d) - len + 1 }, (_, i) => i).sort(() => rng() - 0.5);
+      for (const s of starts) {
+        const n = f.objects.length;
+        const tiles: string[] = [];
+        let at = s;
+        let ok = true;
+        for (const def of order) {
+          const [fw] = info(def)!.footprint;
+          const [w, d] = along ? [fw, 1] : [1, fw];
+          const x = along ? r.x + at : side === 3 ? r.x : r.x + r.w - 1;
+          const z = along ? (side === 0 ? r.z : r.z + r.d - 1) : r.z + at;
+          at += fw;
+          const mine = tilesOf(x, z, w, d);
+          const front = frontTile(x, z, w, d, rot);
+          if (mine.some((t) => f.taken.has(t) || f.keep.has(t)) || !inside(r, front[0], front[1]) || f.taken.has(key(front[0], front[1]))) {
+            ok = false;
+            break;
+          }
+          for (const t of mine) f.taken.add(t);
+          tiles.push(...mine);
+          f.objects.push({ def, x, z, rot });
+          f.fronts.push([front]);
+        }
+        if (ok && reachable(f, r)) {
+          for (const fr of f.fronts.slice(n)) for (const [x, z] of fr ?? []) f.keep.add(key(x, z));
+          return true;
+        }
+        undo(f, n, tiles);
+      }
+    }
+  }
+  // No wall long enough: one by one.
+  return pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required);
+}
+
+/** Room a chair takes along a table's edge (m). */
+const SEAT_WIDTH = 0.6;
+
+/**
+ * The tiles round a table (at `x`, `z`, turned `rot`) where chairs go, each with the way a chair
+ * there faces the table, best first: down its long sides from the middle out, across from each
+ * other, then its ends (a square table: one on each side first). As many along an edge as its
+ * top has room for (a small round table: two, across from each other). `sides`: only these
+ * (0: the -z side, 1: +x, 2: +z, 3: -x).
+ */
+function seatTiles(table: ObjectInfo, x: number, z: number, rot: number, sides = [0, 1, 2, 3]): { x: number; z: number; rot: number }[] {
+  const [w, d] = rot % 2 === 0 ? table.footprint : [table.footprint[1], table.footprint[0]];
+  const top = table.surface?.size ?? table.footprint;
+  const [tw, td] = rot % 2 === 0 ? top : [top[1], top[0]];
+  let [nw, nd] = [Math.min(w, Math.floor(tw / SEAT_WIDTH)), Math.min(d, Math.floor(td / SEAT_WIDTH))];
+  if (nw === 0 && nd === 0) nw = 1;
+  const middleOut = (n: number, most: number) => Array.from({ length: n }, (_, i) => i).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b).slice(0, most);
+  // Per side: the chair tiles, facing the table (a chair at rot 0 faces +z).
+  const along: { x: number; z: number; rot: number }[][] = [
+    middleOut(w, nw).map((i) => ({ x: x + i, z: z - 1, rot: 0 })),
+    middleOut(d, nd).map((i) => ({ x: x + w, z: z + i, rot: 3 })),
+    middleOut(w, nw).map((i) => ({ x: x + i, z: z + d, rot: 2 })),
+    middleOut(d, nd).map((i) => ({ x: x - 1, z: z + i, rot: 1 })),
+  ].map((list, i) => (sides.includes(i) ? list : []));
+  const groups = w === d ? [[0, 2, 1, 3]] : w > d ? [[0, 2], [1, 3]] : [[1, 3], [0, 2]];
+  const out: { x: number; z: number; rot: number }[] = [];
+  for (const group of groups) {
+    const most = Math.max(...group.map((s) => along[s].length));
+    for (let k = 0; k < most; k++) for (const s of group) if (along[s][k]) out.push(along[s][k]);
+  }
+  return out;
+}
+
+/**
+ * A table and its chairs in room `r`: the table free in the room (off the walls where it can
+ * be, near the middle; a desk with `wall` against one), chairs of one kind on its free sides,
+ * each facing it and with a way to it. False if it doesn't fit with the fewest seats.
+ */
+function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: TableSet): boolean {
+  const chairs = set.chairs.filter((d) => info(d));
+  const chair = chairs.length ? pick(rng, chairs) : null;
+  const want = between(rng, set.seats);
+  const [least] = set.seats;
+  if (!chair && least > 0) return false;
+  for (const def of set.tables.filter((d) => info(d)).sort(() => rng() - 0.5)) {
+    const table = info(def)!;
+    const [fw, fd] = table.footprint;
+    const spots: { x: number; z: number; rot: number; score: number }[] = [];
+    if (set.wall) {
+      // Back to a wall, front into the room (as `place` puts furniture).
+      for (const side of [0, 1, 2, 3]) {
+        const rot = [0, 3, 2, 1][side];
+        const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
+        const line = side % 2 === 0 ? r.w - w : r.d - d;
+        for (let i = 0; i <= line; i++) {
+          const x = side === 0 || side === 2 ? r.x + i : side === 3 ? r.x : r.x + r.w - w;
+          const z = side === 1 || side === 3 ? r.z + i : side === 0 ? r.z : r.z + r.d - d;
+          spots.push({ x, z, rot, score: rng() });
+        }
+      }
+    } else {
+      const [cx, cz] = [r.x + r.w / 2, r.z + r.d / 2];
+      for (const turned of [0, 1]) {
+        const [w, d] = turned ? [fd, fw] : [fw, fd];
+        for (let z = r.z; z + d <= r.z + r.d; z++) {
+          for (let x = r.x; x + w <= r.x + r.w; x++) {
+            // Facing into the room (a table nobody uses still needs its front open).
+            const rot = inside(r, ...frontTile(x, z, w, d, turned)) ? turned : turned + 2;
+            // Room for chairs and a way round them on every side; else as near the middle as can be.
+            const gap = Math.min(x - r.x, z - r.z, r.x + r.w - x - w, r.z + r.d - z - d);
+            spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
+          }
+        }
+      }
+    }
+    spots.sort((a, b) => b.score - a.score);
+    for (const { x, z, rot } of spots.slice(0, 16)) {
+      const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      const mine = tilesOf(x, z, w, d);
+      const front = frontTile(x, z, w, d, rot);
+      if (mine.some((t) => f.taken.has(t) || f.keep.has(t)) || !inside(r, front[0], front[1])) continue;
+      if (table.used && f.taken.has(key(front[0], front[1]))) continue;
+      // Chairs along a desk's front only.
+      const seats = seatTiles(table, x, z, rot, set.wall ? [[2, 1, 0, 3][rot % 4]] : undefined).filter((s) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && !f.keep.has(key(s.x, s.z)));
+      if (seats.length < least) continue;
+      const n = f.objects.length;
+      for (const t of mine) f.taken.add(t);
+      const tiles = [...mine];
+      f.objects.push({ def, x, z, rot });
+      f.fronts.push(table.used ? [front] : null);
+      if (!reachable(f, r)) {
+        undo(f, n, tiles);
+        continue;
+      }
+      let seated = 0;
+      for (const s of seats) {
+        if (seated >= want || !chair) break;
+        const t = key(s.x, s.z);
+        f.taken.add(t);
+        f.objects.push({ def: chair, x: s.x, z: s.z, rot: s.rot });
+        f.fronts.push(approachCandidates(info(chair), s.x, s.z, s.rot).map((c) => c.tile));
+        if (reachable(f, r)) {
+          tiles.push(t);
+          seated++;
+        } else {
+          undo(f, f.objects.length - 1, [t]);
+        }
+      }
+      if (seated >= least) {
+        if (table.used) f.keep.add(key(front[0], front[1]));
+        return true;
+      }
+      undo(f, n, tiles);
+    }
+  }
+  return false;
+}
+
+/**
+ * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
+ * in its middle, elsewhere anywhere free), facing about the way its host does, listed right
+ * after its host (the simulation places it on a top that's already there).
+ */
+function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () => number, slot: TopSlot): void {
+  const count = slot.count ? between(rng, slot.count) : 1;
+  for (let n = 0; n < count; n++) {
+    if (rng() >= (slot.chance ?? 1)) continue;
+    // Something not on a top in the room yet, if there's anything left (one toaster is plenty).
+    const here = new Set(f.objects.filter((o) => info(o.def)?.layer === 'surface' && inside(r, o.x, o.z)).map((o) => o.def));
+    const fresh = slot.one.filter((d) => !here.has(d));
+    const def = pick(rng, fresh.length ? fresh : slot.one);
+    const thing = info(def);
+    if (thing?.layer !== 'surface') continue;
+    const tops = f.objects
+      .map((o) => topOf(shapes, o))
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+    const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
+    const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
+    for (const { t } of order) {
+      const spots = freeSpots(shapes, f.objects, t, thing.radius);
+      if (!spots.length) continue;
+      const spot = t.kind === 'table' ? spots[0] : spots[Math.floor(rng() * spots.length)];
+      // About the way its host faces, a little turned.
+      const angle = (((t.host.rot * 90 + Math.round(rng() * 60) - 30) % 360) + 360) % 360;
+      const rot = Math.floor(angle / 90);
+      const at = f.objects.indexOf(t.host as Placement) + 1;
+      f.objects.splice(at, 0, { def, x: spot.x, z: spot.z, rot, ...(angle % 90 ? { turn: angle % 90 } : {}), ...(spot.offset[0] || spot.offset[1] ? { offset: spot.offset } : {}) });
+      f.fronts.splice(at, 0, null);
+      break;
+    }
+  }
+}
+
 /**
  * One thing on the wall, ceiling or rug layer of room `r` (it never blocks anything): on a wall,
  * its back on wall or window edges; from the ceiling, over a free spot; a rug, in the middle of
  * the room. Never on the stairs, and its front (where the simulation checks for walls) inside the room.
  */
-function mount(cfg: HouseGenConfig, footprint: Footprints, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number): boolean {
+function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number): boolean {
   const layers = (f.layers ??= new Set());
   const stairs = new Set<string>();
   for (const o of f.objects) {
     if (o.def !== cfg.stairs) continue;
-    const [sw, sd] = footprint(o.def) ?? [1, 4];
+    const [sw, sd] = info(o.def)?.footprint ?? [1, 4];
     const [w, d] = o.rot % 2 === 0 ? [sw, sd] : [sd, sw];
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
   }
@@ -585,7 +887,7 @@ function mount(cfg: HouseGenConfig, footprint: Footprints, f: Floor, r: Room, de
  * One piece against a wall of room `r`, facing into it (`prefer`: a side first, 0 the side
  * towards the street, then clockwise). Returns the side, or null if there's no place for it.
  */
-function place(f: Floor, r: Room, def: string, [fw, fd]: [number, number], rng: () => number, prefer?: number): number | null {
+function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectInfo, rng: () => number, prefer?: number): number | null {
   const sideList = [0, 1, 2, 3].sort(() => rng() - 0.5);
   if (prefer !== undefined) sideList.sort((a, b) => (a === prefer ? -1 : b === prefer ? 1 : 0));
   for (const side of sideList) {
@@ -599,51 +901,45 @@ function place(f: Floor, r: Room, def: string, [fw, fd]: [number, number], rng: 
     if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z]);
     spots.sort(() => rng() - 0.5);
     for (const [x, z] of spots) {
-      const tiles: string[] = [];
-      for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) tiles.push(key(x + dx, z + dz));
+      const tiles = tilesOf(x, z, w, d);
       const front = frontTile(x, z, w, d, rot);
       if (!inside(r, front[0], front[1])) continue;
       if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || f.taken.has(key(front[0], front[1]))) continue;
+      const n = f.objects.length;
       for (const t of tiles) f.taken.add(t);
       f.objects.push({ def, x, z, rot });
-      f.fronts.push(front);
+      f.fronts.push([front]);
       if (reachable(f, r)) {
         f.keep.add(key(front[0], front[1]));
         return side;
       }
-      for (const t of tiles) f.taken.delete(t);
-      f.objects.pop();
-      f.fronts.pop();
+      undo(f, n, tiles);
     }
   }
   return null;
 }
 
-function frontTile(x: number, z: number, w: number, d: number, rot: number): [number, number] {
-  const mx = x + Math.floor((w - 1) / 2);
-  const mz = z + Math.floor((d - 1) / 2);
-  return [
-    [mx, z + d],
-    [x + w, mz],
-    [mx, z - 1],
-    [x - 1, mz],
-  ][rot % 4] as [number, number];
-}
-
-/** Every free tile of the room the doors and furniture need is still connected. */
+/**
+ * Every free tile of the room the doors need is still connected, and so is a way to everything
+ * in it: its front tile (which must be free), or for chairs one of the free tiles round them.
+ */
 function reachable(f: Floor, r: Room): boolean {
   const free = (x: number, z: number) => inside(r, x, z) && !f.taken.has(key(x, z));
   const needed: string[] = [];
   for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (f.keep.has(key(x, z)) && free(x, z)) needed.push(key(x, z));
-  for (const front of f.fronts) {
-    if (!front || !inside(r, front[0], front[1])) continue;
-    const [x, z] = front;
-    if (!free(x, z)) return false;
-    needed.push(key(x, z));
+  // Per object in the room, the free tiles it can be used from (one must be reached).
+  const ways: string[][] = [];
+  for (const tiles of f.fronts) {
+    const mine = (tiles ?? []).filter(([x, z]) => inside(r, x, z));
+    if (!mine.length) continue;
+    const open = mine.filter(([x, z]) => free(x, z)).map(([x, z]) => key(x, z));
+    if (!open.length) return false;
+    ways.push(open);
   }
-  if (needed.length <= 1) return true;
-  const seen = new Set<string>([needed[0]]);
-  const queue = [needed[0]];
+  const start = needed[0] ?? ways[0]?.[0];
+  if (!start) return true;
+  const seen = new Set<string>([start]);
+  const queue = [start];
   while (queue.length) {
     const [x, z] = queue.pop()!.split(':').map(Number);
     for (const [nx, nz] of [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]]) {
@@ -654,23 +950,49 @@ function reachable(f: Floor, r: Room): boolean {
       }
     }
   }
-  return needed.every((k) => seen.has(k));
+  return needed.every((k) => seen.has(k)) && ways.every((w) => w.some((k) => seen.has(k)));
 }
 
-function garden(cfg: HouseGenConfig, footprint: Footprints, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }): void {
+function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }): void {
+  const clear = (x: number, z: number) => x >= 0 && z >= 0 && x < lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d) && !g.taken.has(key(x, z));
+  // Behind the house or to its sides (the front garden is left for the path and drive).
+  const spot = (w: number, d: number): [number, number] => [Math.floor(rng() * (lot.width - w)), house.z + Math.floor(rng() * (lot.depth - house.z - d))];
+  // A table with chairs round it, with a clear tile round the chairs.
+  for (const set of cfg.garden.sets ?? []) {
+    if (rng() >= (set.chance ?? 1)) continue;
+    const chairs = set.chairs.filter((d) => info(d));
+    const tables = set.tables.filter((d) => info(d));
+    if (!chairs.length || !tables.length) continue;
+    const chair = pick(rng, chairs);
+    const def = pick(rng, tables);
+    const rot = rng() < 0.5 ? 0 : 1;
+    const [fw, fd] = info(def)!.footprint;
+    const [w, d] = rot ? [fd, fw] : [fw, fd];
+    const seats = seatTiles(info(def)!, 0, 0, rot).slice(0, between(rng, set.seats));
+    for (let tries = 0; tries < 30; tries++) {
+      const [x, z] = spot(w + 4, d + 4);
+      const tiles = tilesOf(x, z, w + 4, d + 4);
+      if (!tiles.every((t) => clear(...(t.split(':').map(Number) as [number, number])))) continue;
+      for (const t of tiles) g.taken.add(t);
+      g.objects.push({ def, x: x + 2, z: z + 2, rot });
+      g.fronts.push(null);
+      for (const s of seats) {
+        g.objects.push({ def: chair, x: x + 2 + s.x, z: z + 2 + s.z, rot: s.rot });
+        g.fronts.push(null);
+      }
+      break;
+    }
+  }
   const count = between(rng, cfg.garden.count);
-  const clear = (x: number, z: number) => x >= 0 && z >= 0 && x < lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d);
   for (let n = 0, tries = 0; n < count && tries < 40; tries++) {
     const def = pick(rng, cfg.garden.objects);
-    const fp = footprint(def);
+    const fp = info(def)?.footprint;
     if (!fp) continue;
     const [w, d] = fp;
-    const x = Math.floor(rng() * (lot.width - w));
-    // Behind the house or to its sides (the front garden is left for the path and drive).
-    const z = house.z + Math.floor(rng() * (lot.depth - house.z - d));
+    const [x, z] = spot(w, d);
     const tiles: [number, number][] = [];
     for (let dz = -1; dz <= d; dz++) for (let dx = -1; dx <= w; dx++) tiles.push([x + dx, z + dz]);
-    if (!tiles.every(([tx, tz]) => clear(tx, tz) && !g.taken.has(key(tx, tz)))) continue;
+    if (!tiles.every(([tx, tz]) => clear(tx, tz))) continue;
     for (const [tx, tz] of tiles) g.taken.add(key(tx, tz));
     g.objects.push({ def, x, z, rot: Math.floor(rng() * 4) & 2 });
     g.fronts.push(null);

@@ -13,7 +13,7 @@ import type { Content } from '../content/content';
 import type { GameKind, Lifespan } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, randomHousehold, type HouseholdDraft, type SimSpawn } from './household';
-import { generateHouse, type HouseGenConfig } from './housegen';
+import { generateHouse, objectInfos, type HouseGenConfig, type ObjectInfos } from './housegen';
 
 export type Wall = [number, number, number, number];
 export interface Door {
@@ -80,8 +80,8 @@ export interface Templates {
   parks: PublicTemplate[];
   /** How houses are generated (`content/housegen.json`; absent: only the fixed layouts above). */
   gen?: HouseGenConfig;
-  /** Object footprints from the game's content (for furnishing generated houses). */
-  footprint?: (def: string) => [number, number] | undefined;
+  /** Object types from the game's content (for furnishing generated houses). */
+  info?: ObjectInfos;
 }
 
 export type TownSize = 'small' | 'medium' | 'large';
@@ -156,7 +156,7 @@ export function loadTemplates(): Promise<Templates> {
       .then((t) => JSON.parse(t) as HouseGenConfig)
       .catch(() => undefined),
     townContent,
-  ]).then(([t, gen, content]) => ({ ...t, gen, footprint: (def: string) => content.object(def)?.footprint as [number, number] | undefined }));
+  ]).then(([t, gen, content]) => ({ ...t, gen, info: objectInfos(content) }));
   return templates;
 }
 
@@ -173,7 +173,7 @@ export function houseTemplate(t: Templates, id: string): HouseTemplate | undefin
   if (id.startsWith('gen:')) {
     if (!generated.has(id)) {
       const [, size, seed] = id.split(':');
-      const house = t.gen && t.footprint ? generateHouse(t.gen, t.footprint, lotDims(t, size as LotSize), t.plot, size, Number(seed)) : null;
+      const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed)) : null;
       generated.set(id, house ?? undefined);
     }
     return generated.get(id);
