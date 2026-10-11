@@ -8,6 +8,7 @@
 
 import { mergeDeep } from '../content/content';
 import { hashUnit } from './voices';
+import type { LineRequest } from './writer';
 
 /** Lines, alone or with a tone for all of them. */
 type Group = string[] | { lines: string[]; tone?: string };
@@ -41,8 +42,13 @@ export interface Use {
   interaction?: string;
 }
 
-/** Planner thought kinds in snapshot order (`thought` 1..9). */
-const THOUGHTS = ['skipped', 'noPlace', 'kept', 'goal', 'roomLoved', 'roomDisliked', 'broken', 'accident', 'crying'] as const;
+/** Planner thought kinds in snapshot order (`thought` 1..10). */
+const THOUGHTS = ['skipped', 'noPlace', 'kept', 'goal', 'roomLoved', 'roomDisliked', 'broken', 'accident', 'crying', 'dinnerReady'] as const;
+
+/** A planner thought kind's id (snapshot `thought`, 1..). */
+export function thoughtId(kind: number): string | undefined {
+  return THOUGHTS[kind - 1];
+}
 /** Lines a resident said lately per key, not picked again while others are left. */
 const RECENT = 3;
 /** Forget everyone's recent lines past this many keys (a long session with many residents). */
@@ -106,6 +112,38 @@ export class Lines {
   thought(who: number, kind: number, seed: number): Line | null {
     const id = THOUGHTS[kind - 1];
     return id ? this.group(who, `thought:${id}`, this.data.thought[id], seed) : null;
+  }
+
+  /**
+   * The lines a request would pick from and their tone, without picking (examples for the
+   * language model): the same, most specific first, as `social`, `use`, `emotion`, `thought`.
+   */
+  candidates(req: LineRequest): { lines: string[]; tone?: string; key: string } | null {
+    const of = (key: string, g: Group | undefined) => (!g ? null : Array.isArray(g) ? { lines: g, key } : { lines: g.lines, tone: g.tone, key });
+    const found = (c: { lines: string[]; tone?: string; key: string } | null) => (c?.lines?.length ? c : null);
+    switch (req.kind) {
+      case 'social': {
+        const s = req.social ? this.data.social[req.social] : undefined;
+        if (!s || !req.phase) return null;
+        return found({ lines: s[req.phase], tone: req.phase === 'bad' && s.tone === 'happy' ? undefined : s.tone, key: `social:${req.social}:${req.phase}` });
+      }
+      case 'use': {
+        const { object, interaction, tag } = req;
+        const o = object ? this.data.object?.[object] : undefined;
+        return (
+          (o && interaction ? found(of(`object:${object}:${interaction}`, o.interactions?.[interaction])) : null) ??
+          (o ? found({ lines: o.lines ?? [], tone: o.tone, key: `object:${object}` }) : null) ??
+          (interaction ? found(of(`interaction:${interaction}`, this.data.interaction?.[interaction])) : null) ??
+          (tag ? found(of(`action:${tag}`, this.data.action[tag])) : null)
+        );
+      }
+      case 'emotion':
+        return req.emotion ? found(of(`emotion:${req.emotion}`, this.data.emotion[req.emotion])) : null;
+      case 'thought': {
+        const id = req.thought ? THOUGHTS[req.thought - 1] : undefined;
+        return id ? found(of(`thought:${id}`, this.data.thought[id])) : null;
+      }
+    }
   }
 
   private group(who: number, key: string, g: Group | undefined, seed: number): Line | null {

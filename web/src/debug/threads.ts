@@ -1,9 +1,10 @@
 /**
  * What each thread is doing, for the debug overlay and debug reports: the main thread (UI and
- * drawing), the sim worker and the voice worker, and the sum of them.
+ * drawing), the sim worker, the voice worker and the language model's worker, and the sum of them.
  */
 
 import type { SimThreadStats } from '../core/protocol';
+import { llmStats, type LlmStats } from '../llm';
 import type { RenderStats } from '../render/types';
 import type { VoiceDirectorStats } from '../voice';
 import { voiceThreadStats, type VoiceThreadStats } from '../voice/service.svelte';
@@ -12,7 +13,7 @@ export interface ThreadStats {
   overall: {
     /** Logical cores the browser reports. */
     cores: number;
-    /** Work across all three threads, in cores (1 = one core fully busy). */
+    /** Work across all the threads, in cores (1 = one core fully busy). */
     busyCores: number;
     /** Main-thread JS heap plus the sim's WASM memory, bytes (null when the browser won't say). */
     memoryBytes: number | null;
@@ -30,6 +31,7 @@ export interface ThreadStats {
   /** Null until the worker's first report. */
   sim: SimThreadStats | null;
   voice: VoiceThreadStats & VoiceDirectorStats;
+  llm: LlmStats;
 }
 
 const LONG_TASK_WINDOW_MS = 10_000;
@@ -52,10 +54,13 @@ export function threadStats(
   const heapBytes = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null;
   const mainBusy = Math.min(1, (render.cpuMs * render.fps) / 1000);
   const voice = { ...voiceThreadStats(), ...director };
+  const llm = llmStats();
+  // On the CPU the model keeps all its threads busy while it writes; on the GPU about one.
+  const llmCores = llm.busy * (llm.device === 'cpu' ? Math.max(1, llm.threads) : 1);
   return {
     overall: {
       cores: navigator.hardwareConcurrency ?? 0,
-      busyCores: mainBusy + (sim?.busy ?? 0) + voice.busy,
+      busyCores: mainBusy + (sim?.busy ?? 0) + voice.busy + llmCores,
       memoryBytes: heapBytes === null ? null : heapBytes + (sim?.memoryBytes ?? 0),
       isolated: self.crossOriginIsolated,
     },
@@ -67,5 +72,6 @@ export function threadStats(
     },
     sim,
     voice,
+    llm,
   };
 }

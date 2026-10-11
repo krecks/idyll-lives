@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { resetSettings, RESTART_KEYS, settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { services } from '../services';
@@ -7,11 +8,15 @@
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
   import Toggle from '../kit/Toggle.svelte';
+  import Busy from '../kit/Busy.svelte';
   import SettingRow from './SettingRow.svelte';
   import type { Lifespan } from '../../core/protocol';
   import { benchVerdict, DOWNLOAD_MB, runBenchmark, speak, voiceStatus } from '../../voice/service.svelte';
   import { playClip } from '../../voice/player';
   import { voiceFor } from '../../voice/voices';
+  import { addModel, allModels, downloadMb, llmStatus, removeModel } from '../../llm';
+  import { hasWebGpu } from '../../ml/ort';
+  import { currentModel, deviceTest, reportFor, reportKey, sampleLine, stopDeviceTest, testDevices } from '../../talk';
 
   // This game's lifespan (sent to the simulation when picked).
   let lifespan = $state<Lifespan>(game.lifespan);
@@ -69,7 +74,93 @@
     }
   }
 
+  // The language model that writes lines.
+  let gpuAvailable = $state(true);
+  void hasWebGpu().then((ok) => (gpuAvailable = ok));
+  const model = $derived(currentModel());
+  /** The chosen model is downloading (or loading). */
+  const downloading = $derived(llmStatus.state === 'loading');
+  /** What loading shows: the download, then starting the model (the files are in). */
+  const loadLabel = $derived(llmStatus.progress < 1 ? `Downloading ${model.label}` : `Starting ${model.label}`);
+  const models = $derived(allModels());
+  const mb = (m: (typeof models)[number]) => Math.round(downloadMb(m));
+  const llmText = $derived.by(() => {
+    if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
+    return `${model.about} Licence: ${model.licence}. About ${mb(model)} MB, downloaded once.`;
+  });
+  const NAMES = { A: 'the GPU, voices on the CPU', B: 'the GPU, voices too', C: 'the CPU' };
+  const deviceText = $derived.by(() => {
+    if (deviceTest.running) return deviceTest.step || 'Testing…';
+    const r = reportFor(model);
+    if (!r && deviceTest.stopped.includes(reportKey(model))) return 'Test stopped. Until it has run, residents say hand-written lines.';
+    if (!r) return gpuAvailable ? 'Not tested here yet: it tests itself when chosen.' : 'No WebGPU here: the model would run on the CPU, which is usually too slow. It tests itself when chosen.';
+    const ran = r.results.filter((x) => x.ran);
+    if (!r.pick) {
+      const why = ran.length ? `${ran.map((x) => `${(x.lineMs / 1000).toFixed(1)} s a line on ${NAMES[x.id]}${x.ok ? '' : ' (wrong text)'}`).join('; ')}.` : 'It couldn\'t load.';
+      return `Doesn't run well enough here, so residents say hand-written lines. ${why}`;
+    }
+    const best = r.results.find((x) => x.id === r.pick!.setup)!;
+    return `Runs on ${NAMES[r.pick.setup]}: ${(best.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
+  });
+  let writing = $state(false);
+  let written = $state('');
+  async function writeSample() {
+    writing = true;
+    try {
+      const line = await sampleLine();
+      written = line ?? '(nothing usable this time: try again)';
+      if (line) playClip((await speak(line, voiceFor(7, 'female'))).samples);
+    } catch (e) {
+      written = `Failed: ${(e as Error).message}`;
+    } finally {
+      writing = false;
+    }
+  }
+  let repo = $state('');
+  let adding = $state(false);
+  let addText = $state('');
+  async function add() {
+    adding = true;
+    addText = 'Looking it up…';
+    try {
+      const spec = await addModel(repo);
+      settings.llmModel = spec.id;
+      addText = `Added ${spec.label} (${mb(spec)} MB). It's tested before residents use it.`;
+      repo = '';
+    } catch (e) {
+      addText = (e as Error).message;
+    } finally {
+      adding = false;
+    }
+  }
+  function remove() {
+    const id = model.id;
+    settings.llmModel = models[0].id;
+    removeModel(id);
+  }
+
   const percent = (v: number) => `${Math.round(v * 100)}%`;
+
+  // Frame rate cap: a preset, or a number of the player's own (`custom`, -1 in the control).
+  const FPS_PRESETS = [30, 60, 120, 0];
+  const FPS_MIN = 10;
+  const FPS_MAX = 500;
+  let fpsChoice = $state(FPS_PRESETS.includes(settings.fpsCap) ? settings.fpsCap : -1);
+  let customFps = $state(FPS_PRESETS.includes(settings.fpsCap) ? 90 : settings.fpsCap);
+  $effect(() => {
+    if (fpsChoice !== -1) settings.fpsCap = fpsChoice;
+    else if (Number.isFinite(customFps) && customFps > 0) settings.fpsCap = Math.round(Math.min(FPS_MAX, Math.max(FPS_MIN, customFps)));
+  });
+  // Changed elsewhere (Reset to defaults): the control follows.
+  $effect(() => {
+    const cap = settings.fpsCap;
+    untrack(() => {
+      const shown = fpsChoice === -1 ? Math.round(Math.min(FPS_MAX, Math.max(FPS_MIN, customFps))) : fpsChoice;
+      if (shown === cap) return;
+      fpsChoice = FPS_PRESETS.includes(cap) ? cap : -1;
+      if (fpsChoice === -1) customFps = cap;
+    });
+  });
 
   /** Shortcuts by area: keys (each a keycap), and what they do. */
   const shortcuts: { title: string; keys: [string[], string][] }[] = [
@@ -158,6 +249,22 @@
         <SettingRow title="Resolution" hint="How many pixels the game draws. Lower is softer but much faster.">
           <input class="slider" type="range" min="0.5" max="1" step="0.05" aria-label="Resolution scale" bind:value={settings.resolutionScale} />
           <output>{percent(settings.resolutionScale)}</output>
+        </SettingRow>
+        <SettingRow title="Frame rate cap" hint="Draws at most this many frames a second. A cap saves power and keeps laptops cooler; No cap follows the display.">
+          <Segmented
+            label="Frame rate cap"
+            bind:value={fpsChoice}
+            options={[
+              { value: 30, label: '30' },
+              { value: 60, label: '60' },
+              { value: 120, label: '120' },
+              { value: 0, label: 'No cap' },
+              { value: -1, label: 'Custom' },
+            ]}
+          />
+          {#if fpsChoice === -1}
+            <input class="input fps" type="number" min={FPS_MIN} max={FPS_MAX} step="1" aria-label="Frames per second" bind:value={customFps} />
+          {/if}
         </SettingRow>
         <SettingRow title="Smooth edges" hint="Anti-aliasing: 4× multisampling removes jagged edges. Off uses a cheaper filter that blurs them a little." badges={[NEXT_LOAD]}>
           <Toggle label="Smooth edges" bind:checked={settings.antiAliasing} />
@@ -331,19 +438,92 @@
           <Toggle label="Resident voices" bind:checked={settings.voices} />
         </SettingRow>
         {#if settings.voices}
-          <SettingRow title="Voice model" hint={modelStatus}>
-            <output>{voiceStatus.state === 'ready' ? 'Ready' : voiceStatus.state === 'loading' ? 'Loading' : voiceStatus.state === 'error' ? 'Failed' : 'Not loaded'}</output>
-          </SettingRow>
           <SettingRow title="Voice volume">
             <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Voice volume" bind:value={settings.voiceVolume} />
             <output>{percent(settings.voiceVolume)}</output>
           </SettingRow>
-          <SettingRow title="Try it" hint={benchText}>
-            <button class="btn ghost" disabled={sampleBusy} onclick={sample}>Hear a sample</button>
-            <button class="btn ghost" disabled={voiceStatus.benchmarking} onclick={() => void runBenchmark().catch(() => {})}>Speed test</button>
+          <SettingRow title="Voice model" hint={modelStatus}>
+            {#if voiceStatus.state === 'loading'}
+              <Busy label="Downloading the voices" progress={voiceStatus.progress} />
+            {:else}
+              <output>{voiceStatus.state === 'ready' ? 'Ready' : voiceStatus.state === 'error' ? 'Failed' : 'Not loaded'}</output>
+            {/if}
+          </SettingRow>
+          <SettingRow title="Try the voices" hint={benchText}>
+            <button class="btn ghost" disabled={sampleBusy} onclick={sample}>{#if sampleBusy}<span class="spinner" aria-hidden="true"></span>{/if}Hear a sample</button>
+            <button class="btn ghost" disabled={voiceStatus.benchmarking} onclick={() => void runBenchmark().catch(() => {})}>
+              {#if voiceStatus.benchmarking}<span class="spinner" aria-hidden="true"></span>{/if}Speed test
+            </button>
           </SettingRow>
         {/if}
       </section>
+      {#if settings.voices}
+        <section>
+          <h3>What residents say</h3>
+          <SettingRow
+            title="Lines"
+            hint="Hand-written lines, or a small language model on this computer writes each line from who the resident is and what's going on: traits, mood, plans, job, what's around them, the time of day."
+            badges={settings.voiceWriter === 'llm' ? ['Experimental'] : []}
+          >
+            <Segmented
+              label="Lines"
+              bind:value={settings.voiceWriter}
+              options={[
+                { value: 'lines', label: 'Hand-written' },
+                { value: 'llm', label: 'Language model' },
+              ]}
+            />
+          </SettingRow>
+          <SettingRow title="Subtitles" hint="Spoken lines also show as text in the speech bubble.">
+            <Toggle label="Subtitles" bind:checked={settings.subtitles} />
+          </SettingRow>
+        </section>
+        {#if settings.voiceWriter === 'llm'}
+          <section>
+            <h3>Language model</h3>
+            <SettingRow title="Model" hint={llmText}>
+              <select class="input" aria-label="Model" bind:value={settings.llmModel} disabled={deviceTest.running}>
+                <optgroup label="Built in">
+                  {#each models.filter((m) => !m.added) as m (m.id)}<option value={m.id}>{m.label} · {mb(m)} MB</option>{/each}
+                </optgroup>
+                {#if models.some((m) => m.added)}
+                  <optgroup label="Added">
+                    {#each models.filter((m) => m.added) as m (m.id)}<option value={m.id}>{m.label} · {mb(m)} MB</option>{/each}
+                  </optgroup>
+                {/if}
+              </select>
+            </SettingRow>
+            <SettingRow title="On this computer" hint={deviceTest.running ? 'Writes and speaks a few lines where it can run, to find the fastest that works.' : deviceText}>
+              {#if deviceTest.running}
+                <Busy label={downloading ? loadLabel : deviceTest.step} progress={downloading && llmStatus.progress < 1 ? llmStatus.progress : deviceTest.progress} />
+                <button class="btn ghost" disabled={deviceTest.stopping} onclick={stopDeviceTest}>Stop</button>
+              {:else}
+                <button class="btn ghost" onclick={() => void testDevices().catch(() => {})}>{reportFor(model) ? 'Test again' : 'Test'}</button>
+              {/if}
+            </SettingRow>
+            <SettingRow title="Try the model" hint={written ? `“${written}”` : 'Writes a line for a sample moment and says it.'}>
+              {#if writing && downloading}
+                <Busy label={loadLabel} progress={llmStatus.progress < 1 ? llmStatus.progress : null} />
+              {/if}
+              <button class="btn ghost" disabled={writing || deviceTest.running} onclick={writeSample}>
+                {#if writing}<span class="spinner" aria-hidden="true"></span>{/if}{writing && !downloading ? 'Writing…' : 'Write a sample line'}
+              </button>
+            </SettingRow>
+            <SettingRow
+              title="Add a model"
+              hint={addText || 'Any small model on Hugging Face with a 4-bit ONNX build (onnx/model_q4.onnx), such as onnx-community/SmolLM2-135M-Instruct-ONNX. It downloads from Hugging Face when used.'}
+            >
+              <input class="input repo" type="text" placeholder="owner/model" aria-label="Hugging Face model" bind:value={repo} onkeydown={(e) => e.key === 'Enter' && repo.trim() && !adding && void add()} />
+              <button class="btn ghost" disabled={adding || !repo.trim()} onclick={add}>{#if adding}<span class="spinner" aria-hidden="true"></span>{/if}Add</button>
+            </SettingRow>
+            {#if model.added}
+              <SettingRow title="Remove {model.label}" hint="Removes it from the list (its download is freed the next time a model loads).">
+                <button class="btn ghost" disabled={deviceTest.running} onclick={remove}>Remove</button>
+              </SettingRow>
+            {/if}
+          </section>
+        {/if}
+      {/if}
     {:else}
       <section>
         <h3>Mouse</h3>
@@ -475,6 +655,15 @@
   }
   .slider {
     width: 170px;
+  }
+  select.input {
+    width: 280px;
+  }
+  .repo {
+    width: 220px;
+  }
+  .fps {
+    width: 76px;
   }
   output {
     min-width: 40px;

@@ -7,6 +7,10 @@
  * - the one whose panel is open (`game.inspected`), and whoever they are talking to;
  * - both sides of a conversation the player started from the social menu.
  *
+ * Lines are hand-written (`lines.ts`), or written by a small language model from who the
+ * resident is and what's going on (`talk/`, the `voiceWriter` setting): a `LineWriter` turns
+ * what happened into words. With subtitles on, the speech bubble shows the line while it plays.
+ *
  * Everyone speaks with KittenTTS (`voices.ts`); babies don't speak. If lines keep coming late
  * or slow the frames, voices pause for the session.
  *
@@ -16,14 +20,19 @@
 
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
+import type { WorldStructure } from '../core/protocol';
+import { llmReady, llmStatus, unloadLlm } from '../llm';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
+import { deviceTest, ensureTalk, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
+import { SAMPLE_RATE } from './protocol';
 import { cachedClip, ensureVoice, speak, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { voiceFor, withTone } from './voices';
+import { scripted, type LineRequest } from './writer';
 
 const TICK_MS = 100;
 /** At most this many voices at once, and lines being made at once. */
@@ -31,6 +40,10 @@ const MAX_VOICES = 2;
 const MAX_IN_FLIGHT = 2;
 /** A line not ready by then is dropped: the moment has passed. */
 const MAX_WAIT_MS = 4000;
+/** The same for a line the language model writes (it has `WRITE_MS` of it, speech the rest). */
+const MAX_WAIT_LLM_MS = 6000;
+/** Lines being written by the language model at once (it writes one after another). */
+const MAX_WRITING = 2;
 /** Lines this late, so many times in a row, pause voices for the session. */
 const LATE_RUN = 3;
 /** Frames this slow, in this share of the frames drawn while speech is being made, pause them too. */
@@ -39,6 +52,8 @@ const SLOW_SHARE = 0.1;
 const FRAME_WINDOW = 120;
 /** The engine is unloaded after this long without a line (it reloads from the cache). */
 const IDLE_UNLOAD_MS = 5 * 60_000;
+/** A subtitle stays this long after its line ends. */
+const SUBTITLE_LINGER_MS = 1200;
 /** Quiet time after a resident's own thought before the next one. */
 const THOUGHT_GAP_MS = 6000;
 /** How long a conversation the player ordered may take to begin (residents may walk over first). */
@@ -63,9 +78,24 @@ interface SimState {
 export interface VoiceDirectorStats {
   speaking: number;
   inFlight: number;
+  /** Lines the language model is writing. */
+  writing: number;
   spoken: number;
   dropped: number;
   language: 'off' | 'english' | 'paused';
+  writer: 'lines' | 'llm';
+}
+
+/** Where a line's text shows while it plays (the speech bubbles). */
+export interface Subtitles {
+  say(id: number, text: string, ms: number): void;
+}
+
+/** What the voice director needs from the game besides the snapshot. */
+export interface VoiceSources {
+  /** The lot in view (rooms, for where residents are). */
+  world: () => WorldStructure | null;
+  subtitles?: Subtitles;
 }
 
 interface Speaking {
@@ -79,6 +109,11 @@ interface Speaking {
 export class VoiceDirector {
   private lines: Lines | null = null;
   private linesLanguage = '';
+  private llmWriter: LlmWriter | null = null;
+  /** The resident whose persona the language model last read ahead. */
+  private primed: number | null = null;
+    /** Lines the language model is writing, by resident (a newer event replaces theirs). */
+  private readonly writing = new Map<number, AbortController>();
   private readonly sims = new Map<number, SimState>();
   /** Each resident's snapshot index at the last tick. */
   private readonly rows = new Map<number, number>();
@@ -110,14 +145,21 @@ export class VoiceDirector {
   constructor(
     private readonly content: Content,
     private readonly renderer: Renderer,
+    private readonly sources: VoiceSources = { world: () => null },
   ) {
     if (this.debug) Object.assign(window, { __voices: this });
   }
 
-  /** Loads the engine. */
+  /** The language model's writer, with `?debug` its log (`__voices.writer.log`). */
+  get writer(): LlmWriter | null {
+    return this.llmWriter;
+  }
+
+  /** Loads the engines (the language model too when it writes the lines). */
   private wake(): void {
     this.asleep = false;
     if (voiceStatus.state === 'off') void ensureVoice().catch(() => {});
+    if (llmWrites() && llmStatus.state === 'off') void ensureTalk().catch(() => {});
   }
 
   /** Lines for the voice language, (re)loaded when it changes. */
@@ -126,8 +168,13 @@ export class VoiceDirector {
     if (this.linesLanguage === language) return;
     this.linesLanguage = language;
     this.lines = null;
+    this.llmWriter = null;
     void loadLines(language).then((data) => {
       if (data && !this.disposed && this.linesLanguage === language) this.lines = new Lines(data, this.content.voice[language]);
+    });
+    void loadTalk(language, this.content).then((text) => {
+      if (!text || this.disposed || this.linesLanguage !== language) return;
+      this.llmWriter = new LlmWriter(text, { content: this.content, world: this.sources.world }, () => this.lines);
     });
   }
 
@@ -147,8 +194,9 @@ export class VoiceDirector {
     }
     this.ensureLines();
     if (!this.asleep) this.wake();
-    if (voiceStatus.state === 'ready' && this.inFlight === 0 && performance.now() - this.lastLine > IDLE_UNLOAD_MS) {
+    if (voiceStatus.state === 'ready' && this.inFlight === 0 && !this.writing.size && performance.now() - this.lastLine > IDLE_UNLOAD_MS) {
       unloadVoice();
+      if (llmStatus.state === 'ready') unloadLlm();
       this.asleep = true;
     }
     updateVoiceVolume();
@@ -165,6 +213,14 @@ export class VoiceDirector {
     // Who may speak this tick.
     const voiced = new Set<number>();
     const inspected = game.inspected;
+    // A newly picked resident's persona is read ahead by the language model.
+    if (inspected !== this.primed && inspected !== null && llmWrites() && llmReady() && this.llmWriter) {
+      const at = this.rows.get(inspected);
+      if (at !== undefined) {
+        this.primed = inspected;
+        this.llmWriter.prime({ speaker: inspected, row: at, partner: -1, kind: 'emotion', emotion: 'happy', seed: 0 }, frame);
+      }
+    }
     const talk = this.playerTalk;
     for (let i = 0; i < count; i++) {
       const o = row(i);
@@ -184,7 +240,8 @@ export class VoiceDirector {
       else if (talk.started || now > talk.until) this.playerTalk = null;
     }
 
-    const quiet = game.mode !== 'live' || document.hidden || !this.lines;
+    // Nothing is said while the device test runs (it measures the voices and the model).
+    const quiet = game.mode !== 'live' || document.hidden || !this.lines || deviceTest.running;
     const fast = game.speed >= 3;
     for (let i = 0; i < count; i++) {
       const o = row(i);
@@ -206,10 +263,8 @@ export class VoiceDirector {
       // At high speed only the conversation the player started is voiced.
       const playerSide = !!talk && (id === talk.a || id === talk.b || this.isPartnerOf(curr, row, k, i, talk));
       if (fast && !playerSide) continue;
-      const line = this.event(prev, next, frame, i, id, now);
-      if (!line) continue;
-      if (this.debug && this.heard.push(`${id} ${line.line.key}: ${line.line.text}`) > 50) this.heard.shift();
-      this.say(id, i, line.line, line.partnerId, line.thought, now);
+      const e = this.event(prev, next, frame, i, id, now);
+      if (e) this.write(e, frame, now);
     }
 
     this.pan(frame);
@@ -224,6 +279,8 @@ export class VoiceDirector {
       spoken: this.spoken,
       dropped: this.dropped,
       language,
+      writing: this.writing.size,
+      writer: llmWrites() ? 'llm' : 'lines',
     };
   }
 
@@ -235,7 +292,7 @@ export class VoiceDirector {
     if (dt <= 0 || dt > 1000 || document.hidden || this.paused) return;
     const f = this.frames;
     const slow = dt > SLOW_FRAME_MS ? 1 : 0;
-    if (this.inFlight > 0 && voiceStatus.state === 'ready') {
+    if ((this.inFlight > 0 && voiceStatus.state === 'ready') || this.writing.size > 0) {
       f.busy++;
       f.busySlow += slow;
     } else {
@@ -254,6 +311,7 @@ export class VoiceDirector {
     if (this.paused) return;
     this.paused = true;
     unloadVoice();
+    if (llmStatus.state !== 'off') unloadLlm();
     toast(
       why === 'late'
         ? 'Resident voices are paused for now: speech came too slowly on this computer.'
@@ -264,6 +322,8 @@ export class VoiceDirector {
 
   dispose(): void {
     this.disposed = true;
+    for (const w of this.writing.values()) w.abort();
+    this.writing.clear();
     this.stopAll();
   }
 
@@ -280,16 +340,8 @@ export class VoiceDirector {
     return pid === talk.a || pid === talk.b;
   }
 
-  /** The line for what just changed for resident `id` (row `i`), if any. */
-  private event(
-    prev: SimState,
-    next: SimState,
-    frame: FrameState,
-    i: number,
-    id: number,
-    now: number,
-  ): { line: Line; partnerId: number; thought: boolean } | null {
-    const lines = this.lines!;
+  /** What just changed for resident `id` (row `i`) that is worth a line, if anything. */
+  private event(prev: SimState, next: SimState, frame: FrameState, i: number, id: number, now: number): { req: LineRequest; thought: boolean } | null {
     const { curr, layout } = frame;
     const k = layout.sim;
     const o = layout.headerLen + i * layout.simStride;
@@ -298,44 +350,87 @@ export class VoiceDirector {
     const partnerId = partner >= 0 ? curr[layout.headerLen + partner * layout.simStride + k.id] : -1;
     const role = curr[o + k.role];
     // Conversations: the one who starts says the opener, the other answers once the outcome shows.
+    const base = { speaker: id, row: i, partner: partnerId, seed };
     if (next.social > 0) {
       const def = this.content.social(next.social - 1);
       if (!def) return null;
-      if (role === 1 && next.social !== prev.social) {
-        const line = lines.social(id, def.id, 'start', seed);
-        return line && { line, partnerId, thought: false };
-      }
+      if (role === 1 && next.social !== prev.social) return { req: { ...base, kind: 'social', social: def.id, phase: 'start' }, thought: false };
       if (role === 2 && prev.outcome === 0 && next.outcome > 0) {
-        const line = lines.social(id, def.id, next.outcome === 1 ? 'good' : 'bad', seed);
-        return line && { line, partnerId, thought: false };
+        return { req: { ...base, kind: 'social', social: def.id, phase: next.outcome === 1 ? 'good' : 'bad' }, thought: false };
       }
       return null;
     }
+    const alone = { ...base, partner: -1 };
     if (now < next.quietUntil) return null;
     if (next.thought > 0 && next.thought !== prev.thought) {
-      const line = lines.thought(id, next.thought, seed);
-      return line && { line, partnerId: -1, thought: true };
+      const subject = layout.sim.thoughtSubject === undefined ? 0 : curr[o + layout.sim.thoughtSubject];
+      return { req: { ...alone, kind: 'thought', thought: next.thought, thoughtSubject: subject }, thought: true };
     }
     if (next.emotion > 0 && next.emotion !== prev.emotion && chance(seed, EMOTION_CHANCE)) {
       const emotion = this.content.emotions[next.emotion - 1];
-      const line = emotion ? lines.emotion(id, emotion.id, seed) : null;
-      if (line) return { line, partnerId: -1, thought: true };
+      if (emotion) return { req: { ...alone, kind: 'emotion', emotion: emotion.id }, thought: true };
     }
     // Starting something, or going on to another thing with the same animation (a snack, then a meal).
     const started = next.action !== prev.action || next.def !== prev.def || next.interaction !== prev.interaction;
     if (next.action >= 0 && started && chance(seed + 1, ACTION_CHANCE)) {
       const object = next.def >= 0 ? this.content.objectList[next.def] : undefined;
       const interaction = next.interaction >= 0 ? object?.interactions[next.interaction]?.id : undefined;
-      const line = lines.use(id, layout.actions[next.action], { object: object?.id, interaction }, seed);
-      if (line) return { line, partnerId: -1, thought: true };
+      return { req: { ...alone, kind: 'use', object: object?.id, interaction, tag: layout.actions[next.action] }, thought: true };
     }
     return null;
   }
 
-  private say(id: number, index: number, line: Line, partnerId: number, thought: boolean, now: number): void {
+  /**
+   * The line for an event: hand-written at once, or written by the language model (one at a
+   * time per resident, a newer event replacing theirs); then said.
+   */
+  private write({ req, thought }: { req: LineRequest; thought: boolean }, frame: FrameState, now: number): void {
+    const id = req.speaker;
+    const requested = performance.now();
+    const writer = llmWrites() ? this.llmWriter : null;
+    if (!writer) {
+      const line = this.lines ? scripted(this.lines, req) : null;
+      if (line) this.say(id, req.row, line, req.partner, thought, now, requested, MAX_WAIT_MS);
+      return;
+    }
+    // Nothing is written while the model loads: the moment passes.
+    if (!llmReady()) {
+      this.wake();
+      return;
+    }
+    this.writing.get(id)?.abort();
+    this.writing.delete(id);
+    if (this.writing.size >= MAX_WRITING) {
+      this.dropped++;
+      return;
+    }
+    const state = this.sims.get(id);
+    if (thought && state) state.quietUntil = now + THOUGHT_GAP_MS;
+    const control = new AbortController();
+    this.writing.set(id, control);
+    this.lastLine = requested;
+    void writer
+      .write(req, frame, control.signal)
+      .catch(() => null)
+      .then((line) => {
+        if (this.writing.get(id) === control) this.writing.delete(id);
+        if (control.signal.aborted || this.disposed) return;
+        if (!line) {
+          // Not written in time counts as late; a line that didn't pass doesn't.
+          if (performance.now() - requested >= WRITE_MS) this.timed(Infinity, MAX_WAIT_LLM_MS);
+          else this.dropped++;
+          return;
+        }
+        this.say(id, req.row, line, req.partner, thought, performance.now(), requested, MAX_WAIT_LLM_MS);
+      });
+  }
+
+  /** Says a line: its speech from the cache or made, then played. `requested`: when the moment was; `budget`: how late it may be. */
+  private say(id: number, index: number, line: Line, partnerId: number, thought: boolean, now: number, requested: number, budget: number): void {
     const info = game.roster.find((s) => s.id === id);
     if (info?.stage === 'baby') return;
     const text = fill(line.text, this.firstName(id), partnerId >= 0 ? this.firstName(partnerId) : '');
+    if (this.debug && this.heard.push(`${id} ${line.key}: ${text}`) > 50) this.heard.shift();
     const voice = withTone(voiceFor(id, info?.gender, info?.stage, info?.appearance?.voice), line.tone);
     // A line said before plays at once, even while the engine is unloaded.
     const cached = cachedClip(text, voice);
@@ -352,15 +447,14 @@ export class VoiceDirector {
     }
     const state = this.sims.get(id);
     if (thought && state) state.quietUntil = now + THOUGHT_GAP_MS;
-    const requested = performance.now();
     let clip: Promise<Clip>;
     if (cached) {
       clip = Promise.resolve(cached);
     } else {
       this.inFlight++;
-      this.lastLine = requested;
+      this.lastLine = performance.now();
       clip = speak(text, voice).finally(() => this.inFlight--);
-      void clip.then(() => this.timed(performance.now() - requested)).catch(() => {});
+      void clip.then(() => this.timed(performance.now() - requested, budget)).catch(() => {});
     }
     void clip
       .then(async ({ samples, visemes }) => {
@@ -368,7 +462,7 @@ export class VoiceDirector {
         const before = this.speaking.filter((s) => s.id !== id);
         if (before.length && !thought) await Promise.race([Promise.all(before.map((s) => s.playing.ended)), wait(3000)]);
         if (this.disposed || !settings.voices) return;
-        if (performance.now() - requested > MAX_WAIT_MS + 3000 || this.speaking.length >= MAX_VOICES) {
+        if (performance.now() - requested > budget + 3000 || this.speaking.length >= MAX_VOICES) {
           this.dropped++;
           return;
         }
@@ -380,6 +474,7 @@ export class VoiceDirector {
         const entry: Speaking = { id, playing, row, track: visemes };
         this.speaking.push(entry);
         this.renderer.setSpeech(row, visemes, playing.startTime);
+        if (settings.subtitles) this.sources.subtitles?.say(id, text, (samples.length / SAMPLE_RATE) * 1000 + SUBTITLE_LINGER_MS);
         void playing.ended.then(() => {
           const at = this.speaking.indexOf(entry);
           if (at >= 0) this.speaking.splice(at, 1);
@@ -391,8 +486,8 @@ export class VoiceDirector {
   }
 
   /** How long a line took to make (waiting included); too many late ones in a row pause voices. */
-  private timed(ms: number): void {
-    this.lateRun = ms > MAX_WAIT_MS ? this.lateRun + 1 : 0;
+  private timed(ms: number, budget: number): void {
+    this.lateRun = ms > budget ? this.lateRun + 1 : 0;
     if (this.lateRun >= LATE_RUN) this.pause('late');
   }
 
@@ -434,6 +529,8 @@ export class VoiceDirector {
   }
 
   private stopAll(): void {
+    for (const w of this.writing.values()) w.abort();
+    this.writing.clear();
     const playing = this.speaking.splice(0);
     for (const s of playing) {
       s.playing.stop();

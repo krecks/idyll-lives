@@ -1,0 +1,146 @@
+{
+  "$comment": "How residents' lines are asked of the language model (web/src/talk/prompt.ts), per language. Content packs can add or replace any key under \"talk\": {\"en\": {...}}. {name}: the other resident's first name; {me}: the speaker's; {subject}, {emotion}, {action}: what the event is about.",
+  "rules": "You write what residents of a small town say out loud. Reply with only the resident's words: one short sentence, at most 12 words, in first person. Casual, friendly and fit for all ages.",
+  "ask": "Write what {me} says now.",
+  "askTo": "Write what {me} says to {name} now.",
+  "examples": "{me} might say something like:",
+  "reply": "{me}: \"",
+  "demos": [
+    {
+      "me": "Sam", "person": "a young man", "personality": ["upbeat, sees the bright side", "loves food and talks about it a lot"],
+      "moment": "Monday morning, at home, in the kitchen.\n{me} feels hungry.\nNearby: toaster, fridge.\n{me} is about to eat breakfast (fridge).\nWrite what {me} says now.",
+      "line": "Breakfast time, I'm starving!"
+    },
+    {
+      "me": "Ada", "person": "an old woman", "personality": ["warm and gentle"],
+      "moment": "Friday evening, in the park.\n{me} feels happy.\nTom is {me}'s friend.\nTom just told {me} a joke, and {me} likes it.\nWrite what {me} says to Tom now.",
+      "line": "Ha! Tom, that one was really good."
+    },
+    {
+      "me": "Kit", "person": "a teenage boy", "personality": ["sleepy and unhurried"],
+      "moment": "Wednesday night, at home, in the bedroom.\n{me} feels tired.\nOn {me}'s mind: wants to read more.\n{me} decides to skip the plan to read.\nWrite what {me} says now.",
+      "line": "Too sleepy for books tonight. Tomorrow, maybe."
+    }
+  ],
+  "intro": "{me} is {person} in a small town.",
+  "job": "{me} works as: {subject}.",
+  "school": "{me} goes to school.",
+  "personality": "{me} is {subject}.",
+  "traits": {
+    "foodie": "loves food and talks about it a lot",
+    "bookworm": "loves books, a little nerdy",
+    "couchPotato": "laid-back, loves the sofa and TV",
+    "neat": "tidy and a bit fussy",
+    "slob": "messy and carefree",
+    "energetic": "bouncy and full of energy",
+    "lazy": "sleepy and unhurried",
+    "cheerful": "upbeat, sees the bright side",
+    "gloomy": "a little gloomy and dry",
+    "natureLover": "loves plants and the outdoors",
+    "outgoing": "chatty and friendly",
+    "loner": "quiet, keeps to themselves",
+    "romantic": "dreamy and romantic",
+    "hotHeaded": "quick-tempered and blunt",
+    "kind": "warm and gentle"
+  },
+  "perks": {
+    "powerNapper": "proud of their naps",
+    "lightEater": "eats like a bird",
+    "speedWalker": "always in a hurry",
+    "freshScent": "always smells nice",
+    "easilyAmused": "laughs easily",
+    "comfortSeeker": "loves being cosy",
+    "sunnyDisposition": "sunny",
+    "charming": "charming"
+  },
+  "people": {
+    "child": { "female": "a girl", "male": "a boy", "": "a child" },
+    "teen": { "female": "a teenage girl", "male": "a teenage boy", "": "a teenager" },
+    "youngAdult": { "female": "a young woman", "male": "a young man", "": "a young adult" },
+    "adult": { "female": "a woman", "male": "a man", "": "an adult" },
+    "elder": { "female": "an old woman", "male": "an old man", "": "an older person" }
+  },
+  "needs": {
+    "hunger": "hungry",
+    "energy": "tired",
+    "bladder": "needs the toilet",
+    "hygiene": "feels grubby",
+    "fun": "bored",
+    "comfort": "uncomfortable",
+    "social": "lonely",
+    "environment": "dislikes the place"
+  },
+  "times": {
+    "night": "night",
+    "early": "early morning",
+    "morning": "morning",
+    "midday": "midday",
+    "afternoon": "afternoon",
+    "evening": "evening"
+  },
+  "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+  "situation": {
+    "when": "{subject}",
+    "home": "at home",
+    "homeRoom": "at home, in the {subject}",
+    "visiting": "visiting {subject}",
+    "out": "out in town",
+    "weather": "The weather: {subject}.",
+    "feeling": "{me} feels {subject}.",
+    "mind": "On {me}'s mind: {subject}.",
+    "nearby": "Nearby: {subject}.",
+    "holding": "{me} is holding {subject}.",
+    "with": "{name} is {me}'s {subject}.",
+    "now": "{subject}"
+  },
+  "relations": {
+    "partner": "partner",
+    "parent": "parent",
+    "child": "child",
+    "sibling": "sibling",
+    "bestFriend": "best friend",
+    "goodFriend": "good friend",
+    "friend": "friend",
+    "acquaintance": "acquaintance",
+    "disliked": "rival",
+    "enemy": "enemy",
+    "stranger": "neighbour you just met"
+  },
+  "social": {
+    "introduce": { "start": "{me} introduces themselves to {name}.", "reply": "{name} introduces themselves to {me}" },
+    "chat": { "start": "{me} starts chatting with {name}.", "reply": "{name} starts chatting with {me}" },
+    "joke": { "start": "{me} tells {name} a joke.", "reply": "{name} just told {me} a joke" },
+    "compliment": { "start": "{me} pays {name} a compliment.", "reply": "{name} just complimented {me}" },
+    "deepTalk": { "start": "{me} starts a deep talk with {name}.", "reply": "{name} starts a deep talk with {me}" },
+    "hug": { "start": "{me} goes to hug {name}.", "reply": "{name} hugs {me}" },
+    "flirt": { "start": "{me} flirts with {name}.", "reply": "{name} flirts with {me}" },
+    "sweetTalk": { "start": "{me} sweet-talks {name}.", "reply": "{name} sweet-talks {me}" },
+    "kiss": { "start": "{me} leans in to kiss {name}.", "reply": "{name} leans in to kiss {me}" },
+    "askPartner": { "start": "{me} asks {name} to be their partner.", "reply": "{name} asks {me} to be their partner" },
+    "breakUp": { "start": "{me} breaks up with {name}.", "reply": "{name} breaks up with {me}" },
+    "insult": { "start": "{me} teases {name} rudely.", "reply": "{name} teases {me} rudely" },
+    "argue": { "start": "{me} starts an argument with {name}.", "reply": "{name} argues with {me}" },
+    "prank": { "start": "{me} plays a harmless prank on {name}.", "reply": "{name} just pranked {me}" },
+    "fight": { "start": "{me} picks a scuffle with {name}.", "reply": "{name} picks a scuffle with {me}" },
+    "apologize": { "start": "{me} apologises to {name}.", "reply": "{name} apologises to {me}" },
+    "tryForBaby": { "start": "{me} tells {name} they would love a baby together.", "reply": "{name} says they would love a baby with {me}" }
+  },
+  "outcome": { "good": ", and {me} likes it.", "bad": ", and {me} doesn't like it." },
+  "use": "{me} is about to {action}.",
+  "emotion": "{me} suddenly feels {emotion}.",
+  "thought": {
+    "skipped": "{me} decides to skip the plan to {subject}.",
+    "noPlace": "{me} wants to {subject}, but there's nowhere for it here.",
+    "kept": "{me} sticks to the plan to {subject}.",
+    "goal": "{me} just reached a goal: {subject}.",
+    "roomLoved": "{me} notices how much they love this room.",
+    "roomDisliked": "{me} notices they don't like this room.",
+    "broken": "The {subject} just broke.",
+    "accident": "{me} just had a little accident.",
+    "crying": "{me} feels like crying.",
+    "dinnerReady": "Dinner is ready."
+  },
+  "blocklist": [
+    "fuck", "shit", "bitch", "bastard", "asshole", "crap", "damn", "dick", "piss", "slut", "whore", "sex", "sexy", "naked", "nude", "porn", "boobs", "kill", "murder", "suicide", "blood", "gun", "stab", "drunk", "beer", "wine", "vodka", "whiskey", "booze", "cigarette", "weed", "drugs", "assistant", "language model", "as an ai"
+  ]
+}

@@ -219,6 +219,27 @@ input[type='range'] {
   width: 100%;
 }
 
+/* Working on it: a small ring that turns (in buttons and `kit/Busy.svelte`). */
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: spinner 0.8s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.btn .spinner {
+  margin-right: 6px;
+}
+
 :root.reduce-motion *,
 :root.reduce-motion *::before,
 :root.reduce-motion *::after {
@@ -302,6 +323,45 @@ input[type='range'] {
 }
 .bubble-body[data-tone='wish'] {
   --tone: var(--warn);
+}
+/* A spoken line (subtitles): the bubble grows around its text, centred over the head. */
+.bubble-text {
+  display: none;
+}
+.bubble-body.has-text {
+  left: 0;
+  width: max-content;
+  max-width: 240px;
+  height: auto;
+  min-height: 38px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+}
+.bubble-body.has-text::after {
+  left: calc(50% - 5px);
+}
+.bubble-body.has-text.thought::after {
+  left: calc(50% - 12px);
+}
+.bubble-body.has-text .bubble-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.bubble-body.has-text .bubble-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text);
 }
 .bubble-body.pop {
   animation: bubble-pop 360ms var(--ease);

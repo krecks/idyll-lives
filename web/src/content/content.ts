@@ -448,6 +448,8 @@ interface ContentFile {
   planner?: Partial<PlannerRules>;
   /** Spoken lines per language, laid out like `content/voice/<lang>.json` (see `voice/lines.ts`). */
   voice?: Record<string, Json>;
+  /** How the language model is asked for lines, per language, laid out like `content/talk/<lang>.json` (see `talk/prompt.ts`). */
+  talk?: Record<string, Json>;
   cooking?: CookingRules;
   items?: ItemDef[];
   recipes?: RecipeDef[];
@@ -501,6 +503,8 @@ export class Content {
   readonly objectList: readonly ObjectDef[];
   /** Spoken lines from content packs per language, laid over `content/voice/<lang>.json`. */
   readonly voice: Readonly<Record<string, Json>>;
+  /** The language model's words from content packs per language, laid over `content/talk/<lang>.json`. */
+  readonly talk: Readonly<Record<string, Json>>;
   /** Cooking rules, and the items and recipes in the order the snapshot's `sim.held` / `sim.recipe` index them. */
   readonly cooking: CookingRules;
   readonly items: readonly ItemDef[];
@@ -547,6 +551,7 @@ export class Content {
     this.objects = new Map(file.objects.map((o) => [o.id, o]));
     this.objectList = file.objects;
     this.voice = file.voice ?? {};
+    this.talk = file.talk ?? {};
     this.cooking = file.cooking ?? {};
     this.items = file.items ?? [];
     this.recipes = file.recipes ?? [];
@@ -753,8 +758,9 @@ const PATCH_MAPS = ['needDecay', 'needGain', 'tagPreference', 'tagAcceptance', '
  * top-level arrays are appended (a repeated `id` is an error), objects are merged
  * shallowly, other values replaced, `traitPatches` are applied to the merged traits
  * last, and `include` / `$comment` are dropped. Keys from before the moodlet → feeling rename
- * are renamed first (`LEGACY_KEYS`). Only here: `voice` (spoken lines, which sim-core drops) is
- * merged at every depth, so packs add or replace single lines (`mergeDeep`).
+ * are renamed first (`LEGACY_KEYS`). Only here: `voice` (spoken lines) and `talk` (the language
+ * model's words), which sim-core drops, are merged at every depth, so packs add or replace
+ * single lines (`mergeDeep`).
  */
 export function mergeContent(files: [name: string, text: string][]): Json {
   const out: Json = {};
@@ -775,9 +781,10 @@ export function mergeContent(files: [name: string, text: string][]): Json {
         patches.push([name, value]);
         continue;
       }
-      if (key === 'voice') {
-        if (!isJsonObject(value)) throw new Error(`${name}: voice must be an object`);
-        out.voice = mergeDeep(isJsonObject(out.voice) ? out.voice : {}, value);
+      if (key === 'voice' || key === 'talk') {
+        if (!isJsonObject(value)) throw new Error(`${name}: ${key} must be an object`);
+        const prev = out[key];
+        out[key] = mergeDeep(isJsonObject(prev) ? prev : {}, value);
         continue;
       }
       const prev = out[key];

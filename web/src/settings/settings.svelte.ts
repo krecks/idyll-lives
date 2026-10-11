@@ -11,6 +11,8 @@ export interface Settings {
   renderer: 'auto' | 'webgl';
   /** Fraction of native resolution, 0.5..1. */
   resolutionScale: number;
+  /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
+  fpsCap: number;
   /** Shadow map size (1024, 2048 or 4096). */
   shadowDetail: number;
   /** 4× multisampling; off: FXAA. */
@@ -51,6 +53,15 @@ export interface Settings {
   voiceLanguage: 'en';
   /** 0..1. */
   voiceVolume: number;
+  /**
+   * Who writes residents' lines: `lines`, the hand-written ones; `llm`, a small language model
+   * in the browser, from who they are and what's going on (`talk/`; downloads the model).
+   */
+  voiceWriter: 'lines' | 'llm';
+  /** The language model that writes lines (`llm/library.svelte.ts`: built in, or added from Hugging Face). */
+  llmModel: string;
+  /** Spoken lines also show as text in the speech bubble. */
+  subtitles: boolean;
   /** Birds, crickets, and things in use at home (audio/world.ts). */
   worldSound: boolean;
   /** 0..1. */
@@ -65,6 +76,7 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 export const DEFAULT_SETTINGS: Settings = {
   renderer: 'auto',
   resolutionScale: 1,
+  fpsCap: 60,
   shadowDetail: QUALITY.high.shadowMapSize,
   antiAliasing: QUALITY.high.msaaSamples > 1,
   allLamps: QUALITY.high.clusteredLamps,
@@ -87,6 +99,9 @@ export const DEFAULT_SETTINGS: Settings = {
   voices: false,
   voiceLanguage: 'en',
   voiceVolume: 0.8,
+  voiceWriter: 'lines',
+  llmModel: 'lfm2.5-350m',
+  subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
 };

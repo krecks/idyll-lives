@@ -201,7 +201,7 @@ export async function startSession(
     buildBuy.modeChanged();
     refreshRoomOverlay();
   }
-  const voices = new VoiceDirector(content, renderer);
+  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
   const worldSound = new WorldSound(renderer);
   const buildBuy = new BuildBuyInput(renderer, content, assets, (command) => bridge.send(command));
   game.catalog = bridge.catalog;
@@ -1235,6 +1235,7 @@ export async function startSession(
       renderer.configure({
         resolutionScale: s.resolutionScale,
         cameraSensitivity: s.cameraSensitivity,
+        fpsCap: s.fpsCap,
       });
       bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
