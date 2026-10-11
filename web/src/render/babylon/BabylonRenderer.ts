@@ -281,7 +281,7 @@ export class BabylonRenderer implements Renderer {
   /** Lot the camera was last turned towards (see `buildSims`). */
   private framedView = '';
 
-  private options: LiveRenderOptions = { resolutionScale: 1, cameraSensitivity: 1 };
+  private options: LiveRenderOptions = { resolutionScale: 1, cameraSensitivity: 1, fpsCap: 60 };
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
@@ -778,6 +778,8 @@ export class BabylonRenderer implements Renderer {
     this.camera.angularSensibilityX = this.camera.angularSensibilityY = 1000 / s;
     this.camera.panningSensibility = 90 / s;
     this.camera.wheelDeltaPercentage = 0.012 * s;
+    // Babylon skips whole frames (nothing begun or presented) until the next one is due.
+    this.engine.maxFPS = options.fpsCap > 0 ? options.fpsCap : undefined;
     this.applyLook();
   }
 

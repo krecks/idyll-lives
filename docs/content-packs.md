@@ -33,6 +33,7 @@ mirrored by `mergeContent` in `web/src/content/content.ts`):
 | `traitPatches` | merged *into* existing traits (below). Never copied into the result. |
 | `include`, `$comment` | dropped. Use `$comment` for notes. |
 | `voice` | spoken lines (see [Voice lines](#voice-lines)): merged at every depth by the web side, so a pack adds or replaces single groups of lines. The simulation drops it. |
+| `talk` | how the language model is asked for residents' lines, per language, laid out like `web/public/content/talk/<lang>.json` (speech-style hints per trait and perk, event wording, blocklist): merged at every depth by the web side. The simulation drops it. |
 
 A key whose type differs from earlier files (array in base, object in your pack) is an error.
 Packs should normally only add `objects`, `feelings`, `tags`, `buyCategories` and

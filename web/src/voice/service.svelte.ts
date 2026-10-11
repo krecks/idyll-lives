@@ -4,6 +4,7 @@
  * the settings screen shows.
  */
 
+import type { Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker } from './protocol';
 import { parseVisemes, type VisemeTrack } from './visemes';
@@ -76,6 +77,8 @@ const BENCH_LINES = [
 const BENCH_VOICE: VoiceParams = { mix: [5, 5, 1], speed: 1, pitch: 1, depth: 1 };
 
 let worker: Worker | null = null;
+/** Where the model runs: the CPU, unless the device test found the GPU better (`useVoiceDevice`). */
+let device: Device = 'cpu';
 let nextId = 1;
 const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error) => void }>();
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -132,9 +135,21 @@ export function ensureVoice(): Promise<void> {
     voiceStatus.progress = 0;
     voiceStatus.error = '';
     voiceStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage });
+    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+}
+
+/** Runs the model on another device from the next load on (unloading it if loaded on another). */
+export function useVoiceDevice(next: Device): void {
+  if (next === device) return;
+  device = next;
+  if (worker) unloadVoice();
+}
+
+/** The device the model runs on (or will, when loaded). */
+export function voiceDevice(): Device {
+  return device;
 }
 
 /** Whether the engine can speak now. */
@@ -154,7 +169,8 @@ const cache = { bytes: 0, hits: 0 };
 
 function clipKey(text: string, voice: VoiceParams): string {
   const mix = `${voice.mix[0]}/${voice.mix[1]}/${voice.mix[2].toFixed(3)}`;
-  return `${settings.voiceLanguage}|${MODEL_ID}|${mix}|${voice.speed.toFixed(3)}|${voice.pitch.toFixed(3)}|${voice.depth.toFixed(3)}|${text}`;
+  // The GPU's arithmetic differs a little from the CPU's: clips are kept per device.
+  return `${settings.voiceLanguage}|${MODEL_ID}|${device}|${mix}|${voice.speed.toFixed(3)}|${voice.pitch.toFixed(3)}|${voice.depth.toFixed(3)}|${text}`;
 }
 
 /** The clip for this line and voice if it was made before (and keeps it fresh), else null. */

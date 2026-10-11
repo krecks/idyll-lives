@@ -70,6 +70,19 @@
       {#if v.language !== 'off'}
         <div><span>Playing</span><b>{v.speaking} · {v.spoken} said · {v.dropped} dropped</b></div>
       {/if}
+      {@const l = t.llm}
+      {#if v.writer === 'llm' || l.state !== 'off'}
+        <h4>Language model thread</h4>
+        <div><span>Model</span><b>{l.model} {l.state}{l.state === 'ready' ? ` · ${l.device.toUpperCase()}${l.device === 'cpu' ? ` × ${l.threads}` : ''}` : ''}{l.loadMs ? ` · loaded in ${(l.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
+        {#if l.state === 'ready'}
+          <div><span>Lines written</span><b>{l.replies}{l.queued ? ` · ${l.queued} queued` : ''}{v.writing ? ` · ${v.writing} writing` : ''} · {l.skipped} skipped</b></div>
+          {#if l.replies}
+            <div><span>Prompt</span><b>{l.lastPrefillMs.toFixed(0)} ms · {pct(l.lastCachedShare)} cached</b></div>
+            <div><span>Writing</span><b>{l.lastTokPerS.toFixed(0)} tokens/s · avg {l.avgTokPerS.toFixed(0)}</b></div>
+          {/if}
+          <div><span>Busy (5 s)</span><b>{pct(l.busy)}</b></div>
+        {/if}
+      {/if}
     {/if}
     <form class="debug" onsubmit={(e) => (e.preventDefault(), void report())}>
       <input bind:value={note} placeholder="What went wrong? (optional)" aria-label="Debug report note" />

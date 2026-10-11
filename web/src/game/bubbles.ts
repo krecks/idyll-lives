@@ -1,9 +1,10 @@
 /**
  * Speech bubbles above Sims in a conversation, and thought bubbles (a planned block skipped or
  * kept, wanting somewhere to do it, a goal reached, a room loved or disliked, something broken,
- * an accident), as DOM elements over the canvas.
- * Per frame only `transform` is written (compositor-only); icons change only when a
- * conversation starts or its outcome is revealed. No allocations per frame.
+ * an accident), as DOM elements over the canvas. With subtitles, a spoken line shows as text in
+ * the bubble while it plays (`say`; a bubble of its own if there's no icon).
+ * Per frame only `transform` is written (compositor-only); icons and text change only when a
+ * conversation starts, its outcome is revealed or a line starts or ends. No allocations per frame.
  */
 
 import type { AssetRegistry } from '../assets/registry';
@@ -21,9 +22,18 @@ interface Bubble {
   /** Visual body (animated independently of the position). */
   body: HTMLDivElement;
   icon: HTMLSpanElement;
-  /** Current icon key, to avoid redundant DOM writes. */
+  /** The spoken line's text. */
+  text: HTMLSpanElement;
+  /** Current icon key and text, to avoid redundant DOM writes. */
   key: string;
+  shown: string;
   visible: boolean;
+}
+
+/** A line being said: its text, until when (ms, performance clock). */
+interface Said {
+  text: string;
+  until: number;
 }
 
 export class BubbleLayer {
@@ -31,6 +41,8 @@ export class BubbleLayer {
   private readonly bubbles: Bubble[] = [];
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
+  /** Lines being said, by resident id. */
+  private readonly said = new Map<number, Said>();
 
   constructor(
     container: HTMLElement,
@@ -43,25 +55,40 @@ export class BubbleLayer {
     container.appendChild(this.root);
   }
 
+  /** Shows `text` in resident `id`'s bubble for `ms`. */
+  say(id: number, text: string, ms: number): void {
+    this.said.set(id, { text, until: performance.now() + ms });
+  }
+
   update(frame: FrameState): void {
     const { curr, layout } = frame;
     const k = layout.sim;
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    const now = performance.now();
+    for (const [id, s] of this.said) if (s.until < now) this.said.delete(id);
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
       const social = curr[o + k.social];
       const thought = social > 0 || k.thought === undefined ? 0 : curr[o + k.thought];
+      const text = this.said.size ? (this.said.get(curr[o + k.id])?.text ?? '') : '';
       const key =
         social > 0
           ? this.iconFor(social - 1, curr[o + k.role], curr[o + k.outcome])
           : thought > 0
             ? this.thoughtIcon(thought, curr[o + (k.thoughtSubject ?? 0)])
             : '';
-      const bubble = key ? this.bubble(i) : this.bubbles[i];
+      const bubble = key || text ? this.bubble(i) : this.bubbles[i];
       if (!bubble) continue;
-      if (!key || !this.renderer.simHead(i, this.head) || !this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) {
+      if ((!key && !text) || !this.renderer.simHead(i, this.head) || !this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) {
         this.hide(bubble);
         continue;
+      }
+      if (bubble.shown !== text) {
+        bubble.shown = text;
+        bubble.text.textContent = text;
+        bubble.body.classList.toggle('has-text', !!text);
+        bubble.icon.style.display = key ? '' : 'none';
+        if (!key) bubble.body.dataset.tone = 'topic';
       }
       if (bubble.key !== key) {
         bubble.key = key;
@@ -132,10 +159,12 @@ export class BubbleLayer {
       body.className = 'bubble-body';
       const icon = document.createElement('span');
       icon.className = 'bubble-icon';
-      body.appendChild(icon);
+      const text = document.createElement('span');
+      text.className = 'bubble-text';
+      body.append(icon, text);
       el.appendChild(body);
       this.root.appendChild(el);
-      b = this.bubbles[i] = { el, body, icon, key: '', visible: false };
+      b = this.bubbles[i] = { el, body, icon, text, key: '', shown: '', visible: false };
     }
     return b;
   }
@@ -144,6 +173,10 @@ export class BubbleLayer {
     if (!b.visible) return;
     b.visible = false;
     b.key = '';
+    b.shown = '';
+    b.text.textContent = '';
+    b.body.classList.remove('has-text');
+    b.icon.style.display = '';
     b.el.style.display = 'none';
   }
 }

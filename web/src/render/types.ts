@@ -64,6 +64,8 @@ export interface LiveRenderOptions {
   /** Fraction of native resolution, 0.5..1. */
   resolutionScale: number;
   cameraSensitivity: number;
+  /** Frames per second at most; 0: as many as the display shows. */
+  fpsCap: number;
 }
 
 /** Translucent preview of an object being placed in buy mode. */

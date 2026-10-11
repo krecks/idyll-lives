@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Idyll Lives</title>
     <link rel="icon" href="data:," />
+    <script>
+      // Cross-origin isolation where the host doesn't send the headers (GitHub Pages): a service
+      // worker adds them (public/isolation-sw.js), and the page loads once more under it. Once
+      // only: if the browser still won't isolate it (private windows), the game runs without.
+      if (!self.crossOriginIsolated && self.isSecureContext && 'serviceWorker' in navigator) {
+        const again = 'littlelives.isolationReload';
+        navigator.serviceWorker.register(new URL('isolation-sw.js', document.baseURI)).then(
+          (registration) => {
+            if (navigator.serviceWorker.controller) return;
+            const reload = () => {
+              if (sessionStorage.getItem(again)) return;
+              sessionStorage.setItem(again, '1');
+              location.reload();
+            };
+            if (registration.active) reload();
+            else navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+          },
+          (err) => console.warn('[isolation] service worker not registered', err),
+        );
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

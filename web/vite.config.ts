@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 
-// SharedArrayBuffer (zero-copy sim -> render snapshots) requires cross-origin isolation.
-// Production hosting must send the same two headers.
+// SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
+// CPU) requires cross-origin isolation. Where production hosting can't send these two headers
+// (GitHub Pages), a service worker adds them (public/isolation-sw.js, registered by index.html).
 const crossOriginIsolation = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -104,9 +105,9 @@ export default defineConfig({
   server: { headers: crossOriginIsolation },
   preview: { headers: crossOriginIsolation },
   worker: { format: 'es' },
-  // The voice worker's ONNX Runtime: Vite's start-up scan doesn't reach worker imports, so it would
-  // find it only when the first line is spoken, re-bundle and reload the page.
-  optimizeDeps: { include: ['onnxruntime-web/wasm'] },
+  // The voice and language model workers' imports: Vite's start-up scan doesn't reach worker
+  // imports, so it would find them only when the first line is spoken, re-bundle and reload the page.
+  optimizeDeps: { include: ['onnxruntime-web/wasm', 'onnxruntime-web/webgpu', '@huggingface/tokenizers'] },
   // The main chunk is about 1.7 MB (Babylon by module, see render/babylon/core.ts): warn if it grows.
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
 });

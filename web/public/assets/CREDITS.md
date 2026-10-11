@@ -84,6 +84,18 @@ The phonemizer in `crates/voice/src/g2p.rs` ports the English rules of Misaki (A
 
 The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebAssembly build `ort-wasm-simd-threaded.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
 
+## Language models for residents' lines
+
+Optional (Settings → Audio → What residents say → Language model), downloaded by the player's browser only when chosen, each as its 4-bit ONNX build, unchanged. The default is fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git); the others download from Hugging Face at a pinned revision, checked by SHA-256. Models a player adds from Hugging Face keep their own licences.
+
+| Model | Files | By | Source | Licence |
+|---|---|---|---|---|
+| LFM2.5-350M (default) | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_data`, `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 |
+| SmolLM2-360M-Instruct | `onnx/model_q4.onnx`, tokenizer (revision `a10cc151`), from Hugging Face | Hugging Face | https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct | Apache-2.0 |
+| Gemma 3 270M (instruction-tuned) | `onnx/model_q4.onnx`, `model_q4.onnx_data`, tokenizer (revision `2dbbfdb1`), from Hugging Face | Google (model), onnx-community (export) | https://huggingface.co/onnx-community/gemma-3-270m-it-ONNX | Gemma Terms of Use |
+
+The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. On the GPU the model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
+
 ## Decoders (`../decoders/`, refreshed by `tools/assets/decoders.mjs`)
 
 Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes them with these files, served from its own folder instead of Babylon's CDN:
