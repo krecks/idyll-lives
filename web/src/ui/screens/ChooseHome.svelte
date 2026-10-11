@@ -55,7 +55,7 @@
   const labels = $derived<LotLabel[]>(
     town.slots.map((s) => {
       const h = town.households.find((x) => x.slot === s.index);
-      if (s.kind === 'park') return { plot: s.index, title: s.name, kind: 'park' };
+      if (s.kind !== 'house') return { plot: s.index, title: s.name, kind: 'park' };
       if (h) return { plot: s.index, title: `The ${h.household.name}s`, kind: 'home' };
       if (selected?.index === s.index) return { plot: s.index, title: mine, sub: lot === 'empty' ? 'An empty lot' : 'Your new home', kind: 'mine' };
       return { plot: s.index, title: 'For sale', sub: bedrooms(s), kind: 'sale' };

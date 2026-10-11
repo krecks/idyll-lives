@@ -143,6 +143,8 @@
       "id": "couchPotato.snackFridge",
       "name": "Sofa-side snack fridge",
       "model": "model.couchPotato.snackFridge",
+      "stations": ["ingredients"],
+      "stores": true,
       "footprint": [1, 1],
       "price": 260,
       "category": "kitchen",

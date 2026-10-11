@@ -1,6 +1,6 @@
 /**
  * Household-creator reactions: short performances on the stage, built from the game's own clips and
- * facial expressions plus one procedural gesture (a wave; the clip set has none).
+ * facial expressions, with a head tilt or a slump on top for some.
  */
 
 import { EXPRESSIONS, type Face } from '../babylon/characters';
@@ -13,7 +13,7 @@ export interface Performance {
   /** Seconds a looping clip (or a clip-less reaction) lasts; one-shots last their clip. */
   seconds?: number;
   face?: Partial<Face>;
-  /** Waves the right hand. */
+  /** A wave at the viewer (the `wave` clip): the Sim turns to the front for it. */
   wave?: boolean;
   /** Eyes on the camera (default true). */
   eyeContact?: boolean;
@@ -37,10 +37,10 @@ const TRAITS: Record<string, Performance> = {
   slob: { clip: 'pickUp', face: { ...EXPRESSIONS.playful, lidU: 0.25 }, hands: 0.3 },
   energetic: { clip: 'jog', seconds: 1.8, face: EXPRESSIONS.energized, hands: 0.1 },
   lazy: { clip: 'foldArms', seconds: 2.2, face: { jaw: 0.55, lidU: 0.55, browUp: 0.3, smile: 0 }, eyeContact: false },
-  cheerful: { wave: true, face: GRIN },
+  cheerful: { clip: 'wave', wave: true, face: GRIN },
   gloomy: { seconds: 2.6, face: EXPRESSIONS.sad, eyeContact: false, slump: 1 },
   natureLover: { clip: 'water', seconds: 2.6, face: EXPRESSIONS.relaxed, eyeContact: false, hands: 0.35 },
-  outgoing: { wave: true, face: EXPRESSIONS.playful },
+  outgoing: { clip: 'wave', wave: true, face: EXPRESSIONS.playful },
   loner: { seconds: 2.4, face: EXPRESSIONS.embarrassed, eyeContact: false, slump: 0.6, tilt: -0.08 },
   romantic: { seconds: 2.4, face: EXPRESSIONS.flirty, tilt: 0.16 },
   hotHeaded: { clip: 'punchJab', face: EXPRESSIONS.angry, hands: 0.1 },
@@ -51,35 +51,14 @@ const FRIENDLY: Performance = { clip: 'yes', face: SMILE };
 export function reactionFor(reaction: StageReaction): Performance {
   switch (reaction) {
     case 'hello':
-      return { wave: true, face: SMILE };
+      return { clip: 'wave', wave: true, face: SMILE };
     case 'cheer':
-      return { wave: true, face: GRIN };
+      return { clip: 'wave', wave: true, face: GRIN };
     case 'admire':
       return { seconds: 1.4, face: { ...SMILE, browUp: 0.35 } };
     default:
       return TRAITS[reaction.slice('trait:'.length)] ?? FRIENDLY;
   }
-}
-
-/** Duration of the wave gesture (s). */
-export const WAVE_SECONDS = 2.1;
-
-/**
- * Right-hand wave at `t` seconds into the gesture: the arm rises to the side, the forearm swings
- * a few times, the arm comes down again. Model-space rotations on top of the idle clip.
- */
-export function wave(add: Additive, bone: Record<string, number>, t: number): void {
-  const up = smoothstep(0, 0.35, t) * (1 - smoothstep(WAVE_SECONDS - 0.45, WAVE_SECONDS, t));
-  if (up <= 0) return;
-  const swing = Math.sin((t - 0.3) * 10.5) * 0.32 * smoothstep(0.25, 0.45, t);
-  addRotation(add, bone.clavicle_r, 0, 0, 1, 0.22 * up);
-  addRotation(add, bone.upperarm_r, 0, 0, 1, 1.3 * up);
-  addRotation(add, bone.upperarm_r, 0, 1, 0, -0.4 * up);
-  addRotation(add, bone.lowerarm_r, 0, 0, 1, (1.55 + swing) * up);
-  addRotation(add, bone.hand_r, 0, 0, 1, 0.15 * up);
-  // A little lean into it.
-  addRotation(add, bone.spine_03, 0, 0, 1, -0.05 * up);
-  addRotation(add, bone.Head, 0, 0, 1, 0.06 * up);
 }
 
 /** Head tilt (radians, eased in and out over `seconds`). */

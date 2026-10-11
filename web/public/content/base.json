@@ -2063,13 +2063,22 @@
     "write",
     "listen",
     "meditate",
-    "knock"
+    "knock",
+    "fetch",
+    "chop",
+    "stir",
+    "flip",
+    "serve"
   ],
   "objects": [
     {
       "id": "fridge",
       "name": "Fridge",
       "model": "model.fridge",
+      "stations": [
+        "ingredients"
+      ],
+      "stores": true,
       "footprint": [
         1,
         1
@@ -2090,10 +2099,9 @@
         {
           "id": "meal",
           "label": "Make a meal",
+          "recipe": "meal",
           "anim": "cook",
-          "minutes": 40,
           "effects": {
-            "hunger": 0.85,
             "fun": 0.05
           },
           "tags": [
@@ -2107,11 +2115,10 @@
         {
           "id": "gourmet",
           "label": "Cook a gourmet meal",
+          "recipe": "gourmet",
           "anim": "cook",
-          "minutes": 75,
           "effects": {
-            "hunger": 0.95,
-            "fun": 0.15
+            "fun": 0.1
           },
           "tags": [
             "food",
@@ -2132,6 +2139,9 @@
       "id": "sink",
       "name": "Sink",
       "model": "model.sink",
+      "stations": [
+        "dishes"
+      ],
       "footprint": [
         1,
         1
@@ -2711,6 +2721,18 @@
       "price": 1100,
       "category": "office",
       "description": "Builds Technology, Writing and Business.",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          1.54,
+          0.38
+        ],
+        "at": [
+          0,
+          0.26
+        ]
+      },
       "interactions": [
         {
           "id": "code",
@@ -2976,6 +2998,18 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "surface": {
+        "height": 0.765,
+        "kind": "table",
+        "size": [
+          1.62,
+          0.38
+        ],
+        "at": [
+          0,
+          0.26
+        ]
+      },
       "interactions": [
         {
           "id": "coffee",
@@ -3156,7 +3190,7 @@
     "wakeBeforeWorkMinutes": 75
   },
   "objectRules": {
-    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids"],
+    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
     "maxQuality": 3,
@@ -3338,7 +3372,9 @@
       "groups": [
         {"id": "appliances", "label": "Appliances"},
         {"id": "counters", "label": "Counters & storage"},
-        {"id": "dining", "label": "Dining"}
+        {"id": "islands", "label": "Islands & bars"},
+        {"id": "dining", "label": "Dining"},
+        {"id": "cabinets", "label": "Sideboards & cabinets"}
       ]
     },
     {
@@ -3358,6 +3394,7 @@
       "icon": "icon.category.bedroom",
       "groups": [
         {"id": "beds", "label": "Beds"},
+        {"id": "nightstands", "label": "Nightstands"},
         {"id": "storage", "label": "Storage"},
         {"id": "dressing", "label": "Dressing"}
       ]
@@ -3373,6 +3410,7 @@
       "icon": "icon.category.living",
       "groups": [
         {"id": "seating", "label": "Seating"},
+        {"id": "sectionals", "label": "Sectionals"},
         {"id": "tables", "label": "Tables"},
         {"id": "media", "label": "TV & music"},
         {"id": "shelves", "label": "Shelves"}
@@ -3381,7 +3419,11 @@
     {
       "id": "office",
       "label": "Office",
-      "icon": "icon.category.office"
+      "icon": "icon.category.office",
+      "groups": [
+        {"id": "desks", "label": "Desks"},
+        {"id": "chairs", "label": "Chairs"}
+      ]
     },
     {
       "id": "fitness",
@@ -3409,6 +3451,21 @@
       ]
     },
     {
+      "id": "tabletop",
+      "label": "Tabletop",
+      "icon": "icon.category.tabletop",
+      "groups": [
+        {"id": "kitchenware", "label": "Kitchenware"},
+        {"id": "tableware", "label": "Tableware"},
+        {"id": "books", "label": "Books"},
+        {"id": "plants", "label": "Small plants"},
+        {"id": "ornaments", "label": "Ornaments"},
+        {"id": "bath", "label": "Bath & dressing"},
+        {"id": "desk", "label": "Desk"},
+        {"id": "toys", "label": "Toys"}
+      ]
+    },
+    {
       "id": "lighting",
       "label": "Lighting",
       "icon": "icon.category.lighting",
@@ -3428,7 +3485,597 @@
         {"id": "cooking", "label": "Grills & fire", "outside": true},
         {"id": "play", "label": "Play", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
-        {"id": "decor", "label": "Garden decor", "outside": true}
+        {"id": "decor", "label": "Garden decor", "outside": true},
+        {"id": "yard", "label": "Sheds & garden work", "outside": true}
+      ]
+    },
+    {
+      "id": "community",
+      "label": "Community",
+      "icon": "icon.category.community", "outside": true,
+      "groups": [
+        {"id": "play", "label": "Playground", "outside": true},
+        {"id": "street", "label": "Street & square", "outside": true},
+        {"id": "food", "label": "Carts & machines", "outside": true},
+        {"id": "shops", "label": "Shop & café", "outside": false}
+      ]
+    }
+  ],
+  "cooking": {
+    "$comment": "Cooking that makes food (see docs/content-packs.md, 'Cooking'). Objects say which stations they are (`stations`); recipe steps happen at one of their `at` stations.",
+    "stations": [
+      "ingredients",
+      "prep",
+      "stove",
+      "oven",
+      "grill",
+      "microwave",
+      "dishes",
+      "bin"
+    ],
+    "spoilHours": 8,
+    "storedSpoilHours": 72,
+    "eatMinutes": 25,
+    "dishesMinutes": 5,
+    "carryDishes": 3,
+    "leftoverPreference": 1.5,
+    "feedFamily": 0.15,
+    "hungryBelow": 0.5,
+    "invitedBoost": 2.5,
+    "inviteMinutes": 60,
+    "stationWaitMinutes": 10,
+    "dirtyDirtPerHour": 0.02,
+    "skipPenalty": 0.12,
+    "seatTags": [
+      "lounge",
+      "food"
+    ],
+    "seatAvoid": [
+      "spa",
+      "hygiene",
+      "bathroom"
+    ],
+    "defaultSurfaceHeight": 0.9,
+    "serveRange": 6,
+    "eatLabel": "Eat",
+    "eatTags": [
+      "food"
+    ],
+    "eatAnim": "eat",
+    "dishesLabel": "Wash the dishes",
+    "dishesTags": [
+      "chores",
+      "cleaning"
+    ],
+    "dishesAnim": "wash",
+    "dishesInterest": 0.6
+  },
+  "items": [
+    {
+      "id": "ingredients",
+      "label": "Ingredients",
+      "model": "item.ingredients",
+      "hold": "both",
+      "radius": 0.15
+    },
+    {
+      "id": "prepBowl",
+      "label": "Prepped bowl",
+      "model": "item.prepBowl",
+      "hold": "both",
+      "radius": 0.14
+    },
+    {
+      "id": "mealPot",
+      "label": "Home-cooked meal",
+      "model": "item.mealPot",
+      "hold": "both",
+      "serving": "mealPlate",
+      "emptyAs": "potDirty",
+      "radius": 0.16
+    },
+    {
+      "id": "tastingBoard",
+      "label": "Tasting menu",
+      "model": "item.tastingBoard",
+      "hold": "both",
+      "serving": "mealPlate",
+      "emptyAs": "platterDirty",
+      "radius": 0.2
+    },
+    {
+      "id": "grillPlatter",
+      "label": "Barbecue",
+      "model": "item.grillPlatter",
+      "hold": "both",
+      "serving": "mealPlate",
+      "emptyAs": "platterDirty",
+      "radius": 0.2
+    },
+    {
+      "id": "pizza",
+      "label": "Wood-fired pizza",
+      "model": "item.pizza",
+      "hold": "both",
+      "serving": "pizzaSlice",
+      "emptyAs": "platterDirty",
+      "radius": 0.2
+    },
+    {
+      "id": "bakingTray",
+      "label": "Baked treats",
+      "model": "item.bakingTray",
+      "hold": "both",
+      "serving": "treatPlate",
+      "emptyAs": "trayDirty",
+      "radius": 0.2
+    },
+    {
+      "id": "pieDish",
+      "label": "Family pie",
+      "model": "item.pieDish",
+      "hold": "both",
+      "serving": "pieSlice",
+      "emptyAs": "trayDirty",
+      "radius": 0.16
+    },
+    {
+      "id": "mealPlate",
+      "label": "Plate of food",
+      "model": "item.mealPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "pizzaSlice",
+      "label": "Slice of pizza",
+      "model": "item.pizzaSlice",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "treatPlate",
+      "label": "Plate of treats",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "pieSlice",
+      "label": "Slice of pie",
+      "model": "item.pieSlice",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "sandwich",
+      "label": "Sandwich",
+      "model": "item.sandwich",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "plateDirty",
+      "label": "Dirty plate",
+      "model": "item.plateDirty",
+      "hold": "hand",
+      "dirty": true,
+      "radius": 0.13
+    },
+    {
+      "id": "potDirty",
+      "label": "Dirty pot",
+      "model": "item.potDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.16
+    },
+    {
+      "id": "platterDirty",
+      "label": "Dirty platter",
+      "model": "item.platterDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    },
+    {
+      "id": "trayDirty",
+      "label": "Dirty baking tray",
+      "model": "item.trayDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    }
+  ],
+  "recipes": [
+    {
+      "id": "meal",
+      "label": "Make a meal",
+      "item": "mealPot",
+      "servings": [
+        1,
+        4
+      ],
+      "costPerServing": 3,
+      "effects": {
+        "hunger": 1.0
+      },
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 10,
+          "anim": "chop",
+          "optional": true,
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Cook",
+          "at": [
+            "stove",
+            "oven",
+            "microwave"
+          ],
+          "minutes": 20,
+          "anim": "stir",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "gourmet",
+      "label": "Cook a gourmet meal",
+      "item": "mealPot",
+      "servings": [
+        2,
+        4
+      ],
+      "costPerServing": 6,
+      "effects": {
+        "hunger": 1.0,
+        "fun": 0.05
+      },
+      "eatFeeling": "home.homeCooked",
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 20,
+          "anim": "chop",
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Cook",
+          "at": [
+            "stove"
+          ],
+          "minutes": 45,
+          "anim": "stir"
+        }
+      ]
+    },
+    {
+      "id": "tastingMenu",
+      "label": "Cook a tasting menu",
+      "item": "tastingBoard",
+      "servings": [
+        2,
+        4
+      ],
+      "costPerServing": 10,
+      "effects": {
+        "hunger": 0.95,
+        "fun": 0.15,
+        "comfort": 0.05
+      },
+      "eatFeeling": "home.homeCooked",
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 30,
+          "anim": "chop",
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Cook",
+          "at": [
+            "stove"
+          ],
+          "minutes": 45,
+          "anim": "stir"
+        }
+      ]
+    },
+    {
+      "id": "bbq",
+      "label": "Grill dinner",
+      "item": "grillPlatter",
+      "servings": [
+        1,
+        4
+      ],
+      "costPerServing": 4,
+      "outdoor": true,
+      "effects": {
+        "hunger": 0.85,
+        "fun": 0.05
+      },
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 10,
+          "anim": "chop",
+          "optional": true,
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Grill",
+          "at": [
+            "grill"
+          ],
+          "minutes": 25,
+          "anim": "flip"
+        }
+      ]
+    },
+    {
+      "id": "bbqFeast",
+      "label": "Grill a barbecue feast",
+      "item": "grillPlatter",
+      "servings": [
+        2,
+        6
+      ],
+      "costPerServing": 7,
+      "outdoor": true,
+      "effects": {
+        "hunger": 1.0,
+        "fun": 0.1
+      },
+      "eatFeeling": "home.homeCooked",
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 20,
+          "anim": "chop",
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Grill",
+          "at": [
+            "grill"
+          ],
+          "minutes": 50,
+          "anim": "flip"
+        }
+      ]
+    },
+    {
+      "id": "pizza",
+      "label": "Bake a wood-fired pizza",
+      "item": "pizza",
+      "servings": [
+        2,
+        4
+      ],
+      "costPerServing": 4,
+      "outdoor": true,
+      "effects": {
+        "hunger": 0.85,
+        "fun": 0.1
+      },
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Prep",
+          "at": [
+            "prep"
+          ],
+          "minutes": 15,
+          "anim": "chop",
+          "optional": true,
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Bake",
+          "at": [
+            "oven"
+          ],
+          "minutes": 25,
+          "anim": "stir"
+        }
+      ]
+    },
+    {
+      "id": "bakedTreats",
+      "label": "Bake treats",
+      "item": "bakingTray",
+      "servings": [
+        2,
+        6
+      ],
+      "costPerServing": 2,
+      "effects": {
+        "hunger": 0.35,
+        "fun": 0.15
+      },
+      "eatMinutes": 15,
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Mix",
+          "at": [
+            "prep"
+          ],
+          "minutes": 15,
+          "anim": "chop",
+          "optional": true,
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Bake",
+          "at": [
+            "oven"
+          ],
+          "minutes": 35,
+          "anim": "stir"
+        }
+      ]
+    },
+    {
+      "id": "pie",
+      "label": "Bake a family pie",
+      "item": "pieDish",
+      "servings": [
+        2,
+        6
+      ],
+      "costPerServing": 3,
+      "effects": {
+        "hunger": 0.75,
+        "fun": 0.05
+      },
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 5,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Roll the pastry",
+          "at": [
+            "prep"
+          ],
+          "minutes": 15,
+          "anim": "chop",
+          "optional": true,
+          "holds": "prepBowl"
+        },
+        {
+          "label": "Bake",
+          "at": [
+            "oven"
+          ],
+          "minutes": 30,
+          "anim": "stir"
+        }
+      ]
+    },
+    {
+      "id": "sandwich",
+      "label": "Make a sandwich",
+      "item": "sandwich",
+      "servings": [
+        1,
+        1
+      ],
+      "costPerServing": 1,
+      "eatNow": true,
+      "eatMinutes": 10,
+      "effects": {
+        "hunger": 0.4
+      },
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 3,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Make it",
+          "at": [
+            "prep"
+          ],
+          "minutes": 7,
+          "anim": "chop"
+        }
       ]
     }
   ],
@@ -3436,6 +4083,18 @@
     "careers.json",
     "garden.json",
     "furniture.json",
+    "community.json",
+    "catalog2/kitchen.json",
+    "catalog2/dining.json",
+    "catalog2/living.json",
+    "catalog2/bedroom.json",
+    "catalog2/bath.json",
+    "catalog2/kids.json",
+    "catalog2/office.json",
+    "catalog2/hobbies.json",
+    "catalog2/tabletop.json",
+    "catalog2/lighting.json",
+    "catalog2/outdoor.json",
     "packs/example.json",
     "packs/foodie.json",
     "packs/bookworm.json",

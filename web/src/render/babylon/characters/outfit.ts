@@ -1,12 +1,13 @@
 /**
- * Turns a Sim's appearance (creator colours, hairstyle, gender) into its outfit: which garment
- * meshes it wears (`top.*`, `bottom.*`, `shoes.*` parts: MakeHuman's clothes, see
- * tools/characters/clothes.py) and the per-Sim shader parameters (skin tint, top and bottom colours,
- * the coverage cuts that hide skin under the clothes, hair colour). The top follows the creator's
- * outfit colour; shoes keep their own. Garments and colours chosen in the household creator
- * (`appearance.top`, `bottom`, `shoes`, `bottomColor`) are worn as chosen; whatever is missing
- * (Sims from older saves) is picked deterministically from the Sim's id, so a Sim always wears the
- * same clothes. Pyjamas recolour the same garments.
+ * Turns a Sim's appearance (creator colours, hairstyle, gender) into its outfit: which garments it
+ * wears (ids from the body's `garments`; the shell parts `top.*`, `bottom.*`, `shoes.*` of those
+ * that have one, see tools/characters/prim/clothes.py) and the per-Sim shader parameters (skin
+ * colour, top, bottom and shoe colours, the cuts that paint the clothes on the body, hair colour).
+ * The top follows the creator's outfit colour; shoes keep their own unless one is chosen. Garments
+ * and colours chosen in the household creator (`appearance.top`, `bottom`, `shoes`, `bottomColor`,
+ * `shoesColor`) are worn as chosen; whatever is missing (Sims from older saves) is picked
+ * deterministically from the Sim's id, so a Sim always wears the same clothes. Pyjamas recolour
+ * the same garments.
  */
 
 import type { Appearance } from '../../../game/household';
@@ -48,14 +49,20 @@ function pickShoes(top: string, bottom: string, r: number): string {
 }
 
 export interface OutfitParams {
-  /** Garment parts worn (mesh part names; empty = none). */
+  /** Garments worn (ids; those with a shell are also mesh part names; empty = none). */
   parts: string[];
   /** Skin colour (linear rgb). */
   skin: [number, number, number];
-  /** The body texture's own median skin colour (linear rgb); the shader tints relative to it. */
+  /** The body's skin reference colour (linear rgb, 1); the shader tints relative to it. */
   skinRef: [number, number, number];
   top: [number, number, number];
   bottom: [number, number, number];
+  /** Shoe colour (linear rgb: the creator's, else the shoe's own). */
+  shoe: [number, number, number];
+  /** 1 if the top is painted over the bottom (its hem below the waistband), else 0. */
+  over: number;
+  /** Age (0 young .. 1 elder): the shader deepens the skin's cavities with it. */
+  age: number;
   hair: [number, number, number];
   /** Iris colour (linear rgb). */
   eyes: [number, number, number];
@@ -88,8 +95,20 @@ function luminance(c: readonly number[]): number {
 /** Eye colours for looks without one (older saves): the creator's `palette.eyes`, mostly brown. */
 export const EYE_COLOURS = ['#4A2E1B', '#6B4226', '#6B4226', '#8A6237', '#5F7A3E', '#4E7BA6', '#7C8A96'];
 
-/** Share of each (linear) swatch channel real skin reflects. */
+/** Share of each (linear) swatch channel real skin reflects (light swatches; see `skinColour`). */
 const SKIN_REFLECT = [0.68, 0.6, 0.56];
+
+/**
+ * A creator skin swatch as the skin's albedo (linear). Swatches are bright UI colours; real skin
+ * reflects less, and less blue and green than red (blood under the skin), so light swatches read
+ * as warm skin rather than chalk. Deep swatches keep more of their own value, so their faces keep
+ * the shading, lips and cavities that shape them.
+ */
+function skinColour(hex: string | undefined): [number, number, number] {
+  const c = hexToLinear(hex, '#D9A882');
+  const keep = 1 - Math.min(1, Math.max(0, (luminance(c) - 0.03) / 0.12));
+  return c.map((v, k) => v * (SKIN_REFLECT[k] + (1 - SKIN_REFLECT[k]) * keep * keep)) as [number, number, number];
+}
 
 const OFF = -10;
 
@@ -97,15 +116,11 @@ const OFF = -10;
 export function outfitFor(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep = false): OutfitParams {
   const r = (k: number) => hash(id * 31 + k);
   const has = (p: string) => p in body.garments;
-  // Creator swatches are bright UI colours; real skin reflects less, and less blue and green than
-  // red (blood under the skin), so light swatches read as warm skin rather than chalk.
-  const skin = hexToLinear(appearance?.skin, '#D9A882').map((v, k) => v * SKIN_REFLECT[k]) as [number, number, number];
+  const skin = skinColour(appearance?.skin);
   const skinRef = [body.skinRef[0], body.skinRef[1], body.skinRef[2]] as [number, number, number];
   // Fabric: the creator colour, a little less saturated-bright than the UI swatch.
   let top = hexToLinear(appearance?.body, '#8FA89A').map((v) => v * 0.9) as [number, number, number];
   const hair = hexToLinear(appearance?.hair, '#5A3B2A');
-  // Hair texture is normalised to ~0.5 linear; scale so the result matches the chosen colour.
-  const hairMult = hair.map((v) => Math.min(2, v * 2)) as [number, number, number];
 
   // Creator choices (when the body has them), else picks from the id.
   const chosen = (part: string | undefined, prefix: string) => (part && part.startsWith(prefix) && has(part) ? part : null);
@@ -146,7 +161,10 @@ export function outfitFor(id: number, gender: string, appearance: Appearance | n
     skinRef,
     top,
     bottom,
-    hair: hairMult,
+    shoe: hexToLinear(isHex(appearance?.shoesColor) ? appearance!.shoesColor : s.colour, '#3A3330'),
+    over: t.over ? 1 : 0,
+    age: appearance?.stage === 'elder' ? 1 : appearance?.stage === 'adult' ? 0.4 : 0,
+    hair,
     eyes: hexToLinear(appearance?.eyes ?? EYE_COLOURS[Math.floor(r(9) * EYE_COLOURS.length)], '#6B4226'),
     scalp: appearance?.hairStyle === 'none' ? 0 : 1,
     cuts,
@@ -160,8 +178,8 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.top[0], o.top[1], o.top[2], c[1]], offset + 4);
   row.set([o.bottom[0], o.bottom[1], o.bottom[2], c[2]], offset + 8);
   row.set([o.hair[0], o.hair[1], o.hair[2], c[3]], offset + 12);
-  row.set([0, 0, 0, c[4]], offset + 16);
+  row.set([o.over, o.age, 0, c[4]], offset + 16);
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
-  row.set([0, 0, 0, c[6]], offset + 24);
+  row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);
 }

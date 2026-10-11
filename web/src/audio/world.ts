@@ -19,11 +19,15 @@ const TICK_MS = 100;
 /** Seconds for a loop to fade in or out. */
 const FADE = 0.4;
 
-type LoopKind = 'sizzle' | 'water' | 'tv' | 'music';
+type LoopKind = 'sizzle' | 'chop' | 'water' | 'tv' | 'music';
 
 /** What each action sounds like (content animation tags; unknown tags are silent). */
 const ACTION_SOUNDS: Record<string, LoopKind> = {
   cook: 'sizzle',
+  // The cooking steps (content `recipes`): a knife on a board, a pan, the grill.
+  chop: 'chop',
+  stir: 'sizzle',
+  flip: 'sizzle',
   shower: 'water',
   bath: 'water',
   wash: 'water',
@@ -42,6 +46,7 @@ interface LoopDef {
 
 const LOOPS: Record<LoopKind, LoopDef> = {
   sizzle: { make: sizzleBuffer, filter: { type: 'highpass', frequency: 1800, q: 0.5 }, level: 0.22 },
+  chop: { make: chopBuffer, filter: { type: 'bandpass', frequency: 1400, q: 0.8 }, level: 0.3 },
   water: { make: waterBuffer, filter: { type: 'bandpass', frequency: 1800, q: 0.45 }, level: 0.3 },
   tv: { make: murmurBuffer, filter: { type: 'bandpass', frequency: 700, q: 1.1 }, level: 0.35 },
   music: { make: musicBuffer, filter: { type: 'lowpass', frequency: 2600, q: 0.7 }, level: 0.16 },
@@ -656,6 +661,29 @@ function sizzleBuffer(ac: AudioContext): AudioBuffer {
       }
       const crackle = pop > 0 ? (r() * 2 - 1) * popLevel * (pop-- / (0.008 * rate)) : 0;
       d[i] = (r() * 2 - 1) * 0.18 + crackle;
+    }
+  });
+}
+
+/** A knife on a chopping board: short woody knocks in uneven runs. */
+function chopBuffer(ac: AudioContext): AudioBuffer {
+  const r = random(9);
+  return buffer(ac, 3, (d, rate) => {
+    let i = 0;
+    while (i < d.length) {
+      // A run of quick chops, then a pause to move the food along.
+      const chops = 3 + Math.floor(r() * 6);
+      for (let c = 0; c < chops && i < d.length; c++) {
+        const len = Math.round(0.035 * rate);
+        const level = 0.6 + r() * 0.4;
+        const tone = 900 + r() * 500;
+        for (let j = 0; j < len && i + j < d.length; j++) {
+          const decay = Math.exp((-j / rate) * 90);
+          d[i + j] = ((r() * 2 - 1) * 0.5 + Math.sin((2 * Math.PI * tone * j) / rate)) * level * decay;
+        }
+        i += Math.round((0.16 + r() * 0.08) * rate);
+      }
+      i += Math.round((0.4 + r() * 0.6) * rate);
     }
   });
 }

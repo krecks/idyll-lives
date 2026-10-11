@@ -1,6 +1,6 @@
 /**
- * Faces as morph weights (ARKit face units and Meta visemes from MakeHuman, see
- * tools/characters/build_mpfb.py).
+ * Faces as morph weights: ARKit face units and the voice engine's visemes, authored as shapes of
+ * the residents' generated faces (lids, brows, lips, teeth, tongue; tools/characters/prim/face.py).
  *
  * An expression is a mood (`MOODS`: whole-face recipes, one per emotion) plus a small `Face` of
  * adjustments (a resting smile, lids, gaze). Both mix into a target the face settles towards
@@ -61,7 +61,7 @@ export const FACE_KEYS = (Object.keys(NEUTRAL) as (keyof Face)[]).filter((k) => 
 /**
  * Whole-face moods as ARKit face-unit weights. Names without a side (`mouthSmile`) set both. Most
  * are adapted from the emoji expressions of TalkingHead by Mika Suominen (MIT,
- * https://github.com/met4citizen/TalkingHead), made for the same MakeHuman face units:
+ * https://github.com/met4citizen/TalkingHead), made for the same ARKit face units:
  * 😊 happy, 😄 playful, 😃 energized, 😀 inspired, 🥰 hug, 😳 embarrassed, 😔 sad, 😬 tense,
  * 😒 uncomfortable, 😠 angry, 😱 surprised, 😂 laugh, 😚 kiss, and its "love" and "disgust" moods
  * (flirty, disgusted). Its `mouthOpen` became `jawOpen`, its `eyesClosed` lid closing; head and eye
@@ -216,8 +216,8 @@ function hash01(n: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Share of a recipe's `eyeSquint` applied (see `FaceMixer.resolve`). */
-const SQUINT = 0.3;
+/** Share of a recipe's `eyeSquint` applied (see `FaceMixer.resolve`; the faces' units are at ARKit strength). */
+const SQUINT = 1;
 
 /** Visemes that close or nearly close the lips (kept at full strength in quiet speech). */
 const CLOSED_VISEMES = new Set([1, 2]);
@@ -292,10 +292,7 @@ export class FaceMixer {
     for (const [id, recipe] of Object.entries(MOODS)) this.moods.set(id, this.resolve(recipe));
   }
 
-  /**
-   * A recipe's names as channels; a name without a side applies to both. MakeHuman's `eyeSquint`
-   * closes the lids much further than ARKit's (where it only narrows them), so it is scaled down.
-   */
+  /** A recipe's names as channels; a name without a side applies to both; `eyeSquint` scaled by `SQUINT`. */
   private resolve(recipe: Record<string, number>): MoodEntry {
     const c: number[] = [];
     const v: number[] = [];

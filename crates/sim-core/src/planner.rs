@@ -462,6 +462,8 @@ pub enum ThoughtKind {
     Accident = 8,
     /// A baby crying for care (subject: the need that's lowest).
     Crying = 9,
+    /// Dinner's ready: someone at home cooked (subject: the recipe).
+    DinnerReady = 10,
 }
 
 /// A wish about the home itself (beyond somewhere for a planned activity).
@@ -833,6 +835,13 @@ fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &Block
         (TaskKind::Clean { .. }, Phase::Using { .. } | Phase::Routing { .. }) => {
             run.skill.is_none() && a.tags & content.room_rules.clean.tags != 0
         }
+        // Cooking is what the recipe's interaction is (all along, between stations too); eating
+        // and washing up are what their tags say.
+        (TaskKind::Cook { recipe, origin, .. }, _) => {
+            crate::cooking::origin_interaction(content, objects, origin, recipe).is_some_and(|inter| a.fits(inter, run.skill))
+        }
+        (TaskKind::Eat { .. }, _) => run.skill.is_none() && a.tags & content.cooking.eat_tags != 0,
+        (TaskKind::Dishes { .. }, _) => run.skill.is_none() && a.tags & content.cooking.dishes_tags != 0,
         _ => false,
     }
 }

@@ -8,7 +8,7 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        validate_parts, CHROME, BRASS, OAK, OAKD, WHITE, CREAM, HONEY)
 
 TRAIT = 'loner'

@@ -97,15 +97,49 @@ pub fn check(w: &World) {
     for o in &w.objects {
         for u in o.users() {
             let s = &w.sims[u as usize];
-            let ok = s.current().is_some_and(
-                |a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == o.id),
-            );
+            let ok = s.current().is_some_and(|a| match a.task.kind {
+                TaskKind::Use { object, .. } => object == o.id,
+                TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
+                TaskKind::Eat { seat, .. } => seat == Some(o.id),
+                _ => false,
+            });
             assert!(
                 ok,
                 "object {} is held by {} who isn't using it",
                 o.id, s.name
             );
         }
+    }
+    // Everything on a top stands on one, which comes before it in the list.
+    for o in &w.objects {
+        if w.content.objects[o.def].layer == sim_core::content::Layer::Surface {
+            let host = sim_core::surface::host_of(&w.content, &w.objects, o);
+            assert!(host.is_some_and(|h| h < o.id), "object {} stands on nothing before it ({host:?})", o.id);
+        }
+    }
+    // Only cooks, people eating and people washing up carry things (the rest put them down).
+    for s in &w.sims {
+        if s.held.is_some() {
+            let chain = |k: &TaskKind| matches!(k, TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. });
+            assert!(
+                match s.current() {
+                    Some(a) => chain(&a.task.kind),
+                    None => s.queue().next().is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
+                },
+                "{} carries something while doing something else",
+                s.name
+            );
+        }
+    }
+    // Items are in id order, belong to a household, and stand somewhere on the lot.
+    for pair in w.items.list.windows(2) {
+        assert!(pair[0].id < pair[1].id, "items out of order");
+    }
+    for it in &w.items.list {
+        assert!((it.household as usize) < w.households.len());
+        let (x, z) = it.at.tile();
+        assert!(w.lot.in_bounds(x, z), "item {} is off the lot", it.id);
+        assert!(it.id < w.items.next_id);
     }
     // Partners are mutual and one at a time.
     for a in 0..n {

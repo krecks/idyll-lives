@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+/// What a resident can do with an item (`Command::UseItem`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ItemAction {
+    Eat,
+    Clear,
+}
+
 /// Player commands. Serialized as `{"type": "...", ...}` from the UI.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -76,6 +84,13 @@ pub enum Command {
         object: u32,
         interaction: usize,
     },
+    /// Do something with food or a dish (an item, see `items.rs`): eat a serving, or clear it
+    /// away to the sink.
+    UseItem {
+        sim: u32,
+        item: u32,
+        action: ItemAction,
+    },
     MoveTo {
         sim: u32,
         x: f32,
@@ -122,6 +137,10 @@ pub enum Command {
         /// Degrees past the facing, for objects that turn freely (0..90).
         #[serde(default)]
         turn: Option<u8>,
+        /// Centimetres (x, z) off the middle of its footprint, for objects that turn freely
+        /// (up to `MAX_OFFSET` each way).
+        #[serde(default)]
+        offset: Option<[i8; 2]>,
     },
     /// Sell an object at home for part of what was paid.
     Sell {
@@ -138,6 +157,10 @@ pub enum Command {
         /// Degrees past the facing (objects that turn freely); absent keeps the angle it had.
         #[serde(default)]
         turn: Option<u8>,
+        /// Centimetres (x, z) off the middle of its footprint (objects that turn freely); absent
+        /// keeps the offset it had.
+        #[serde(default)]
+        offset: Option<[i8; 2]>,
     },
     /// Change how an object looks (free; effects stay the same).
     Restyle {

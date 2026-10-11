@@ -23,6 +23,12 @@
     return c && group ? `${c.label} · ${group}` : c?.label;
   });
   const collection = $derived(collectionOf(content, def));
+  /** The tops a seat tucks under, in words ("tables and desks"). */
+  const KIND_WORDS: Record<string, string> = { table: 'tables', bar: 'bars', counter: 'counters', desk: 'desks', low: 'low tables', shelf: 'shelves' };
+  function seatKinds(kinds: readonly string[]): string {
+    const words = kinds.map((k) => KIND_WORDS[k] ?? k);
+    return words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}` : words[0];
+  }
   const model = $derived(styledModel(content, services.assets, def, owned ? owned.style : game.householdStyle));
   const glyph = $derived(info.boosts[0]?.need.icon ?? 'icon.ui.buy');
   const residents = $derived(game.roster.filter((s) => game.households[s.household]?.player));
@@ -214,6 +220,9 @@
 
   {#if info.slots > 1}<p class="facts">Fits {info.slots} residents at once</p>{/if}
   {#if def.outdoors}<p class="facts">Goes outdoors</p>{/if}
+  {#if def.layer === 'surface'}<p class="facts">Goes on tables, counters, desks and shelves</p>{/if}
+  {#if def.surface}<p class="facts">Small things stand on its top</p>{/if}
+  {#if def.seatAt?.length}<p class="facts">Seat for {seatKinds(def.seatAt)}: pull it up to one</p>{/if}
 
 </div>
 

@@ -3,12 +3,12 @@
 import math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        OAK, OAKD, HONEY, WALNUT, BRASS, CHROME, TEAL, MUSTARD, SAGE, RUST, CREAM)
 from objects_extra import books  # noqa: E402
+from furniture_prims import tea_set, wing_chair, drawer_chest  # noqa: E402
 from pack_foodie import run  # noqa: E402
 
-LIB = '../../models/'
 E, FOOT = {}, {}
 WOOD = '#9A6A45'           # warm library walnut (lighter than WALNUT so it never reads black)
 SPINES = ['#7A2E2E', '#2F5D62', '#B5653F', '#D6A64A', '#3E5A3A', '#E6DCC6', '#5A4A7A', '#A9583E', '#C9B48A']
@@ -171,7 +171,7 @@ def writing_bureau():
 E['model.bookworm.writingBureau'] = writing_bureau(); FOOT['model.bookworm.writingBureau'] = (1, 1)
 
 
-# ---- teaTrolley (1x1): brass-and-oak trolley with a real porcelain tea set (Poly Haven) ---------
+# ---- teaTrolley (1x1): brass-and-oak trolley with a porcelain tea set ---------------------------
 def tea_trolley():
     p = [box([0.74, 0.03, 0.44], [0, 0.78, -0.2], OAK, 'wood', radius=0.01),
          box([0.74, 0.03, 0.44], [0, 0.32, -0.2], OAK, 'wood', radius=0.01)]
@@ -187,16 +187,14 @@ def tea_trolley():
                 [[0, -0.5], [0.15, -0.5], [0.08, -0.3], [0.08, 0.3], [0.5, 0.35], [0.5, 0.5], [0, 0.45]], segments=18),
           cyl([0.18, 0.06, 0.18], [0.14, 0.49, -0.2], '#C8964F', 'matte', segments=18),             # cake
           cyl([0.18, 0.015, 0.18], [0.14, 0.525, -0.2], '#F4E9D8', 'satin', segments=18)]           # icing
-    # placeholder fallback for the tea set
-    fb = p + [lathe([0.2, 0.18, 0.16], [0, 0.885, -0.2], '#F6F3EA', 'gloss',
-                    [[0, -0.5], [0.4, -0.5], [0.5, 0.0], [0.35, 0.4], [0, 0.5]], segments=16)]
-    return gltf(LIB + 'ph/tea_set_01.glb', [0.62, 0.11, 0.33], align='centre', offset=[0, 0.795, -0.2], parts=p, placeholder=fb)
+    p += tea_set(0, 0.795, -0.2, 0.62, 0.33, body='#F6F3EA', accent='#2F5D62')                    # on the top shelf
+    return placeholder(p)
 
 
 E['model.bookworm.teaTrolley'] = tea_trolley(); FOOT['model.bookworm.teaTrolley'] = (1, 1)
 
 
-# ---- firesideLounge (2x2, 2 seats at x = +-0.5): twin velvet wing chairs (Poly Haven), stove ----
+# ---- firesideLounge (2x2, 2 seats at x = +-0.5): twin velvet wing chairs, stove ----------------
 def fireside_lounge():
     rnd = random.Random(5)
     p = [cyl([1.7, 0.012, 1.3], [0, 0.006, 0.25], '#9C4A3A', 'fabric', segments=32),           # oval rug
@@ -228,15 +226,14 @@ def fireside_lounge():
           ]
     p += books(rnd, -0.78, 0.78, 0.6, -0.9, SPINES, fill=0.35, hmax=0.3, dmax=0.2, stack=0)
     p += lamp(0.6, -0.78, 0.6, shade=CREAM, h=0.5)
-    fb = p + [cushion([0.66, 0.9, 0.66], [x, 0.45, 0.0], '#3E5A3A') for x in (-0.5, 0.5)]
-    return gltf(LIB + 'ph/fireside_wing_chairs.glb', [1.66, 1.05, 0.66], align='centre', offset=[0, 0, -0.02],
-                parts=p, placeholder=fb, footprint=(2, 2))
+    p += wing_chair(-0.5, fabric='#4F6B55', wood=WOOD) + wing_chair(0.5, fabric='#4F6B55', wood=WOOD)   # seats 0.45, facing the fire
+    return placeholder(p)
 
 
 E['model.bookworm.firesideLounge'] = fireside_lounge(); FOOT['model.bookworm.firesideLounge'] = (2, 2)
 
 
-# ---- bedsideStack (1x1): a warm wooden drawer chest (Poly Haven) piled with books and a lamp ----
+# ---- bedsideStack (1x1): a warm wooden chest of little drawers piled with books and a lamp -------
 def bedside_stack():
     rnd = random.Random(9)
     H = 0.5
@@ -253,9 +250,7 @@ def bedside_stack():
     # a leaning floor stack beside the chest
     fs, _ = book_stack(0.3, 0.2, 0.0, 6, rnd, 0.24, 0.18)
     p += fs
-    fb = [box([0.8, H, 0.43], [0, H / 2, -0.24], HONEY, 'wood', radius=0.01)] + p
-    return gltf(LIB + 'ph/vintage_wooden_drawer_01.glb', [0.8, H, 0.43], align='back', offset=[0, 0, 0.045],
-                parts=p, placeholder=fb)
+    return placeholder(drawer_chest(0.8, H, 0.43, wood=WOOD, front='#B88A60') + p)
 
 
 E['model.bookworm.bedsideStack'] = bedside_stack(); FOOT['model.bookworm.bedsideStack'] = (1, 1)

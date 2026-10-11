@@ -1,0 +1,516 @@
+{
+  "$comment": "Catalogue 2: Beds, nightstands and bedroom storage. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "bedDouble",
+      "name": "Double bed",
+      "model": "model.bedDouble",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 900,
+      "category": "bedroom",
+      "group": "beds",
+      "slots": 2,
+      "decor": 0.2,
+      "description": "An oak bed with a slatted headboard and a blue duvet, for two.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 1.0,
+            "comfort": 0.4
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ]
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 60,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.25,
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bedQueenUpholstered",
+      "name": "Upholstered queen bed",
+      "model": "model.bedQueenUpholstered",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 1400,
+      "category": "bedroom",
+      "group": "beds",
+      "slots": 2,
+      "decor": 0.4,
+      "description": "A tall channel-tufted headboard and plump pillows.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 1.0,
+            "comfort": 0.45
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ]
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 60,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.25,
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bedCanopy",
+      "name": "Four-poster bed",
+      "model": "model.bedCanopy",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 2200,
+      "category": "bedroom",
+      "group": "beds",
+      "slots": 2,
+      "decor": 0.8,
+      "description": "A dark wood four-poster with a linen canopy. A full night here leaves residents well rested.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 1.0,
+            "comfort": 0.5
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "feeling": "home.wellRested"
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 60,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.25,
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bedDaybed",
+      "name": "Daybed",
+      "model": "model.bedDaybed",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 480,
+      "category": "bedroom",
+      "group": "beds",
+      "decor": 0.2,
+      "description": "A single bed with a back and arms: a sofa by day, a bed by night.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 1.0,
+            "comfort": 0.35
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ]
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 60,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.25,
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nightstandModern",
+      "name": "Modern nightstand",
+      "model": "model.nightstandModern",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 95,
+      "category": "bedroom",
+      "group": "nightstands",
+      "decor": 0.15,
+      "surface": {
+        "height": 0.56,
+        "kind": "low",
+        "size": [
+          0.58,
+          0.6
+        ],
+        "at": [
+          0.0,
+          -0.13
+        ]
+      },
+      "description": "A white bedside table on oak legs with a drawer and a shelf.",
+      "interactions": []
+    },
+    {
+      "id": "nightstandRound",
+      "name": "Drum nightstand",
+      "model": "model.nightstandRound",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "bedroom",
+      "group": "nightstands",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.57,
+        "kind": "low",
+        "size": [
+          0.38,
+          0.38
+        ],
+        "at": [
+          0.0,
+          -0.06
+        ]
+      },
+      "description": "A round terracotta bedside table with a little drawer.",
+      "interactions": []
+    },
+    {
+      "id": "nightstandDrawers",
+      "name": "Three-drawer nightstand",
+      "model": "model.nightstandDrawers",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 130,
+      "category": "bedroom",
+      "group": "nightstands",
+      "decor": 0.2,
+      "surface": {
+        "height": 0.6,
+        "kind": "low",
+        "size": [
+          0.58,
+          0.6
+        ],
+        "at": [
+          0.0,
+          -0.13
+        ]
+      },
+      "description": "A walnut bedside chest with three drawers.",
+      "interactions": []
+    },
+    {
+      "id": "chestOfDrawers",
+      "name": "Tall chest of drawers",
+      "model": "model.chestOfDrawers",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 280,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.2,
+      "surface": {
+        "height": 1.16,
+        "kind": "shelf",
+        "size": [
+          0.88,
+          0.68
+        ],
+        "at": [
+          0.0,
+          -0.14
+        ]
+      },
+      "description": "Five drawers with brass pulls; things stand on top.",
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "feeling": "home.dressedUp"
+        }
+      ]
+    },
+    {
+      "id": "dresserLow",
+      "name": "Low dresser",
+      "model": "model.dresserLow",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 360,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.8,
+        "kind": "low",
+        "size": [
+          1.82,
+          0.66
+        ],
+        "at": [
+          0.0,
+          -0.15
+        ]
+      },
+      "description": "Nine oak drawers on short legs, long enough for a mirror and a lamp on top.",
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "feeling": "home.dressedUp"
+        }
+      ]
+    },
+    {
+      "id": "wardrobeSingle",
+      "name": "Single wardrobe",
+      "model": "model.wardrobeSingle",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 240,
+      "category": "bedroom",
+      "group": "storage",
+      "description": "A narrow white wardrobe for a small room.",
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "feeling": "home.dressedUp"
+        }
+      ]
+    },
+    {
+      "id": "armoire",
+      "name": "Armoire",
+      "model": "model.armoire",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.6,
+      "description": "A grand two-door wardrobe in dark wood with a cornice and turned feet.",
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "feeling": "home.dressedUp"
+        }
+      ]
+    },
+    {
+      "id": "cedarChest",
+      "name": "Blanket chest",
+      "model": "model.cedarChest",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 220,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.3,
+      "surface": {
+        "height": 0.505,
+        "kind": "low",
+        "size": [
+          0.94,
+          0.5
+        ]
+      },
+      "description": "A cedar chest with iron straps for the foot of the bed.",
+      "interactions": []
+    },
+    {
+      "id": "benchBedEnd",
+      "name": "Bed-end bench",
+      "model": "model.benchBedEnd",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 240,
+      "category": "bedroom",
+      "group": "storage",
+      "slots": 2,
+      "decor": 0.3,
+      "seat": {
+        "height": 0.47,
+        "forward": 0.0
+      },
+      "description": "A buttoned bench on brass legs for the foot of the bed.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mirrorFloor",
+      "name": "Standing mirror",
+      "model": "model.mirrorFloor",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "bedroom",
+      "group": "dressing",
+      "decor": 0.3,
+      "description": "A full-length mirror on a brass stand.",
+      "interactions": [
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "look",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "laundryHamper",
+      "name": "Laundry hamper",
+      "model": "model.laundryHamper",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.1,
+      "description": "A wicker hamper with a lid.",
+      "interactions": []
+    }
+  ]
+}

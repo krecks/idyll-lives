@@ -36,7 +36,6 @@ import type { Material } from './core';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground, prefetch } from '../../assets/stream';
 import type { ModelEntry, PlaceholderPart, Vec3 } from '../../assets/types';
-import { bakeFoliageCards } from './foliageCards';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
 
 export type TintSlot = NonNullable<PlaceholderPart['tint']>;
@@ -58,6 +57,8 @@ export interface ModelTemplate {
 export interface BuildOptions {
   /** 0 = full detail, 1 = reduced tessellation for distant instances. */
   lod?: 0 | 1;
+  /** Things on a top: the radius (m) of the disc they take, for the stand-in when the model is missing. */
+  radius?: number;
 }
 
 export async function buildModel(
@@ -74,7 +75,7 @@ export async function buildModel(
       console.warn(`[render] failed to load ${entry.url}, using placeholder`, err);
     }
   }
-  return buildPlaceholder(scene, name, entry?.placeholder ?? fallbackParts(footprint), options.lod ?? 0);
+  return buildPlaceholder(scene, name, entry?.placeholder ?? fallbackParts(footprint, options.radius), options.lod ?? 0);
 }
 
 function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
@@ -176,7 +177,7 @@ function partMesh(scene: Scene, p: PlaceholderPart, lod: 0 | 1, index: number, a
       mesh.scaling.set(1, 1, sz / sx);
       break;
     case 'blob':
-      mesh = blobMesh(scene, sx, sy, sz, p.noise ?? 0.18, lo ? 1 : 2, index * 7.31 + sx * 3.7);
+      mesh = blobMesh(scene, sx, sy, sz, p.noise ?? 0.18, p.segments ?? (lo ? 1 : 2), index * 7.31 + sx * 3.7);
       // Fake ambient occlusion: undersides and the inner canopy are darker.
       shade = (_nx, ny) => 0.55 + 0.45 * smoothstep(-0.7, 0.75, ny);
       break;
@@ -430,13 +431,30 @@ function blobMesh(scene: Scene, sx: number, sy: number, sz: number, amount: numb
   }
   const normals: number[] = [];
   VertexData.ComputeNormals(pos, mesh.getIndices()!, normals);
+  // The icosphere repeats vertices along its base faces' edges: average their normals so the
+  // lumps shade smoothly instead of in facets.
+  const shared = new Map<string, number[]>();
+  for (let i = 0; i < pos.length; i += 3) {
+    const key = `${pos[i].toFixed(4)},${pos[i + 1].toFixed(4)},${pos[i + 2].toFixed(4)}`;
+    const list = shared.get(key);
+    if (list) list.push(i);
+    else shared.set(key, [i]);
+  }
+  for (const list of shared.values()) {
+    if (list.length < 2) continue;
+    let [nx, ny, nz] = [0, 0, 0];
+    for (const i of list) [nx, ny, nz] = [nx + normals[i], ny + normals[i + 1], nz + normals[i + 2]];
+    const l = Math.hypot(nx, ny, nz) || 1;
+    for (const i of list) [normals[i], normals[i + 1], normals[i + 2]] = [nx / l, ny / l, nz / l];
+  }
   mesh.setVerticesData(VertexBuffer.PositionKind, pos);
   mesh.setVerticesData(VertexBuffer.NormalKind, normals);
   return mesh;
 }
 
-/** A neutral box when a model key is missing entirely. */
-function fallbackParts([w, d]: [number, number]): PlaceholderPart[] {
+/** A neutral box when a model key is missing entirely (for something on a top, a small one its size). */
+function fallbackParts([w, d]: [number, number], radius?: number): PlaceholderPart[] {
+  if (radius) return [{ shape: 'cylinder', size: [radius * 1.8, radius * 1.6, radius * 1.8], at: [0, radius * 0.8, 0], color: '#B8B2AA' }];
   return [{ shape: 'box', size: [w * 0.8, 0.8, d * 0.8], at: [0, 0.4, 0], color: '#B8B2AA' }];
 }
 
@@ -511,7 +529,6 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry): Promise<
     node.rotationQuaternion = null;
     node.rotation.setAll(0);
     node.scaling.setAll(1);
-    bakeFoliageCards(node, world);
     node.bakeTransformIntoVertices(world);
     node.refreshBoundingInfo();
     node.name = name;
@@ -585,7 +602,6 @@ function fitInto(meshes: Mesh[], [w, h, d]: Vec3, align: 'centre' | 'back', [ox,
   const tz = align === 'back' ? -0.5 + oz : oz;
   const m = Matrix.Scaling(sx, sy, sz).multiply(Matrix.Translation(ox - cx * sx, oy - min.y * sy, tz - cz * sz));
   for (const mesh of meshes) {
-    bakeFoliageCards(mesh, m);
     mesh.bakeTransformIntoVertices(m);
     mesh.refreshBoundingInfo();
   }

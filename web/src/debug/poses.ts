@@ -8,7 +8,10 @@
  *
  * URL: `?only=garden,water` (stations whose label contains any), `?cols=6`, `?gap=3.4`,
  * `?focus=<n>` (frame station n close up), `?alpha=…&beta=…&radius=…`, `?labels=0`,
- * `?manual` (time only advances via `__poses.advance(seconds)`, for screenshots).
+ * `?manual` (time only advances via `__poses.advance(seconds)`, for screenshots), `?seats=sofa,toilet`
+ * (a man and a woman seated on each),
+ * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
+ * the clip held at 8 times through it, on a man, a woman and a child; no stations).
  */
 
 import {
@@ -27,6 +30,7 @@ import {
   Vector3,
 } from '../render/babylon/core';
 import { AssetRegistry } from '../assets/registry';
+import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ObjectPlacement, SimInfo } from '../core/protocol';
 import { Pose, type SnapshotLayout } from '../core/snapshot';
@@ -44,7 +48,6 @@ interface Step {
   pose: number;
   /** Activity tag while in this step ('' = none). */
   tag?: string;
-  moving?: boolean;
 }
 interface Station {
   label: string;
@@ -55,6 +58,13 @@ interface Station {
   /** Cycles through these steps (overrides `pose` / `tag`). */
   script?: Step[];
   female?: boolean;
+  /** Filmstrip frame: the clip time as a share of its length (`?strip`), and the life stage. */
+  strip?: number;
+  stage?: string;
+  /** Carries this item (content `items` id). */
+  held?: string;
+  /** Walks to and fro across the cell. */
+  walk?: boolean;
 }
 
 const STATIONS: Station[] = [
@@ -94,6 +104,25 @@ const STATIONS: Station[] = [
       { seconds: 4, pose: P.Stand },
     ],
   },
+  // Seats
+  { label: 'sofa', def: 'sofa', tag: 'sit', pose: P.Sit },
+  { label: 'tv sofa', def: 'sofaThree', tag: 'watch', pose: P.Sit, female: true },
+  { label: 'dining chair', def: 'diningChair', tag: 'sit', pose: P.Sit, female: true },
+  { label: 'bar stool', def: 'barStool', tag: 'sit', pose: P.Sit },
+  { label: 'office chair', def: 'officeChair', tag: 'sit', pose: P.Sit, female: true },
+  { label: 'eat dining table', def: 'diningTable', tag: 'eat', pose: P.Sit },
+  { label: 'eat dining oak', def: 'diningOak', tag: 'eat', pose: P.Sit, female: true },
+  { label: 'child at desk', def: 'kidsDesk', tag: 'write', pose: P.Sit, stage: 'child' },
+  { label: 'elder armchair', def: 'armchair', tag: 'relax', pose: P.Sit, stage: 'elder', female: true },
+  // Kitchen and carrying
+  { label: 'chop', def: 'counter', tag: 'chop' },
+  { label: 'stir', def: 'stoveGas', tag: 'stir', female: true },
+  { label: 'flip', def: 'grill', tag: 'flip' },
+  { label: 'carry plate', held: 'mealPlate', walk: true, female: true },
+  { label: 'carry pot', held: 'mealPot', walk: true },
+  { label: 'hold ingredients', held: 'ingredients' },
+  { label: 'child carries', held: 'sandwich', walk: true, stage: 'child' },
+  { label: 'walk elder', walk: true, stage: 'elder' },
   // Eating / drinking
   { label: 'eat (fridge)', def: 'fridge', tag: 'eat' },
   { label: 'drink (espresso)', def: 'foodie.espressoBar', tag: 'drink', female: true },
@@ -135,7 +164,22 @@ const STATIONS: Station[] = [
 
 const params = new URLSearchParams(location.search);
 const only = params.get('only')?.split(',');
-const stations = only ? STATIONS.filter((s) => only.some((o) => s.label.includes(o) || s.def?.includes(o) || s.tag === o)) : STATIONS;
+const forced = params.get('clip');
+const strip = Number(params.get('strip')) || 0;
+const STRIP_ROWS = [
+  { label: 'man', female: false },
+  { label: 'woman', female: true },
+  { label: 'child', female: false, stage: 'child' },
+];
+// `?seats=sofa,toilet`: a man and a woman sitting on each of those objects instead of the stations.
+const seats = params.get('seats')?.split(',');
+const stations: Station[] = strip
+  ? STRIP_ROWS.flatMap((r) => Array.from({ length: strip }, (_, k) => ({ label: `${r.label} ${k}/${strip}`, female: r.female, stage: r.stage, strip: k / strip })))
+  : seats
+    ? seats.flatMap((def) => [false, true].map((female) => ({ label: def, def, tag: 'sit', pose: P.Sit, female })))
+    : only
+    ? STATIONS.filter((s) => only.some((o) => s.label.includes(o) || s.def?.includes(o) || s.tag === o))
+    : STATIONS;
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -170,7 +214,7 @@ interface DefRaw {
 }
 const PACKS = ['bookworm', 'cheerful', 'couchPotato', 'energetic', 'foodie', 'gloomy', 'hotHeaded', 'kind', 'lazy', 'loner', 'natureLover', 'neat', 'outgoing', 'romantic', 'slob'];
 const files = await Promise.all(
-  ['base', 'garden', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
+  ['base', 'furniture', 'garden', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
     fetch(`${base}content/${f}.json`)
       .then((r) => r.json() as Promise<{ objects?: DefRaw[]; animations?: string[] }>)
       .catch(() => ({ objects: [] as DefRaw[], animations: undefined as string[] | undefined })),
@@ -182,8 +226,8 @@ const actions = [...(files[0].animations ?? [])];
 for (const s of stations) for (const t of [s.tag, ...(s.script ?? []).map((x) => x.tag)]) if (t && !actions.includes(t)) actions.push(t);
 
 // Layout: stations in a grid, each object at its cell's centre facing +z.
-const cols = Number(params.get('cols')) || Math.ceil(Math.sqrt(stations.length * 1.4));
-const gap = Number(params.get('gap')) || 3.4;
+const cols = Number(params.get('cols')) || (strip ? strip : Math.ceil(Math.sqrt(stations.length * 1.4)));
+const gap = Number(params.get('gap')) || (strip ? 1.1 : 3.4);
 const rows = Math.ceil(stations.length / cols);
 const ground = MeshBuilder.CreateGround('ground', { width: cols * gap + 6, height: rows * gap + 6 }, scene);
 const gm = new PBRMaterial('ground', scene);
@@ -210,7 +254,7 @@ const actors: Actor[] = [];
 const labels = document.getElementById('labels')!;
 const spots: { at: Vector3; el: HTMLSpanElement }[] = [];
 const centres: Vector3[] = [];
-const look = (id: number, female: boolean): SimInfo => ({
+const look = (id: number, female: boolean, stage?: string): SimInfo => ({
   id,
   name: '',
   household: 0,
@@ -222,6 +266,7 @@ const look = (id: number, female: boolean): SimInfo => ({
     hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][id % 4],
     hairStyle: female ? 'long' : 'short',
     height: 1,
+    ...(stage ? { stage } : {}),
   },
   traits: [],
   perks: [],
@@ -232,7 +277,9 @@ await Promise.all(
     const cx = ((n % cols) - (cols - 1) / 2) * gap;
     const cz = -(Math.floor(n / cols) - (rows - 1) / 2) * gap;
     centres.push(new Vector3(cx, 0, cz));
-    if (s.social) {
+    if (s.strip !== undefined) {
+      actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
+    } else if (s.social) {
       actors.push({ station: n, x: cx, z: cz - 0.5, yaw: 0, object: -1, partner: 0, role: 1 });
       actors.push({ station: n, x: cx, z: cz + 0.5, yaw: Math.PI, object: -1, partner: 0, role: 2 });
     } else if (s.def) {
@@ -254,6 +301,8 @@ await Promise.all(
       const slots = def?.slots ?? 1;
       const slotX = ox + w / 2 + (0 - (slots - 1) / 2) * (w / slots);
       actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5 });
+    } else {
+      actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
     if (params.get('labels') !== '0') {
       const el = document.createElement('span');
@@ -265,18 +314,28 @@ await Promise.all(
 );
 actors.sort((a, b) => a.station - b.station);
 // Stations load in any order: row i is actor i after sorting.
-const actorSims = actors.map((a, i) => look(i, stations[a.station].social ? a.role === 2 : !!stations[a.station].female));
+const actorSims = actors.map((a, i) => look(i, stations[a.station].social ? a.role === 2 : !!stations[a.station].female, stations[a.station].stage));
 for (let i = 0; i < actors.length; i++) {
   const a = actors[i];
   if (a.partner >= 0) a.partner = actors[i].role === 1 ? i + 1 : i - 1;
 }
 
-const characters = new Characters(scene, assets, lib);
+// The base content (with its includes): seats it describes and the items Sims carry.
+const content = await Content.load(`${base}content/base.json`);
+const characters = new Characters(scene, assets, lib, content);
 if (!(await characters.init())) throw new Error('characters unavailable');
 await characters.build({ sims: actorSims, objects });
 for (const m of characters.casters()) shadowGen.addShadowCaster(m);
+if (strip) {
+  // Each frame of the strip holds the clip at its share of the clip's length.
+  const clip = forced ?? 'idle';
+  actors.forEach((a, i) => (characters.directions[i] = { clip, still: true, time: (stations[a.station].strip ?? 0) * characters.clipDuration(clip) }));
+} else if (forced) {
+  characters.force = forced;
+}
 
-const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood'] as const;
+const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held'] as const;
+const items = content.items.map((it) => it.id);
 const HEADER_LEN = 6;
 const STRIDE = FIELDS.length;
 const layout: SnapshotLayout = {
@@ -288,6 +347,7 @@ const layout: SnapshotLayout = {
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
   sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
   actions,
+  items,
 };
 const snap = new Float32Array(layout.capacity);
 const frame: FrameState = { prev: snap, curr: snap, alpha: 0, layout, now: 0 };
@@ -319,6 +379,16 @@ function writeSnapshot(): void {
     snap[o + k.yaw] = standing && !s.script ? Math.PI : a.yaw;
     snap[o + k.pose] = pose;
     snap[o + k.moving] = 0;
+    if (s.walk) {
+      // To and fro along the cell, turning at the ends.
+      const t = (clock * 0.45) % 2;
+      const back = t > 1;
+      snap[o + k.x] = a.x;
+      snap[o + k.z] = a.z - 0.9 + 1.8 * (back ? 2 - t : t);
+      snap[o + k.yaw] = back ? Math.PI : 0;
+      snap[o + k.moving] = 1;
+    }
+    snap[o + k.held!] = s.held ? items.indexOf(s.held) + 1 : 0;
     const social = s.social ? SOCIAL[s.social] : 0;
     snap[o + k.social] = social ? 1 : 0;
     snap[o + k.anim] = social;

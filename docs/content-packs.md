@@ -84,16 +84,23 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `name` | Shown in the catalog. |
 | `model` | Asset key of the 3D model (`model.<id>`). Art is registered separately in the asset manifest; a missing key logs a warning and falls back to a placeholder. |
 | `icon` | Optional catalog icon key. Without one (or if the key is missing) the catalog shows a picture of the 3D model. |
-| `footprint` | `[width, depth]` in tiles, default `[1, 1]`. The resident uses it from the tile in front of the footprint's centre (local +z), which must be free. |
+| `footprint` | `[width, depth]` in tiles, default `[1, 1]`. The resident uses it from the tile in front of the footprint's centre (local +z), which must be free (unless nobody uses it: no interactions; see `approach` for chairs). |
 | `price` | Buy-mode price in dollars. Without a price the object isn't sold (scenery). |
 | `category` | Buy-mode category id (see [Buy categories](#buy-categories)). |
 | `group` | Optional group within the category, for categories that have `groups` (the garden: `trees`, `shrubs`, `flowers`, `edibles`, `houseplants`). The catalog shows the groups as chips. |
 | `outdoors` | `true` for things that can only stand outdoors (trees, flower beds, ponds). Buying or moving one indoors is refused ("Goes outdoors"). Default `false`. |
-| `layer` | Where it goes: `floor` (default: furniture, which takes its tiles), `wall` (hangs with its back on a wall or window: pictures, curtains, shelves, wall lamps), `ceiling` (hangs in a room: pendant lamps, fans) or `rug` (lies on the floor). Off the floor layer it takes no floor space: residents walk under and over it, furniture stands in front of, under or on it, and only things on the same layer can't overlap. A wall with something on it can't be removed or get a door. Model things on a wall with their back on the wall face (`z = -0.43` in a 1-deep footprint) at their real height, ceiling things hanging from 2.8 m. Things nobody uses (no interactions) needn't be reachable. |
+| `layer` | Where it goes: `floor` (default: furniture, which takes its tiles), `wall` (hangs with its back on a wall or window: pictures, curtains, shelves, wall lamps), `ceiling` (hangs in a room: pendant lamps, fans) or `rug` (lies on the floor). Off the floor layer it takes no floor space: residents walk under and over it, furniture stands in front of, under or on it, and only things on the same layer can't overlap. A wall with something on it can't be removed or get a door. Model things on a wall with their back on the wall face (`z = -0.43` in a 1-deep footprint) at their real height, ceiling things hanging from 2.8 m. `surface`: small things standing on another object's top (vases, books, plates, table lamps); see `surface` and `radius` below. They must be 1×1 with one slot and no interactions, always turn freely, and stand anywhere on a top: the disc they take (`radius`) lies wholly on one top, clear of its edges and of anything else standing there. Moving or turning the top carries them along, selling it sells them too. Model them standing on y = 0; the game lifts them to the top's height. Things nobody uses (no interactions), on any layer, needn't be reachable: a table can have chairs all round it. |
+| `surface` | A top small things stand on: `{"height": 0.75, "kind": "table", "size": [1.6, 0.8], "at": [0, 0.1], "inset": 0.04}`: its height (m), its kind (`table`, `bar`, `counter`, `desk`, `low` for coffee and side tables and nightstands, `shelf`), its width and depth (m; default the footprint) and where its middle is off the footprint's middle (m, to the object's right and front; default `[0, 0]`), and the margin kept clear along its edges (m, default 0.04). Measure `size` and `at` from the model: a counter's worktop is at the back of its tile, a desk's top over its front. Only furniture on the floor has one. |
+| `radius` | Things on the `surface` layer: the radius (m) of the disc they take on a top, 0.02 to 0.45. Default 0.12. |
+| `approach` | Where it's used from: `front` (default: the tile in front of it, which must be free) or `around` (chairs pushed under a table: the first free tile in front, behind, left or right of it, with no wall between). An `around` seat needs one free side. |
+| `seatAt` | Seats: the kinds of top they tuck under (`["table"]`, `["bar", "counter"]`). Facing one (it covers the tile in front of the seat, with no wall between), the seat is a seat at that table: residents eat there first, and `needsTable` interactions are offered. In Buy mode such a seat turns to face a table it's put beside. |
+| `seat` | Seats (looks only): `{"height": 0.46, "forward": 0}`: the height of the seat (m) and how far forward of the object's middle the resident's hips are (m). Default: a few known objects' own values, else 0.45 and 0. |
 | `bunk` | Bunk beds (2 `slots`): both sleepers lie in the middle of the bed's width, the second on the upper bunk (heights per object in `render/babylon/characters.ts`, `BUNKS`). |
-| `slots` | How many residents use it at once, 1 or 2 (double bed, sofa, hot tub). Default 1. |
+| `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width. Default 1. |
 | `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55}` makes it a light at night (reach in metres, relative brightness, bulb height). |
-| `freeRotation` | `true` lets the player turn it to any angle in 15° steps (only for looks). Default: 1×1 objects whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`). |
+| `stations` | Cooking stations it is (see [Cooking](#cooking)): `["ingredients"]` for a fridge or pantry, `["prep"]` for a counter or island, `["stove", "oven"]` for a cooker, `["grill"]`, `["microwave"]`, `["dishes"]` for a sink or dishwasher. Recipe steps happen at stations. |
+| `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
+| `freeRotation` | `true` lets the player turn it to any angle in 15° steps and stand it anywhere on its tile (quarter tiles, or to the centimetre with Shift); both only for looks. Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
 | `decor` | Decor points it gives the room it stands in (see [Rooms](#rooms-wear-and-accidents)). Default: by category, `roomRules.decorByCategory`. |
 | `wearPerUse` | Wear added by each completed use; at 1 it breaks. Default: by category, `objectRules.wear` (nothing wears out that nobody uses). |
 | `description` | Catalog text: say what it's for and what makes it special. |
@@ -129,6 +136,8 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `skills` | Skill id → levels gained per hour of use (before the per-level slowdown). |
 | `pose` | `stand` (default), `sit` or `lie`. |
 | `autonomous` | `false` = only when the player asks. Default `true`. |
+| `needsTable` | Only offered while the seat faces a table it tucks under (its `seatAt`): dining at a table. A chair alone offers only its other interactions; the player's order fails with "needs a table". Needs a `seatAt`. Default `false`. |
+| `recipe` | Starts a recipe (`recipes` id; see [Cooking](#cooking)) instead of being used here alone: the resident goes round the recipe's stations (fridge, counter, stove), from whichever one they clicked, and serves a dish. `minutes` isn't needed (the steps take theirs); `effects` are then only what cooking does for the cook (`{"fun": 0.05}`), the meal's own are the recipe's. Keep the `tags` (`food`, `cooking`): kitchens, plans and traits go by them. `cost` comes from the recipe. |
 | `cost` | Dollars charged from the resident's household each time a resident **starts** using it (on arrival). Default 0. Only for real consumables bought from outside (takeout, deliveries, a rented movie, donations); owning and running an item costs money through the weekly bills instead. Residents never choose something their household can't afford, and the player's order fails with "not enough money". Guests pay from their own household. |
 | `skill` | Skill id that makes this interaction better: need gains and skill gains are multiplied by `1 + skillRules.effectPerLevel × level` (0.05 per whole level: level 4 = ×1.2, level 8 = ×1.4). Autonomy knows this, so good cooks prefer cooking. |
 | `feeling` | Feeling id granted when the interaction finishes after at least half its `minutes` (not when cancelled early). |
@@ -260,6 +269,11 @@ voices pick their lines by them.
 | `phone` | calls and video calls, radio chats |
 | `meditate` | breathing, counting to ten |
 | `idle` | standing at an object with nothing better to show (donation jar) |
+| `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
+| `chop` | preparing food on a counter (a chopping board is drawn on its top) |
+| `stir` | cooking on the stove or baking (a pan is drawn on it) |
+| `flip` | grilling (food is drawn on the grill) |
+| `serve` | putting a dish down |
 
 **Adding an animation:** reuse a tag whenever one is close enough; the characters need a
 clip for every tag. If you must add one, append it to a top-level `"animations"` list in
@@ -449,19 +463,24 @@ id) and `last` (household names).
 - **Emotions:** `happy`, `flirty`, `angry`, `sad`, `embarrassed`, `focused` (likes
   `training`), `inspired` (likes `creative`), `energized` (likes `fitness`), `relaxed`
   (likes `rest`, `lounge`, `spa`). Icons are `icon.emotion.<id>`.
-- **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `dining`),
-  `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom` (`beds`, `storage`,
-  `dressing`), `kids`, `living` (`seating`, `tables`, `media`, `shelves`), `office`,
-  `fitness`, `hobbies` (`music`, `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`),
-  `lighting` (`ceiling`, `wall`, `floor`, `table`), `outdoor` (`seating`, `cooking`, `play`,
-  `lights`, `decor`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
-  `houseplants`), `wellness` (example pack). An object without a `group` shows under its
+- **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `islands`,
+  `dining`, `cabinets`), `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom`
+  (`beds`, `nightstands`, `storage`, `dressing`), `kids`, `living` (`seating`, `sectionals`,
+  `tables`, `media`, `shelves`), `office` (`desks`, `chairs`), `fitness`, `hobbies` (`music`,
+  `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`), `tabletop` (things on the
+  `surface` layer: `kitchenware`, `tableware`, `books`, `plants`, `ornaments`, `bath`, `desk`,
+  `toys`), `lighting` (`ceiling`, `wall`, `floor`, `table`), `outdoor` (`seating`, `cooking`,
+  `play`, `lights`, `decor`, `yard`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
+  `houseplants`), `community` (`play`, `street`, `food`, `shops`: the town's playground,
+  street furniture, carts and vending machines, shop fittings; `content/community.json`),
+  `wellness` (example pack). An object without a `group` shows under its
   category's *All*. Add a category with
   `"buyCategories": [{ "id": "...", "label": "...", "icon": "icon.category.<id>" }]` only if
   none fits (`icon` is optional: the catalog tab's icon, an `icon` asset key; `groups`
   optional: `[{ "id": "...", "label": "..." }]`, chips that objects pick with `group`;
   `"outside": true` on a category or group marks garden things, which wishes for a room don't
-  offer: base game `outdoor` and the garden's `trees`, `shrubs`, `flowers`, `edibles`).
+  offer: base game `outdoor` and `community` (except its `shops` group, `"outside": false`)
+  and the garden's `trees`, `shrubs`, `flowers`, `edibles`).
 - **Activities** (routine blocks): `sleep`, `eat`, `cook`, `wash`, `train` (names a skill),
   `workout`, `read`, `create`, `fun`, `relax`, `garden`, `chores`, `social`, `visit`.
 - **Traits** (for `traitPatches`): `foodie`, `bookworm`, `couchPotato`, `neat`, `slob`,
@@ -535,6 +554,73 @@ it taken, on two different days within a week, wish for another room of that kin
 game's `wetSelf`: a second bathroom). `crowdedGraceMinutes` also lets it happen when the home has the essential but it's
 taken. At most 8.
 
+## Cooking
+
+Cooking makes food. A recipe (top-level `recipes`) is a chain of steps, each at a kind of
+**station**: the fridge for ingredients, a counter to prep on, the stove to cook. Clicking the
+stove's "Cook dinner" sends the resident to the fridge first, then a counter, then back to that
+stove; between steps they carry what the step leaves (`holds`: the ingredients, a prepped bowl).
+The last step serves the dish (an item with servings) on a free surface near the cook, outdoors
+for outdoor recipes, else in the fridge: one serving for each of the household at home, within
+the recipe's `servings`. The ingredients are paid at the first step (`costPerServing` × servings).
+Housemates are told dinner's ready (a thought bubble); whoever's hungry takes a serving, sits
+down with it (a chair at a table, then a table with seats of its own, then any seat in
+`cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table. Someone
+washes up later at a sink or dishwasher (a chore, like tidying up), carrying up to
+`carryDishes` at a time. Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
+dirty or spoilt things slowly make their room dirty. The player can order any of it: clicking a
+dish offers **Eat** and **Clear away**.
+
+```json
+"recipes": [{
+  "id": "meal", "label": "Make a meal", "item": "mealPot", "servings": [1, 4], "costPerServing": 3,
+  "effects": { "hunger": 1.0 },
+  "steps": [
+    { "label": "Get ingredients", "at": ["ingredients"], "minutes": 5, "anim": "fetch", "holds": "ingredients" },
+    { "label": "Prep", "at": ["prep"], "minutes": 10, "anim": "chop", "optional": true, "holds": "prepBowl" },
+    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir", "optional": true }
+  ]
+}]
+```
+
+| Recipe field | Meaning |
+|---|---|
+| `item` | The dish it serves (an `items` id with a `serving`, or a plate itself for `eatNow`). |
+| `servings` | `[fewest, most]` servings it makes. Default `[1, 1]`. |
+| `costPerServing` | Dollars per serving, paid when the cook takes the ingredients. |
+| `effects` | What eating one serving gives (times the dish's quality: the cook's skill in the interaction's `skill`, the station's quality, and a little less per step done without its station). |
+| `eatFeeling` | Feeling for eating a serving of good quality (1 or better). |
+| `eatMinutes` | How long eating a serving takes (default `cooking.eatMinutes`). |
+| `eatNow` | The cook eats it at once (a sandwich): no dish is served. |
+| `outdoor` | A barbecue: outdoor stations first, served on an outdoor table. |
+| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the step before) and `holds` (an item carried away from it). |
+
+Residents choose a recipe only if their home has a station for every step that isn't
+optional; a long recipe tempts them less, a hungry family more, and food already made hardly
+at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
+keep the prep and cooking steps of everyday recipes optional. A station that's busy is waited
+for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
+(a snack, toast, a coffee, reheating) stays a plain interaction.
+
+**`items`**: `{ "id": "mealPot", "label": "Home-cooked meal", "model": "item.mealPot", "hold": "both", "serving": "mealPlate", "emptyAs": "potDirty", "radius": 0.16 }`.
+`label` names it ("Eat Home-cooked meal"); `model` is its asset key; `hold` is `hand` or
+`both`; taking a serving gives a `serving` (a plate) and an empty dish becomes `emptyAs`;
+`dirty` things are washed up; `radius` is the disc it takes on a surface. Ingredients and bowls
+are only carried (they're used up). Items aren't objects: they belong to a household, keep
+their place on the surface they stand on (moving the table carries them, selling it throws
+them away) and are saved with the game.
+
+**`cooking`** rules (all optional): `stations` (the station kinds, at most 16; default
+`ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`), `spoilHours` 8,
+`storedSpoilHours` 72, `eatMinutes` 25, `dishesMinutes` 5 (per thing washed), `carryDishes` 3,
+`leftoverPreference` 1.3, `feedFamily` 0.15 (extra pull per hungry housemate), `hungryBelow` 0.5,
+`invitedBoost` 2.5 and `inviteMinutes` 60 (dinner's ready), `stationWaitMinutes` 10,
+`dirtyDirtPerHour` 0.02, `skipPenalty` 0.05, `seatTags` (`lounge`, `food`) and `seatAvoid`
+(`spa`, `hygiene`, `bathroom`), `defaultSurfaceHeight` 0.9 (where tools are drawn on a station
+without a `surface`), `serveRange` 6 (m), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
+`dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6.
+Packs merge `cooking` key by key and append to `items` and `recipes`.
+
 ## Balance guidance
 
 Money: households start with $2,500 (`economy.startingFunds`), plus $10,000 to build with when
@@ -553,6 +639,7 @@ careers go) for the base game, so run it after changing prices, pay or rent.
 |---|---|---|
 | decor | $40–150 | plant 40, lamp 120 |
 | outdoor | $40–250 | bush 40, flowerbed 60, bench 200 |
+| community | $60–2,600 | litter bin 60, café chair 160, park bench 380, slide 520, vending machine 800, town fountain 2,600 |
 | bathroom | $180–650 | sink 180, toilet 300, shower 650 |
 | kitchen | $350–600 | dining table 350, fridge 600 |
 | bedroom | $180–750 | mirror 180, bed 750 |
@@ -560,6 +647,25 @@ careers go) for the base game, so run it after changing prices, pay or rent.
 | fitness | $480–650 | weight bench 480, treadmill 650 |
 | hobbies | $300–1,400 | easel 300, chess 350, telescope 900, piano 1,400 |
 | office | ~$1,100 | computer desk 1,100 |
+
+The second catalogue (`content/catalog2/*.json`, separate pieces: a table and its chairs are
+bought one by one) fills in below and between those:
+
+| Category / group | Range | Examples |
+|---|---|---|
+| tabletop (all groups) | $10–80, decor 0.2–0.5 | toy blocks 12, mugs 15, vase of flowers 40, stand mixer 80 |
+| kitchen counters, islands | $110–520 (long island 1,100) | counter end 140, butcher block 260, double sink 520 |
+| kitchen appliances | $380–1,600 | dishwasher 380, oven tower 900, French-door fridge 1,500, range cooker 1,600 |
+| kitchen dining: tables | $90–620 | bistro table 90, table for four 260, farmhouse table 520, banquet table 620 |
+| kitchen dining: chairs, stools | $30–160 | folding chair 30, wooden chair 55, carver chair 160 |
+| kitchen cabinets | $180–650 | bar cart 180, sideboard 380, china cabinet 650 |
+| living sectionals | $280–420 a piece | middle, arm or corner seat 280, chaise 420 |
+| living seating, tables, shelves | $35–980 | floor cushion 35, coffee table 180, recliner 650, three-seater 980 |
+| bedroom nightstands, storage | $45–900 | nightstand 95, dresser 360, armoire 900 |
+| bedroom beds | $480–2,200 | daybed 480, double 900, four-poster 2,200 |
+| office desks, chairs | $160–1,200 | desk chair 160, desk 180, standing desk 650, executive desk 1,200 |
+| lighting: table lamps (on tops) | $45–90 | lantern 45, banker's lamp 90 |
+| outdoor yard | $70–2,400 | rain barrel 70, raised bed 160, shed 900, greenhouse 2,400 |
 
 Something clearly better than the basic version (bigger gains, a buff, two slots) costs
 2–3× the basic item; luxury items $1,500–3,000. Per-use `cost` ($4–15) only for
@@ -588,6 +694,41 @@ interaction above 1.0 is wasted (needs cap at 1).
 
 **Feelings:** `mood` +0.05..+0.12 for everyday treats, up to +0.2 for big events; `hours`
 2–8 for everyday treats. Gate the nice ones behind `feelingMinSkill` so skill matters.
+
+## Towns: houses and public places
+
+`content/houses.json` holds the house layouts a town is built from and, under `parks`, its
+public places. Everything is drawn for a medium lot (`plot`, 26×22 tiles) with the street
+along z = 0; plots across the street are the same layout turned round 180°.
+
+```json
+{
+  "id": "cafe", "name": "Corner Café", "kind": "shop", "description": "Coffee, cake and a terrace in the sun.",
+  "walls": [[7, 6, 19, 6], [7, 13, 19, 13], [7, 6, 7, 13], [19, 6, 19, 13]],
+  "doors": [{"x": 12, "z": 6, "axis": "x"}],
+  "windows": [{"x": 8, "z": 6, "axis": "x"}],
+  "paths": [{"x": 1, "z": 1, "w": 24, "d": 5}],
+  "entry": [12.5, 4.5],
+  "objects": [{"def": "cafeTable", "x": 9, "z": 8, "rot": 0, "turn": 30}, {"def": "cafeChair", "x": 8, "z": 8, "rot": 1}]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` | `park` (default: laid out in the open) or `shop` (a small shell with `walls`, `doors` and `windows`, placed like a house's). |
+| `walls`, `doors`, `windows` | As in house layouts (optional). A shop's first door gets a garden path to the street. |
+| `paths` | Paved ground in plot tiles (`x`, `z`, `w`, `d`, any size): walks, squares, terraces. Only drawn. |
+| `entry` | Where visitors arrive (default: the middle of the street front, 1.5 m in). |
+| `objects` | Placements: `def`, `x`, `z` (the footprint's corner), `rot` (0 = facing +z, away from the street; 2 = facing the street), and for things that turn freely (`freeRotation`) `turn` (degrees past `rot`, 0..89) and `offset` (`[x, z]` off the middle of the tile in hundredths of a tile, up to ±50; turned round with the plot it points the other way). |
+
+Every town has the first entry (the Town Park) in the middle of one row and gets more public
+places round it by size (small 1, medium 2, large 3), picked at random from the rest. Everyone in
+town may use what stands on a public place; residents walk there on their own when it's worth
+the walk (food carts and machines when hungry, a bench, the playground). Town files are loaded
+strictly: one thing that doesn't fit (overlaps, faces off the lot, a wall in the way, a turn on
+something that doesn't turn) and the town doesn't load, so `cargo test -p sim-core --test
+public_places` loads every place on both sides of the street and checks that everything in it
+can be reached from the street.
 
 ## Checking a pack
 

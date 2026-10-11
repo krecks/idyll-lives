@@ -1,5 +1,5 @@
 {
-  "$comment": "The garden catalog (v0.5): the Gardening skill, the Garden buy category with its groups, garden feelings and plants. Models: tools/art/garden_models.py.",
+  "$comment": "The garden catalog (v0.5): the Gardening skill, the Garden buy category with its groups, garden feelings and plants. Models: tools/art/nature.py.",
   "skills": [
     {
       "id": "gardening",

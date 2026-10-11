@@ -1,9 +1,9 @@
 # Furniture entries for the base objects and their style variants (`model.<key>[@modern|@cozy|@minimal]`).
 #
-# Sources: the optimised model library built by build_library.py (models/kenney/*.glb: Kenney Furniture
-# Kit, models/ph/*.glb: Poly Haven; all CC0) restyled with the game's finishes through the manifest
-# (`fit`, `materials`, `parts`; see render/babylon/models.ts), plus primitive-part models from
-# objects_extra.py (kept, recoloured or rebuilt here).
+# All primitive parts (box, cylinder, cone, sphere, capsule, blob, lathe, torus; see
+# render/babylon/models.ts): designs from objects_extra.py (kept, recoloured or rebuilt here) and the
+# pieces in furniture_prims.py that replaced the downloaded Kenney / Poly Haven models, drawn in the
+# boxes those files were fitted into so seats, tops and footprints did not move.
 #
 # Style direction (price/behaviour never change with style):
 #   modern  = clean lines, light greys and white, white oak, black-metal accents (never a black body)
@@ -23,6 +23,8 @@ import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import objects_extra as OX                                     # noqa: E402  (placeholder designs + helpers)
 from objects_extra import box, cyl, cone, sph, rod, part, on   # noqa: E402
+import furniture_prims as FP                                   # noqa: E402  (stand-ins for the old library models)
+from furniture_prims import lathe, torus, cushion              # noqa: E402  (re-exported for the other scripts)
 
 F = 'material.finish.'
 E = {}
@@ -37,34 +39,10 @@ TEAL, COGNAC, MUSTARD, SAGE, RUST, CREAM = '#4E7A7F', '#C08A52', '#D6A64A', '#9D
 SCREEN = '#16202B'
 
 
-def lathe(size, at, color, finish, profile, **kw):
-    return part('lathe', size, at, color, finish, profile=[[round(r, 4), round(y, 4)] for r, y in profile], **kw)
-
-
-def torus(size, at, color, finish, **kw):
-    return part('torus', size, at, color, finish, **kw)
-
-
-def cushion(size, at, color, finish='fabric', **kw):
-    kw.setdefault('radius', round(min(size) * 0.42, 3))
-    return box(size, at, color, finish, **kw)
-
-
 def mat(finish, color, **kw):
     d = {'finish': F + finish, 'color': color}
     d.update(kw)
     return d
-
-
-def gltf(url, fit, materials=None, parts=None, align='back', offset=None, rotationY=None, placeholder=None, footprint=(1, 1)):
-    e = {'type': 'model', 'url': url, 'fit': [round(v, 4) for v in fit]}
-    if align != 'centre': e['align'] = align
-    if offset: e['offset'] = offset
-    if rotationY: e['rotationY'] = rotationY
-    if materials: e['materials'] = materials
-    if parts: e['parts'] = parts
-    e['placeholder'] = placeholder or [box([fit[0] * 0.95, fit[1], fit[2] * 0.95], [0, fit[1] / 2, -footprint[1] / 2 + 0.04 + fit[2] / 2 if align == 'back' else 0], LGREY, 'satin', radius=0.02)]
-    return e
 
 
 def placeholder(parts):
@@ -95,35 +73,22 @@ def shift(parts, dx=0.0, dy=0.0, dz=0.0, when=lambda p: True):
     return out
 
 
-KEN, PH = 'models/kenney/', 'models/ph/'
-
 # =============================================================================================
-# Fridge (1x1)
+# Fridge (1x1): back on the wall
 # =============================================================================================
-E['model.fridge'] = gltf(KEN + 'kitchenFridge.glb', [0.74, 1.8, 0.68], {
-    'metalLight': mat('gloss', '#F3F3F1'), 'metalDark': mat('satin', '#B9BCBF'),
-    'metal': mat('chrome', CHROME), 'glass': mat('gloss', '#DADDE0')}, offset=[0, 0, 0.04])
-E['model.fridge@modern'] = gltf(KEN + 'kitchenFridgeLarge.glb', [0.88, 1.84, 0.7], {
-    'metalLight': mat('metal', STEEL), 'metalMedium': mat('satin', '#3A3D41')}, offset=[0, 0, 0.04])
+E['model.fridge'] = placeholder(FP.fridge_classic(0.74, 1.8, 0.67))                     # white, freezer on top, chrome bars
+E['model.fridge@modern'] = placeholder(FP.fridge_side_by_side(0.88, 1.84, 0.69, steel=STEEL))
 E['model.fridge@cozy'] = placeholder(OX.M['model.fridge@cozy'])
-E['model.fridge@minimal'] = gltf(KEN + 'kitchenFridge.glb', [0.7, 1.86, 0.66], {
-    'metalLight': mat('satin', '#F4F3EF'), 'metalDark': mat('satin', '#E4E1DA'),
-    'metal': mat('wood', BIRCH), 'glass': mat('satin', '#ECEAE5')}, offset=[0, 0, 0.04])
+E['model.fridge@minimal'] = placeholder(FP.fridge_classic(                               # handleless white, birch pulls, freezer drawer below
+    0.7, 1.86, 0.65, body='#F4F3EF', gap='#E4E1DA', handle=BIRCH, body_fin='satin', freezer_top=False, split=0.4, handles='wood'))
 
 # =============================================================================================
 # Sink (1x1): a vanity / kitchen sink cabinet (used in both rooms), worktop at 0.9 m
 # =============================================================================================
-SINK = KEN + 'kitchenSink.glb'
-# Kenney kitchenSink materials: wood = cabinet, woodDark = door frame, metal = worktop + basin + pull,
-# metalLight = tap, metalDark / _defaultMat = drain details.
-E['model.sink'] = gltf(SINK, [0.86, 0.92, 0.62], {
-    'wood': mat('satin', '#EDEBE6'), 'woodDark': mat('satin', '#E0DDD6'), 'metal': mat('gloss', '#DCDDDA'),
-    'metalDark': mat('metal', '#AEB3B8'), 'metalLight': mat('chrome', CHROME), '_defaultMat': mat('metal', '#8E9196')},
-    offset=[0, 0, 0.04])
-E['model.sink@modern'] = gltf(SINK, [0.88, 0.92, 0.62], {
-    'wood': mat('satin', '#C9CBCC'), 'woodDark': mat('wood', OAK), 'metal': mat('gloss', '#F4F4F2'),
-    'metalDark': mat('metal', '#AEB3B8'), 'metalLight': mat('metal', BLACKMETAL), '_defaultMat': mat('metal', '#6E7277')},
-    offset=[0, 0, 0.04], parts=[
+E['model.sink'] = placeholder(FP.sink_cabinet(0.86, 0.92))                              # shaker doors, steel basin, gooseneck tap
+E['model.sink@modern'] = placeholder(FP.sink_cabinet(                                    # grey carcass, oak slab doors, black square tap
+    0.88, 0.92, cab='#C9CBCC', door=OAK, door_fin='wood', top='#F4F4F2', basin='#B9BDC1', tap=BLACKMETAL, tap_fin='metal',
+    style='slab', hole=0.4, handle=BLACKMETAL, hfin='metal') + [
         box([0.18, 0.13, 0.13], [0.3, 0.985, -0.18], '#E8E6E1', 'gloss', radius=0.05),          # soap dispenser jar
         cyl([0.07, 0.16, 0.07], [-0.3, 1.0, -0.2], TEAL, 'gloss', taper=0.8),                  # bottle
     ])
@@ -133,10 +98,7 @@ E['model.sink@minimal'] = placeholder(OX.M['model.sink@minimal'])
 # =============================================================================================
 # Toilet (1x1): the Sim sits at the centre facing +Z (seat top ~0.44 m)
 # =============================================================================================
-# Kenney toilet: carpetWhite = body, _defaultMat = seat, metalLight = flush lever.
-E['model.toilet'] = gltf(KEN + 'toilet.glb', [0.44, 0.8, 0.72], {
-    '*': mat('gloss', '#F6F6F4'), 'metalLight': mat('chrome', CHROME), '_defaultMat': mat('gloss', '#EFEFEC')},
-    offset=[0, 0, 0.06])
+E['model.toilet'] = placeholder(FP.toilet(body='#F6F6F4', seat='#EFEFEC'))
 E['model.toilet@modern'] = placeholder(recolor(OX.M['model.toilet@modern'], {
     '#3A3C40': ('#D9D8D4', 'satin'), '#1E1F21': '#F6F6F4', '#2A2B2E': '#F0F0EE'}))
 E['model.toilet@cozy'] = placeholder(OX.M['model.toilet@cozy'])
@@ -145,26 +107,17 @@ E['model.toilet@minimal'] = placeholder(OX.M['model.toilet@minimal'])
 # =============================================================================================
 # Shower (1x1)
 # =============================================================================================
-E['model.shower'] = gltf(KEN + 'shower.glb', [0.9, 2.15, 0.9], {
-    'carpetWhite': mat('gloss', '#F4F4F2'), 'metalDark': mat('chrome', CHROME), 'glass': mat('glass', '#DCE6E8'),
-    'metal': mat('chrome', CHROME)}, align='centre')
-E['model.shower@modern'] = gltf(KEN + 'shower.glb', [0.9, 2.15, 0.9], {
-    'carpetWhite': mat('satin', '#E4E3DF'), 'metalDark': mat('metal', BLACKMETAL), 'glass': mat('glass', '#DCE6E8'),
-    'metal': mat('metal', BLACKMETAL)}, align='centre', parts=[
-        box([0.2, 0.012, 0.6], [0, 0.012, 0.0], OAK, 'wood', radius=0.004),                   # teak duckboard
-        box([0.2, 0.012, 0.6], [0.22, 0.012, 0.0], OAK, 'wood', radius=0.004),
-        box([0.2, 0.012, 0.6], [-0.22, 0.012, 0.0], OAK, 'wood', radius=0.004),
-    ])
+E['model.shower'] = placeholder(FP.shower_cabin())                                      # white tray and tiles, chrome, glass
+E['model.shower@modern'] = placeholder(FP.shower_cabin(tray='#E4E3DF', tray_fin='satin', frame=BLACKMETAL, frame_fin='metal', wall='#D3D2CE',
+                                                     joint='#BDBBB6') + [
+    box([0.2, 0.012, 0.6], [x, 0.064, 0.0], OAK, 'wood', radius=0.004) for x in (-0.22, 0.0, 0.22)])   # teak duckboard
 E['model.shower@cozy'] = placeholder(OX.M['model.shower@cozy'])
-E['model.shower@minimal'] = gltf(KEN + 'showerRound.glb', [0.9, 2.1, 0.9], {
-    '*': mat('satin', '#F4F3EF'), 'glass': mat('glass', '#E2EAEA'), 'metalDark': mat('chrome', CHROME),
-    'carpetWhite': mat('chrome', CHROME)}, align='centre')
+E['model.shower@minimal'] = placeholder(FP.shower_round())                               # D-shaped, curved glass front
 
 # =============================================================================================
 # Sofa (2x1, 2 seats at x = +-0.5): seat ~0.44 m
 # =============================================================================================
-E['model.sofa'] = gltf(PH + 'Sofa_01.glb', [1.86, 0.92, 0.86], align='back', offset=[0, 0, 0.04], footprint=(2, 1),
-                       placeholder=OX.M['model.sofa@minimal'])
+E['model.sofa'] = placeholder(FP.sofa_classic())                                         # camel back, walnut show-wood, cabriole legs
 E['model.sofa@modern'] = placeholder(recolor(OX.M['model.sofa@modern'], {
     '#3A3C40': '#B9BCBE', '#46494E': '#C9CBCC', '#8A8F96': TEAL, '#B0B4BA': COGNAC,
     '#D0D3D6': (BLACKMETAL, 'metal')}))
@@ -203,9 +156,8 @@ E['model.tv'] = placeholder(tv_set(OAKD, OAK))
 E['model.tv@modern'] = placeholder(recolor(OX.M['model.tv@modern'], {
     '#151618': ('#F2F1EE', 'gloss'), '#0E0F10': (OAK, 'wood'), '#1C1D20': (OAK, 'wood'),
     '#1E1F22': '#3A3D41', '#26282B': '#3A3D41'}))
-E['model.tv@cozy'] = gltf(PH + 'tv_crt_side_table.glb', [0.62, 0.94, 0.5], offset=[0, 0, 0.06],
-                         placeholder=OX.M['model.tv@cozy'], parts=[
-                             box([0.5, 0.012, 0.3], [0.0, 0.006, 0.18], RUST, 'fabric', radius=0.004)])
+E['model.tv@cozy'] = placeholder(FP.crt_tv_on_table() + [                                  # wood-veneer CRT on a little table, rag rug
+    box([0.5, 0.012, 0.3], [0.0, 0.006, 0.18], RUST, 'fabric', radius=0.004)])
 E['model.tv@minimal'] = placeholder(OX.M['model.tv@minimal'])
 
 # =============================================================================================
@@ -218,8 +170,7 @@ E['model.bookshelf@cozy'] = placeholder(OX.M['model.bookshelf@cozy'])
 # =============================================================================================
 # Armchair (1x1): one seat at the centre
 # =============================================================================================
-E['model.armchair'] = gltf(PH + 'ArmChair_01.glb', [0.8, 0.98, 0.82], align='back', offset=[0, 0, 0.05],
-                           placeholder=OX.M['model.armchair@cozy'])
+E['model.armchair'] = placeholder(FP.armchair_bergere())                                 # matches the sofa: bergere in a walnut frame
 E['model.armchair@modern'] = placeholder(recolor(OX.M['model.armchair@modern'], {
     '#1E1F22': ('#BFC2C4', 'fabric'), '#2A2B2E': ('#D2D4D5', 'fabric'), '#6B7079': COGNAC}))
 E['model.armchair@cozy'] = placeholder(OX.M['model.armchair@cozy'])
@@ -228,11 +179,10 @@ E['model.armchair@minimal'] = placeholder(OX.M['model.armchair@minimal'])
 # =============================================================================================
 # Plant (1x1)
 # =============================================================================================
-E['model.plant'] = gltf(PH + 'potted_plant_02.glb', [0.62, 0.82, 0.62], align='centre', placeholder=OX.M['model.plant@cozy'])
+E['model.plant'] = placeholder(FP.potted_arrowhead())                                   # terracotta pot, arrowhead leaves on stalks
 E['model.plant@modern'] = placeholder(recolor(OX.M['model.plant@modern'], {
     '#1C1D20': ('#E8E6E1', 'satin'), '#26282B': ('#D5D2CB', 'satin')}))
-E['model.plant@cozy'] = gltf(PH + 'potted_plant_01.glb', [0.66, 0.78, 0.66], align='centre', placeholder=OX.M['model.plant@cozy'],
-                            parts=[cyl([0.5, 0.06, 0.5], [0, 0.03, 0], HONEY, 'wood', segments=20)])
+E['model.plant@cozy'] = placeholder([cyl([0.5, 0.06, 0.5], [0, 0.03, 0], HONEY, 'wood', segments=20)] + FP.potted_ivy())  # pothos on a saucer
 E['model.plant@minimal'] = placeholder(OX.M['model.plant@minimal'])
 
 # =============================================================================================
@@ -497,8 +447,29 @@ E['model.treadmill'] = placeholder(recolor(OX.M['model.treadmill'], {
 E['model.telescope'] = placeholder(recolor(OX.M['model.telescope'], {
     '#3A3D42': ('#F2F2F0', 'gloss'), '#1A1A1C': '#2F3236', '#22314F': '#2E4E7E'}))
 E['model.mirror'] = placeholder(recolor(OX.M['model.mirror'], {'#7A563A': HONEY, '#5A3F2A': WALNUT}))
-E['model.workbench'] = gltf(PH + 'workbench_metal_desk.glb', [1.62, 1.05, 0.7], offset=[0, 0, 0.04], footprint=(2, 1),
-                            placeholder=OX.M['model.workbench'])
+def workbench():
+    """A steel desk turned workbench (2x1, top 0.78): toolbox, cordless drill, a few screws and a pencil."""
+    p = FP.metal_desk(1.62, 0.78, 0.69)
+    y = 0.78
+    p += [box([0.42, 0.16, 0.2], [-0.5, y + 0.08, -0.3], '#4E7A5A', 'satin', radius=0.02),                # toolbox
+          box([0.43, 0.035, 0.21], [-0.5, y + 0.15, -0.3], '#5E8C68', 'satin', radius=0.012),
+          box([0.06, 0.03, 0.03], [-0.62, y + 0.1, -0.195], CHROME, 'chrome', radius=0.006),             # latches
+          box([0.06, 0.03, 0.03], [-0.38, y + 0.1, -0.195], CHROME, 'chrome', radius=0.006),
+          rod([-0.62, y + 0.17, -0.3], [-0.6, y + 0.24, -0.3], 0.02, '#2F3236', 'satin'),                 # handle
+          rod([-0.6, y + 0.24, -0.3], [-0.4, y + 0.24, -0.3], 0.02, '#2F3236', 'satin'),
+          rod([-0.4, y + 0.24, -0.3], [-0.38, y + 0.17, -0.3], 0.02, '#2F3236', 'satin'),
+          part('capsule', [0.06, 0.2, 0.06], [0.45, y + 0.13, -0.16], '#F2B84B', 'satin', rotate=[0, 0, 90]),   # drill body
+          box([0.05, 0.13, 0.05], [0.5, y + 0.07, -0.16], '#2F3236', 'satin', radius=0.015, rotate=[0, 0, -12]),  # grip
+          box([0.09, 0.03, 0.07], [0.51, y + 0.015, -0.16], '#F2B84B', 'satin', radius=0.012),             # battery
+          cyl([0.035, 0.05, 0.035], [0.33, y + 0.13, -0.16], '#2F3236', 'satin', rotate=[0, 0, 90], segments=10),  # chuck
+          cyl([0.008, 0.06, 0.008], [0.28, y + 0.13, -0.16], CHROME, 'chrome', rotate=[0, 0, 90], segments=6),
+          box([0.3, 0.012, 0.21], [0.0, y + 0.006, 0.05], '#D9C7A7', 'matte', radius=0.004, rotate=[0, 6, 0]),  # plan sheet
+          box([0.15, 0.01, 0.01], [0.04, y + 0.017, 0.07], '#E9B54A', 'matte', radius=0.004, rotate=[0, -20, 0]),  # pencil
+          cyl([0.09, 0.06, 0.09], [0.15, y + 0.03, -0.32], '#B9BDC1', 'metal', segments=14)]                # jar of screws
+    return p
+
+
+E['model.workbench'] = placeholder(workbench())
 
 # =============================================================================================
 # Floor lamp (1x1) variants (the base model is the brass lamp from objects_extra)
@@ -586,17 +557,14 @@ def chef_stove():
 E['model.whirlpoolTub'] = placeholder(whirlpool())
 E['model.chefStove'] = placeholder(chef_stove())
 
-# Spare keys (not placed yet) and the minimal shelf: same placement, optimised library files.
-for key, src, extra in (
-    ('model.diningChair', 'painted_wooden_chair_01', {'offset': [-0.0015, 0.0007, 0.0307]}),
-    ('model.sideTable', 'side_table_01', {'offset': [0.0, 0.0024, 0.0]}),
-    ('model.stove', 'electric_stove', {'offset': [0.0, 0.0, -0.1498]}),
-    ('model.plantSmall', 'potted_plant_04', {'offset': [0.0, 0.0, -0.0084]}),
-    ('model.ceilingLamp', 'modern_ceiling_lamp_01', {'offset': [0.0, -0.2211, -0.0015]}),
-):
-    E[key] = {'type': 'model', 'url': PH + src + '.glb', 'scale': 1.0, **extra}
-E['model.bookshelf@minimal'] = {'type': 'model', 'url': PH + 'wooden_display_shelves_01.glb', 'scale': 0.835, 'rotationY': 90,
-                                'offset': [0.0, 0.0, -0.295], 'placeholder': OX.M['model.bookshelf@minimal']}
+# Spare keys (not placed by the base content; the catalogue overrides diningChair and sideTable) and the
+# minimal shelf, in the same boxes as the library files they replaced.
+E['model.diningChair'] = placeholder(FP.painted_chair())                                  # 0.43 x 0.96 x 0.54, seat 0.46
+E['model.sideTable'] = placeholder(FP.side_table(0.55, 0.55, 0.45))                       # top 0.55
+E['model.stove'] = placeholder(FP.stove_electric())                                       # 0.5 x 0.86 x 0.65
+E['model.plantSmall'] = placeholder(FP.potted_aloe())                                     # 0.17 x 0.27
+E['model.ceilingLamp'] = placeholder(FP.pendant_globe())                                  # 0.43 globe, 0.95 drop
+E['model.bookshelf@minimal'] = placeholder(FP.cube_shelf())                               # birch cube shelf, 0.9 x 1.3 x 0.31
 
 # =============================================================================================
 # Validation (footprint bounds within ~4.5 cm, finishes, colours)

@@ -3,11 +3,11 @@
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        WHITE, OAK, OAKD, BIRCH, CHROME, TEAL, MUSTARD, SAGE)
 from pack_foodie import run  # noqa: E402
+from furniture_prims import washer_dryer, shower_cabin  # noqa: E402
 
-LIB = '../../models/'
 E, FOOT = {}, {}
 W = '#F4F3EF'
 PASTEL = ['#9FD3C7', '#F2C6A0', '#B8C9E8', '#E9D58A', '#D9B8D6', '#A8D5A2']
@@ -55,7 +55,7 @@ def steam_mop_dock():
 E['model.neat.steamMopDock'] = steam_mop_dock(); FOOT['model.neat.steamMopDock'] = (1, 1)
 
 
-# ---- laundryCenter (2x1): stacked washer/dryer (Kenney, restyled) + folding counter, rail -------
+# ---- laundryCenter (2x1): stacked washer/dryer + folding counter, rail -------------------------
 def laundry_center():
     cx = 0.45
     p = [box([0.9, 0.9, 0.56], [cx, 0.45, -0.17], W, 'satin', radius=0.012),                       # counter cabinet
@@ -83,19 +83,13 @@ def laundry_center():
         x = cx - 0.27 + i * 0.18
         p += [box([0.05, 0.03, 0.015], [x, 1.7, -0.29], OAK, 'wood', radius=0.005),
               box([0.3, 0.42, 0.04], [x, 1.46, -0.29], c, 'fabric', radius=0.03, rotate=[0, 70, 0])]
-    # Kenney washerDryerStacked: metalLight = body, metalMedium = trims, metalDark = displays,
-    # metal = porthole rings, glass = portholes, _defaultMat = details.
-    fb = [box([0.68, 1.72, 0.6], [-0.56, 0.86, -0.15], W, 'gloss', radius=0.02)] + p
-    return gltf(LIB + 'kenney/washerDryerStacked.glb', [0.68, 1.72, 0.62], {
-        'metalLight': mat('gloss', '#F7F7F5'), 'metalMedium': mat('satin', '#D5D7D8'), 'metalDark': mat('gloss', '#2E3A46'),
-        'metal': mat('chrome', CHROME), 'glass': mat('glass', '#C9E0E8'), '_defaultMat': mat('satin', '#C3C6C8')},
-        align='back', offset=[-0.56, 0, 0.045], parts=p, placeholder=fb, footprint=(2, 1))
+    return placeholder(washer_dryer(-0.56, 0.68, 1.72, 0.62) + p)
 
 
 E['model.neat.laundryCenter'] = laundry_center(); FOOT['model.neat.laundryCenter'] = (2, 1)
 
 
-# ---- rainShowerTower (1x1): glass enclosure (Kenney shower) with a ceiling rain head, steam
+# ---- rainShowerTower (1x1): glass enclosure with a ceiling rain head, steam
 #      column and a teak bench ---------------------------------------------------------------------
 def rain_shower_tower():
     p = [box([0.44, 0.02, 0.44], [0, 2.09, 0.0], CHROME, 'chrome', radius=0.01),                  # rain head
@@ -113,10 +107,7 @@ def rain_shower_tower():
         p.append(box([0.04, 0.43, 0.24], [x, 0.215, -0.24], '#B07A4A', 'wood', radius=0.008))
     p += towels(0.2, -0.26, 0.47, 2, w=0.24, d=0.2, colors=['#F7F7F7', '#9FD3C7'])
     p += bottle(-0.22, -0.3, 0.47, '#F2C6A0', h=0.16, d=0.06) + bottle(-0.12, -0.3, 0.47, '#B8C9E8', h=0.18, d=0.06)
-    fb = [box([0.9, 0.06, 0.9], [0, 0.03, 0], W, 'gloss', radius=0.02)] + p
-    return gltf(LIB + 'kenney/shower.glb', [0.9, 2.18, 0.9], {
-        'carpetWhite': mat('satin', W), 'metalDark': mat('chrome', CHROME), 'glass': mat('glass', '#DCE8EA'),
-        'metal': mat('chrome', CHROME)}, align='centre', parts=p, placeholder=fb)
+    return placeholder(shower_cabin(0.9, 2.18, tray=W, tray_fin='satin', glass='#DCE8EA', wall='#F1F0EC', joint='#D6D4CE', fittings=False) + p)
 
 
 E['model.neat.rainShowerTower'] = rain_shower_tower(); FOOT['model.neat.rainShowerTower'] = (1, 1)

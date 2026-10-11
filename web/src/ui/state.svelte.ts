@@ -6,6 +6,8 @@ import type { RenderStats, WallMode } from '../render/types';
 
 export interface MenuState {
   objectId: number;
+  /** A menu for food or a dish (an item) instead of an object: index 0 eats, 1 clears away. */
+  itemId?: number;
   title: string;
   /** Canvas-relative CSS pixels. */
   x: number;

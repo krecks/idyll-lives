@@ -6,7 +6,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import type { WorldStructure } from '../core/protocol';
+import type { ItemPlacement, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -48,6 +48,8 @@ export interface PickResult {
   ground: { x: number; z: number } | null;
   /** Object id under the cursor, if any. */
   objectId: number | null;
+  /** Food or a dish (item id) under the cursor, if any (picked before what it stands on). */
+  itemId?: number | null;
 }
 
 export interface RendererDeps {
@@ -89,6 +91,10 @@ export interface PlacementGhost {
   rot: number;
   /** Degrees past `rot` (objects that turn freely). */
   turn?: number;
+  /** Centimetres (x, z) its middle stands off the middle of the footprint (objects that turn freely). */
+  offset?: [number, number];
+  /** Things on the `surface` layer: the height (m) of the top it's held over. */
+  lift?: number;
   w: number;
   d: number;
   /** The tile a Sim uses it from, marked with an arrow (must stay clear). */
@@ -187,10 +193,17 @@ export interface Renderer {
    * switches and on build-mode edits.
    */
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void>;
+  /** Food and dishes (sent apart from the world: they change far more often). */
+  setItems(items: readonly ItemPlacement[]): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
+  /**
+   * Where the ray of the last `pick` meets the level `height` metres above the floor in view (a
+   * table top), in the lot's rows like `PickResult.ground`; null if it doesn't.
+   */
+  pickPlane(height: number): { x: number; z: number } | null;
   /** Projects a world point to canvas CSS pixels into `out`; false if behind the camera. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */

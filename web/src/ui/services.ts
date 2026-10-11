@@ -58,6 +58,8 @@ export interface GameControls {
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
   useObject(objectId: number, interaction: number): void;
+  /** The selected Sim eats a serving of food (an item) or clears it away to the sink. */
+  useItem(itemId: number, action: 'eat' | 'clear'): void;
   cancelAction(index: number): void;
   setWallMode(mode: WallMode): void;
   closeMenu(): void;

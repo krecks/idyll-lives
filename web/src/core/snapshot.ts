@@ -20,6 +20,8 @@ export interface SnapshotLayout {
     calm?: number;
     /** Id of the latest milestone event modulo 2^24 (missing in older layouts). */
     majorEvent?: number;
+    /** Food and dishes changed (`Items::version` modulo 2^24; missing in older layouts). */
+    itemsVersion?: number;
   };
   sim: {
     id: number;
@@ -52,9 +54,17 @@ export interface SnapshotLayout {
     objectDef?: number;
     /** Index into that definition's interactions, -1 = none (missing in older layouts). */
     interaction?: number;
+    /** What they carry: index into `items` + 1, 0 = nothing (missing in older layouts). */
+    held?: number;
+    /** The recipe they're cooking: index into `recipes` + 1, 0 = none. While cooking, `object` is the station and `action` the step's animation. */
+    recipe?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];
+  /** Content item ids (named by `sim.held` - 1). */
+  items?: string[];
+  /** Content recipe ids (named by `sim.recipe` - 1). */
+  recipes?: string[];
 }
 
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;

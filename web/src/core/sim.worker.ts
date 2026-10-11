@@ -25,6 +25,7 @@ let game: Game | null = null;
 let memory: WebAssembly.Memory;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
+let lastItems = -1;
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
@@ -144,6 +145,11 @@ function publish(): void {
   if (version !== lastStructure) {
     lastStructure = version;
     postWorld();
+  }
+  const items = g.items_version();
+  if (items !== lastItems) {
+    lastItems = items;
+    scope.postMessage({ type: 'items', items: JSON.parse(g.items()) });
   }
 }
 

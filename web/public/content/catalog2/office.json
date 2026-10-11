@@ -1,0 +1,350 @@
+{
+  "$comment": "Catalogue 2: Desks (tops), desk chairs that work at them (`needsTable`) and office bits. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "objects": [
+    {
+      "id": "deskSimple",
+      "name": "Simple desk",
+      "model": "model.deskSimple",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 180,
+      "category": "office",
+      "group": "desks",
+      "surface": {
+        "height": 0.74,
+        "kind": "desk",
+        "size": [
+          1.5,
+          0.72
+        ],
+        "at": [
+          0.0,
+          -0.1
+        ]
+      },
+      "description": "An oak top on hairpin legs with a drawer. Pull up a desk chair.",
+      "interactions": []
+    },
+    {
+      "id": "deskCorner",
+      "name": "Corner desk",
+      "model": "model.deskCorner",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 420,
+      "category": "office",
+      "group": "desks",
+      "surface": {
+        "height": 0.74,
+        "kind": "desk",
+        "size": [
+          1.96,
+          1.96
+        ]
+      },
+      "description": "A big white corner desk with a drawer unit: room for two to work.",
+      "interactions": []
+    },
+    {
+      "id": "deskStanding",
+      "name": "Standing desk",
+      "model": "model.deskStanding",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 650,
+      "category": "office",
+      "group": "desks",
+      "surface": {
+        "height": 1.05,
+        "kind": "desk",
+        "size": [
+          0.96,
+          0.66
+        ],
+        "at": [
+          0.0,
+          -0.13
+        ]
+      },
+      "description": "A desk at standing height with a monitor on an arm. Good for the back.",
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the web",
+          "anim": "type",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "screen"
+          ]
+        },
+        {
+          "id": "code",
+          "label": "Practise coding",
+          "anim": "type",
+          "minutes": 60,
+          "effects": {
+            "fun": 0.1,
+            "energy": -0.03
+          },
+          "tags": [
+            "training",
+            "screen"
+          ],
+          "skills": {
+            "technology": 0.18,
+            "endurance": 0.03
+          }
+        }
+      ]
+    },
+    {
+      "id": "deskExecutive",
+      "name": "Executive desk",
+      "model": "model.deskExecutive",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1200,
+      "category": "office",
+      "group": "desks",
+      "decor": 0.5,
+      "surface": {
+        "height": 0.74,
+        "kind": "desk",
+        "size": [
+          1.8,
+          0.8
+        ],
+        "at": [
+          0.0,
+          -0.06
+        ]
+      },
+      "description": "A walnut desk with a green leather top and drawers both sides.",
+      "interactions": []
+    },
+    {
+      "id": "filingCabinet",
+      "name": "Filing cabinet",
+      "model": "model.filingCabinet",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "office",
+      "description": "Three steel drawers of paperwork, a plant on top.",
+      "interactions": []
+    },
+    {
+      "id": "chairExecutive",
+      "name": "Executive chair",
+      "model": "model.chairExecutive",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 450,
+      "category": "office",
+      "group": "chairs",
+      "decor": 0.2,
+      "approach": "around",
+      "seatAt": [
+        "desk",
+        "table"
+      ],
+      "seat": {
+        "height": 0.49,
+        "forward": 0.05
+      },
+      "description": "A high-backed leather swivel chair. Facing a desk, it is a place to work.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.4
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "write",
+          "label": "Write at the desk",
+          "anim": "write",
+          "minutes": 60,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.2,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework at the desk",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "needsTable": true,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "chairTask",
+      "name": "Desk chair",
+      "model": "model.chairTask",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 160,
+      "category": "office",
+      "group": "chairs",
+      "approach": "around",
+      "seatAt": [
+        "desk",
+        "table"
+      ],
+      "seat": {
+        "height": 0.48,
+        "forward": 0.05
+      },
+      "description": "A swivel chair with a mesh back. Facing a desk, it is a place to work.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit down",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "write",
+          "label": "Write at the desk",
+          "anim": "write",
+          "minutes": 60,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.2,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework at the desk",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "needsTable": true,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "whiteboard",
+      "name": "Whiteboard",
+      "model": "model.whiteboard",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "office",
+      "layer": "wall",
+      "description": "A whiteboard for plans and sums. Planning on it trains Intelligence and Business.",
+      "interactions": [
+        {
+          "id": "plan",
+          "label": "Plan on the whiteboard",
+          "anim": "paint",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.05
+          },
+          "tags": [
+            "training"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "business": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "id": "corkboard",
+      "name": "Corkboard",
+      "model": "model.corkboard",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 40,
+      "category": "office",
+      "layer": "wall",
+      "decor": 0.3,
+      "description": "Notes and postcards pinned to cork.",
+      "interactions": []
+    }
+  ]
+}

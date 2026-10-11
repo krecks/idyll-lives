@@ -5,7 +5,8 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, on, CHROME, BRASS  # noqa: E402
-from pack_shapes import LIB, POT, DOME, JAR, leafy, sling, run  # noqa: E402
+from pack_shapes import POT, DOME, JAR, leafy, sling, run  # noqa: E402
+from furniture_prims import fern  # noqa: E402
 
 E = {}
 CEDAR, CEDARD, SOIL, TERRA, SAGE = '#C27C4E', '#A3653E', '#5A4030', '#C7744F', '#8FA88A'
@@ -195,7 +196,7 @@ gp += [box([1.4, 0.05, 0.42], [0, 0.42, -0.02], CEDAR, 'wood', radius=0.012),
        cushion([0.6, 0.04, 0.36], [0.5, 0.465, -0.01], '#E8B07A', 'satin', radius=0.015)]
 for x in (-0.64, 0.64):
     gp += [box([0.05, 0.3, 0.38], [x, 0.27, -0.02], CEDARD, 'wood', radius=0.01)]
-# Plants: back shelf (ferns from Poly Haven via the url), orchids, a palm, hanging pots
+# Plants: back shelf (ferns and orchids), a palm, hanging pots
 gp += [box([1.7, 0.04, 0.3], [0, 0.78, -0.72], CEDAR, 'wood', radius=0.008)]
 for x in (-0.72, 0.72):
     gp.append(box([0.04, 0.66, 0.26], [x, 0.45, -0.72], CEDARD, 'wood', radius=0.006))
@@ -214,9 +215,9 @@ for x in (-0.68, 0.68):                                                         
     gp += [rod([x, HW, -0.3], [x, 1.72, -0.3], 0.008, '#8A6A4A', 'matte'),
            lathe([0.2, 0.14, 0.2], [x, 1.65, -0.3], TERRA, 'satin', POT, segments=14),
            part('blob', [0.26, 0.26, 0.26], [x, 1.6, -0.3], '#5E8F4E', 'foliage', noise=0.35)]
-E['model.natureLover.glasshouse'] = {
-    'type': 'model', 'url': LIB + 'ph/fern_02.glb', 'fit': [1.5, 0.5, 0.26], 'align': 'centre', 'offset': [0, 0.8, -0.72],
-    'parts': gp, 'placeholder': gp}
+for x in (-0.6, -0.07, 0.43):                                                                       # ferns on the back shelf
+    gp += fern(x, 0.8, -0.74, TERRA, spread=0.25, green=(GREEN3, GREEN, GREEN2))
+E['model.natureLover.glasshouse'] = {'type': 'model', 'placeholder': gp}
 
 if __name__ == '__main__':
     sys.exit(1 if run('natureLover', E) else 0)

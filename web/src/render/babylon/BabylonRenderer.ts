@@ -51,7 +51,7 @@ import {
   type AbstractEngine,
 } from './core';
 import type { FrameState } from '../../core/bridge';
-import { groundDepth, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type ItemPlacement, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -82,6 +82,7 @@ import { MaterialLibrary } from './materials';
 import { buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
+import { ItemLayer } from './items';
 import { installNature, Landscape, natureDecor, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
@@ -132,6 +133,8 @@ interface PlacedObject {
   pop: PopTarget;
   /** Its contact shadow's instance. */
   shadow?: PopTarget;
+  /** Things on a top: the object whose top it is (they're in hand with it). */
+  host?: number;
 }
 
 const MAX_SIMS = MAX_CHARACTERS;
@@ -255,6 +258,8 @@ export class BabylonRenderer implements Renderer {
   private cutLook = -1;
   private placed: PlacedObject[] = [];
   private characters!: Characters;
+  /** Food and dishes (`items.ts`). */
+  private items!: ItemLayer;
   private cursor!: Mesh;
   private selectedSim: number | null = null;
   private cameraPlaced = false;
@@ -315,6 +320,8 @@ export class BabylonRenderer implements Renderer {
   /** The ghost glides to its tile and turns smoothly; it floats a little, as if held. */
   private ghostShown = false;
   private readonly ghostGoal = new Vector3();
+  /** Height of the top the ghost is held over (things on tables, counters, shelves). */
+  private ghostLift = 0;
   private ghostYawGoal = 0;
   private ghostAge = 0;
   private ghostSpawn = 0;
@@ -394,7 +401,11 @@ export class BabylonRenderer implements Renderer {
       roofs: c.roofStyles,
       roofColors: c.roofColors,
     });
-    this.street = new Street(scene, this.deps.assets, this.house);
+    // Public places seen from another lot show their things in the open (as the overview does).
+    this.street = new Street(scene, this.deps.assets, this.house, undefined, (def) => {
+      const d = this.deps.content.object(def);
+      return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1] };
+    });
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
     await this.setupEnvironment();
@@ -409,7 +420,9 @@ export class BabylonRenderer implements Renderer {
     this.setupHelpers();
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
-    this.characters = new Characters(scene, this.deps.assets, this.lib);
+    this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
+    this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
+    this.items.onChange = () => this.resetSnapshot();
     this.applyLook();
     window.addEventListener('resize', this.onResize);
   }
@@ -529,6 +542,7 @@ export class BabylonRenderer implements Renderer {
     for (const mesh of [...this.worldMeshes, ...templates]) mesh.freezeWorldMatrix();
     this.applyWallMode();
     this.applyStoreys();
+    this.showItems();
     this.lastLightMinute = -1;
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0)).map((o) => this.objectModel(o));
@@ -584,10 +598,25 @@ export class BabylonRenderer implements Renderer {
     this.markerHalo.thinInstanceBufferUpdated('color');
   }
 
+  /** The ray of the last `pick` (for `pickPlane`). */
+  private readonly pickOrigin = new Vector3();
+  private readonly pickDir = new Vector3();
+
+  setItems(items: readonly ItemPlacement[]): void {
+    this.items.set(items);
+  }
+
+  /** Food and dishes for the lot and storeys in view. */
+  private showItems(): void {
+    this.items.show({ storey: this.storey, depth: this.storeys.depth, storeyHeight: WALL_HEIGHT, inView: (x, z) => this.inView(x, z, 0) });
+  }
+
   pick(x: number, y: number): PickResult {
     const ray = this.scene.createPickingRay(x, y, null, this.camera);
     const o = ray.origin;
     const d = ray.direction;
+    this.pickOrigin.copyFrom(o);
+    this.pickDir.copyFrom(d);
     let ground: PickResult['ground'] = null;
     // The floor of the storey in view, answered in its rows of the lot.
     const floor = this.storey * WALL_HEIGHT;
@@ -605,7 +634,25 @@ export class BabylonRenderer implements Renderer {
         objectId = p.id;
       }
     }
-    return { ground, objectId };
+    // A plate on a table is picked before the table.
+    let itemId: number | null = null;
+    let nearestItem = Infinity;
+    for (const p of this.items.placed) {
+      const t = rayBox(o, d, p.minX, p.y0, p.minZ, p.maxX, p.y0 + p.height, p.maxZ);
+      if (t < nearestItem && t <= nearest + 0.3) {
+        nearestItem = t;
+        itemId = p.id;
+      }
+    }
+    return { ground, objectId, itemId };
+  }
+
+  pickPlane(height: number): { x: number; z: number } | null {
+    const [o, d] = [this.pickOrigin, this.pickDir];
+    const y = this.storey * WALL_HEIGHT + height;
+    if (d.y > -1e-6 || o.y <= y) return null;
+    const t = (y - o.y) / d.y;
+    return { x: o.x + d.x * t, z: o.z + d.z * t + this.storey * this.storeys.depth };
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -676,8 +723,10 @@ export class BabylonRenderer implements Renderer {
     }
     const fresh = !this.ghostShown || ghost.model !== this.ghostKey;
     if (ghost.model !== this.ghostKey) this.loadGhost(ghost.model);
-    // Rotate about the footprint centre, like placed objects. The turn takes the short way round.
-    this.ghostGoal.set(ghost.x + ghost.w / 2, 0, ghost.z + ghost.d / 2);
+    // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
+    const centre = objectCentre(ghost);
+    this.ghostGoal.set(centre.x, 0, centre.z);
+    this.ghostLift = ghost.lift ?? 0;
     const yaw = (ghost.rot * Math.PI) / 2 + ((ghost.turn ?? 0) * Math.PI) / 180;
     const turn = Math.atan2(Math.sin(yaw - this.ghostYawGoal), Math.cos(yaw - this.ghostYawGoal));
     this.ghostYawGoal += turn;
@@ -726,7 +775,9 @@ export class BabylonRenderer implements Renderer {
     this.showHeld();
     const p = this.heldId === null ? undefined : this.placed.find((o) => o.id === this.heldId);
     if (!p) return;
-    const targets = p.shadow ? [p.pop, p.shadow] : [p.pop];
+    // What stands on its top goes with it.
+    const riders = this.placed.filter((o) => o.host === p.id);
+    const targets = [p, ...riders].flatMap((o) => (o.shadow ? [o.pop, o.shadow] : [o.pop]));
     this.held = { id: p.id, saved: targets.map((target) => ({ target, matrix: target.matrices.slice(target.index * 16, target.index * 16 + 16) })) };
     // Scaled to nothing where it stands (an all-zero matrix would put w = 0).
     for (const { target, matrix } of this.held.saved) {
@@ -761,8 +812,8 @@ export class BabylonRenderer implements Renderer {
     root.position.x += (this.ghostGoal.x - root.position.x) * glide;
     root.position.z += (this.ghostGoal.z - root.position.z) * glide;
     root.rotation.y += (this.ghostYawGoal - root.rotation.y) * (1 - Math.exp(-dt * 16));
-    // Held a hand's breadth above the floor, bobbing gently; picked up with a springy pop.
-    root.position.y = 0.07 + 0.035 * Math.sin(this.ghostAge * 3.4);
+    // Held a hand's breadth above the floor (or the top it goes on), bobbing gently; picked up with a springy pop.
+    root.position.y = this.ghostLift + 0.07 + 0.035 * Math.sin(this.ghostAge * 3.4);
     const t = this.ghostSpawn;
     const s = t > 0.6 ? 1 : 1 - Math.exp(-8 * t) * Math.cos(14 * t);
     root.scaling.set(s, s, s);
@@ -1307,6 +1358,7 @@ export class BabylonRenderer implements Renderer {
     this.wallItemsHidden.clear();
     this.held = null;
     this.characters?.clear();
+    this.items?.clear();
     this.simCount = 0;
     this.selectedSim = null;
     this.onFrame = null;
@@ -1813,10 +1865,19 @@ export class BabylonRenderer implements Renderer {
     this.previewMeshes = { wall, door, window: pane, open };
     this.previewBuffers = { wall: wallBuf, door: doorBuf, window: paneBuf, open: openBuf };
 
-    // Tile grid: white lines on a transparent texture, repeated once per tile.
+    // Tile grid: white lines on a transparent texture, repeated once per tile, with fainter
+    // half- and quarter-tile lines inside for lining up small things (they fade out with distance).
     const gridTex = new DynamicTexture('grid', 128, this.scene, true);
     const gctx = gridTex.getContext();
     gctx.clearRect(0, 0, 128, 128);
+    gctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (const p of [32, 96]) {
+      gctx.fillRect(0, p, 128, 2);
+      gctx.fillRect(p, 0, 2, 128);
+    }
+    gctx.fillStyle = 'rgba(255,255,255,0.55)';
+    gctx.fillRect(0, 64, 128, 2);
+    gctx.fillRect(64, 0, 2, 128);
     gctx.fillStyle = 'rgba(255,255,255,1)';
     gctx.fillRect(0, 0, 128, 3);
     gctx.fillRect(0, 0, 3, 128);
@@ -2211,9 +2272,16 @@ export class BabylonRenderer implements Renderer {
       [...byModel.entries()].map(([group, list]) => {
         const key = group.slice(group.indexOf('|') + 1);
         const def = this.deps.content.object(list[0].def);
-        return this.template(`object:${key}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1]));
+        const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
+        return this.template(`object:${key}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius }));
       }),
     );
+    // What each tile's top belongs to, for the things standing on tops.
+    const tops = new Map<string, number>();
+    for (const o of shown) {
+      if (!this.deps.content.object(o.def)?.surface) continue;
+      for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) tops.set(`${x}:${z}`, o.id);
+    }
     // Soft contact shadows under every object, sized to its footprint.
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
     [...byModel.entries()].forEach(([group, list], n) => {
@@ -2223,22 +2291,31 @@ export class BabylonRenderer implements Renderer {
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const k = this.storeyOf(o.z);
-        const [y0, z] = [k * WALL_HEIGHT, o.z - k * D];
+        // Things on a top stand on it.
+        const [y0, z] = [k * WALL_HEIGHT + (o.lift ?? 0), o.z - k * D];
+        // Things that stand anywhere on their tile are moved off its middle (picking and the shadow follow).
+        const centre = objectCentre(o);
+        const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
         Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.qTmp);
-        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(o.x + o.w / 2, y0, z + o.d / 2), this.mOut);
+        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(centre.x, y0, centre.z - k * D), this.mOut);
         this.mOut.copyToArray(matrices, i * 16);
-        const layer = this.deps.content.object(o.def)?.layer;
+        const def = this.deps.content.object(o.def);
+        const layer = def?.layer;
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
+        // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
+        const [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - k * D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
+        const [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
         this.placed.push({
           id: o.id,
           y0,
-          minX: o.x,
-          minZ: z,
-          maxX: o.x + o.w,
-          maxZ: z + o.d,
+          minX: px,
+          minZ: pz,
+          maxX: px + pw,
+          maxZ: pz + pd,
           height: template.height,
           bottom,
           wallRot: layer === 'wall' ? o.rot % 4 : undefined,
+          host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           pop: { meshes: template.meshes, matrices, index: i },
         });
       });
@@ -2251,14 +2328,19 @@ export class BabylonRenderer implements Renderer {
     shown.forEach((o, i) => {
       const k = i * 16;
       const s = this.storeyOf(o.z);
-      // Nothing on a wall, the ceiling or the floor's surface (rugs) sits on a contact shadow.
-      const flat = (this.deps.content.object(o.def)?.layer ?? 'floor') !== 'floor' ? 0 : 1;
-      blobs[k] = o.w * 1.15 * flat;
+      // Nothing on a wall, the ceiling or the floor's surface (rugs) sits on a contact shadow;
+      // things on a top get a small one there, the size of what they take on it.
+      const def = this.deps.content.object(o.def);
+      const layer = def?.layer ?? 'floor';
+      const flat = layer === 'floor' || layer === 'surface' ? 1 : 0;
+      const [sw, sd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.3, this.deps.content.radius(def) * 2.3] : [o.w * 1.15, o.d * 1.15];
+      blobs[k] = sw * flat;
       blobs[k + 5] = flat;
-      blobs[k + 10] = o.d * 1.15 * flat;
-      blobs[k + 12] = o.x + o.w / 2;
-      blobs[k + 13] = 0.018 + s * WALL_HEIGHT;
-      blobs[k + 14] = o.z - s * D + o.d / 2;
+      blobs[k + 10] = sd * flat;
+      const centre = objectCentre(o);
+      blobs[k + 12] = centre.x;
+      blobs[k + 13] = 0.018 + s * WALL_HEIGHT + (o.lift ?? 0);
+      blobs[k + 14] = centre.z - s * D;
       blobs[k + 15] = 1;
     });
     if (!shown.length) return;

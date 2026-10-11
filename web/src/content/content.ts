@@ -37,7 +37,97 @@ export interface InteractionDef {
    * Without one the simulation derives a tag from `tags`, `pose` and `effects`.
    */
   anim?: string;
+  /** Only offered while the seat faces a table it tucks under (`seatAt`): dining at a table. */
+  needsTable?: boolean;
+  /**
+   * Starts this recipe (`recipes` id): the resident goes round its stations (fridge, counter,
+   * stove) instead of using this object alone, and a dish is served. `effects` are then what
+   * cooking does for the cook; `minutes` aren't needed (the steps take their own).
+   */
+  recipe?: string;
 }
+
+/** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */
+export interface CookingRules {
+  /** The kinds of station (objects' `stations` and recipe steps' `at` name them). */
+  stations?: string[];
+  spoilHours?: number;
+  storedSpoilHours?: number;
+  eatMinutes?: number;
+  dishesMinutes?: number;
+  carryDishes?: number;
+  leftoverPreference?: number;
+  feedFamily?: number;
+  hungryBelow?: number;
+  invitedBoost?: number;
+  inviteMinutes?: number;
+  stationWaitMinutes?: number;
+  dirtyDirtPerHour?: number;
+  skipPenalty?: number;
+  seatTags?: string[];
+  seatAvoid?: string[];
+  /** Height (m) of a station's top without a `surface` (where the board or pan is drawn). */
+  defaultSurfaceHeight?: number;
+  serveRange?: number;
+  eatLabel?: string;
+  eatTags?: string[];
+  eatAnim?: string;
+  dishesLabel?: string;
+  dishesTags?: string[];
+  dishesAnim?: string;
+  dishesInterest?: number;
+}
+
+/** Something residents carry or put down (content `items`): ingredients, a pot of stew, a plate. */
+export interface ItemDef {
+  id: string;
+  label: string;
+  /** Asset key of its model (`item.*`). */
+  model?: string;
+  /** Carried in one hand (a plate) or both (a pot). */
+  hold?: 'hand' | 'both';
+  /** Taking a serving gives one of these (a pot's servings are plates). */
+  serving?: string;
+  /** What's left once it's eaten up (a dirty pot). */
+  emptyAs?: string;
+  /** Needs washing up. */
+  dirty?: boolean;
+  radius?: number;
+}
+
+/** One step of a recipe: at one of the stations `at`, for `minutes`. */
+export interface RecipeStep {
+  label?: string;
+  at: string[];
+  minutes: number;
+  anim?: string;
+  /** Done without when the home has no such station. */
+  optional?: boolean;
+  /** What the cook carries away from it (an item id). */
+  holds?: string;
+}
+
+/** Something to cook (content `recipes`; sim-core `cooking::RecipeDef`). */
+export interface RecipeDef {
+  id: string;
+  label: string;
+  /** The dish it serves (an item id). */
+  item: string;
+  servings?: [number, number];
+  costPerServing?: number;
+  /** What eating one serving gives. */
+  effects?: Record<string, number>;
+  eatFeeling?: string;
+  /** The cook eats it straight away (a sandwich). */
+  eatNow?: boolean;
+  eatMinutes?: number;
+  /** Cooked and served outdoors (a barbecue). */
+  outdoor?: boolean;
+  steps: RecipeStep[];
+}
+
+/** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
+export type SurfaceKind = 'table' | 'bar' | 'counter' | 'desk' | 'low' | 'shelf';
 
 export interface ObjectDef {
   id: string;
@@ -70,11 +160,30 @@ export interface ObjectDef {
   /**
    * Where it goes (sim-core `content::Layer`): furniture on the floor (default), on a `wall` (its
    * back against one), from the `ceiling` (indoors) or flat on the floor as a `rug`. Off the floor
-   * layer it takes no floor space; only things on the same layer can't overlap.
+   * layer it takes no floor space; only things on the same layer can't overlap. On a `surface`
+   * it stands on another object's top (a vase on a table).
    */
-  layer?: 'floor' | 'wall' | 'ceiling' | 'rug';
+  layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
+  /**
+   * A top small things stand on: its height (m), kind, and the margin kept clear along its edges
+   * (m, default 0.04); its width and depth (m, default the footprint's) and where its middle is off
+   * the footprint's middle (m, to the object's right and front; default [0, 0]).
+   */
+  surface?: { height: number; kind: SurfaceKind; inset?: number; size?: [number, number]; at?: [number, number] };
+  /** Things on the `surface` layer: the radius (m) of the disc they take on their host's top (default 0.12). */
+  radius?: number;
+  /** Where it is used from: the tile in front (default), or any free tile `around` it (chairs pushed under a table). */
+  approach?: 'front' | 'around';
+  /** Seats: the kinds of surface they tuck under; facing one, they are a seat at that table. */
+  seatAt?: SurfaceKind[];
+  /** Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m). */
+  seat?: { height: number; forward?: number };
+  /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`). */
+  stations?: string[];
+  /** Keeps leftovers (fridges). */
+  stores?: boolean;
 }
 
 export interface SkillDef {
@@ -339,6 +448,9 @@ interface ContentFile {
   planner?: Partial<PlannerRules>;
   /** Spoken lines per language, laid out like `content/voice/<lang>.json` (see `voice/lines.ts`). */
   voice?: Record<string, Json>;
+  cooking?: CookingRules;
+  items?: ItemDef[];
+  recipes?: RecipeDef[];
   /** Further content files (relative to this one), merged key by key. */
   include?: string[];
 }
@@ -389,6 +501,11 @@ export class Content {
   readonly objectList: readonly ObjectDef[];
   /** Spoken lines from content packs per language, laid over `content/voice/<lang>.json`. */
   readonly voice: Readonly<Record<string, Json>>;
+  /** Cooking rules, and the items and recipes in the order the snapshot's `sim.held` / `sim.recipe` index them. */
+  readonly cooking: CookingRules;
+  readonly items: readonly ItemDef[];
+  readonly recipes: readonly RecipeDef[];
+  private readonly itemById: Map<string, ItemDef>;
 
   private constructor(
     /** Raw JSON, forwarded unchanged to the simulation. */
@@ -430,6 +547,10 @@ export class Content {
     this.objects = new Map(file.objects.map((o) => [o.id, o]));
     this.objectList = file.objects;
     this.voice = file.voice ?? {};
+    this.cooking = file.cooking ?? {};
+    this.items = file.items ?? [];
+    this.recipes = file.recipes ?? [];
+    this.itemById = new Map(this.items.map((i) => [i.id, i]));
     this.freeRotation = new Set(file.objectRules?.freeRotation ?? []);
   }
 
@@ -438,11 +559,20 @@ export class Content {
   /** Whether an object turns freely (sim-core `ObjectDef::turns`): at any angle past its facing. */
   turns(def: ObjectDef): boolean {
     const [w, d] = def.footprint ?? [1, 1];
-    return def.freeRotation ?? (def.layer !== 'wall' && w === 1 && d === 1 && def.category !== undefined && this.freeRotation.has(def.category));
+    return def.freeRotation ?? (def.layer === 'surface' || (def.layer !== 'wall' && w === 1 && d === 1 && def.category !== undefined && this.freeRotation.has(def.category)));
+  }
+
+  /** Things on the `surface` layer: the radius (m) of the disc they take on a top (sim-core `ObjectDef::radius`). */
+  radius(def: ObjectDef | undefined): number {
+    return Math.max(0.02, Math.min(0.45, def?.radius ?? 0.12));
+  }
+
+  item(id: string): ItemDef | undefined {
+    return this.itemById.get(id);
   }
 
   /** Its layer (`floor` for furniture): only things on the same layer take each other's place. */
-  layer(def: ObjectDef | undefined): 'floor' | 'wall' | 'ceiling' | 'rug' {
+  layer(def: ObjectDef | undefined): NonNullable<ObjectDef['layer']> {
     return def?.layer ?? 'floor';
   }
 

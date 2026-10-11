@@ -81,6 +81,10 @@
       "id": "kind.neighbourlyOven",
       "name": "Neighbourly baking counter",
       "model": "model.kind.neighbourlyOven",
+      "stations": [
+        "prep",
+        "oven"
+      ],
       "footprint": [
         2,
         1
@@ -93,13 +97,12 @@
         {
           "id": "familyPie",
           "label": "Bake a family pie",
+          "recipe": "pie",
           "anim": "cook",
-          "minutes": 50,
           "pose": "stand",
           "autonomous": true,
           "effects": {
-            "hunger": 0.8,
-            "fun": 0.1
+            "fun": 0.05
           },
           "tags": [
             "food",
@@ -113,13 +116,12 @@
         {
           "id": "treatsToShare",
           "label": "Bake treats for the neighbours",
+          "recipe": "bakedTreats",
           "anim": "cook",
-          "minutes": 60,
           "pose": "stand",
           "autonomous": true,
           "effects": {
-            "hunger": 0.3,
-            "fun": 0.2,
+            "fun": 0.1,
             "social": 0.05
           },
           "tags": [

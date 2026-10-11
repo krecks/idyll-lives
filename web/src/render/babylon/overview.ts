@@ -16,7 +16,7 @@
 import { ArcRotateCamera, Color3, Constants, Matrix, Quaternion, StandardMaterial, Vector3, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
-import { groundDepth, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { LotHighlight, TownShot } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder } from './house';
@@ -246,8 +246,9 @@ export class TownOverview {
       const vary = this.assets.get(key, 'model')?.vary ?? 0;
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
-        Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + turn, 0, 0, q);
-        Matrix.ComposeToRef(scale.setAll(size), q, at.set(o.x + o.w / 2, 0, o.z + o.d / 2), m);
+        const centre = objectCentre(o);
+        Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, q);
+        Matrix.ComposeToRef(scale.setAll(size), q, at.set(centre.x, 0, centre.z), m);
         m.copyToArray(matrices, i * 16);
       });
       out.set(key, { template, matrices });

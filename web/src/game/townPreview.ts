@@ -90,7 +90,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   const objects: ObjectPlacement[] = layout.objects.filter((o) => o.z < D).map((o, id) => {
     const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];
     const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
-    return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, w, d, quality: 0, style: 0, sellValue: null };
+    return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn, offset: o.offset, w, d, quality: 0, style: 0, sellValue: null };
   });
 
   const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, seed: town.seed ?? 1 };

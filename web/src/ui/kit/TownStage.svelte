@@ -3,7 +3,7 @@
     plot: number;
     title: string;
     sub?: string;
-    /** Look of the tag: a household, a house for sale, the park, the player's new home. */
+    /** Look of the tag: a household, a house for sale, a public place (park or shop), the player's new home. */
     kind: 'home' | 'sale' | 'park' | 'mine';
   }
 </script>

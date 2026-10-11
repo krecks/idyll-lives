@@ -259,6 +259,13 @@ pub struct PlacementRaw {
     /// Facing: 0 = +z, 1 = +x, 2 = -z, 3 = -x.
     #[serde(default)]
     pub rot: u8,
+    /// Degrees past the facing (0..90), for things that turn freely.
+    #[serde(default)]
+    pub turn: u8,
+    /// How far it stands off the middle of its footprint, in hundredths of a tile (up to
+    /// `MAX_OFFSET` each way), for things that turn freely.
+    #[serde(default)]
+    pub offset: [i8; 2],
 }
 
 #[derive(Debug, Clone, Deserialize)]

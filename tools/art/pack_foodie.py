@@ -6,11 +6,11 @@
 import json, math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, gltf, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, placeholder,  # noqa: E402
                        validate_parts, WHITE, OFFWHITE, OAK, OAKD, HONEY, WALNUT, BRASS, CHROME, STEEL,
                        TEAL, MUSTARD, SAGE, RUST, CREAM, SCREEN)
+from furniture_prims import planter_trough  # noqa: E402
 
-LIB = '../../models/'
 E, FOOT = {}, {}
 TERRA, SOIL, BASIL, THYME, ROSEMARY = '#C46A43', '#5A4030', '#5E9E3E', '#86A06E', '#4E7C52'
 COPPER = '#C27A4A'
@@ -47,7 +47,7 @@ def herb_garden():
         p.append(box([0.78, 0.02, 0.09], [0, 0.18, z], HONEY, 'wood', radius=0.004))
     p += [box([0.8, 0.03, 0.06], [0, 0.6, -0.4], HONEY, 'wood', radius=0.006),
           box([0.8, 0.03, 0.06], [0, 0.6, -0.06], HONEY, 'wood', radius=0.006)]
-    # trough planter (the real crate model sits on top; soil + herbs inside)
+    # slatted trough planter on top; soil + herbs inside
     p.append(box([0.8, 0.02, 0.33], [0, 0.95, -0.26], SOIL, 'matte', radius=0.005))
     p += herbs(-0.26, -0.26, 0.96, 'basil', 0.2) + herbs(0.0, -0.26, 0.96, 'rosemary', 0.2) + herbs(0.27, -0.26, 0.96, 'thyme', 0.22)
     for x, label in ((-0.26, '#F2EDE2'), (0.0, '#F2EDE2'), (0.27, '#F2EDE2')):
@@ -61,8 +61,7 @@ def herb_garden():
     p += [lathe([0.22, 0.1, 0.16], [-0.2, 0.05, 0.25], '#C9A46E', 'wood',
                 [[0.0, -0.5], [0.42, -0.5], [0.5, 0.5], [0.46, 0.5], [0.38, -0.3], [0.0, -0.3]], segments=14),
           sph([0.16, 0.08, 0.12], [-0.2, 0.1, 0.25], BASIL, 'foliage', segments=8)]
-    return gltf(LIB + 'ph/planter_box_01.glb', [0.84, 0.39, 0.38], align='back', offset=[0, 0.615, 0.045],
-                parts=p, placeholder=[box([0.84, 0.36, 0.38], [0, 0.8, -0.26], HONEY, 'wood', radius=0.01)] + p)
+    return placeholder(planter_trough(0.615, 0.84, 0.39, 0.38) + p)
 
 
 E['model.foodie.herbGarden'] = herb_garden(); FOOT['model.foodie.herbGarden'] = (1, 1)

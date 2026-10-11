@@ -394,3 +394,154 @@ fn house_templates_have_closed_bathrooms() {
         }
     }
 }
+
+/// The merged content's objects, as JSON (to check keys the simulation itself doesn't read).
+fn raw_objects() -> Vec<serde_json::Value> {
+    let merged: serde_json::Value = serde_json::from_str(&content()).unwrap();
+    merged["objects"].as_array().unwrap().clone()
+}
+
+fn numbers(v: &serde_json::Value) -> Vec<f64> {
+    v.as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect()
+}
+
+/// Every object's `model` is an entry of the asset manifest or of one of its packs.
+#[test]
+fn every_object_model_is_in_the_asset_manifests() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/assets");
+    let read = |p: &std::path::Path| -> serde_json::Value {
+        serde_json::from_str(&std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{p:?}: {e}")))
+            .unwrap_or_else(|e| panic!("{p:?}: {e}"))
+    };
+    let base = read(&dir.join("manifest.json"));
+    let mut keys: std::collections::HashSet<String> =
+        base["entries"].as_object().unwrap().keys().cloned().collect();
+    for pack in base["packs"].as_array().into_iter().flatten() {
+        let m = read(&dir.join(pack.as_str().unwrap()));
+        keys.extend(m["entries"].as_object().unwrap().keys().cloned());
+    }
+    for obj in raw_objects() {
+        if let Some(model) = obj["model"].as_str() {
+            assert!(
+                keys.contains(model),
+                "{}: model {model} is in no manifest",
+                obj["id"]
+            );
+        }
+    }
+}
+
+/// Things for sale name a buy category that exists, and a group of it if they name one.
+#[test]
+fn every_category_and_group_exists() {
+    let merged: serde_json::Value = serde_json::from_str(&content()).unwrap();
+    let mut groups: std::collections::HashMap<&str, Vec<&str>> = Default::default();
+    for c in merged["buyCategories"].as_array().unwrap() {
+        let entry = groups.entry(c["id"].as_str().unwrap()).or_default();
+        for g in c["groups"].as_array().into_iter().flatten() {
+            entry.push(g["id"].as_str().unwrap());
+        }
+    }
+    for obj in merged["objects"].as_array().unwrap() {
+        // Stairs are built with Build mode's own tool, not bought from a category.
+        let Some(cat) = obj["category"].as_str().filter(|_| obj["stairs"] != true) else {
+            continue;
+        };
+        let known = groups
+            .get(cat)
+            .unwrap_or_else(|| panic!("{}: no buy category {cat}", obj["id"]));
+        if let Some(g) = obj["group"].as_str() {
+            assert!(
+                known.contains(&g),
+                "{}: category {cat} has no group {g}",
+                obj["id"]
+            );
+        }
+    }
+}
+
+/// Things on tops are small and nobody uses them; tops lie on their footprint; table-only
+/// interactions belong to seats that tuck under a table and are sat down for.
+#[test]
+fn surfaces_seats_and_tabletop_things_are_consistent() {
+    for obj in raw_objects() {
+        let id = &obj["id"];
+        let fp = if obj["footprint"].is_array() {
+            numbers(&obj["footprint"])
+        } else {
+            vec![1.0, 1.0]
+        };
+        if obj["layer"] == "surface" {
+            let r = obj["radius"].as_f64().unwrap_or(0.12);
+            assert!(r > 0.0 && r <= 0.45, "{id}: radius {r}");
+            assert!(
+                obj["interactions"].as_array().is_none_or(|i| i.is_empty()),
+                "{id}: things on a top have no interactions"
+            );
+        }
+        if obj["surface"].is_object() {
+            let s = &obj["surface"];
+            let size = if s["size"].is_array() { numbers(&s["size"]) } else { fp.clone() };
+            let at = if s["at"].is_array() { numbers(&s["at"]) } else { vec![0.0, 0.0] };
+            for k in 0..2 {
+                assert!(
+                    size[k] > 0.0 && at[k].abs() + size[k] / 2.0 <= fp[k] / 2.0 + 0.02,
+                    "{id}: top {size:?} at {at:?} leaves the footprint {fp:?}"
+                );
+            }
+        }
+        for it in obj["interactions"].as_array().into_iter().flatten() {
+            if it["needsTable"] == true {
+                assert!(
+                    obj["seatAt"].as_array().is_some_and(|s| !s.is_empty()),
+                    "{id}.{}: needsTable without seatAt",
+                    it["id"]
+                );
+                assert_eq!(
+                    it["pose"], "sit",
+                    "{id}.{}: a table interaction is sat down for",
+                    it["id"]
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn recipes_are_cookable_and_every_home_can_make_a_meal() {
+    let content = Content::from_json(&content()).unwrap();
+    // Every step names stations some object is, and what it leaves resolves (content
+    // validates the names); every dish has servings to take and something left to wash.
+    let all = content.objects.iter().fold(0, |m, o| m | o.stations);
+    for r in &content.recipes {
+        assert!(r.possible(all), "nothing in the catalogue can make {}", r.id);
+        assert!(r.steps.iter().all(|s| s.anim.is_some()), "{}: a step without an animation", r.id);
+        let dish = &content.items[r.item];
+        if !r.eat_now {
+            assert!(dish.empty_as.is_some_and(|e| content.items[e].dirty), "{}: the empty {} isn't washed up", r.id, dish.id);
+        }
+        let plate = dish.serving.unwrap_or(r.item);
+        assert!(content.items[plate].empty_as.is_some_and(|e| content.items[e].dirty), "{}: no dirty plate", r.id);
+    }
+    // Interactions with a recipe keep their tags (kitchen rooms, plans and traits go by them).
+    for o in &content.objects {
+        for i in o.interactions.iter().filter(|i| i.recipe.is_some()) {
+            assert!(i.tags != 0, "{}.{} has no tags", o.id, i.id);
+        }
+    }
+    // The town's houses and the starter lot can make a meal (it needs only the fridge).
+    let meal = &content.recipes[content.recipe_index("meal").unwrap()];
+    let houses: serde_json::Value =
+        serde_json::from_str(include_str!("../../../web/public/content/houses.json")).unwrap();
+    let defs = |list: &serde_json::Value| -> Vec<String> {
+        list.as_array().unwrap().iter().map(|o| o["def"].as_str().unwrap().to_owned()).collect()
+    };
+    let mut homes: Vec<(String, Vec<String>)> =
+        houses["houses"].as_array().unwrap().iter().map(|h| (h["id"].to_string(), defs(&h["objects"]))).collect();
+    let starter: serde_json::Value = serde_json::from_str(STARTER_LOT).unwrap();
+    homes.push(("starter".into(), defs(&starter["objects"])));
+    for (name, defs) in homes {
+        let mask = defs.iter().filter_map(|d| content.object_index(d)).fold(0, |m, d| m | content.objects[d].stations);
+        assert!(meal.possible(mask), "{name} can't make a meal");
+    }
+}

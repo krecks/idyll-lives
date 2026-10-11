@@ -21,8 +21,9 @@ pub const MAX_TAGS: usize = 64;
 pub type TagMask = u64;
 /// Upper bound on the number of skills, so per-Sim skills fit in a fixed array.
 pub const MAX_SKILLS: usize = 16;
-/// Most Sims that can use one object at once (two in a double bed or on a sofa).
-pub const MAX_SLOTS: usize = 2;
+/// Most Sims that can use one object at once (two in a double bed, three on a long sofa, four
+/// round a merry-go-round).
+pub const MAX_SLOTS: usize = 4;
 /// Built-in tag for visiting another household.
 pub const VISIT_TAG: &str = "visit";
 /// Animation shown during conversations (when content declares it).
@@ -88,8 +89,16 @@ pub struct Interaction {
     pub dirt: f32,
     /// The place a baby lies (only babies use it; nobody else ever).
     pub baby: bool,
+    /// Only offered while the seat faces a table it tucks under (content `needsTable`; see
+    /// `ObjectDef::seat_at` and `surface.rs`): dining at a table.
+    pub needs_table: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
+    /// Starts this recipe (index into `Content::recipes`): the resident goes round the
+    /// recipe's stations (see `cooking.rs`) instead of using this object on its own. Its
+    /// `total_gain` is then what a serving gives plus its own effects (what cooking gives the
+    /// cook, spread over `minutes`, the whole recipe's time).
+    pub recipe: Option<usize>,
     /// Needs this fills for the baby lying in the object, over the whole interaction (feeding,
     /// changing); only with a baby there, and only grown-ups do it.
     pub care: [f32; MAX_NEEDS],
@@ -153,6 +162,83 @@ pub struct ObjectDef {
     /// Its two slots are bunks, one above the other (content `bunk`): both users lie in the
     /// middle of its width, and the renderer lifts the second to the upper bunk.
     pub bunk: bool,
+    /// A top that small things stand on (content `surface`): tables, counters, desks,
+    /// nightstands, shelves. Things on the `Surface` layer stand on it; plated food too.
+    pub surface: Option<Surface>,
+    /// Things on the `Surface` layer: the radius (m) of the disc they take on their host's top
+    /// (content `radius`, default `DEFAULT_RADIUS`).
+    pub radius: f32,
+    /// Where it is used from (content `approach`): the tile in front, or (chairs pushed under a
+    /// table) any free tile around it.
+    pub approach: Approach,
+    /// Seats: the kinds of surface it tucks under (content `seatAt`, a mask of
+    /// `SurfaceKind::bit`). Facing one of those it is a seat at that table.
+    pub seat_at: u8,
+    /// The cooking stations it is (content `stations`, a mask of `cooking.stations`): the
+    /// fridge for ingredients, a counter to prep on, a stove, a sink to wash up (`cooking.rs`).
+    pub stations: crate::cooking::StationMask,
+    /// Keeps leftovers (content `stores`: fridges); food served where there's no free
+    /// surface goes in.
+    pub stores: bool,
+}
+
+/// Radius of a thing on the `Surface` layer when content gives none (m).
+pub const DEFAULT_RADIUS: f32 = 0.12;
+
+/// A top that small things stand on (content `surface`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Surface {
+    /// Height of the top above the floor (m).
+    pub height: f32,
+    pub kind: SurfaceKind,
+    /// Margin (m) kept clear along the top's edges.
+    pub inset: f32,
+    /// Width and depth of the top (m; content `size`, default the footprint's): a desk's top
+    /// is smaller than the floor it stands on.
+    pub size: [f32; 2],
+    /// Where the top's middle is off the footprint's middle (m; content `at`, to its right and
+    /// front): a counter's top is at the back of its tile.
+    pub at: [f32; 2],
+}
+
+/// What kind of top a surface is: which seats tuck under it (content `surface.kind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceKind {
+    Table,
+    Bar,
+    Counter,
+    Desk,
+    Low,
+    Shelf,
+}
+
+impl SurfaceKind {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "table" => Self::Table,
+            "bar" => Self::Bar,
+            "counter" => Self::Counter,
+            "desk" => Self::Desk,
+            "low" => Self::Low,
+            "shelf" => Self::Shelf,
+            _ => return None,
+        })
+    }
+
+    /// Its bit in `ObjectDef::seat_at`.
+    pub fn bit(self) -> u8 {
+        1 << self as u8
+    }
+}
+
+/// Where an object is used from (content `approach`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Approach {
+    /// The tile centred in front of it (`ObjectInstance::front_tile`).
+    #[default]
+    Front,
+    /// Any free tile beside it, the front first (chairs pushed under a table).
+    Around,
 }
 
 /// Where an object goes (content `layer`). Things on a wall, the ceiling or the floor's surface
@@ -169,6 +255,8 @@ pub enum Layer {
     Ceiling,
     /// Lies flat on the floor: rugs.
     Rug,
+    /// Stands on another object's `surface` (a table, counter, shelf): vases, books, lamps.
+    Surface,
 }
 
 impl Layer {
@@ -1020,6 +1108,11 @@ pub struct Content {
     pub activities: Vec<crate::planner::ActivityDef>,
     pub planner: crate::planner::PlannerRules,
     pub goals: Vec<crate::planner::GoalDef>,
+    /// Stations, eating and washing up (content `cooking`), the things residents carry and
+    /// put down (`items`) and what they cook (`recipes`); see `cooking.rs`.
+    pub cooking: crate::cooking::CookingRules,
+    pub items: Vec<crate::cooking::ItemDef>,
+    pub recipes: Vec<crate::cooking::RecipeDef>,
     object_index: HashMap<String, usize>,
 }
 
@@ -1109,6 +1202,12 @@ struct ContentFile {
     planner: crate::planner::PlannerRaw,
     #[serde(default)]
     goals: Vec<crate::planner::GoalRaw>,
+    #[serde(default)]
+    cooking: crate::cooking::CookingRaw,
+    #[serde(default)]
+    items: Vec<crate::cooking::ItemRaw>,
+    #[serde(default)]
+    recipes: Vec<crate::cooking::RecipeRaw>,
 }
 
 #[derive(Deserialize)]
@@ -1650,6 +1749,36 @@ struct ObjectRaw {
     /// Bunk beds: the two slots lie one above the other.
     #[serde(default)]
     bunk: bool,
+    #[serde(default)]
+    surface: Option<SurfaceRaw>,
+    #[serde(default)]
+    radius: Option<f32>,
+    /// `front` (default) or `around`.
+    #[serde(default)]
+    approach: Option<String>,
+    #[serde(default, rename = "seatAt")]
+    seat_at: Vec<String>,
+    /// Cooking stations (`cooking.stations`).
+    #[serde(default)]
+    stations: Vec<String>,
+    #[serde(default)]
+    stores: bool,
+}
+
+#[derive(Deserialize)]
+struct SurfaceRaw {
+    height: f32,
+    kind: String,
+    #[serde(default = "surface_inset")]
+    inset: f32,
+    #[serde(default)]
+    size: Option<[f32; 2]>,
+    #[serde(default)]
+    at: [f32; 2],
+}
+
+fn surface_inset() -> f32 {
+    0.04
 }
 
 fn one_slot() -> u8 {
@@ -1661,12 +1790,18 @@ fn one_slot() -> u8 {
 struct InteractionRaw {
     id: String,
     label: String,
+    /// Not needed with a `recipe` (its steps take their own time).
+    #[serde(default)]
     minutes: f32,
+    #[serde(default)]
+    recipe: Option<String>,
     /// Mess it leaves (default: by its tags, `roomRules.dirt`).
     #[serde(default)]
     dirt: Option<f32>,
     #[serde(default)]
     baby: bool,
+    #[serde(default)]
+    needs_table: bool,
     #[serde(default)]
     homework: f32,
     #[serde(default)]
@@ -1972,6 +2107,13 @@ impl Content {
             skills: &skill_index,
         };
 
+        let (cooking, items, recipes) = crate::cooking::parse(
+            &raw.cooking,
+            &raw.items,
+            &raw.recipes,
+            &crate::cooking::Lookups { needs: &need_index, tags: &tag_index, feelings: &feeling_index, animations: &animations },
+        )?;
+
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
         for obj in &raw.objects {
@@ -1984,12 +2126,27 @@ impl Content {
             let mut interactions = Vec::with_capacity(obj.interactions.len());
             for it in &obj.interactions {
                 let ctx = format!("{}.{}", obj.id, it.id);
-                if it.minutes <= 0.0 {
+                let recipe = it
+                    .recipe
+                    .as_deref()
+                    .map(|r| recipes.iter().position(|d| d.id == r).ok_or_else(|| Error::new(format!("{ctx}: unknown recipe '{r}'"))))
+                    .transpose()?;
+                // A recipe takes as long as its steps.
+                let minutes = recipe.map_or(it.minutes, |r| recipes[r].minutes);
+                if minutes <= 0.0 {
                     return Err(Error::new(format!("{ctx}: minutes must be > 0")));
                 }
-                let mut total_gain = [0.0; MAX_NEEDS];
+                let mut own_gain = [0.0; MAX_NEEDS];
                 for (need, gain) in &it.effects {
-                    total_gain[lookup(&need_index, need, &ctx, "need")?] = *gain;
+                    own_gain[lookup(&need_index, need, &ctx, "need")?] = *gain;
+                }
+                // With a recipe, residents weigh it by what a serving gives, plus what cooking
+                // itself does for the cook.
+                let mut total_gain = own_gain;
+                if let Some(r) = recipe {
+                    for (t, e) in total_gain.iter_mut().zip(recipes[r].effects) {
+                        *t += e;
+                    }
                 }
                 let mut care = [0.0; MAX_NEEDS];
                 for (need, gain) in &it.care {
@@ -2033,22 +2190,26 @@ impl Content {
                 interactions.push(Interaction {
                     id: it.id.clone(),
                     label: it.label.clone(),
-                    minutes: it.minutes,
+                    minutes,
                     total_gain,
-                    gain_per_minute: total_gain.map(|g| g / it.minutes),
+                    gain_per_minute: own_gain.map(|g| g / minutes),
                     pose: it.pose,
                     autonomous: it.autonomous,
                     tags: mask,
                     skill_gain: skill_array(&it.skills, &ctx)?,
-                    cost: it.cost,
+                    // A recipe costs its ingredients (for its fewest servings; it charges for as
+                    // many as it makes).
+                    cost: recipe.map_or(it.cost, |r| recipes[r].cost(recipes[r].servings[0])),
                     skill,
                     feeling,
                     feeling_min_skill: it.feeling_min_skill,
                     anim,
                     dirt: it.dirt.unwrap_or(-1.0),
                     baby: it.baby,
+                    needs_table: it.needs_table,
                     homework: it.homework.max(0.0),
                     care,
+                    recipe,
                 });
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
@@ -2070,13 +2231,76 @@ impl Content {
                 Some("wall") => Layer::Wall,
                 Some("ceiling") => Layer::Ceiling,
                 Some("rug") => Layer::Rug,
+                Some("surface") => Layer::Surface,
                 Some(other) => {
                     return Err(Error::new(format!(
-                        "object '{}': unknown layer '{other}' (floor, wall, ceiling or rug)",
+                        "object '{}': unknown layer '{other}' (floor, wall, ceiling, rug or surface)",
                         obj.id
                     )));
                 }
             };
+            if layer == Layer::Surface
+                && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
+            {
+                return Err(Error::new(format!(
+                    "object '{}': things on a surface are 1×1, with one slot and no interactions",
+                    obj.id
+                )));
+            }
+            let surface = match &obj.surface {
+                None => None,
+                Some(_) if layer != Layer::Floor => {
+                    return Err(Error::new(format!(
+                        "object '{}': only furniture on the floor has a surface",
+                        obj.id
+                    )));
+                }
+                Some(s) => Some(Surface {
+                    height: s.height.max(0.0),
+                    kind: SurfaceKind::parse(&s.kind).ok_or_else(|| {
+                        Error::new(format!(
+                            "object '{}': unknown surface kind '{}' (table, bar, counter, desk, low or shelf)",
+                            obj.id, s.kind
+                        ))
+                    })?,
+                    inset: s.inset.max(0.0),
+                    size: s
+                        .size
+                        .unwrap_or(obj.footprint.map(|f| f as f32))
+                        .map(|v| v.max(0.0)),
+                    at: s.at,
+                }),
+            };
+            let approach = match obj.approach.as_deref() {
+                None | Some("front") => Approach::Front,
+                Some("around") => Approach::Around,
+                Some(other) => {
+                    return Err(Error::new(format!(
+                        "object '{}': unknown approach '{other}' (front or around)",
+                        obj.id
+                    )));
+                }
+            };
+            let mut seat_at = 0;
+            for k in &obj.seat_at {
+                seat_at |= SurfaceKind::parse(k)
+                    .ok_or_else(|| {
+                        Error::new(format!("object '{}': unknown seatAt kind '{k}'", obj.id))
+                    })?
+                    .bit();
+            }
+            if interactions.iter().any(|i| i.needs_table) && seat_at == 0 {
+                return Err(Error::new(format!(
+                    "object '{}': needsTable interactions need a seatAt",
+                    obj.id
+                )));
+            }
+            let mut stations = 0;
+            for name in &obj.stations {
+                stations |= cooking.station(name).ok_or_else(|| {
+                    Error::new(format!("object '{}': unknown station '{name}' (see cooking.stations)", obj.id))
+                })?;
+            }
             if obj.bunk && (obj.slots != 2 || layer.mounted()) {
                 return Err(Error::new(format!(
                     "object '{}': a bunk bed has 2 slots and stands on the floor",
@@ -2095,9 +2319,10 @@ impl Content {
                 slots: obj.slots,
                 outdoors: obj.outdoors,
                 stairs: obj.stairs,
-                // Things on a wall hang square to it.
+                // Things on a wall hang square to it; things on a surface always turn.
                 turns: obj.free_rotation.unwrap_or_else(|| {
-                    layer != Layer::Wall
+                    layer == Layer::Surface
+                        || layer != Layer::Wall
                         && obj.footprint == [1, 1]
                         && obj.category.as_ref().is_some_and(|c| {
                             raw.object_rules.free_rotation.iter().flatten().any(|f| f == c)
@@ -2125,6 +2350,12 @@ impl Content {
                 tags: offered,
                 layer,
                 bunk: obj.bunk,
+                surface,
+                radius: obj.radius.unwrap_or(DEFAULT_RADIUS).clamp(0.02, 0.45),
+                approach,
+                seat_at,
+                stations,
+                stores: obj.stores,
             });
         }
 
@@ -2745,12 +2976,23 @@ impl Content {
             activities,
             planner,
             goals,
+            cooking,
+            items,
+            recipes,
             object_index,
         })
     }
 
     pub fn object_index(&self, id: &str) -> Option<usize> {
         self.object_index.get(id).copied()
+    }
+
+    pub fn recipe_index(&self, id: &str) -> Option<usize> {
+        self.recipes.iter().position(|r| r.id == id)
+    }
+
+    pub fn item_index(&self, id: &str) -> Option<usize> {
+        self.items.iter().position(|i| i.id == id)
     }
 
     pub fn feeling_index(&self, id: &str) -> Option<usize> {

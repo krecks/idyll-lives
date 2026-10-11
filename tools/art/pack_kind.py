@@ -1,7 +1,6 @@
 # Kind pack models (`model.kind.*`): neighbourly baking counter, community giving jar, knitting
-# rocker, welcome tea table, songbird feeder and bird bath, quilted hearth settee. Primitive parts
-# plus Kenney's kitchen stove (restyled), Poly Haven's rocking chair and tea set (all CC0). Warm
-# honey woods, buttercream, sage and soft pastels. Conventions as furniture.py: 1 unit = 1 m,
+# rocker, welcome tea table, songbird feeder and bird bath, quilted hearth settee, all primitive
+# parts. Warm honey woods, buttercream, sage and soft pastels. Conventions as furniture.py: 1 unit = 1 m,
 # origin at the footprint centre on the floor, front +Z, back against the wall at -Z; seats centred
 # on z = 0 with tops at ~0.45 m (DEFAULT_SEAT); multi-slot seats at x = +-0.5.
 # Run: python3 -I pack_kind.py [out.json]  then  python3 -I apply_pack.py kind out.json
@@ -9,13 +8,13 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, gltf, placeholder, mat,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
                        validate_parts, CHROME, BRASS, OAK, WHITE, CREAM, HONEY, WALNUT)
+from furniture_prims import range_cooker, rocking_chair, tea_set  # noqa: E402
 
 TRAIT = 'kind'
 FOOT = {o['model']: tuple(o['footprint']) for o in
         json.load(open(os.path.join(HERE, '..', '..', 'web', 'public', 'content', 'packs', TRAIT + '.json')))['objects']}
-LIB = '../../models/'
 E = {}
 
 BUTTER, SAGE, SAGED, ROSE, SKY, MUSTARD, TERRA, LEAF = '#F1E6C8', '#A8BFA0', '#7E9A76', '#E3A0A0', '#9CC3DB', '#D6A64A', '#C0714C', '#5E8F4E'
@@ -28,7 +27,7 @@ def jar(x, y, z, h=0.16, r=0.11, fill='#F2E6CC'):
             cyl([r * 0.85, 0.03, r * 0.85], [x, y + h + 0.015, z], HONEY, 'wood')]
 
 
-# ---- Neighbourly baking counter (2x1): Kenney range (restyled) + counter with bakes ------------
+# ---- Neighbourly baking counter (2x1): cream retro range + counter with bakes -------------------
 CX0, CX1 = -0.915, 0.27
 cw, cx = CX1 - CX0, (CX0 + CX1) / 2
 ov = [box([cw, 0.82, 0.58], [cx, 0.45, -0.165], BUTTER, 'satin', radius=0.012),
@@ -60,10 +59,7 @@ ov += [cyl([0.045, 0.32, 0.045], [cx + 0.42, 0.93, 0.0], '#D9B98A', 'wood', rota
        lathe([0.22, 0.14, 0.22], [0.52, 0.99, -0.25], '#A8BFA0', 'gloss',
              profile=[[0, -0.5], [0.5, -0.5], [0.5, 0.45], [0.46, 0.5], [0, 0.5]]),           # pot on the hob
        cyl([0.24, 0.02, 0.24], [0.52, 1.07, -0.25], '#7E9A76', 'gloss')]
-E['model.kind.neighbourlyOven'] = gltf(LIB + 'kenney/kitchenStove.glb', [0.62, 0.92, 0.62], align='back', offset=[0.6, 0, 0.04],
-    materials={'wood': mat('gloss', BUTTER), 'metal': mat('chrome', CHROME), 'metalDark': mat('satin', '#4A4E54'),
-               'carpetWhite': mat('satin', '#ECE6D8'), 'glass': mat('gloss', '#4A3A30')},
-    parts=ov, placeholder=[box([0.62, 0.92, 0.62], [0.6, 0.46, -0.15], BUTTER, 'gloss', radius=0.02)] + ov, footprint=(2, 1))
+E['model.kind.neighbourlyOven'] = placeholder(range_cooker(0.6, 0.62, 0.92, 0.61, body=BUTTER, hob='#4A4E54', glass='#4A3A30', trim='#ECE6D8') + ov)
 
 # ---- Community giving jar (1x1) ------------------------------------------------------------------
 gj = [lathe([0.44, 0.86, 0.44], [0, 0.43, -0.05], HONEY, 'wood',
@@ -96,7 +92,7 @@ gj += [lathe([0.16, 0.16, 0.16], [0.3, 0.08, 0.28], TERRA, 'satin',
        sph([0.05, 0.05, 0.05], [0.35, 0.3, 0.25], ROSE, 'satin', segments=8)]
 E['model.kind.givingJar'] = placeholder(gj)
 
-# ---- Knitting rocker (1x1): Poly Haven rocking chair, quilted cushion, yarn basket ------------
+# ---- Knitting rocker (1x1): spindle-back rocking chair, quilted cushion, yarn basket -----------
 kr = [cushion([0.4, 0.05, 0.38], [0, 0.465, -0.02], SAGE, radius=0.02),
       box([0.36, 0.42, 0.03], [0.02, 0.8, -0.22], '#F1E6C8', 'fabric', radius=0.01, rotate=[-14, 4, 0]),  # throw over the back
       lathe([0.2, 0.18, 0.2], [0.33, 0.09, 0.33], '#C9A16A', 'wood',
@@ -106,8 +102,7 @@ kr = [cushion([0.4, 0.05, 0.38], [0, 0.465, -0.02], SAGE, radius=0.02),
       sph([0.08, 0.08, 0.08], [0.33, 0.19, 0.38], MUSTARD, 'fabric', segments=10),
       rod([0.27, 0.15, 0.36], [0.4, 0.32, 0.28], 0.008, '#C9CCD0', 'metal'),                  # needles
       rod([0.29, 0.15, 0.38], [0.36, 0.33, 0.3], 0.008, '#C9CCD0', 'metal')]
-E['model.kind.knittingRocker'] = gltf(LIB + 'ph/Rockingchair_01.glb', [0.66, 1.05, 0.88], align='centre', offset=[0, 0, -0.02],
-                                       parts=kr, placeholder=kr)
+E['model.kind.knittingRocker'] = placeholder(rocking_chair(-0.02, wood='#8A5A36') + kr)
 
 # ---- Welcome tea table (2x1): two poufs (tops 0.45 at x = +-0.5), low table and tea set between --
 tt = [cyl([1.86, 0.012, 0.86], [0, 0.006, 0], '#E8D6C0', 'fabric', segments=40),             # oval rug
@@ -129,8 +124,8 @@ tt += [box([0.4, 0.02, 0.48], [0, 0.12, -0.02], HONEY, 'wood', radius=0.006),
 for x in (-0.83, 0.83):                                                                         # potted ferns
     tt += [lathe([0.18, 0.2, 0.18], [x, 0.1, -0.32], '#F4F1EA', 'satin', profile=[[0, -0.5], [0.4, -0.5], [0.5, 0.5], [0, 0.5]]),
            part('blob', [0.22, 0.24, 0.2], [x * 0.97, 0.3, -0.3], LEAF, 'foliage', noise=0.25)]
-E['model.kind.welcomeTeaTable'] = gltf(LIB + 'ph/tea_set_01.glb', [0.42, 0.15, 0.32], align='centre', offset=[0, 0.42, 0.0],
-                                       parts=tt, placeholder=tt, footprint=(2, 1))
+tt += tea_set(0, 0.42, 0.0, 0.42, 0.32, body='#FBF6EC', accent=ROSE)                          # teapot and two cups on the table
+E['model.kind.welcomeTeaTable'] = placeholder(tt)
 
 
 # ---- Songbird feeding station (1x1): feeder house on a post, bird bath, songbirds -------------

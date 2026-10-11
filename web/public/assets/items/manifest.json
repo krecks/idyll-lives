@@ -1,0 +1,1462 @@
+{
+  "$comment": "Food, dishes and cooking tools (content `items` models, and the props drawn on a station while cooking), drawn from primitive parts by tools/art/items.py. Listed in the base manifest's packs.",
+  "version": 1,
+  "entries": {
+    "item.ingredients": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.2,
+            0.22,
+            0.14
+          ],
+          "at": [
+            0,
+            0.11,
+            0
+          ],
+          "color": "#C49A6C",
+          "material": "material.finish.matte",
+          "radius": 0.01
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.1,
+            0.08,
+            0.08
+          ],
+          "at": [
+            0.02,
+            0.24,
+            0
+          ],
+          "color": "#5FA33A",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.035,
+            0.18,
+            0.035
+          ],
+          "at": [
+            -0.06,
+            0.24,
+            0.02
+          ],
+          "color": "#E8772E",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            0,
+            20
+          ]
+        },
+        {
+          "shape": "sphere",
+          "size": [
+            0.07,
+            0.07,
+            0.07
+          ],
+          "at": [
+            0.06,
+            0.23,
+            0.03
+          ],
+          "color": "#D93A2B",
+          "material": "material.finish.satin",
+          "segments": 10
+        }
+      ]
+    },
+    "item.prepBowl": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.09,
+            0.24
+          ],
+          "at": [
+            0,
+            0.045,
+            0
+          ],
+          "color": "#E9E4D8",
+          "material": "material.finish.gloss",
+          "taper": 1.35,
+          "segments": 20
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.07,
+            0.03,
+            0.06
+          ],
+          "at": [
+            0.03,
+            0.09,
+            0.02
+          ],
+          "color": "#E8772E",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.07,
+            0.03,
+            0.06
+          ],
+          "at": [
+            -0.04,
+            0.09,
+            -0.02
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.05,
+            0.03,
+            0.05
+          ],
+          "at": [
+            0.0,
+            0.095,
+            -0.05
+          ],
+          "color": "#E8D9A0",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        }
+      ]
+    },
+    "item.mealPot": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.27,
+            0.15,
+            0.27
+          ],
+          "at": [
+            0,
+            0.075,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal",
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.235,
+            0.012,
+            0.235
+          ],
+          "at": [
+            0,
+            0.14,
+            0
+          ],
+          "color": "#B0562C",
+          "material": "material.finish.satin",
+          "segments": 20
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.06,
+            0.02,
+            0.03
+          ],
+          "at": [
+            0.165,
+            0.12,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal"
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.06,
+            0.02,
+            0.03
+          ],
+          "at": [
+            -0.165,
+            0.12,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal"
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.06,
+            0.03,
+            0.05
+          ],
+          "at": [
+            0.04,
+            0.15,
+            0.03
+          ],
+          "color": "#D9772B",
+          "material": "material.finish.satin",
+          "noise": 0.25
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.05,
+            0.03,
+            0.05
+          ],
+          "at": [
+            -0.05,
+            0.15,
+            -0.02
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "noise": 0.25
+        }
+      ]
+    },
+    "item.potDirty": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.27,
+            0.15,
+            0.27
+          ],
+          "at": [
+            0,
+            0.075,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal",
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.235,
+            0.012,
+            0.235
+          ],
+          "at": [
+            0,
+            0.05,
+            0
+          ],
+          "color": "#5B4636",
+          "material": "material.finish.satin",
+          "segments": 20
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.06,
+            0.02,
+            0.03
+          ],
+          "at": [
+            0.165,
+            0.12,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal"
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.06,
+            0.02,
+            0.03
+          ],
+          "at": [
+            -0.165,
+            0.12,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal"
+        }
+      ]
+    },
+    "item.tastingBoard": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.4,
+            0.03,
+            0.24
+          ],
+          "at": [
+            0,
+            0.015,
+            0
+          ],
+          "color": "#9A6A3E",
+          "material": "material.finish.wood",
+          "radius": 0.01
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.08,
+            0.04,
+            0.07
+          ],
+          "at": [
+            -0.12,
+            0.05,
+            0
+          ],
+          "color": "#C8452E",
+          "material": "material.finish.satin",
+          "noise": 0.2
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.08,
+            0.04,
+            0.07
+          ],
+          "at": [
+            0,
+            0.05,
+            0.02
+          ],
+          "color": "#E9C46A",
+          "material": "material.finish.satin",
+          "noise": 0.2
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.08,
+            0.04,
+            0.07
+          ],
+          "at": [
+            0.12,
+            0.05,
+            -0.01
+          ],
+          "color": "#5E8C3A",
+          "material": "material.finish.satin",
+          "noise": 0.2
+        }
+      ]
+    },
+    "item.grillPlatter": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.4,
+            0.02,
+            0.28
+          ],
+          "at": [
+            0,
+            0.01,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "segments": 24
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.045,
+            0.16,
+            0.045
+          ],
+          "at": [
+            -0.08,
+            0.04,
+            -0.04
+          ],
+          "color": "#8A4A2A",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            20,
+            90
+          ]
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.045,
+            0.16,
+            0.045
+          ],
+          "at": [
+            -0.08,
+            0.04,
+            0.04
+          ],
+          "color": "#93512E",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            -10,
+            90
+          ]
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1,
+            0.035,
+            0.1
+          ],
+          "at": [
+            0.08,
+            0.035,
+            0.03
+          ],
+          "color": "#5E3A24",
+          "material": "material.finish.satin",
+          "segments": 14
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.05,
+            0.14,
+            0.05
+          ],
+          "at": [
+            0.07,
+            0.04,
+            -0.07
+          ],
+          "color": "#F2C230",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            70,
+            90
+          ]
+        }
+      ]
+    },
+    "item.platterDirty": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.4,
+            0.02,
+            0.28
+          ],
+          "at": [
+            0,
+            0.01,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "segments": 24
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.004,
+            0.16
+          ],
+          "at": [
+            0.02,
+            0.022,
+            0
+          ],
+          "color": "#7A5A3C",
+          "material": "material.finish.matte",
+          "segments": 16
+        }
+      ]
+    },
+    "item.pizza": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.4,
+            0.02,
+            0.4
+          ],
+          "at": [
+            0,
+            0.01,
+            0
+          ],
+          "color": "#A8784A",
+          "material": "material.finish.wood",
+          "segments": 24
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.34,
+            0.025,
+            0.34
+          ],
+          "at": [
+            0,
+            0.032,
+            0
+          ],
+          "color": "#E2B064",
+          "material": "material.finish.satin",
+          "segments": 24
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.3,
+            0.008,
+            0.3
+          ],
+          "at": [
+            0,
+            0.046,
+            0
+          ],
+          "color": "#C8452E",
+          "material": "material.finish.satin",
+          "segments": 24
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.05,
+            0.006,
+            0.05
+          ],
+          "at": [
+            0.06,
+            0.052,
+            0.05
+          ],
+          "color": "#F3E3B0",
+          "material": "material.finish.satin",
+          "segments": 10
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.05,
+            0.006,
+            0.05
+          ],
+          "at": [
+            -0.07,
+            0.052,
+            0.02
+          ],
+          "color": "#F3E3B0",
+          "material": "material.finish.satin",
+          "segments": 10
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.04,
+            0.006,
+            0.04
+          ],
+          "at": [
+            0.0,
+            0.052,
+            -0.08
+          ],
+          "color": "#7C2A20",
+          "material": "material.finish.satin",
+          "segments": 10
+        }
+      ]
+    },
+    "item.bakingTray": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.38,
+            0.025,
+            0.28
+          ],
+          "at": [
+            0,
+            0.0125,
+            0
+          ],
+          "color": "#8E949B",
+          "material": "material.finish.metal",
+          "radius": 0.01
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            -0.11,
+            0.037,
+            -0.07
+          ],
+          "color": "#B5743A",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            0,
+            0.037,
+            -0.07
+          ],
+          "color": "#D69A55",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            0.11,
+            0.037,
+            -0.07
+          ],
+          "color": "#B5743A",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            -0.11,
+            0.037,
+            0.07
+          ],
+          "color": "#D69A55",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            0,
+            0.037,
+            0.07
+          ],
+          "color": "#B5743A",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.025,
+            0.08
+          ],
+          "at": [
+            0.11,
+            0.037,
+            0.07
+          ],
+          "color": "#D69A55",
+          "material": "material.finish.satin",
+          "segments": 12
+        }
+      ]
+    },
+    "item.trayDirty": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.38,
+            0.025,
+            0.28
+          ],
+          "at": [
+            0,
+            0.0125,
+            0
+          ],
+          "color": "#8E949B",
+          "material": "material.finish.metal",
+          "radius": 0.01
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.2,
+            0.003,
+            0.14
+          ],
+          "at": [
+            0,
+            0.027,
+            0
+          ],
+          "color": "#6E5338",
+          "material": "material.finish.matte",
+          "segments": 12
+        }
+      ]
+    },
+    "item.pieDish": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.28,
+            0.06,
+            0.28
+          ],
+          "at": [
+            0,
+            0.03,
+            0
+          ],
+          "color": "#E6E0D2",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 22
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.26,
+            0.03,
+            0.26
+          ],
+          "at": [
+            0,
+            0.07,
+            0
+          ],
+          "color": "#D8A257",
+          "material": "material.finish.satin",
+          "segments": 22
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.08,
+            0.006,
+            0.02
+          ],
+          "at": [
+            0.04,
+            0.087,
+            0
+          ],
+          "color": "#B07A3A",
+          "material": "material.finish.satin"
+        }
+      ]
+    },
+    "item.mealPlate": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.1,
+            0.05,
+            0.08
+          ],
+          "at": [
+            0.02,
+            0.04,
+            0.01
+          ],
+          "color": "#B0562C",
+          "material": "material.finish.satin",
+          "noise": 0.2
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.06,
+            0.04,
+            0.05
+          ],
+          "at": [
+            -0.05,
+            0.035,
+            -0.03
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        }
+      ]
+    },
+    "item.pizzaSlice": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "cone",
+          "size": [
+            0.12,
+            0.02,
+            0.16
+          ],
+          "at": [
+            0,
+            0.03,
+            0
+          ],
+          "color": "#E2B064",
+          "material": "material.finish.satin",
+          "segments": 3,
+          "rotate": [
+            90,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "item.treatPlate": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.07,
+            0.025,
+            0.07
+          ],
+          "at": [
+            -0.04,
+            0.03,
+            0
+          ],
+          "color": "#C98A45",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.07,
+            0.025,
+            0.07
+          ],
+          "at": [
+            0.04,
+            0.03,
+            0.02
+          ],
+          "color": "#8A5530",
+          "material": "material.finish.satin",
+          "segments": 12
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.07,
+            0.025,
+            0.07
+          ],
+          "at": [
+            0.0,
+            0.055,
+            -0.01
+          ],
+          "color": "#D69A55",
+          "material": "material.finish.satin",
+          "segments": 12
+        }
+      ]
+    },
+    "item.pieSlice": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.1,
+            0.045,
+            0.08
+          ],
+          "at": [
+            0,
+            0.04,
+            0
+          ],
+          "color": "#D8A257",
+          "material": "material.finish.satin",
+          "radius": 0.01,
+          "rotate": [
+            0,
+            30,
+            0
+          ]
+        }
+      ]
+    },
+    "item.sandwich": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.12,
+            0.02,
+            0.1
+          ],
+          "at": [
+            0,
+            0.03,
+            0
+          ],
+          "color": "#E3C08A",
+          "material": "material.finish.satin",
+          "radius": 0.01
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.13,
+            0.012,
+            0.11
+          ],
+          "at": [
+            0,
+            0.045,
+            0
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.12,
+            0.02,
+            0.1
+          ],
+          "at": [
+            0,
+            0.06,
+            0
+          ],
+          "color": "#E3C08A",
+          "material": "material.finish.satin",
+          "radius": 0.01
+        }
+      ]
+    },
+    "item.plateDirty": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.24,
+            0.016,
+            0.24
+          ],
+          "at": [
+            0,
+            0.008,
+            0
+          ],
+          "color": "#F1EEE6",
+          "material": "material.finish.gloss",
+          "taper": 1.2,
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1488,
+            0.004,
+            0.1488
+          ],
+          "at": [
+            0,
+            0.017,
+            0
+          ],
+          "color": "#E4DFD4",
+          "material": "material.finish.gloss",
+          "segments": 20
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.13,
+            0.004,
+            0.09
+          ],
+          "at": [
+            0.02,
+            0.02,
+            0.01
+          ],
+          "color": "#7A5A3C",
+          "material": "material.finish.matte",
+          "segments": 12
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.16,
+            0.006,
+            0.014
+          ],
+          "at": [
+            0.0,
+            0.024,
+            -0.04
+          ],
+          "color": "#8E949B",
+          "material": "material.finish.metal",
+          "rotate": [
+            0,
+            25,
+            0
+          ]
+        }
+      ]
+    },
+    "tool.board": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.34,
+            0.025,
+            0.24
+          ],
+          "at": [
+            0,
+            0.0125,
+            0
+          ],
+          "color": "#B88A57",
+          "material": "material.finish.wood",
+          "radius": 0.008
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.18,
+            0.006,
+            0.03
+          ],
+          "at": [
+            0.06,
+            0.03,
+            -0.07
+          ],
+          "color": "#C9CED4",
+          "material": "material.finish.metal",
+          "rotate": [
+            0,
+            20,
+            0
+          ]
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.07,
+            0.04,
+            0.06
+          ],
+          "at": [
+            -0.06,
+            0.04,
+            0.03
+          ],
+          "color": "#E8772E",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.06,
+            0.04,
+            0.05
+          ],
+          "at": [
+            0.02,
+            0.04,
+            0.05
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        }
+      ]
+    },
+    "tool.pan": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "cylinder",
+          "size": [
+            0.28,
+            0.05,
+            0.28
+          ],
+          "at": [
+            0,
+            0.025,
+            0
+          ],
+          "color": "#3A3D42",
+          "material": "material.finish.metal",
+          "segments": 20
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.2,
+            0.02,
+            0.03
+          ],
+          "at": [
+            0,
+            0.04,
+            0.22
+          ],
+          "color": "#2B2D31",
+          "material": "material.finish.metal"
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.12,
+            0.03,
+            0.1
+          ],
+          "at": [
+            0.02,
+            0.05,
+            -0.01
+          ],
+          "color": "#B0562C",
+          "material": "material.finish.satin",
+          "noise": 0.25
+        },
+        {
+          "shape": "blob",
+          "size": [
+            0.06,
+            0.03,
+            0.05
+          ],
+          "at": [
+            -0.06,
+            0.05,
+            0.04
+          ],
+          "color": "#6BA33A",
+          "material": "material.finish.satin",
+          "noise": 0.3
+        }
+      ]
+    },
+    "tool.grillFood": {
+      "type": "model",
+      "placeholder": [
+        {
+          "shape": "capsule",
+          "size": [
+            0.045,
+            0.16,
+            0.045
+          ],
+          "at": [
+            -0.08,
+            0.025,
+            -0.05
+          ],
+          "color": "#8A4A2A",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            0,
+            90
+          ]
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.045,
+            0.16,
+            0.045
+          ],
+          "at": [
+            -0.08,
+            0.025,
+            0.04
+          ],
+          "color": "#93512E",
+          "material": "material.finish.satin",
+          "rotate": [
+            0,
+            0,
+            90
+          ]
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.1,
+            0.03,
+            0.1
+          ],
+          "at": [
+            0.08,
+            0.015,
+            0.0
+          ],
+          "color": "#5E3A24",
+          "material": "material.finish.satin",
+          "segments": 14
+        }
+      ]
+    }
+  }
+}

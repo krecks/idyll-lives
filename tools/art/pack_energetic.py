@@ -3,8 +3,9 @@
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, mat, on, CHROME  # noqa: E402
-from pack_shapes import LIB, JAR, NET, BOWL, glass_with_drink, leafy, run  # noqa: E402
+from furniture import box, cyl, cone, sph, rod, part, lathe, torus, cushion, on, CHROME  # noqa: E402
+from pack_shapes import JAR, NET, BOWL, glass_with_drink, leafy, run  # noqa: E402
+from furniture_prims import kitchen_cabinet, shower_cabin  # noqa: E402
 
 E = {}
 WHITE, GREY, STEEL = '#F2F2F0', '#9EA3A8', '#C3C7CB'
@@ -102,7 +103,7 @@ p = [box([0.6, 0.22, 0.5], [0, 0.11, -0.2], '#2F5D8A', 'satin', radius=0.06),   
      box([0.005, 0.24, 0.24], [0.28, 0.12, 0.3], '#3A2A20', 'matte', radius=0.002)]
 E['model.energetic.streetballHoop'] = {'type': 'model', 'placeholder': p}
 
-# ---- Power blender station (1x1): Kenney kitchen cabinet + blender, fruit and smoothies ----------
+# ---- Power blender station (1x1): mint kitchen cabinet + blender, fruit and smoothies ------------
 TOP = 0.9
 parts = [
     box([0.18, 0.1, 0.16], [-0.18, TOP + 0.05, -0.12], WHITE, 'gloss', radius=0.03),          # blender motor base
@@ -119,25 +120,19 @@ parts = [
     sph([0.06, 0.03, 0.06], [0.08, TOP + 0.03, 0.12], '#F2E05C', 'satin', segments=10),        # lemon halves
     sph([0.06, 0.03, 0.06], [0.16, TOP + 0.03, 0.13], '#F2E05C', 'satin', segments=10),
 ] + glass_with_drink(-0.04, TOP, 0.12, '#F07AA0') + glass_with_drink(-0.32, TOP, 0.12, '#F2A93B')
-E['model.energetic.powerBlender'] = {
-    'type': 'model', 'url': LIB + 'kenney/kitchenCabinet.glb', 'fit': [0.82, 0.9, 0.6], 'align': 'back', 'offset': [0, 0, 0.04],
-    'materials': {'wood': mat('satin', '#DDEFE6'), 'woodDark': mat('satin', '#CDE6DA'), 'metal': mat('gloss', '#F4F4F2')},
-    'parts': parts, 'placeholder': [box([0.8, 0.9, 0.6], [0, 0.45, -0.16], '#DDEFE6', 'satin', radius=0.02)] + parts}
+E['model.energetic.powerBlender'] = {'type': 'model', 'placeholder': kitchen_cabinet(0.82, TOP, cab='#DDEFE6', door='#CDE6DA', top='#F4F4F2') + parts}
 
-# ---- Contrast rain shower (1x1): Kenney cubicle, wide rain head, hot/cold dials -------------------
+# ---- Contrast rain shower (1x1): glass cubicle, wide rain head, hot/cold dials -------------------
 parts = [box([0.4, 0.025, 0.4], [0, 2.02, -0.02], CHROME, 'chrome', radius=0.01),             # square rain head
          box([0.36, 0.004, 0.36], [0, 2.005, -0.02], '#B9DDF0', 'gloss', radius=0.006),
          rod([0, 2.04, -0.4], [0, 2.04, -0.04], 0.03, CHROME, 'chrome'),                       # arm
          cyl([0.08, 0.03, 0.08], [-0.1, 1.15, -0.385], '#D9483B', 'gloss', rotate=[90, 0, 0]),  # hot dial
          cyl([0.08, 0.03, 0.08], [0.1, 1.15, -0.385], '#3A86FF', 'gloss', rotate=[90, 0, 0]),   # cold dial
          box([0.34, 0.12, 0.012], [0, 1.15, -0.395], '#E8E8E5', 'satin', radius=0.01),
-         box([0.6, 0.012, 0.6], [0, 0.075, 0], '#7FC4C0', 'satin', radius=0.004),               # mint anti-slip mat
+         box([0.6, 0.012, 0.6], [0, 0.064, 0], '#7FC4C0', 'satin', radius=0.004),               # mint anti-slip mat
          box([0.04, 0.3, 0.14], [0.36, 1.25, -0.33], '#F2F2F0', 'fabric', radius=0.02)]         # towel
-E['model.energetic.contrastShower'] = {
-    'type': 'model', 'url': LIB + 'kenney/shower.glb', 'fit': [0.9, 2.15, 0.9], 'align': 'centre',
-    'materials': {'carpetWhite': mat('gloss', '#EEF3F2'), 'metalDark': mat('metal', '#8E979E'), 'glass': mat('glass', '#D6E8EC'),
-                  'metal': mat('chrome', CHROME)},
-    'parts': parts, 'placeholder': [box([0.86, 0.1, 0.86], [0, 0.05, 0], '#EEF3F2', 'gloss', radius=0.02)] + parts}
+E['model.energetic.contrastShower'] = {'type': 'model', 'placeholder': shower_cabin(
+    tray='#EEF3F2', frame='#8E979E', frame_fin='metal', glass='#D6E8EC', wall='#E2F0EE', joint='#BFD6D2', fittings=False) + parts}
 
 # ---- Recovery pod (1x2): padded lounger (top 0.5) under a tinted canopy, head at -Z ---------------
 p = [box([0.82, 0.3, 1.86], [0, 0.17, 0.0], WHITE, 'gloss', radius=0.12),                    # shell base
