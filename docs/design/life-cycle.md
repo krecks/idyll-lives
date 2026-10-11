@@ -63,7 +63,7 @@ game's pace, so changing the lifespan never makes anyone jump in age. Content `l
 - **Birthdays** pass quietly; a new stage is a story event ("Ada is an elder now") with a
   feeling. Elders get tired sooner and walk slower (content `effects`), and their hair greys
   (presentation only; elder bodies are 0.13).
-- The household creator gets an age stage per resident (young adult, adult, elder; a random age
+- Creation (the household creator) gets an age stage per resident (young adult, adult, elder; a random age
   within it), and generated households get ages that fit (partners within a few years, a grown
   child 20-30 years younger than their parents).
 

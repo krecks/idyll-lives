@@ -5,7 +5,7 @@
   import { storyIcon, storyText, storyTone } from './story';
 </script>
 
-<ol class="feed" class:hidden={game.journalOpen} aria-live="polite">
+<ol class="feed" class:hidden={game.journalOpen || game.townOpen} aria-live="polite">
   {#each game.feed as f (f.event.id)}
     <li class={storyTone(f.event)} class:milestone={f.event.importance >= 2}>
       <button title="Show" onclick={() => services.controls.showEvent(f.event)}>
@@ -19,7 +19,7 @@
 <style>
   .feed {
     position: absolute;
-    top: 80px;
+    top: var(--top);
     right: var(--edge);
     width: 300px;
     margin: 0;

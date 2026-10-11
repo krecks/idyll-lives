@@ -48,8 +48,7 @@ export type StartRequest =
   | {
       kind: 'new';
       town: NeighbourhoodDraft;
-      /** Null: build first, a family moves in later (the home is named after its address until then). */
-      household: HouseholdDraft | null;
+      household: HouseholdDraft;
       slot: number;
       /** `household` already lives in `town` at `slot`: the player takes it over instead of moving a new one in. */
       existing?: boolean;
@@ -64,7 +63,7 @@ export type StartRequest =
 const FEED_MS = 12_000;
 /** Story-feed entries shown at once. */
 const FEED_SIZE = 3;
-/** Watch mode: the camera starts watching this long after a game is revealed. */
+/** Live: the camera starts watching this long after a game is revealed. */
 const START_WATCH_MS = 2500;
 /** Shift+R turns things that turn freely by this many degrees. */
 const FINE_TURN = 15;
@@ -78,7 +77,7 @@ const SLOW_MS = 25_000;
 const WARM_FRAMES = 3;
 /** Longest wait for the household's portraits before a prepared session counts as ready anyway. */
 const PORTRAIT_WAIT_MS = 8000;
-/** After this long in the game, the catalog's pictures are drawn in idle moments (Buy mode then opens with them). */
+/** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
 
 export interface GameSession {
@@ -137,7 +136,7 @@ export async function startSession(
     const templates = await loadTemplates();
     const lot = assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan });
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
-    household = request.household?.name.trim() ?? request.town.slots[request.slot].name;
+    household = request.household.name.trim();
   } else {
     const record = await readSave(request.saveId);
     if (!record) throw new Error('That save no longer exists.');
@@ -173,8 +172,8 @@ export async function startSession(
   let routinesSeen: Routine[] | null = null;
   const bubbles = new BubbleLayer(overlay, renderer, content, assets);
   const roomOverlay = new RoomOverlay(overlay, renderer, content);
-  /** Build mode's room scores, at home, when asked for. */
-  const roomOverlayOn = () => game.mode === 'build' && game.roomScores && world !== null && worldView === homePlot();
+  /** Build mode's Home tab: the rooms at home tinted by their scores. */
+  const roomOverlayOn = () => game.mode === 'build' && game.buildTab === 'home' && world !== null && worldView === homePlot();
   const refreshRoomOverlay = () => roomOverlay.set(roomOverlayOn() ? world : null, game.rooms, game.storey);
   /** When the player last chose a storey (the view then stays there a while rather than following residents). */
   let storeyChosenAt = -Infinity;
@@ -254,9 +253,9 @@ export async function startSession(
     if (playerWalls !== null && game.wallMode !== playerWalls) controls.setWallMode(playerWalls);
     playerWalls = null;
   }
-  /** Watch mode: seconds after the player's last input before the camera watches again (Off: never by itself, after the start). */
+  /** Live: seconds after the player's last input before the camera watches on its own (Off: never). */
   const autoWatchDelay = () => (liveSettings.directorDelay > 0 ? liveSettings.directorDelay : Infinity);
-  /** Watch mode at the start of a game: when the camera starts watching (0: not pending). */
+  /** At the start of a game: when the camera starts watching (0: not pending). */
   let watchAt = 0;
   /** Any input: the camera is the player's again at once. */
   function takeBack() {
@@ -275,7 +274,7 @@ export async function startSession(
     hudTimer = setTimeout(() => (game.hudAwake = false), HUD_AWAKE_MS);
   };
   let speedBeforeMenu: number | null = null;
-  /** Buy mode pauses the game; the speed to restore when leaving it. */
+  /** Build and Create pause the game; the speed to restore back in Live. */
   let speedBeforeBuy: number | null = null;
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -283,7 +282,7 @@ export async function startSession(
 
   const controls: GameControls = {
     setSpeed(speed) {
-      // Time stands still in Buy mode.
+      // Time stands still in Build and Create.
       if (game.mode !== 'live') return;
       speed = Math.max(0, Math.min(MAX_SPEED, speed));
       if (speed > 0) lastSpeed = speed;
@@ -320,16 +319,6 @@ export async function startSession(
         if (home && viewPlot !== home.id) showPlot(home.id);
       }
     },
-    watch() {
-      lastInput = -Infinity;
-      if (canWatch()) startWatching(performance.now());
-    },
-    setWatchMode(watch) {
-      if (game.mode !== 'live') controls.setMode('live');
-      game.watchMode = watch;
-      if (watch) controls.watch();
-      else takeBack();
-    },
     frameHouse() {
       takeBack();
       if (game.follow !== null) controls.follow(null);
@@ -344,7 +333,7 @@ export async function startSession(
     },
     toggleJournal() {
       game.journalOpen = !game.journalOpen;
-      if (game.journalOpen) game.homeOpen = false;
+      if (game.journalOpen) game.townOpen = false;
       if (game.journalOpen) void bridge.requestEvents().then((events) => (game.journal = events));
     },
     setLifespan(lifespan) {
@@ -355,14 +344,6 @@ export async function startSession(
     },
     setPlayerMoves(enabled) {
       bridge.send({ type: 'setPlayerMoves', enabled });
-    },
-    toggleHome() {
-      game.homeOpen = !game.homeOpen;
-      if (game.homeOpen) game.journalOpen = false;
-    },
-    toggleRoomScores(on) {
-      game.roomScores = on ?? !game.roomScores;
-      refreshRoomOverlay();
     },
     openPlanner(who) {
       if (!game.occupied) return;
@@ -399,7 +380,7 @@ export async function startSession(
     },
     openCatalog(filter) {
       game.plannerOpen = false;
-      controls.setMode('buy');
+      controls.setBuildTab('furnish');
       game.buySelection = null;
       game.placing = null;
       game.buyFilter = filter;
@@ -462,7 +443,8 @@ export async function startSession(
       game.pauseMenu = true;
     },
     setMode(mode) {
-      if (game.mode === mode) return;
+      // Creation is the new game's: in a game, only a family moving into an empty home.
+      if (game.mode === mode || (mode === 'create' && game.occupied)) return;
       takeBack();
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
@@ -474,7 +456,7 @@ export async function startSession(
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
       game.socialMenu = null;
-      // Buy and Build mode pause the game (and close Live-only panels); back in Live the speed returns.
+      // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
       if (mode !== 'live') {
         if (fromLive) {
           speedBeforeBuy = game.speed;
@@ -482,6 +464,7 @@ export async function startSession(
         }
         game.townOpen = false;
         game.jobBoardOpen = false;
+        game.plannerOpen = false;
       } else if (speedBeforeBuy !== null) {
         if (speedBeforeBuy > 0) lastSpeed = speedBeforeBuy;
         bridge.send({ type: 'setSpeed', speed: speedBeforeBuy });
@@ -489,16 +472,28 @@ export async function startSession(
       }
       // Building happens at home, with the walls down so the floor plan is visible.
       const home = buildBuy.home();
-      if (mode !== 'live' && home) {
+      if (mode === 'build' && home) {
         if (viewPlot !== home.id) showPlot(home.id);
         controls.setWallMode('down');
       }
       buildBuy.modeChanged();
     },
+    setBuildTab(tab) {
+      if (tab === 'build') return controls.setBuildTool(game.buildTool);
+      const wasBuilding = game.mode === 'build';
+      controls.setMode('build');
+      if (game.buildTab === tab) return;
+      buildBuy.cancel();
+      game.buildTab = tab;
+      game.buildStart = null;
+      buildBuy.clearPreviews();
+      refreshRoomOverlay();
+      if (wasBuilding) play('tab');
+    },
     startPlacing(def) {
-      // Stairs are built in Build mode.
+      // Stairs are built with the Build tab's Stairs tool.
       if (content.object(def)?.stairs) return controls.setBuildTool('stairs');
-      controls.setMode('buy');
+      controls.setBuildTab('furnish');
       game.buySelection = null;
       const turns = !!content.object(def) && content.turns(content.object(def)!);
       game.placing = { def, rot: game.placing?.rot ?? 0, turn: turns ? (game.placing?.turn ?? 0) : 0, objectId: null };
@@ -510,13 +505,13 @@ export async function startSession(
         controls.setBuildTool('stairs');
         buildBuy.cancel();
       } else {
-        controls.setMode('buy');
+        controls.setBuildTab('furnish');
         game.buySelection = null;
       }
       game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId, size: ownSize(content, obj), tall: obj.tall ?? 0 };
     },
     rotatePlacing(fine = false) {
-      if (game.mode !== 'buy' && !buildBuy.stairsTool()) return;
+      if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Facing and turn as one angle: a quarter turn, or 15° for things that turn freely.
       const turned = (def: string, rot: number, turn: number) => {
         const d = content.object(def);
@@ -537,7 +532,7 @@ export async function startSession(
       buildBuy.cancel();
     },
     sell(objectId) {
-      if (game.mode !== 'buy' && !buildBuy.stairsTool()) return;
+      if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Selling what's in hand puts it down first (selling renumbers the objects after it).
       if (game.placing?.objectId === objectId) buildBuy.cancel();
       bridge.send({ type: 'sell', household: game.home, object: objectId });
@@ -549,7 +544,7 @@ export async function startSession(
     },
     undo() {
       // The step count follows a little later; don't send more undos than there are steps.
-      if (game.mode === 'live' || game.undoSteps <= 0) return;
+      if (game.mode !== 'build' || game.undoSteps <= 0) return;
       game.undoSteps--;
       game.buildStart = null;
       game.buySelection = null;
@@ -557,7 +552,7 @@ export async function startSession(
       bridge.send({ type: 'undo', household: game.home });
     },
     redo() {
-      if (game.mode === 'live' || game.redoSteps <= 0) return;
+      if (game.mode !== 'build' || game.redoSteps <= 0) return;
       game.redoSteps--;
       game.buildStart = null;
       game.buySelection = null;
@@ -579,14 +574,14 @@ export async function startSession(
       bridge.send({ type: 'setStyle', household: game.home, style });
       game.householdStyle = style;
     },
-    /** Buy mode: buy the next quality level (instant). */
+    /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
-      if (game.mode !== 'buy') return;
+      if (!game.furnishing) return;
       bridge.send({ type: 'upgrade', household: game.home, object: objectId });
       game.menu = null;
     },
     toggleEyedropper() {
-      if (game.mode === 'live') return;
+      if (game.mode !== 'build') return;
       game.eyedropper = !game.eyedropper;
       if (!game.eyedropper) game.pickHint = null;
       else {
@@ -617,10 +612,17 @@ export async function startSession(
       if (saved) bridge.send({ type: 'buildBlueprint', household: game.home, blueprint: JSON.parse(saved.data) as unknown });
     },
     setBuildTool(tool) {
+      const wasBuilding = game.mode === 'build';
       controls.setMode('build');
-      // Leaving or (re)entering the Stairs tool drops the staircase in hand.
-      if (tool !== game.buildTool || tool === 'stairs') buildBuy.cancel();
+      // Changing tab or tool, or (re)entering the Stairs tool, drops what's in hand.
+      const fromTab = game.buildTab;
+      if (fromTab !== 'build' || tool !== game.buildTool || tool === 'stairs') buildBuy.cancel();
+      game.buildTab = 'build';
       game.buildTool = tool;
+      if (fromTab !== 'build') {
+        refreshRoomOverlay();
+        if (wasBuilding) play('tab');
+      }
       // Painting needs the walls standing to see them; the roof shows with walls up.
       if (tool === 'paint' && game.wallMode === 'down') controls.setWallMode('cutaway');
       if (tool === 'roof') controls.setWallMode('up');
@@ -650,13 +652,8 @@ export async function startSession(
         sims: householdSpawns(draft, game.home, spawns),
         bonds: householdBonds(draft, 0),
       });
-      // Closing the creator must not bring back the pause it held (taken in Build mode, the
-      // speed is 0): Live mode resumes the speed from before building, or the creator's own.
-      const resume = speedBeforeMenu;
-      speedBeforeMenu = null;
-      game.moveInOpen = false;
-      if (game.mode !== 'live') controls.setMode('live');
-      else if (resume !== null) bridge.send({ type: 'setSpeed', speed: resume });
+      // Back to Live (its speed returns) to see them arrive.
+      controls.setMode('live');
       play('open');
     },
     async debugReport(note) {
@@ -701,7 +698,7 @@ export async function startSession(
   bridge.onError((message) => {
     if (disposed) return;
     toast(message);
-    if (game.mode !== 'live') play('error');
+    if (game.mode === 'build') play('error');
   });
   bridge.onUi((ui) => {
     if (disposed) return;
@@ -782,11 +779,11 @@ export async function startSession(
         if (hair !== s.appearance.hair || s.appearance.hairBase) s.appearance = { ...s.appearance, hair, hairBase: base };
       }
     }
-    // Buy mode: show what the simulation just accepted (furniture popping in, dust, money).
-    const feedback = game.mode !== 'live' && world && worldView === viewPlot ? editFeedback(world, w) : null;
+    // Build mode: show what the simulation just accepted (furniture popping in, dust, money).
+    const feedback = game.mode === 'build' && world && worldView === viewPlot ? editFeedback(world, w) : null;
     if (feedback?.sound) play(feedback.sound);
     // Things the player just placed: the director looks out for their first use.
-    if (game.mode !== 'live' && world) {
+    if (game.mode === 'build' && world) {
       const before = world.objects;
       const added = w.objects.filter((o) => !before.some((b) => b.id === o.id && b.def === o.def));
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
@@ -823,7 +820,7 @@ export async function startSession(
     if (!focused) {
       focused = true;
       const first = playerSims()[0];
-      // Nobody lives at home yet (build first): nobody to give orders to.
+      // Nobody lives at home: nobody to give orders to.
       game.selected = first ?? -1;
       if (first !== undefined && liveSettings.directControl === 'always') controls.inspect(first);
       // Start on the home lot; its geometry arrives in the next world message.
@@ -920,7 +917,7 @@ export async function startSession(
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
       it.needsTable && !atTable ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
-    // Upgrades are bought in Buy mode, not from here.
+    // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
   };
@@ -945,7 +942,8 @@ export async function startSession(
       if (game.pauseMenu) return;
       game.menu = null;
       game.socialMenu = null;
-      if (game.mode !== 'live') {
+      if (game.mode === 'create') return;
+      if (game.mode === 'build') {
         const hit = renderer.pick(x, y);
         const ground = hit.ground && inLot(hit.ground.x, hit.ground.z) ? hit.ground : null;
         if (buildBuy.picking()) return usePicked(buildBuy.pick(ground, hit.objectId));
@@ -989,7 +987,7 @@ export async function startSession(
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       renderer.setHoverTile(g && inLot(g.x, g.z) && !game.pauseMenu ? { x: Math.floor(g.x), z: Math.floor(g.z) } : null);
-      if (game.mode !== 'live') buildBuy.hover(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
+      if (game.mode === 'build') buildBuy.hover(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
     },
     leave() {
       renderer.setHoverTile(null);
@@ -998,7 +996,7 @@ export async function startSession(
     // Wall and Remove tools: press, drag, release (see `BuildBuyInput.press`).
     press(x, y) {
       // The eyedropper picks with a plain click.
-      if (game.pauseMenu || game.mode === 'live' || buildBuy.picking()) return false;
+      if (game.pauseMenu || game.mode !== 'build' || buildBuy.picking()) return false;
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       return buildBuy.press(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
@@ -1026,21 +1024,20 @@ export async function startSession(
 
   const onKey = (e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    // The household creator is open over the game: its keys are its own.
-    if (game.moveInOpen) {
-      if (e.key === 'Escape') game.moveInOpen = false;
+    // Creation: its keys are its own (Escape goes back to Live).
+    if (game.mode === 'create') {
+      if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
       return;
     }
     if (e.key === 'Escape') {
       if (game.townOpen) return void (game.townOpen = false);
       if (game.jobBoardOpen) return void (game.jobBoardOpen = false);
       if (game.eyedropper) return controls.toggleEyedropper();
-      // Step back: drop what's in hand, then leave Buy or Build mode.
+      // Step back: drop what's in hand, then leave Build mode.
       if (buildBuy.cancel()) return;
       if (game.mode !== 'live') return controls.setMode('live');
       if (game.menu || game.socialMenu) return controls.closeMenu();
       if (game.journalOpen) return void (game.journalOpen = false);
-      if (game.homeOpen) return void (game.homeOpen = false);
       if (game.follow !== null) return controls.follow(null);
       if (game.inspected !== null && liveSettings.directControl !== 'always') return controls.inspect(null);
       game.pauseMenu = !game.pauseMenu;
@@ -1084,9 +1081,9 @@ export async function startSession(
         return;
       case 'o':
       case 'O':
-        if (game.mode === 'live') controls.toggleHome();
-        else if (game.mode === 'build') controls.toggleRoomScores();
-        return;
+        // Our home: Build mode's Home tab (again: back to Live).
+        if (game.mode === 'build' && game.buildTab === 'home') return controls.setMode('live');
+        return controls.setBuildTab('home');
       case 'p':
       case 'P':
         if (game.mode === 'live') {
@@ -1096,7 +1093,10 @@ export async function startSession(
         return;
       case 'm':
       case 'M':
-        if (game.mode === 'live') game.townOpen = !game.townOpen;
+        if (game.mode === 'live') {
+          game.townOpen = !game.townOpen;
+          if (game.townOpen) game.journalOpen = false;
+        }
         return;
       case 'w':
       case 'W':
@@ -1117,23 +1117,22 @@ export async function startSession(
         return controls.toggleEyedropper();
       case 'Delete':
       case 'Backspace':
-        if (game.mode === 'buy' || buildBuy.stairsTool()) {
+        if (game.furnishing || buildBuy.stairsTool()) {
           const target = game.placing?.objectId ?? game.buySelection;
           if (target !== null) controls.sell(target);
         }
         return;
-      // B toggles Build mode, V Buy mode.
+      // B toggles Build mode (V: straight to its catalog), L back to Live.
       case 'b':
       case 'B':
         return controls.setMode(game.mode === 'build' ? 'live' : 'build');
       case 'v':
       case 'V':
         game.buyFilter = null;
-        return controls.setMode(game.mode === 'buy' ? 'live' : 'buy');
+        return game.furnishing ? controls.setMode('live') : controls.setBuildTab('furnish');
       case 'l':
       case 'L':
-        // Back from Buy or Build; in Live and Watch, switches between the two.
-        return game.mode === 'live' ? controls.setWatchMode(!game.watchMode) : controls.setMode('live');
+        return controls.setMode('live');
       case 'Tab': {
         e.preventDefault();
         const ids = playerSims();
@@ -1168,7 +1167,7 @@ export async function startSession(
       // Menus and other modes end watching (opening them is input, but not all of it is ours).
       if (!canWatch() && !director.active) stopWatching();
       else director.update(now);
-    } else if (game.watchMode && canWatch() && ((watchAt > 0 && now >= watchAt) || now - lastInput > autoWatchDelay() * 1000)) {
+    } else if (canWatch() && ((watchAt > 0 && now >= watchAt) || now - lastInput > autoWatchDelay() * 1000)) {
       watchAt = 0;
       startWatching(now);
     }
@@ -1198,15 +1197,17 @@ export async function startSession(
       window.addEventListener('keydown', onInput, true);
       window.addEventListener('pointermove', onMove, { passive: true });
       lastInput = performance.now();
-      // Watch mode is the normal way to play: the camera starts watching once it has flown in.
-      watchAt = lastInput + START_WATCH_MS;
+      // The camera starts watching once it has flown in (unless watching on its own is off).
+      if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
       bridge.send({ type: 'setSpeed', speed: resumeSpeed ?? 1 });
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
       if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
         game.speed = resumeSpeed ?? 1;
-        controls.setMode('build');
+        // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
+        if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
+        else controls.setBuildTab('furnish');
       }
       prefetchTimer = setTimeout(() => {
         if (disposed) return;
@@ -1318,12 +1319,12 @@ export async function startSession(
       plan: (id: number) => game.sims.find((x) => x.id === id)?.plan ?? null,
       objects: () => game.objects.map((o) => ({ id: o.id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn ?? 0, offset: o.offset ?? [0, 0] })),
       steps: () => ({ undo: game.undoSteps, redo: game.redoSteps }),
-      watch: () => ({ mode: game.mode, watchMode: game.watchMode, watching: game.watching }),
+      watch: () => ({ mode: game.mode, watching: game.watching }),
       /** Doors, windows and wall looks (for checks that point at them). */
       openings: () => world?.openings ?? [],
       wallLooks: () => (world?.walls ?? []).filter((w) => w.faces || w.form),
       floors: () => world?.floors ?? [],
-      build: () => ({ mode: game.mode, tool: game.buildTool, look: { ...game.buildLook }, placing: game.placing, eyedropper: game.eyedropper, hint: game.pickHint }),
+      build: () => ({ mode: game.mode, tab: game.buildTab, tool: game.buildTool, look: { ...game.buildLook }, placing: game.placing, eyedropper: game.eyedropper, hint: game.pickHint }),
       sims: () =>
         game.sims.map((x) => {
           const snap = bridge.latest();

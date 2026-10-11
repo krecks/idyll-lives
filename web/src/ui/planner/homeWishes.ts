@@ -73,7 +73,7 @@ export function actOnWish(w: WishInfo, name: string): void {
   if (a.kind === 'catalog') services.controls.openCatalog({ label: `For ${name}: ${a.label}`, defs: a.defs });
   else if (a.kind === 'build') {
     game.plannerOpen = false;
-    services.controls.setMode('build');
+    services.controls.setBuildTab('build');
   } else {
     const o = brokenAtHome(a.def);
     if (o) services.controls.repair(o.id);

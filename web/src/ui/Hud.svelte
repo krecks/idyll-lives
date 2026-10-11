@@ -1,21 +1,22 @@
 <script lang="ts">
-  import NeedsPanel from './NeedsPanel.svelte';
   import PerfOverlay from './PerfOverlay.svelte';
   import PieMenu from './PieMenu.svelte';
   import SimPanel from './SimPanel.svelte';
   import EventFeed from './EventFeed.svelte';
   import HouseholdStrip from './HouseholdStrip.svelte';
   import Journal from './Journal.svelte';
-  import OurHome from './OurHome.svelte';
   import JobBoard from './JobBoard.svelte';
   import SocialMenu from './SocialMenu.svelte';
   import TopBar from './TopBar.svelte';
   import TownPanel from './TownPanel.svelte';
-  import BuyPanel from './BuyPanel.svelte';
+  import FurnishPanel from './FurnishPanel.svelte';
   import BuildPanel from './BuildPanel.svelte';
+  import HomePanel from './HomePanel.svelte';
   import BuyFx from './buy/BuyFx.svelte';
   import { game } from './state.svelte';
   import { settings } from '../settings/settings.svelte';
+
+  /** Live: the household and the world. Build: one dock (Furnish, Build, Home). Create covers the rest (see `Creation`). */
 </script>
 
 <div class="hud" class:quiet={game.watching && settings.hideHudWhileWatching && !game.hudAwake}>
@@ -23,15 +24,15 @@
   {#if game.mode === 'live'}
     <HouseholdStrip />
     <SimPanel />
-    <NeedsPanel />
     <Journal />
-    <OurHome />
+    <EventFeed />
+  {:else if game.mode === 'build'}
+    <FurnishPanel />
+    <BuildPanel />
+    <HomePanel />
+    <BuyFx />
   {/if}
-  <BuyPanel />
-  <BuildPanel />
-  <BuyFx />
   <PerfOverlay />
-  <EventFeed />
   <PieMenu />
   <SocialMenu />
   <TownPanel />

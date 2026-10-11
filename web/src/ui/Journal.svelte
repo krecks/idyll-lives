@@ -69,7 +69,7 @@
 <style>
   .journal {
     position: absolute;
-    top: 80px;
+    top: var(--top);
     right: var(--edge);
     bottom: var(--edge);
     width: 340px;

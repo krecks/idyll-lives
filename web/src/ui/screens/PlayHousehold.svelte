@@ -177,7 +177,7 @@
           </div>
         {/if}
       {:else}
-        <p>Nobody lives in this town yet. Go back and add neighbours, or create your own household.</p>
+        <p>Nobody lives in this town yet. Go back and add neighbours, or make your own household in Creation.</p>
       {/if}
     </aside>
   </main>

@@ -503,8 +503,7 @@ export interface AssembleOptions {
 
 /**
  * Builds the simulation's town file. A new player household moves in as household 0, before the
- * neighbours; with no `player` (build first) household 0 is the player's home with nobody living
- * in it yet, named after its address. With `existing`, `player` is the neighbour household already
+ * neighbours. With `existing`, `player` is the neighbour household already
  * living at `playerSlot`: it stays where it is in the list (with its jobs and history) and only
  * becomes the player's. A new household on an empty lot gets money to build with in Living games.
  */
@@ -512,7 +511,7 @@ export function assembleTown(
   content: Content,
   t: Templates,
   town: NeighbourhoodDraft,
-  player: HouseholdDraft | null,
+  player: HouseholdDraft,
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
@@ -527,10 +526,9 @@ export function assembleTown(
   // A new household first, then the neighbours (one of whom may be the player's).
   const neighbours = town.households.map((h) => ({ ...h, player: existing && h.slot === playerSlot }));
   const home = town.slots[playerSlot];
-  const newcomer: HouseholdDraft = player ?? { name: home.name, members: [], bonds: [] };
   const residents: { household: HouseholdDraft; slot: number; player: boolean }[] = existing
     ? neighbours
-    : [{ household: newcomer, slot: playerSlot, player: true }, ...neighbours];
+    : [{ household: player, slot: playerSlot, player: true }, ...neighbours];
   const { startingFunds, emptyLotFunds = 0 } = content.economy;
   const emptyLot = !houseTemplate(t, home.template);
   const households = residents.map((r, i) => ({
@@ -559,7 +557,7 @@ export function assembleTown(
   });
 
   // Neighbours have history with each other; a newly arrived player household doesn't.
-  const newcomers = existing ? 0 : newcomer.members.length;
+  const newcomers = existing ? 0 : player.members.length;
   for (let a = newcomers; a < sims.length; a++) {
     for (let b = a + 1; b < sims.length; b++) {
       if (sims[a].household === sims[b].household) continue;

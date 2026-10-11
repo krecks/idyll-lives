@@ -94,7 +94,7 @@
   }
   .town {
     position: absolute;
-    top: 80px;
+    top: var(--top);
     right: var(--edge);
     width: 460px;
     padding: 14px;

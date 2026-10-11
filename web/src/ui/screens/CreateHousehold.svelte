@@ -83,7 +83,7 @@
    * home). In a game, a family moving into the home: the caller says where back and next lead.
    */
   let {
-    eyebrow = 'Step 2 of 3 · Create your household',
+    eyebrow = 'Step 2 of 3 · Creation',
     backLabel = 'Neighbourhood',
     nextLabel = 'Choose a home →',
     avoidNames = (app.town?.households ?? []).map((h) => h.household.name),

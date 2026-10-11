@@ -2,12 +2,18 @@
   import type { RoomView } from '../core/protocol';
   import { ROOM_FACTORS, roomName, scoreColor, weakest } from '../game/roomOverlay';
   import Icon from './Icon.svelte';
-  import { money } from './format';
+  import BuildTabs from './buy/BuildTabs.svelte';
+  import { clock, money, WEEKDAYS } from './format';
+  import { settings } from '../settings/settings.svelte';
   import { describeHomeWish } from './planner/homeWishes';
   import { services } from './services';
   import { game } from './state.svelte';
 
-  /** Our home: every room of the house with its kind, size and scores, what the residents wish for it, and what's broken. */
+  /**
+   * Build mode's Home tab: how the home is doing (the rooms are tinted by their scores on the floor
+   * plan meanwhile). Every room with its kind, size and scores, what the residents wish for it,
+   * what's broken, the family, and what the home costs a week.
+   */
   const content = services.content;
   const FACTOR_LABELS: Record<(typeof ROOM_FACTORS)[number], string> = { size: 'Size', light: 'Light', decor: 'Decor', clean: 'Tidy', function: 'Use' };
 
@@ -72,109 +78,121 @@
   const cost = $derived(game.creative ? 0 : (content.adoptionCost ?? 0));
   const parentNames = $derived(game.expecting ? game.expecting.parents.map((id) => game.roster.find((s) => s.id === id)?.name ?? '').filter(Boolean).join(' and ') : '');
   const dueIn = $derived(game.expecting ? Math.max(0, game.expecting.due - game.day + 1) : 0);
-
-  function showPlan() {
-    game.homeOpen = false;
-    services.controls.setMode('build');
-    services.controls.toggleRoomScores(true);
-  }
+  const rent = content.economy.rent;
 </script>
 
-{#if game.homeOpen}
-  <aside class="home glass" aria-label="Our home">
+{#if game.mode === 'build' && game.buildTab === 'home'}
+  <section class="home glass" aria-label="Home">
     <header>
-      <Icon name="icon.need.environment" size={18} />
-      <b>Our home</b>
-      {#if overall !== null}<span class="total tabular" style="--c:{color(overall)}" title="The house as a whole">{Math.round(overall * 100)}</span>{/if}
-      <button class="close" aria-label="Close (O)" onclick={() => (game.homeOpen = false)}><Icon name="icon.ui.close" size={14} /></button>
+      <BuildTabs />
+      {#if overall !== null}
+        <span class="overall"><span class="total tabular" style="--c:{color(overall)}">{Math.round(overall * 100)}</span>The house as a whole</span>
+      {/if}
+      <span class="costs muted">
+        {#if game.creative}Creative · no rent or bills{:else if game.rent !== null}
+          Rent {money(game.rent)} + bills {money(game.bills ?? 0)} every {rent ? `${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}` : 'week'}
+        {/if}
+      </span>
     </header>
-    <button class="btn small" onclick={showPlan}>See it on the floor plan</button>
-    <div class="rooms">
-      {#if game.expecting || (content.adoptionCost !== null && grownUp)}
-        <section class="family">
-          <h3>Family</h3>
-          {#if game.expecting}
-            <p><b>{parentNames || 'They'}</b> are expecting a baby{dueIn <= 1 ? ' any day now' : ` in about ${dueIn} days`}.</p>
+    <div class="body">
+      {#if game.expecting || (content.adoptionCost !== null && grownUp) || broken.length || otherWishes.length}
+        <div class="side">
+          {#if game.expecting || (content.adoptionCost !== null && grownUp)}
+            <section class="family">
+              <h3>Family</h3>
+              {#if game.expecting}
+                <p><b>{parentNames || 'They'}</b> are expecting a baby{dueIn <= 1 ? ' any day now' : ` in about ${dueIn} days`}.</p>
+              {/if}
+              {#if content.adoptionCost !== null && grownUp}
+                <div class="row">
+                  <button class="btn small" disabled={!room || game.funds < cost} onclick={() => services.controls.adopt(false)}>Adopt a baby</button>
+                  <button class="btn small" disabled={!room || game.funds < cost} onclick={() => services.controls.adopt(true)}>Adopt a child</button>
+                </div>
+                <span class="muted">{cost ? money(cost) : 'Free'}{room ? '' : ' · no room for another'}</span>
+              {/if}
+            </section>
           {/if}
-          {#if content.adoptionCost !== null && grownUp}
-            <div class="row">
-              <button class="btn small" disabled={!room || game.funds < cost} onclick={() => services.controls.adopt(false)}>Adopt a baby</button>
-              <button class="btn small" disabled={!room || game.funds < cost} onclick={() => services.controls.adopt(true)}>Adopt a child</button>
-              <span class="muted">{cost ? money(cost) : 'Free'}{room ? '' : ' · no room for another'}</span>
-            </div>
+          {#if broken.length}
+            <section class="broken">
+              <h3>Broken</h3>
+              {#each broken as o (o.id)}
+                {@const def = content.object(o.def)}
+                <div class="row">
+                  <span>{def?.name ?? o.def}</span>
+                  <button class="btn small primary" onclick={() => services.controls.repair(o.id)}>
+                    {game.creative || o.repairCost === undefined ? 'Repair' : `Repair · ${money(o.repairCost)}`}
+                  </button>
+                </div>
+              {/each}
+              <p class="muted">Broken things don't work. Residents fix them in time, or pay for a quick fix.</p>
+            </section>
           {/if}
-        </section>
-      {/if}
-      {#if broken.length}
-        <section class="broken">
-          <h3>Broken</h3>
-          {#each broken as o (o.id)}
-            {@const def = content.object(o.def)}
-            <div class="row">
-              <span>{def?.name ?? o.def}</span>
-              <button class="btn small primary" onclick={() => services.controls.repair(o.id)}>
-                {game.creative || o.repairCost === undefined ? 'Repair' : `Repair · ${money(o.repairCost)}`}
-              </button>
-            </div>
+          {#each otherWishes as [text, names] (text)}
+            <section class="wish"><b>{text}</b><span class="muted">{names.join(' & ')} found it taken when they needed it</span></section>
           {/each}
-          <p class="muted">Broken things don't work. Residents fix them in time, or pay for a quick fix.</p>
-        </section>
+        </div>
       {/if}
-      {#each otherWishes as [text, names] (text)}
-        <section class="wish"><b>{text}</b><span class="muted">{names.join(' & ')} found it taken when they needed it</span></section>
-      {/each}
-      {#each rooms as r (`${r.garden}:${r.id}`)}
-        {@const weak = weakest(r)}
-        <section class="room">
-          <div class="head">
-            <span class="icon" style="--c:{color(r.scores[5])}"><Icon name={icon(r)} size={15} /></span>
-            <b>{roomName(content, r)}</b>
-            <span class="muted tabular">{Math.round(r.tiles)} m²</span>
-            <span class="score tabular" style="--c:{color(r.scores[5])}">{Math.round(r.scores[5] * 100)}</span>
-          </div>
-          <div class="factors">
-            {#each ROOM_FACTORS as f, i (f)}
-              <span class="factor" class:weak={weak === f} title="{FACTOR_LABELS[f]}: {Math.round(r.scores[i] * 100)}">
-                <small>{FACTOR_LABELS[f]}</small>
-                <span class="bar"><span style="width:{r.scores[i] * 100}%; background:{color(r.scores[i])}"></span></span>
-              </span>
-            {/each}
-          </div>
-          {#if !r.garden}
-            <small class="muted">{r.windows} {r.windows === 1 ? 'window' : 'windows'} · {r.lamps} {r.lamps === 1 ? 'lamp' : 'lamps'}{r.dirt > 0.05 ? ` · ${Math.round(r.dirt * 100)}% dirty` : ''}</small>
-          {/if}
-          {#each notes(r) as note (note)}<small class="note">{note}</small>{/each}
-          {#each wishesFor(r) as wish (wish)}<small class="wished">{wish}</small>{/each}
-        </section>
-      {:else}
-        <p class="empty">No rooms yet. Build walls around a space and it becomes a room.</p>
-      {/each}
+      <div class="rooms">
+        {#each rooms as r (`${r.garden}:${r.id}`)}
+          {@const weak = weakest(r)}
+          <section class="room">
+            <div class="head">
+              <span class="icon" style="--c:{color(r.scores[5])}"><Icon name={icon(r)} size={15} /></span>
+              <b>{roomName(content, r)}</b>
+              <span class="muted tabular">{Math.round(r.tiles)} m²</span>
+              <span class="score tabular" style="--c:{color(r.scores[5])}">{Math.round(r.scores[5] * 100)}</span>
+            </div>
+            <div class="factors">
+              {#each ROOM_FACTORS as f, i (f)}
+                <span class="factor" class:weak={weak === f} title="{FACTOR_LABELS[f]}: {Math.round(r.scores[i] * 100)}">
+                  <small>{FACTOR_LABELS[f]}</small>
+                  <span class="bar"><span style="width:{r.scores[i] * 100}%; background:{color(r.scores[i])}"></span></span>
+                </span>
+              {/each}
+            </div>
+            {#if !r.garden}
+              <small class="muted">{r.windows} {r.windows === 1 ? 'window' : 'windows'} · {r.lamps} {r.lamps === 1 ? 'lamp' : 'lamps'}{r.dirt > 0.05 ? ` · ${Math.round(r.dirt * 100)}% dirty` : ''}</small>
+            {/if}
+            {#each notes(r) as note (note)}<small class="note">{note}</small>{/each}
+            {#each wishesFor(r) as wish (wish)}<small class="wished">{wish}</small>{/each}
+          </section>
+        {:else}
+          <p class="empty">No rooms yet. Build walls around a space and it becomes a room.</p>
+        {/each}
+      </div>
     </div>
-  </aside>
+  </section>
 {/if}
 
 <style>
   .home {
     position: absolute;
-    top: 80px;
-    right: var(--edge);
+    left: 50%;
     bottom: var(--edge);
-    width: 340px;
+    transform: translateX(-50%);
+    width: min(1180px, calc(100vw - 2 * var(--edge)));
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px;
+    gap: 8px;
     pointer-events: auto;
-    animation: enter var(--slow) var(--ease);
   }
   header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    flex-wrap: wrap;
   }
-  header b {
-    flex: 1;
-    font-size: 15px;
+  .overall {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 650;
+  }
+  .costs {
+    margin-left: auto;
+    font-size: 12px;
   }
   .total,
   .score {
@@ -187,26 +205,31 @@
     color: #fff;
     background: var(--c);
   }
-  .close {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
+  .body {
+    display: flex;
+    gap: 10px;
+    min-height: 0;
+    max-height: clamp(190px, 31vh, 420px);
   }
-  .close:hover {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .rooms {
-    flex: 1;
-    overflow-y: auto;
+  .side {
+    flex: none;
+    width: 300px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin: 0 -6px;
-    padding: 0 6px 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .rooms {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    align-content: start;
+    gap: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 4px 6px 0;
   }
   section {
     display: flex;
@@ -300,14 +323,19 @@
     font-size: 11.5px;
   }
   .empty {
+    grid-column: 1 / -1;
     margin: 24px 6px;
     color: var(--text-muted);
     font-size: 13px;
   }
-  @keyframes enter {
-    from {
-      opacity: 0;
-      transform: translateX(16px);
+  @media (max-width: 760px) {
+    .body {
+      flex-direction: column;
+      height: auto;
+      max-height: 50vh;
+    }
+    .side {
+      width: auto;
     }
   }
 </style>

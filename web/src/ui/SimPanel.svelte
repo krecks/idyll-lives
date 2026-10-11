@@ -34,6 +34,7 @@
           .sort((x, y) => Math.abs(y.rel.friendship) + y.rel.romance - (Math.abs(x.rel.friendship) + x.rel.romance))
       : [],
   );
+  const needs = services.content.needs;
   const hours = (m: number) => (m >= 60 ? `${Math.round(m / 60)} h` : `${Math.max(1, Math.round(m))} min`);
 </script>
 
@@ -93,6 +94,15 @@
           {/each}
         </div>
       {/if}
+
+      <div class="needs" aria-label="Needs">
+        {#each needs as need, i (need.id)}
+          <div class="need" title="{need.label}: {Math.round(sim.needs[i] * 100)}%">
+            <span class="need-label"><Icon name={need.icon} size={13} /><span>{need.label}</span></span>
+            <span class="need-bar"><span style="width:{sim.needs[i] * 100}%;background:{needColor(sim.needs[i])}"></span></span>
+          </div>
+        {/each}
+      </div>
 
       <div class="tabs" role="tablist">
         {#each tabs as t (t)}
@@ -236,6 +246,42 @@
   .icon-btn.on {
     background: var(--accent-soft);
     color: var(--accent);
+  }
+  .needs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px 10px;
+  }
+  .need {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .need-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 550;
+    color: var(--text-muted);
+  }
+  .need-label span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .need-bar {
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--hairline);
+    overflow: hidden;
+  }
+  .need-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transition: width var(--slow) linear, background var(--slow) var(--ease);
   }
   .plan {
     display: grid;

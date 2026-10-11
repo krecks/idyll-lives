@@ -97,7 +97,7 @@
 <style>
   .perf {
     position: absolute;
-    top: 76px;
+    top: calc(var(--top) - 4px);
     right: var(--edge);
     min-width: 220px;
     padding: 10px 14px;

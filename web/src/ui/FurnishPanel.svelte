@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ObjectDef } from '../content/content';
   import Icon from './Icon.svelte';
+  import BuildTabs from './buy/BuildTabs.svelte';
   import ItemCard from './buy/ItemCard.svelte';
   import ItemDetail from './buy/ItemDetail.svelte';
   import { collectionOf, loversOf, styledModel, styleOptions, summarize } from './buy/catalog';
@@ -9,8 +10,8 @@
   import { game } from './state.svelte';
 
   /**
-   * Buy mode: the furniture catalog by category, plus the owned object picked on the lot.
-   * (Walls, rooms, doors and windows are Build mode's: see `BuildPanel`.)
+   * Build mode's Furnish tab: the furniture catalog by category, plus the owned object picked on
+   * the lot. (Walls, rooms, doors and windows are the Build tab's: see `BuildPanel`.)
    */
   const content = services.content;
   const ALL = '';
@@ -83,7 +84,7 @@
   /** Items passing the search, "Affordable" and "For us" filters, across all categories. */
   const matching = $derived(
     content.shop.filter((def) => {
-      // Stairs are built in Build mode.
+      // Stairs are built with the Build tab's Stairs tool.
       if (def.stairs) return false;
       if (affordableOnly && !game.affords(def.price ?? 0)) return false;
       if (lovedOnly && !lovers.has(def.id)) return false;
@@ -158,7 +159,7 @@
   }
 </script>
 
-{#if game.mode === 'buy' && moving && movingDef}
+{#if game.furnishing && moving && movingDef}
   <section class="buy held glass" aria-label="In hand">
     <div class="side">
       <ItemDetail def={movingDef} owned={moving} />
@@ -167,9 +168,10 @@
       Click on your lot to put it down · <kbd>R</kbd> rotate{#if content.turns(movingDef)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15° · hold <kbd>Shift</kbd> to place freely{/if} · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> put back
     </footer>
   </section>
-{:else if game.mode === 'buy'}
-  <section class="buy glass" aria-label="Buy mode" onpointerenter={() => (over = true)} onpointerleave={() => ((over = false), (hovered = null))}>
+{:else if game.furnishing}
+  <section class="buy glass" aria-label="Furnish" onpointerenter={() => (over = true)} onpointerleave={() => ((over = false), (hovered = null))}>
     <header class="tabs">
+      <BuildTabs />
       <div class="group shop" role="tablist" aria-label="Furniture">
         <button role="tab" aria-selected={category === ALL} class:active={category === ALL} onclick={() => pickCategory(ALL)}>
           <Icon name="icon.ui.buy" size={14} />All <small class="tabular">{matching.length}</small>

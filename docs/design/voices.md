@@ -76,7 +76,7 @@ may replace the runtime later. Measurements and research behind the choices are 
   and resamples its output by α (`crates/voice/src/resample.rs`, in the voice WASM), so the
   formants scale by α while pitch and length stay. A few milliseconds per line (2–6 ms in Chrome
   for 1.5–2 s lines, about 5 ms for a 3.7 s line in Node).
-- **Voices chosen in the household creator:** the resident's own mix or one of KittenTTS's
+- **Voices chosen in Creation (the household creator):** the resident's own mix or one of KittenTTS's
   voices, and pitch, speed and depth, kept in the save (see "A resident's own voice").
 - **Guards (`voice/index.ts`):** nothing is said while the engine loads; it unloads after 5
   minutes without a line and reloads on the next (quiet meanwhile); a watchdog pauses voices for
@@ -499,7 +499,7 @@ realistic) or in a game (speech pauses while it runs). It takes a few seconds.
 
 - At most **two voices at once**, and at most one line per resident every ~8 s.
 - A line that is not ready within **2 s** is dropped (the moment has passed).
-- No generation while in Build or Buy mode, while the tab is hidden, or at speed 3× and above
+- No generation while in Build or Creation, while the tab is hidden, or at speed 3× and above
   (except the conversation the player started).
 - **Live watchdog:** the scheduler tracks each line's RTF and the renderer's frame times
   (`game.stats`). If three lines in a row are late, or frame time rises past the budget while

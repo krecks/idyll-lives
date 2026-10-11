@@ -9,7 +9,7 @@
   import LoadingScreen from './LoadingScreen.svelte';
   import PauseMenu from './PauseMenu.svelte';
   import Planner from '../planner/Planner.svelte';
-  import MoveIn from '../MoveIn.svelte';
+  import Creation from '../Creation.svelte';
 
   /** The game screen: the canvas lives in the host (behind every screen); this adds the HUD. */
   let session = $state.raw<GameSession | null>(null);
@@ -51,14 +51,14 @@
 
   // The world stands still while a menu is open.
   $effect(() => {
-    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen || game.moveInOpen);
+    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen);
   });
 </script>
 
 {#if session}
   <div class="scaled hud-root"><Hud /></div>
   {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
-  {#if game.moveInOpen}<MoveIn />{/if}
+  {#if game.mode === 'create'}<Creation />{/if}
   {#if game.pauseMenu}<PauseMenu {session} />{/if}
 {:else if error}
   <div class="splash">
