@@ -719,7 +719,7 @@ along z = 0; plots across the street are the same layout turned round 180°.
 | `walls`, `doors`, `windows` | As in house layouts (optional). A shop's first door gets a garden path to the street. |
 | `paths` | Paved ground in plot tiles (`x`, `z`, `w`, `d`, any size): walks, squares, terraces. Only drawn. |
 | `entry` | Where visitors arrive (default: the middle of the street front, 1.5 m in). |
-| `objects` | Placements: `def`, `x`, `z` (the footprint's corner), `rot` (0 = facing +z, away from the street; 2 = facing the street), and for things that turn freely (`freeRotation`) `turn` (degrees past `rot`, 0..89) and `offset` (`[x, z]` off the middle of the tile in hundredths of a tile, up to ±50; turned round with the plot it points the other way). |
+| `objects` | Placements: `def`, `x`, `z` (the footprint's corner), `rot` (0 = facing +z, away from the street; 2 = facing the street), for things that turn freely (`freeRotation`) `turn` (degrees past `rot`, 0..89), and for anything but stairs `offset` (`[x, z]` off the middle of its tiles in hundredths of a tile, up to ±50, things on a wall only along it; turned round with the plot it points the other way), `size` (`[across, deep]` in centimetres before turning, 10 to 600 each; it takes its tiles rounded up and stands in their middle; things on a wall keep their depth, things on a top their footprint) and `tall` (centimetres taller, −100 to 200). |
 
 Every town has the first entry (the Town Park) in the middle of one row and gets more public
 places round it by size (small 1, medium 2, large 3), picked at random from the rest. Everyone in

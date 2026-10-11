@@ -150,6 +150,15 @@ impl Top {
         let def = &content.objects[o.def];
         let surface = def.surface?;
         let a = angle(o);
+        // Resized, the top grows with the footprint (its margins stay) and rises with the height.
+        let grown = [0, 1].map(|i| o.extent[i] as f32 / 100.0 - def.footprint[i] as f32);
+        let scale = [0, 1].map(|i| o.extent[i] as f32 / 100.0 / def.footprint[i] as f32);
+        let surface = Surface {
+            size: [0, 1].map(|i| (surface.size[i] + grown[i]).max(0.1)),
+            at: [0, 1].map(|i| surface.at[i] * scale[i]),
+            height: (surface.height + o.tall as f32 / 100.0).max(0.05),
+            ..surface
+        };
         let mut top = Top {
             host: o.id,
             centre: middle(content, o),

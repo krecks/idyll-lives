@@ -137,17 +137,24 @@ pub enum Command {
         /// Degrees past the facing, for objects that turn freely (0..90).
         #[serde(default)]
         turn: Option<u8>,
-        /// Centimetres (x, z) off the middle of its footprint, for objects that turn freely
-        /// (up to `MAX_OFFSET` each way).
+        /// Centimetres (x, z) off the middle of its footprint (up to `MAX_OFFSET` each way;
+        /// things on a wall only along it).
         #[serde(default)]
         offset: Option<[i8; 2]>,
+        /// Its own size: centimetres across and deep before turning (`MIN_SIZE` to `MAX_SIZE`
+        /// tiles; it takes them rounded up to whole tiles); absent: its kind's.
+        #[serde(default)]
+        size: Option<[u16; 2]>,
+        /// Centimetres taller (negative: shorter) than its kind.
+        #[serde(default)]
+        tall: Option<i16>,
     },
     /// Sell an object at home for part of what was paid.
     Sell {
         household: u32,
         object: u32,
     },
-    /// Move or rotate an object at home.
+    /// Move, rotate or resize an object at home.
     MoveObject {
         household: u32,
         object: u32,
@@ -157,10 +164,15 @@ pub enum Command {
         /// Degrees past the facing (objects that turn freely); absent keeps the angle it had.
         #[serde(default)]
         turn: Option<u8>,
-        /// Centimetres (x, z) off the middle of its footprint (objects that turn freely); absent
-        /// keeps the offset it had.
+        /// Centimetres (x, z) off the middle of its footprint; absent keeps the offset it had.
         #[serde(default)]
         offset: Option<[i8; 2]>,
+        /// Centimetres across and deep before turning; absent keeps the size it had.
+        #[serde(default)]
+        size: Option<[u16; 2]>,
+        /// Centimetres taller than its kind; absent keeps the height it had.
+        #[serde(default)]
+        tall: Option<i16>,
     },
     /// Change how an object looks (free; effects stay the same).
     Restyle {
@@ -256,7 +268,21 @@ pub struct EdgeEdit {
     /// Doors and windows: their style. Changing it on a standing door or window replaces it.
     #[serde(default)]
     pub style: Option<u8>,
+    /// Windows: the sill, and doors and windows: the top, in centimetres above the floor (see
+    /// `MAX_HEAD`); absent keeps what a standing one has, else the style's own. Changing only
+    /// these is free.
+    #[serde(default)]
+    pub sill: Option<u16>,
+    #[serde(default)]
+    pub head: Option<u16>,
 }
+
+/// The highest top (centimetres) a door or window may have: just under the ceiling.
+pub const MAX_HEAD: u16 = 270;
+/// The lowest top of a door (centimetres): people walk through it.
+pub const MIN_DOOR_HEAD: u16 = 180;
+/// The least height (centimetres) of a window, sill to top.
+pub const MIN_WINDOW: u16 = 30;
 
 impl EdgeEdit {
     /// An edit with the default look (full-height, automatic covering, first style).
@@ -269,6 +295,8 @@ impl EdgeEdit {
             cover: None,
             form: None,
             style: None,
+            sill: None,
+            head: None,
         }
     }
 }

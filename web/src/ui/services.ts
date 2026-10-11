@@ -69,6 +69,8 @@ export interface GameControls {
   startPlacing(def: string): void;
   /** Buy mode: pick up an owned object to move it. */
   startMoving(objectId: number): void;
+  /** Buy mode: gives a resized object back its kind's size and height. */
+  resetSize(objectId: number): void;
   /** Turns what's in hand (or picked) by a quarter; `fine`: by 15°, for things that turn freely. */
   rotatePlacing(fine?: boolean): void;
   cancelPlacing(): void;

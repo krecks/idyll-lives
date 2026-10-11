@@ -103,6 +103,10 @@ pub struct EdgeLook {
     pub form: u8,
     /// Door or window style: an index into the content's door / window styles.
     pub style: u8,
+    /// Doors and windows the player resized: the sill and the top (centimetres above the
+    /// floor; doors have no sill). None: the style's own.
+    pub sill: Option<u16>,
+    pub head: Option<u16>,
 }
 
 /// A side of a tile.
@@ -263,9 +267,15 @@ pub struct PlacementRaw {
     #[serde(default)]
     pub turn: u8,
     /// How far it stands off the middle of its footprint, in hundredths of a tile (up to
-    /// `MAX_OFFSET` each way), for things that turn freely.
+    /// `MAX_OFFSET` each way; things on a wall only along it).
     #[serde(default)]
     pub offset: [i8; 2],
+    /// Its own size: centimetres across and deep before turning; absent: its kind's.
+    #[serde(default)]
+    pub size: Option<[u16; 2]>,
+    /// Centimetres taller (negative: shorter) than its kind.
+    #[serde(default)]
+    pub tall: i16,
 }
 
 #[derive(Debug, Clone, Deserialize)]

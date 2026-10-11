@@ -1117,6 +1117,11 @@ struct LookView {
     form: u8,
     #[serde(skip_serializing_if = "is_zero")]
     style: u8,
+    /// Doors and windows the player resized: sill and top (centimetres).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sill: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    head: Option<u16>,
 }
 
 fn is_zero(n: &u8) -> bool {
@@ -1130,6 +1135,8 @@ impl LookView {
             faces: (l.sides != [0, 0]).then_some(l.sides),
             form: l.form,
             style: l.style,
+            sill: l.sill,
+            head: l.head,
         }
     }
 }
@@ -1181,6 +1188,11 @@ struct OpeningView {
     kind: &'static str,
     #[serde(skip_serializing_if = "is_zero")]
     style: u8,
+    /// Resized by the player: sill and top, centimetres above the floor (absent: the style's).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sill: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    head: Option<u16>,
 }
 
 /// A fence or gate on edge `axis` `(x, z)` (as walls), in a fence style.
@@ -1233,6 +1245,8 @@ fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<Fe
             z,
             kind,
             style: look.style,
+            sill: look.sill,
+            head: look.head,
         });
     };
     for z in 0..=lot.depth {
@@ -1258,9 +1272,15 @@ struct ObjectView<'a> {
     rot: u8,
     /// Degrees past `rot` (objects that turn freely).
     turn: u8,
-    /// Centimetres (x, z) off the middle of its footprint (objects that turn freely).
+    /// Centimetres (x, z) off the middle of its footprint.
     #[serde(skip_serializing_if = "crate::world::centred")]
     offset: [i8; 2],
+    /// Resized by the player: its own size, centimetres across and deep before turning (it
+    /// stands in the middle of its tiles `w` × `d`, moved by `offset`), and centimetres taller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<[u16; 2]>,
+    #[serde(skip_serializing_if = "is_level")]
+    tall: i16,
     /// Things on the `surface` layer: the height (m) of the top they stand on.
     #[serde(skip_serializing_if = "Option::is_none")]
     lift: Option<f32>,
@@ -1478,6 +1498,8 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 rot: o.rot,
                 turn: o.turn,
                 offset: o.offset,
+                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
+                tall: o.tall,
                 lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
                 w,
@@ -1762,4 +1784,8 @@ pub fn catalog_json(content: &Content) -> String {
         },
     })
     .expect("catalog serializes")
+}
+
+fn is_level(tall: &i16) -> bool {
+    *tall == 0
 }

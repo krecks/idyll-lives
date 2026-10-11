@@ -1206,7 +1206,7 @@ def dressing_table(wood, fin, seat, frame):
         for z in (0.06, 0.38):
             p.append(cyl([0.035, 0.72, 0.035], [x, 0.36, z], frame, 'metal' if frame == BRASS else 'wood', taper=0.8))
     p += [box([0.62, 0.76, 0.03], [0, 1.16, 0.41], frame, 'metal' if frame == BRASS else 'wood', radius=0.12),
-          box([0.54, 0.66, 0.006], [0, 1.15, 0.38], '#CFDCE2', 'gloss', radius=0.1),            # mirror
+          box([0.54, 0.66, 0.006], [0, 1.15, 0.38], '#CFDCE2', 'gloss', radius=0.1, mirror='back'),  # mirror
           cyl([0.05, 0.1, 0.05], [0.3, 0.81, 0.3], BLUSH, 'gloss'), cyl([0.04, 0.12, 0.04], [0.35, 0.82, 0.32], '#E8E6E1', 'gloss'),
           box([0.16, 0.04, 0.1], [-0.28, 0.78, 0.18], '#2A2C30', 'satin', radius=0.01),
           cyl([0.42, 0.36, 0.42], [0, 0.22, -0.22], seat, 'fabric', segments=20),                 # pouf stool
@@ -1223,16 +1223,16 @@ def mirror(frame, ffin, shape, w, h, y0, t=0.035, rim=0.04):
     """A mirror on the wall from y0, `w` x `h`: a `rect` frame with a little ledge, a `pill` or an `arch` (ornate)."""
     zf, zm = WALL + t / 2, WALL + t + 0.003
 
-    def outline(ww, hh, yy, z, depth, color, fin):
+    def outline(ww, hh, yy, z, depth, color, fin, **kw):
         if shape == 'rect':
-            return [box([ww, hh, depth], [0, yy + hh / 2, z], color, fin, radius=min(0.015, depth * 0.45))]
+            return [box([ww, hh, depth], [0, yy + hh / 2, z], color, fin, radius=min(0.015, depth * 0.45), **kw)]
         if shape == 'pill':
-            return [box([ww, hh - ww, depth], [0, yy + hh / 2, z], color, fin, radius=0.002),
-                    cyl([ww, depth, ww], [0, yy + ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32),
-                    cyl([ww, depth, ww], [0, yy + hh - ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32)]
-        return [box([ww, hh - ww / 2, depth], [0, yy + (hh - ww / 2) / 2, z], color, fin, radius=0.002),            # arch
-                cyl([ww, depth, ww], [0, yy + hh - ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32)]
-    p = outline(w, h, y0, zf, t, frame, ffin) + outline(w - 2 * rim, h - 2 * rim, y0 + rim, zm, 0.006, MIRROR, 'gloss')
+            return [box([ww, hh - ww, depth], [0, yy + hh / 2, z], color, fin, radius=0.002, **kw),
+                    cyl([ww, depth, ww], [0, yy + ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32, **kw),
+                    cyl([ww, depth, ww], [0, yy + hh - ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32, **kw)]
+        return [box([ww, hh - ww / 2, depth], [0, yy + (hh - ww / 2) / 2, z], color, fin, radius=0.002, **kw),            # arch
+                cyl([ww, depth, ww], [0, yy + hh - ww / 2, z], color, fin, rotate=[90, 0, 0], segments=32, **kw)]
+    p = outline(w, h, y0, zf, t, frame, ffin) + outline(w - 2 * rim, h - 2 * rim, y0 + rim, zm, 0.006, MIRROR, 'gloss', mirror='front')
     if shape == 'rect':
         p += [box([w - 0.1, 0.02, 0.09], [0, y0 - 0.03, WALL + 0.045], frame, ffin, radius=0.006),                 # ledge
               cyl([0.06, 0.09, 0.06], [-0.16, y0 + 0.025, WALL + 0.05], '#9DC6CF', 'gloss', segments=12),
@@ -1397,7 +1397,7 @@ def double_vanity(cab, top, fin, tap):
                    profile=[[0, -0.5], [0.4, -0.45], [0.5, 0.5], [0.46, 0.5], [0.36, -0.3], [0, -0.3]], segments=24),
               cyl([0.03, 0.22, 0.03], [x, 0.98, -0.36], tap, 'metal'),
               rod([x, 1.08, -0.36], [x, 1.06, -0.24], 0.02, tap, 'metal'),
-              box([0.66, 0.76, 0.03], [x, 1.5, -0.42], '#CFDCE2', 'gloss', radius=0.04)]           # mirrors
+              box([0.66, 0.76, 0.03], [x, 1.5, -0.42], '#CFDCE2', 'gloss', radius=0.04, mirror='front')]  # mirrors
     p += [cyl([0.06, 0.16, 0.06], [0.0, 0.96, -0.3], TEAL, 'gloss'), cyl([0.07, 0.1, 0.07], [0.1, 0.93, -0.32], '#F2F1EE', 'gloss')]
     return p
 
@@ -1430,7 +1430,7 @@ def mirror_cabinet(body, bfin, frame):
     y0, d = 1.2, 0.16
     return [box([0.56, 0.72, d], [0, y0 + 0.36, WALL + d / 2], body, bfin, radius=0.012),
             box([0.54, 0.7, 0.02], [0, y0 + 0.36, WALL + d + 0.01], frame, bfin, radius=0.008),
-            box([0.48, 0.64, 0.006], [0, y0 + 0.36, WALL + d + 0.022], MIRROR, 'gloss', radius=0.004),
+            box([0.48, 0.64, 0.006], [0, y0 + 0.36, WALL + d + 0.022], MIRROR, 'gloss', radius=0.004, mirror='front'),
             box([0.012, 0.1, 0.02], [0.24, y0 + 0.36, WALL + d + 0.03], frame, bfin, radius=0.004),
             box([0.46, 0.04, 0.06], [0, y0 + 0.75, WALL + 0.1], '#F2F1EE', 'gloss', radius=0.015),
             box([0.42, 0.01, 0.03], [0, y0 + 0.727, WALL + 0.11], BULB, 'gloss', radius=0.004)]

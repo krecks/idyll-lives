@@ -21,7 +21,7 @@ use crate::Error;
 use crate::command::{EdgeAxis, EdgeEdit, EdgeKind, FacePaint, FloorPaint};
 use crate::lot::{DiagDir, Diagonal, Edge, EdgeLook, EdgeRef, OUTDOORS};
 use crate::content::Layer;
-use crate::world::{ObjectInstance, Plot, World};
+use crate::world::{Layout, ObjectInstance, Plot, World, kind_size, tiles_for};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +56,11 @@ pub struct BlueprintEdge {
     /// Door, window or fence style id.
     #[serde(default)]
     pub style: Option<String>,
+    /// Doors and windows the player resized: sill and top (centimetres above the floor).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sill: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<u16>,
     /// Wall covering id of each face (face 0 towards `-z`, `-x` or the tile's half 0).
     #[serde(default)]
     pub sides: [Option<String>; 2],
@@ -89,9 +94,15 @@ pub struct BlueprintObject {
     pub rot: u8,
     #[serde(default)]
     pub turn: u8,
-    /// Centimetres (x, z) off the middle of its footprint (things that turn freely).
+    /// Centimetres (x, z) off the middle of its footprint.
     #[serde(default, skip_serializing_if = "crate::world::centred")]
     pub offset: [i8; 2],
+    /// Its own size (centimetres across and deep before turning); absent: its kind's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<[u16; 2]>,
+    /// Centimetres taller (negative: shorter) than its kind.
+    #[serde(default, skip_serializing_if = "is_level")]
+    pub tall: i16,
     #[serde(default)]
     pub style: Option<String>,
     #[serde(default)]
@@ -252,7 +263,7 @@ impl World {
             let (storey, gz) = self.on_storey(if axis == EdgeAxis::H { z - 1 } else { z });
             let gz = if axis == EdgeAxis::H { gz + 1 } else { gz };
             let (lx, lz) = f.edge(axis, x, gz, false);
-            bp.edges.push(BlueprintEdge { storey, axis, x: lx, z: lz, kind, form: look.form, style, sides });
+            bp.edges.push(BlueprintEdge { storey, axis, x: lx, z: lz, kind, form: look.form, style, sides, sill: look.sill, head: look.head });
         }
         for (x, z, c) in self.lot.floors() {
             let (x, z) = (x as i32, z as i32);
@@ -285,6 +296,8 @@ impl World {
                 turn: o.turn,
                 // Turned round, it stands off the other way.
                 offset: if f.flip { o.offset.map(|c| -c) } else { o.offset },
+                size: (o.extent != kind_size(def.footprint)).then_some(o.extent),
+                tall: o.tall,
                 style: self.content.styles.get(o.style as usize).map(|s| s.id.clone()),
                 quality: o.quality,
             });
@@ -368,6 +381,8 @@ impl World {
                 cover: None,
                 form: (e.kind == EdgeKind::Wall && e.form != 0).then_some(e.form),
                 style: style.map(|s| s as u8),
+                sill: if e.kind == EdgeKind::Window { e.sill } else { None },
+                head: if matches!(e.kind, EdgeKind::Door | EdgeKind::Window) { e.head } else { None },
             });
             let mut sides = e.sides.clone();
             if f.flip {
@@ -384,7 +399,7 @@ impl World {
         if self.build(household, &edits).is_err() {
             let (openings, walls): (Vec<EdgeEdit>, Vec<EdgeEdit>) =
                 edits.iter().partition(|e| matches!(e.kind, EdgeKind::Door | EdgeKind::Window | EdgeKind::Gate));
-            let base = |e: &EdgeEdit| EdgeEdit { kind: if e.kind == EdgeKind::Gate { EdgeKind::Fence } else { EdgeKind::Wall }, style: if e.kind == EdgeKind::Gate { e.style } else { None }, ..*e };
+            let base = |e: &EdgeEdit| EdgeEdit { kind: if e.kind == EdgeKind::Gate { EdgeKind::Fence } else { EdgeKind::Wall }, style: if e.kind == EdgeKind::Gate { e.style } else { None }, sill: None, head: None, ..*e };
             let mut first = walls;
             first.extend(openings.iter().map(base));
             self.build(household, &first)?;
@@ -417,7 +432,7 @@ impl World {
         let (riders, rest): (Vec<&BlueprintObject>, Vec<&BlueprintObject>) = bp.objects.iter().partition(on_top);
         for o in rest.into_iter().chain(riders) {
             let Some(def) = self.content.object_index(&o.def) else { continue };
-            let [fw, fd] = self.content.objects[def].footprint;
+            let [fw, fd] = o.size.map_or(self.content.objects[def].footprint, tiles_for);
             let (w, d) = if o.rot % 2 == 0 { (fw as i32, fd as i32) } else { (fd as i32, fw as i32) };
             let (x, z, rot) = f.object(o.x + ox, o.z, w, d, o.rot, true);
             let Ok(up) = lift(o.storey) else { continue };
@@ -425,8 +440,11 @@ impl World {
             let style = o.style.as_ref().and_then(|s| self.content.styles.iter().position(|x| &x.id == s)).map(|s| s as u8);
             // Turned round, it stands off the other way.
             let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
-            let offset = self.check_offset(def, offset).unwrap_or([0, 0]);
-            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), style, offset) else { continue };
+            let offset = self.check_offset(def, rot, offset).unwrap_or([0, 0]);
+            let own = kind_size(self.content.objects[def].footprint);
+            let (size, tall) = self.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
+            let layout = Layout { offset, extent: Some(size), tall };
+            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), style, layout) else { continue };
             if self.content.objects[def].turns && o.turn < 90 {
                 self.objects[id as usize].turn = o.turn;
             }
@@ -598,7 +616,7 @@ impl World {
             for o in rest.into_iter().chain(riders) {
                 let name = self.content.objects[o.def].name.to_lowercase();
                 let id = self
-                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, o.offset, o.style, o.quality, o.value)
+                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, Layout::of(o), o.style, o.quality, o.value)
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
                 let placed = &mut self.objects[id as usize];
                 placed.turn = o.turn;
@@ -635,4 +653,8 @@ impl World {
             }
         }
     }
+}
+
+fn is_level(tall: &i16) -> bool {
+    *tall == 0
 }

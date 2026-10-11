@@ -36,6 +36,10 @@
   /** The designs it comes in; picking one restyles it (owned) or sets the style for new purchases. */
   const styles = $derived(styleOptions(content, services.assets, def));
   const currentStyle = $derived(owned ? owned.style : game.householdStyle);
+  /** Its own size before turning (centimetres across and deep), and whether the player resized it. */
+  const ownSize = $derived(owned?.size ?? (owned ? (owned.rot % 2 === 0 ? [owned.w, owned.d] : [owned.d, owned.w]) : (def.footprint ?? [1, 1])).map((t) => t * 100));
+  const resized = $derived(!!owned && (!!owned.size || !!owned.tall));
+  const metres = (cm: number) => (cm / 100).toFixed(cm % 100 ? (cm % 10 ? 2 : 1) : 0);
   function pickStyle(i: number) {
     if (owned) services.controls.restyle(owned.id, i);
     else services.controls.setHouseholdStyle(i);
@@ -130,6 +134,12 @@
 
   {#if owned}
     <div class="owned">
+      {#if !def.stairs}
+        <div class="size muted">
+          Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
+          · drag its arrows to resize (<kbd>Shift</kbd>: freely), drag it to move
+        </div>
+      {/if}
       {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}
       <div class="row">
         {#if owned.repairCost !== undefined}
@@ -139,6 +149,9 @@
           <button class="btn ghost small" onclick={() => services.controls.startMoving(owned.id)}>Move</button>
         {/if}
         <button class="btn ghost small" title="Rotate (R)" onclick={() => services.controls.rotatePlacing()}>Rotate</button>
+        {#if resized}
+          <button class="btn ghost small" title="Back to its own size" onclick={() => services.controls.resetSize(owned.id)}>Reset size</button>
+        {/if}
         {#if content.turns(def)}
           <button class="btn ghost small" title="Turn a little (Shift+R)" onclick={() => services.controls.rotatePlacing(true)}>Turn 15°</button>
         {/if}
@@ -434,6 +447,9 @@
     gap: 6px;
     padding-bottom: 6px;
     border-bottom: 1px solid var(--hairline);
+  }
+  .size {
+    font-size: 11px;
   }
   .stars {
     color: #e0a526;

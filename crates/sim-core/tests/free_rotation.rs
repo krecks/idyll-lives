@@ -1,6 +1,6 @@
 //! Free rotation for decor: 1×1 objects of the `objectRules.freeRotation` categories (or with
-//! `freeRotation: true`) stand at any angle past their facing, and anywhere on their tile (an
-//! offset off its middle); both are only for looks.
+//! `freeRotation: true`) stand at any angle past their facing. Anything (but stairs) stands
+//! anywhere on its tiles (an offset off their middle). Both are only for looks.
 
 use sim_core::{Command, World};
 
@@ -19,7 +19,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), style: None, turn: Some(turn), offset: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), style: None, turn: Some(turn), offset: None, size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -37,7 +37,7 @@ fn decor_turns_freely_and_keeps_its_angle() {
     assert_eq!(w.objects.len(), 1, "refused purchases buy nothing");
 
     // Moving keeps the angle unless a new one is given.
-    let mv = |turn| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 2, turn, offset: None };
+    let mv = |turn| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 2, turn, offset: None, size: None, tall: None };
     w.apply(mv(None)).unwrap();
     assert_eq!((w.objects[lamp as usize].rot, w.objects[lamp as usize].turn), (2, 30));
     w.apply(mv(Some(75))).unwrap();
@@ -52,18 +52,19 @@ fn decor_turns_freely_and_keeps_its_angle() {
 }
 
 fn buy_at(w: &mut World, household: u32, def: &str, x: i32, z: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: Some(offset) })?;
+    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: Some(offset), size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
 #[test]
-fn decor_stands_anywhere_on_its_tile() {
+fn things_stand_anywhere_on_their_tiles() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let lamp = buy_at(&mut w, 0, "lamp", 1, 1, [25, -50]).unwrap();
     assert_eq!(w.objects[lamp as usize].offset, [25, -50]);
-    assert!(buy_at(&mut w, 0, "chair", 3, 1, [25, 0]).unwrap_err().to_string().contains("square"));
+    let chair = buy_at(&mut w, 0, "chair", 3, 1, [25, 0]).unwrap();
+    assert_eq!(w.objects[chair as usize].offset, [25, 0], "not only what turns freely");
     assert!(buy_at(&mut w, 0, "vase", 5, 1, [51, 0]).unwrap_err().to_string().contains("off its tile"));
-    assert_eq!(w.objects.len(), 1, "refused purchases buy nothing");
+    assert_eq!(w.objects.len(), 2, "refused purchases buy nothing");
     // The footprint stays on its tile: the next tile is still free.
     let vase = buy_at(&mut w, 0, "vase", 2, 1, [-50, 0]).unwrap();
     let at = |w: &World, x, z| w.objects.iter().position(|o| o.x == x && o.z == z).unwrap();
@@ -71,16 +72,16 @@ fn decor_stands_anywhere_on_its_tile() {
     // Moving keeps the offset unless a new one is given; undo puts the old one back. A move
     // re-adds the object at the end of the list: the new offset is its own, not its neighbour's.
     assert!(lamp < vase);
-    w.apply(Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: Some(15), offset: Some([-10, 7]) }).unwrap();
+    w.apply(Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: Some(15), offset: Some([-10, 7]), size: None, tall: None }).unwrap();
     assert_eq!((w.objects[at(&w, 4, 4)].offset, w.objects[at(&w, 4, 4)].turn), ([-10, 7], 15));
     assert_eq!((w.objects[at(&w, 2, 1)].offset, w.objects[at(&w, 2, 1)].turn), ([-50, 0], 0), "the vase is as it was");
     w.apply(Command::Undo { household: 0 }).unwrap();
     let lamp = at(&w, 1, 1) as u32;
-    let mv = |offset| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: None, offset };
+    let mv = |offset| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: None, offset, size: None, tall: None };
     w.apply(mv(None)).unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [25, -50]);
-    w.apply(Command::MoveObject { household: 0, object: lamp as u32, x: 4, z: 4, rot: 0, turn: None, offset: Some([-10, 7]) }).unwrap();
+    w.apply(Command::MoveObject { household: 0, object: lamp as u32, x: 4, z: 4, rot: 0, turn: None, offset: Some([-10, 7]), size: None, tall: None }).unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [-10, 7]);
     w.apply(Command::Undo { household: 0 }).unwrap();

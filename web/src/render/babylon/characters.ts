@@ -555,8 +555,10 @@ interface PlacedObject {
   def: string;
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
-  /** Where Sims sit on it (see `seatOf`). */
+  /** Where Sims sit on it (see `seatOf`; resized taller or shorter, the seat moves with it). */
   seat: { h: number; fwd: number };
+  /** Metres taller than its kind (the player's resizing): mattresses rise with it too. */
+  lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
   restful: boolean;
   cx: number;
@@ -1053,7 +1055,9 @@ export class Characters {
       const centre = objectCentre(o);
       const def = this.content?.object(o.def);
       const restful = !!(SEATS[o.def] || BEDS[o.def]) || !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie');
-      return { def: o.def, rot: o.rot, seat: seatOf(def, o.def), restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      const lift = (o.tall ?? 0) / 100;
+      const seat = seatOf(def, o.def);
+      return { def: o.def, rot: o.rot, seat: { h: seat.h + lift, fwd: seat.fwd }, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     for (const b of this.blankets.values()) {
@@ -1587,7 +1591,7 @@ export class Characters {
       // A bunk's second sleeper (a hair to the right of its centre, see sim-core `slot_position`) is on top.
       const bunk = obj && BUNKS[obj.def];
       const across = obj ? (rig.x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (rig.z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0;
-      rig.bedH = bunk ? bunk[across > 0 ? 1 : 0] : bed.h;
+      rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
       rig.useDef = obj?.def ?? '';
       if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
         // Getting in: sit down on the edge first; the crossfade to lying then leans the Sim back

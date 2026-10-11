@@ -50,7 +50,8 @@ fn new_walls_take_the_chosen_covering_and_form() {
         EdgeLook {
             sides: [2, 2],
             form: FORM_HALF,
-            style: 0
+            style: 0,
+            ..EdgeLook::default()
         }
     );
     assert_eq!(w.lot.look(EdgeRef::H(2, 2)), EdgeLook::default());
@@ -94,7 +95,8 @@ fn rebuilding_a_wall_in_another_form_costs_a_wall_and_keeps_its_faces() {
         EdgeLook {
             sides: [2, 2],
             form: FORM_HALF,
-            style: 0
+            style: 0,
+            ..EdgeLook::default()
         }
     );
 }
@@ -287,7 +289,8 @@ fn looks_survive_saving_by_content_id() {
         EdgeLook {
             sides: [0, 0],
             form: FORM_HALF,
-            style: 0
+            style: 0,
+            ..EdgeLook::default()
         }
     );
     assert_eq!(loaded.lot.look(EdgeRef::H(2, 2)).style, 0);

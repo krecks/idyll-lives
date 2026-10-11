@@ -22,12 +22,12 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, MAX_OFFSET, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
-import type { BuildEffect, Renderer, ViewRect } from '../render/types';
+import { groundDepth, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
-import { approachCandidates, covers, facedTable, fitOnTop, frontTile, spotAt, topOf, type Top } from './surfaces';
+import { approachCandidates, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
 
 /** Preview calls the renderer offers in buy mode. */
 interface BuildPreview {
@@ -49,10 +49,16 @@ interface BuildPreview {
       lift?: number;
       w: number;
       d: number;
+      resize?: ObjectResize;
       front?: { x: number; z: number };
       valid: boolean;
     } | null,
   ): void;
+  setResizeHandles(handles: readonly ResizeHandle[] | null, hot?: string | null): void;
+  handleAt(x: number, y: number): string | null;
+  pickVertical(x: number, z: number): number | null;
+  pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null;
+  objectBox(id: number): { height: number; bottom: number } | null;
   setEdgePreview(edges: EdgeEdit[], valid: boolean): void;
   setBuildGrid(rect: ViewRect | null): void;
   /** Whether a left-drag turns the camera (off while drawing walls). */
@@ -62,15 +68,38 @@ interface BuildPreview {
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
 export type PaintFace = FacePaint & { half: boolean };
-/** A wall's look as the structure sends it. */
-type Look = { faces?: [number, number]; form?: number; style?: number };
-
-/** What the eyedropper picked up: a build tool with its look set, or an object to buy again. */
-export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; style: number; rot: number; turn: number };
+/** A wall's look as the structure sends it (doors and windows resized: sill and top, decimetres). */
+type Look = { faces?: [number, number]; form?: number; style?: number; sill?: number; head?: number };
 
 /**
- * Things that turn freely also stand anywhere on their tile: their middle snaps to quarter tiles
- * (the build grid's finer lines), or with Shift held to the centimetre.
+ * Doors or windows side by side in one straight wall, the same style and size: one wide window
+ * or a double door (as the renderer draws them). `line`: the wall's z (`h`) or x (`v`); the run
+ * covers edges `start .. start + len - 1` along it. Heights in centimetres.
+ */
+interface OpeningRun {
+  axis: 'h' | 'v';
+  line: number;
+  start: number;
+  len: number;
+  kind: 'door' | 'window';
+  style: number;
+  sill: number;
+  head: number;
+  /** Whether the player set them (else the style's own). */
+  sized: boolean;
+}
+/** The widest window (edges) and door (a double door). */
+const MAX_WINDOW_RUN = 6;
+const MAX_DOOR_RUN = 2;
+/** A door's own top (centimetres; house.ts `DOOR_HEIGHT`). */
+const DOOR_HEAD = 210;
+
+/** What the eyedropper picked up: a build tool with its look set, or an object to buy again. */
+export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; style: number; rot: number; turn: number; size?: [number, number]; tall?: number };
+
+/**
+ * Things stand anywhere on their tiles (all but stairs): their middle snaps to quarter tiles (the
+ * build grid's finer lines), or with Shift held to the centimetre.
  */
 const OFFSET_STEP = 0.25;
 const FREE_STEP = 0.01;
@@ -84,6 +113,34 @@ type Axis = EdgeEdit['axis'];
 
 /** A drag counts as diagonal within this angle of 45° (tan 22.5°: halfway to straight). */
 const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
+
+/** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
+const HANDLE_OUT = 0.3;
+
+type Point2 = { x: number; y: number };
+
+/** An owned object being resized by one of its arrows (see `press`). */
+interface Resizing {
+  id: number;
+  def: ObjectDef;
+  handle: string;
+  /** As it was: its middle (tiles) and size along x and z (m), facing, turn and height (cm). */
+  cx: number;
+  cz: number;
+  ex: number;
+  ez: number;
+  rot: number;
+  turn: number;
+  tall: number;
+  lift: number;
+  box: { height: number; bottom: number };
+  /** Its tiles' corner and offset as it was. */
+  was: { x: number; z: number; offset?: [number, number] };
+  /** Height arrow: where the drag started (m above the floor). */
+  from: number | null;
+  /** What letting go now would make it: its middle and size, height, tiles (corner, turned size), offset and own size (cm before turning). */
+  now: { cx: number; cz: number; ex: number; ez: number; tall: number; x: number; z: number; w: number; d: number; offset?: [number, number]; size?: [number, number]; valid: boolean };
+}
 
 /** An object's offset (centimetres off the middle of its footprint) as a key; `0:0` when centred. */
 function offsetKey(offset: [number, number] | undefined): string {
@@ -118,9 +175,11 @@ export class BuildBuyInput {
     if (this.shift === e.shiftKey) return;
     this.shift = e.shiftKey;
     if (this.lastHover && game.mode === 'build' && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
-    // Shift lets go of the quarter-tile snap for things that stand anywhere on their tile.
+    // Shift lets go of the quarter-tile snap, and of whole tiles and 10 cm steps while resizing.
     const held = game.placing && this.content.object(game.placing.def);
-    if (held && this.content.turns(held)) this.rehover();
+    if (held && !held.stairs) this.rehover();
+    if (this.resizing) this.hoverResize(this.lastHover);
+    if (this.openingDrag) this.hoverOpening(this.lastHover);
   };
   private lastHover: Point | null = null;
   /** A wall/remove press is held (the gesture belongs to drawing until release). */
@@ -133,6 +192,20 @@ export class BuildBuyInput {
   private lastGround: Point | null = null;
   /** Move room: the room being carried (its tiles), and the tile it was picked up by. */
   private carrying: { tiles: Point[]; at: Point } | null = null;
+  /** Buy: an owned object carried by a drag (from where its middle was grabbed), until release. */
+  private dragging: { id: number } | null = null;
+  private grab: { dx: number; dz: number } | null = null;
+  /** Buy: an owned object being resized by an arrow, until release. */
+  private resizing: Resizing | null = null;
+  /** After an edit renumbers the picked object: what to pick again once the new structure arrives. */
+  private reselect: { def: string; x: number; z: number; rot: number } | null = null;
+  /** What the shown arrows were made from (redrawn only when it changes). */
+  private handlesKey = '';
+  /** The arrow under the pointer. */
+  private hotHandle: string | null = null;
+  /** Build: the door or window picked with its tool (all of a wide one), and its resize in progress. */
+  private openingSel: OpeningRun | null = null;
+  private openingDrag: { handle: string; from: number | null; now: OpeningRun; valid: boolean } | null = null;
 
   constructor(
     renderer: Renderer,
@@ -173,7 +246,14 @@ export class BuildBuyInput {
     }
     for (const o of world.openings ?? []) {
       this.edges.set(`${o.axis}:${o.x}:${o.z}`, o.kind);
-      if (o.style) look(`${o.axis}:${o.x}:${o.z}`, { style: o.style });
+      if (o.style || o.sill !== undefined || o.head !== undefined) look(`${o.axis}:${o.x}:${o.z}`, { style: o.style, sill: o.sill, head: o.head });
+    }
+    // A picked door or window that changed (or went) is found again from where it starts.
+    const sel = this.openingSel;
+    if (sel) {
+      const [x, z] = sel.axis === 'h' ? [sel.start, sel.line] : [sel.line, sel.start];
+      this.openingSel = this.openingRun(sel.axis, x, z);
+      this.handlesKey = '';
     }
     for (const f of world.fences ?? []) {
       this.edges.set(`${f.axis}:${f.x}:${f.z}`, f.kind);
@@ -210,6 +290,8 @@ export class BuildBuyInput {
 
   /** Called when the mode changes: shows the grid and clears old previews. */
   modeChanged(): void {
+    this.openingSel = null;
+    this.openingDrag = null;
     // Never leave the camera's left-drag switched off once drawing can't continue.
     if (!this.pressed) this.preview.setLeftDragCamera?.(true);
     const home = this.home();
@@ -258,7 +340,23 @@ export class BuildBuyInput {
     return this.building() && game.buildTool === 'stairs';
   }
 
-  hover(ground: Point | null, objectId: number | null = null): void {
+  hover(ground: Point | null, objectId: number | null = null, screen: Point2 | null = null): void {
+    if (this.openingDrag) {
+      if (ground) this.lastHover = ground;
+      return this.hoverOpening(ground ?? this.lastHover);
+    }
+    if (this.resizing) {
+      if (ground) this.lastHover = ground;
+      return this.hoverResize(ground ?? this.lastHover);
+    }
+    // The arrow under the pointer lights up.
+    const picked = (game.mode === 'buy' && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
+    const hot = screen && !this.dragging && picked ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    if (hot !== this.hotHandle) {
+      this.hotHandle = hot;
+      this.handlesKey = '';
+      this.syncHandles();
+    }
     if (this.picking()) {
       this.clearPreviews();
       game.pickHint = this.pickLabel(ground, objectId);
@@ -295,7 +393,7 @@ export class BuildBuyInput {
     const def = obj && this.content.object(obj.def);
     if (obj && def?.stairs) return { kind: 'tool', tool: 'stairs' };
     if (obj && def?.price !== undefined) {
-      return { kind: 'object', def: obj.def, style: obj.style, rot: obj.rot, turn: obj.turn ?? 0 };
+      return { kind: 'object', def: obj.def, style: obj.style, rot: obj.rot, turn: obj.turn ?? 0, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
     }
     if (!ground) return null;
     const e = this.nearestEdge(ground);
@@ -359,20 +457,28 @@ export class BuildBuyInput {
     const placing = game.placing;
     const def = placing && this.content.object(placing.def);
     if (!placing || !def) return null;
-    if (def.layer === 'surface') return this.placementOnTop(ground, def, placing);
-    const [fw, fd] = def.footprint ?? [1, 1];
-    // The middle goes under the pointer: on the tile grid, or (things that turn freely) off it.
-    const step = this.content.turns(def) ? (this.shift ? FREE_STEP : OFFSET_STEP) : 0;
-    const cx = step ? Math.round(ground.x / step) * step : ground.x;
-    const cz = step ? Math.round(ground.z / step) * step : ground.z;
+    // Its own size (cm) and the tiles it takes (rounded up).
+    const kind = def.footprint ?? [1, 1];
+    const size: [number, number] = placing.size ? [placing.size[0], placing.size[1]] : [kind[0] * 100, kind[1] * 100];
+    const tall = placing.tall ?? 0;
+    if (def.layer === 'surface') return { ...this.placementOnTop(ground, def, placing), size, tall };
+    const [fw, fd] = size.map((v) => Math.max(1, Math.ceil(v / 100 - 1e-6)));
+    // The middle goes under the pointer (or where it was grabbed), off the tile grid in quarter
+    // tiles (Shift: centimetres); stairs stay square on it.
+    const step = def.stairs ? 0 : this.shift ? FREE_STEP : OFFSET_STEP;
+    const [gx, gz] = [ground.x + (this.grab?.dx ?? 0), ground.z + (this.grab?.dz ?? 0)];
+    const cx = step ? Math.round(gx / step) * step : gx;
+    const cz = step ? Math.round(gz / step) * step : gz;
     const at = (rot: number) => {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
       const x = Math.floor(cx - w / 2 + 0.5);
       const z = Math.floor(cz - d / 2 + 0.5);
       const cm = (c: number) => Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, Math.round(c * 100)));
-      const offset: [number, number] | undefined = step ? [cm(cx - x - w / 2), cm(cz - z - d / 2)] : undefined;
-      const fit = this.fits(x, z, w, d, rot, placing.objectId, def);
-      return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit, lift: 0 };
+      let offset: [number, number] | undefined = step ? [cm(cx - x - w / 2), cm(cz - z - d / 2)] : undefined;
+      // Things on a wall slide along it, never off it.
+      if (offset && def.layer === 'wall') offset = rot % 2 === 0 ? [offset[0], 0] : [0, offset[1]];
+      const fit = this.fits(x, z, w, d, rot, placing.objectId, def, [fw, fd]);
+      return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit, lift: 0, size, tall };
     };
     const p = at(placing.rot);
     // Things on a wall turn to face away from the wall they're pointed at.
@@ -443,7 +549,7 @@ export class BuildBuyInput {
    * Same checks as the simulation, minus reachability: on the home plot, free tiles, outdoors for
    * garden things, affordable. True, or why not (a short hint; null for the usual "doesn't fit").
    */
-  private fits(x: number, z: number, w: number, d: number, rot: number, moving: number | null, def: ObjectDef): true | string | null {
+  private fits(x: number, z: number, w: number, d: number, rot: number, moving: number | null, def: ObjectDef, size?: readonly [number, number]): true | string | null {
     const home = this.home();
     if (!home) return null;
     const onPlot = (tx: number, tz: number) => tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d;
@@ -471,7 +577,7 @@ export class BuildBuyInput {
     if (!unused && !onPlot(front[0], front[1])) return null;
     const free = ({ tile: [tx, tz], inner: [ix, iz] }: { tile: [number, number]; inner: [number, number] }) =>
       onPlot(tx, tz) && !takenOn('floor', tx, tz) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
-    if (!unused && !approachCandidates(def, x, z, rot).some(free)) return def.approach === 'around' ? 'No free side to sit down from' : null;
+    if (!unused && !approachCandidates(def, x, z, rot, size).some(free)) return def.approach === 'around' ? 'No free side to sit down from' : null;
     // As the simulation: no wall through the footprint, or between it and where it's used from.
     for (let tz = z; tz < z + d; tz++) {
       for (let tx = x; tx < x + w; tx++) {
@@ -504,7 +610,8 @@ export class BuildBuyInput {
     // The arrow marks where it's used from: nothing for things nobody uses (or on a top).
     const used = p.def.interactions.length > 0 && p.def.layer !== 'surface';
     const [fx, fz] = frontTile(p.x, p.z, p.w, p.d, p.rot);
-    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, front: used ? { x: fx, z: fz } : undefined, valid: p.valid });
+    const resize = this.resizeOf(p.def, p.size, p.tall);
+    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz } : undefined, valid: p.valid });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -530,7 +637,8 @@ export class BuildBuyInput {
         this.preview.setPlacementGhost?.(null);
       } else {
         // New purchases stay on the cursor so several can be placed in a row.
-        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], style: placing.style ?? game.householdStyle, ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}) });
+        const resized = this.resizeOf(p.def, p.size, p.tall);
+        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], style: placing.style ?? game.householdStyle, ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}), ...(resized ? { size: resized.size, tall: resized.tall } : {}) });
       }
       return true;
     }
@@ -539,9 +647,441 @@ export class BuildBuyInput {
     game.buySelection = null;
     // Stairs are moved in Build mode (Stairs tool).
     if (!obj || !home || this.content.object(obj.def)?.stairs || obj.x < home.x || obj.z < home.z || obj.x >= home.x + home.w || obj.z >= home.z + home.d) return true;
-    // Clicking something at home picks it up: move it, turn it (R), restyle it from the panel.
-    game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id };
-    if (ground) this.hoverBuy(ground);
+    // Clicking something at home picks it: its panel (move, turn, restyle, sell) and its resize arrows.
+    game.buySelection = obj.id;
+    this.syncHandles();
+    return true;
+  }
+
+  /** How an object of type `def` is resized (undefined: as its kind comes). */
+  private resizeOf(def: ObjectDef, size: readonly [number, number] | undefined, tall: number | undefined): ObjectResize | undefined {
+    const from = def.footprint ?? [1, 1];
+    // Its own size in metres (`size`: centimetres).
+    const own: [number, number] = size ? [size[0] / 100, size[1] / 100] : [from[0], from[1]];
+    if (own[0] === from[0] && own[1] === from[1] && !tall) return undefined;
+    return { from: [from[0], from[1]], size: own, tall: tall ?? 0, ceiling: def.layer === 'ceiling' };
+  }
+
+  /** The owned object at home a press can pick up (not stairs: they move in Build mode). */
+  private ownedAt(objectId: number | null): ObjectPlacement | null {
+    const home = this.home();
+    const obj = objectId === null ? undefined : game.objects.find((o) => o.id === objectId);
+    if (!obj || !home || this.content.object(obj.def)?.stairs) return null;
+    return obj.x >= home.x && obj.z >= home.z && obj.x < home.x + home.w && obj.z < home.z + home.d ? obj : null;
+  }
+
+  /** The object being resized: it's hidden while its preview shows (null: none). */
+  heldId(): number | null {
+    return this.resizing?.id ?? null;
+  }
+
+  /**
+   * The resize arrows for an object as it is (or as a resize would make it): one per side it
+   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs)
+   * and one for its height (none for rugs). `f`: its middle (tiles), its size along x and z (m),
+   * facing, and top and bottom (m above its floor).
+   */
+  private handlesFor(def: ObjectDef, f: { cx: number; cz: number; ex: number; ez: number; rot: number; top: number; bottom: number }): ResizeHandle[] {
+    const layer = this.content.layer(def);
+    if (def.stairs) return [];
+    const out: ResizeHandle[] = [];
+    const [x0, x1, z0, z1] = [f.cx - f.ex / 2, f.cx + f.ex / 2, f.cz - f.ez / 2, f.cz + f.ez / 2];
+    if (layer === 'wall') {
+      // In the wall's plane, a little in front of it, halfway up.
+      const y = (f.top + f.bottom) / 2;
+      const r = f.rot % 4;
+      const front = 0.12;
+      // Its back is on its tile's edge (facing +z: the tile's near edge, -z: its far one).
+      if (r % 2 === 0) {
+        const z = r === 0 ? Math.floor(f.cz) + front : Math.floor(f.cz) + 1 - front;
+        out.push({ id: 'x-', x: x0 - 0.1, y, z, dir: [-1, 0, 0], wall: true }, { id: 'x+', x: x1 + 0.1, y, z, dir: [1, 0, 0], wall: true });
+      } else {
+        const x = r === 1 ? Math.floor(f.cx) + front : Math.floor(f.cx) + 1 - front;
+        out.push({ id: 'z-', x, y, z: z0 - 0.1, dir: [0, 0, -1], wall: true }, { id: 'z+', x, y, z: z1 + 0.1, dir: [0, 0, 1], wall: true });
+      }
+    } else if (layer !== 'surface') {
+      // On the floor around it (from the ceiling: at its underside).
+      const y = layer === 'ceiling' ? f.bottom : 0.04;
+      out.push(
+        { id: 'x-', x: x0 - HANDLE_OUT, y, z: f.cz, dir: [-1, 0, 0] },
+        { id: 'x+', x: x1 + HANDLE_OUT, y, z: f.cz, dir: [1, 0, 0] },
+        { id: 'z-', x: f.cx, y, z: z0 - HANDLE_OUT, dir: [0, 0, -1] },
+        { id: 'z+', x: f.cx, y, z: z1 + HANDLE_OUT, dir: [0, 0, 1] },
+      );
+    }
+    if (layer !== 'rug') {
+      const ceiling = layer === 'ceiling';
+      out.push({ id: 'up', x: f.cx, y: ceiling ? f.bottom - HANDLE_OUT - 0.1 : f.top + HANDLE_OUT, z: f.cz, dir: [0, ceiling ? -1 : 1, 0] });
+    }
+    return out;
+  }
+
+  /** A placed object's middle (tiles) and its size along x and z (m). */
+  private frameOf(o: { x: number; z: number; w: number; d: number; rot: number; offset?: [number, number]; size?: [number, number] }): { cx: number; cz: number; ex: number; ez: number } {
+    const c = objectCentre(o);
+    const [sx, sz] = o.size ? [o.size[0] / 100, o.size[1] / 100] : o.rot % 2 === 0 ? [o.w, o.d] : [o.d, o.w];
+    const [ex, ez] = o.rot % 2 === 0 ? [sx, sz] : [sz, sx];
+    return { cx: c.x, cz: c.z, ex, ez };
+  }
+
+  /**
+   * Shows the resize arrows of the object picked in Buy mode (or of the resize in progress),
+   * when what they're made from changed. Cheap enough to call every frame.
+   */
+  syncHandles(): void {
+    if (this.openingTool() || this.openingDrag) return this.syncOpeningHandles();
+    const r = this.resizing;
+    const sel = game.mode === 'buy' && !game.placing && game.buySelection !== null ? (game.objects.find((o) => o.id === game.buySelection) ?? null) : null;
+    const n = r?.now;
+    const key = r && n ? `r:${r.id}:${n.cx}:${n.cz}:${n.ex}:${n.ez}:${n.tall}:${r.handle}` : sel ? `s:${sel.id}:${sel.x}:${sel.z}:${sel.w}:${sel.d}:${sel.size}:${sel.tall ?? 0}:${offsetKey(sel.offset)}:${this.hotHandle}:${game.objects.length}` : '';
+    if (key === this.handlesKey) return;
+    this.handlesKey = key;
+    if (r && n) {
+      const top = r.lift + r.box.height + (n.tall - r.tall) / 100;
+      const handles = this.handlesFor(r.def, { cx: n.cx, cz: n.cz, ex: n.ex, ez: n.ez, rot: r.rot, top, bottom: r.lift + r.box.bottom });
+      return this.preview.setResizeHandles?.(handles, r.handle);
+    }
+    const def = sel && this.content.object(sel.def);
+    const box = sel && this.preview.objectBox?.(sel.id);
+    if (!sel || !def || !box) {
+      // Picked but not drawn yet (the renderer is still placing the new structure): try again next time.
+      if (sel) this.handlesKey = '';
+      return this.preview.setResizeHandles?.(null);
+    }
+    const lift = sel.lift ?? 0;
+    this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
+  }
+
+  /** A new structure arrived: picks again what an edit renumbered. */
+  objectsChanged(): void {
+    const r = this.reselect;
+    if (r) {
+      const obj = game.objects.find((o) => o.def === r.def && o.x === r.x && o.z === r.z && o.rot === r.rot);
+      this.reselect = null;
+      if (obj && game.mode === 'buy' && !game.placing) game.buySelection = obj.id;
+    }
+    this.handlesKey = '';
+    this.syncHandles();
+  }
+
+  /** Buy: pressing on an arrow of the picked object resizes it; on something at home, carries it. */
+  private pressBuy(ground: Point | null, objectId: number | null, screen: Point2 | null): boolean {
+    if (game.placing || this.picking()) return false;
+    const handle = screen && game.buySelection !== null ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    const sel = handle ? game.objects.find((o) => o.id === game.buySelection) : undefined;
+    const selDef = sel && this.content.object(sel.def);
+    const box = sel && this.preview.objectBox?.(sel.id);
+    if (handle && sel && selDef && box) {
+      const tall = sel.tall ?? 0;
+      const frame = this.frameOf(sel);
+      this.resizing = {
+        id: sel.id,
+        def: selDef,
+        handle,
+        ...frame,
+        rot: sel.rot,
+        turn: sel.turn ?? 0,
+        tall,
+        lift: sel.lift ?? 0,
+        box,
+        from: null,
+        was: { x: sel.x, z: sel.z, offset: sel.offset },
+        now: { ...frame, tall, x: sel.x, z: sel.z, w: sel.w, d: sel.d, offset: sel.offset, valid: true },
+      };
+      this.preview.setLeftDragCamera?.(false);
+      this.preview.setHeldObject?.(sel.id);
+      this.hoverResize(ground);
+      return true;
+    }
+    const obj = this.ownedAt(objectId);
+    if (!obj || !ground) return false;
+    // Carried by the point it was grabbed at.
+    const c = objectCentre(obj);
+    this.grab = { dx: c.x - ground.x, dz: c.z - ground.z };
+    this.dragging = { id: obj.id };
+    game.buySelection = null;
+    game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
+    this.preview.setLeftDragCamera?.(false);
+    this.hoverBuy(ground);
+    return true;
+  }
+
+  /**
+   * Resizing: the size or height the arrow has been dragged to, previewed. The edge opposite the
+   * arrow stays where it is; the size snaps to whole tiles and the height to 10 cm, or with
+   * Shift held to the centimetre. The object takes its size's tiles rounded up and stands in
+   * their middle, moved by its offset.
+   */
+  private hoverResize(ground: Point | null): void {
+    const r = this.resizing;
+    if (!r) return;
+    const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    let [x0, x1, z0, z1] = [r.cx - r.ex / 2, r.cx + r.ex / 2, r.cz - r.ez / 2, r.cz + r.ez / 2];
+    let tall = r.tall;
+    // Things on a wall follow the pointer on the wall's plane (the ground behind it would run away).
+    const layer = this.content.layer(r.def);
+    if (layer === 'wall') {
+      const rr = r.rot % 4;
+      const axis = rr % 2 === 0 ? 'h' : 'v';
+      const line = rr === 0 ? Math.floor(r.cz - r.ez / 2) : rr === 2 ? Math.ceil(r.cz + r.ez / 2) : rr === 1 ? Math.floor(r.cx - r.ex / 2) : Math.ceil(r.cx + r.ex / 2);
+      const hit = this.preview.pickOnWall?.(axis, line, r.was.z) ?? null;
+      if (hit) ground = axis === 'h' ? { x: hit.along, z: ground?.z ?? r.cz } : { x: ground?.x ?? r.cx, z: hit.along };
+    }
+    const step = this.shift ? 0.01 : 1;
+    const [least, most] = [MIN_SIZE / 100, MAX_SIZE];
+    // The size from the fixed edge to the pointer, in steps.
+    const span = (from: number, to: number) => clampN(Math.round(Math.abs(to - from) / step) * step, least, most);
+    if (ground && r.handle === 'x+') x1 = x0 + span(x0, Math.max(ground.x, x0));
+    if (ground && r.handle === 'x-') x0 = x1 - span(x1, Math.min(ground.x, x1));
+    if (ground && r.handle === 'z+') z1 = z0 + span(z0, Math.max(ground.z, z0));
+    if (ground && r.handle === 'z-') z0 = z1 - span(z1, Math.min(ground.z, z1));
+    if (r.handle === 'up') {
+      const h = this.preview.pickVertical?.(r.cx, r.cz) ?? null;
+      if (h !== null) {
+        r.from ??= h;
+        const sign = layer === 'ceiling' ? -1 : 1;
+        const cm = this.shift ? 1 : 10;
+        // Not so short that it folds up (the model shrinks above 40% of its height).
+        const lowest = Math.max(-MAX_SHORTER, r.tall - Math.floor((r.box.height - r.box.bottom) * 50));
+        tall = clampN(r.tall + sign * Math.round(((h - r.from) * 100) / cm) * cm, lowest, MAX_TALLER);
+      }
+    }
+    // Its tiles: its size rounded up, around its middle; what's left over is its offset.
+    const [cx, cz, ex, ez] = [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0];
+    const w = Math.max(1, Math.ceil(ex - 1e-6));
+    const d = Math.max(1, Math.ceil(ez - 1e-6));
+    const x = Math.round(cx - w / 2);
+    const z = Math.round(cz - d / 2);
+    const cm = (v: number) => clampN(Math.round(v * 100), -MAX_OFFSET, MAX_OFFSET);
+    const offset: [number, number] = [cm(cx - x - w / 2), cm(cz - z - d / 2)];
+    const size: [number, number] = r.rot % 2 === 0 ? [Math.round(ex * 100), Math.round(ez * 100)] : [Math.round(ez * 100), Math.round(ex * 100)];
+    const tiles: [number, number] = r.rot % 2 === 0 ? [w, d] : [d, w];
+    const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles);
+    r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
+    const obj = game.objects.find((o) => o.id === r.id);
+    const model = this.styledModel(r.def, obj?.style ?? 0);
+    this.preview.setPlacementGhost?.({ model, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
+    if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
+    const hint = fit === true ? null : (fit ?? "There's no room for it that size");
+    if (game.placeHint !== hint) game.placeHint = hint;
+    this.syncHandles();
+  }
+
+  /** End of a Buy press: drops what was carried, or makes the resize. True if it was one of those. */
+  private releaseBuy(ground: Point | null, moved: boolean): boolean {
+    const r = this.resizing;
+    if (r) {
+      this.resizing = null;
+      this.preview.setLeftDragCamera?.(true);
+      const n = r.now;
+      const changed = n.size !== undefined && (n.cx !== r.cx || n.cz !== r.cz || n.ex !== r.ex || n.ez !== r.ez || n.tall !== r.tall);
+      if (changed && n.valid && n.size) {
+        this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall });
+        this.reselect = { def: r.def.id, x: n.x, z: n.z, rot: r.rot };
+      }
+      this.preview.setHeldObject?.(null, changed && n.valid);
+      this.preview.setPlacementGhost?.(null);
+      game.placeHint = null;
+      game.placeValid = true;
+      this.handlesKey = '';
+      this.syncHandles();
+      return true;
+    }
+    const drag = this.dragging;
+    if (!drag) return false;
+    this.dragging = null;
+    this.preview.setLeftDragCamera?.(true);
+    const p = moved ? this.placement(ground ?? this.lastHover ?? { x: 0, z: 0 }) : null;
+    this.grab = null;
+    game.placing = null;
+    this.preview.setPlacementGhost?.(null);
+    if (!moved) {
+      // A press without a drag picks it.
+      game.buySelection = drag.id;
+      this.syncHandles();
+      return true;
+    }
+    const was = game.objects.find((o) => o.id === drag.id);
+    const same = !!p && !!was && was.x === p.x && was.z === p.z && was.rot === p.rot && offsetKey(was.offset) === offsetKey(p.offset);
+    if (p?.valid && was && !same) {
+      this.send({ type: 'moveObject', household: game.home, object: drag.id, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
+      this.reselect = { def: was.def, x: p.x, z: p.z, rot: p.rot };
+      this.preview.setHeldObject?.(null, true);
+    } else {
+      // Dropped where it can't go (or where it was): it goes back.
+      if (p && !p.valid) game.placeRefused++;
+      this.preview.setHeldObject?.(null);
+      game.buySelection = drag.id;
+    }
+    this.syncHandles();
+    return true;
+  }
+
+  // ---- Doors and windows: resizing -------------------------------------------------
+
+  /** Build mode's Door or Window tool (they pick and resize doors and windows). */
+  private openingTool(): boolean {
+    return this.building() && (game.buildTool === 'door' || game.buildTool === 'window');
+  }
+
+  /** Whether doors or windows on two neighbouring edges make one (house.ts `joins`). */
+  private joined(axis: 'h' | 'v', x: number, z: number, step: 1 | -1): boolean {
+    const kind = this.edgeState({ axis, x, z });
+    if (kind !== 'door' && kind !== 'window') return false;
+    const [nx, nz] = axis === 'h' ? [x + step, z] : [x, z + step];
+    const [px, pz] = axis === 'h' ? [step > 0 ? x + 1 : x, z] : [x, step > 0 ? z + 1 : z];
+    const crossed = axis === 'h'
+      ? this.edgeState({ axis: 'v', x: px, z: pz }) !== 'open' || this.edgeState({ axis: 'v', x: px, z: pz - 1 }) !== 'open'
+      : this.edgeState({ axis: 'h', x: px, z: pz }) !== 'open' || this.edgeState({ axis: 'h', x: px - 1, z: pz }) !== 'open';
+    if (crossed || this.edgeState({ axis, x: nx, z: nz }) !== kind) return false;
+    const [a, b] = [this.lookOf({ axis, x, z }), this.lookOf({ axis, x: nx, z: nz })];
+    return (a.style ?? 0) === (b.style ?? 0) && a.sill === b.sill && a.head === b.head;
+  }
+
+  /** The door or window on an edge with its neighbours of the same kind, style and size (null: none there). */
+  private openingRun(axis: 'h' | 'v', x: number, z: number): OpeningRun | null {
+    const kind = this.edgeState({ axis, x, z });
+    if (kind !== 'door' && kind !== 'window') return null;
+    let [cx, cz] = [x, z];
+    while (this.joined(axis, cx, cz, -1)) [cx, cz] = axis === 'h' ? [cx - 1, cz] : [cx, cz - 1];
+    const start = axis === 'h' ? cx : cz;
+    let len = 1;
+    while (this.joined(axis, cx, cz, 1)) {
+      len++;
+      [cx, cz] = axis === 'h' ? [cx + 1, cz] : [cx, cz + 1];
+    }
+    const look = this.lookOf({ axis, x, z });
+    const style = look.style ?? 0;
+    const spec = kind === 'window' ? this.content.windowStyles[style] : undefined;
+    const sill = look.sill ?? Math.round((spec?.sill ?? 0.9) * 100);
+    const head = look.head ?? (kind === 'door' ? DOOR_HEAD : Math.round((spec?.head ?? 2.1) * 100));
+    return { axis, line: axis === 'h' ? z : x, start, len, kind, style, sill: kind === 'door' ? 0 : sill, head, sized: look.sill !== undefined || look.head !== undefined };
+  }
+
+  /** The edges of a run (lot coordinates). */
+  private runEdges(r: OpeningRun): { axis: 'h' | 'v'; x: number; z: number }[] {
+    return Array.from({ length: r.len }, (_, k) => (r.axis === 'h' ? { axis: r.axis, x: r.start + k, z: r.line } : { axis: r.axis, x: r.line, z: r.start + k }));
+  }
+
+  /** Arrows for a door or window: its two ends along the wall, its top, and a window's sill. */
+  private openingHandles(r: OpeningRun): ResizeHandle[] {
+    const at = (a: number, y: number) => (r.axis === 'h' ? { x: a, y, z: r.line } : { x: r.line, y, z: a });
+    const [sill, head] = [r.sill / 100, r.head / 100];
+    const mid = r.kind === 'door' ? head / 2 : (sill + head) / 2;
+    const dir = (s: number): [number, number, number] => (r.axis === 'h' ? [s, 0, 0] : [0, 0, s]);
+    const out: ResizeHandle[] = [
+      { id: 'a-', ...at(r.start - 0.2, mid), dir: dir(-1), wall: true },
+      { id: 'a+', ...at(r.start + r.len + 0.2, mid), dir: dir(1), wall: true },
+      { id: 'up', ...at(r.start + r.len / 2, head + 0.25), dir: [0, 1, 0] },
+    ];
+    if (r.kind === 'window') out.push({ id: 'down', ...at(r.start + r.len / 2, Math.max(0.15, sill - 0.25)), dir: [0, -1, 0] });
+    return out;
+  }
+
+  private syncOpeningHandles(): void {
+    const d = this.openingDrag;
+    const r = d?.now ?? this.openingSel;
+    const key = r ? `o:${r.axis}:${r.line}:${r.start}:${r.len}:${r.sill}:${r.head}:${d?.handle ?? this.hotHandle}` : '';
+    if (key === this.handlesKey) return;
+    this.handlesKey = key;
+    this.preview.setResizeHandles?.(r ? this.openingHandles(r) : null, d?.handle ?? this.hotHandle);
+  }
+
+  /**
+   * Door or Window tool: a press on an arrow of the picked one resizes it; on a door or window
+   * of the tool's kind in the style picked, picks it (another style is replaced, as a click does).
+   */
+  private pressOpening(ground: Point | null, screen: Point2 | null): boolean {
+    const handle = screen && this.openingSel ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    if (handle && this.openingSel) {
+      this.openingDrag = { handle, from: null, now: { ...this.openingSel }, valid: true };
+      this.preview.setLeftDragCamera?.(false);
+      this.hoverOpening(ground);
+      return true;
+    }
+    if (!ground) return false;
+    const e = this.nearestWall(ground);
+    if (!e || (e.axis !== 'h' && e.axis !== 'v')) return false;
+    const run = this.openingRun(e.axis, e.x, e.z);
+    const style = game.buildTool === 'door' ? game.buildLook.door : game.buildLook.window;
+    if (!run || run.kind !== game.buildTool || run.style !== style) return false;
+    this.openingSel = run;
+    this.clearPreviews();
+    this.handlesKey = '';
+    this.syncHandles();
+    return true;
+  }
+
+  /** Resizing a door or window: the run and heights its arrow has been dragged to, previewed. */
+  private hoverOpening(ground: Point | null): void {
+    const d = this.openingDrag;
+    const sel = this.openingSel;
+    if (!d || !sel) return;
+    const now = { ...sel };
+    const most = sel.kind === 'window' ? MAX_WINDOW_RUN : MAX_DOOR_RUN;
+    const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    // Where the pointer is on the wall's own plane (the ground behind it would run away).
+    void ground;
+    const row = sel.axis === 'h' ? sel.line : sel.start;
+    const hit = this.preview.pickOnWall?.(sel.axis, sel.line, row) ?? null;
+    if (hit && d.handle === 'a+') now.len = clampN(Math.round(hit.along) - sel.start, 1, most);
+    if (hit && d.handle === 'a-') {
+      const end = sel.start + sel.len;
+      now.start = clampN(Math.round(hit.along), end - most, end - 1);
+      now.len = end - now.start;
+    }
+    if (d.handle === 'up' || d.handle === 'down') {
+      const h = hit?.y ?? null;
+      if (h !== null) {
+        d.from ??= h;
+        // In 10 cm steps, or with Shift held to the centimetre.
+        const cm = this.shift ? 1 : 10;
+        const steps = Math.round(((h - d.from) * 100) / cm) * cm;
+        if (d.handle === 'up') now.head = clampN(sel.head + steps, sel.kind === 'door' ? MIN_DOOR_HEAD : sel.sill + MIN_WINDOW, MAX_HEAD);
+        else now.sill = clampN(sel.sill + steps, 0, sel.head - MIN_WINDOW);
+        now.sized = true;
+      }
+    }
+    d.now = now;
+    const edits = this.openingEdits(sel, now);
+    // Every edge it takes needs a full-height wall (or the same kind of opening) already there.
+    const fits = this.runEdges(now).every((e) => {
+      const state = this.edgeState(e);
+      return (state === 'wall' && !this.lookOf(e).form) || state === sel.kind;
+    });
+    d.valid = fits && this.edgesOnHome(edits) && game.affords(game.creative ? 0 : this.cost(edits));
+    game.buildCost = game.creative ? 0 : this.cost(edits);
+    game.buildValid = d.valid;
+    this.preview.setEdgePreview?.(this.runEdges(now).map((e) => ({ ...e, kind: sel.kind, style: sel.style, ...(now.sized ? { sill: sel.kind === 'window' ? now.sill : undefined, head: now.head } : {}) })), d.valid);
+    this.syncHandles();
+  }
+
+  /** The build edits that turn run `from` into `to`: its edges with the new size, walls where it no longer reaches. */
+  private openingEdits(from: OpeningRun, to: OpeningRun): EdgeEdit[] {
+    const size = to.sized ? { ...(to.kind === 'window' ? { sill: to.sill } : {}), head: to.head } : {};
+    const kept = new Set(this.runEdges(to).map((e) => `${e.x}:${e.z}`));
+    return [
+      ...this.runEdges(to).map((e) => ({ ...e, kind: to.kind, style: to.style, ...size })),
+      ...this.runEdges(from).filter((e) => !kept.has(`${e.x}:${e.z}`)).map((e) => ({ ...e, kind: 'wall' as const })),
+    ];
+  }
+
+  /** End of an arrow drag on a door or window: makes the change. True if it was one. */
+  private releaseOpening(): boolean {
+    const d = this.openingDrag;
+    const sel = this.openingSel;
+    if (!d) return false;
+    this.openingDrag = null;
+    this.preview.setLeftDragCamera?.(true);
+    const n = d.now;
+    const changed = !!sel && (n.start !== sel.start || n.len !== sel.len || n.sill !== sel.sill || n.head !== sel.head);
+    if (sel && changed && d.valid) {
+      this.send({ type: 'build', household: game.home, edits: this.openingEdits(sel, n) });
+      this.openingSel = n;
+    }
+    this.clearPreviews();
+    this.handlesKey = '';
+    this.syncHandles();
     return true;
   }
 
@@ -987,6 +1527,7 @@ export class BuildBuyInput {
   private clickBuild(ground: Point): boolean {
     if (game.buildTool === 'roof' || game.buildTool === 'blueprint' || game.buildTool === 'move') return true;
     if (this.opening()) {
+      this.openingSel = null;
       this.send({ type: 'build', household: game.home, edits: this.edits(ground) });
       return true;
     }
@@ -1004,7 +1545,9 @@ export class BuildBuyInput {
    * with a start already set by a click, will finish it on release). Returns true when the
    * gesture belongs to drawing; the camera then doesn't turn until the release.
    */
-  press(ground: Point | null): boolean {
+  press(ground: Point | null, objectId: number | null = null, screen: Point2 | null = null): boolean {
+    if (game.mode === 'buy') return this.pressBuy(ground, objectId, screen);
+    if (this.openingTool() && this.pressOpening(ground, screen)) return true;
     if (this.floorTool() && ground) {
       // Floor: a drag covers the rectangle of tiles it spans; a click, one tile (Shift: the room).
       this.pressed = true;
@@ -1048,6 +1591,8 @@ export class BuildBuyInput {
 
   /** End of a drawing press: a drag builds the run; a click without moving only sets the start. */
   release(ground: Point | null, moved: boolean): void {
+    if (this.releaseOpening()) return;
+    if (this.releaseBuy(ground, moved)) return;
     if (!this.pressed) return;
     this.pressed = false;
     this.preview.setLeftDragCamera?.(true);
@@ -1120,6 +1665,20 @@ export class BuildBuyInput {
   /** Escape: drop what's in hand. Returns true if there was something to cancel. */
   cancel(): boolean {
     this.carrying = null;
+    if (this.resizing || this.dragging) {
+      const id = this.resizing?.id ?? this.dragging?.id ?? null;
+      this.resizing = null;
+      this.dragging = null;
+      this.grab = null;
+      game.placing = null;
+      this.preview.setHeldObject?.(null);
+      this.preview.setLeftDragCamera?.(true);
+      this.clearPreviews();
+      game.buySelection = id;
+      this.handlesKey = '';
+      this.syncHandles();
+      return true;
+    }
     if (this.pressed) {
       this.dropped = true;
       this.preview.setLeftDragCamera?.(true);

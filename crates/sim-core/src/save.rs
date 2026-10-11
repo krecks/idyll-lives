@@ -28,7 +28,10 @@
 //! 18 = objects placed off the middle of their tile (`offset`, centimetres; absent: centred);
 //! 19 = cooking makes food: food and dishes (`items`, by content id, and `nextItem`), what
 //! residents carry (`sims[].held`) and recipes in progress (`Cook` tasks; eating and washing up
-//! aren't saved, they start again from what's there; absent: none of it).
+//! aren't saved, they start again from what's there; absent: none of it); 20 = objects
+//! resized by the player (`size`, centimetres across and deep before turning, absent: their
+//! kind's; `tall`, centimetres taller, absent: 0), and anything may stand off its tile's middle;
+//! doors and windows too (`looks[].sill`, `looks[].head`, centimetres; absent: their style's).
 //! Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
@@ -46,7 +49,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 19;
+pub const SAVE_VERSION: u32 = 20;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -180,6 +183,11 @@ pub struct LookSave {
     /// Door or window style id (empty for none).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub style: String,
+    /// Doors and windows the player resized: sill and top, centimetres (absent before v20, or the style's own).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sill: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<u16>,
 }
 
 fn is_zero(n: &u8) -> bool {
@@ -221,6 +229,16 @@ pub struct ObjectSave {
     /// Wear, 0..1 (broken at 1; absent before v12: new).
     #[serde(default, skip_serializing_if = "is_unworn")]
     pub wear: f32,
+    /// Its own size, centimetres across and deep before turning (absent before v20, or its kind's).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<[u16; 2]>,
+    /// Centimetres taller (negative: shorter) than its kind (absent before v20: 0).
+    #[serde(default, skip_serializing_if = "is_level")]
+    pub tall: i16,
+}
+
+fn is_level(tall: &i16) -> bool {
+    *tall == 0
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -542,6 +560,8 @@ impl World {
                 turn: o.turn,
                 offset: o.offset,
                 wear: o.wear,
+                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
+                tall: o.tall,
             })
             .collect();
         let sims = self
@@ -871,7 +891,11 @@ impl World {
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
                     let style = world.check_style(o.style).unwrap_or(0);
-                    world.place(def, o.x, o.z, o.rot, o.offset, style, o.quality, value)
+                    // A size the content no longer allows goes back to its kind's.
+                    let own = crate::world::kind_size(world.content.objects[def].footprint);
+                    let (size, tall) = world.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
+                    let layout = crate::world::Layout { offset: o.offset, extent: Some(size), tall };
+                    world.place(def, o.x, o.z, o.rot, layout, style, o.quality, value)
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };
@@ -879,7 +903,7 @@ impl World {
                 Ok(id) => {
                     let obj = &world.objects[id as usize];
                     let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
-                    let offset = world.check_offset(obj.def, o.offset).unwrap_or([0, 0]);
+                    let offset = world.check_offset(obj.def, obj.rot, o.offset).unwrap_or([0, 0]);
                     world.objects[id as usize].turn = turn;
                     world.objects[id as usize].offset = offset;
                     world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
@@ -1272,6 +1296,8 @@ fn encode_looks(lot: &Lot, content: &Content) -> Vec<LookSave> {
                 style: styles
                     .get(look.style as usize)
                     .map_or(String::new(), |s| s.id.clone()),
+                sill: look.sill,
+                head: look.head,
             })
         })
         .collect()
@@ -1315,6 +1341,9 @@ fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave]) {
                     0
                 },
                 style: index(styles, &l.style).map_or(0, |i| i as u8),
+                // A size no door or window may have is dropped.
+                sill: l.sill.filter(|&s| edge == Edge::Window && s + crate::command::MIN_WINDOW <= crate::command::MAX_HEAD),
+                head: l.head.filter(|&h| matches!(edge, Edge::Door | Edge::Window) && h <= crate::command::MAX_HEAD),
             },
         );
     }

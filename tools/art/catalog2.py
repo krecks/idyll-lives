@@ -1143,7 +1143,7 @@ for x in range(-5, 6):
     p.append(sph([0.025, 0.02, 0.025], [x * 0.13, 0.482, 0], '#737B54', 'fabric', segments=6))
 add('benchBedEnd', p, (2, 1), seat=(0.47, 0.0))
 p = [box([0.56, 1.66, 0.04], [0, 0.95, -0.06], '#C9A06A', 'metal', radius=0.03, rotate=[-8, 0, 0]),
-     box([0.5, 1.58, 0.01], [0, 0.95, -0.035], '#D7E2E6', 'gloss', radius=0.025, rotate=[-8, 0, 0]),
+     box([0.5, 1.58, 0.01], [0, 0.95, -0.035], '#D7E2E6', 'gloss', radius=0.025, rotate=[-8, 0, 0], mirror='front'),
      rod([0, 0, -0.38], [0, 1.4, -0.12], 0.03, '#C9A06A', 'metal', segments=8)]
 add('mirrorFloor', p)
 p = [flare([0.42, 0.56, 0.42], [0, 0.28, -0.2], '#C9A979', 'fabric', 1.1, segments=20),
@@ -1228,7 +1228,7 @@ add('towelLadder', p)
 add('bathMat', [box([0.76, 0.02, 0.5], [0, 0.01, 0], '#B9CCC4', 'fabric', radius=0.009),
                 box([0.68, 0.006, 0.42], [0, 0.021, 0], '#C9DAD3', 'fabric', radius=0.003)], kind='rug')
 p = [torus([0.62, 0.04, 0.62], [0, 1.55, WALL + 0.03], BRASS, 'metal', rotate=[90, 0, 0], segments=32),
-     cyl([0.58, 0.012, 0.58], [0, 1.55, WALL + 0.02], '#D7E2E6', 'gloss', rotate=[90, 0, 0], segments=32),
+     cyl([0.58, 0.012, 0.58], [0, 1.55, WALL + 0.02], '#D7E2E6', 'gloss', rotate=[90, 0, 0], segments=32, mirror='front'),
      cyl([0.012, 0.3, 0.012], [0, 1.95, WALL + 0.01], BRASS, 'metal', rotate=[0, 0, 30])]
 add('mirrorRound', p, kind='wall')
 p = [flare([0.46, 0.34, 0.36], [0, 0.17, -0.2], '#C9A979', 'fabric', 1.12, segments=20),

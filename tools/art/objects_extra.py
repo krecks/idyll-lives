@@ -246,7 +246,7 @@ M['model.easel'] = es; FOOT['model.easel'] = (1, 1)
 MW, BRASS = '#7A563A', '#B8925A'
 MP, MR = [0, 0.95, -0.05], [-6, 0, 0]
 mi = [
-    box([0.53, 1.53, 0.008], on(MP, MR, [0, 0, 0.006]), '#E3E8EC', 'chrome', radius=0.003, rotate=MR),  # glass
+    box([0.53, 1.53, 0.008], on(MP, MR, [0, 0, 0.006]), '#E3E8EC', 'chrome', radius=0.003, rotate=MR, mirror='front'),  # glass
     box([0.58, 1.58, 0.012], on(MP, MR, [0, 0, -0.012]), '#5A3F2A', 'wood', radius=0.004, rotate=MR),  # backing
     box([0.68, 0.045, 0.06], on(MP, MR, [0, 0.83, 0]), MW, 'wood', radius=0.012, rotate=MR),          # crown
     sph([0.07, 0.07, 0.04], on(MP, MR, [0, 0.875, 0]), MW, 'wood', segments=8, rotate=MR),          # crest

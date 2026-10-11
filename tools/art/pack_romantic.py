@@ -140,7 +140,7 @@ va = [box([0.8, 0.06, 0.36], [0, 0.73, -0.27], IVORY, 'satin', radius=0.015),
 for x in (-0.36, 0.36):
     for z in (-0.42, -0.12):
         va.append(cyl([0.035, 0.57, 0.035], [x, 0.285, z], ROSEGOLD, 'metal', taper=0.5, segments=10))
-va += [cyl([0.5, 0.02, 0.72], [0, 1.24, -0.42], '#DCE6EA', 'gloss', rotate=[90, 0, 0], segments=32),   # oval mirror
+va += [cyl([0.5, 0.02, 0.72], [0, 1.24, -0.42], '#DCE6EA', 'gloss', rotate=[90, 0, 0], segments=32, mirror='front'),   # oval mirror
        torus([0.54, 0.04, 0.76], [0, 1.24, -0.425], ROSEGOLD, 'metal', rotate=[90, 0, 0], segments=32),
        box([0.04, 0.12, 0.04], [0, 0.82, -0.43], ROSEGOLD, 'metal', radius=0.01)]
 for i, (x, h, c) in enumerate([(-0.3, 0.12, '#F2B8C6'), (-0.22, 0.09, '#F2C77F'), (-0.15, 0.14, '#E8C9F0')]):

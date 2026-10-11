@@ -37,6 +37,11 @@ export interface PlaceholderPart {
    * with the body.
    */
   bone?: 'head' | 'armL' | 'armR' | 'legL' | 'legR' | 'shinL' | 'shinR';
+  /**
+   * Mirror glass (a thin box, or a disc: a flat cylinder): the face towards the model's front
+   * (+z) or back reflects the room live (see `render/babylon/mirrors.ts`).
+   */
+  mirror?: 'front' | 'back';
 }
 
 export interface ModelEntry {

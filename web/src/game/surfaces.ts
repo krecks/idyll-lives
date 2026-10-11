@@ -30,6 +30,13 @@ export interface Placed {
   rot: number;
   turn?: number;
   offset?: [number, number];
+  /** Resized: its footprint turned (tiles along x and z, as the structure lists it); absent: its kind's. */
+  w?: number;
+  d?: number;
+  /** Resized: its own size (centimetres across and deep before turning); absent: its footprint's. */
+  size?: [number, number];
+  /** Centimetres taller (negative: shorter) than its kind. */
+  tall?: number;
 }
 
 /** Default margin along a top's edges (m). */
@@ -54,15 +61,33 @@ export interface Top {
   inset: number;
 }
 
-/** Rotated footprint (tiles) of a placed thing. */
-export function sizeOf(def: Shape | undefined, rot: number): [number, number] {
-  const [w, d] = def?.footprint ?? [1, 1];
+/** Rotated footprint (tiles) of a thing of type `def` (`size`: its own, before turning). */
+export function sizeOf(def: Shape | undefined, rot: number, size?: readonly [number, number]): [number, number] {
+  const [w, d] = size ?? def?.footprint ?? [1, 1];
   return rot % 2 === 0 ? [w, d] : [d, w];
+}
+
+/** Rotated footprint (tiles) of a placed thing, resized or not. */
+export function placedSize(content: Shapes, o: Placed): [number, number] {
+  return o.w && o.d ? [o.w, o.d] : sizeOf(content.object(o.def), o.rot);
+}
+
+/** A placed thing's own footprint before turning (tiles across and deep). */
+export function footprintOf(content: Shapes, o: Placed): [number, number] {
+  const [w, d] = placedSize(content, o);
+  return o.rot % 2 === 0 ? [w, d] : [d, w];
+}
+
+/** A placed thing's own size before turning (centimetres across and deep). */
+export function ownSize(content: Shapes, o: Placed): [number, number] {
+  if (o.size) return [o.size[0], o.size[1]];
+  const [w, d] = footprintOf(content, o);
+  return [w * 100, d * 100];
 }
 
 /** Where a placed thing's middle is, its offset included (tiles). */
 export function middleOf(content: Shapes, o: Placed): [number, number] {
-  const [w, d] = sizeOf(content.object(o.def), o.rot);
+  const [w, d] = placedSize(content, o);
   return [o.x + w / 2 + (o.offset?.[0] ?? 0) / 100, o.z + d / 2 + (o.offset?.[1] ?? 0) / 100];
 }
 
@@ -74,9 +99,13 @@ export function topOf(content: Shapes, o: Placed): Top | null {
   const a = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
   const [cos, sin] = [Math.cos(a), Math.sin(a)];
   const [mx, mz] = middleOf(content, o);
-  const [w, d] = s.size ?? def.footprint ?? [1, 1];
-  const [ax, az] = s.at ?? [0, 0];
-  return { host: o, cx: mx + ax * cos + az * sin, cz: mz - ax * sin + az * cos, hw: w / 2, hd: d / 2, cos, sin, height: s.height, kind: s.kind, inset: s.inset ?? DEFAULT_INSET };
+  // Resized, the top grows with the footprint (its margins stay) and rises with the height (sim-core `Top::of`).
+  const kind = def.footprint ?? [1, 1];
+  const own = ownSize(content, o).map((v) => v / 100);
+  const [w, d] = (s.size ?? kind).map((v, i) => Math.max(0.1, v + own[i] - kind[i]));
+  const [ax, az] = (s.at ?? [0, 0]).map((v, i) => (v * own[i]) / kind[i]);
+  const height = Math.max(0.05, s.height + (o.tall ?? 0) / 100);
+  return { host: o, cx: mx + ax * cos + az * sin, cz: mz - ax * sin + az * cos, hw: w / 2, hd: d / 2, cos, sin, height, kind: s.kind, inset: s.inset ?? DEFAULT_INSET };
 }
 
 /** A point in a top's own frame (x to its right, z to its front). */
@@ -194,8 +223,8 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
  * `approach_tiles`): the front, then (seats used from `around`) behind, left and right of its
  * middle. Each comes with the tile of its own it's next to; the caller checks it's free and open.
  */
-export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number): { tile: [number, number]; inner: [number, number] }[] {
-  const [w, d] = sizeOf(def, rot);
+export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number, size?: readonly [number, number]): { tile: [number, number]; inner: [number, number] }[] {
+  const [w, d] = sizeOf(def, rot, size);
   const front = frontTile(x, z, w, d, rot);
   if (def?.approach !== 'around') {
     const inner: [number, number] = [front[0] - [0, 1, 0, -1][rot % 4], front[1] - [1, 0, -1, 0][rot % 4]];
@@ -222,13 +251,13 @@ export function facedTable(content: Shapes, objects: readonly Placed[], seat: Pl
   const def = content.object(seat.def);
   const kinds = def?.seatAt ?? [];
   if (!def || !kinds.length) return null;
-  const [{ tile, inner }] = approachCandidates({ ...def, approach: 'front' }, seat.x, seat.z, seat.rot);
+  const [{ tile, inner }] = approachCandidates({ ...def, approach: 'front' }, seat.x, seat.z, seat.rot, footprintOf(content, seat));
   const storey = (z: number) => (storeyDepth > 0 ? Math.floor(z / storeyDepth) : 0);
   if (storey(tile[1]) !== storey(inner[1]) || wallBetween(inner[0], inner[1], tile[0], tile[1])) return null;
   for (const o of objects) {
     const s = content.object(o.def)?.surface;
     if (!s || !kinds.includes(s.kind)) continue;
-    const [ow, od] = sizeOf(content.object(o.def), o.rot);
+    const [ow, od] = placedSize(content, o);
     if (tile[0] >= o.x && tile[1] >= o.z && tile[0] < o.x + ow && tile[1] < o.z + od) return o;
   }
   return null;
