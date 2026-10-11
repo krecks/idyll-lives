@@ -58,7 +58,7 @@ function plan(rel) {
   return null;
 }
 
-/** By file name: `normal.jpg`, `male_normal.jpg` and `cloth_normal.jpg` are normal maps, `arm.jpg` is data. */
+/** By file name: `normal.jpg` and `*_normal.jpg` are normal maps, `arm.jpg` is data. */
 function textureRole(rel) {
   if (/(^|[/_])normal\.[a-z]+$/i.test(rel)) return 'normal';
   if (/(^|\/)arm\.[a-z]+$/i.test(rel)) return 'data';
