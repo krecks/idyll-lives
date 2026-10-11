@@ -34,69 +34,14 @@ Downloaded 2026-10-07. Textures were resized and re-encoded (JPG). Fabric, wood,
 |---|---|---|---|---|
 | `belfast_open_field.env` | Belfast Open Field (1k HDRI, prefiltered to a Babylon `.env`) | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
 
-## Models (`models/`)
+## Models
 
-Furniture and props come from two CC0 libraries, rebuilt by `tools/art/build_library.py` /
-`optimize_model.mjs` (flattened, primitives joined per material, heavy meshes simplified, textures
-resized to 512 px WebP, geometry quantised) into single `.glb` files. Kenney models are flat-coloured
-and are restyled in the manifest with the game's own finishes (`materials`), and many entries add
-primitive parts (`parts`). Downloaded 2026-10-07/08.
-
-| File | Used for | Source asset | Authors | URL | Licence |
-|---|---|---|---|---|---|
-| `kenney/kitchenFridge.glb`, `kitchenFridgeLarge.glb`, `kitchenFridgeSmall.glb`, `kitchenSink.glb`, `kitchenCabinet.glb`, `kitchenStove.glb`, `kitchenMicrowave.glb`, `toilet.glb`, `shower.glb`, `showerRound.glb`, `washerDryerStacked.glb`, `televisionModern.glb`, `speaker.glb` | `model.fridge` (+`@modern`, `@minimal`), `model.sink` (+`@modern`), `model.toilet`, `model.shower` (+`@modern`, `@minimal`); packs: couchPotato.snackFridge, couchPotato.fitnessGame, energetic.powerBlender, energetic.contrastShower, cheerful.karaokeMachine, kind.neighbourlyOven, neat.laundryCenter, neat.rainShowerTower, slob.microwaveCart | Furniture Kit | Kenney | https://kenney.nl/assets/furniture-kit | CC0 |
-| `ph/Sofa_01.glb` | `model.sofa` | Sofa 01 | Kirill Sannikov | https://polyhaven.com/a/Sofa_01 | CC0 |
-| `ph/ArmChair_01.glb` | `model.armchair` | Arm Chair 01 | Kirill Sannikov | https://polyhaven.com/a/ArmChair_01 | CC0 |
-| `ph/fireside_wing_chairs.glb` | bookworm.firesideLounge (two copies composed with `gltf_compose.py`) | Green Chair 01 | Kirill Sannikov | https://polyhaven.com/a/GreenChair_01 | CC0 |
-| `ph/potted_plant_02.glb` | `model.plant` | Potted Plant 02 | Rico Cilliers | https://polyhaven.com/a/potted_plant_02 | CC0 |
-| `ph/potted_plant_01.glb` | `model.plant@cozy` | Potted Plant 01 | Rico Cilliers | https://polyhaven.com/a/potted_plant_01 | CC0 |
-| `ph/potted_plant_04.glb` | `model.plantSmall` | Potted Plant 04 | James Ray Cock | https://polyhaven.com/a/potted_plant_04 | CC0 |
-| `ph/fern_02.glb` | natureLover.glasshouse | Fern 02 | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/fern_02 | CC0 |
-| `ph/wooden_display_shelves_01.glb` | `model.bookshelf@minimal` | Wooden Display Shelves 01 | James Ray Cock | https://polyhaven.com/a/wooden_display_shelves_01 | CC0 |
-| `ph/tv_crt_side_table.glb` | `model.tv@cozy` (composed) | Television 01 + Side Table 01 | Gabriel Radić; James Ray Cock | https://polyhaven.com/a/Television_01, https://polyhaven.com/a/side_table_01 | CC0 |
-| `ph/workbench_metal_desk.glb` | `model.workbench` (composed) | Metal Office Desk + Metal Toolbox + Drill 01 | Ulan Cabanilla; Mateusz Sadek; Fernando Quinn | https://polyhaven.com/a/metal_office_desk, https://polyhaven.com/a/metal_toolbox, https://polyhaven.com/a/Drill_01 | CC0 |
-| `ph/side_table_01.glb` | `model.sideTable` (catalogue side table); lazy.smartHub | Side Table 01 | James Ray Cock | https://polyhaven.com/a/side_table_01 | CC0 |
-| `ph/painted_wooden_chair_01.glb` | `model.diningChair` (catalogue dining chair) | Painted Wooden Chair 01 | Kuutti Siitonen | https://polyhaven.com/a/painted_wooden_chair_01 | CC0 |
-| `ph/electric_stove.glb` | `model.stove`, catalogue `stoveElectric` | Electric Stove | Kuutti Siitonen | https://polyhaven.com/a/electric_stove | CC0 |
-| `ph/modern_ceiling_lamp_01.glb` | `model.ceilingLamp`, catalogue `ceilingPendant` | Modern Ceiling Lamp 01 | James Ray Cock | https://polyhaven.com/a/modern_ceiling_lamp_01 | CC0 |
-| `ph/modern_wooden_cabinet.glb` | gloomy.recordCabinet | Modern Wooden Cabinet | Patrik Pangerl | https://polyhaven.com/a/modern_wooden_cabinet | CC0 |
-| `ph/Rockingchair_01.glb` | kind.knittingRocker | Rockingchair 01 | Jorge Camacho | https://polyhaven.com/a/Rockingchair_01 | CC0 |
-| `ph/tea_set_01.glb` | kind.welcomeTeaTable, bookworm.teaTrolley | Tea Set 01 | James Ray Cock, Rico Cilliers, Jurita Burger | https://polyhaven.com/a/tea_set_01 | CC0 |
-| `ph/wine_bottles_01.glb` | outgoing.partyBar | Wine Bottles 01 | Rico Cilliers, Jurita Burger | https://polyhaven.com/a/wine_bottles_01 | CC0 |
-| `ph/wooden_crate_01.glb` | hotHeaded.smashBin | Wooden Crate 01 | James Ray Cock | https://polyhaven.com/a/wooden_crate_01 | CC0 |
-| `ph/planter_box_01.glb` | foodie.herbGarden | Planter Box 01 | James Ray Cock | https://polyhaven.com/a/planter_box_01 | CC0 |
-| `ph/vintage_wooden_drawer_01.glb` | bookworm.bedsideStack | Vintage Wooden Drawer 01 | James Ray Cock | https://polyhaven.com/a/vintage_wooden_drawer_01 | CC0 |
-| `kenney/kitchenFridgeBuiltIn.glb`, `kitchenCabinetDrawer.glb`, `kitchenCabinetUpperDouble.glb`, `hoodModern.glb`, `stoolBar.glb`, `stoolBarSquare.glb`, `bookcaseClosedDoors.glb`, `bookcaseOpenLow.glb`, `bookcaseClosedWide.glb`, `chairModernFrameCushion.glb`, `chairCushion.glb`, `chairRounded.glb`, `chairDesk.glb`, `loungeSofa.glb`, `loungeDesignSofa.glb`, `loungeChair.glb`, `tableCoffee.glb`, `tableCoffeeGlass.glb`, `sideTableDrawers.glb`, `cabinetBedDrawerTable.glb`, `bedSingle.glb`, `bedBunk.glb`, `bathroomCabinet.glb`, `bathroomMirror.glb`, `bathroomSink.glb`, `bathtub.glb`, `toiletSquare.glb`, `washer.glb`, `dryer.glb`, `coatRackStanding.glb`, `rugRound.glb`, `rugRectangle.glb`, `ceilingFan.glb`, `lampSquareCeiling.glb`, `lampSquareFloor.glb`; sets composed from kit pieces by `build_library.py` (`SETS`): `microwaveCounter.glb`, `coffeeCounter.glb`, `breakfastCounter.glb` (cabinets, microwave, coffee machine, toaster, blender), `stereoUnit.glb`, `tvRetroUnit.glb` (TV cabinet, radio, speakers, vintage TV), `nightstandLamp.glb`, `tableLamp.glb`, `tableLampSquare.glb` (bedside cabinet, side table, table lamps) | the 0.20 catalogue (`content/furniture.json`, models in `catalog/manifest.json`): fridges, counters, cabinets, appliances, stools, chairs, sofas, coffee tables, bookcases, beds, nightstands, bathroom fittings, laundry, rugs, lamps | Furniture Kit | Kenney | https://kenney.nl/assets/furniture-kit | CC0 |
-| `ph/hanging_picture_frame_01.glb` | catalogue `printFramed` | Hanging Picture Frame 01 | James Ray Cock | https://polyhaven.com/a/hanging_picture_frame_01 | CC0 |
-| `ph/hanging_picture_frame_02.glb` | catalogue `photoPrint` | Hanging Picture Frame 02 | James Ray Cock | https://polyhaven.com/a/hanging_picture_frame_02 | CC0 |
-| `ph/fancy_picture_frame_01.glb` | catalogue `paintingClassic` | Fancy Picture Frame 01 | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/fancy_picture_frame_01 | CC0 |
-| `ph/wall_clock.glb` | catalogue `wallClock` | Wall Clock | PierreB3D | https://polyhaven.com/a/wall_clock | CC0 |
-| `ph/vintage_grandfather_clock_01.glb` | catalogue `grandfatherClock` | Vintage Grandfather Clock 01 | Yann Kervran, James Ray Cock | https://polyhaven.com/a/vintage_grandfather_clock_01 | CC0 |
-| `ph/ceramic_vase_02.glb` | catalogue `vasePedestal` | Ceramic Vase 02 | James Ray Cock | https://polyhaven.com/a/ceramic_vase_02 | CC0 |
-| `ph/ceramic_vase_03.glb` | catalogue `vaseTall` | Ceramic Vase 03 | James Ray Cock | https://polyhaven.com/a/ceramic_vase_03 | CC0 |
-| `ph/antique_ceramic_vase_01.glb` | catalogue `urnPorcelain` | Antique Ceramic Vase 01 | James Ray Cock | https://polyhaven.com/a/antique_ceramic_vase_01 | CC0 |
-| `ph/marble_bust_01.glb` | catalogue `bustMarble` | Marble Bust 01 | Rico Cilliers | https://polyhaven.com/a/marble_bust_01 | CC0 |
-| `ph/concrete_cat_statue.glb` | catalogue `statueCat` | Concrete Cat Statue | Rico Cilliers, Riley Queen | https://polyhaven.com/a/concrete_cat_statue | CC0 |
-| `ph/horse_statue_01.glb` | catalogue `statueHorse` | Horse Statue 01 | Rico Cilliers | https://polyhaven.com/a/horse_statue_01 | CC0 |
-| `ph/ornate_mirror_01.glb` | catalogue `mirrorWall@cozy` | Ornate Mirror 01 | James Ray Cock | https://polyhaven.com/a/ornate_mirror_01 | CC0 |
-| `ph/hanging_industrial_lamp.glb` | catalogue `pendantIndustrial` | Hanging Industrial Lamp | Kuutti Siitonen | https://polyhaven.com/a/hanging_industrial_lamp | CC0 |
-| `ph/industrial_wall_lamp.glb` | catalogue `wallLightOutdoor` | Industrial Wall Lamp | Kuutti Siitonen | https://polyhaven.com/a/industrial_wall_lamp | CC0 |
-| `ph/industrial_wall_sconce.glb` | catalogue `wallLampArm` | Industrial Wall Sconce | Ulan Cabanilla | https://polyhaven.com/a/industrial_wall_sconce | CC0 |
-| `ph/outdoor_table_chair_set_01.glb` | catalogue `patioSet` | Outdoor Table Chair Set 01 | James Ray Cock | https://polyhaven.com/a/outdoor_table_chair_set_01 | CC0 |
-| `ph/wooden_picnic_table.glb` | catalogue `picnicTable` | Wooden Picnic Table | Ulan Cabanilla | https://polyhaven.com/a/wooden_picnic_table | CC0 |
-| `ph/Ukulele_01.glb` | catalogue `ukulele` | Ukulele 01 | Joseph Burgan | https://polyhaven.com/a/Ukulele_01 | CC0 |
-| `ph/boombox.glb` | catalogue `boombox` | Boombox | Thomas Paul Mouilleron | https://polyhaven.com/a/boombox | CC0 |
-| `ph/dartboard.glb` | catalogue `dartboard` | Dartboard | Satyaki Mandal | https://polyhaven.com/a/dartboard | CC0 |
-| `ph/standing_chalkboard_01.glb` | catalogue `kidsChalkboard` | Standing Chalkboard 01 | ParzivalCG | https://polyhaven.com/a/standing_chalkboard_01 | CC0 |
-| `ph/mid_century_lounge_chair.glb` | catalogue `armchairDesign` | Mid Century Lounge Chair | Kuutti Siitonen | https://polyhaven.com/a/mid_century_lounge_chair | CC0 |
-| `ph/modern_arm_chair_01.glb` | catalogue `armchairLeather` | Modern Arm Chair 01 | Vibrant Nordic | https://polyhaven.com/a/modern_arm_chair_01 | CC0 |
-| `ph/Ottoman_01.glb` | catalogue `pouf` | Ottoman 01 | Caspian Fortune | https://polyhaven.com/a/Ottoman_01 | CC0 |
-| `ph/coffee_table_round_01.glb` | catalogue `coffeeTableMarble` | Coffee Table Round 01 | Ulan Cabanilla | https://polyhaven.com/a/coffee_table_round_01 | CC0 |
-| `ph/steel_frame_shelves_03.glb` | catalogue `shelvingIndustrial` | Steel Frame Shelves 03 | Ulan Cabanilla | https://polyhaven.com/a/steel_frame_shelves_03 | CC0 |
-
-Every other model (most style variants, gym/hobby objects, pack items and the catalogue's primitive models: kitchen island, dining sets, beds, tubs, showers, kids' toys, desks, instruments, games, fitness gear, wall art, curtains, rugs, chandelier, garden furniture, grills, hot tub, play equipment and garden lights, drawn by `tools/art/catalog.py`) is built from primitive parts in
-`manifest.json` / the pack manifests by `tools/art/objects_extra.py`, `furniture.py` and `pack_<trait>.py`
-(original, CC0).
+Every model of a thing in the world (furniture, appliances, decor, the town's street furniture and
+shops, trees, bushes, flowers and garden things, food and kitchen tools) is built from primitive
+parts in the manifests (original, CC0), drawn by `tools/art/furniture.py`, `furniture_prims.py`,
+`objects_extra.py`, `catalog.py`, `catalog2.py`, `community.py`, `items.py`, `nature.py` and
+`pack_<trait>.py`. They take their surfaces from the finishes and textures above. No downloaded
+models are used.
 
 ## Generated art (original, CC0)
 
@@ -126,17 +71,6 @@ The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, street
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|
 | `street/sidewalk/albedo.webp`, `normal.webp`, `arm.webp` | `material.sidewalk` | Concrete Pavement (1k; albedo made a greyscale detail map, resized to 512 px, ARM to 256 px, WebP) | Charlotte Baglioni | https://polyhaven.com/a/concrete_pavement | CC0 |
-
-## Trees, bushes and lawn (`nature/`)
-
-Trees (oak, maple, birch, cherry blossom, apple, Japanese maple, magnolia, weeping willow, pine, blue spruce and Italian cypress, each with a `*_far` LOD), bushes, a clipped hedge, grass tufts and wildflowers are low-poly leaf-card models generated by `tools/art/nature_models.py`, and the garden catalog (`nature/garden_*.glb`: flowers, shrubs, fruit and vegetables, house plants, pots, planters, a pond, a fountain, a gnome and other decor) by `tools/art/garden_models.py` (all original, CC0): procedural trunks, branches, stems, pots and stones plus alpha-cut cards with crown-bent normals. They share two textures. `nature/bark.webp` is the brown bark from `textures/bark/` (Bark Brown 02, Rob Tuytel, Poly Haven, CC0) next to a procedural birch bark. `nature/foliage.webp` is the foliage atlas built by `tools/art/foliage_atlas.py`: its leaf clumps, willow strands, plant leaves, flower heads, fruit, soil and stems are procedural (original, CC0); its conifer fronds, small-leaf sprigs and grass come from the earlier atlas `nature/leaves.webp` (built by `tools/art/nature_atlas.py`, now only an input). That atlas's leaf sprays are composited from these photographed leaves, which were recoloured and arranged into twigs:
-
-| Atlas cell | Source asset | Author | URL | Licence |
-|---|---|---|---|---|
-| Broadleaf cluster (shade, blossom and apple trees) | Leaf Set 024 (1K) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=LeafSet024 | CC0 |
-| Small-leaf sprigs (bushes, hedges) | Leaf Set 002 (1K) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=LeafSet002 | CC0 |
-| Birch cluster | Leaf Set 004 (1K) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=LeafSet004 | CC0 |
-| Conifer fronds | Leaf Set 019 (1K) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=LeafSet019 | CC0 |
 
 ## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
 

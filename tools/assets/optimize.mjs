@@ -33,7 +33,6 @@ const VERSION = 1;
 
 /** Left as they are: not loaded by the game, or drawn in a way KTX2 can't (flipped on upload). */
 const SKIP = new Set([
-  'nature/leaves.webp', // only an input of the foliage atlas
   'textures/sky/clouds.png', // loaded with invertY (compressed textures can't be flipped), small
 ]);
 

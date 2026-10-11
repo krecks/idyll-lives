@@ -1,7 +1,6 @@
 # Merge generated model entries into one personality pack manifest in place
 # (web/public/assets/packs/<trait>/manifest.json), keeping its other keys and entries.
-# Re-reads the manifest right before writing. Model URLs in a pack resolve relative to the pack
-# manifest, so library files are referenced as "../../models/ph/<id>.glb".
+# Re-reads the manifest right before writing.
 #
 # usage: python3 -I apply_pack.py <trait> <entries.json>
 import json, os, sys
