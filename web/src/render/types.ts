@@ -422,6 +422,11 @@ export interface SimPreviews {
   cachedPortrait(look: SimLook): string | null;
   /** Renders portraits ahead of time (e.g. everyone in a game being prepared). */
   prefetch(looks: readonly SimLook[]): void;
+  /**
+   * While on (a game is running), the engine stays when idle: new faces come up now and then in
+   * play, and a fresh engine would compile every shader again (a stutter each time).
+   */
+  keep(on: boolean): void;
   wardrobe(gender: string): Promise<Wardrobe | null>;
 }
 

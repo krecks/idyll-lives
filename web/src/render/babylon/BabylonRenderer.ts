@@ -82,13 +82,13 @@ import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { Street } from './street';
 import { MaterialLibrary } from './materials';
-import { buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { installNature, Landscape, natureDecor, Sky } from './nature';
+import { DECOR_MODELS, installNature, Landscape, natureDecor, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
@@ -307,6 +307,7 @@ export class BabylonRenderer implements Renderer {
   private roomLightUse: (RoomLight | null)[] = [];
   private readonly lampColor = new Color3();
   private readonly glowColor = new Color3();
+  private readonly emissiveTmp = new Color3();
 
   // Selection marker (sparkle star, outline, glow halo) and contact shadows (thin instances
   // updated per frame).
@@ -568,8 +569,9 @@ export class BabylonRenderer implements Renderer {
     this.showItems();
     this.lastLightMinute = -1;
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
-    const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0)).map((o) => this.objectModel(o));
-    prefetchModels(elsewhere.filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
+    const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
+    prefetchModels(elsewhere.map((o) => this.objectModel(o)).filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
+    this.warmTemplates(elsewhere);
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -1406,7 +1408,10 @@ export class BabylonRenderer implements Renderer {
   /** The director's shot, or keeping a followed resident centred (game world only). */
   private steerCamera(dt: number): void {
     if (this.gameRig.active) return this.gameRig.frame(dt);
-    if (this.followIndex === null || !this.simHead(this.followIndex, this.followHead)) return;
+    const i = this.followIndex;
+    // Off the drawn lot (on the street, or arriving where the next lot is still being built):
+    // where they stand, so the camera keeps going with them.
+    if (i === null || (!this.simHead(i, this.followHead) && !(i < this.simCount && this.characters.spot(i, this.followHead)))) return;
     const t = this.camera.target;
     const k = 1 - Math.exp(-dt / 0.5);
     t.x += (this.followHead.x - t.x) * k;
@@ -1450,9 +1455,11 @@ export class BabylonRenderer implements Renderer {
     this.cameraPlaced = false;
     this.framedView = '';
     this.warmFrames = 0;
+    this.warmPass++;
   }
 
   dispose(): void {
+    this.warmPass++;
     window.removeEventListener('resize', this.onResize);
     this.overview?.dispose();
     this.engine.dispose();
@@ -2223,10 +2230,14 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
+  private decorModel(key: string): Promise<ModelTemplate> {
+    return buildModel(this.scene, key, this.deps.assets.get(key, 'model'), [1, 1]);
+  }
+
   /** Garden dressing as thin instances of a cached template (`deco:` keys). */
   private async placeDecor(key: string, items: [number, number, number, number][]): Promise<void> {
     if (!items.length) return;
-    const template = await this.template(`deco:${key}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), [1, 1]));
+    const template = await this.template(`deco:${key}`, () => this.decorModel(key));
     const matrices = new Float32Array(items.length * 16);
     items.forEach(([x, z, s, yaw], i) => {
       Matrix.ComposeToRef(this.vScale.setAll(s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.qTmp), this.vTmp.set(x, 0, z), this.mOut);
@@ -2354,15 +2365,7 @@ export class BabylonRenderer implements Renderer {
     const shown = world.objects.filter((o) => this.storeyOf(o.z) <= this.storey && this.inView(o.x + o.w / 2, o.z - this.storeyOf(o.z) * D + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
-    const templates = await Promise.all(
-      [...byModel.values()].map((list) => {
-        const key = this.objectModel(list[0]);
-        const def = this.deps.content.object(list[0].def);
-        const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
-        const resize = this.objectResize(list[0]);
-        return this.template(`object:${key}${resizeKey(resize)}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius, resize }));
-      }),
-    );
+    const templates = await Promise.all([...byModel.values()].map((list) => this.template(...this.objectTemplate(list[0]))));
     // What each tile's top belongs to, for the things standing on tops.
     const tops = new Map<string, number>();
     for (const o of shown) {
@@ -2466,6 +2469,45 @@ export class BabylonRenderer implements Renderer {
     this.worldMeshes.push(shadows);
   }
 
+  /** An object's template key, and how to build it. */
+  private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>] {
+    const key = this.objectModel(o);
+    const def = this.deps.content.object(o.def);
+    const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
+    const resize = this.objectResize(o);
+    return [`object:${key}${resizeKey(resize)}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius, resize })];
+  }
+
+  /** Bumped by each world build: an older pass of `warmTemplates` stops. */
+  private warmPass = 0;
+
+  /**
+   * Builds the other lots' generated furniture and every kind of garden plant ahead, a few per
+   * idle moment, kept hidden until a lot uses them: walking onto a lot (the camera following
+   * someone) then needn't stop to build them. Models from files only download ahead
+   * (`prefetchModels`); they build when shown.
+   */
+  private warmTemplates(objects: readonly ObjectPlacement[]): void {
+    const pass = ++this.warmPass;
+    const queue = new Map<string, () => Promise<ModelTemplate>>();
+    const generated = (model: string) => !this.deps.assets.has(model, 'model') || !this.deps.assets.get(model, 'model')?.url;
+    for (const o of objects) {
+      if (!generated(this.objectModel(o))) continue;
+      const [key, build] = this.objectTemplate(o);
+      queue.set(key, build);
+    }
+    for (const model of DECOR_MODELS) if (generated(model)) queue.set(`deco:${model}`, () => this.decorModel(model));
+    const jobs = [...queue].filter(([key]) => !this.templates.has(key)).map(([key, build]) => () => {
+      if (this.templates.has(key)) return;
+      const t = build();
+      this.templates.set(key, t);
+      void t.then((template) => {
+        if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
+      });
+    });
+    buildAhead(jobs, () => pass === this.warmPass);
+  }
+
   /** Cached template by key; marks it as used by the world being built. */
   private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
     let t = this.templates.get(key);
@@ -2501,11 +2543,13 @@ export class BabylonRenderer implements Renderer {
     await this.characters.build(world);
     // Sims arrive at the lot's entry, in front of the door. The first time a lot is shown, view it
     // from that side (three-quarter angle) so the cutaway opens the front wall instead of the
-    // full-height back wall hiding the arriving household.
+    // full-height back wall hiding the arriving household. (Not when following someone there:
+    // the camera goes along as the player left it.)
     const v = this.view;
     const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
-    if (v && key !== this.framedView) {
-      this.framedView = key;
+    const framing = !!v && key !== this.framedView;
+    if (framing) this.framedView = key;
+    if (framing && this.followIndex === null) {
       const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
       const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
       const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;
@@ -2663,7 +2707,7 @@ export class BabylonRenderer implements Renderer {
     this.skyDome.update(l);
     this.lib.setEnvironmentIntensity(l.envIntensity);
     if (this.post) {
-      this.post.imageProcessing.exposure = l.exposure * LOOK.exposure;
+      setExposure(this.post.imageProcessing.imageProcessingConfiguration, l.exposure * LOOK.exposure);
       // Moonlit nights: blue-grey dark tones, warm lamps and windows (see nightGrade.ts).
       if (this.nightGrade) {
         this.nightGrade.amount = l.night * LOOK.nightGrade;
@@ -2691,12 +2735,11 @@ export class BabylonRenderer implements Renderer {
     const glass = this.lib.surface('material.window', { vertexColors: true, cutaway: true }) as PBRMaterial;
     // Windows light up only once it is getting dark outside.
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
-    this.glowColor.scaleToRef(glow * glow * 1.6, glass.emissiveColor);
-    this.lib.touch(glass);
+    this.glowColor.scaleToRef(glow * glow * 1.6, this.emissiveTmp);
+    this.lib.setEmissive(glass, this.emissiveTmp);
     const inner = this.lib.surface('material.window.inner', { vertexColors: true, cutaway: true }) as PBRMaterial;
-    l.clearColor.toLinearSpaceToRef(inner.emissiveColor);
-    inner.emissiveColor.scaleInPlace((1 - l.lamps) * 0.9 + 0.05);
-    this.lib.touch(inner);
+    l.clearColor.toLinearSpaceToRef(this.emissiveTmp);
+    this.lib.setEmissive(inner, this.emissiveTmp.scaleInPlace((1 - l.lamps) * 0.9 + 0.05));
     this.street?.setNight(l.lamps, this.glowColor);
     this.overview?.setNight(l.lamps, this.glowColor);
   }
@@ -2766,6 +2809,19 @@ export class BabylonRenderer implements Renderer {
 }
 
 /** Copies an orbit camera's angles, radius and target. */
+/**
+ * Sets exposure without the configuration's change notice. Image processing runs as a post
+ * process, where exposure is a uniform read each frame, but the notice marks every material dirty
+ * (each walking every mesh: tens of ms per lighting step) for nothing; nothing else here listens
+ * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
+ * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
+ */
+function setExposure(config: ImageProcessingConfiguration, value: number): void {
+  const fields = config as unknown as { _exposure?: number };
+  if (typeof fields._exposure === 'number' && (fields._exposure === 1) === (value === 1)) fields._exposure = value;
+  else config.exposure = value;
+}
+
 function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.alpha = from.alpha;
   to.beta = from.beta;

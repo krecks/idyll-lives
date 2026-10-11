@@ -1,8 +1,8 @@
 /**
  * `SimPreviews`: the household-creator stage and Sim portraits, from one small engine (`studio.ts`)
  * that runs only while it has work: a stage attached, or portraits to draw. It is disposed a few
- * seconds after the last of either, so it never runs alongside a game for long (portraits are
- * cached for the page; in play only new looks need it, briefly).
+ * seconds after the last of either, except while a game keeps it (`keep`): then it only stops
+ * drawing, and new faces in play find its shaders compiled (portraits are cached for the page).
  */
 
 import type { AssetRegistry } from '../../assets/registry';
@@ -27,6 +27,7 @@ class Previews implements SimPreviews {
   private readonly portraits = new Portraits();
   private looping = false;
   private releaseTimer = 0;
+  private kept = false;
 
   constructor(private readonly deps: StudioDeps) {
     // `?debug`: inspect from the console / test harness (`__previews.live` is the engine, if any).
@@ -69,6 +70,11 @@ class Previews implements SimPreviews {
 
   prefetch(looks: readonly SimLook[]): void {
     for (const look of looks) void this.portrait(look);
+  }
+
+  keep(on: boolean): void {
+    this.kept = on;
+    if (!on) this.idleCheck();
   }
 
   async wardrobe(gender: string): Promise<Wardrobe | null> {
@@ -124,7 +130,7 @@ class Previews implements SimPreviews {
     clearTimeout(this.releaseTimer);
     this.releaseTimer = window.setTimeout(() => {
       const studio = this.live;
-      if (!studio || this.stageCtl || this.portraits.busy) return;
+      if (!studio || this.kept || this.stageCtl || this.portraits.busy) return;
       this.live = null;
       this.studio = null;
       this.looping = false;

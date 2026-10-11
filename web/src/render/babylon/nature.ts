@@ -421,6 +421,25 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   return null;
 }
 
+/** Every model `natureDecor` picks from (the renderer builds them ahead). */
+export const DECOR_MODELS = [
+  'model.tree',
+  'model.tree.maple',
+  'model.tree.blossom',
+  'model.tree.fruit',
+  'model.tree.birch',
+  'model.tree.magnolia',
+  'model.tree.japaneseMaple',
+  'model.hedge',
+  'model.bush',
+  'model.bush.flowering',
+  'model.bush.small',
+  'model.garden.hydrangea',
+  'model.garden.rosebush',
+  'model.garden.lavender',
+  'model.garden.boxwood',
+] as const;
+
 /**
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,

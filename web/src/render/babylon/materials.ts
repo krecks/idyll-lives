@@ -266,6 +266,13 @@ export function encodeFinish(roughness: number, metallic: number): number {
 
 /** Point lights (interior lamps) a lit material must handle besides the sun and the sky. */
 const MAX_LIGHTS = 6;
+/**
+ * Smallest change (share of the value, and absolute) passed on to frozen materials over the day:
+ * each one thaws them, and every mesh drawn with them then redoes its shader checks for a few
+ * frames. Lighting updates come every half game minute, mostly with far smaller changes.
+ */
+const LIGHT_CHANGE = 0.02;
+const LIGHT_CHANGE_MIN = 0.004;
 
 export interface SurfaceOptions {
   /** Multiply albedo by (sRGB) vertex / instance colours. */
@@ -390,6 +397,14 @@ export class MaterialLibrary {
     return mat;
   }
 
+  /** A material's emissive colour (a frozen one is thawed only for a change one could see). */
+  setEmissive(material: PBRMaterial, color: Color3): void {
+    const e = material.emissiveColor;
+    if (!visibleChange(e.r, color.r) && !visibleChange(e.g, color.g) && !visibleChange(e.b, color.b)) return;
+    e.copyFrom(color);
+    this.touch(material);
+  }
+
   /** Re-uploads a frozen material's uniforms after a property change (e.g. emissive glow). */
   touch(material: Material): void {
     if (!(material instanceof PBRMaterial) || !material.isFrozen) return;
@@ -406,9 +421,19 @@ export class MaterialLibrary {
    */
   excludeFromLights(lights: readonly Light[], meshes: ReadonlySet<Mesh>): void {
     for (const light of lights) {
-      const before = new Set(light.excludedMeshes);
-      light.excludedMeshes = [...light.excludedMeshes.filter((m) => !m.isDisposed() && !meshes.has(m as Mesh)), ...meshes];
-      for (const mesh of meshes) if (!before.has(mesh) && mesh.material) this.touch(mesh.material);
+      // The list is changed in place: assigning a new one makes Babylon check every mesh of the
+      // scene against all of it, per light (most of a lot change's hitch); its `push` checks just
+      // the meshes added. Disposed ones are just dropped (nothing of them is left to update).
+      const list = light.excludedMeshes;
+      let kept = 0;
+      for (const m of list) if (!m.isDisposed()) list[kept++] = m;
+      list.length = kept;
+      const before = new Set(list);
+      const added = [...meshes].filter((m) => !before.has(m));
+      if (added.length) list.push(...added);
+      // Meshes not drawn yet get their shaders set up on their first frame, frozen or not
+      // (thawing a shared material would redo that for every mesh drawn with it).
+      for (const mesh of added) if (mesh.material && mesh.subMeshes?.some((sm) => sm.effect)) this.touch(mesh.material);
     }
   }
 
@@ -435,9 +460,9 @@ export class MaterialLibrary {
     });
   }
 
-  /** Scales image-based lighting (sky ambient + reflections), e.g. for the time of day. */
+  /** Scales image-based lighting (sky ambient + reflections), e.g. for the time of day (in steps too small to see). */
   setEnvironmentIntensity(value: number): void {
-    if (Math.abs(this.scene.environmentIntensity - value) < 1e-4) return;
+    if (!visibleChange(this.scene.environmentIntensity, value)) return;
     this.scene.environmentIntensity = value;
     for (const m of this.lit) {
       if (!m.isFrozen) continue;
@@ -530,4 +555,11 @@ export function textureWithFallback(url: string, scene: Scene, srgb: boolean, an
   tex.gammaSpace = srgb;
   if (anisotropy !== undefined) tex.anisotropicFilteringLevel = anisotropy;
   return tex;
+}
+
+/** Whether a lighting value moved enough to pass on (see `LIGHT_CHANGE`). */
+function visibleChange(from: number, to: number): boolean {
+  // Going off (or coming on) always counts.
+  if (from === 0 || to === 0) return from !== to;
+  return Math.abs(to - from) >= Math.max(LIGHT_CHANGE_MIN, Math.max(Math.abs(from), Math.abs(to)) * LIGHT_CHANGE);
 }

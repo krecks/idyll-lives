@@ -692,6 +692,8 @@ export async function startSession(
   }
   game.sharedMemory = bridge.sharedMemory;
   game.household = household;
+  // Portraits of new faces in play come from a studio already warmed up.
+  services.previews.keep(true);
 
   // Goal ideas and wishes as they come up, to accept or decline.
   const ideas = ideaToasts();
@@ -872,13 +874,16 @@ export async function startSession(
     }
   }
 
-  /** Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt. */
+  /**
+   * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
+   * The camera moves to its middle, unless it is going along with someone the player follows.
+   */
   function showPlot(plot: number) {
     const p = world?.plots[plot];
     if (!p) return;
     viewPlot = plot;
     game.viewPlot = plot;
-    renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
+    if (game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
   controls.setWallMode(game.wallMode);
@@ -1283,6 +1288,7 @@ export async function startSession(
       clearTimeout(hudTimer);
       renderer.setGameShot(null);
       renderer.followSim(null);
+      services.previews.keep(false);
       pointer?.dispose();
       bubbles.dispose();
       roomOverlay.dispose();

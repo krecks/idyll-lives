@@ -612,6 +612,31 @@ export function prefetchModels(entries: Iterable<ModelEntry | undefined>): void 
   prefetch([...entries].flatMap((e) => (e?.url ? [optimizedUrl(e.url)] : [])));
 }
 
+/** Idle time (ms) left below which `buildAhead` waits for the next idle moment. */
+const IDLE_SLICE_MS = 6;
+
+/**
+ * Runs `jobs` in idle moments, as many as fit in each, until they are done or `current()` turns
+ * false: generated models built ahead (each a few ms) without holding up a frame.
+ */
+export function buildAhead(jobs: (() => void)[], current: () => boolean): void {
+  const step = (deadline?: IdleDeadline) => {
+    if (!current()) return;
+    while (jobs.length) {
+      jobs.shift()!();
+      if (!deadline || deadline.timeRemaining() < IDLE_SLICE_MS) break;
+    }
+    if (jobs.length) idle(step);
+  };
+  idle(step);
+}
+
+/** Runs `fn` when the page is idle (soon anyway; a short timeout where idle callbacks are missing). */
+function idle(fn: (deadline?: IdleDeadline) => void): void {
+  if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout: 2000 });
+  else setTimeout(fn, 50);
+}
+
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
  * A model being built is wanted now: background downloads wait for it.

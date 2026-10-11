@@ -13,7 +13,7 @@ import { Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import type { ItemPlacement } from '../../core/protocol';
-import { buildModel, type ModelTemplate } from './models';
+import { buildAhead, buildModel, type ModelTemplate } from './models';
 
 /** Where items show: the storey in view, rows per storey and how high each stands. */
 export interface ItemView {
@@ -49,6 +49,8 @@ export class ItemLayer {
   private view: ItemView | null = null;
   /** Bumped per rebuild, so a slow one never overwrites a newer one. */
   private generation = 0;
+  /** Models drawn by the last rebuild. */
+  private drawn = new Set<string>();
   placed: PlacedItem[] = [];
   /** Called after the drawn items change (the renderer redraws a recorded frame). */
   onChange: (() => void) | null = null;
@@ -111,6 +113,7 @@ export class ItemLayer {
       return it.state !== 'stored' && k <= view.storey && view.inView(it.x, it.z - k * view.depth);
     });
     const byModel = Map.groupBy(shown, (it) => this.modelOf(it.def));
+    this.buildElsewhere(generation);
     const keys = [...byModel.keys()];
     const templates = await Promise.all(keys.map((k) => this.template(k)));
     if (generation !== this.generation) return;
@@ -172,8 +175,28 @@ export class ItemLayer {
     this.mold.thinInstanceBufferUpdated('matrix');
     this.mold.thinInstanceRefreshBoundingInfo(false);
     this.mold.setEnabled(count > 0);
+    this.drawn = new Set(keys);
     this.placed = placed;
     this.onChange?.();
+  }
+
+  /**
+   * Generated models of the items on other lots, built ahead in idle moments and kept hidden
+   * (the camera may follow someone there). Models from files build when shown.
+   */
+  private buildElsewhere(generation: number): void {
+    const missing = new Set<string>();
+    for (const it of this.items) {
+      const key = this.modelOf(it.def);
+      if (!this.templates.has(key) && !(this.assets.has(key, 'model') && this.assets.get(key, 'model')?.url)) missing.add(key);
+    }
+    const jobs = [...missing].map((key) => () => {
+      if (this.templates.has(key)) return;
+      void this.template(key).then((template) => {
+        if (!this.drawn.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
+      });
+    });
+    if (jobs.length) buildAhead(jobs, () => generation === this.generation);
   }
 
   dispose(): void {

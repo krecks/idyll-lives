@@ -663,6 +663,8 @@ export class Characters {
   private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array }>();
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
+  /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
+  private readonly spots = new Float32Array(MAX_CHARACTERS * 2).fill(NaN);
   /** Per Sim row: projected size (px) of 5 cm of its face, from the last frame (see `faceDetail`). */
   private readonly facePx = new Float32Array(MAX_CHARACTERS).fill(1e6);
   /** Per Sim row: drawn with the low-detail body and clothes. */
@@ -1303,6 +1305,14 @@ export class Characters {
     return true;
   }
 
+  /** Where Sim `i` stands (x, z), also when not drawn (another lot); false while away or unknown. */
+  spot(i: number, out: { x: number; z: number }): boolean {
+    if (i < 0 || i >= MAX_CHARACTERS || Number.isNaN(this.spots[i * 2])) return false;
+    out.x = this.spots[i * 2];
+    out.z = this.spots[i * 2 + 1];
+    return true;
+  }
+
   /**
    * Poses every Sim for this frame. `inView(x, z)` decides visibility; contact-shadow matrices
    * (one 4x4 per Sim row) are written into `shadows`.
@@ -1352,7 +1362,10 @@ export class Characters {
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
         tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
       }
-      const show = !!rig && curr[o + k.away] === 0 && inView(tx, tz) && Math.floor(th + 0.01) <= storey;
+      const away = curr[o + k.away] !== 0;
+      this.spots[i * 2] = away ? NaN : tx;
+      this.spots[i * 2 + 1] = tz;
+      const show = !!rig && !away && inView(tx, tz) && Math.floor(th + 0.01) <= storey;
       if (!rig || !show) {
         if (this.visible[i]) {
           this.data.fill(0, this.row(i), this.row(i) + NB * 16);

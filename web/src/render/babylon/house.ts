@@ -435,9 +435,7 @@ export class HouseBuilder {
     const mat = this.material(HOUSE_MATERIALS.clearGlass) as PBRMaterial;
     const g = Math.min(1, Math.max(0, (lamps - 0.35) / 0.5));
     glow.scaleToRef(g * g * 0.35, this.glassGlow);
-    if (mat.emissiveColor.equals(this.glassGlow)) return;
-    mat.emissiveColor.copyFrom(this.glassGlow);
-    this.lib.touch(mat);
+    this.lib.setEmissive(mat, this.glassGlow);
   }
   private readonly glassGlow = new Color3();
 
