@@ -24,7 +24,7 @@
  *   1: top colour rgb, top: hem height
  *   2: bottom colour rgb, top: crew neckline cut
  *   3: hair colour rgb, top: scoop neckline cut
- *   4: r = 1 if the top is painted over the bottom (gb unused), bottom: waist height
+ *   4: r = 1 if the top is painted over the bottom, g = age (deeper cavities: elders 1), bottom: waist height
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
  *   6: shoe colour rgb, shoes: top height
  *   7: eye colour rgb, 1 if the Sim wears hair (the scalp takes the hair colour)
@@ -262,7 +262,7 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let simRef = textureLoad(simDataTexture, vec2<i32>(${off + 5}, simRow), 0);
   // Skin: the Sim's colour (relative to the reference), blushed and darkened in cavities by the tone.
   var skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
-  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
   let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * textureLoad(simDataTexture, vec2<i32>(${off + 7}, simRow), 0).w;
   skin = mix(skin, textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   let cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
@@ -424,7 +424,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 {
   vec4 simRef = texelFetch(simDataTexture, ivec2(${off + 5}, simRow), 0);
   vec3 skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
-  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
   float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * texelFetch(simDataTexture, ivec2(${off + 7}, simRow), 0).w;
   skin = mix(skin, texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   vec3 cTop = texelFetch(simDataTexture, ivec2(${off + 1}, simRow), 0).rgb;

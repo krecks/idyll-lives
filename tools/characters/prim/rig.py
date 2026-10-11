@@ -144,7 +144,7 @@ def joints(family, stage):
         J[f'ball_{s}'] = (hx, 0.012 * fs, -0.01 + 0.095 * fs)
     # Eyes: sphere centres, head-relative.
     for s, sx in (('l', 1), ('r', -1)):
-        J[f'eye_{s}'] = (-0.20 * hh * sx, chin + 0.44 * hh, 0.30 * hh)
+        J[f'eye_{s}'] = (-0.17 * hh * sx, chin + 0.44 * hh, 0.275 * hh)
     out = np.zeros((NB, 3))
     for n, v in J.items():
         out[B[n]] = np.asarray(v, np.float64)

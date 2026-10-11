@@ -18,7 +18,8 @@ from rig import BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, TARGET_HEI
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 WEB = os.path.join(ROOT, 'web', 'src')
-BUDGET = {'body': 4500, 'lod.body': 1100}
+# lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
+BUDGET = {'body': 4500, 'lod.body': 1200}
 HAIR_BUDGET = 3000
 SHELL_BUDGET = 1500
 CUT_KEYS = {'top': {'sleeve', 'hem'}, 'bottom': {'waist', 'leg'}, 'shoes': {'shoe', 'colour'}}
@@ -184,6 +185,17 @@ def main(argv):
         front = h.eyes + [0, 0, h.eye_r]
         if (h.sdf(front) <= 0).any():
             fail(f'{fam}: an eye does not show in front of the skull')
+        # The sockets: no skin over the eyes' fronts (within 40 degrees of looking ahead), every stage.
+        for stage in STAGES:
+            hs = head_frame(fam, stage)
+            a = np.linspace(0, 2 * np.pi, 12, endpoint=False)
+            for e in hs.eyes:
+                for phi in np.radians([0, 20, 40]):
+                    p = e + hs.eye_r * np.stack([np.sin(phi) * np.cos(a), np.sin(phi) * np.sin(a), np.full_like(a, np.cos(phi))], -1)
+                    over = (hs.surface_z(p[:, 0], p[:, 1]) - p[:, 2]).max()
+                    if over > -0.0005:
+                        fail(f'{fam}.{stage}: skin covers an eye ({over * 1000:.1f} mm at {np.degrees(phi):.0f} degrees)')
+                        break
         # Hair more than 2 mm off the head at every life stage (stage positions: base + deltas).
         for stage in STAGES:
             hs = h if stage == BASE_STAGE else head_frame(fam, stage)

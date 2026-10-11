@@ -60,6 +60,8 @@ export interface OutfitParams {
   shoe: [number, number, number];
   /** 1 if the top is painted over the bottom (its hem below the waistband), else 0. */
   over: number;
+  /** Age (0 young .. 1 elder): the shader deepens the skin's cavities with it. */
+  age: number;
   hair: [number, number, number];
   /** Iris colour (linear rgb). */
   eyes: [number, number, number];
@@ -150,6 +152,7 @@ export function outfitFor(id: number, gender: string, appearance: Appearance | n
     bottom,
     shoe: hexToLinear(s.colour, '#3A3330'),
     over: t.over ? 1 : 0,
+    age: appearance?.stage === 'elder' ? 1 : appearance?.stage === 'adult' ? 0.4 : 0,
     hair,
     eyes: hexToLinear(appearance?.eyes ?? EYE_COLOURS[Math.floor(r(9) * EYE_COLOURS.length)], '#6B4226'),
     scalp: appearance?.hairStyle === 'none' ? 0 : 1,
@@ -164,7 +167,7 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.top[0], o.top[1], o.top[2], c[1]], offset + 4);
   row.set([o.bottom[0], o.bottom[1], o.bottom[2], c[2]], offset + 8);
   row.set([o.hair[0], o.hair[1], o.hair[2], c[3]], offset + 12);
-  row.set([o.over, 0, 0, c[4]], offset + 16);
+  row.set([o.over, o.age, 0, c[4]], offset + 16);
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
   row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);

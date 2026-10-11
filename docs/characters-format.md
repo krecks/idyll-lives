@@ -116,22 +116,34 @@ Every body has:
 | Part | What | Skinning | Material |
 |---|---|---|---|
 | `body` | the skin, with the eyelids and lips (from the face) | body bones; lids and lips Head | `body`: skin colour, painted clothes |
-| `lod.body` | the low-detail body (far residents, every shadow) | body bones | `body` |
+| `lod.body` | the low-detail body (far residents, every shadow), with the eyelids (they blink) | body bones; lids Head | `body` |
 | `eyes` | two eyeballs | `eye_l`, `eye_r` | `eye` (procedural iris) |
 | `lashes`, `brows` | lashes on the upper lid rims; brows | Head | `lash` (dark), `brow` (hair colour x 0.45), opaque |
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one (jackets, suits, skirts, shoes) | from the body | `cloth` (flat colour) |
+| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe's soles and the boots' cuffs | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
+
+The body (`prim/body.py`) is a control cage of superellipse rings (`prim/cage.py`; the head's cage
+in `prim/head.py`) fitted so its limit surface passes through the ring points and subdivided once
+(`prim/subdiv.py`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
+4.5k), `lod.body` the cage at its limit plus the lids (budget 1.2k). Skin weights are set per ring
+and subdivide with the positions. Every stage of a family has the same cage.
+
+The head interface (`head_frame(family, stage)`, `prim/head.py`): `sdf` is a smooth signed distance
+to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
+front surface's z; `ears` boxes round the ears (hair goes round or over them); `centre` / `radii` a
+loose ellipsoid round the skull (with a margin; fit close things to `sdf`); eyes, mouth, brows,
+hairline and chin as before.
 
 ## Fields (4 per vertex)
 
 | Part | x | y | z | w |
 |---|---|---|---|---|
-| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew-neck distance (m, > 0 covered); head: -1 - scalp weight | scoop-neck distance; head: -1 - scalp weight |
+| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
 | shells | hem distance (m) | flag: 1 sole, 2 waistband, 3 skirt | category: 0 top, 1 bottom, 2 shoes | 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
@@ -140,7 +152,9 @@ Every body has:
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = cavity darkening (armpits,
 between fingers, under the chin, between the lips, deep in the hair; the mouth plate is 1), z = hair
-clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.py).
+clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.py). Every
+stage uses the base stage's tone; the shader deepens the cavities with the resident's age
+(appearance texel 4 g).
 
 ## Clothes
 
@@ -170,7 +184,7 @@ Garment ids per family (outfit.ts):
 | 1 | top colour | top: hem |
 | 2 | bottom colour | top: crew cut |
 | 3 | hair colour (plain) | top: scoop cut |
-| 4 | r = 1 if the top is `over` the bottom | bottom: waist |
+| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: top height |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |

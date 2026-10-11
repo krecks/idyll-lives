@@ -45,12 +45,15 @@ def assemble(family, stage, cuts=None):
     n_skin = len(body['pos'])
     extras = [dict(m, arm=np.zeros(len(m['pos']))) for m in f['body']]
     parts['body'] = merge([body] + extras, keys=('pos', 'nor', 'dense', 'arm'))
+    # The low-detail body has the eyelids too (they come first among the face's skin pieces).
+    lids = [m for m in extras if m.get('skin_tone')]
+    parts['lod.body'] = merge([parts['lod.body']] + lids, keys=('pos', 'nor', 'dense', 'arm'))
     parts.update(f['parts'])
     parts.update(build_hair(family, stage, head, P))
     if cuts is None:
         cuts = garment_cuts(family, P)
     parts.update(build_clothes(family, stage, head, P, parts['body'], cuts))
-    return dict(parts=parts, meta=b['meta'], P=P, head=head, face=f, n_skin=n_skin, cuts=cuts)
+    return dict(parts=parts, meta=b['meta'], P=P, head=head, face=f, n_skin=n_skin, n_lod=len(b['parts']['lod.body']['pos']), cuts=cuts)
 
 
 def skeleton_json(family, stage, meta):
@@ -76,26 +79,33 @@ def build_family(family, out):
         parts[name]['fields'] = f
         parts[name]['tone'] = t
     # The face's skin pieces: the lids take the tone of the skin they lie on, the lips keep theirs.
-    k = base['n_skin']
-    tone = parts['body']['tone']
-    near = cKDTree(parts['body']['pos'][:k])
-    for m in base['face']['body']:
-        n = len(m['pos'])
-        # (The lightest of the skin round each lid vertex: not the shade deep in the socket.)
-        tone[k:k + n] = tone[near.query(m['pos'], k=16)[1]].min(1) if m.get('skin_tone') else m['tone']
-        k += n
+    for name, k in (('body', base['n_skin']), ('lod.body', base['n_lod'])):
+        tone = parts[name]['tone']
+        near = cKDTree(parts[name]['pos'][:k])
+        for m in base['face']['body']:
+            if name == 'lod.body' and not m.get('skin_tone'):
+                continue
+            n = len(m['pos'])
+            # (The lightest of the skin round each lid vertex: not the shade deep in the socket.)
+            tone[k:k + n] = tone[near.query(m['pos'], k=16)[1]].min(1) if m.get('skin_tone') else m['tone']
+            k += n
     # Face morphs: the face's own parts, the body's lids (after its skin), the beard.
     morphs = dict(base['face']['morphs'])
     if 'body' in morphs:
-        n = len(parts['body']['pos'])
-        k = base['n_skin']
-        body_d = {}
-        for c, (dp, dn) in morphs['body'].items():
-            fp, fn = np.zeros((n, 3)), np.zeros((n, 3))
-            fp[k:k + len(dp)] = dp
-            fn[k:k + len(dn)] = dn
-            body_d[c] = (fp, fn)
-        morphs['body'] = body_d
+        n_lids = sum(len(m['pos']) for m in base['face']['body'] if m.get('skin_tone'))
+        face_d = morphs['body']
+        for name, k, count in (('body', base['n_skin'], None), ('lod.body', base['n_lod'], n_lids)):
+            n = len(parts[name]['pos'])
+            d = {}
+            for c, (dp, dn) in face_d.items():
+                dp, dn = dp[:count], dn[:count]
+                if not np.abs(dp).max() > 0:
+                    continue
+                fp, fn = np.zeros((n, 3)), np.zeros((n, 3))
+                fp[k:k + len(dp)] = dp
+                fn[k:k + len(dn)] = dn
+                d[c] = (fp, fn)
+            morphs[name] = d
     if 'hair.beard' in parts:
         morphs['hair.beard'] = follow_mouth(parts['hair.beard'], base['face']['follow'], head)
     for name, d in morphs.items():
