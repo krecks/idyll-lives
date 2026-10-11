@@ -204,6 +204,40 @@ export interface Placement {
   scale: number;
   /** Head (and face) size relative to the body, scaled about the head joint (children: > 1). */
   head?: number;
+  /** Build (slim 0.85 .. broad 1.2): girth across the torso's and limbs' bones (see `girth`). */
+  build?: number;
+}
+
+/** Share of the build's girth per bone: the torso takes it all, the neck half, the limbs 60%. */
+const GIRTH: Record<string, number> = { pelvis: 1, spine_01: 1, spine_02: 1, spine_03: 1, neck_01: 0.5 };
+const LIMB = /^(clavicle|upperarm|lowerarm|thigh|calf)_/;
+
+const girths = new WeakMap<BodyData, Float32Array>();
+
+/**
+ * Per bone: the unit axis towards its (first) child at rest and its share of the build's girth
+ * (4 per bone). Rest frames are the identity, so the axis is the same in the bone's own space.
+ */
+function girth(set: CharacterSet, body: BodyData): Float32Array {
+  let g = girths.get(body);
+  if (g) return g;
+  const NB = set.bones.length;
+  g = new Float32Array(NB * 4);
+  for (let b = 0; b < NB; b++) {
+    const c = set.parents.indexOf(b);
+    const src = c >= 0 ? c : b;
+    let x = body.restT[src * 3];
+    let y = body.restT[src * 3 + 1];
+    let z = body.restT[src * 3 + 2];
+    const l = Math.hypot(x, y, z) || 1;
+    x /= l;
+    y /= l;
+    z /= l;
+    const n = set.bones[b];
+    g.set([x, y, z, GIRTH[n] ?? (LIMB.test(n) ? 0.6 : 0)], b * 4);
+  }
+  girths.set(body, g);
+  return g;
 }
 
 /**
@@ -313,9 +347,12 @@ export function skin(
     }
   }
 
-  // Skinning matrices: K = [s * R(wq) | wt] * inverseBind (column-major). The head and the face
-  // under it are scaled by `place.head` about the head joint.
+  // Skinning matrices: K = [s * R(wq) * G | wt] * inverseBind (column-major). The head and the face
+  // under it are scaled by `place.head` about the head joint. G widens a bone across its axis a by
+  // its share of the build: G = I + (f - 1)(I - a a^T), in the bone's rest space (about its joint).
   const hs = place.head ?? 1;
+  const build = place.build ?? 1;
+  const gt = build !== 1 ? girth(set, body) : null;
   const hj = set.head * 3;
   const hx = wt[hj];
   const hy = wt[hj + 1];
@@ -328,15 +365,35 @@ export function skin(
     const y = wq[o + 1];
     const z = wq[o + 2];
     const w = wq[o + 3];
-    const r00 = (1 - 2 * (y * y + z * z)) * sb;
-    const r01 = 2 * (x * y - z * w) * sb;
-    const r02 = 2 * (x * z + y * w) * sb;
-    const r10 = 2 * (x * y + z * w) * sb;
-    const r11 = (1 - 2 * (x * x + z * z)) * sb;
-    const r12 = 2 * (y * z - x * w) * sb;
-    const r20 = 2 * (x * z - y * w) * sb;
-    const r21 = 2 * (y * z + x * w) * sb;
-    const r22 = (1 - 2 * (x * x + y * y)) * sb;
+    let r00 = (1 - 2 * (y * y + z * z)) * sb;
+    let r01 = 2 * (x * y - z * w) * sb;
+    let r02 = 2 * (x * z + y * w) * sb;
+    let r10 = 2 * (x * y + z * w) * sb;
+    let r11 = (1 - 2 * (x * x + z * z)) * sb;
+    let r12 = 2 * (y * z - x * w) * sb;
+    let r20 = 2 * (x * z - y * w) * sb;
+    let r21 = 2 * (y * z + x * w) * sb;
+    let r22 = (1 - 2 * (x * x + y * y)) * sb;
+    if (gt && gt[o + 3] > 0) {
+      // R * G = f R - (f - 1)(R a) a^T
+      const f = 1 + (build - 1) * gt[o + 3];
+      const ax = gt[o];
+      const ay = gt[o + 1];
+      const az = gt[o + 2];
+      const k = f - 1;
+      const p0 = (r00 * ax + r01 * ay + r02 * az) * k;
+      const p1 = (r10 * ax + r11 * ay + r12 * az) * k;
+      const p2 = (r20 * ax + r21 * ay + r22 * az) * k;
+      r00 = f * r00 - p0 * ax;
+      r01 = f * r01 - p0 * ay;
+      r02 = f * r02 - p0 * az;
+      r10 = f * r10 - p1 * ax;
+      r11 = f * r11 - p1 * ay;
+      r12 = f * r12 - p1 * az;
+      r20 = f * r20 - p2 * ax;
+      r21 = f * r21 - p2 * ay;
+      r22 = f * r22 - p2 * az;
+    }
     const t0 = big ? hx + (wt[b * 3] - hx) * hs : wt[b * 3];
     const t1 = big ? hy + (wt[b * 3 + 1] - hy) * hs : wt[b * 3 + 1];
     const t2 = big ? hz + (wt[b * 3 + 2] - hz) * hs : wt[b * 3 + 2];

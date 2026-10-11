@@ -1,6 +1,7 @@
 /**
- * Sims as skinned, animated characters (CC0 MakeHuman bodies and faces, hair and clips by
- * Quaternius; see `tools/characters/build_mpfb.py` and `assets/characters/`).
+ * Sims as skinned, animated characters (bodies, faces, hair and clothes generated in code by
+ * `tools/characters/prim`, clips made in code in `characters/clips`; format in
+ * docs/characters-format.md).
  *
  * GPU / performance model:
  * - One mesh per (body, part) — body, eyes, brows, lashes, teeth, tongue, each hairstyle and each garment
@@ -12,15 +13,15 @@
  *   Only buffer contents change per frame (bone texture, contact-shadow / ring / blanket instance
  *   matrices), never meshes. (WebGPU snapshot replays don't pick up the texture writes, so the game
  *   draws live; see `scheduleSnapshot` in BabylonRenderer.)
- * - The body's skin is split into chunks by the garments that hide them completely (the build's
- *   `body_chunks`): a Sim draws only the chunks its outfit leaves visible.
+ * - Clothes are painted on the body by its shader (each garment's cut over the body's fields);
+ *   shells (`top.*`, `bottom.*`, `shoes.*` parts) are added only where the silhouette needs them.
  * - Small face parts (teeth, tongue, lashes, brows) are drawn only on faces big enough on screen to
  *   show them, and faces too small to show expressions skip their morphs (`faceDetail`); only the
  *   instance lists change per frame.
- * - Far from the camera a Sim switches to MakeHuman's low-detail body and clothes (`lod.*` parts,
- *   about a tenth of the vertices; with a gap between switching down and up), and every Sim casts
- *   its sun shadow from shadow-only copies of those (`shadowMeshes`, on `LAYER_SHADOW_ONLY`).
- * - Hairstyles and life stages load the first time a Sim needs them (`loadPart`, `loadStage`).
+ * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
+ *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
+ *   those (`shadowMeshes`, on `LAYER_SHADOW_ONLY`).
+ * - Life stages load the first time a Sim needs them (`loadStage`).
  * - No allocations per frame.
  *
  * Animation: a small state machine per Sim, driven by the snapshot: pose, moving, conversation
@@ -58,14 +59,14 @@ import type { Content, ObjectDef } from '../../content/content';
 import type { FrameState } from '../../core/bridge';
 import { objectCentre, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
-import { loadCharacterSet, loadPart, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
+import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
 import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, resetAdditive, sampleClip, skin, type Additive, type Placement } from './characters/pose';
-import { textureWithFallback, type MaterialLibrary } from './materials';
+import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
 import { buildModel, type ModelTemplate } from './models';
@@ -216,7 +217,7 @@ const USE: Record<string, readonly string[]> = {
 };
 
 /** Per finger and per joint (knuckle, middle, tip): share of the hand pose's opening (see `fingerMask`). */
-const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9 };
+const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9, fingers: 0.92 };
 const JOINT_OPEN = [0.78, 0.9, 1];
 
 /** Finger pose: 0 = the clip's grip, 1 = open hand (rest pose). */
@@ -489,6 +490,8 @@ interface SimRig {
   head: number;
   /** How much they stoop (elders), 0..1. */
   stoop: number;
+  /** Build (girth across the torso and limbs; 1 = as modelled). */
+  build: number;
   seed: number;
   visible: boolean;
   /** Displayed position / yaw (smoothed). */
@@ -815,7 +818,7 @@ export class Characters {
     // finger, so open hands rest softly curved instead of straight-knuckled with curled tips (a claw).
     this.fingerMask = new Float32Array(NB);
     set.bones.forEach((n, b) => {
-      const m = /^(index|middle|ring|pinky|thumb)_0(\d)/.exec(n);
+      const m = /^(index|middle|ring|pinky|thumb|fingers)_0(\d)/.exec(n);
       if (m) this.fingerMask[b] = FINGER_OPEN[m[1]] * (JOINT_OPEN[Number(m[2]) - 1] ?? 1);
     });
     this.legMask = new Float32Array(NB);
@@ -939,23 +942,17 @@ export class Characters {
   async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number }, keep = false): Promise<void> {
     if (!(await this.init())) return;
     const set = this.set!;
-    // Life stages other than the base bodies' (children, teens, elders …) and hairstyles load on
-    // demand, the first time a Sim needs them.
+    // Life stages other than the base bodies' (children, teens, elders …) load on demand, the
+    // first time a Sim needs them.
     await Promise.all(
       world.sims.map(async (s) => {
         if (s.gone || s.id >= MAX_CHARACTERS) return;
         const base = this.baseBody(s.gender);
         const stage = s.appearance?.stage;
-        let body = base;
         if (stage && stage !== base.stage) {
           const b = await loadStage(set, base, stage).catch((err) => (console.warn(`[render] ${base.name}.${stage} unavailable`, err), null));
-          if (b) {
-            if (!this.sitPelvis.has(b.name)) this.sitPelvis.set(b.name, this.measureSit(b));
-            body = b;
-          }
+          if (b && !this.sitPelvis.has(b.name)) this.sitPelvis.set(b.name, this.measureSit(b));
         }
-        const hair = [this.hairPart(s.appearance?.hairStyle), ...(s.appearance?.beard ? ['hair.beard'] : [])];
-        await Promise.all(hair.map((h) => loadPart(set, body, h).catch((err) => console.warn(`[render] ${body.name}:${h} unavailable`, err))));
       }),
     );
     // Positions arrive in lot rows, which hold every storey (see `WorldStructure.storeys`).
@@ -994,6 +991,7 @@ export class Characters {
       // children are the base body made smaller with a bigger head (the session sets these).
       const stageScale = shaped ? 1 : (s.appearance?.stageScale ?? 1);
       const scale = ((BASE_HEIGHT[base.name] ?? 1.72) / base.height) * height * stageScale;
+      const build = clampBuild(s.appearance?.build);
       const rig: SimRig = {
         id: s.id,
         floorY: 0,
@@ -1001,6 +999,7 @@ export class Characters {
         scale,
         head: shaped ? 1 : (s.appearance?.stageHead ?? 1),
         stoop: s.appearance?.stageStoop ?? 0,
+        build,
         seed: hash(s.id + 17),
         visible: false,
         x: 0,
@@ -1060,7 +1059,7 @@ export class Characters {
         speechSeg: 0,
       };
       const old = kept[s.id];
-      if (old) Object.assign(rig, old, { body, scale, asleep: false });
+      if (old) Object.assign(rig, old, { body, scale, build, asleep: false });
       this.sims[s.id] = rig;
       rig.day = outfitFor(outfitId, s.gender, s.appearance, body);
       rig.night = outfitFor(outfitId, s.gender, s.appearance, body, true);
@@ -1141,6 +1140,7 @@ export class Characters {
         scale: (BASE_HEIGHT[body.name] ?? 1.72) / body.height,
         head: 1,
         stoop: 0,
+        build: 1,
         cur: player(),
         prev: player(),
         upper: player(),
@@ -1202,6 +1202,7 @@ export class Characters {
       pl.z = g.z;
       pl.scale = rig.scale;
       pl.head = rig.head;
+      pl.build = rig.build;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       this.visible[i] = 1;
     });
@@ -1515,6 +1516,7 @@ export class Characters {
       pl.z = rig.z + Math.cos(rig.yaw) * rootFwd;
       pl.scale = rig.scale;
       pl.head = rig.head;
+      pl.build = rig.build;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       this.writeBlanket(rig, i, pose, dt);
       this.writeCarried(rig, i, k.held !== undefined ? curr[o + k.held] | 0 : 0, layout.items);
@@ -2724,8 +2726,8 @@ export class Characters {
       return { y: this.scratch.worldT[p + 1], z: this.scratch.worldT[p + 2] };
     };
     const sit = pose('sit', 0);
-    // Hips rest ~11 cm above the seat surface.
-    return { y: sit.y - 0.11, z: sit.z };
+    // The pelvis joint rests `seatDrop` above the seat surface (sets without it: ~11 cm).
+    return { y: sit.y - (body.seatDrop ?? 0.11), z: sit.z };
   }
 
   /**
@@ -2743,30 +2745,29 @@ export class Characters {
     const vd = new VertexData();
     vd.positions = data.positions;
     vd.normals = data.normals;
-    vd.uvs = data.uvs;
     vd.indices = data.indices;
     vd.matricesIndices = data.joints;
     vd.matricesWeights = data.weights;
     vd.applyToMesh(mesh, false);
-    if (data.morph && this.morph) {
-      // Fields and morph slots interleaved in one buffer: WebGPU allows 8 vertex buffers per
-      // draw, and with the instance buffers these would be the ninth.
-      const n = data.fields.length / 4;
-      const both = new Float32Array(n * 8);
-      for (let v = 0; v < n; v++) {
-        both.set(data.fields.subarray(v * 4, v * 4 + 4), v * 8);
-        both.set(data.morph.subarray(v * 4, v * 4 + 4), v * 8 + 4);
-      }
-      const buffer = new Buffer(this.scene.getEngine(), both, false, 8);
-      mesh.setVerticesBuffer(buffer.createVertexBuffer('simField', 0, 4));
-      mesh.setVerticesBuffer(buffer.createVertexBuffer('simMorph', 4, 4));
-    } else {
-      mesh.setVerticesData('simField', data.fields, false, 4);
+    // Fields, morph slots and tone interleaved in one buffer: WebGPU allows 8 vertex buffers per
+    // draw (here: position, normal, joints, weights, this, the instance matrices and settings).
+    // Parts no morph moves get slot -1 (and no `simMorph` attribute).
+    const n = data.fields.length / 4;
+    const all = new Float32Array(n * 12);
+    for (let v = 0; v < n; v++) {
+      all.set(data.fields.subarray(v * 4, v * 4 + 4), v * 12);
+      if (data.morph) all.set(data.morph.subarray(v * 4, v * 4 + 4), v * 12 + 4);
+      else all[v * 12 + 4] = -1;
+      all.set(data.tone.subarray(v * 4, v * 4 + 4), v * 12 + 8);
     }
+    const buffer = new Buffer(this.scene.getEngine(), all, false, 12);
+    mesh.setVerticesBuffer(buffer.createVertexBuffer('simField', 0, 4));
+    if (data.morph && this.morph) mesh.setVerticesBuffer(buffer.createVertexBuffer('simMorph', 4, 4));
+    mesh.setVerticesBuffer(buffer.createVertexBuffer('simTone', 8, 4));
     mesh.skeleton = this.skeleton(body);
     mesh.numBoneInfluencers = 4;
     mesh.bakedVertexAnimationManager = this.vat;
-    mesh.material = this.material(body, part);
+    mesh.material = this.material(part);
     mesh.isPickable = false;
     mesh.receiveShadows = !shadow;
     // Shadow copies: on a layer no camera draws (the shadow map draws its own list of meshes).
@@ -2873,7 +2874,7 @@ export class Characters {
     return sk;
   }
 
-  private material(body: BodyData, part: string): PBRMaterial {
+  private material(part: string): PBRMaterial {
     const set = this.set!;
     const kind: CharacterSurface =
       part === 'body' || part === 'lod.body' || part.startsWith('body.')
@@ -2888,100 +2889,47 @@ export class Characters {
                 ? 'mouth'
                 : /^(lod\.)?(top|bottom|shoes)\./.test(part)
                   ? 'cloth'
-                  : set.hairCards[part.replace('hair.', '')]
-                    ? 'card'
-                    : 'hair';
-    const hairTex = set.hairTextures[part.replace('hair.', '')] ?? 'hair1';
-    const key =
-      kind === 'body'
-        ? `body:${body.textures.albedo}`
-        : kind === 'brow'
-          ? `brow:${body.family}`
-          : kind === 'hair'
-            ? `hair:${hairTex}`
-            : kind === 'mouth' || kind === 'card'
-              ? `${kind}:${part}`
-              : kind;
+                  : 'hair';
+    const key = kind === 'mouth' ? `${kind}:${part}` : kind;
     const cached = this.materials.get(key);
     if (cached) return cached;
     const mat = new PBRMaterial(`sim:${key}`, this.scene);
-    const tex = (file: string, srgb: boolean) => textureWithFallback(set.file(file), this.scene, srgb, 4);
     mat.metallic = 0;
     mat.maxSimultaneousLights = 6;
+    // No textures: every colour comes from the Sim's appearance texels and the vertex tone (see the plugin).
+    mat.albedoColor = new Color3(1, 1, 1);
     if (kind === 'body') {
-      mat.albedoTexture = tex(body.textures.albedo, true);
-      if (body.textures.normal) {
-        mat.bumpTexture = tex(body.textures.normal, false);
-        mat.bumpTexture.level = 0.8;
-      }
-      mat.roughness = 0.52;
+      mat.roughness = 0.55;
     } else if (kind === 'cloth') {
-      // MakeHuman's clothes: tops and bottoms tint the atlas' detail per Sim (see the plugin).
-      mat.albedoTexture = tex(set.cloth.albedo, true);
-      mat.bumpTexture = tex(set.cloth.normal, false);
-      mat.bumpTexture.level = 0.8;
-      mat.roughness = 0.82;
-      mat.sheen.isEnabled = true;
-      mat.sheen.intensity = 0.35;
-      mat.sheen.linkSheenWithAlbedo = true;
-      // Inside of collars and cuffs.
+      // As rough as the clothes painted on the body (so shells and paint match).
+      mat.roughness = 0.85;
+      // Open hems and collars show their inside.
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'hair') {
-      mat.albedoTexture = tex(`${hairTex}_albedo.jpg`, true);
-      mat.bumpTexture = tex(`${hairTex}_normal.jpg`, false);
-      mat.roughness = 0.42;
+      mat.roughness = 0.5;
+      mat.sheen.isEnabled = true;
+      mat.sheen.intensity = 0.4;
+      mat.sheen.linkSheenWithAlbedo = true;
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
-      // Strand highlight: anisotropic along the strands (UV v).
-      mat.anisotropy.isEnabled = true;
-      mat.anisotropy.intensity = 0.75;
-      mat.anisotropy.direction.set(0, 1);
-    } else if (kind === 'card') {
-      // MakeHuman hair: strand cards, alpha-tested, tinted with the hair colour (see the plugin).
-      const t = tex(set.hairCards[part.replace('hair.', '')], true);
-      t.hasAlpha = true;
-      mat.albedoTexture = t;
-      mat.useAlphaFromAlbedoTexture = true;
-      mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
-      mat.alphaCutOff = 0.45;
-      mat.roughness = 0.45;
-      mat.backFaceCulling = false;
-      mat.twoSidedLighting = true;
-      mat.anisotropy.isEnabled = true;
-      mat.anisotropy.intensity = 0.6;
-      mat.anisotropy.direction.set(0, 1);
     } else if (kind === 'brow' || kind === 'lash') {
-      // Soft-edged cards (brows in the hair colour, see the plugin; lashes dark brown): blended, so
-      // lashes read as a soft line rather than spikes.
-      const t = tex(kind === 'brow' ? (body.textures.brows ?? 'lashes.png') : (set.textures.lashes ?? 'lashes.png'), true);
-      t.hasAlpha = true;
-      mat.albedoTexture = t;
-      mat.useAlphaFromAlbedoTexture = true;
-      mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
-      mat.alpha = kind === 'lash' ? 0.85 : 0.9;
+      // Opaque: brows in the hair colour (see the plugin), lashes dark brown.
       if (kind === 'lash') mat.albedoColor = new Color3(0.16, 0.12, 0.1);
       mat.roughness = 0.6;
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'mouth') {
-      mat.albedoTexture = tex(set.textures[part] ?? `${part}.jpg`, true);
       // Warm, soft and hardly reflecting the sky (the mouth hides most of it).
       mat.albedoColor = part === 'teeth' ? new Color3(1, 0.96, 0.9) : new Color3(0.85, 0.8, 0.8);
       mat.roughness = 0.5;
       mat.environmentIntensity = 0.35;
     } else {
-      // Eyes: wet and glossy (a clear coat for the catchlight).
-      mat.albedoTexture = tex(set.textures.eyes ?? 'eye_albedo.jpg', true);
+      // Eyes: drawn by the plugin (sclera, iris, pupil); wet and glossy (a clear coat for the catchlight).
       mat.roughness = 0.25;
       mat.clearCoat.isEnabled = true;
       mat.clearCoat.intensity = 1;
       mat.clearCoat.roughness = 0.03;
-    }
-    if (mat.bumpTexture) {
-      // OpenGL-style maps on geometry mirrored from glTF (same as Babylon's glTF loader).
-      mat.invertNormalMapX = true;
-      mat.invertNormalMapY = false;
     }
     new CharacterPlugin(mat, kind, set.bones.length * 4, this.texture, this.morph);
     this.lib.adopt(mat);
@@ -3001,7 +2949,8 @@ const HEAD_MARGIN = 0.04;
 
 /** The eyes' height below a Sim's head-top marker (m). */
 function eyesBelowTop(rig: SimRig): number {
-  return (rig.body.headAbove * 0.7 + HEAD_MARGIN) * rig.scale * rig.head;
+  const b = rig.body;
+  return ((b.eyeY !== null ? b.height - b.eyeY : b.headAbove * 0.7) + HEAD_MARGIN) * rig.scale * rig.head;
 }
 
 /** Mouth shapes for talk without a voice line (viseme indices: aa, E, O, I, U, PP, DD, SS, nn). */
@@ -3050,4 +2999,9 @@ function lerpAngle(a: number, b: number, t: number): number {
 
 function clampHeight(h: number | undefined): number {
   return typeof h === 'number' && Number.isFinite(h) ? Math.min(1.15, Math.max(0.85, h)) : 1;
+}
+
+/** Build (appearance `build`, slim 0.85 .. broad 1.2; missing in older saves: 1). */
+function clampBuild(b: number | undefined): number {
+  return typeof b === 'number' && Number.isFinite(b) ? Math.min(1.2, Math.max(0.85, b)) : 1;
 }

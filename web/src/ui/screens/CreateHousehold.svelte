@@ -582,6 +582,11 @@
             <input type="range" min="0.9" max="1.1" step="0.01" bind:value={sim.appearance.height} />
             <span class="scale"><span>Shorter</span><span>Taller</span></span>
           </label>
+          <label class="field">
+            <span class="eyebrow">Build</span>
+            <input type="range" min="0.85" max="1.2" step="0.01" bind:value={() => sim.appearance.build ?? 1, (v) => (sim.appearance.build = v)} />
+            <span class="scale"><span>Slimmer</span><span>Broader</span></span>
+          </label>
         {:else if tab === 'Traits'}
           <div class="pane-head">
             <span><b>{sim.traits.length}</b> / {rules.maxTraits} traits</span>

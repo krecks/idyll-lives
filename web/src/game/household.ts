@@ -47,6 +47,8 @@ export interface Appearance {
   eyes?: string;
   /** Scale factor, 0.9..1.1. */
   height: number;
+  /** Build, slim 0.85 .. broad 1.2 (girth of the torso and limbs; missing in older saves: 1). */
+  build?: number;
   /** Facial hair (bodies that have it). */
   beard?: boolean;
   /**
@@ -284,8 +286,11 @@ export function randomSim(content: Content, assets: AssetRegistry, taken: readon
   };
 }
 
-/** A random look for `gender` (the creator's dice, or seeded for the same look every time). */
-export function randomLook(assets: AssetRegistry, gender: string, rand: () => number = Math.random): Appearance {
+/**
+ * A random look for `gender` (the creator's dice, or seeded for the same look every time). The
+ * build comes from `buildRand`, so seeded looks made before builds existed stay the same.
+ */
+export function randomLook(assets: AssetRegistry, gender: string, rand: () => number = Math.random, buildRand: () => number = rand): Appearance {
   const appearance: Appearance = {
     body: pick(palette(assets, 'palette.outfit'), rand),
     skin: pick(palette(assets, 'palette.skin'), rand),
@@ -295,6 +300,7 @@ export function randomLook(assets: AssetRegistry, gender: string, rand: () => nu
     height: Math.round((0.94 + rand() * 0.12) * 100) / 100,
     beard: gender === 'male' && rand() < 0.2,
     ...pickOutfit(gender, rand),
+    build: Math.round((0.92 + buildRand() * 0.16) * 100) / 100,
   };
   lookGenders.set(appearance, gender);
   return appearance;
@@ -305,16 +311,8 @@ export function randomLook(assets: AssetRegistry, gender: string, rand: () => nu
  * the same. A child of `parents` takes skin from one and hair colour from the other.
  */
 export function lookFromSeed(assets: AssetRegistry, gender: string, seed: number, parents: readonly Appearance[] = []): Appearance {
-  let state = seed >>> 0;
-  // mulberry32
-  const rand = () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const look = randomLook(assets, gender, rand);
+  const rand = mulberry32(seed);
+  const look = randomLook(assets, gender, rand, mulberry32(seed ^ 0x5bd1e995));
   if (parents.length) {
     const first = Math.floor(rand() * parents.length);
     const skinFrom = parents[first];
@@ -325,6 +323,18 @@ export function lookFromSeed(assets: AssetRegistry, gender: string, seed: number
     if (!isGreyHair(inherited)) look.hair = inherited;
   }
   return look;
+}
+
+/** A seeded random number generator (mulberry32): 0..1. */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /** A random age: mostly adults, some young adults, a few elders (or within `stage`). */

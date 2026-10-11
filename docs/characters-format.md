@@ -1,0 +1,247 @@
+# Residents: the character format
+
+The residents (bodies, faces, hair, clothes) are generated in code by `tools/characters/prim`,
+and their animation clips are made in code in `web/src/render/babylon/characters/clips`. This page
+is the contract between the generator, the clips and the runtime
+(`web/src/render/babylon/characters*`). Everything here is original work.
+
+```
+python3 -B tools/characters/prim/build.py              # writes web/public/assets/characters, then runs check.py
+python3 -B tools/characters/prim/check.py [set dir]    # the set against this contract
+node --experimental-strip-types tools/characters/check_clips.ts   # the clips against the rig
+```
+
+The build is deterministic (seeded noise only): the same code gives the same bytes. Use `-B`:
+the repo tracks some `.pyc` files.
+
+## Conventions
+
+- Babylon's left-handed space, metres, y up. A resident faces +z; their left is -x.
+- Every rest local rotation is the identity. A bone's frame at rest is model space, and its local
+  translation is the offset from its parent's joint. `restQ`, `pre`, `post` and `sourceRestQ` are
+  absent or identity.
+- The rest pose is an A-pose: arms 45 degrees down, legs straight and vertical, a gently curled
+  open hand.
+- Meshes are written with clockwise front faces (Babylon's left-handed convention). Inside the
+  generator every mesh is counter-clockwise from outside; `write.py` turns the faces round.
+
+## Skeleton (33 bones)
+
+| # | Bone | Parent |
+|---|---|---|
+| 0 | root | - |
+| 1 | pelvis | root |
+| 2-4 | spine_01, spine_02, spine_03 | chain |
+| 5 | neck_01 | spine_03 |
+| 6 | Head | neck_01 |
+| 7-14 | clavicle_l, upperarm_l, lowerarm_l, hand_l, thumb_01_l, thumb_02_l, fingers_01_l, fingers_02_l | spine_03, chain; thumbs and fingers off the hand |
+| 15-22 | the same on the right (`_r`) | |
+| 23-26 | thigh_l, calf_l, foot_l, ball_l | pelvis, chain |
+| 27-30 | thigh_r, calf_r, foot_r, ball_r | pelvis, chain |
+| 31-32 | eye_l, eye_r | Head |
+
+- `clipBones` is 31: clips store bones 0-30. The eyes come last and are turned procedurally
+  (`addLocal`; +x turns the front down, +y turns it to the resident's right).
+- The runtime looks these up by name: `pelvis spine_01 spine_02 spine_03 neck_01 Head clavicle_* upperarm_* lowerarm_* hand_* thigh_* calf_* foot_* eye_*`.
+  Fingers match `/^(index|middle|ring|pinky|thumb|fingers)_0(\d)/`, legs `/^(thigh|calf|foot|ball)_/`.
+- `hand_*` is the wrist joint. `grip` (optional) is the left palm centre relative to the wrist; the
+  right mirrors x.
+- Proportions per family and life stage are in `prim/rig.py` (`PROPORTIONS`). The stage heights stay
+  within 3% of `TARGET_HEIGHT` (what cribs, kids' beds, desks and seats were fitted to).
+- The reference skeleton for the clips is the male young adult: `sourcePelvis` is its pelvis rest
+  position, and `reference` gives its body name and its thigh and shin lengths (for leg IK).
+
+## rig.json (version 4)
+
+| Key | Meaning |
+|---|---|
+| `version` | 4 |
+| `bones`, `parents`, `clipBones`, `head`, `face.bones` | the skeleton above (parents come before children) |
+| `fps` | 30 (clip baking) |
+| `sourcePelvis`, `sourceRestQ` | the reference pelvis; identity rotations (`NB * 4`) |
+| `reference` | `{ body, thigh, shin }`: the clips' reference body and leg lengths |
+| `fieldScale`, `toneScale`, `stageScale` | int16 per unit for fields and tone, per metre for stage deltas (4000, 4000, 5000) |
+| `morphs` | `{ channels, scale: 30000, normalScale: 63 }` |
+| `anims`, `clips` | optional baked clips; absent: the runtime bakes `clips/` at load |
+| `bodies.<family>` | `male`, `female` (below) |
+
+A body entry:
+
+| Key | Meaning |
+|---|---|
+| `mesh` | `<family>.bin` |
+| `stage` | `youngAdult` (the base stage) |
+| `height` | top of the head (m); the base is drawn at `BASE_HEIGHT`, so its scale is the resident's height factor |
+| `restT`, `inverseBind` | per bone: local translation (`NB * 3`), inverse bind matrix (`NB * 16`, column-major) |
+| `pelvisScale` | pelvis height / the reference pelvis height (scales clip pelvis motion) |
+| `seatDrop` | seated, the pelvis joint's height above the seat surface (m) |
+| `eyeY` | the eye centres' height (m) |
+| `grip` | see above (optional) |
+| `skinRef` | `[1, 1, 1]` |
+| `garments` | id -> cut, every id of the family in the creator's order (see Clothes) |
+| `bodyChunks` | `{ "body": [] }` (clothes are painted, skin is never hidden) |
+| `parts` | part name -> byte offsets in `mesh` |
+| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, parts }` |
+
+No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so are UVs.
+
+## Binaries
+
+`<family>.bin`, per part (offsets 4-byte aligned):
+
+| Array | Type |
+|---|---|
+| `positions` | f32 x3 |
+| `normals` | i16 x4 (/ 32767; w unused) |
+| `joints` | u8 x4 |
+| `weights` | u8 x4, summing to 255 |
+| `fields` | i16 x4 (/ fieldScale) |
+| `tone` | i16 x4 (/ toneScale) |
+| `index` | u16 x3 per triangle (clockwise) |
+| `morph` (optional) | `count`, `ranges` (channel c: `ranges[c] .. ranges[c + 1]`), `morphVerts` u16 (the moved vertices), `morphSlots` u16, `morphPositions` i16 x4 (/ scale), `morphNormals` i8 x4 (/ normalScale) |
+
+`<family>.<stage>.bin`: per part, `positions` i16 x4 deltas from the base (/ stageScale) and
+`normals` i8 x4 (/ 127). Every part has the same vertices at every stage; fields, tone, weights,
+indices and morphs come from the base.
+
+The runtime interleaves field, morph slot and tone into one vertex buffer (`simField` 0,
+`simMorph` 4, `simTone` 8; stride 12 floats; parts no morph moves get slot -1), so a draw uses 7
+vertex buffers (position, normal, joints, weights, that one, the instance matrices and settings)
+of WebGPU's 8.
+
+## Parts
+
+Every body has:
+
+| Part | What | Skinning | Material |
+|---|---|---|---|
+| `body` | the skin, with the eyelids and lips (from the face) | body bones; lids and lips Head | `body`: skin colour, painted clothes |
+| `lod.body` | the low-detail body (far residents, every shadow) | body bones | `body` |
+| `eyes` | two eyeballs | `eye_l`, `eye_r` | `eye` (procedural iris) |
+| `lashes`, `brows` | lashes on the upper lid rims; brows | Head | `lash` (dark), `brow` (hair colour x 0.45), opaque |
+| `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
+| `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
+| `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
+| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one (jackets, suits, skirts, shoes) | from the body | `cloth` (flat colour) |
+| `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
+
+`hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
+
+## Fields (4 per vertex)
+
+| Part | x | y | z | w |
+|---|---|---|---|---|
+| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew-neck distance (m, > 0 covered); head: -1 - scalp weight | scoop-neck distance; head: -1 - scalp weight |
+| shells | hem distance (m) | flag: 1 sole, 2 waistband, 3 skirt | category: 0 top, 1 bottom, 2 shoes | 0 |
+| eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
+| hair | 0.1 (unused) | | | |
+
+## Tone (4 per vertex)
+
+x = lip / cheek blush (0..1), y = cavity darkening (armpits, between fingers, under the chin; the
+mouth plate is 1), z = hair clump bands (0..1), w reserved.
+
+## Clothes
+
+Clothes are painted on the body by its shader. Each garment's cut (metres on the base body's
+fields) decides where it covers:
+
+- top: `(sleeve - x) * 0.55 > 0`, `y > hem`, `z > crew` (if set), `w > scoop` (if set);
+- bottom: `y < waist`, `y > leg`, `x < -0.5` (not on the arms);
+- shoes: `y < shoe`.
+
+A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
+bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
+rougher than skin. Shoes have a `colour` (sRGB hex). Skirts set `skirt: true` and their `leg` cut
+paints the thighs (the shell hangs over them).
+
+Garment ids per family (outfit.ts):
+
+- male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
+- female: `top.tee top.tank top.blouse top.long top.shirt top.jacket`, `bottom.trousers bottom.shorts bottom.capri bottom.skirt`;
+- both: `shoes.sneakers shoes.trainers shoes.boots shoes.dress`.
+
+## Appearance texels (per resident, after the bone matrices)
+
+| Texel | rgb | w |
+|---|---|---|
+| 0 | skin colour (linear) | top: sleeve cut |
+| 1 | top colour | top: hem |
+| 2 | bottom colour | top: crew cut |
+| 3 | hair colour (plain) | top: scoop cut |
+| 4 | r = 1 if the top is `over` the bottom | bottom: waist |
+| 5 | skin reference (1) | bottom: leg cut |
+| 6 | shoe colour | shoes: top height |
+| 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
+
+Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).
+
+`appearance.build` (0.85 slim .. 1.2 broad; missing = 1) widens bones across their axis in
+`skin()`: `K = W * (I + (g - 1)(I - a a^T)) * IBM`, the torso by g, the neck by half and the limbs
+by 60% of it. The simulation keeps the appearance opaque, so old saves are unaffected.
+
+## Morph channels
+
+`morphs.channels` is the 15 visemes in the voice engine's order, then 43 ARKit units:
+
+- visemes: `sil PP FF TH DD kk CH SS nn RR aa E I O U`;
+- units: `browDownLeft browDownRight browInnerUp browOuterUpLeft browOuterUpRight cheekSquintLeft cheekSquintRight eyeBlinkLeft eyeBlinkRight eyeLookDownLeft eyeLookDownRight eyeLookUpLeft eyeLookUpRight eyeSquintLeft eyeSquintRight eyeWideLeft eyeWideRight jawForward jawOpen mouthClose mouthDimpleLeft mouthDimpleRight mouthFrownLeft mouthFrownRight mouthFunnel mouthLeft mouthLowerDownLeft mouthLowerDownRight mouthPressLeft mouthPressRight mouthPucker mouthRollLower mouthRollUpper mouthShrugLower mouthShrugUpper mouthSmileLeft mouthSmileRight mouthStretchLeft mouthStretchRight mouthUpperUpLeft mouthUpperUpRight noseSneerLeft noseSneerRight`.
+
+`Left` is the resident's left (-x). Units are authored at ARKit strength. The head itself never
+deforms: channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and beard. Morphs
+are built at the base stage and shared by the other stages.
+
+## Clips
+
+`clips/dsl.ts` defines clips as key poses (`clip`) or functions of the phase (`cycle`), with
+layers (`layer`), leg IK (`legIK`) and mirroring; `clips/index.ts` lists them and bakes them into
+the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get one more frame).
+
+- A pose names bones with Euler angles in degrees, `[x, y, z]`, applied about x, then y, then z of
+  the parent's frame (model axes at rest). The signs match `addRotation`: -x on a thigh or upper
+  arm raises it forward, +x on a calf bends the knee, -x on a forearm bends the elbow, +z on the
+  left upper arm brings it down to the side.
+- `thigh` sets `thigh_l` and the mirrored `thigh_r` (x, -y, -z); `thigh_r` sets one side and wins.
+  Bones a pose doesn't name rest. `move` is the pelvis offset from rest (m, reference skeleton).
+- Clips hold fists (`GRIP`); the runtime opens the hands towards the rest (open) pose per activity.
+- Clips start from the relaxed stance (feet under the hips, upright).
+- Every name the runtime plays, with its loop flag and length (seconds):
+
+| Clip | Loop | s | | Clip | Loop | s |
+|---|---|---|---|---|---|---|
+| idle | yes | 2.5 | | eat | no | 1.33 |
+| talk | yes | 2.93 | | water | yes | 3.8 |
+| walk | yes | 1.1 (speed 1.1 m/s) | | harvest | yes | 2.5 |
+| jog | yes | 0.93 | | plant | no | 2.77 |
+| sit | yes | 1.67 | | foldArms | yes | 2.5 |
+| sitTalk | yes | 2.93 | | yes | no | 2.5 |
+| sitDown | no | 1.3 | | no | yes | 2.5 |
+| standUp | no | 1.03 | | phone | yes | 2.93 |
+| sitHands | yes | 1.67 | | lantern | yes | 2.5 |
+| interact | no | 2.0 | | rail | yes | 2.5 |
+| pickUp | no | 0.83 | | spell | yes | 2.1 |
+| dance | yes | 1.0 | | push | yes | 2.67 |
+| punchJab | no | 0.87 | | kneel | yes | 5.2 |
+| punchCross | no | 1.0 | | crouch | yes | 2.93 |
+| hit | no | 0.33 | | | | |
+
+In dev, editing a clip file re-bakes the clips in place (Vite HMR).
+
+## Who owns what
+
+| Stream | Files |
+|---|---|
+| 0, contract | `prim/rig.py`, `prim/head.py` (interface), `prim/contract.py`, `prim/write.py`, `prim/build.py`, `prim/check.py`, `check_clips.ts`, `clips/dsl.ts`, this page |
+| A, body and clothes | `prim/body.py`, `prim/clothes.py`, `prim/garments.py`, `prim/cage.py`, `prim/subdiv.py`; the `head.py` numbers behind the interface; parts `body` (skin), `lod.*`, `top.*`, `bottom.*`, `shoes.*` |
+| B, face and hair | `prim/face.py`, `prim/hair.py`, `prim/prims.py`; parts `eyes lashes brows teeth tongue hair.*`, the lids and lips inside `body`; the `SIMEYE` / `SIMHAIR` / `SIMBROW` shader branches |
+| C, clips | `clips/*` except `dsl.ts` |
+| D, integration | `characters.ts`, `outfit.ts`, `household.ts`, the UI, credits and docs |
+
+## Dev benches
+
+- `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
+  stage), `?hair=all`, `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1`, `?build=1.2`, `?cols=`, `?manual`
+  (`__bench.advance(s)`); sets `window.__ready`.
+- `/poses.html`: residents at real furniture. `?clip=<name>` plays one clip on everyone;
+  `?clip=<name>&strip=8` shows it held at 8 times on a man, a woman and a child.
