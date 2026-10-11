@@ -1,7 +1,9 @@
 /**
  * The residents' animation clips, made in code (`dsl.ts`) and baked when the character set loads.
  * Every name the runtime plays (characters.ts `ACTIONS`, `choose`, reactions) must be here; see
- * docs/characters-format.md for the list and the conventions.
+ * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
+ * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. Arm and leg
+ * placement uses the IK helpers in `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
  * pose bench updates without a reload.

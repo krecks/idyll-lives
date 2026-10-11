@@ -180,8 +180,25 @@ const MASKS: Record<Mask, (bone: string) => boolean> = {
 
 // --- leg IK -----------------------------------------------------------------------------------
 
+/** The reference skeleton while clips bake: rest joints (model space), parents, leg lengths, the palm centre. */
+export interface Reference {
+  joint: (name: string) => Vec;
+  /** The parent bone's name ('' for the root). */
+  parent: (name: string) => string;
+  thigh: number;
+  shin: number;
+  /** The left palm centre from the wrist (rest frame; the right mirrors x). */
+  grip: Vec;
+}
+
 /** Rest joints of the reference skeleton while baking (for `legIK`). */
-let ref: { joint: (name: string) => Vec; thigh: number; shin: number } | null = null;
+let ref: Reference | null = null;
+
+/** The reference skeleton; only while clips bake (for IK helpers such as clips/ik.ts). */
+export function reference(): Reference {
+  if (!ref) throw new Error('reference: only while baking clips');
+  return ref;
+}
 
 /**
  * Thigh, calf and foot rotations that put the ankle of leg `side` at its rest position + `ankle`
@@ -246,7 +263,14 @@ export function bake(defs: readonly ClipDef[], set: CharacterSet): Map<string, C
     const q = joint(b);
     return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
   };
-  ref = { joint, thigh: set.reference?.thigh ?? len('thigh_l', 'calf_l'), shin: set.reference?.shin ?? len('calf_l', 'foot_l') };
+  const body = set.bodies.get(set.reference?.body ?? 'male') ?? set.bodies.values().next().value!;
+  ref = {
+    joint,
+    parent: (name) => set.bones[set.parents[set.bone[name]]] ?? '',
+    thigh: set.reference?.thigh ?? len('thigh_l', 'calf_l'),
+    shin: set.reference?.shin ?? len('calf_l', 'foot_l'),
+    grip: body.grip ?? [-0.02, -0.055, 0],
+  };
   const out = new Map<string, Clip>();
   try {
     for (const def of defs) out.set(def.name, bakeOne(def, set));
