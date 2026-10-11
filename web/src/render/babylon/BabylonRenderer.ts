@@ -99,6 +99,12 @@ const FENCE_PREVIEW_HEIGHT = 1.0;
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
 /**
+ * Metres of the game's sun shadow map beyond the lot's corners (nearby trees and the street
+ * still shade it), and the outer share of it over which shadows fade out.
+ */
+const SHADOW_MARGIN = 10;
+const SHADOW_EDGE_FADE = 0.15;
+/**
  * Interior lights: the household's lamps first, then dim fills for rooms without one. With
  * clustered lighting (WebGPU, and WebGL2 with float blending) they live in one
  * `ClusteredLightContainer` (one light to the materials) and many lamps light at once
@@ -279,6 +285,8 @@ export class BabylonRenderer implements Renderer {
   private lastWorld: WorldStructure | null = null;
   private lastMinute = 12 * 60;
   private readonly lotCentre = new Vector3();
+  /** Radius of the game's sun shadow map around `lotCentre` (see `applyLighting`). */
+  private shadowRadius = 30;
   /** `?debug`: expose the scene/renderer on `window` and log build timings. */
   private readonly debug = new URLSearchParams(location.search).has('debug');
   /** `?hour=21` freezes the lighting at that hour (for screenshots and look development). */
@@ -483,6 +491,7 @@ export class BabylonRenderer implements Renderer {
 
     const { width, depth } = world;
     this.lotCentre.set(view ? view.x + view.w / 2 : width / 2, 0, view ? view.z + view.d / 2 : depth / 2);
+    this.shadowRadius = Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN;
     if (!this.cameraPlaced) {
       // (Re-aims from the camera's current position; a parked camera computes it first.)
       this.gameCamera.getViewMatrix(true);
@@ -2519,8 +2528,24 @@ export class BabylonRenderer implements Renderer {
   private applyLighting(minute: number): void {
     const l = lightingAt(minute, LOOK, this.lighting);
     this.sun.direction.copyFrom(l.sunDirection);
-    l.sunDirection.scaleToRef(-40, this.vTmp);
-    this.sun.position.copyFrom(this.townMode && this.overview ? this.overview.centre : this.lotCentre).addInPlace(this.vTmp);
+    const town = this.townMode && this.overview;
+    // The game's shadow map covers a fixed circle round the lot: its texels keep their size
+    // and place while the sun turns and residents walk, so shadows don't change shape at each
+    // lighting step (fitted to the casters, it spanned the town at ~10 cm a texel). The
+    // overview fits the whole town.
+    const r = this.shadowRadius;
+    const distance = town ? 40 : r + 40;
+    l.sunDirection.scaleToRef(-distance, this.vTmp);
+    this.sun.position.copyFrom(town ? this.overview!.centre : this.lotCentre).addInPlace(this.vTmp);
+    this.sun.autoUpdateExtends = this.sun.autoCalcShadowZBounds = !!town;
+    this.sun.shadowOrthoScale = town ? 0.1 : 0;
+    this.shadows.frustumEdgeFalloff = town ? 0 : SHADOW_EDGE_FADE;
+    if (!town) {
+      this.sun.orthoLeft = this.sun.orthoBottom = -r;
+      this.sun.orthoRight = this.sun.orthoTop = r;
+      this.sun.shadowMinZ = 1;
+      this.sun.shadowMaxZ = distance + r;
+    }
     this.sun.intensity = l.sunIntensity;
     this.sun.diffuse.copyFrom(l.sunColor);
     this.sun.specular.copyFrom(l.sunColor);
