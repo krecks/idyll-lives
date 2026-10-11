@@ -7,9 +7,10 @@
  * - `?family=male|female` (default both), `?stage=child` or `stage=all` (default: the body sheet,
  *   every stage, when no other sheet is asked for);
  * - `?hair=all` every hairstyle (and the beard), `?tops=all` every garment, `?skins=all` eight skin
- *   tones, `?builds=all` slim / as built / broad, `?face=moods|visemes` every mood / viseme;
+ *   tones, `?builds=all` slim / as built / broad, `?face=moods|visemes` every mood (and the friendly
+ *   resting face, a half and a full blink) / viseme;
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
- *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`;
+ *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
  * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`.
  * Sets `window.__ready` once everything is drawn.
  */
@@ -21,7 +22,7 @@ import type { SimInfo } from '../core/protocol';
 import { Pose, type SnapshotLayout } from '../core/snapshot';
 import type { Appearance, HairStyle } from '../game/household';
 import { HAIR_STYLES } from '../game/household';
-import { Characters, EXPRESSIONS, MAX_CHARACTERS, type StageDirection } from '../render/babylon/characters';
+import { Characters, EXPRESSIONS, FRIENDLY, MAX_CHARACTERS, type StageDirection } from '../render/babylon/characters';
 import { GARMENTS } from '../render/babylon/characters/outfit';
 import { WALL_HEIGHT } from '../render/babylon/house';
 import { MaterialLibrary } from '../render/babylon/materials';
@@ -43,7 +44,7 @@ interface Cell {
 const base = (gender: string): Appearance => ({
   body: gender === 'female' ? '#C9725F' : '#5F86C9',
   skin: '#C08A64',
-  hair: '#4A3020',
+  hair: params.get('hairColor') ?? '#4A3020',
   hairStyle: gender === 'female' ? 'long' : 'short',
   eyes: '#4E7BA6',
   height: 1,
@@ -90,6 +91,10 @@ for (const g of families) {
     rows.push([
       { label: 'neutral', gender: g, look: common(), face: {} },
       ...Object.keys(EXPRESSIONS).map((m) => ({ label: m, gender: g, look: common(), face: EXPRESSIONS[m] })),
+      { label: 'friendly', gender: g, look: common(), face: FRIENDLY },
+      // Half (eyeBlink 0.5) and full blinks.
+      { label: 'half blink', gender: g, look: common(), face: { lidU: 1 / 0.9 } },
+      { label: 'blink', gender: g, look: common(), face: { mood: 'asleep' } },
     ]);
   } else if (params.get('face') === 'visemes') {
     rows.push(VISEMES.map((v, i) => ({ label: v, gender: g, look: common(), viseme: i })));

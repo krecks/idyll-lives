@@ -23,7 +23,7 @@ from scipy.spatial import cKDTree
 from body import body_fields_and_tone, build_body
 from clothes import build_clothes, garment_cuts
 from contract import CHANNELS
-from face import build_face
+from face import build_face, follow_mouth
 from hair import build_hair
 from head import head_frame
 from prims import merge
@@ -53,17 +53,6 @@ def assemble(family, stage, cuts=None):
     return dict(parts=parts, meta=b['meta'], P=P, head=head, face=f, n_skin=n_skin, cuts=cuts)
 
 
-def follow_mouth(beard, plate, deltas, head):
-    """The beard's morphs: each vertex copies the nearest lower-mouth plate vertex's, fading with distance."""
-    lower = np.where(plate['pos'][:, 1] < head.mouth[1])[0]
-    d, nn = cKDTree(plate['pos'][lower]).query(beard['pos'])
-    w = np.clip(1 - d / (0.35 * head.hh), 0, 1)[:, None] * (beard['pos'][:, 1] < head.mouth[1])[:, None]
-    out = {}
-    for c, (dp, dn) in deltas.items():
-        out[c] = (dp[lower][nn] * w, np.zeros_like(beard['pos']))
-    return out
-
-
 def skeleton_json(family, stage, meta):
     sk = skeleton(family, stage)
     return dict(
@@ -86,6 +75,15 @@ def build_family(family, out):
         f, t = body_fields_and_tone(family, parts[name], base['P'], head)
         parts[name]['fields'] = f
         parts[name]['tone'] = t
+    # The face's skin pieces: the lids take the tone of the skin they lie on, the lips keep theirs.
+    k = base['n_skin']
+    tone = parts['body']['tone']
+    near = cKDTree(parts['body']['pos'][:k])
+    for m in base['face']['body']:
+        n = len(m['pos'])
+        # (The lightest of the skin round each lid vertex: not the shade deep in the socket.)
+        tone[k:k + n] = tone[near.query(m['pos'], k=16)[1]].min(1) if m.get('skin_tone') else m['tone']
+        k += n
     # Face morphs: the face's own parts, the body's lids (after its skin), the beard.
     morphs = dict(base['face']['morphs'])
     if 'body' in morphs:
@@ -98,8 +96,8 @@ def build_family(family, out):
             fn[k:k + len(dn)] = dn
             body_d[c] = (fp, fn)
         morphs['body'] = body_d
-    if 'hair.beard' in parts and 'tongue' in morphs:
-        morphs['hair.beard'] = follow_mouth(parts['hair.beard'], parts['tongue'], morphs['tongue'], head)
+    if 'hair.beard' in parts:
+        morphs['hair.beard'] = follow_mouth(parts['hair.beard'], base['face']['follow'], head)
     for name, d in morphs.items():
         m = pack_morph(parts[name], d, CHANNELS)
         if m is not None:

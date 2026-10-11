@@ -10,7 +10,7 @@
  *   -1 - scalp weight) takes the hair colour;
  * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker;
  * - hair: the hair colour, with the tone's clump bands;
- * - brow: brows in the hair colour (darker); lash: lashes;
+ * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
  * - eye: the eyeballs drawn procedurally: sclera, the iris in the Sim's eye colour with a darker
  *   limbal ring, the pupil (fields: offset from the iris centre, iris radius, pupil radius).
@@ -90,6 +90,7 @@ export class CharacterPlugin extends MaterialPluginBase {
         SIMCLOTH: false,
         SIMHAIR: false,
         SIMBROW: false,
+        SIMLASH: false,
         SIMEYE: false,
         SIMMOUTH: false,
         SIMMORPH: false,
@@ -124,6 +125,7 @@ export class CharacterPlugin extends MaterialPluginBase {
     defines.SIMCLOTH = kind === 'cloth';
     defines.SIMHAIR = kind === 'hair';
     defines.SIMBROW = kind === 'brow';
+    defines.SIMLASH = kind === 'lash';
     defines.SIMEYE = kind === 'eye';
     defines.SIMMOUTH = kind === 'mouth';
     defines.SIMMORPH = !!this.m && mesh.isVerticesDataPresent('simMorph');
@@ -166,6 +168,8 @@ export class CharacterPlugin extends MaterialPluginBase {
 const GUARD = '#if defined(SIMCHAR) && defined(INSTANCES) && defined(BAKED_VERTEX_ANIMATION_TEXTURE)';
 /** Microsurface (1 - roughness) of painted clothes; skin keeps the material's. */
 const CLOTH_MICRO = '0.15';
+/** Hair is matte: no more glossy than this (the sheen gives it its soft highlight). */
+const HAIR_MICRO = '0.38';
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -246,6 +250,9 @@ let simCloth = max(max(simTop, simBottom), simShoe);
 #ifdef SIMEYE
 let simR = length(simF.xy);
 let simAA = max(fwidth(simR), 1e-5);
+// A catchlight up and to the viewer's left of the pupil (the eye's own frame: it moves with the gaze).
+let simC = length(simF.xy - vec2f(0.38, 0.42) * simF.z);
+let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC);
 #endif
 #endif
 `,
@@ -277,10 +284,14 @@ let simAA = max(fwidth(simR), 1e-5);
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (0.85 + 0.3 * (simT.z - 0.5));
+// The hair colour in clumps (tone.z), darker deep in (tone.y).
+surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (0.8 + 0.5 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.45;
+#endif
+#ifdef SIMLASH
+surfaceAlbedo = vec3f(0.03, 0.022, 0.02);
 #endif
 #ifdef SIMEYE
 {
@@ -295,8 +306,18 @@ surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rg
 }
 #endif
 #ifdef SIMMOUTH
-// Inside the mouth: shaded by the lips and cheeks; the mouth plate (tone.y) much darker.
-surfaceAlbedo = surfaceAlbedo * 0.8 * (1.0 - 0.88 * clamp(simT.y, 0.0, 1.0));
+{
+  // Inside the mouth: the tongue red (tone.x), shaded (tone.y); the mouth plate (tone.y = 1) dark red.
+  let shade = clamp(simT.y, 0.0, 1.0);
+  let c = mix(surfaceAlbedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+  surfaceAlbedo = mix(c, vec3f(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
+}
+#endif
+#endif
+`,
+    CUSTOM_FRAGMENT_BEFORE_FINALCOLORCOMPOSITION: `${GUARD}
+#ifdef SIMEYE
+finalEmissive += vec3f(0.85) * simCatch;
 #endif
 #endif
 `,
@@ -305,6 +326,10 @@ surfaceAlbedo = surfaceAlbedo * 0.8 * (1.0 - 0.88 * clamp(simT.y, 0.0, 1.0));
 ${GUARD}
 #ifdef SIMBODY
 microSurface = mix(microSurface, ${CLOTH_MICRO}, simCloth);
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMHAIR
+microSurface = min(microSurface, ${HAIR_MICRO});
 roughness = 1.0 - microSurface;
 #endif
 #endif
@@ -389,6 +414,8 @@ float simCloth = max(max(simTop, simBottom), simShoe);
 #ifdef SIMEYE
 float simR = length(simF.xy);
 float simAA = max(fwidth(simR), 1e-5);
+float simC = length(simF.xy - vec2(0.38, 0.42) * simF.z);
+float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC);
 #endif
 #endif
 `,
@@ -418,10 +445,13 @@ float simAA = max(fwidth(simR), 1e-5);
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (0.85 + 0.3 * (simT.z - 0.5));
+surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (0.8 + 0.5 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.45;
+#endif
+#ifdef SIMLASH
+surfaceAlbedo = vec3(0.03, 0.022, 0.02);
 #endif
 #ifdef SIMEYE
 {
@@ -435,7 +465,17 @@ surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0
 }
 #endif
 #ifdef SIMMOUTH
-surfaceAlbedo = surfaceAlbedo * 0.8 * (1.0 - 0.88 * clamp(simT.y, 0.0, 1.0));
+{
+  float shade = clamp(simT.y, 0.0, 1.0);
+  vec3 c = mix(surfaceAlbedo, vec3(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+  surfaceAlbedo = mix(c, vec3(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
+}
+#endif
+#endif
+`,
+    CUSTOM_FRAGMENT_BEFORE_FINALCOLORCOMPOSITION: `${GUARD}
+#ifdef SIMEYE
+finalEmissive += vec3(0.85) * simCatch;
 #endif
 #endif
 `,
@@ -443,6 +483,10 @@ surfaceAlbedo = surfaceAlbedo * 0.8 * (1.0 - 0.88 * clamp(simT.y, 0.0, 1.0));
 ${GUARD}
 #ifdef SIMBODY
 microSurface = mix(microSurface, ${CLOTH_MICRO}, simCloth);
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMHAIR
+microSurface = min(microSurface, ${HAIR_MICRO});
 roughness = 1.0 - microSurface;
 #endif
 #endif

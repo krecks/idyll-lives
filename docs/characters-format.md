@@ -138,8 +138,9 @@ Every body has:
 
 ## Tone (4 per vertex)
 
-x = lip / cheek blush (0..1), y = cavity darkening (armpits, between fingers, under the chin; the
-mouth plate is 1), z = hair clump bands (0..1), w reserved.
+x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = cavity darkening (armpits,
+between fingers, under the chin, between the lips, deep in the hair; the mouth plate is 1), z = hair
+clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.py).
 
 ## Clothes
 

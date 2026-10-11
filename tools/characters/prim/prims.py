@@ -1,7 +1,9 @@
 """
 Mesh primitives for the generated residents: lofts (cross-sections along a curve, with rounded or
-flat ends), ellipsoids, spherical caps and merging. Each has a fixed vertex layout for given
-counts, so the same call at every life stage gives the same topology (stage deltas need it).
+flat ends; along a smooth spline they make bent capsules), ellipsoids, spherical caps, lathes
+(a profile turned round an axis), tori, sheets through grids of points, seeded value noise and
+merging. Each has a fixed vertex layout for given counts, so the same call at every life stage
+gives the same topology (stage deltas need it).
 
 Winding: every primitive is counter-clockwise seen from outside (`cross(b - a, c - a)` points
 out, as `meshops.smooth_normals` expects); `write.py` turns faces round for Babylon.
@@ -164,3 +166,109 @@ def merge(meshes, keys=('pos', 'nor')):
 def smoothstep(a, b, x):
     t = np.clip((np.asarray(x, np.float64) - a) / (b - a), 0, 1)
     return t * t * (3 - 2 * t)
+
+
+def grid(P, wrap=False):
+    """
+    Faces of a sheet through a grid of points P (rows, cols, 3): counter-clockwise seen from the
+    side where the columns run right and the rows run up (`wrap`: the last column joins the first).
+    Returns pos (rows * cols, 3) and idx.
+    """
+    P = np.asarray(P, np.float64)
+    r, c, _ = P.shape
+    i, j = np.meshgrid(np.arange(r - 1), np.arange(c if wrap else c - 1), indexing='ij')
+    i, j = i.ravel(), j.ravel()
+    j1 = (j + 1) % c
+    a, b, cc, d = i * c + j, i * c + j1, (i + 1) * c + j1, (i + 1) * c + j
+    idx = np.stack([a, b, cc, a, cc, d], 1).ravel()
+    return P.reshape(-1, 3), idx.astype(np.int64)
+
+
+def orient(pos, idx, out):
+    """`idx` turned round if its faces mostly point against `out` (per vertex directions, (n, 3))."""
+    t = np.asarray(idx).reshape(-1, 3)
+    fn = np.cross(pos[t[:, 1]] - pos[t[:, 0]], pos[t[:, 2]] - pos[t[:, 0]])
+    o = out[t[:, 0]] + out[t[:, 1]] + out[t[:, 2]]
+    return idx if (fn * o).sum() >= 0 else t[:, [0, 2, 1]].ravel()
+
+
+def spline(points, n):
+    """`n` points along a Catmull-Rom curve through `points` (k, 3), evenly spaced in parameter."""
+    P = np.asarray(points, np.float64)
+    Q = np.concatenate([2 * P[:1] - P[1:2], P, 2 * P[-1:] - P[-2:-1]])
+    u = np.linspace(0, len(P) - 1, n)
+    k = np.minimum(u.astype(int), len(P) - 2)
+    t = (u - k)[:, None]
+    p0, p1, p2, p3 = Q[k], Q[k + 1], Q[k + 2], Q[k + 3]
+    return 0.5 * ((2 * p1) + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t ** 3)
+
+
+def lathe(profile, segs, centre=(0, 0, 0), start=None, end=None, a0=0.0, a1=2 * np.pi):
+    """
+    A profile turned round the y axis through `centre`: rows of (rx, y, rz) (an elliptic ring of
+    semi-axes rx, rz at height y, from the top down), `segs` around (a0..a1, 0 = +z, towards +x;
+    closed when the arc is whole). `start` / `end` cap the first / last ring with a pole.
+    Faces point out. Returns dict(pos, idx, nor, t) with t the row (0 .. 1 down the profile).
+    """
+    C = np.asarray(centre, np.float64)
+    prof = np.asarray(profile, np.float64)
+    whole = abs(a1 - a0 - 2 * np.pi) < 1e-9
+    a = np.linspace(a0, a1, segs, endpoint=not whole)
+    rings = [C + np.stack([np.sin(a) * rx, np.full_like(a, y), np.cos(a) * rz], -1) for rx, y, rz in prof]
+    if whole:
+        # rings_mesh winds outward for rings stacked up the axis; the profile runs down.
+        pos, idx, ri = rings_mesh(rings[::-1], C + [0, end, 0] if end is not None else None, C + [0, start, 0] if start is not None else None)
+        t = 1 - ri / max(len(prof) - 1, 1)
+    else:
+        pos, idx = grid(np.array(rings[::-1]))
+        t = 1 - np.repeat(np.arange(len(prof)), segs) / max(len(prof) - 1, 1)
+        out = pos - C
+        out[:, 1] = 0
+        idx = orient(pos, idx, out)
+    return dict(pos=pos, idx=idx, nor=smooth_normals(pos, idx), t=np.clip(t, 0, 1))
+
+
+def torus(centre, R, r, segs, sides, axis=(0, 1, 0), rz=None):
+    """A torus round `axis` through `centre`: ring radius R, tube radius r (rz across, default r)."""
+    C = np.asarray(centre, np.float64)
+    ax = np.asarray(axis, np.float64)
+    ax = ax / np.linalg.norm(ax)
+    U, V = frame(ax, np.array([0, 0, 1.0]) if abs(ax[2]) < 0.9 else np.array([1.0, 0, 0]))
+    a = np.linspace(0, 2 * np.pi, segs, endpoint=False)
+    b = np.linspace(0, 2 * np.pi, sides, endpoint=False)
+    rz = r if rz is None else rz
+    d = np.cos(a)[:, None] * U + np.sin(a)[:, None] * V
+    P = C + d[:, None] * (R + np.cos(b)[None, :, None] * r) + ax * np.sin(b)[None, :, None] * rz
+    pos, idx = grid(P, wrap=True)
+    # Close the ring of tubes too.
+    n = segs * sides
+    last = np.arange(sides)
+    j1 = (last + 1) % sides
+    a_, b_, c_, d_ = (segs - 1) * sides + last, (segs - 1) * sides + j1, j1, last
+    idx = np.concatenate([idx, np.stack([a_, b_, c_, a_, c_, d_], 1).ravel()])
+    cen = C + d * R
+    out = pos - np.repeat(cen, sides, 0)
+    idx = orient(pos, idx, out)
+    assert len(pos) == n
+    return dict(pos=pos, idx=idx, nor=smooth_normals(pos, idx))
+
+
+def noise3(p, seed=0, scale=1.0):
+    """Seeded smooth value noise (-1..1) at points p (n, 3), features about 1 / `scale` apart."""
+    q = np.asarray(p, np.float64) * scale
+    i = np.floor(q).astype(np.int64)
+    f = q - i
+    f = f * f * (3 - 2 * f)
+
+    def h(x, y, z):
+        v = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791) ^ (seed * 2654435761)
+        v = (v ^ (v >> 13)) * 1274126177
+        return ((v ^ (v >> 16)) & 0xFFFF) / 32767.5 - 1
+
+    out = 0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (f[:, 0] if dx else 1 - f[:, 0]) * (f[:, 1] if dy else 1 - f[:, 1]) * (f[:, 2] if dz else 1 - f[:, 2])
+                out = out + w * h(i[:, 0] + dx, i[:, 1] + dy, i[:, 2] + dz)
+    return out

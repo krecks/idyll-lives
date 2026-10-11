@@ -177,18 +177,35 @@ def main(argv):
                 end = e['positions'] + n * 8
                 if end > len(sbuf):
                     fail(f'{fam}.{stage}:{name} topology differs from the base')
-        # Eyes in their sockets, hair off the skull (base stage).
+        # Eyes in their sockets (base stage).
         h = head_frame(fam, BASE_STAGE)
         if (h.sdf(h.eyes) >= 0).any():
             fail(f'{fam}: an eye centre is outside the skull')
         front = h.eyes + [0, 0, h.eye_r]
         if (h.sdf(front) <= 0).any():
             fail(f'{fam}: an eye does not show in front of the skull')
+        # Hair more than 2 mm off the head at every life stage (stage positions: base + deltas).
+        for stage in STAGES:
+            hs = h if stage == BASE_STAGE else head_frame(fam, stage)
+            info = None if stage == BASE_STAGE else body['stages'].get(stage)
+            sbuf = None if info is None else open(os.path.join(out, info['mesh']), 'rb').read()
+            for name, e in parts.items():
+                if not name.startswith('hair.'):
+                    continue
+                pos = read_part(buf, e, 3, 'positions', '<f4').astype(np.float64)
+                if info is not None:
+                    d = np.frombuffer(sbuf, '<i2', e['vertices'] * 4, info['parts'][name]['positions']).reshape(-1, 4)[:, :3]
+                    pos = pos + d / rig['stageScale']
+                gap = hs.sdf(pos).min()
+                if gap < 0.002:
+                    fail(f'{fam}.{stage}:{name} comes within 2 mm of the head ({gap * 1000:.1f} mm)')
+        # Face morphs: small, finite shapes (no channel moves anything further than 4 cm).
         for name, e in parts.items():
-            if name.startswith('hair.'):
-                pos = read_part(buf, e, 3, 'positions', '<f4')
-                if (h.sdf(pos) < 0.002).any():
-                    fail(f'{fam}:{name} comes within 2 mm of the skull')
+            m = e.get('morph')
+            if m:
+                dp = np.frombuffer(buf, '<i2', m['ranges'][-1] * 4, m['morphPositions']).reshape(-1, 4)[:, :3] / rig['morphs']['scale']
+                if len(dp) and np.abs(dp).max() > 0.04:
+                    fail(f'{fam}:{name} has a morph moving {np.abs(dp).max() * 100:.1f} cm')
     for c in ch:
         if c != 'sil' and c not in moved:
             fail(f'channel {c} moves nothing')
