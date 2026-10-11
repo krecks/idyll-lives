@@ -16,7 +16,7 @@ use crate::content::Layer;
 use crate::lot::{Diagonal, Edge, EdgeLook, EdgeRef, FORM_HALF, OUTDOORS};
 use crate::path::NavGrid;
 use crate::social::EventKind;
-use crate::world::{GameMode, MAX_OFFSET, ObjectInstance, Task, TaskKind, World, end_activity};
+use crate::world::{GameMode, Layout, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_SIZE, ObjectInstance, Task, TaskKind, World, end_activity, kind_size};
 
 /// Tiles around a plot that still count when checking who can reach what (the path from the street).
 const REACH_MARGIN: i32 = 2;
@@ -251,19 +251,53 @@ impl World {
         }
     }
 
-    /// How far object type `def` stands off the middle of its footprint: only those that turn
-    /// freely can, by up to half a tile.
-    pub(crate) fn check_offset(&self, def: usize, offset: [i8; 2]) -> Result<[i8; 2], Error> {
+    /// How far object type `def`, facing `rot`, stands off the middle of its footprint: by up
+    /// to half a tile, things on a wall only along it. Stairs stand square.
+    pub(crate) fn check_offset(&self, def: usize, rot: u8, offset: [i8; 2]) -> Result<[i8; 2], Error> {
         let d = &self.content.objects[def];
+        // Across the wall (z facing 0 or 2, x facing 1 or 3) a thing on it can't move.
+        let across = if rot.is_multiple_of(2) { offset[1] } else { offset[0] };
         if offset == [0, 0] {
             Ok(offset)
-        } else if !d.turns {
-            Err(Error::new(format!("the {} stands square on its tiles", d.name)))
+        } else if d.stairs {
+            Err(Error::new(format!("the {} stands square on its tiles", d.name.to_lowercase())))
+        } else if d.layer == Layer::Wall && across != 0 {
+            Err(Error::new("that hangs flat on its wall"))
         } else if offset.iter().any(|&o| o.unsigned_abs() > MAX_OFFSET as u8) {
             Err(Error::new("that's off its tile"))
         } else {
             Ok(offset)
         }
+    }
+
+    /// A size for object type `def` (centimetres across and deep, before turning, and
+    /// centimetres taller): each side `MIN_SIZE` to `MAX_SIZE` tiles. Stairs keep theirs; things
+    /// on a wall keep their depth and things on a top their footprint (they can still be taller
+    /// or shorter).
+    pub(crate) fn check_size(&self, def: usize, size: [u16; 2], tall: i16) -> Result<([u16; 2], i16), Error> {
+        let d = &self.content.objects[def];
+        let name = d.name.to_lowercase();
+        let own = kind_size(d.footprint);
+        if d.stairs && (size != own || tall != 0) {
+            Err(Error::new(format!("the {name} keep their size")))
+        } else if d.layer == Layer::Surface && size != own {
+            Err(Error::new(format!("the {name} only gets taller or shorter")))
+        } else if d.layer == Layer::Wall && size[1] != own[1] {
+            Err(Error::new(format!("the {name} hangs flat on its wall")))
+        } else if size.iter().any(|&s| !(MIN_SIZE..=MAX_SIZE as u16 * 100).contains(&s)) {
+            Err(Error::new(format!("things measure {MIN_SIZE} cm to {MAX_SIZE} m each way")))
+        } else if !(-MAX_SHORTER..=MAX_TALLER).contains(&tall) {
+            Err(Error::new(format!("things grow {} m at most, or shrink {} m", MAX_TALLER as f32 / 100.0, MAX_SHORTER as f32 / 100.0)))
+        } else {
+            Ok((size, tall))
+        }
+    }
+
+    /// `layout` for object type `def` facing `rot`, checked (`check_offset`, `check_size`).
+    pub(crate) fn check_layout(&self, def: usize, rot: u8, layout: Layout) -> Result<Layout, Error> {
+        let offset = self.check_offset(def, rot, layout.offset)?;
+        let (size, tall) = self.check_size(def, layout.extent.unwrap_or(kind_size(self.content.objects[def].footprint)), layout.tall)?;
+        Ok(Layout { offset, extent: Some(size), tall })
     }
 
     pub(crate) fn check_style(&self, style: u8) -> Result<u8, Error> {
@@ -380,8 +414,8 @@ impl World {
         })
     }
 
-    /// Places object `def` on the home plot (standing `offset` off its tiles' middle) if it fits
-    /// there and blocks nothing.
+    /// Places object `def` on the home plot (laid out as `layout`) if it fits there and blocks
+    /// nothing.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn place_at_home(
         &mut self,
@@ -390,12 +424,12 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
-        offset: [i8; 2],
+        layout: Layout,
         style: u8,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
-        let obj = self.check_fit(def, x, z, rot, offset).map_err(|e| {
+        let obj = self.check_fit(def, x, z, rot, layout).map_err(|e| {
             let e = e.to_string();
             Error::new(if e.contains("diagonal") {
                 "furniture can't stand on a tile with a diagonal wall"
@@ -423,7 +457,7 @@ impl World {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, offset, style, quality, value)?;
+        let id = self.place(def, x, z, rot, layout, style, quality, value)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
         let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
@@ -484,7 +518,7 @@ impl World {
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
-                    let Ok(obj) = self.check_fit(def, x, z, rot, [0, 0]) else {
+                    let Ok(obj) = self.check_fit(def, x, z, rot, Layout::default()) else {
                         continue;
                     };
                     if !self.fits_on_plot(&obj, plot)
@@ -519,19 +553,20 @@ impl World {
         at: Option<[i32; 3]>,
         style: Option<u8>,
     ) -> Result<u32, Error> {
-        self.buy_at(household, def_id, at, style, [0, 0])
+        self.buy_at(household, def_id, at, style, Layout::default())
     }
 
-    /// Buys an object for the household's home, standing `offset` off its tiles' middle (where
-    /// it goes on a top, for things on a surface). Without `at`, it goes at the first good free
-    /// spot (`offset` kept unless it stands on a surface). Returns the new object's id.
+    /// Buys an object for the household's home, laid out as `layout` (unchecked: see
+    /// `check_layout`; its offset is where it goes on a top, for things on a surface). Without
+    /// `at`, it goes at the first good free spot (the offset kept unless it stands on a
+    /// surface). Returns the new object's id.
     pub fn buy_at(
         &mut self,
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
         style: Option<u8>,
-        offset: [i8; 2],
+        layout: Layout,
     ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
         let def = self
@@ -546,13 +581,13 @@ impl World {
         let style = self.check_style(style.unwrap_or(self.households[h].style))?;
         let on_top = d.layer == Layer::Surface;
         let id = match at {
-            Some([x, z, rot]) => self.place_at_home(plot, def, x, z, rot as u8, offset, style, 0, price)?,
+            Some([x, z, rot]) => self.place_at_home(plot, def, x, z, rot as u8, layout, style, 0, price)?,
             None => self
                 .find_spot(plot, def)
                 .into_iter()
                 .find_map(|(x, z, rot, found)| {
-                    let offset = if on_top { found } else { offset };
-                    self.place_at_home(plot, def, x, z, rot, offset, style, 0, price).ok()
+                    let layout = if on_top { Layout::at(found) } else { layout };
+                    self.place_at_home(plot, def, x, z, rot, layout, style, 0, price).ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
@@ -568,7 +603,7 @@ impl World {
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, offset, style, 0, value).ok())
+            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), style, 0, value).ok())
     }
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
@@ -608,12 +643,13 @@ impl World {
         z: i32,
         rot: u8,
     ) -> Result<u32, Error> {
-        self.move_object_to(household, object, x, z, rot, None, None)
+        self.move_object_to(household, object, x, z, rot, None, None, None, None)
     }
 
-    /// Moves or rotates an object at home, with a new free turn and offset if given (else it
-    /// keeps its own). Things standing on its top go with it, turned with it. Its look, quality
-    /// and value stay. Returns its new id: it's placed again at the end of the list (its riders
+    /// Moves, rotates or resizes an object at home, with a new free turn, offset, size
+    /// (centimetres across and deep, before turning) and height (centimetres taller) if given, else it keeps
+    /// its own (all unchecked: see `check_turn`, `check_layout`). Things standing on its top go
+    /// with it, turned with it. Its look, quality and value stay. Returns its new id: it's placed again at the end of the list (its riders
     /// after it), so the ids after it shift down. If anything doesn't fit, nothing moves.
     #[allow(clippy::too_many_arguments)]
     pub fn move_object_to(
@@ -625,6 +661,8 @@ impl World {
         rot: u8,
         turn: Option<u8>,
         offset: Option<[i8; 2]>,
+        size: Option<[u16; 2]>,
+        tall: Option<i16>,
     ) -> Result<u32, Error> {
         let (_, plot) = self.home_object(household, object)?;
         let before = self.home_snapshot(household).expect("the household has a home");
@@ -638,8 +676,8 @@ impl World {
         lifted.reverse();
         let old = lifted.iter().find(|o| o.id == object).expect("lifted it").clone();
         let result = (|| {
-            let offset = offset.unwrap_or(old.offset);
-            let id = self.place_at_home(plot, old.def, x, z, rot, offset, old.style, old.quality, old.value)?;
+            let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
+            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.style, old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
@@ -659,7 +697,7 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, offset, r.style, r.quality, r.value)
+                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.style, r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let placed = &mut self.objects[rid as usize];
                 placed.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
@@ -895,8 +933,8 @@ impl World {
                     Edge::Gate => rules.gate_price(look.style),
                     Edge::Open => rules.remove,
                 };
-            } else if target != Edge::Open && look != old {
-                // Rebuilt in another form, or replaced by another style.
+            } else if target != Edge::Open && look != old && (look.style, look.form, look.sides) != (old.style, old.form, old.sides) {
+                // Rebuilt in another form, or replaced by another style (resizing a door or window is free).
                 cost += match target {
                     Edge::Door => rules.door_price(look.style),
                     Edge::Window => rules.window_price(look.style),
@@ -1148,6 +1186,22 @@ fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Result<(), Er
     if matches!(e.kind, EdgeKind::Door | EdgeKind::Window) && e.form == Some(FORM_HALF) {
         return Err(Error::new("doors and windows need a full-height wall"));
     }
+    use crate::command::{MAX_HEAD, MIN_DOOR_HEAD, MIN_WINDOW};
+    match e.kind {
+        _ if e.sill.is_none() && e.head.is_none() => {}
+        EdgeKind::Door if e.sill.is_some() => return Err(Error::new("a door starts at the floor")),
+        EdgeKind::Door if e.head.is_some_and(|h| !(MIN_DOOR_HEAD..=MAX_HEAD).contains(&h)) => {
+            return Err(Error::new(format!("a door is {} to {} m tall", MIN_DOOR_HEAD as f32 / 100.0, MAX_HEAD as f32 / 100.0)));
+        }
+        EdgeKind::Window if e.head.is_some_and(|h| h > MAX_HEAD) || e.sill.is_some_and(|s| s + MIN_WINDOW > MAX_HEAD) => {
+            return Err(Error::new(format!("a window reaches {} m at most", MAX_HEAD as f32 / 100.0)));
+        }
+        EdgeKind::Window if matches!((e.sill, e.head), (Some(s), Some(h)) if s + MIN_WINDOW > h) => {
+            return Err(Error::new(format!("a window is at least {MIN_WINDOW} cm tall")));
+        }
+        EdgeKind::Door | EdgeKind::Window => {}
+        _ => return Err(Error::new("only doors and windows have a sill or a top")),
+    }
     Ok(())
 }
 
@@ -1177,6 +1231,8 @@ fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLo
                 } else {
                     e.style.unwrap_or(0)
                 },
+                sill: if target == Edge::Window { e.sill } else { None },
+                head: if target == Edge::Wall { None } else { e.head },
             }
         }
         Edge::Wall => EdgeLook {
@@ -1184,13 +1240,18 @@ fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLo
                 .form
                 .unwrap_or(if current == Edge::Wall { old.form } else { 0 }),
             style: 0,
+            sill: None,
+            head: None,
             ..old
         },
+        // A door or window keeps its size when restyled; one put in for another kind starts as its style is.
         _ => EdgeLook {
             form: 0,
             style: e
                 .style
                 .unwrap_or(if current == target { old.style } else { 0 }),
+            sill: if target == Edge::Window { e.sill.or(if current == target { old.sill } else { None }) } else { None },
+            head: e.head.or(if current == target { old.head } else { None }),
             ..old
         },
     }

@@ -81,6 +81,34 @@ export interface BuildEffect {
   y?: number;
 }
 
+/** An object the player resized (see `render/babylon/models.ts` `resizeParts`): its kind's footprint (tiles) and its own size (m), across and deep before turning, and centimetres taller. */
+export interface ObjectResize {
+  from: [number, number];
+  size: [number, number];
+  tall: number;
+  /** Hangs from the ceiling: grows downwards. */
+  ceiling?: boolean;
+}
+
+/** Key of a resize for caching models; empty when not resized. */
+export function resizeKey(r: ObjectResize | undefined): string {
+  return r && (r.size[0] !== r.from[0] || r.size[1] !== r.from[1] || r.tall) ? `|${r.size[0]}x${r.size[1]}|${r.tall}` : '';
+}
+
+/**
+ * A resize arrow: where it is (lot tiles `x`, `z` in the lot's rows, `y` metres above that
+ * storey's floor), which way it points (`dir`, unit: along x or z, or up) and whether it stands
+ * on a wall (in the wall's plane) rather than lying on the floor.
+ */
+export interface ResizeHandle {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  dir: [number, number, number];
+  wall?: boolean;
+}
+
 export interface PlacementGhost {
   /** Asset key of the model (style variant already resolved by the caller, or a base key). */
   model: string;
@@ -97,6 +125,8 @@ export interface PlacementGhost {
   lift?: number;
   w: number;
   d: number;
+  /** Resized: its kind's footprint (tiles) and its own size (m) across and deep before turning, and centimetres taller. */
+  resize?: ObjectResize;
   /** The tile a Sim uses it from, marked with an arrow (must stay clear). */
   front?: { x: number; z: number };
   valid: boolean;
@@ -118,6 +148,9 @@ export interface EdgePreview {
   style?: number;
   /** New walls: covering of both faces. */
   cover?: number;
+  /** Doors and windows resized: sill and top, centimetres above the floor. */
+  sill?: number;
+  head?: number;
 }
 
 /** A wall face the Paint tool would cover (`side` 0 looks towards -z / -x / half 0). */
@@ -215,6 +248,23 @@ export interface Renderer {
   setWallMode(mode: WallMode): void;
   /** Build/buy mode: object placement preview (null hides it). Cheap; call on every pointer move. */
   setPlacementGhost(ghost: PlacementGhost | null): void;
+  /** Resize arrows around what's picked (null hides them); `hot`: the one pointed at or held. */
+  setResizeHandles(handles: readonly ResizeHandle[] | null, hot?: string | null): void;
+  /** The resize arrow at canvas CSS pixel (`x`, `y`), if any. */
+  handleAt(x: number, y: number): string | null;
+  /**
+   * Where the ray of the last `pick` passes over lot point (`x`, `z`): its height (m) above the
+   * floor of that point's storey, on an upright plane facing the camera (dragging a height arrow).
+   */
+  pickVertical(x: number, z: number): number | null;
+  /**
+   * Where the ray of the last `pick` meets the wall line `line` (lot z for `h`, x for `v`; in the
+   * lot's rows for a storey above): how far along it (lot x or z) and how high above that
+   * storey's floor (dragging arrows on a wall).
+   */
+  pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null;
+  /** A placed object's model height and bottom (m above its floor; things on a wall start above it). */
+  objectBox(id: number): { height: number; bottom: number } | null;
   /**
    * Buy mode: hides a placed object while it is in hand (null shows it again). With `moved` it
    * stays hidden until the next world shows it in its new place (or briefly, if the move is refused).

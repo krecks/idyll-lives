@@ -376,7 +376,7 @@ fn food_moves_with_its_table_goes_when_it_is_sold_and_comes_back_on_undo() {
     let (mut w, pot) = dinner_on_the_table();
     let table = 3;
     let before = w.items.get(pot).unwrap().at;
-    w.apply(Command::MoveObject { household: 0, object: table, x: 2, z: 3, rot: 0, turn: None, offset: None }).unwrap();
+    w.apply(Command::MoveObject { household: 0, object: table, x: 2, z: 3, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
     let moved = w.items.get(pot).expect("still there").at;
     let host = sim_core::items::holder(&w.content, &w.objects, &moved).expect("on something");
     assert_eq!(w.content.objects[w.objects[host as usize].def].id, "table", "on the table where it went: {moved:?}");

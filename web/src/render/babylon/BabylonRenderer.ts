@@ -65,7 +65,9 @@ import type {
   RoomOverlayTile,
   LotHighlight,
   PickResult,
+  ObjectResize,
   PlacementGhost,
+  ResizeHandle,
   Renderer,
   RendererDeps,
   RenderStats,
@@ -73,6 +75,7 @@ import type {
   ViewRect,
   WallMode,
 } from '../types';
+import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
 import { buildFences } from './fences';
 import { applyShaderFixes } from './shaderFixes';
@@ -84,6 +87,7 @@ import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
+import { ResizeHandles } from './handles';
 import { installNature, Landscape, natureDecor, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
@@ -269,6 +273,8 @@ export class BabylonRenderer implements Renderer {
   private items!: ItemLayer;
   /** Live reflections in the mirrors nearest the camera. */
   private mirrors!: Mirrors;
+  /** Resize arrows around what's picked in Buy and Build mode. */
+  private handles!: ResizeHandles;
   private cursor!: Mesh;
   private selectedSim: number | null = null;
   private cameraPlaced = false;
@@ -320,6 +326,8 @@ export class BabylonRenderer implements Renderer {
   // Build mode helpers.
   private ghostRoot!: TransformNode;
   private ghostKey = '';
+  /** The model in hand (without its resizing). */
+  private ghostModel = '';
   private ghostMeshes: Mesh[] = [];
   /** Each ghost mesh's own material: shown where the thing fits; the translucent tint where it can't go. */
   private ghostOwn: (Material | null)[] = [];
@@ -436,6 +444,7 @@ export class BabylonRenderer implements Renderer {
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
     this.mirrors = new Mirrors(scene, this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
     window.addEventListener('resize', this.onResize);
   }
@@ -598,6 +607,7 @@ export class BabylonRenderer implements Renderer {
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
     this.mirrors.update(this.camera);
+    this.handles.update(this.camera.globalPosition);
     const sel = this.selectedSim;
     if (sel !== null && sel < count && this.characters.visible[sel]) {
       const h = this.characters.heads;
@@ -660,6 +670,52 @@ export class BabylonRenderer implements Renderer {
       }
     }
     return { ground, objectId, itemId };
+  }
+
+  setResizeHandles(handles: readonly ResizeHandle[] | null, hot: string | null = null): void {
+    const D = this.storeys.depth;
+    this.handles.set(handles, (h) => {
+      const k = this.storeyOf(h.z);
+      return new Vector3(h.x, k * WALL_HEIGHT + h.y, h.z - k * D);
+    }, hot);
+  }
+
+  handleAt(x: number, y: number): string | null {
+    return this.handles.at(x, y, (p, out) => this.project(p.x, p.y, p.z, out));
+  }
+
+  pickVertical(x: number, z: number): number | null {
+    const [o, d] = [this.pickOrigin, this.pickDir];
+    const k = this.storeyOf(z);
+    const pz = z - k * this.storeys.depth;
+    // The upright plane through the point, square to the camera's view across the floor.
+    const fx = this.camera.target.x - this.camera.globalPosition.x;
+    const fz = this.camera.target.z - this.camera.globalPosition.z;
+    const len = Math.hypot(fx, fz);
+    if (len < 1e-6) return null;
+    const [nx, nz] = [fx / len, fz / len];
+    const along = d.x * nx + d.z * nz;
+    if (Math.abs(along) < 1e-6) return null;
+    const t = ((x - o.x) * nx + (pz - o.z) * nz) / along;
+    return o.y + d.y * t - k * WALL_HEIGHT;
+  }
+
+  pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null {
+    const [o, d] = [this.pickOrigin, this.pickDir];
+    const k = this.storeyOf(storeyRow);
+    const D = this.storeys.depth;
+    // The wall's plane in render space (rows of upper storeys are drawn at the ground's).
+    const plane = axis === 'h' ? line - k * D : line;
+    const across = axis === 'h' ? d.z : d.x;
+    if (Math.abs(across) < 1e-6) return null;
+    const t = (plane - (axis === 'h' ? o.z : o.x)) / across;
+    if (t <= 0) return null;
+    return { along: axis === 'h' ? o.x + d.x * t : o.z + d.z * t + k * D, y: o.y + d.y * t - k * WALL_HEIGHT };
+  }
+
+  objectBox(id: number): { height: number; bottom: number } | null {
+    const p = this.placed.find((p) => p.id === id);
+    return p ? { height: p.height, bottom: p.bottom } : null;
   }
 
   pickPlane(height: number): { x: number; z: number } | null {
@@ -736,8 +792,9 @@ export class BabylonRenderer implements Renderer {
       }
       return;
     }
-    const fresh = !this.ghostShown || ghost.model !== this.ghostKey;
-    if (ghost.model !== this.ghostKey) this.loadGhost(ghost.model);
+    // A new thing in hand pops in; the same one resized just changes shape.
+    const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
+    if (ghost.model + resizeKey(ghost.resize) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -991,7 +1048,7 @@ export class BabylonRenderer implements Renderer {
         const had = walled.get(`${e.axis}:${e.x}:${e.z}`);
         if (had) standing.push(e);
         walls.push({ axis: e.axis, x: e.x, z: e.z, faces: faces ?? had?.faces, form: e.kind === 'wall' ? (had ? had.form : e.form) : undefined });
-        if (e.kind !== 'wall') openings.push({ axis: e.axis, x: e.x, z: e.z, kind: e.kind, style: e.style });
+        if (e.kind !== 'wall') openings.push({ axis: e.axis, x: e.x, z: e.z, kind: e.kind, style: e.style, sill: e.sill, head: e.head });
       }
     }
     if (walls.length || diagonals.length) {
@@ -2268,6 +2325,16 @@ export class BabylonRenderer implements Renderer {
     }
   }
 
+  /** How the player resized an object (undefined: as its kind comes). */
+  private objectResize(o: ObjectPlacement): ObjectResize | undefined {
+    const def = this.deps.content.object(o.def);
+    const from = def?.footprint ?? [1, 1];
+    const tiles: [number, number] = o.rot % 2 === 0 ? [o.w, o.d] : [o.d, o.w];
+    const size: [number, number] = o.size ? [o.size[0] / 100, o.size[1] / 100] : tiles;
+    const resize = { from: [from[0], from[1]] as [number, number], size, tall: o.tall ?? 0, ceiling: def?.layer === 'ceiling' };
+    return resizeKey(resize) ? resize : undefined;
+  }
+
   /** Model key for an object, preferring its style variant (`model.sofa@modern`) when one exists. */
   private objectModel(o: ObjectPlacement): string {
     const def = this.deps.content.object(o.def);
@@ -2283,13 +2350,15 @@ export class BabylonRenderer implements Renderer {
     // Things on the storeys up to the one in view, each lifted to its storey (from its lot rows).
     const D = this.storeys.depth;
     const shown = world.objects.filter((o) => this.storeyOf(o.z) <= this.storey && this.inView(o.x + o.w / 2, o.z - this.storeyOf(o.z) * D + o.d / 2, 0));
-    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}`);
+    // One template per model and size (things the player resized get their own).
+    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
     const templates = await Promise.all(
-      [...byModel.entries()].map(([group, list]) => {
-        const key = group.slice(group.indexOf('|') + 1);
+      [...byModel.values()].map((list) => {
+        const key = this.objectModel(list[0]);
         const def = this.deps.content.object(list[0].def);
         const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
-        return this.template(`object:${key}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius }));
+        const resize = this.objectResize(list[0]);
+        return this.template(`object:${key}${resizeKey(resize)}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius, resize }));
       }),
     );
     // What each tile's top belongs to, for the things standing on tops.
@@ -2301,10 +2370,10 @@ export class BabylonRenderer implements Renderer {
     // Soft contact shadows under every object, sized to its footprint.
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
     const mirrors: MirrorInstance[] = [];
-    [...byModel.entries()].forEach(([group, list], n) => {
+    [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
-      const vary = this.deps.assets.get(group.slice(group.indexOf('|') + 1), 'model')?.vary ?? 0;
+      const vary = this.deps.assets.get(this.objectModel(list[0]), 'model')?.vary ?? 0;
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const k = this.storeyOf(o.z);
@@ -2320,8 +2389,27 @@ export class BabylonRenderer implements Renderer {
         const layer = def?.layer;
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
         // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
-        const [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - k * D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
-        const [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
+        // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
+        // never past its tiles.
+        let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - k * D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
+        let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
+        const shape = template.outline;
+        if (layer !== 'surface' && shape) {
+          const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
+          const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
+          // Model x and z turned by the yaw (as `RotationYawPitchRoll`: x -> (c, -s), z -> (s, c)).
+          const xs: number[] = [];
+          const zs: number[] = [];
+          for (const mx of [shape.minX, shape.maxX]) {
+            for (const mz of [shape.minZ, shape.maxZ]) {
+              xs.push(centre.x + (mx * c + mz * s) * size);
+              zs.push(centre.z - k * D + (-mx * s + mz * c) * size);
+            }
+          }
+          const [x0, x1] = [Math.max(o.x + ox, Math.min(...xs) - 0.03), Math.min(o.x + ox + o.w, Math.max(...xs) + 0.03)];
+          const [z0, z1] = [Math.max(z + oz, Math.min(...zs) - 0.03), Math.min(z + oz + o.d, Math.max(...zs) + 0.03)];
+          if (x1 > x0 && z1 > z0) [px, pz, pw, pd] = [x0, z0, x1 - x0, z1 - z0];
+        }
         this.placed.push({
           id: o.id,
           y0,
@@ -2448,17 +2536,22 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
-  private loadGhost(model: string): void {
-    this.ghostKey = model;
-    for (const mesh of this.ghostMeshes) mesh.dispose(false, false);
-    this.ghostMeshes = [];
-    this.ghostOwn = [];
-    const key = model;
-    void buildModel(this.scene, `ghost:${key}`, this.deps.assets.get(key, 'model'), [1, 1]).then((template) => {
+  private loadGhost(model: string, resize?: ObjectResize): void {
+    const key = model + resizeKey(resize);
+    this.ghostKey = key;
+    // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
+    if (model !== this.ghostModel) {
+      for (const mesh of this.ghostMeshes) mesh.dispose(false, false);
+      this.ghostMeshes = [];
+      this.ghostOwn = [];
+    }
+    this.ghostModel = model;
+    void buildModel(this.scene, `ghost:${key}`, this.deps.assets.get(model, 'model'), resize?.from ?? [1, 1], { resize }).then((template) => {
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
       }
+      for (const mesh of this.ghostMeshes) mesh.dispose(false, false);
       for (const mesh of template.meshes) {
         mesh.parent = this.ghostRoot;
         mesh.isPickable = false;

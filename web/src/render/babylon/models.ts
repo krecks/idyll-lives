@@ -54,6 +54,8 @@ export interface ModelTemplate {
   bottom?: number;
   /** Its mirror glass, if any (parts with `mirror`). */
   mirrors?: MirrorSurface[];
+  /** Its outline on the floor in model space (m: x and z, before turning), for picking it by what's drawn rather than its tiles. */
+  outline?: { minX: number; maxX: number; minZ: number; maxZ: number };
 }
 
 /**
@@ -70,6 +72,17 @@ export interface BuildOptions {
   lod?: 0 | 1;
   /** Things on a top: the radius (m) of the disc they take, for the stand-in when the model is missing. */
   radius?: number;
+  /** Resized by the player: drawn at this size (see `resizeParts`). */
+  resize?: Resize;
+}
+
+/** A player's resizing: its own size (metres across and deep, before turning) and how much taller. */
+export interface Resize {
+  size: [number, number];
+  /** Centimetres taller (negative: shorter). */
+  tall: number;
+  /** Things hanging from the ceiling grow downwards. */
+  ceiling?: boolean;
 }
 
 export async function buildModel(
@@ -86,7 +99,71 @@ export async function buildModel(
       console.warn(`[render] failed to load ${entry.url}, using placeholder`, err);
     }
   }
-  return buildPlaceholder(scene, name, entry?.placeholder ?? fallbackParts(footprint, options.radius), options.lod ?? 0);
+  const parts = entry?.placeholder ?? fallbackParts(footprint, options.radius);
+  const resized = options.resize ? resizeParts(parts, footprint, options.resize) : parts;
+  return buildPlaceholder(scene, name, resized, options.lod ?? 0);
+}
+
+/** Share of a model's height above which everything rises with it (seats, tops, backs; sim-core `Top::of`). */
+const RISE_FROM = 0.4;
+/** Along the floor: the band at each edge (m, at most this share of half the width) that moves with the edge unstretched. */
+const EDGE_BAND = 0.35;
+const EDGE_SHARE = 0.4;
+/** Parts smaller than this share of the width (or height) move without stretching. */
+const SMALL = 0.15;
+
+/**
+ * Smart resizing for a model of `from` tiles drawn at `resize`: along the floor, the parts at
+ * each edge (legs, side panels, frames) move out with it, keeping their thickness, while the
+ * middle stretches (a table top, a sofa's cushions); upward, everything above `RISE_FROM` of its
+ * height rises by the extra height and what spans that line (legs, a wardrobe's body) stretches
+ * to meet it. Small parts only move. Parts turned off the model's axes only move, too.
+ */
+export function resizeParts(parts: readonly PlaceholderPart[], from: readonly [number, number], resize: Resize): PlaceholderPart[] {
+  const [tw, td] = resize.size;
+  const dy = resize.tall / 100;
+  if (tw === from[0] && td === from[1] && !dy) return [...parts];
+  // Each part's turn and axis-aligned box in model space.
+  const boxes = parts.map(partBox);
+  const bottom = Math.min(...boxes.map((b) => b.lo[1]));
+  const top = Math.max(...boxes.map((b) => b.hi[1]));
+  const span = Math.max(top - bottom, 1e-3);
+  // Upward (or, from the ceiling, downward): what lies past the line moves by `dy`.
+  const line = resize.ceiling ? top - RISE_FROM * span : bottom + RISE_FROM * span;
+  const lift = (v: number) => (resize.ceiling ? (v < line ? v - dy : v) : v > line ? v + dy : v);
+  // Along the floor: a band at each edge moves with it; the middle scales to fill.
+  const across = (half: number, half2: number) => {
+    const band = Math.min(EDGE_BAND, EDGE_SHARE * half);
+    const band2 = Math.min(band, EDGE_SHARE * half2);
+    const inner = half - band;
+    const inner2 = half2 - band2;
+    return (v: number) => {
+      const a = Math.abs(v);
+      const mapped = a <= inner ? (a * inner2) / Math.max(inner, 1e-6) : inner2 + ((a - inner) * band2) / band;
+      return Math.sign(v) * mapped;
+    };
+  };
+  const maps = [across(from[0] / 2, tw / 2), lift, across(from[1] / 2, td / 2)];
+  const widths = [from[0], span, from[1]];
+  return parts.map((p, i) => {
+    const { lo, hi, along } = boxes[i];
+    const at = [...p.at] as Vec3;
+    const size = [...p.size] as Vec3;
+    for (let k = 0; k < 3; k++) {
+      const map = maps[k];
+      const length = hi[k] - lo[k];
+      const j = along[k];
+      if (j < 0 || length < SMALL * widths[k]) {
+        // Moves as a whole: its middle goes where the map takes it.
+        at[k] = map(p.at[k]);
+        continue;
+      }
+      const [a, b] = [map(lo[k]), map(hi[k])];
+      at[k] = (a + b) / 2;
+      size[j] = Math.max(0.005, p.size[j] + (b - a) - length);
+    }
+    return { ...p, at, size };
+  });
 }
 
 function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
@@ -94,7 +171,22 @@ function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], 
   parts.forEach((part, index) => groups.addPart(part, lod, index));
   const { meshes, tints, bones } = groups.build(name);
   const mirrors = parts.filter((p) => p.mirror).map(mirrorSurface);
-  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, ...(mirrors.length ? { mirrors } : {}) };
+  const boxes = parts.map(partBox);
+  const outline = boxes.length ? { minX: Math.min(...boxes.map((b) => b.lo[0])), maxX: Math.max(...boxes.map((b) => b.hi[0])), minZ: Math.min(...boxes.map((b) => b.lo[2])), maxZ: Math.max(...boxes.map((b) => b.hi[2])) } : undefined;
+  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline, ...(mirrors.length ? { mirrors } : {}) };
+}
+
+/**
+ * A part's box in model space (`lo`, `hi`: corners along x, y, z), turned as `partMesh` turns it,
+ * and which of its own axes lies along each model axis (-1: none; it's turned off the axes).
+ */
+function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: number[] } {
+  const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
+  const m = Matrix.FromQuaternionToRef(Quaternion.FromEulerAngles(rx, ry, rz), new Matrix()).m;
+  // Model axis k gathers |R[j][k]| * size[j] from each local axis j (row j: where local axis j goes).
+  const half = [0, 1, 2].map((k) => [0, 1, 2].reduce((sum, j) => sum + Math.abs(m[j * 4 + k]) * p.size[j], 0) / 2);
+  const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(m[j * 4 + k]) > 0.999) ?? -1);
+  return { lo: p.at.map((c, k) => c - half[k]), hi: p.at.map((c, k) => c + half[k]), along };
 }
 
 /** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. */
@@ -118,7 +210,6 @@ function mirrorSurface(p: PlaceholderPart): MirrorSurface {
     .multiply(Matrix.Compose(Vector3.One(), turn, new Vector3(p.at[0], p.at[1], p.at[2])));
   return { round, matrix };
 }
-
 
 /**
  * Meshes grouped per (tint slot, finish, bone) and merged into one draw call each. Untextured

@@ -43,6 +43,10 @@ export interface Placing {
   style?: number;
   /** Set when moving an object the household already owns. */
   objectId: number | null;
+  /** Its own size (centimetres across and deep, before turning), resized by the player; absent: its kind's. */
+  size?: [number, number];
+  /** Centimetres taller (negative: shorter) than its kind. */
+  tall?: number;
 }
 
 export interface SocialMenuState {

@@ -29,6 +29,7 @@ import { WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
+import { ownSize } from './surfaces';
 import { styledModel } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { greyed, householdBonds, householdSpawns, lookFromSeed, lookOfStage, palette, type Appearance, type HouseholdDraft } from './household';
@@ -512,7 +513,7 @@ export async function startSession(
         controls.setMode('buy');
         game.buySelection = null;
       }
-      game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId };
+      game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId, size: ownSize(content, obj), tall: obj.tall ?? 0 };
     },
     rotatePlacing(fine = false) {
       if (game.mode !== 'buy' && !buildBuy.stairsTool()) return;
@@ -565,6 +566,14 @@ export async function startSession(
     },
     restyle(objectId, style) {
       bridge.send({ type: 'restyle', household: game.home, object: objectId, style });
+    },
+    resetSize(objectId) {
+      const obj = game.objects.find((o) => o.id === objectId);
+      const def = obj && content.object(obj.def);
+      if (!obj || !def) return;
+      // Back to its kind's footprint from the same corner (the simulation refuses it if that doesn't fit).
+      const [w, d] = def.footprint ?? [1, 1];
+      bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0 });
     },
     setHouseholdStyle(style) {
       bridge.send({ type: 'setStyle', household: game.home, style });
@@ -799,6 +808,7 @@ export async function startSession(
     // Something restyled while in hand: the ghost takes the new look.
     if (game.placing?.objectId != null) buildBuy.rehover();
     if (game.buySelection !== null && !w.objects.some((o) => o.id === game.buySelection)) game.buySelection = null;
+    buildBuy.objectsChanged();
     game.roster = w.sims.filter((s) => !s.gone);
     game.everyone = w.sims;
     game.former = w.former ?? [];
@@ -979,7 +989,7 @@ export async function startSession(
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       renderer.setHoverTile(g && inLot(g.x, g.z) && !game.pauseMenu ? { x: Math.floor(g.x), z: Math.floor(g.z) } : null);
-      if (game.mode !== 'live') buildBuy.hover(g && inLot(g.x, g.z) ? g : null, hit.objectId);
+      if (game.mode !== 'live') buildBuy.hover(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
     },
     leave() {
       renderer.setHoverTile(null);
@@ -989,8 +999,9 @@ export async function startSession(
     press(x, y) {
       // The eyedropper picks with a plain click.
       if (game.pauseMenu || game.mode === 'live' || buildBuy.picking()) return false;
-      const g = renderer.pick(x, y).ground;
-      return buildBuy.press(g && inLot(g.x, g.z) ? g : null);
+      const hit = renderer.pick(x, y);
+      const g = hit.ground;
+      return buildBuy.press(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
     },
     release(x, y, moved) {
       const g = renderer.pick(x, y).ground;
@@ -1010,7 +1021,7 @@ export async function startSession(
     play('pick');
     if (p.kind === 'tool') return controls.setBuildTool(p.tool);
     controls.startPlacing(p.def);
-    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, style: p.style };
+    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, style: p.style, size: p.size, tall: p.tall };
   }
 
   const onKey = (e: KeyboardEvent) => {
@@ -1145,7 +1156,8 @@ export async function startSession(
     bridge.sync(now);
     const frame = bridge.frame(now);
     renderer.update(frame);
-    renderer.setHeldObject(game.placing?.objectId ?? null);
+    renderer.setHeldObject(game.placing?.objectId ?? buildBuy.heldId());
+    buildBuy.syncHandles();
     if (!revealed) return;
     bubbles.update(frame);
     voices.update(frame);

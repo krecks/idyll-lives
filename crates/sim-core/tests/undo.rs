@@ -36,6 +36,8 @@ fn buy(w: &mut World, def: &str, x: i32, z: i32) {
         style: None,
         turn: None,
         offset: None,
+        size: None,
+        tall: None,
     })
     .unwrap();
 }
@@ -100,6 +102,8 @@ fn undo_reverses_moves_walls_and_floors_one_step_at_a_time() {
         rot: 1,
         turn: None,
         offset: None,
+        size: None,
+        tall: None,
     })
     .unwrap();
     let mut edits = Vec::new();

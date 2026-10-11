@@ -26,7 +26,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None, offset: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None, offset: None, size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -63,7 +63,7 @@ fn things_on_a_wall_or_ceiling_share_tiles_with_furniture() {
 
     // A wall something hangs on can't be taken down or get a door.
     let edit = |kind| sim_core::command::EdgeEdit {
-        axis: sim_core::command::EdgeAxis::H, x: 3, z: 1, kind, cover: None, form: None, style: None,
+        axis: sim_core::command::EdgeAxis::H, x: 3, z: 1, kind, cover: None, form: None, style: None, sill: None, head: None,
     };
     let err = w.apply(Command::Build { household: 0, edits: vec![edit(sim_core::command::EdgeKind::Open)] }).unwrap_err().to_string();
     assert!(err.contains("hangs"), "{err}");

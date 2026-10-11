@@ -26,13 +26,16 @@ export type Command =
   /** Build and buy are addressed to a household: its home may have nobody living in it yet. */
   /**
    * `turn`: degrees past the facing, for objects that turn freely (0..89); `offset`: centimetres
-   * (x, z) off the middle of the footprint, for the same objects (up to `MAX_OFFSET` each way).
+   * (x, z) off the middle of the footprint (up to `MAX_OFFSET` each way; things on a wall only
+   * along it); `size`: its own size (centimetres across and deep before turning, `MIN_SIZE` to
+   * `MAX_SIZE` tiles; it takes them rounded up to whole tiles); `tall`: centimetres taller
+   * (negative: shorter) than its kind.
    */
-  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number] }
+  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
   | { type: 'sell'; household: number; object: number }
   /** The paid quick fix for something worn or broken. */
   | { type: 'repair'; household: number; object: number }
-  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number] }
+  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
   | { type: 'restyle'; household: number; object: number; style: number }
   | { type: 'setStyle'; household: number; style: number }
   | { type: 'upgrade'; household: number; object: number }
@@ -185,7 +188,15 @@ export interface EdgeEdit {
   form?: number;
   /** Doors and windows: style index; fences and gates: fence style index. */
   style?: number;
+  /** Windows: sill; doors and windows: top (centimetres above the floor, `MAX_HEAD` at most). Absent keeps a standing one's. */
+  sill?: number;
+  head?: number;
 }
+
+/** Doors and windows (sim-core `MAX_HEAD`, `MIN_DOOR_HEAD`, `MIN_WINDOW`): the highest top, a door's lowest top, a window's least height (centimetres). */
+export const MAX_HEAD = 270;
+export const MIN_DOOR_HEAD = 180;
+export const MIN_WINDOW = 30;
 
 /** A fence or gate on a grid edge (as `WallEdge`); not a wall: it makes no rooms. */
 export interface FenceEdge {
@@ -224,6 +235,9 @@ export interface Opening extends WallEdge {
   kind: 'door' | 'window';
   /** Door or window style index. */
   style?: number;
+  /** Resized by the player: the sill (windows) and the top, centimetres above the floor; absent: the style's. */
+  sill?: number;
+  head?: number;
 }
 
 export interface MeshArrays {
@@ -263,11 +277,18 @@ export interface ObjectPlacement {
   rot: number;
   /** Degrees past `rot`, for objects that turn freely (0..89). */
   turn?: number;
-  /** Centimetres (x, z) its middle stands off the middle of its footprint (objects that turn freely). */
+  /** Centimetres (x, z) its middle stands off the middle of its footprint. */
   offset?: [number, number];
+  /**
+   * Resized by the player: its own size, centimetres across and deep before turning (it stands
+   * in the middle of its tiles `w` × `d`, moved by `offset`); absent: its kind's footprint.
+   */
+  size?: [number, number];
+  /** Centimetres taller (negative: shorter) than its kind. */
+  tall?: number;
   /** Things on the `surface` layer: the height (m) of the top they stand on. */
   lift?: number;
-  /** Rotated footprint in tiles. */
+  /** Rotated footprint in tiles (its own: resized, it differs from its kind's). */
   w: number;
   d: number;
   /** Upgrade level (0 = as bought). */
@@ -698,6 +719,11 @@ export function storeyOfRow(world: { depth: number; storeyDepth?: number; storey
 
 /** How far an object can stand off the middle of its footprint (centimetres per axis; sim-core `MAX_OFFSET`). */
 export const MAX_OFFSET = 50;
+/** Resizing (sim-core `MAX_SIZE`, `MIN_SIZE`, `MAX_TALLER`, `MAX_SHORTER`): tiles each way at most, centimetres each way at least, centimetres taller and shorter. */
+export const MAX_SIZE = 6;
+export const MIN_SIZE = 10;
+export const MAX_TALLER = 200;
+export const MAX_SHORTER = 100;
 
 /** Where an object's middle stands (tiles): the middle of its footprint, moved by its `offset`. */
 export function objectCentre(o: { x: number; z: number; w: number; d: number; offset?: [number, number] }): { x: number; z: number } {

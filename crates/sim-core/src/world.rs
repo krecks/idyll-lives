@@ -35,6 +35,46 @@ pub(crate) fn centred(offset: &[i8; 2]) -> bool {
     *offset == [0, 0]
 }
 
+/// The most tiles a resized object may take along either side.
+pub const MAX_SIZE: u8 = 6;
+/// The least a resized object may measure across or deep (centimetres).
+pub const MIN_SIZE: u16 = 10;
+/// How much taller (centimetres) a resized object may be than its kind, and how much shorter.
+pub const MAX_TALLER: i16 = 200;
+pub const MAX_SHORTER: i16 = 100;
+
+/// The tiles an object of `size` (centimetres across and deep) takes: rounded up.
+pub fn tiles_for(size: [u16; 2]) -> [u8; 2] {
+    size.map(|s| s.div_ceil(100).max(1) as u8)
+}
+
+/// A kind's footprint in centimetres (its own size before any resizing).
+pub fn kind_size(footprint: [u8; 2]) -> [u16; 2] {
+    footprint.map(|t| t as u16 * 100)
+}
+
+/// How an object is laid out on its tiles beyond where and which way it stands: off their
+/// middle, and resized (see `ObjectInstance::offset`, `extent` and `tall`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Layout {
+    pub offset: [i8; 2],
+    /// Its size (centimetres across and deep, before turning); None: its kind's.
+    pub extent: Option<[u16; 2]>,
+    pub tall: i16,
+}
+
+impl Layout {
+    /// Standing `offset` off its tiles' middle, its kind's size.
+    pub fn at(offset: [i8; 2]) -> Self {
+        Layout { offset, ..Layout::default() }
+    }
+
+    /// The layout `o` has now.
+    pub fn of(o: &ObjectInstance) -> Self {
+        Layout { offset: o.offset, extent: Some(o.extent), tall: o.tall }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectInstance {
     /// Equal to the object's index in `World::objects`.
@@ -51,6 +91,15 @@ pub struct ObjectInstance {
     /// `MAX_OFFSET`), for objects that turn freely: they can stand anywhere on their tile.
     /// Only for looks, like `turn`; the footprint stays on tiles.
     pub offset: [i8; 2],
+    /// Tiles it takes across and deep, before turning: its `extent` rounded up to whole tiles
+    /// (`MAX_SIZE` at most).
+    pub footprint: [u8; 2],
+    /// Its own size, centimetres across and deep before turning: its kind's footprint unless the
+    /// player resized it. It stands in the middle of its tiles (moved by `offset`).
+    pub extent: [u16; 2],
+    /// Centimetres taller (negative: shorter) than its kind, the player's resizing: tops and
+    /// seats rise with it.
+    pub tall: i16,
     /// Sims using or walking to this object, one per slot.
     pub users: [Option<u32>; MAX_SLOTS],
     /// Upgrade level: higher quality objects satisfy needs and teach skills faster.
@@ -133,15 +182,15 @@ impl ObjectInstance {
         let n = def.slots.max(1) as f32;
         // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
         // tell the lower bunk from the upper one).
-        let spread = if def.bunk { 0.04 } else { def.footprint[0] as f32 / n };
+        let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
         let offset = (slot as f32 - (n - 1.0) / 2.0) * spread;
         let yaw = self.yaw();
         // Local +x (the object's right) after rotation.
         [c[0] + yaw.cos() * offset, c[1] - yaw.sin() * offset]
     }
     /// Rotated footprint `(x extent, z extent)`.
-    pub fn size(&self, content: &Content) -> (i32, i32) {
-        let [w, d] = content.objects[self.def].footprint;
+    pub fn size(&self, _content: &Content) -> (i32, i32) {
+        let [w, d] = self.footprint;
         if self.rot.is_multiple_of(2) {
             (w as i32, d as i32)
         } else {
@@ -910,12 +959,12 @@ impl World {
                 .content
                 .object_index(&p.def)
                 .ok_or_else(|| Error::new(format!("unknown object '{}'", p.def)))?;
-            // Turned or set off its tile's middle: only what turns freely may be.
+            // Turned (only what turns freely may be), set off its tile's middle or resized.
             let at = |e: Error| Error::new(format!("'{}' at {},{}: {e}", p.def, p.x, p.z));
             let turn = world.check_turn(def, p.turn).map_err(at)?;
-            let offset = world.check_offset(def, p.offset).map_err(at)?;
+            let layout = world.check_layout(def, p.rot, Layout { offset: p.offset, extent: p.size, tall: p.tall }).map_err(at)?;
             let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(def, p.x, p.z, p.rot, offset, 0, 0, value)?;
+            let id = world.place(def, p.x, p.z, p.rot, layout, 0, 0, value)?;
             world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
@@ -1032,10 +1081,11 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, [0, 0], 0, 0, value)
+        self.place(def, x, z, rot, Layout::default(), 0, 0, value)
     }
 
-    /// Checks that object `def` fits at `x, z, rot` (standing `offset` off its tiles' middle):
+    /// Checks that object `def` fits at `x, z, rot` (laid out as `layout`, unchecked: see
+    /// `check_layout`):
     /// inside the lot, on free tiles without a diagonal wall, facing a tile on the lot. Things
     /// on the `Surface` layer need a top to stand on instead (see `surface::fit_on_top`).
     pub(crate) fn check_fit(
@@ -1044,7 +1094,7 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
-        offset: [i8; 2],
+        layout: Layout,
     ) -> Result<ObjectInstance, Error> {
         let obj = ObjectInstance {
             id: self.objects.len() as u32,
@@ -1053,7 +1103,10 @@ impl World {
             z,
             rot: rot % 4,
             turn: 0,
-            offset,
+            offset: layout.offset,
+            footprint: layout.extent.map_or(self.content.objects[def].footprint, tiles_for),
+            extent: layout.extent.unwrap_or(kind_size(self.content.objects[def].footprint)),
+            tall: layout.tall,
             users: [None; MAX_SLOTS],
             quality: 0,
             style: 0,
@@ -1171,12 +1224,12 @@ impl World {
         x: i32,
         z: i32,
         rot: u8,
-        offset: [i8; 2],
+        layout: Layout,
         style: u8,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
-        let mut obj = self.check_fit(def, x, z, rot, offset)?;
+        let mut obj = self.check_fit(def, x, z, rot, layout)?;
         obj.style = style;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
@@ -2094,11 +2147,15 @@ impl World {
                 style,
                 turn,
                 offset,
+                size,
+                tall,
             } => {
                 let def = self.content.object_index(&object);
                 let turn = def.map(|d| self.check_turn(d, turn.unwrap_or(0))).transpose()?;
-                let offset = def.map(|d| self.check_offset(d, offset.unwrap_or([0, 0]))).transpose()?;
-                let id = self.buy_at(household, &object, at, style, offset.unwrap_or([0, 0]))?;
+                let rot = at.map_or(0, |a| a[2] as u8);
+                let layout = Layout { offset: offset.unwrap_or([0, 0]), extent: size, tall: tall.unwrap_or(0) };
+                let layout = def.map(|d| self.check_layout(d, rot, layout)).transpose()?;
+                let id = self.buy_at(household, &object, at, style, layout.unwrap_or_default())?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
@@ -2110,17 +2167,27 @@ impl World {
                 rot,
                 turn,
                 offset,
+                size,
+                tall,
             } => {
+                let old = self.objects.get(object as usize).map(Layout::of);
                 let def = self.objects.get(object as usize).map(|o| o.def);
                 let turn = match (def, turn) {
                     (Some(d), Some(t)) => Some(self.check_turn(d, t)?),
                     _ => None,
                 };
-                let offset = match (def, offset) {
-                    (Some(d), Some(o)) => Some(self.check_offset(d, o)?),
+                // What isn't given stays as it was (checked against the new facing).
+                let layout = match (def, old) {
+                    (Some(d), Some(old)) => {
+                        // An offset it keeps that doesn't suit its new facing (along another wall) goes.
+                        let kept = if self.check_offset(d, rot, old.offset).is_ok() { old.offset } else { [0, 0] };
+                        let wanted = Layout { offset: offset.unwrap_or(kept), extent: size.or(old.extent), tall: tall.unwrap_or(old.tall) };
+                        Some(self.check_layout(d, rot, wanted)?)
+                    }
                     _ => None,
                 };
-                self.move_object_to(household, object, x, z, rot, turn, offset)?;
+                let (offset, size, tall) = (layout.map(|l| l.offset), layout.and_then(|l| l.extent), layout.map(|l| l.tall));
+                self.move_object_to(household, object, x, z, rot, turn, offset, size, tall)?;
             }
             Command::Restyle {
                 household,

@@ -128,6 +128,19 @@ interface Look {
   faces?: [number, number];
   form?: number;
   style?: number;
+  /** Doors and windows the player resized: sill and top, centimetres above the floor. */
+  sill?: number;
+  head?: number;
+}
+
+/**
+ * Doors or windows side by side in a wall that make one: a wide window, a double door. `start`:
+ * where the run begins along the line, `len` its edges, `index` this edge's place in it.
+ */
+interface Run {
+  start: number;
+  len: number;
+  index: number;
 }
 
 // Colour schemes (sRGB) chosen per house from its position, so a house always looks the same.
@@ -474,8 +487,69 @@ export class HouseBuilder {
     // Looks: face coverings and form from the wall list, the style from the opening.
     const looks = new Map<string, Look>();
     for (const e of world.walls) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
-    for (const o of world.openings) if (o.style) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style });
+    for (const o of world.openings) {
+      if (o.style || o.sill !== undefined || o.head !== undefined) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
+    }
     const lookOf = (axis: 'h' | 'v', x: number, z: number): Look => looks.get(`${axis}:${x}:${z}`) ?? {};
+    /** A door's top on an edge (m): the player's, else the usual. */
+    const doorHead = (axis: 'h' | 'v', x: number, z: number): number => {
+      const h = lookOf(axis, x, z).head;
+      return h === undefined ? DOOR_HEIGHT : h / 100;
+    };
+    /** A window on an edge: its style, with the player's sill and top. */
+    const windowOf = (axis: 'h' | 'v', x: number, z: number): WindowSpec => {
+      const l = lookOf(axis, x, z);
+      const spec = this.windowSpec(l.style);
+      return { ...spec, sill: l.sill === undefined ? spec.sill : l.sill / 100, head: l.head === undefined ? spec.head : l.head / 100 };
+    };
+    /** The next edge along the line, and whether the node between is clear (nothing crosses there). */
+    const along = (axis: 'h' | 'v', x: number, z: number, step: 1 | -1): { x: number; z: number; open: boolean } => {
+      const [nx, nz] = axis === 'h' ? [x + step, z] : [x, z + step];
+      const [px, pz] = axis === 'h' ? [step > 0 ? x + 1 : x, z] : [x, step > 0 ? z + 1 : z];
+      const crossed = axis === 'h' ? edges.get('v', px, pz) ?? edges.get('v', px, pz - 1) : edges.get('h', px, pz) ?? edges.get('h', px - 1, pz);
+      return { x: nx, z: nz, open: crossed === undefined && !diagonalAtNode(px, pz) };
+    };
+    /** Two edges make one opening: the same kind, style and size, nothing crossing between. */
+    const joins = (axis: 'h' | 'v', x: number, z: number, step: 1 | -1): boolean => {
+      const kind = edges.get(axis, x, z);
+      if (kind !== 'door' && kind !== 'window') return false;
+      const n = along(axis, x, z, step);
+      if (!n.open || edges.get(axis, n.x, n.z) !== kind) return false;
+      const [a, b] = [lookOf(axis, x, z), lookOf(axis, n.x, n.z)];
+      return (a.style ?? 0) === (b.style ?? 0) && a.sill === b.sill && a.head === b.head;
+    };
+    /** The run an opening belongs to (windows: as long as they go; doors: in pairs). */
+    const runOf = (axis: 'h' | 'v', x: number, z: number): Run => {
+      const pos = axis === 'h' ? x : z;
+      let start = pos;
+      let [cx, cz] = [x, z];
+      while (joins(axis, cx, cz, -1)) {
+        start--;
+        [cx, cz] = axis === 'h' ? [cx - 1, cz] : [cx, cz - 1];
+      }
+      let len = 1;
+      [cx, cz] = axis === 'h' ? [start, z] : [x, start];
+      while (joins(axis, cx, cz, 1)) {
+        len++;
+        [cx, cz] = axis === 'h' ? [cx + 1, cz] : [cx, cz + 1];
+      }
+      if (edges.get(axis, x, z) === 'door') {
+        // Doors go in pairs (a last one on its own).
+        const pair = Math.floor((pos - start) / 2) * 2;
+        return { start: start + pair, len: Math.min(2, len - pair), index: pos - start - pair };
+      }
+      return { start, len, index: pos - start };
+    };
+    /** Whether the grid node `(x, z)` lies inside a wide window or a double door (no post there). */
+    const inRun = (x: number, z: number): boolean => {
+      for (const axis of ['h', 'v'] as const) {
+        const [ex, ez] = axis === 'h' ? [x - 1, z] : [x, z - 1];
+        if (!joins(axis, ex, ez, 1)) continue;
+        const r = runOf(axis, ex, ez);
+        if (r.index < r.len - 1) return true;
+      }
+      return false;
+    };
     /** The covering of one face of the wall on an edge; undefined where there's no wall. */
     const faceAt = (axis: 'h' | 'v', x: number, z: number, side: 0 | 1): number | undefined => (edges.get(axis, x, z) ? (lookOf(axis, x, z).faces?.[side] ?? 0) : undefined);
     /** How tall the wall on an edge stands (0 where there's none). */
@@ -656,22 +730,29 @@ export class HouseBuilder {
       }
     };
 
-    /** A wall with a window: solid below the sill and above the head, piers either side. */
-    const windowWall = (axis: 'h' | 'v', x: number, z: number, win: WindowSpec) => {
+    /**
+     * A wall with a window: solid below the sill and above the head, piers either side. Inside a
+     * wide window (`run`), only its two ends have piers; the wall above and below runs on across
+     * the nodes (they get no post).
+     */
+    const windowWall = (axis: 'h' | 'v', x: number, z: number, win: WindowSpec, run: Run) => {
       const { sill, head } = win;
       const base = axis === 'h' ? x : z;
-      const g0 = base + win.inset;
-      const g1 = base + 1 - win.inset;
-      segment(axis, x, z, 0, sill, Cut.Clamp);
-      segment(axis, x, z, head, H, Cut.Hide);
-      segment(axis, x, z, sill, head, Cut.Hide, undefined, g0, false);
-      segment(axis, x, z, sill, head, Cut.Hide, g1, undefined, false);
+      const [first, last] = [run.index === 0, run.index === run.len - 1];
+      const g0 = first ? base + win.inset : base;
+      const g1 = last ? base + 1 - win.inset : base + 1;
+      const [s0, s1] = [first ? undefined : base, last ? undefined : base + 1];
+      segment(axis, x, z, 0, sill, Cut.Clamp, s0, s1);
+      segment(axis, x, z, head, H, Cut.Hide, s0, s1);
+      if (first) segment(axis, x, z, sill, head, Cut.Hide, undefined, g0, false);
+      if (last) segment(axis, x, z, sill, head, Cut.Hide, g1, undefined, false);
       // Reveals: the jambs and the head's underside, in trim.
       const P = (a: number, y: number, d: number): V3 => (axis === 'h' ? [a, y, z + d] : [x + d, y, a]);
       const na: V3 = axis === 'h' ? [1, 0, 0] : [0, 0, 1];
-      trim.poly([P(g0, sill, -T), P(g0, sill, T), P(g0, head, T), P(g0, head, -T)], na);
-      trim.poly([P(g1, sill, -T), P(g1, head, -T), P(g1, head, T), P(g1, sill, T)], [-na[0], 0, -na[2]]);
+      if (first) trim.poly([P(g0, sill, -T), P(g0, sill, T), P(g0, head, T), P(g0, head, -T)], na);
+      if (last) trim.poly([P(g1, sill, -T), P(g1, head, -T), P(g1, head, T), P(g1, sill, T)], [-na[0], 0, -na[2]]);
       trim.poly([P(g0, head, -T), P(g0, head, T), P(g1, head, T), P(g1, head, -T)], [0, -1, 0]);
+      trim.poly([P(g0, sill, -T), P(g1, sill, -T), P(g1, sill, T), P(g0, sill, T)], [0, 1, 0]);
     };
 
     /**
@@ -695,12 +776,20 @@ export class HouseBuilder {
         if (kind === 'wall') {
           segment(axis, x, z, 0, heightOf(axis, x, z), Cut.Clamp);
         } else if (kind === 'window') {
-          const win = this.windowSpec(lookOf(axis, x, z).style);
-          windowWall(axis, x, z, win);
-          this.window(axis, x, z, edgeMask(axis, x, z), roomP, scheme, trim, glass, [plainEnd(axis, x, z, 0), plainEnd(axis, x, z, 1)], win);
+          const win = windowOf(axis, x, z);
+          const run = runOf(axis, x, z);
+          windowWall(axis, x, z, win, run);
+          // The frame, glass and shutters once for the whole window, from its first edge.
+          if (run.index === 0) {
+            const [ex, ez] = axis === 'h' ? [run.start + run.len - 1, z] : [x, run.start + run.len - 1];
+            this.window(axis, x, z, edgeMask(axis, x, z), roomP, scheme, trim, glass, [plainEnd(axis, x, z, 0), plainEnd(axis, ex, ez, 1)], win, run.len);
+          }
         } else {
-          segment(axis, x, z, DOOR_HEIGHT, H, Cut.Hide);
-          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass }, lookOf(axis, x, z).style);
+          const run = runOf(axis, x, z);
+          const base = axis === 'h' ? x : z;
+          const head = doorHead(axis, x, z);
+          segment(axis, x, z, head, H, Cut.Hide, run.index > 0 ? base : undefined, run.index < run.len - 1 ? base + 1 : undefined);
+          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass }, lookOf(axis, x, z).style, head, run);
         }
       }
     }
@@ -713,8 +802,9 @@ export class HouseBuilder {
         const vd = edges.get('v', x, z - 1);
         const vu = edges.get('v', x, z);
         if (!hl && !hr && !vd && !vu) continue;
-        // Corners where a diagonal meets get a mitred post (below).
-        if (diagonalAtNode(x, z)) continue;
+        // Corners where a diagonal meets get a mitred post (below); inside a wide window or a
+        // double door there's none.
+        if (diagonalAtNode(x, z) || inRun(x, z)) continue;
         let maskH: number = LOOK.All;
         let maskV: number = LOOK.All;
         if (hl) maskH &= edgeMask('h', x - 1, z);
@@ -734,10 +824,11 @@ export class HouseBuilder {
           const a0 = axis === 'v' ? z - T : x - T;
           const a1 = axis === 'v' ? z + T : x + T;
           if (e === 'door') {
+            const top = dir === 'px' ? doorHead('h', x, z) : dir === 'nx' ? doorHead('h', x - 1, z) : dir === 'pz' ? doorHead('v', x, z) : doorHead('v', x, z - 1);
             trim.poly(
               axis === 'v'
-                ? [[plane, 0, a0], [plane, 0, a1], [plane, DOOR_HEIGHT, a1], [plane, DOOR_HEIGHT, a0]]
-                : [[a0, 0, plane], [a1, 0, plane], [a1, DOOR_HEIGHT, plane], [a0, DOOR_HEIGHT, plane]],
+                ? [[plane, 0, a0], [plane, 0, a1], [plane, top, a1], [plane, top, a0]]
+                : [[a0, 0, plane], [a1, 0, plane], [a1, top, plane], [a0, top, plane]],
               n,
             );
             return;
@@ -913,7 +1004,7 @@ export class HouseBuilder {
         const into = out0 ? 1 : -1;
         const at = (l: number) => into * (T + 0.01 + l);
         const hinge = o0 + 0.02;
-        this.leaf(d.style, front, scheme, mask, { trim, wood: doorWood, glass }, {
+        this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, { trim, wood: doorWood, glass }, {
           box: (g, s0, s1, y0, y1, l0, l1) => f.box(g, hinge + s0, hinge + s1, y0, y1, Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))),
           pane: (y0, y1, l0, l1) => {
             const a = hinge + LEAF_T / 2;
@@ -1436,17 +1527,22 @@ export class HouseBuilder {
     scheme: HouseScheme,
     geos: { wood: Geo; glass: Geo },
     style: number | undefined,
+    head = DOOR_HEIGHT,
+    run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
   ): void {
-    // Casings on both faces: two side boards (clamped to stubs when cut) and a head (hidden).
+    // Casings on both faces: two side boards (clamped to stubs when cut) and a head (hidden). A
+    // double door has its side boards at its two ends only, its head board right across.
+    const [first, last] = [run.index === 0, run.index === run.len - 1];
+    const base = axis === 'h' ? x : z;
     for (const n of axis === 'h' ? ([[0, 0, -1], [0, 0, 1]] as V3[]) : ([[-1, 0, 0], [1, 0, 0]] as V3[])) {
       const plane = axis === 'h' ? z + n[2] * T : x + n[0] * T;
-      const a0 = (axis === 'h' ? x : z) + T;
-      const a1 = (axis === 'h' ? x : z) + 1 - T;
+      const a0 = base + T;
+      const a1 = base + 1 - T;
       trim.cutting(Cut.Clamp, mask);
-      trim.box(...span(axis, plane, n, a0 - 0.1, a0 + 0.01, 0, DOOR_HEIGHT + 0.1, 0.022));
-      trim.box(...span(axis, plane, n, a1 - 0.01, a1 + 0.1, 0, DOOR_HEIGHT + 0.1, 0.022));
+      if (first) trim.box(...span(axis, plane, n, a0 - 0.1, a0 + 0.01, 0, head + 0.1, 0.022));
+      if (last) trim.box(...span(axis, plane, n, a1 - 0.01, a1 + 0.1, 0, head + 0.1, 0.022));
       trim.cutting(Cut.Hide, mask);
-      trim.box(...span(axis, plane, n, a0 - 0.1, a1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, 0.024));
+      trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
     }
     // An open door leaf hinged on one jamb, swung 90 degrees into the room (or the outdoor
     // side's opposite for front doors), standing against the opening's edge.
@@ -1454,11 +1550,12 @@ export class HouseBuilder {
     const outdoorB = axis === 'h' ? roomP(x + 0.5, z + 0.25) === 0 : roomP(x + 0.25, z + 0.5) === 0;
     const front = outdoorA !== outdoorB;
     const into = outdoorA ? 1 : -1; // swing towards the indoor side
-    // Leaf space: `s` across its thickness from the hinge jamb, `l` from the hinge outwards.
-    const hinge = (axis === 'h' ? x : z) + T + 0.02;
+    // Leaf space: `s` across its thickness from the hinge jamb, `l` from the hinge outwards. The
+    // second leaf of a double door hangs on the far jamb.
+    const hinge = run.len > 1 && run.index === run.len - 1 ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
     const at = (l: number) => (axis === 'h' ? z : x) + into * (T + 0.01 + l);
     const { glass } = geos;
-    this.leaf(style, front, scheme, mask, { trim, ...geos }, {
+    this.leaf(style, front, scheme, mask, head, { trim, ...geos }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
         if (axis === 'h') g.box(hinge + s0, y0, p0, hinge + s1, y1, p1);
@@ -1486,6 +1583,7 @@ export class HouseBuilder {
     front: boolean,
     scheme: HouseScheme,
     mask: number,
+    head: number,
     geos: { trim: Geo; wood: Geo; glass: Geo },
     put: { box: (g: Geo, s0: number, s1: number, y0: number, y1: number, l0: number, l1: number) => void; pane: (y0: number, y1: number, l0: number, l1: number) => void },
   ): void {
@@ -1493,7 +1591,7 @@ export class HouseBuilder {
     const { trim, wood, glass } = geos;
     for (const g of [trim, wood, glass]) g.cutting(Cut.Hide, mask);
     const paint = def.color ?? (front ? scheme.accent : '#EDEAE2');
-    const top = DOOR_HEIGHT - 0.03;
+    const top = head - 0.03;
     const box = (g: Geo, y0: number, y1: number, l0: number, l1: number) => put.box(g, 0, LEAF_T, y0, y1, l0, l1);
     if (def.leaf === 'oak') box(wood.color('#FFFFFF'), 0.01, top, 0, LEAF_W);
     else if (def.leaf === 'panel') box(trim.color(paint), 0.01, top, 0, LEAF_W);
@@ -1526,17 +1624,24 @@ export class HouseBuilder {
     glass: Geo,
     shutters: [boolean, boolean],
     win: WindowSpec,
+    len = 1,
   ): void {
     // Frames, sill and shutters on both faces around the opening (see `windowWall`); a pane
-    // with glazing bars set a little into the opening from each side.
+    // with glazing bars set a little into the opening from each side. A wide window (`len`
+    // edges) has each metre's panes and a mullion between them.
     const { sill, head } = win;
-    const a0 = (axis === 'h' ? x : z) + win.inset;
-    const a1 = (axis === 'h' ? x : z) + 1 - win.inset;
+    const base = axis === 'h' ? x : z;
+    const a0 = base + win.inset;
+    const a1 = base + len - win.inset;
     const recess = 0.03;
     const n0: V3 = axis === 'h' ? [0, 0, 1] : [1, 0, 0];
     const back = (axis === 'h' ? z : x) - T + recess;
     trim.cutting(Cut.Hide, mask).color(TRIM);
-    muntins(win, a0, a1, (b0, b1, y0, y1) => trim.box(...span(axis, back, n0, b0, b1, y0, y1, 2 * (T - recess))));
+    const bar = (b0: number, b1: number, y0: number, y1: number) => trim.box(...span(axis, back, n0, b0, b1, y0, y1, 2 * (T - recess)));
+    for (let k = 0; k < len; k++) {
+      muntins(win, k === 0 ? a0 : base + k, k === len - 1 ? a1 : base + k + 1, bar);
+      if (k > 0) bar(base + k - 0.03, base + k + 0.03, sill, head);
+    }
     for (const sign of [-1, 1]) {
       const n: V3 = axis === 'h' ? [0, 0, sign] : [sign, 0, 0];
       const plane = axis === 'h' ? z + sign * T : x + sign * T;
