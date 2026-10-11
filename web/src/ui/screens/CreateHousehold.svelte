@@ -40,6 +40,7 @@
     eyes: palette(assets, 'palette.eyes'),
     hair: palette(assets, 'palette.hair'),
     bottomColor: palette(assets, 'palette.bottoms'),
+    shoesColor: palette(assets, 'palette.shoes'),
   };
   const garmentLabels: Record<string, string> = {
     'top.tee': 'T-shirt',
@@ -514,7 +515,7 @@
             {rules.perkPoints} points.
           </p>
         {:else if tab === 'Look'}
-          {#snippet colors(key: 'body' | 'skin' | 'eyes' | 'hair' | 'bottomColor', label: string)}
+          {#snippet colors(key: 'body' | 'skin' | 'eyes' | 'hair' | 'bottomColor' | 'shoesColor', label: string)}
             <div class="swatches" role="radiogroup" aria-label={label}>
               {#each swatches[key] as color (color)}
                 <button
@@ -576,6 +577,7 @@
           <div class="field">
             <span class="eyebrow">Shoes</span>
             {#if wardrobe}{@render garments('shoes', wardrobe.shoes, 'Shoes')}{/if}
+            {@render colors('shoesColor', 'Shoe colour')}
           </div>
           <label class="field">
             <span class="eyebrow">Height</span>

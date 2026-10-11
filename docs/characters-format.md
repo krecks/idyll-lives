@@ -219,38 +219,58 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 - `thigh` sets `thigh_l` and the mirrored `thigh_r` (x, -y, -z); `thigh_r` sets one side and wins.
   Bones a pose doesn't name rest. `move` is the pelvis offset from rest (m, reference skeleton).
 - Clips hold fists (`GRIP`); the runtime opens the hands towards the rest (open) pose per activity.
-- Clips start from the relaxed stance (feet under the hips, upright).
-- Every name the runtime plays, with its loop flag and length (seconds):
+- Clips start from the relaxed stance (feet under the hips, upright, arms hanging loose); the
+  runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
+  elder's stoop), so a clip looks in game as it was authored.
+- Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
+  goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS` in
+  characters.ts, or the content's `seat`). Lying plays `lie` turned flat on the mattress (`LIE_*`);
+  the blanket is fitted to `lie` too.
+- Carried things sit on the palms (`grip`): the right one, or between both.
+- Every name the runtime plays, with its loop flag and length (seconds; the runtime sequences
+  object use, sitting down and standing up on these lengths):
 
-| Clip | Loop | s | | Clip | Loop | s |
-|---|---|---|---|---|---|---|
-| idle | yes | 2.5 | | eat | no | 1.33 |
-| talk | yes | 2.93 | | water | yes | 3.8 |
-| walk | yes | 1.1 (speed 1.1 m/s) | | harvest | yes | 2.5 |
-| jog | yes | 0.93 | | plant | no | 2.77 |
-| sit | yes | 1.67 | | foldArms | yes | 2.5 |
-| sitTalk | yes | 2.93 | | yes | no | 2.5 |
-| sitDown | no | 1.3 | | no | yes | 2.5 |
-| standUp | no | 1.03 | | phone | yes | 2.93 |
-| sitHands | yes | 1.67 | | lantern | yes | 2.5 |
-| interact | no | 2.0 | | rail | yes | 2.5 |
-| pickUp | no | 0.83 | | spell | yes | 2.1 |
-| dance | yes | 1.0 | | push | yes | 2.67 |
-| punchJab | no | 0.87 | | kneel | yes | 5.2 |
-| punchCross | no | 1.0 | | crouch | yes | 2.93 |
-| hit | no | 0.33 | | | | |
+| Clip | Loop | s | Played for |
+|---|---|---|---|
+| idle | yes | 2.5 | standing about, and object use that needs no hands |
+| talk | yes | 2.93 | talking, singing (with `phone` on top), the mirror |
+| walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
+| jog | yes | 0.7 | running, treadmills |
+| sit | yes | 1.67 | seated |
+| sitTalk | yes | 2.93 | seated in a conversation |
+| sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
+| standUp | no | 1.07 | getting up from a seat or out of bed |
+| sitHands | yes | 1.67 | seated at a desk or keys (type, write, play, music) |
+| interact | no | 2.0 | reaching to use something |
+| pickUp | no | 0.87 | lifting, serving, fetching |
+| spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |
+| chop, stir, flip | yes | 1.6, 2.0, 2.0 | the cooking steps of those names |
+| eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body) |
+| carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
+| lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
+| foldArms | yes | 2.5 | watching, relaxing, idle variations |
+| yes / no | no / yes | 2.5 | listening, arguing |
+| phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |
+| rail | yes | 2.5 | the telescope |
+| push | yes | 2.67 | mopping, vacuuming |
+| water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
+| dance | yes | 1.0 | dancing, fitness games |
+| punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
+| wave | no | 2.2 | the household creator's greetings |
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 
-## Who owns what
+## Where things are
 
-| Stream | Files |
+| What | Files |
 |---|---|
-| 0, contract | `prim/rig.py`, `prim/head.py` (interface), `prim/contract.py`, `prim/write.py`, `prim/build.py`, `prim/check.py`, `check_clips.ts`, `clips/dsl.ts`, this page |
-| A, body and clothes | `prim/body.py`, `prim/clothes.py`, `prim/garments.py`, `prim/cage.py`, `prim/subdiv.py`; the `head.py` numbers behind the interface; parts `body` (skin), `lod.*`, `top.*`, `bottom.*`, `shoes.*` |
-| B, face and hair | `prim/face.py`, `prim/hair.py`, `prim/prims.py`; parts `eyes lashes brows teeth tongue hair.*`, the lids and lips inside `body`; the `SIMEYE` / `SIMHAIR` / `SIMBROW` shader branches |
-| C, clips | `clips/*` except `dsl.ts` |
-| D, integration | `characters.ts`, `outfit.ts`, `household.ts`, the UI, credits and docs |
+| the contract | `prim/rig.py`, `prim/head.py` (the head interface), `prim/contract.py`, `prim/write.py`, `prim/build.py`, `prim/check.py`, `check_clips.ts`, `clips/dsl.ts`, this page |
+| body and clothes | `prim/body.py`, `prim/cage.py`, `prim/subdiv.py`, `prim/clothes.py`, `prim/garments.py`, `prim/meshops.py` |
+| face and hair | `prim/face.py`, `prim/hair.py`, `prim/prims.py`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
+| clips | `clips/*` (with `clips/ik.ts`) |
+| the runtime | `characters.ts` (activities, seats, beds, carrying, faces), `characters/{data,pose,material,outfit,blanket}.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
+
+See also `tools/characters/README.md`.
 
 ## Dev benches
 
@@ -258,5 +278,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
   stage), `?hair=all`, `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1`, `?build=1.2`, `?cols=`, `?manual`
   (`__bench.advance(s)`); sets `window.__ready`.
-- `/poses.html`: residents at real furniture. `?clip=<name>` plays one clip on everyone;
-  `?clip=<name>&strip=8` shows it held at 8 times on a man, a woman and a child.
+- `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
+  `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,
+  `?clip=<name>` plays one clip on everyone, `?clip=<name>&strip=8` shows it held at 8 times on a
+  man, a woman and a child; `?manual` with `__poses.advance(s)` and `__poses.focus(n)`.

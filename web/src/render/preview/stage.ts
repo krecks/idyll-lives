@@ -9,7 +9,7 @@ import { FreeCamera, Vector3 } from '../babylon/core';
 import type { StageDirection } from '../babylon/characters';
 import type { VisemeTrack } from '../../voice/visemes';
 import type { SimLook, SimStage, StageReaction } from '../types';
-import { reactionFor, slump, tilt, wave, WAVE_SECONDS, type Performance } from './reactions';
+import { reactionFor, slump, tilt, type Performance } from './reactions';
 import type { Studio } from './studio';
 
 const ROW = 0;
@@ -89,7 +89,7 @@ export class StageController implements SimStage {
     const now = performance.now() / 1000;
     const clipSeconds = perf.clip ? this.studio.characters.clipDuration(perf.clip) : 0;
     const oneShot = perf.clip && perf.seconds === undefined;
-    const seconds = Math.max(perf.wave ? WAVE_SECONDS : 0, oneShot ? clipSeconds : (perf.seconds ?? 1.5));
+    const seconds = oneShot ? clipSeconds : (perf.seconds ?? 1.5);
     const start = now;
     const dir: StageDirection = {
       clip: perf.clip ?? null,
@@ -97,7 +97,6 @@ export class StageController implements SimStage {
       face: perf.face ?? null,
       lookAt: perf.eyeContact === false ? null : this.eye,
       pose: (add, bone, time) => {
-        if (perf.wave) wave(add, bone, time - start);
         if (perf.tilt) tilt(add, bone, time - start, seconds, perf.tilt);
         if (perf.slump) slump(add, bone, time - start, seconds, perf.slump);
       },

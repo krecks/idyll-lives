@@ -285,7 +285,7 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
 #endif
 #ifdef SIMHAIR
 // The hair colour in clumps (tone.z), darker deep in (tone.y).
-surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (0.8 + 0.5 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.45;
@@ -445,7 +445,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (0.8 + 0.5 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.45;

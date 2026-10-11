@@ -5,7 +5,7 @@ import type { Content, LifeStageDef } from '../content/content';
 import { GARMENTS, pickOutfit } from '../render/babylon/characters/outfit';
 import { baseVoice, KITTEN_VOICES, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
 
-/** Hairstyles (character parts `hair.<style>`): the stylised set, MakeHuman's, and bald. */
+/** Hairstyles (character parts `hair.<style>`), and bald. */
 export const HAIR_STYLES = [
   'short',
   'crop',
@@ -59,7 +59,7 @@ export interface Appearance {
   bottom?: string;
   shoes?: string;
   bottomColor?: string;
-  /** No longer used (shoes keep their own colours); kept in older saves. */
+  /** Shoe colour (missing: the shoes' own colour). */
   shoesColor?: string;
   /** Optional model key overriding `model.sim` (for future character models). */
   model?: string;
