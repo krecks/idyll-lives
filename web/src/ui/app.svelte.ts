@@ -6,9 +6,8 @@ import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
 
 /**
- * New game: neighbourhood → household → home → game; neighbourhood → home → game (build first,
- * a family moves in later); or neighbourhood → play (take over a household that already lives
- * there) → game.
+ * New game: neighbourhood → household (Creation) → home → game; or neighbourhood → play (take
+ * over a household that already lives there) → game.
  */
 export type Screen = 'menu' | 'neighbourhood' | 'create' | 'home' | 'play' | 'game';
 export type Overlay = 'settings' | 'load' | 'credits' | null;
@@ -33,8 +32,6 @@ class AppState {
   mode = $state<GameKind>('living');
   /** How fast residents age (the new game's choice). */
   lifespan = $state<Lifespan>('normal');
-  /** Build first: the new game starts without a household (the draft is kept for going back). */
-  buildFirst = $state(false);
   /** The home is an empty lot (its house cleared away) rather than the house as it stands. */
   emptyLot = $state(false);
   /** House picked on the home screen (prepared in the background). */
@@ -56,7 +53,6 @@ class AppState {
     this.town = null;
     this.household = null;
     this.playSlot = null;
-    this.buildFirst = false;
     this.emptyLot = false;
     this.screen = 'neighbourhood';
   }
@@ -71,8 +67,8 @@ class AppState {
   /** The new game the home screen starts on `slot` (also prepared in the background). */
   homeRequest(slot: number): StartRequest | null {
     const town = this.homeTown(slot);
-    const household = this.buildFirst ? null : this.household;
-    if (!town || (!household && !this.buildFirst)) return null;
+    const household = this.household;
+    if (!town || !household) return null;
     return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan };
   }
 

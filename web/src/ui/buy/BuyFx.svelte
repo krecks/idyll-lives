@@ -6,7 +6,7 @@
   import { game } from '../state.svelte';
 
   /**
-   * Buy and Build mode's pointer companions: a tag beside the cursor saying what a click will
+   * Build mode's pointer companions: a tag beside the cursor saying what a click will
    * do and cost (red where it can't), and the money each purchase or sale moves, floating up
    * from where it happened.
    */
@@ -25,10 +25,10 @@
   }
 
   const tag = $derived.by((): { text: string; sub?: string; bad: boolean } | null => {
-    if (game.mode === 'live' || !onCanvas) return null;
+    if (game.mode !== 'build' || !onCanvas) return null;
     if (game.pickHint !== null) return { text: 'Pick up', sub: game.pickHint, bad: game.pickHint.startsWith('Nothing') };
     const placing = game.placing;
-    if (game.mode === 'buy') {
+    if (game.furnishing || (game.buildTool === 'stairs' && placing)) {
       if (!placing) return null;
       const def = services.content.object(placing.def);
       if (!def) return null;
@@ -87,12 +87,12 @@
     shakeTimer = setTimeout(() => (shaking = false), 480);
   });
 
-  // Money moved by an edit floats up from the pointer (time stands still in Buy mode, so the
+  // Money moved by an edit floats up from the pointer (time stands still in Build mode, so the
   // funds only change through buying, selling and building).
   let lastFunds: number | null = null;
   $effect(() => {
     const funds = game.funds;
-    const buying = game.mode !== 'live';
+    const buying = game.mode === 'build';
     const prev = lastFunds;
     lastFunds = funds;
     if (!buying || prev === null || funds === prev) return;

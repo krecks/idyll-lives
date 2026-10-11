@@ -40,12 +40,12 @@
 <section class="strip" aria-label="Household">
   {#if !game.occupied}
     <div class="card glass empty">
-      <button class="main" title="Create a family to live here" onclick={() => (game.moveInOpen = true)}>
+      <button class="main" title="Creation: a family to live here" onclick={() => services.controls.setMode('create')}>
         <span class="face add"><Icon name="icon.ui.plus" size={18} /></span>
         <span class="text">
           <span class="name">Nobody lives here yet</span>
-          <span class="doing">Move a family in</span>
-          <span class="where">Build first, or let them help</span>
+          <span class="doing">Creation: move a family in</span>
+          <span class="where">The home stands empty</span>
         </span>
       </button>
     </div>
@@ -100,7 +100,7 @@
     position: absolute;
     left: var(--edge);
     bottom: var(--edge);
-    right: 420px;
+    right: var(--edge);
     display: flex;
     align-items: flex-end;
     gap: 8px;

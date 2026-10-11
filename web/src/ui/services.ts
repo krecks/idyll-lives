@@ -2,7 +2,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { EdgeEdit, FacePaint, GoalIn, Lifespan, RoutineIn, SocialEvent } from '../core/protocol';
-import type { BuildTool, BuyFilter, GameMode } from './state.svelte';
+import type { BuildTab, BuildTool, BuyFilter, GameMode } from './state.svelte';
 import type { Content } from '../content/content';
 import type { HouseholdDraft } from '../game/household';
 import type { ItemPreviews, SimPreviews, WallMode } from '../render/types';
@@ -16,10 +16,6 @@ export interface GameControls {
   inspect(id: number | null): void;
   /** The camera follows a resident, also to other lots (null: back home). */
   follow(id: number | null): void;
-  /** The camera starts watching on its own now (the director). */
-  watch(): void;
-  /** Watch mode (true: the camera follows the household on its own) or Live mode; also leaves Buy and Build. */
-  setWatchMode(watch: boolean): void;
   /** Frames the whole house. */
   frameHouse(): void;
   /** Opens or closes the journal (the story so far). */
@@ -30,10 +26,6 @@ export interface GameControls {
   adopt(child: boolean): void;
   /** Whether the player's residents move in with partners and out of home on their own. */
   setPlayerMoves(enabled: boolean): void;
-  /** Opens or closes the Our home panel (the rooms and how they're doing). */
-  toggleHome(): void;
-  /** Build mode: shows or hides room scores on the floor (`on`: set). */
-  toggleRoomScores(on?: boolean): void;
   /** Shows the people of a story event, if they're at home. */
   showEvent(event: SocialEvent): void;
   /** Opens the planner on a resident (default: the one looked at) or the household's template. */
@@ -47,7 +39,7 @@ export interface GameControls {
   moveGoal(sim: number, index: number, to: number): void;
   acceptSuggestion(sim: number, index: number): void;
   dismissSuggestion(sim: number, index: number): void;
-  /** Buy mode with only items that fit (a wish, a goal). */
+  /** Build mode's catalog with only items that fit (a wish, a goal). */
   openCatalog(filter: BuyFilter): void;
   /** Take level `level` (grade) of career `career` (catalog index). */
   joinCareer(career: number, level: number): void;
@@ -64,12 +56,15 @@ export interface GameControls {
   setWallMode(mode: WallMode): void;
   closeMenu(): void;
   openPauseMenu(): void;
+  /** Live, Build or Create (only while nobody lives in the home); Build and Create pause the game. */
   setMode(mode: GameMode): void;
-  /** Buy mode: start placing a new object from the catalog. */
+  /** Build mode on a tab: Furnish (the catalog), Build (the last tool) or Home (rooms tinted by their scores). */
+  setBuildTab(tab: BuildTab): void;
+  /** Build mode: start placing a new object from the catalog. */
   startPlacing(def: string): void;
-  /** Buy mode: pick up an owned object to move it. */
+  /** Build mode: pick up an owned object to move it. */
   startMoving(objectId: number): void;
-  /** Buy mode: gives a resized object back its kind's size and height. */
+  /** Build mode: gives a resized object back its kind's size and height. */
   resetSize(objectId: number): void;
   /** Turns what's in hand (or picked) by a quarter; `fine`: by 15°, for things that turn freely. */
   rotatePlacing(fine?: boolean): void;
@@ -77,14 +72,14 @@ export interface GameControls {
   sell(objectId: number): void;
   /** Pays for a quick fix of something worn or broken at home (free in Creative). */
   repair(objectId: number): void;
-  /** Buy and Build mode: takes back the last edit (Ctrl/⌘+Z). */
+  /** Build mode: takes back the last edit (Ctrl/⌘+Z). */
   undo(): void;
-  /** Buy and Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
+  /** Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
   redo(): void;
   restyle(objectId: number, style: number): void;
   setHouseholdStyle(style: number): void;
   upgrade(objectId: number): void;
-  /** Build and Buy mode: arms (or disarms) the eyedropper: the next click picks up a look (E). */
+  /** Build mode: arms (or disarms) the eyedropper: the next click picks up a look (E). */
   toggleEyedropper(): void;
   /** Which storey is in view (0: the ground); higher ones are hidden, and building happens on it. */
   setStorey(storey: number): void;
@@ -94,12 +89,12 @@ export interface GameControls {
   saveBlueprint(name: string): Promise<void>;
   /** Build mode: builds a saved blueprint on the home's empty lot. */
   buildBlueprint(id: string): void;
-  /** Build mode: pick a tool (walls, rooms, doors, windows, remove); switches to Build mode. */
+  /** Build mode: pick a tool (walls, rooms, doors, windows, remove...); switches to Build mode's Build tab. */
   setBuildTool(tool: BuildTool): void;
   build(edits: EdgeEdit[]): void;
   /** Build mode: cover wall faces (paint, wallpaper, brick...). */
   paint(faces: FacePaint[]): void;
-  /** A family moves into the home (it arrives at the front of the lot); Live mode shows them arrive. */
+  /** Create mode: a family moves into the home (it arrives at the front of the lot); Live mode shows them arrive. */
   moveIn(household: HouseholdDraft): void;
   /** Saves a debug report (screenshot, game state, log) and returns where it went. */
   debugReport(note: string): Promise<string>;

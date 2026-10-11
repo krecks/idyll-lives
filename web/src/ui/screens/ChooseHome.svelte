@@ -12,8 +12,7 @@
   let templates = $state.raw<Templates | null>(null);
   /** Changes when a lot is made bigger or smaller (the lots along the street move). */
   const town = $derived(app.town!);
-  /** Null: build first, a family moves in later. */
-  const household = app.buildFirst ? null : app.household;
+  const household = app.household!;
   const economy = services.content.economy;
   const vacant = $derived(vacantSlots(town));
   const vacantIds = $derived(vacant.map((v) => v.index));
@@ -50,7 +49,7 @@
       ? 'Free: this is a Creative game'
       : money(economy.startingFunds + (lot === 'empty' ? (economy.emptyLotFunds ?? 0) : 0)),
   );
-  const mine = household ? `The ${household.name}s` : 'Your lot';
+  const mine = `The ${household.name}s`;
 
   const labels = $derived<LotLabel[]>(
     town.slots.map((s) => {
@@ -85,7 +84,7 @@
   }
 
   function back() {
-    app.screen = household ? 'create' : 'neighbourhood';
+    app.screen = 'create';
   }
 
   onMount(async () => {
@@ -108,12 +107,12 @@
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
   <header>
-    <button class="btn ghost back" onclick={back}><Icon name="icon.ui.back" size={18} /> {household ? 'Household' : 'Neighbourhood'}</button>
+    <button class="btn ghost back" onclick={back}><Icon name="icon.ui.back" size={18} /> Household</button>
     <div class="title">
-      <span class="eyebrow">{household ? 'Step 3 of 3' : 'Step 2 of 2'} · Choose a home</span>
-      <h1>{household ? `Where will the ${household.name}s live?` : 'Where will you build?'}</h1>
+      <span class="eyebrow">Step 3 of 3 · Choose a home</span>
+      <h1>Where will the {household.name}s live?</h1>
     </div>
-    <button class="btn primary large move" disabled={!selected} onclick={moveIn}>{household ? 'Move in →' : 'Start building →'}</button>
+    <button class="btn primary large move" disabled={!selected} onclick={moveIn}>Move in →</button>
   </header>
 
   <main>
@@ -161,7 +160,7 @@
             <h2>{selected.name}</h2>
             {#if lot === 'empty' || !house}
               <b class="house">An empty lot</b>
-              <p>The house is cleared away: build your own from the ground up.{household ? '' : ' A family can move in whenever you like.'}</p>
+              <p>The house is cleared away: build your own from the ground up.</p>
             {:else}
               <b class="house">{house.name}</b>
               <p>{house.description}</p>
@@ -177,8 +176,8 @@
               {/if}
               <dt>To build with</dt>
               <dd>{budget}</dd>
-              <dt>{household ? 'Your household' : 'Living here'}</dt>
-              <dd>{household ? household.members.map((m) => m.name).join(', ') : 'Nobody yet: move a family in later'}</dd>
+              <dt>Your household</dt>
+              <dd>{household.members.map((m) => m.name).join(', ')}</dd>
             </dl>
             {#if neighbours.length}
               <span class="eyebrow">Closest neighbours</span>

@@ -149,7 +149,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 
 Per need, each tick: `gain/min × needGain (traits × perks × active feeling buffs) × quality × skill`
 
-- quality: `1 + objectRules.qualityBonus × stars` = +25% per upgrade star (0–3 stars, bought in Buy mode);
+- quality: `1 + objectRules.qualityBonus × stars` = +25% per upgrade star (0–3 stars, bought in Build › Furnish);
 - skill: `1 + 0.05 × level` for interactions with `skill`.
 - Negative effects (costs) are not multiplied.
 

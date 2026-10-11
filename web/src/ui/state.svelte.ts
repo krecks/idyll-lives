@@ -16,9 +16,11 @@ export interface MenuState {
   items: { label: string; index: number; disabled?: boolean; cost?: number }[];
 }
 
-/** Live: play. Buy: furnish (place, move, upgrade, sell). Build: walls, rooms, doors and windows. */
-export type GameMode = 'live' | 'buy' | 'build';
+/** Live: play. Build: furnish, build and look after the home. Create: a family moving into an empty home (the new game's Creation, for a home left empty). */
+export type GameMode = 'live' | 'build' | 'create';
 export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'roof' | 'remove' | 'move' | 'blueprint';
+/** Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house itself) and Home (how its rooms are doing). */
+export type BuildTab = 'furnish' | 'build' | 'home';
 
 /** What Build mode puts up: wall covering (0: automatic, else wall covering + 1) and form, door and window style. */
 export interface BuildLook {
@@ -33,7 +35,7 @@ export interface BuildLook {
   fence: number;
 }
 
-/** An object being placed in buy mode: a new purchase, or an owned object being moved. */
+/** An object being placed in Build mode: a new purchase, or an owned object being moved. */
 export interface Placing {
   def: string;
   rot: number;
@@ -118,7 +120,7 @@ class GameState {
   pauseMenu = $state(false);
   townOpen = $state(false);
   weekday = $state(0);
-  /** The player's household (build and buy are addressed to it; nobody may live there yet). */
+  /** The player's household (Build mode's edits are addressed to it; nobody may live there yet). */
   home = $state(0);
   /** A Creative game: building and buying are free, and the home pays no rent or bills. */
   creative = $state(false);
@@ -136,12 +138,13 @@ class GameState {
   objects = $state.raw<ObjectPlacement[]>([]);
   mode = $state<GameMode>('live');
   placing = $state.raw<Placing | null>(null);
-  /** Owned object picked in buy mode. */
+  /** Owned object picked in Build mode's catalog. */
   buySelection = $state<number | null>(null);
   /** The storey in view (0: the ground) and how many the lot has; higher storeys are hidden. */
   storey = $state(0);
   storeys = $state(1);
-  /** Build mode's tool (kept between visits). */
+  /** Build mode's tab, and the Build tab's tool (both kept between visits). */
+  buildTab = $state<BuildTab>('furnish');
   buildTool = $state<BuildTool>('wall');
   /** The looks Build mode's tools use (kept between visits). */
   buildLook = $state<BuildLook>({ cover: 0, floor: 1, form: 0, door: 0, window: 0, fence: 0 });
@@ -153,7 +156,7 @@ class GameState {
   eyedropper = $state(false);
   /** While picking: what a click would pick up (the cursor tag). */
   pickHint = $state<string | null>(null);
-  /** Build and buy edits that can be taken back (until time moves on). */
+  /** Build mode's edits that can be taken back (until time moves on). */
   undoSteps = $state(0);
   /** Edits taken back that can be made again (until the next edit, or time moves on). */
   redoSteps = $state(0);
@@ -182,30 +185,19 @@ class GameState {
   inspected = $state<number | null>(null);
   /** Resident the camera follows (also to other lots); null: the camera stays home. */
   follow = $state<number | null>(null);
-  /** The camera is watching on its own (the director). */
+  /** The camera is watching on its own (the director): in Live, a while after the player's last input. */
   watching = $state(false);
-  /**
-   * Watch mode (the default) or Live mode: watching, the camera follows what happens at home on
-   * its own (and takes over again a while after the player moves it); live, it stays with the player.
-   */
-  watchMode = $state(true);
   /** The mouse moved lately: a quiet interface shows itself again for a moment. */
   hudAwake = $state(false);
   journalOpen = $state(false);
-  /** The Our home panel: every room of the house with its scores. */
-  homeOpen = $state(false);
-  /** Build mode: rooms tinted by their score. */
-  roomScores = $state(false);
   /** The rooms and garden of the player's home, with their scores. */
   rooms = $state.raw<RoomView[]>([]);
   /** The planner is open, on a resident (id) or the household's template. */
   plannerOpen = $state(false);
   plannerFor = $state<number | 'household'>('household');
-  /** The household creator is open over the game: a family moving into the home. */
-  moveInOpen = $state(false);
   /** The player household's routine template. */
   householdRoutines = $state.raw<Routine[]>([]);
-  /** Buy mode shows only what this filter allows (a wish, a goal); null: everything. */
+  /** The catalog shows only what this filter allows (a wish, a goal); null: everything. */
   buyFilter = $state.raw<BuyFilter | null>(null);
   /** The story so far (the whole log, fetched when the journal opens, then kept up to date). */
   journal = $state.raw<SocialEvent[]>([]);
@@ -222,8 +214,10 @@ class GameState {
     return this.creative || cost <= this.funds;
   }
 
-  /** Somebody lives in the player's home (false: build first, a family moves in later). */
+  /** Somebody lives in the player's home (false: the household moved away or is gone, or an older save built first). */
   occupied = $derived(this.roster.some((s) => this.households[s.household]?.player));
+  /** Build mode with the catalog in hand: clicks pick, place and move furniture rather than build. */
+  furnishing = $derived(this.mode === 'build' && this.buildTab === 'furnish');
 
   selectedSim = $derived(this.sims.find((s) => s.id === this.selected) ?? null);
   #shown: SimView | null = null;
@@ -259,20 +253,17 @@ class GameState {
     this.inspected = null;
     this.follow = null;
     this.watching = false;
-    this.watchMode = true;
     this.journalOpen = false;
-    this.homeOpen = false;
-    this.roomScores = false;
     this.rooms = [];
     this.journal = [];
     this.plannerOpen = false;
-    this.moveInOpen = false;
     this.buyFilter = null;
     this.day = 1;
     this.minute = 480;
     this.mode = 'live';
     this.placing = null;
     this.buySelection = null;
+    this.buildTab = 'furnish';
     this.buildTool = 'wall';
     this.buildStart = null;
     this.eyedropper = false;

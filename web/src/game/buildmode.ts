@@ -29,7 +29,7 @@ import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachCandidates, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
 
-/** Preview calls the renderer offers in buy mode. */
+/** Preview calls the renderer offers in Build mode. */
 interface BuildPreview {
   /** Paint tool: the wall faces a click would cover, dressed in wall covering `cover` (null: hidden). */
   setPaintPreview(faces: readonly PaintFace[], cover: number | null): void;
@@ -174,7 +174,7 @@ export class BuildBuyInput {
     }
     if (this.shift === e.shiftKey) return;
     this.shift = e.shiftKey;
-    if (this.lastHover && game.mode === 'build' && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
+    if (this.lastHover && this.building() && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
     // Shift lets go of the quarter-tile snap, and of whole tiles and 10 cm steps while resizing.
     const held = game.placing && this.content.object(game.placing.def);
     if (held && !held.stairs) this.rehover();
@@ -279,7 +279,7 @@ export class BuildBuyInput {
   private storeyDepth = 0;
 
   /**
-   * The player's home plot, where everything in build and buy mode happens: on the storey in
+   * The player's home plot, where everything in Build mode happens: on the storey in
    * view, in its rows of the lot (the renderer lifts them to that storey).
    */
   home(): PlotInfo | null {
@@ -295,7 +295,7 @@ export class BuildBuyInput {
     // Never leave the camera's left-drag switched off once drawing can't continue.
     if (!this.pressed) this.preview.setLeftDragCamera?.(true);
     const home = this.home();
-    this.preview.setBuildGrid?.(game.mode !== 'live' && home ? { x: home.x, z: home.z, w: home.w, d: home.d } : null);
+    this.preview.setBuildGrid?.(game.mode === 'build' && home ? { x: home.x, z: home.z, w: home.w, d: home.d } : null);
     this.clearPreviews();
   }
 
@@ -320,9 +320,9 @@ export class BuildBuyInput {
     return styledModel(this.content, this.assets, def, style);
   }
 
-  /** Build mode: walls, rooms, paint, doors, windows and removing them. */
+  /** Build mode's Build tab: walls, rooms, paint, doors, windows and removing them. */
   private building(): boolean {
-    return game.mode === 'build';
+    return game.mode === 'build' && game.buildTab === 'build';
   }
 
   /** Build mode's Paint tool. */
@@ -335,7 +335,7 @@ export class BuildBuyInput {
     return this.building() && game.buildTool === 'floor';
   }
 
-  /** Build mode's Stairs tool: places and moves staircases like Buy mode places furniture. */
+  /** Build mode's Stairs tool: places and moves staircases as the catalog places furniture. */
   stairsTool(): boolean {
     return this.building() && game.buildTool === 'stairs';
   }
@@ -350,7 +350,7 @@ export class BuildBuyInput {
       return this.hoverResize(ground ?? this.lastHover);
     }
     // The arrow under the pointer lights up.
-    const picked = (game.mode === 'buy' && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
+    const picked = (game.furnishing && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
     const hot = screen && !this.dragging && picked ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
     if (hot !== this.hotHandle) {
       this.hotHandle = hot;
@@ -368,18 +368,18 @@ export class BuildBuyInput {
     this.lastHover = ground;
     if (!ground) return this.clearPreviews();
     if (this.pressed) this.lastGround = ground;
-    if (this.stairsTool() || game.mode === 'buy') this.hoverBuy(ground);
+    if (this.stairsTool() || game.furnishing) this.hoverBuy(ground);
     else if (this.building()) this.hoverBuild(ground);
   }
 
   /** Redraw the Buy ghost where the pointer last was (after a turn, without waiting for the pointer to move). */
   rehover(): void {
-    if (this.lastHover && (game.mode === 'buy' || this.stairsTool()) && !this.picking()) this.hoverBuy(this.lastHover);
+    if (this.lastHover && (game.furnishing || this.stairsTool()) && !this.picking()) this.hoverBuy(this.lastHover);
   }
 
   /** The next click picks up a look (E, or Alt held) instead of building or placing. */
   picking(): boolean {
-    return game.mode !== 'live' && (game.eyedropper || this.alt);
+    return game.mode === 'build' && (game.eyedropper || this.alt);
   }
 
   /**
@@ -447,7 +447,7 @@ export class BuildBuyInput {
     if (this.paintTool() || this.floorTool()) return true;
     if (this.stairsTool()) return this.clickStairs(ground, objectId);
     if (this.building()) return ground ? this.clickBuild(ground) : true;
-    if (game.mode === 'buy') return this.clickBuy(ground, objectId);
+    if (game.furnishing) return this.clickBuy(ground, objectId);
     return false;
   }
 
@@ -725,13 +725,13 @@ export class BuildBuyInput {
   }
 
   /**
-   * Shows the resize arrows of the object picked in Buy mode (or of the resize in progress),
+   * Shows the resize arrows of the object picked in the catalog (or of the resize in progress),
    * when what they're made from changed. Cheap enough to call every frame.
    */
   syncHandles(): void {
     if (this.openingTool() || this.openingDrag) return this.syncOpeningHandles();
     const r = this.resizing;
-    const sel = game.mode === 'buy' && !game.placing && game.buySelection !== null ? (game.objects.find((o) => o.id === game.buySelection) ?? null) : null;
+    const sel = game.furnishing && !game.placing && game.buySelection !== null ? (game.objects.find((o) => o.id === game.buySelection) ?? null) : null;
     const n = r?.now;
     const key = r && n ? `r:${r.id}:${n.cx}:${n.cz}:${n.ex}:${n.ez}:${n.tall}:${r.handle}` : sel ? `s:${sel.id}:${sel.x}:${sel.z}:${sel.w}:${sel.d}:${sel.size}:${sel.tall ?? 0}:${offsetKey(sel.offset)}:${this.hotHandle}:${game.objects.length}` : '';
     if (key === this.handlesKey) return;
@@ -758,7 +758,7 @@ export class BuildBuyInput {
     if (r) {
       const obj = game.objects.find((o) => o.def === r.def && o.x === r.x && o.z === r.z && o.rot === r.rot);
       this.reselect = null;
-      if (obj && game.mode === 'buy' && !game.placing) game.buySelection = obj.id;
+      if (obj && game.furnishing && !game.placing) game.buySelection = obj.id;
     }
     this.handlesKey = '';
     this.syncHandles();
@@ -1546,7 +1546,7 @@ export class BuildBuyInput {
    * gesture belongs to drawing; the camera then doesn't turn until the release.
    */
   press(ground: Point | null, objectId: number | null = null, screen: Point2 | null = null): boolean {
-    if (game.mode === 'buy') return this.pressBuy(ground, objectId, screen);
+    if (game.furnishing) return this.pressBuy(ground, objectId, screen);
     if (this.openingTool() && this.pressOpening(ground, screen)) return true;
     if (this.floorTool() && ground) {
       // Floor: a drag covers the rectangle of tiles it spans; a click, one tile (Shift: the room).

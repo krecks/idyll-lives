@@ -14,12 +14,14 @@
     { value: 5, icon: 'icon.ui.speed5', label: 'Fastest (5)' },
   ];
   const modes = [
-    { id: 'buy', icon: 'icon.ui.buy', label: 'Buy', key: 'V' },
-    { id: 'build', icon: 'icon.ui.build', label: 'Build', key: 'B' },
+    { id: 'live', icon: 'icon.ui.live', label: 'Live', title: 'Live (L): the household and the world, in motion' },
+    { id: 'build', icon: 'icon.ui.build', label: 'Build', title: 'Build (B): furnish, build, and see how the home is doing' },
   ] as const;
-  const watchActive = $derived(game.mode === 'live' && game.watchMode);
-  const liveActive = $derived(game.mode === 'live' && !game.watchMode);
   const rent = services.content.economy.rent;
+  function toggleTown() {
+    game.townOpen = !game.townOpen;
+    if (game.townOpen) game.journalOpen = false;
+  }
   const fundsTitle = $derived(
     game.creative
       ? 'Household funds · Creative game: building and buying are free, and your home pays no rent or bills.'
@@ -32,37 +34,14 @@
 <header class="bar">
   <div class="glass group">
     <span class="brand">{game.household || 'Idyll Lives'}</span>
-    <div class="segmented">
-      <button
-        class:active={watchActive}
-        title={watchActive ? 'Watching: the camera follows what happens at home. Click for Live (L).' : 'Watch: the camera follows what happens at home on its own (L)'}
-        aria-pressed={watchActive}
-        onclick={() => services.controls.setWatchMode(!watchActive)}
-      >
-        <Icon name="icon.ui.watch" size={16} />
-        <span>Watch</span>
-      </button>
-      <button
-        class:active={liveActive}
-        title={liveActive ? 'Live: the camera stays with you. Click to watch (L).' : 'Live: the camera stays with you (L)'}
-        aria-pressed={liveActive}
-        onclick={() => services.controls.setWatchMode(liveActive)}
-      >
-        <Icon name="icon.ui.live" size={16} />
-        <span>Live</span>
-      </button>
+    <div class="segmented" role="tablist" aria-label="Mode">
       {#each modes as mode (mode.id)}
-        <button class:active={mode.id === game.mode} title="{mode.label} ({mode.key})" onclick={() => services.controls.setMode(mode.id)}>
+        <button role="tab" aria-selected={mode.id === game.mode} class:active={mode.id === game.mode} title={mode.title} onclick={() => services.controls.setMode(mode.id)}>
           <Icon name={mode.icon} size={16} />
           <span>{mode.label}</span>
         </button>
       {/each}
     </div>
-    {#if !game.occupied}
-      <button class="move-in" title="Nobody lives here yet: create a family to move in" onclick={() => (game.moveInOpen = true)}>
-        <Icon name="icon.ui.plus" size={14} />Move a family in
-      </button>
-    {/if}
   </div>
 
   <div class="glass group center">
@@ -71,9 +50,11 @@
       <span class="clock tabular">{clock(game.minute, settings.clock24h)}</span>
     </div>
     {#if game.mode !== 'live'}
-      <span class="paused" title="Time stands still while you shop and build. Back to Live (L) to resume.">
-        <Icon name="icon.ui.pause" size={14} />Paused · {game.mode === 'build' ? 'Build' : 'Buy'} mode
+      <span class="paused" title="Time stands still while you build. Back to Live (L) to resume.">
+        <Icon name="icon.ui.pause" size={14} />Paused
       </span>
+    {/if}
+    {#if game.mode === 'build'}
       <button
         class="undo"
         disabled={game.undoSteps === 0}
@@ -101,19 +82,7 @@
       >
         <Icon name="icon.ui.eyedropper" size={16} />
       </button>
-      {#if game.mode === 'build'}
-        <button
-          class="undo redo"
-          class:on={game.roomScores}
-          aria-pressed={game.roomScores}
-          title="Room scores (O): each room tinted by how it's doing, and what would help"
-          aria-label="Room scores"
-          onclick={() => services.controls.toggleRoomScores()}
-        >
-          <Icon name="icon.need.environment" size={16} />
-        </button>
-      {/if}
-    {:else}
+    {:else if game.mode === 'live'}
       <div class="segmented">
         {#each speeds as s (s.value)}
           <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} onclick={() => services.controls.setSpeed(s.value)}>
@@ -126,36 +95,22 @@
 
   <div class="glass group">
     {#if game.mode === 'live'}
-      <button class="tool" title="Whole house (H)" aria-label="Show the whole house" onclick={() => services.controls.frameHouse()}>
-        <Icon name="icon.ui.home" />
-      </button>
       {#if game.occupied}
         <button class="tool" class:active={game.plannerOpen} title="Planner (P): routines and goals" aria-label="Planner" onclick={() => services.controls.openPlanner()}>
           <Icon name="icon.ui.calendar" />
         </button>
       {/if}
-      <button class="tool" class:active={game.homeOpen} title="Our home (O): the rooms and how they're doing" aria-label="Our home" aria-pressed={game.homeOpen} onclick={() => services.controls.toggleHome()}>
-        <Icon name="icon.need.environment" />
-      </button>
       <button class="tool" class:active={game.journalOpen} title="Journal (J)" aria-label="Journal" aria-pressed={game.journalOpen} onclick={() => services.controls.toggleJournal()}>
         <Icon name="icon.ui.journal" />
+      </button>
+      <button class="tool" class:active={game.townOpen} title="Town map (M)" aria-label="Town map" aria-pressed={game.townOpen} onclick={toggleTown}>
+        <Icon name="icon.ui.town" />
       </button>
       <span class="divider" aria-hidden="true"></span>
     {/if}
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
-      {#if game.creative}<small>Creative · building is free</small>{:else if game.rent !== null}<small>rent + bills {money(game.rent + (game.bills ?? 0))}/wk</small>{/if}
     </span>
-    <button
-      class="tool"
-      class:active={game.townOpen}
-      disabled={game.mode !== 'live'}
-      title={game.mode === 'live' ? 'Town map (M)' : 'Town map (Live mode only)'}
-      aria-label="Town map"
-      onclick={() => (game.townOpen = !game.townOpen)}
-    >
-      <Icon name="icon.ui.town" />
-    </button>
     {#if game.storeys > 1}
       <div class="storeys" role="group" aria-label="Storey">
         <button class="tool" title="Storey down (Page Down)" aria-label="Storey down" disabled={game.storey === 0} onclick={() => services.controls.setStorey(game.storey - 1)}>
@@ -174,9 +129,6 @@
       onclick={() => services.controls.setWallMode(nextWallMode(game.wallMode))}
     >
       <Icon name={game.wallMode === 'up' ? 'icon.ui.wallsUp' : 'icon.ui.wallsDown'} />
-    </button>
-    <button class="tool" class:active={game.perfOpen} title="Performance (F3)" aria-label="Performance overlay" onclick={() => (game.perfOpen = !game.perfOpen)}>
-      <Icon name="icon.ui.perf" />
     </button>
     <button class="tool" title="Menu (Esc)" aria-label="Pause menu" onclick={() => services.controls.openPauseMenu()}>
       <Icon name="icon.ui.settings" />
@@ -254,23 +206,6 @@
     font-weight: 650;
     letter-spacing: -0.01em;
   }
-  .move-in {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 650;
-    white-space: nowrap;
-  }
-  .move-in:hover {
-    filter: brightness(1.08);
-  }
   .funds {
     display: inline-flex;
     align-items: center;
@@ -281,11 +216,6 @@
   }
   .funds.debt {
     color: var(--bad);
-  }
-  .funds small {
-    color: var(--text-muted);
-    font-weight: 550;
-    font-size: 11px;
   }
   .tool {
     display: grid;

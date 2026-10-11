@@ -53,7 +53,7 @@
     return sim && i >= 0 ? Math.floor(sim.skills[i] ?? 0) : null;
   };
   const stars = (q: number, max: number) => '★'.repeat(q) + '☆'.repeat(Math.max(0, max - q));
-  /** Upgrades are bought here in Buy mode; each ★ adds `qualityBonus` to everything the object gives. */
+  /** Upgrades are bought here, in the catalog; each ★ adds `qualityBonus` to everything the object gives. */
   const upgradable = $derived(!!rules && def.price !== undefined && rules.maxQuality > 0);
   const quality = $derived(owned?.quality ?? 0);
   const factor = $derived(rules ? 1 + rules.qualityBonus * quality : 1);

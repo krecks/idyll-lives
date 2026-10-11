@@ -192,18 +192,18 @@
     {
       title: 'Modes and panels',
       keys: [
-        [['L'], 'Live / Watch'],
-        [['V'], 'Buy mode'],
-        [['B'], 'Build mode'],
+        [['L'], 'Live'],
+        [['B'], 'Build'],
+        [['V'], 'Build: Furnish'],
+        [['O'], 'Build: Home (how the rooms are doing)'],
         [['P'], 'Planner'],
         [['J'], 'Journal'],
-        [['O'], 'Our home (room scores in Build)'],
         [['M'], 'Town map'],
         [['Esc'], 'Close / step back / pause menu'],
       ],
     },
     {
-      title: 'Buy and Build',
+      title: 'Build',
       keys: [
         [['R'], 'Rotate (Shift: the other way)'],
         [['E'], 'Eyedropper'],
@@ -350,8 +350,8 @@
       </section>
     {:else if page === 'camera'}
       <section>
-        <h3>Watching</h3>
-        <SettingRow title="Back to watching" hint="Watch mode lets the camera follow what happens at home. Any input takes it back; after this long it watches again.">
+        <h3>Camera in Live</h3>
+        <SettingRow title="Back to watching" hint="After this long without input the camera follows what happens at home on its own. Any input takes it back.">
           <Segmented
             label="Back to watching"
             bind:value={settings.directorDelay}

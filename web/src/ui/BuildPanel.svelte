@@ -1,16 +1,15 @@
 <script lang="ts">
+  import BuildTabs from './buy/BuildTabs.svelte';
   import BuildTools from './buy/BuildTools.svelte';
   import { game } from './state.svelte';
 
-  /** Build mode: walls, rooms, doors and windows on the home lot (furniture is Buy mode's). */
+  /** Build mode's Build tab: walls, rooms, doors and windows on the home lot (furniture is the Furnish tab's). */
 </script>
 
-{#if game.mode === 'build'}
-  <section class="build glass" aria-label="Build mode">
+{#if game.mode === 'build' && game.buildTab === 'build'}
+  <section class="build glass" aria-label="Build">
+    <header><BuildTabs /></header>
     <BuildTools />
-    <footer class="muted">
-      <kbd>B</kbd> or <kbd>Esc</kbd> back to Live · <kbd>V</kbd> Buy mode to furnish
-    </footer>
   </section>
 {/if}
 
@@ -22,22 +21,14 @@
     left: 50%;
     bottom: var(--edge);
     transform: translateX(-50%);
-    width: min(1000px, calc(100vw - 2 * var(--edge)));
+    width: min(1180px, calc(100vw - 2 * var(--edge)));
     padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     pointer-events: auto;
   }
-  .muted {
-    color: var(--text-muted);
-    font-size: 12px;
-  }
-  kbd {
-    padding: 0 5px;
-    border-radius: 4px;
-    background: var(--hairline);
-    font-family: inherit;
-    font-size: 11px;
+  header {
+    display: flex;
   }
 </style>

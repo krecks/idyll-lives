@@ -105,7 +105,7 @@ Once an hour each awake resident at home forms an opinion of the room they're in
   - light → "More light in the bedroom" (*Find in catalog*: things that give light),
   - decor → "Something nice for the bedroom" (*Find in catalog*: decor; garden things for the
     garden),
-  - size → "A bigger bathroom" (opens Build mode),
+  - size → "A bigger bathroom" (opens Build › Build),
   - cleanliness → "A tidier kitchen" (nothing to buy: someone should tidy up),
   - function → "Everything a kitchen needs" (*Find in catalog*: its essentials).
 - A broken object at home → "The shower fixed" (Repair: the paid quick fix) and a thought.
@@ -124,16 +124,15 @@ the object's icon or the need's icon, and residents say a line for each.
 
 ## Interface
 
-- **Our home** panel (top bar in Live, `O`): the house's score (rooms weighted by size), then
-  every room worst first with its kind, size, overall score and the five factors as bars (the
+- **Home** tab of Build mode (`ui/HomePanel.svelte`, `O`): the house's score (rooms weighted by
+  size) and what the home costs a week, then every room worst first with its kind, size, overall score and the five factors as bars (the
   weakest marked), windows, lamps and dirt, what's off (two rooms in one, a missing essential,
-  nothing that says what it's for), and who wishes what for it. Above them: broken things with
-  Repair, and wishes for another room. *See it on the floor plan* opens Build mode with the
-  overlay.
-- **Room scores overlay** in Build mode (top bar toggle, `O`): each room's floor tinted from red
+  nothing that says what it's for), and who wishes what for it. Beside them: the family
+  (expecting, adopting), broken things with Repair, and wishes for another room.
+- **Room scores overlay** while the Home tab is open: each room's floor tinted from red
   to green by its score (`Renderer.setRoomOverlay`, one thin-instance film per tile), with a tag
   over its centre showing its kind, score and what would help most (`game/roomOverlay.ts`).
-- Buy mode: a broken object says so, and owned worn things offer the quick fix (Repair).
+- Build › Furnish: a broken object says so, and owned worn things offer the quick fix (Repair).
 
 ## Saves
 
