@@ -2,7 +2,8 @@
 // One version for the whole game: web/package.json (shown in the menu and Credits) and the Rust
 // workspace (Cargo.toml) must always match.
 //   node tools/release/version.mjs          prints the version, fails if the two differ (CI runs this)
-//   node tools/release/version.mjs 0.3.0    sets both to 0.3.0 (then: cargo build, commit, git tag v0.3.0)
+//   node tools/release/version.mjs 0.3.0    sets both to 0.3.0 (then: cargo build, commit, git tag v0.3.0;
+//                                          pushing the tag publishes the game, see .github/workflows/pages.yml)
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = new URL('../../', import.meta.url);

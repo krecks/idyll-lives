@@ -1,10 +1,11 @@
 # Builds the game and publishes it on GitHub Pages: https://<owner>.github.io/<repo>/
-# Runs on every push to main (and by hand from the Actions tab).
+# Runs when a release tag (`v0.2.0`) is pushed (and by hand from the Actions tab); pushes to
+# main alone don't publish. The github-pages environment must allow `v*` tags to deploy.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -40,8 +41,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Version check (web and Rust must match)
-        run: node tools/release/version.mjs
+      - name: Version check (web and Rust must match, and the tag if there is one)
+        run: |
+          version=$(node tools/release/version.mjs)
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "v$version" ]; then
+            echo "Tag ${{ github.ref_name }} doesn't match version $version"; exit 1
+          fi
 
       - name: Simulation tests
         run: cargo test -p sim-core

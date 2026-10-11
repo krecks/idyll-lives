@@ -28,7 +28,7 @@ pnpm dev          # builds the WASM module, then starts Vite on http://localhost
 | `pnpm assets` | Build or update the compressed asset copies (the build does this too) |
 | `pnpm decoders` | Refresh `public/decoders` after a Babylon upgrade |
 
-**Hosting:** every push to `main` builds the game and publishes it on GitHub Pages (`.github/workflows/pages.yml`). For the fastest snapshot path a server can send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. The dev and preview servers already do. Without these headers the game still runs, but snapshots are copied instead of shared.
+**Hosting:** pushing a release tag (`v0.2.0`, matching the version; see `tools/release/version.mjs`) builds the game and publishes it on GitHub Pages (`.github/workflows/pages.yml`); pushes to `main` alone don't. For the fastest snapshot path a server can send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. The dev and preview servers already do. Without these headers the game still runs, but snapshots are copied instead of shared.
 
 ## Playing
 
