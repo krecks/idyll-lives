@@ -52,6 +52,17 @@ export interface ModelTemplate {
   height: number;
   /** Bottom of its bounding box (above 0 for things on a wall or the ceiling), for picking. */
   bottom?: number;
+  /** Its mirror glass, if any (parts with `mirror`). */
+  mirrors?: MirrorSurface[];
+}
+
+/**
+ * A mirror's reflecting face in model space: `matrix` takes the unit square (or, `round`, the
+ * unit-diameter disc) in the xy plane, facing +z, onto the face, just in front of the glass.
+ */
+export interface MirrorSurface {
+  round: boolean;
+  matrix: Matrix;
 }
 
 export interface BuildOptions {
@@ -82,8 +93,32 @@ function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], 
   const groups = new PartGroups(scene);
   parts.forEach((part, index) => groups.addPart(part, lod, index));
   const { meshes, tints, bones } = groups.build(name);
-  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom };
+  const mirrors = parts.filter((p) => p.mirror).map(mirrorSurface);
+  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, ...(mirrors.length ? { mirrors } : {}) };
 }
+
+/** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. */
+function mirrorSurface(p: PlaceholderPart): MirrorSurface {
+  const [sx, sy, sz] = p.size;
+  const round = p.shape === 'cylinder';
+  // The face's normal before the part turns: a disc's axis (y), a box's thinnest side.
+  const axis = round ? 1 : [sx, sy, sz].indexOf(Math.min(sx, sy, sz));
+  const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
+  const turn = Quaternion.FromEulerAngles(rx, ry, rz);
+  const unit = (k: number, v: number) => new Vector3(k === 0 ? v : 0, k === 1 ? v : 0, k === 2 ? v : 0);
+  const turned = unit(axis, 1).rotateByQuaternionToRef(turn, new Vector3());
+  const sign = (turned.z >= 0) === ((p.mirror ?? 'front') === 'front') ? 1 : -1;
+  // Unit square / disc in xy facing +z -> sized, onto the face on `axis` (a hair in front), turned and placed.
+  const [w, h] = axis === 0 ? [sz, sy] : axis === 1 ? [sx, sz] : [sx, sy];
+  const onto = axis === 0 ? Matrix.RotationY((sign * Math.PI) / 2) : axis === 1 ? Matrix.RotationX((-sign * Math.PI) / 2) : sign > 0 ? Matrix.Identity() : Matrix.RotationY(Math.PI);
+  const offset = unit(axis, (p.size[axis] / 2 + 0.002) * sign);
+  const matrix = Matrix.Scaling(w, h, 1)
+    .multiply(onto)
+    .multiply(Matrix.Translation(offset.x, offset.y, offset.z))
+    .multiply(Matrix.Compose(Vector3.One(), turn, new Vector3(p.at[0], p.at[1], p.at[2])));
+  return { round, matrix };
+}
+
 
 /**
  * Meshes grouped per (tint slot, finish, bone) and merged into one draw call each. Untextured

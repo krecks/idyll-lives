@@ -179,6 +179,9 @@
         <SettingRow title="Every lamp lights" hint="On: up to 32 lamps light their rooms. Off: only the four nearest the biggest rooms. Costs little on WebGPU, more on WebGL2." badges={[NEXT_LOAD]}>
           <Toggle label="Every lamp lights" bind:checked={settings.allLamps} />
         </SettingRow>
+        <SettingRow title="Mirror reflections" hint="The two mirrors nearest the camera show the room. Each draws the scene once more while it is on screen." badges={[NEXT_LOAD]}>
+          <Toggle label="Mirror reflections" bind:checked={settings.mirrors} />
+        </SettingRow>
         <SettingRow title="Ambient occlusion" hint="Soft contact shadows in corners and under furniture. Costly, and may fail to start on some WebGPU drivers." badges={['Experimental', NEXT_LOAD]}>
           <Toggle label="Ambient occlusion" bind:checked={settings.ambientOcclusion} />
         </SettingRow>

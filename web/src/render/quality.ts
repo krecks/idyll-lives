@@ -15,13 +15,15 @@ export interface QualitySettings {
    * +2.8 ms on WebGL2 (where supported; otherwise four lamps).
    */
   clusteredLamps: boolean;
+  /** How many mirrors (the nearest the camera) reflect the room live; 0: none. Each draws the scene once more at half resolution. */
+  mirrors: number;
 }
 
 export const QUALITY: Record<'low' | 'medium' | 'high' | 'ultra', QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: false },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true },
+  low: { shadowMapSize: 1024, msaaSamples: 1, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: false, mirrors: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 1 },
   // Ambient occlusion is off by default: Babylon 9.29's SSAO2 intermittently fails to bind its
   // sampler on WebGPU startup (~1 in 4 loads). Enable with `?quality=ultra` to test fixes.
-  high: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true },
-  ultra: { shadowMapSize: 4096, msaaSamples: 4, ambientOcclusion: true, snapshotRendering: true, clusteredLamps: true },
+  high: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 2 },
+  ultra: { shadowMapSize: 4096, msaaSamples: 4, ambientOcclusion: true, snapshotRendering: true, clusteredLamps: true, mirrors: 3 },
 };

@@ -17,6 +17,8 @@ export interface Settings {
   antiAliasing: boolean;
   /** Every lamp lights (clustered lighting) rather than the four nearest the biggest rooms. */
   allLamps: boolean;
+  /** The nearest mirrors reflect the room live. */
+  mirrors: boolean;
   ambientOcclusion: boolean;
   autonomy: boolean;
   /** 0 disables autosave. */
@@ -55,7 +57,7 @@ export interface Settings {
   worldVolume: number;
 }
 
-export const RESTART_KEYS: readonly (keyof Settings)[] = ['renderer', 'shadowDetail', 'antiAliasing', 'allLamps', 'ambientOcclusion'];
+export const RESTART_KEYS: readonly (keyof Settings)[] = ['renderer', 'shadowDetail', 'antiAliasing', 'allLamps', 'mirrors', 'ambientOcclusion'];
 
 // Legacy key from the project's old name; kept so saves survive (and settings with them).
 const STORAGE_KEY = 'open-sims-wasm.settings';
@@ -66,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shadowDetail: QUALITY.high.shadowMapSize,
   antiAliasing: QUALITY.high.msaaSamples > 1,
   allLamps: QUALITY.high.clusteredLamps,
+  mirrors: QUALITY.high.mirrors > 0,
   ambientOcclusion: QUALITY.high.ambientOcclusion,
   autonomy: true,
   autosaveMinutes: 5,
@@ -131,6 +134,7 @@ export function qualityFromSettings(s: Settings, params: URLSearchParams): Quali
     ambientOcclusion: s.ambientOcclusion,
     snapshotRendering: true,
     clusteredLamps: s.allLamps,
+    mirrors: s.mirrors ? QUALITY.high.mirrors : 0,
   };
   return {
     ...chosen,

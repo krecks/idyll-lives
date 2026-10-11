@@ -83,6 +83,7 @@ import { buildModel, placementVariation, prefetchModels, type ModelTemplate } fr
 import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
+import { Mirrors, type MirrorInstance } from './mirrors';
 import { installNature, Landscape, natureDecor, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
@@ -266,6 +267,8 @@ export class BabylonRenderer implements Renderer {
   private characters!: Characters;
   /** Food and dishes (`items.ts`). */
   private items!: ItemLayer;
+  /** Live reflections in the mirrors nearest the camera. */
+  private mirrors!: Mirrors;
   private cursor!: Mesh;
   private selectedSim: number | null = null;
   private cameraPlaced = false;
@@ -431,6 +434,8 @@ export class BabylonRenderer implements Renderer {
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
+    // Reflections show the game world (not the shadow-only copies or the overview).
+    this.mirrors = new Mirrors(scene, this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
     this.applyLook();
     window.addEventListener('resize', this.onResize);
   }
@@ -592,6 +597,7 @@ export class BabylonRenderer implements Renderer {
     this.markerHaloMatrix.fill(0);
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+    this.mirrors.update(this.camera);
     const sel = this.selectedSim;
     if (sel !== null && sel < count && this.characters.visible[sel]) {
       const h = this.characters.heads;
@@ -1368,6 +1374,7 @@ export class BabylonRenderer implements Renderer {
     this.held = null;
     this.characters?.clear();
     this.items?.clear();
+    this.mirrors?.set([]);
     this.simCount = 0;
     this.selectedSim = null;
     this.onFrame = null;
@@ -2293,6 +2300,7 @@ export class BabylonRenderer implements Renderer {
     }
     // Soft contact shadows under every object, sized to its footprint.
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
+    const mirrors: MirrorInstance[] = [];
     [...byModel.entries()].forEach(([group, list], n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
@@ -2327,6 +2335,7 @@ export class BabylonRenderer implements Renderer {
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           pop: { meshes: template.meshes, matrices, index: i },
         });
+        if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
       });
       for (const mesh of template.meshes) {
         mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
@@ -2334,6 +2343,7 @@ export class BabylonRenderer implements Renderer {
         mesh.receiveShadows = true;
       }
     });
+    this.mirrors.set(mirrors);
     shown.forEach((o, i) => {
       const k = i * 16;
       const s = this.storeyOf(o.z);

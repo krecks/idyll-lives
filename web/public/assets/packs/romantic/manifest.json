@@ -2884,7 +2884,8 @@
             0,
             0
           ],
-          "segments": 32
+          "segments": 32,
+          "mirror": "front"
         },
         {
           "shape": "torus",
