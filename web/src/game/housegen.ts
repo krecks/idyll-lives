@@ -95,6 +95,8 @@ interface Slot {
   chance?: number;
   count?: [number, number];
   opposite?: string;
+  /** Things on walls: on the wall behind one of these if the room has one (a mirror over the basin). */
+  over?: string[];
 }
 
 /** Counter pieces side by side along a wall: each of `with` (one id per slot) among plain `segments`, `length` tiles in all. */
@@ -741,7 +743,7 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
           if (rng() >= (slot.chance ?? 1)) continue;
           const def = pick(rng, slot.one);
           const fp = info(def)?.footprint;
-          if (fp) mount(cfg, info, f, r, def, fp, layer, rng);
+          if (fp) mount(cfg, info, f, r, def, fp, layer, rng, slot.over);
         }
       }
     }
@@ -982,7 +984,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
  * its back on wall or window edges; from the ceiling, over a free spot; a rug, in the middle of
  * the room. Never on the stairs, and its front (where the simulation checks for walls) inside the room.
  */
-function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number): boolean {
+function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number, over?: string[]): boolean {
   const layers = (f.layers ??= new Set());
   const stairs = new Set<string>();
   for (const o of f.objects) {
@@ -1009,6 +1011,21 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
   };
   if (layer === 'wall') {
     const backed = (e: string) => f.edges.get(e) === 'wall' || f.edges.get(e) === 'window';
+    // Over a piece in the room: turned as it is, centred on it, its back on the same wall.
+    for (const o of over ? f.objects.filter((o) => over.includes(o.def) && inside(r, o.x, o.z)) : []) {
+      const [ow, od] = info(o.def)?.footprint ?? [1, 1];
+      const [pw, pd] = o.rot % 2 === 0 ? [ow, od] : [od, ow];
+      const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      const x = o.x + Math.floor((pw - w) / 2);
+      const z = o.z + Math.floor((pd - d) / 2);
+      const backs =
+        o.rot === 0 ? Array.from({ length: w }, (_, i) => `h:${x + i}:${o.z}`)
+        : o.rot === 2 ? Array.from({ length: w }, (_, i) => `h:${x + i}:${o.z + pd}`)
+        : o.rot === 3 ? Array.from({ length: d }, (_, i) => `v:${o.x + pw}:${z + i}`)
+        : Array.from({ length: d }, (_, i) => `v:${o.x}:${z + i}`);
+      const [wx, wz] = o.rot === 2 ? [x, o.z + pd - d] : o.rot === 3 ? [o.x + pw - w, z] : o.rot === 0 ? [x, o.z] : [o.x, z];
+      if (backs.every(backed) && fits(wx, wz, w, d, o.rot)) return take(wx, wz, w, d, o.rot);
+    }
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
       const rot = [0, 3, 2, 1][side];
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
