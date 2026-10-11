@@ -105,7 +105,7 @@ Once an hour each awake resident at home forms an opinion of the room they're in
   - light → "More light in the bedroom" (*Find in catalog*: things that give light),
   - decor → "Something nice for the bedroom" (*Find in catalog*: decor; garden things for the
     garden),
-  - size → "A bigger bathroom" (opens Build › Build),
+  - size → "A bigger bathroom" (opens Build › Construct),
   - cleanliness → "A tidier kitchen" (nothing to buy: someone should tidy up),
   - function → "Everything a kitchen needs" (*Find in catalog*: its essentials).
 - A broken object at home → "The shower fixed" (Repair: the paid quick fix) and a thought.

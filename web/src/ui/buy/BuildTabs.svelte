@@ -3,10 +3,10 @@
   import { services } from '../services';
   import { game, type BuildTab } from '../state.svelte';
 
-  /** Build mode's tabs, at the head of each of its panels: the catalog, the house itself, and how the home is doing. */
+  /** Build mode's tabs, at the head of its dock: the catalog, the house itself, and how the home is doing. */
   const tabs: { id: BuildTab; icon: string; label: string; title: string }[] = [
     { id: 'furnish', icon: 'icon.ui.buy', label: 'Furnish', title: 'Furnish (V): buy, move, resize, upgrade and sell furniture' },
-    { id: 'build', icon: 'icon.ui.build', label: 'Build', title: 'Build: walls, rooms, paint, floors, doors, windows, stairs and the roof' },
+    { id: 'build', icon: 'icon.ui.build', label: 'Construct', title: 'Construct (C): walls, rooms, paint, floors, doors, windows, stairs and the roof' },
     { id: 'home', icon: 'icon.ui.home', label: 'Home', title: "Home (O): the rooms and how they're doing, what's broken, and the family" },
   ];
 </script>

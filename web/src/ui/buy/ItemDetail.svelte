@@ -89,6 +89,35 @@
   </div>
   {#if short > 0}<p class="warn">Can't afford — {money(short)} short</p>{/if}
   {#if def.description}<p class="desc">{def.description}</p>{/if}
+  {#if owned}
+    <div class="owned">
+      {#if !def.stairs}
+        <div class="size muted">
+          Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
+          · drag its arrows to resize (<kbd>Shift</kbd>: freely), drag it to move
+        </div>
+      {/if}
+      {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}
+      <div class="row">
+        {#if owned.repairCost !== undefined}
+          <button class="btn small primary" title="Repair it now" onclick={() => services.controls.repair(owned.id)}>{game.creative ? 'Repair' : `Repair · ${money(owned.repairCost)}`}</button>
+        {/if}
+        {#if game.placing?.objectId !== owned.id}
+          <button class="btn ghost small" onclick={() => services.controls.startMoving(owned.id)}>Move</button>
+        {/if}
+        <button class="btn ghost small" title="Rotate (R)" onclick={() => services.controls.rotatePlacing()}>Rotate</button>
+        {#if resized}
+          <button class="btn ghost small" title="Back to its own size" onclick={() => services.controls.resetSize(owned.id)}>Reset size</button>
+        {/if}
+        {#if content.turns(def)}
+          <button class="btn ghost small" title="Turn a little (Shift+R)" onclick={() => services.controls.rotatePlacing(true)}>Turn 15°</button>
+        {/if}
+        {#if owned.sellValue !== null}
+          <button class="btn ghost small danger" title="Sell (Delete)" onclick={() => services.controls.sell(owned.id)}>{game.creative ? 'Sell' : `Sell · ${money(owned.sellValue)}`}</button>
+        {/if}
+      </div>
+    </div>
+  {/if}
   {#if lovers.length || collection}
     <div class="chips">
       {#if lovers.length}
@@ -132,35 +161,6 @@
     </div>
   {/if}
 
-  {#if owned}
-    <div class="owned">
-      {#if !def.stairs}
-        <div class="size muted">
-          Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
-          · drag its arrows to resize (<kbd>Shift</kbd>: freely), drag it to move
-        </div>
-      {/if}
-      {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}
-      <div class="row">
-        {#if owned.repairCost !== undefined}
-          <button class="btn small primary" title="Repair it now" onclick={() => services.controls.repair(owned.id)}>{game.creative ? 'Repair' : `Repair · ${money(owned.repairCost)}`}</button>
-        {/if}
-        {#if game.placing?.objectId !== owned.id}
-          <button class="btn ghost small" onclick={() => services.controls.startMoving(owned.id)}>Move</button>
-        {/if}
-        <button class="btn ghost small" title="Rotate (R)" onclick={() => services.controls.rotatePlacing()}>Rotate</button>
-        {#if resized}
-          <button class="btn ghost small" title="Back to its own size" onclick={() => services.controls.resetSize(owned.id)}>Reset size</button>
-        {/if}
-        {#if content.turns(def)}
-          <button class="btn ghost small" title="Turn a little (Shift+R)" onclick={() => services.controls.rotatePlacing(true)}>Turn 15°</button>
-        {/if}
-        {#if owned.sellValue !== null}
-          <button class="btn ghost small danger" title="Sell (Delete)" onclick={() => services.controls.sell(owned.id)}>{game.creative ? 'Sell' : `Sell · ${money(owned.sellValue)}`}</button>
-        {/if}
-      </div>
-    </div>
-  {/if}
 
   {#if info.boosts.length || info.drains.length}
     <h4>Boosts <small>per use{factor > 1 ? ` · incl. ★ bonus` : ''}</small></h4>

@@ -16537,6 +16537,38 @@
       "type": "icon",
       "url": "icons/magnifier.svg"
     },
+    "icon.ui.menu": {
+      "type": "icon",
+      "url": "icons/menu.svg"
+    },
+    "icon.ui.filters": {
+      "type": "icon",
+      "url": "icons/sliders.svg"
+    },
+    "icon.ui.chevron": {
+      "type": "icon",
+      "url": "icons/chevron.svg"
+    },
+    "icon.ui.audio": {
+      "type": "icon",
+      "url": "icons/speaker.svg"
+    },
+    "icon.ui.display": {
+      "type": "icon",
+      "url": "icons/display.svg"
+    },
+    "icon.ui.voice": {
+      "type": "icon",
+      "url": "icons/mic.svg"
+    },
+    "icon.ui.info": {
+      "type": "icon",
+      "url": "icons/info.svg"
+    },
+    "icon.ui.load": {
+      "type": "icon",
+      "url": "icons/folder.svg"
+    },
     "icon.category.kitchen": {
       "type": "icon",
       "url": "icons/chef.svg"

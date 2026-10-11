@@ -1079,6 +1079,12 @@ export async function startSession(
       case 'J':
         if (game.mode === 'live') controls.toggleJournal();
         return;
+      case 'c':
+      case 'C':
+        // Construct: Build mode's walls, rooms and paint (again: back to Live). Not Ctrl/⌘+C: that copies.
+        if (e.ctrlKey || e.metaKey) return;
+        if (game.mode === 'build' && game.buildTab === 'build') return controls.setMode('live');
+        return controls.setBuildTab('build');
       case 'o':
       case 'O':
         // Our home: Build mode's Home tab (again: back to Live).

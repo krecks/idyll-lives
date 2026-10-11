@@ -5,11 +5,16 @@
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { clock, timeAgo } from '../format';
-  import Icon from '../Icon.svelte';
+  import MenuItem from '../kit/MenuItem.svelte';
+  import { enterMenu, menuArrows } from '../kit/menuKeys';
 
   let saves = $state<SaveMeta[]>([]);
   const latest = $derived(saves[0]);
-  const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  /** The graphics API the game draws with: WebGPU where there is one, unless WebGL2 is asked for. */
+  const webgpu = $derived(
+    typeof navigator !== 'undefined' && 'gpu' in navigator && settings.renderer !== 'webgl' && new URLSearchParams(location.search).get('renderer') !== 'webgl',
+  );
+  let nav = $state<HTMLElement>();
   /** The neighbourhood drifting behind the menu. */
   let townName = $state('');
 
@@ -24,6 +29,8 @@
   });
 </script>
 
+<svelte:window onkeydown={(e) => enterMenu(e, nav)} />
+
 <div class="menu scaled">
   <div class="scrim" aria-hidden="true"></div>
 
@@ -33,7 +40,9 @@
       <p>A little life, simulated in your browser.</p>
     </header>
 
-    <nav>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+
+    <nav bind:this={nav} onkeydown={menuArrows}>
       {#if latest}
         <button class="continue" onclick={() => app.start({ kind: 'load', saveId: latest.id })}>
           {#if latest.thumbnail}<img class="thumb" src={latest.thumbnail} alt="" />{:else}<span class="thumb blank"></span>{/if}
@@ -45,26 +54,16 @@
           <span class="arrow" aria-hidden="true">→</span>
         </button>
       {/if}
-      <button class="item" class:primary={!latest} onclick={() => app.newGame()}>
-        <Icon name="icon.ui.plus" size={18} /><span class="label">New game</span>
-        {#if !latest}<span class="arrow" aria-hidden="true">→</span>{/if}
-      </button>
-      <button class="item" disabled={saves.length === 0} onclick={() => (app.overlay = 'load')}>
-        <Icon name="icon.ui.save" size={18} /><span class="label">Load game</span>
-        {#if saves.length}<span class="badge">{saves.length}</span>{/if}
-      </button>
-      <button class="item" onclick={() => (app.overlay = 'settings')}>
-        <Icon name="icon.ui.settings" size={18} /><span class="label">Settings</span>
-      </button>
-      <button class="item quiet" onclick={() => (app.overlay = 'credits')}>
-        <span class="label">Credits</span>
-      </button>
+      <MenuItem label="New game" icon="icon.ui.plus" variant={latest ? 'default' : 'primary'} arrow={!latest} onclick={() => app.newGame()} />
+      <MenuItem label="Load game" icon="icon.ui.load" disabled={saves.length === 0} badge={saves.length || undefined} onclick={() => (app.overlay = 'load')} />
+      <MenuItem label="Settings" icon="icon.ui.settings" onclick={() => (app.overlay = 'settings')} />
+      <MenuItem label="Credits" variant="quiet" onclick={() => (app.overlay = 'credits')} />
     </nav>
 
     <footer>
-      <span>v{__APP_VERSION__} · desktop</span>
+      <span>v{__APP_VERSION__}</span>
       <span class="dot"></span>
-      <span>{gpu ? 'WebGPU' : 'WebGL2'}</span>
+      <span>{webgpu ? 'WebGPU' : 'WebGL2'}</span>
     </footer>
   </section>
 
@@ -105,7 +104,7 @@
     padding: 40px 32px 26px;
     display: flex;
     flex-direction: column;
-    gap: 34px;
+    gap: 24px;
     border-radius: 28px;
     background: linear-gradient(180deg, rgba(22, 27, 38, 0.56), rgba(14, 18, 26, 0.5));
     border: 1px solid var(--glass-dark-border);
@@ -137,90 +136,6 @@
     flex-direction: column;
     gap: 4px;
   }
-  .item {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    height: 54px;
-    padding: 0 18px;
-    border-radius: 16px;
-    font-size: 17px;
-    font-weight: 600;
-    text-align: left;
-    color: inherit;
-    transition:
-      background var(--fast) ease,
-      transform var(--fast) var(--ease),
-      box-shadow var(--fast) var(--ease);
-    animation: enter 600ms var(--ease) both;
-  }
-  .item:nth-child(2) {
-    animation-delay: 50ms;
-  }
-  .item:nth-child(3) {
-    animation-delay: 100ms;
-  }
-  .item:nth-child(4) {
-    animation-delay: 150ms;
-  }
-  .item:nth-child(5) {
-    animation-delay: 200ms;
-  }
-  .item:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateX(4px);
-  }
-  .item:not(.primary):hover:not(:disabled)::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 14px;
-    bottom: 14px;
-    width: 3px;
-    border-radius: 2px;
-    background: #8fe07a;
-  }
-  .item:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .item.primary {
-    height: 60px;
-    margin-bottom: 6px;
-    background: linear-gradient(180deg, #ffffff, #eef1f6);
-    color: #121826;
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
-  }
-  .item.primary:hover:not(:disabled) {
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36);
-  }
-  .item .arrow {
-    margin-left: auto;
-    font-size: 20px;
-    transition: transform var(--fast) var(--ease);
-  }
-  .item:hover .arrow {
-    transform: translateX(3px);
-  }
-  .badge {
-    margin-left: auto;
-    min-width: 24px;
-    height: 22px;
-    padding: 0 7px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.16);
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .item.quiet {
-    height: 46px;
-    font-size: 15px;
-    font-weight: 550;
-    color: rgba(246, 242, 234, 0.74);
-  }
   .continue {
     display: flex;
     align-items: center;
@@ -237,7 +152,8 @@
       box-shadow var(--fast) var(--ease);
     animation: enter 600ms var(--ease) both;
   }
-  .continue:hover {
+  .continue:hover,
+  .continue:focus-visible {
     transform: translateY(-1px);
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
   }
@@ -337,7 +253,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .panel,
-    .item {
+    .continue {
       animation: none;
     }
   }

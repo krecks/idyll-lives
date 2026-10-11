@@ -7,8 +7,8 @@
 
   /**
    * Build mode's pointer companions: a tag beside the cursor saying what a click will
-   * do and cost (red where it can't), and the money each purchase or sale moves, floating up
-   * from where it happened.
+   * do and cost (red where it can't) and, with something in hand, the keys that turn it or put it
+   * back; and the money each purchase or sale moves, floating up from where it happened.
    */
   let x = $state(0);
   let y = $state(0);
@@ -24,7 +24,7 @@
     onCanvas = e.target instanceof HTMLCanvasElement;
   }
 
-  const tag = $derived.by((): { text: string; sub?: string; bad: boolean } | null => {
+  const tag = $derived.by((): { text: string; sub?: string; keys?: string; bad: boolean } | null => {
     if (game.mode !== 'build' || !onCanvas) return null;
     if (game.pickHint !== null) return { text: 'Pick up', sub: game.pickHint, bad: game.pickHint.startsWith('Nothing') };
     const placing = game.placing;
@@ -33,10 +33,12 @@
       const def = services.content.object(placing.def);
       if (!def) return null;
       const misfit = game.placeHint ?? "Doesn't fit here";
-      if (placing.objectId !== null) return { text: `Move ${def.name}`, sub: game.placeValid ? undefined : misfit, bad: !game.placeValid };
+      const turn = services.content.turns(def) ? ' · Shift+R 15° · Shift: freely' : '';
+      if (placing.objectId !== null) return { text: `Move ${def.name}`, sub: game.placeValid ? undefined : misfit, keys: `R rotate${turn} · Del sell · Esc put back`, bad: !game.placeValid };
+      const keys = `R rotate${turn} · Esc put back`;
       const short = game.creative ? 0 : (def.price ?? 0) - game.funds;
-      if (short > 0) return { text: def.name, sub: `${money(short)} short`, bad: true };
-      return { text: game.creative ? 'Free' : money(def.price ?? 0), sub: game.placeValid ? def.name : misfit, bad: !game.placeValid };
+      if (short > 0) return { text: def.name, sub: `${money(short)} short`, keys, bad: true };
+      return { text: game.creative ? 'Free' : money(def.price ?? 0), sub: game.placeValid ? def.name : misfit, keys, bad: !game.placeValid };
     }
     const tool = game.buildTool;
     if (game.buildEdges === 0) return null;
@@ -113,6 +115,7 @@
     <div class="tag" class:bad={tag.bad} class:shake={shaking} style="transform: translate({x + 18}px, {y + 14}px)">
       <b class="tabular">{tag.text}</b>
       {#if tag.sub}<span>{tag.sub}</span>{/if}
+      {#if tag.keys}<small>{tag.keys}</small>{/if}
     </div>
   {/key}
 {/if}
@@ -145,6 +148,13 @@
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 600;
+  }
+  .tag small {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.85;
   }
   .tag.bad b,
   .tag.bad span {

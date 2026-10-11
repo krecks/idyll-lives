@@ -1,17 +1,19 @@
 <script lang="ts">
   import type { ObjectDef } from '../content/content';
   import Icon from './Icon.svelte';
-  import BuildTabs from './buy/BuildTabs.svelte';
+  import BuildDock from './buy/BuildDock.svelte';
   import ItemCard from './buy/ItemCard.svelte';
   import ItemDetail from './buy/ItemDetail.svelte';
-  import { collectionOf, loversOf, styledModel, styleOptions, summarize } from './buy/catalog';
+  import ItemHoverCard from './buy/ItemHoverCard.svelte';
+  import { loversOf, styledModel, styleOptions, summarize } from './buy/catalog';
   import { services } from './services';
   import { play } from './sfx';
   import { game } from './state.svelte';
 
   /**
-   * Build mode's Furnish tab: the furniture catalog by category, plus the owned object picked on
-   * the lot. (Walls, rooms, doors and windows are the Build tab's: see `BuildPanel`.)
+   * Build mode's Furnish tab: the furniture catalog in the dock (categories as icons beside a row of
+   * cards; what an item is worth shows on pointing), plus the owned object picked on the lot, in a
+   * card of its own above the dock. (Walls, rooms, doors and windows are the Construct tab's.)
    */
   const content = services.content;
   const ALL = '';
@@ -28,7 +30,7 @@
   const hue = (id: string) => Math.round((Math.max(0, categories.findIndex((c) => c.id === id)) * 137.5 + 28) % 360);
   const known = new Set(content.buyCategories.map((c) => c.id));
   const categoryOf = (def: ObjectDef) => (known.has(def.category ?? '') ? def.category! : OTHER);
-  const categoryLabel = (id: string) => categories.find((c) => c.id === id)?.label ?? '';
+  const categoryLabel = (id: string) => (id === ALL ? 'Everything' : (categories.find((c) => c.id === id)?.label ?? ''));
 
   type Sort = 'default' | 'cheap' | 'pricey' | 'name';
   const sorts: { id: Sort; label: string }[] = [
@@ -45,12 +47,11 @@
   let sort = $state<Sort>('default');
   let affordableOnly = $state(false);
   let lovedOnly = $state(false);
-  /** The item last pointed at; it stays in the detail pane while the pointer is on the panel (so it can be turned). */
-  let hovered = $state<string | null>(null);
-  /**
-   * The pointer came (back) to the panel. While something is in hand the catalog folds away, from
-   * the moment it's picked, so the lot behind it is free to click; pointing at the panel opens it.
-   */
+  let filtersOpen = $state(false);
+  let filtersEl = $state<HTMLElement>();
+  /** The card pointed at, and where it is along the dock (0..1) for its hover card. */
+  let hovered = $state<{ id: string; at: number } | null>(null);
+  /** The pointer came to the dock's header line: the catalog is open while something is in hand. */
   let over = $state(false);
 
   /** The household's residents, and who of them loves each item (by their traits). */
@@ -84,7 +85,7 @@
   /** Items passing the search, "Affordable" and "For us" filters, across all categories. */
   const matching = $derived(
     content.shop.filter((def) => {
-      // Stairs are built with the Build tab's Stairs tool.
+      // Stairs are built with the Construct tab's Stairs tool.
       if (def.stairs) return false;
       if (affordableOnly && !game.affords(def.price ?? 0)) return false;
       if (lovedOnly && !lovers.has(def.id)) return false;
@@ -118,21 +119,18 @@
     else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
   });
+  const filterCount = $derived(Number(affordableOnly) + Number(lovedOnly));
 
   const folded = $derived(!!game.placing && !over);
   const selected = $derived(game.buySelection === null ? null : (game.objects.find((o) => o.id === game.buySelection) ?? null));
-  /** Something already owned, in hand: the panel shows just it, to restyle, upgrade or sell. */
+  /** Something already owned, in hand, else the owned object picked on the lot: its card restyles, upgrades or sells it. */
   const moving = $derived(game.placing?.objectId == null ? null : (game.objects.find((o) => o.id === game.placing!.objectId) ?? null));
-  const movingDef = $derived(moving && content.object(moving.def));
-  /** The card pointed at, else what's in hand, else the owned object picked on the lot. */
-  const detail = $derived.by(() => {
-    const hover = hovered && content.object(hovered);
-    if (hover) return { def: hover, owned: null };
-    const hand = game.placing && content.object(game.placing.def);
-    if (hand) return { def: hand, owned: null };
-    const def = selected && content.object(selected.def);
-    return def ? { def, owned: selected } : null;
+  const pinned = $derived.by(() => {
+    const obj = moving ?? selected;
+    const def = obj && content.object(obj.def);
+    return obj && def ? { def, owned: obj } : null;
   });
+  const hoveredDef = $derived(hovered && !folded ? content.object(hovered.id) : undefined);
 
   function pickCategory(id: string) {
     if (category !== id) play('tab');
@@ -147,6 +145,19 @@
     hovered = null;
   }
 
+  function point(id: string, card: HTMLElement) {
+    const dock = card.closest('[data-dock]')?.getBoundingClientRect();
+    const r = card.getBoundingClientRect();
+    hovered = { id, at: dock && dock.width ? (r.left + r.width / 2 - dock.left) / dock.width : 0.5 };
+  }
+
+  function clearFilters() {
+    query = '';
+    affordableOnly = false;
+    lovedOnly = false;
+    game.buyFilter = null;
+  }
+
   function onSearchKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       if (query) query = '';
@@ -157,244 +168,200 @@
       (e.currentTarget as HTMLInputElement).blur();
     }
   }
+
+  function onWindowPointer(e: PointerEvent) {
+    if (filtersOpen && filtersEl && !filtersEl.contains(e.target as Node)) filtersOpen = false;
+  }
+  function onFiltersKey(e: KeyboardEvent) {
+    if (e.key !== 'Escape') return;
+    filtersOpen = false;
+    e.stopPropagation();
+  }
 </script>
 
-{#if game.furnishing && moving && movingDef}
-  <section class="buy held glass" aria-label="In hand">
-    <div class="side">
-      <ItemDetail def={movingDef} owned={moving} />
-    </div>
-    <footer class="muted">
-      Click on your lot to put it down · <kbd>R</kbd> rotate{#if content.turns(movingDef)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15° · hold <kbd>Shift</kbd> to place freely{/if} · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> put back
-    </footer>
-  </section>
-{:else if game.furnishing}
-  <section class="buy glass" aria-label="Furnish" onpointerenter={() => (over = true)} onpointerleave={() => ((over = false), (hovered = null))}>
-    <header class="tabs">
-      <BuildTabs />
-      <div class="group shop" role="tablist" aria-label="Furniture">
-        <button role="tab" aria-selected={category === ALL} class:active={category === ALL} onclick={() => pickCategory(ALL)}>
-          <Icon name="icon.ui.buy" size={14} />All <small class="tabular">{matching.length}</small>
+<svelte:window onpointerdown={onWindowPointer} />
+
+{#if game.furnishing}
+  <BuildDock label="Furnish" bind:over tipId="furnish">
+    {#snippet tip()}
+      <b>Make it home.</b> Pick something to buy, then click on your lot to place it. Point at an item to see what it does for your household;
+      <span class="heart">♥</span> marks what suits someone's personality. Click something you own to move, restyle, upgrade or sell it.
+    {/snippet}
+
+    {#snippet head()}
+      <span class="title">{categoryLabel(category)} <small class="tabular">{items.length}</small></span>
+      {#if game.buyFilter}
+        <button class="chip active wish" title="Show everything" onclick={() => (game.buyFilter = null)}>
+          {game.buyFilter.label} <Icon name="icon.ui.close" size={10} />
         </button>
-        {#each categories as c (c.id)}
-          {@const n = counts.get(c.id) ?? 0}
-          <button
-            role="tab"
-            aria-selected={category === c.id}
-            class:active={category === c.id}
-            class:empty={n === 0}
-            style="--hue:{hue(c.id)}"
-            title={c.label}
-            onclick={() => pickCategory(c.id)}
-          >
-            <span class="cat-icon"><Icon name={c.icon ?? 'icon.ui.buy'} size={14} /></span><span class="label">{c.label}</span>
-            <small class="tabular">{n}</small>
-          </button>
-        {/each}
-      </div>
-    </header>
-
-    <div class="drawer" class:folded>
-      <div class="drawer-inner">
-        <div class="filters">
-          <label class="search">
-            <Icon name="icon.ui.search" size={13} />
-            <input type="search" placeholder="Search {content.shop.length} items — name, need, skill, personality…" bind:value={query} onkeydown={onSearchKey} />
-          </label>
-          <select class="sort" bind:value={sort} aria-label="Sort">
-            {#each sorts as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
-          </select>
-          {#if game.buyFilter}
-            <button class="chip active wish" title="Show everything" onclick={() => (game.buyFilter = null)}>
-              {game.buyFilter.label} <Icon name="icon.ui.close" size={10} />
-            </button>
-          {/if}
-          {#if !game.creative}
-            <button class="chip" class:active={affordableOnly} aria-pressed={affordableOnly} onclick={() => (affordableOnly = !affordableOnly)}>Affordable</button>
-          {/if}
-          {#if lovers.size}
-            <button
-              class="chip love"
-              class:active={lovedOnly}
-              aria-pressed={lovedOnly}
-              title="Things your household's personalities draw them to"
-              onclick={() => (lovedOnly = !lovedOnly)}>♥ For us <small class="tabular">{lovers.size}</small></button
-            >
-          {/if}
-          {#if content.styles.length > 1 && styledItems > 0}
-            <div
-              class="styles"
-              title="{styledItems} pieces of furniture come in several designs (marked on their cards); the rest have one. New purchases come in the style you pick. Styles never change price or quality."
-            >
-              <span class="eyebrow">Style</span>
-              {#each content.styles as st, i (st.id)}
-                <button class="chip" class:active={game.householdStyle === i} onclick={() => (play('tab'), services.controls.setHouseholdStyle(i))}>{st.label}</button>
-              {/each}
-              <span class="styled-count"><Icon name="icon.skill.creativity" size={11} />{styledItems} items</span>
-            </div>
-          {/if}
-        </div>
-
+      {/if}
+      <div class="subgroups" role="tablist" aria-label="{categoryLabel(category)} groups">
         {#if groups.length}
-          <div class="subgroups" role="tablist" aria-label="{categoryLabel(category)} groups">
-            <button class="chip" role="tab" aria-selected={!group} class:active={!group} onclick={() => pickGroup('')}>All</button>
-            {#each groups as g (g.id)}
-              <button class="chip" role="tab" aria-selected={group === g.id} class:active={group === g.id} class:empty={g.n === 0} onclick={() => pickGroup(g.id)}
-                >{g.label} <small class="tabular">{g.n}</small></button
-              >
-            {/each}
+          <button class="chip" role="tab" aria-selected={!group} class:active={!group} onclick={() => pickGroup('')}>All</button>
+          {#each groups as g (g.id)}
+            <button class="chip" role="tab" aria-selected={group === g.id} class:active={group === g.id} class:empty={g.n === 0} onclick={() => pickGroup(g.id)}>{g.label}</button>
+          {/each}
+        {/if}
+      </div>
+      <label class="search" title="Search by name, need, skill or personality">
+        <Icon name="icon.ui.search" size={13} />
+        <input type="search" placeholder="Search" bind:value={query} onkeydown={onSearchKey} />
+      </label>
+      <select class="sort" bind:value={sort} aria-label="Sort">
+        {#each sorts as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
+      </select>
+      <div class="filters" bind:this={filtersEl} onkeydown={onFiltersKey} role="presentation">
+        <button class="chip" class:active={filterCount > 0} aria-expanded={filtersOpen} onclick={() => (filtersOpen = !filtersOpen)}>
+          <Icon name="icon.ui.filters" size={13} />Filters{#if filterCount}<small class="tabular">{filterCount}</small>{/if}
+        </button>
+        {#if filtersOpen}
+          <div class="popover glass" role="dialog" aria-label="Filters">
+            <span class="eyebrow">Show</span>
+            <div class="row">
+              {#if !game.creative}
+                <button class="chip" class:active={affordableOnly} aria-pressed={affordableOnly} onclick={() => (affordableOnly = !affordableOnly)}>Affordable</button>
+              {/if}
+              {#if lovers.size}
+                <button class="chip love" class:active={lovedOnly} aria-pressed={lovedOnly} title="Things your household's personalities draw them to" onclick={() => (lovedOnly = !lovedOnly)}
+                  >♥ For us <small class="tabular">{lovers.size}</small></button
+                >
+              {/if}
+            </div>
+            {#if content.styles.length > 1 && styledItems > 0}
+              <span class="eyebrow">Style of new purchases</span>
+              <div class="row">
+                {#each content.styles as st, i (st.id)}
+                  <button class="chip" class:active={game.householdStyle === i} onclick={() => (play('tab'), services.controls.setHouseholdStyle(i))}>{st.label}</button>
+                {/each}
+              </div>
+              <p class="muted">{styledItems} items come in several designs. Styles never change price or quality.</p>
+            {/if}
           </div>
         {/if}
-
-        <div class="body">
-          {#key `${category}/${group}`}
-            <ul class="items">
-              {#each items as def, i (def.id)}
-                <li style="--i:{Math.min(i, 16)}">
-                  <ItemCard
-                    {def}
-                    model={styledModel(content, services.assets, def, game.householdStyle)}
-                    affordable={game.affords(def.price ?? 0)}
-                    active={game.placing?.def === def.id && game.placing.objectId === null}
-                    category={category === ALL && terms.length ? categoryLabel(categoryOf(def)) : null}
-                    owned={owned.get(def.id) ?? 0}
-                    lovers={lovers.get(def.id) ?? []}
-                    collection={collectionOf(content, def)}
-                    styles={styleCounts.get(def.id) ?? 0}
-                    tint={hue(categoryOf(def))}
-                    onpick={() => ((over = false), services.controls.startPlacing(def.id))}
-                    onpoint={() => (hovered = def.id)}
-                  />
-                </li>
-              {:else}
-                <li class="none muted">
-                  {#if terms.length || affordableOnly || lovedOnly || game.buyFilter}
-                    <span class="big">🔍</span>Nothing matches.
-                    <button class="link" onclick={() => ((query = ''), (affordableOnly = false), (lovedOnly = false), (game.buyFilter = null))}>Clear filters</button>
-                  {:else}Nothing here yet.{/if}
-                </li>
-              {/each}
-            </ul>
-          {/key}
-          <aside class="side">
-            {#if detail}
-              <ItemDetail def={detail.def} owned={detail.owned} />
-            {:else}
-              <div class="tip">
-                <span class="tip-icon"><Icon name="icon.ui.buy" size={22} /></span>
-                <p><b>Make it home.</b> Point at an item to turn it around and see what it's worth to your household — the needs it fills, the skills it trains and how it can make your residents feel.</p>
-                {#if lovers.size}<p class="muted">Items marked <span class="heart">♥</span> suit someone's personality.</p>{/if}
-              </div>
-            {/if}
-          </aside>
-        </div>
       </div>
-    </div>
+    {/snippet}
 
-    <footer class="muted">
-      {#if game.placing}
-        {@const def = content.object(game.placing.def)}
-        Click on your lot to place · <kbd>R</kbd> rotate{#if def && content.turns(def)}{' · '}<kbd>Shift</kbd>+<kbd>R</kbd> turn 15° · hold <kbd>Shift</kbd> to place freely{/if} · <kbd>Esc</kbd> put back{#if folded}<span class="peek">&nbsp;· point here for the catalog</span>{/if}
-      {:else if selected}
-        Upgrade, restyle or move it · <kbd>R</kbd> rotate · <kbd>Delete</kbd> sell · <kbd>Esc</kbd> deselect
-      {:else}
-        Pick something to buy, or click something you own to pick it up: move, turn, restyle, upgrade or sell it.
+    {#snippet body()}
+      <div class="body">
+        <div class="cats" role="tablist" aria-label="Furniture">
+          <button role="tab" aria-selected={category === ALL} aria-label="Everything" class:active={category === ALL} title="Everything · {matching.length}" onclick={() => pickCategory(ALL)}>
+            <span class="cat-icon all"><Icon name="icon.ui.buy" size={14} /></span>
+          </button>
+          {#each categories as c (c.id)}
+            {@const n = counts.get(c.id) ?? 0}
+            <button
+              role="tab"
+              aria-selected={category === c.id}
+              aria-label={c.label}
+              class:active={category === c.id}
+              class:empty={n === 0}
+              style="--hue:{hue(c.id)}"
+              title="{c.label} · {n}"
+              onclick={() => pickCategory(c.id)}
+            >
+              <span class="cat-icon"><Icon name={c.icon ?? 'icon.ui.buy'} size={14} /></span>
+            </button>
+          {/each}
+        </div>
+        {#key `${category}/${group}`}
+          <ul class="items" onpointerleave={() => (hovered = null)}>
+            {#each items as def, i (def.id)}
+              <li style="--i:{Math.min(i, 16)}">
+                <ItemCard
+                  {def}
+                  model={styledModel(content, services.assets, def, game.householdStyle)}
+                  affordable={game.affords(def.price ?? 0)}
+                  active={game.placing?.def === def.id && game.placing.objectId === null}
+                  owned={owned.get(def.id) ?? 0}
+                  lovers={lovers.get(def.id) ?? []}
+                  tint={hue(categoryOf(def))}
+                  onpick={() => ((over = false), (hovered = null), services.controls.startPlacing(def.id))}
+                  onpoint={(card) => point(def.id, card)}
+                />
+              </li>
+            {:else}
+              <li class="none muted">
+                {#if terms.length || affordableOnly || lovedOnly || game.buyFilter}
+                  Nothing matches. <button class="link" onclick={clearFilters}>Clear filters</button>
+                {:else}Nothing here yet.{/if}
+              </li>
+            {/each}
+          </ul>
+        {/key}
+      </div>
+    {/snippet}
+
+    {#snippet above()}
+      {#if hoveredDef && hovered}
+        <ItemHoverCard def={hoveredDef} at={hovered.at} lovers={lovers.get(hoveredDef.id) ?? []} owned={owned.get(hoveredDef.id) ?? 0} styles={styleCounts.get(hoveredDef.id) ?? 0} />
       {/if}
-    </footer>
-  </section>
+      {#if pinned}
+        <section class="pinned glass" aria-label={moving ? 'In hand' : 'Picked'}>
+          {#if !moving}
+            <button class="close" aria-label="Put down" title="Done (Esc)" onclick={() => (game.buySelection = null)}><Icon name="icon.ui.close" size={12} /></button>
+          {/if}
+          <ItemDetail def={pinned.def} owned={pinned.owned} />
+        </section>
+      {/if}
+    {/snippet}
+  </BuildDock>
 {/if}
 
 <style>
-  .buy {
-    position: absolute;
-    left: 50%;
-    bottom: var(--edge);
-    transform: translateX(-50%);
-    width: min(1180px, calc(100vw - 2 * var(--edge)));
-    /* Never reach the top bar. */
-    max-height: calc(100vh - 2 * var(--edge) - 64px);
-    padding: 10px 12px;
+  .title {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .title small {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .subgroups {
+    flex: 1;
+    min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: auto;
-    container-type: inline-size;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
   }
-  .tabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-  .group {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--radius-md);
-    background: var(--hairline);
-  }
-  .group.shop {
-    flex: 1 1 0;
-    min-width: 280px;
-  }
-  .group button {
+  .chip {
+    flex: none;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 28px;
+    height: 26px;
     padding: 0 10px;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
+    border-radius: var(--radius-pill);
+    background: var(--hairline);
     font-size: 12px;
+    font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
-    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
   }
-  .group button:hover {
-    color: var(--text);
+  .chip.active {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
-  .group button small {
-    font-size: 10px;
-    font-weight: 600;
-    opacity: 0.7;
-  }
-  .group button.empty {
+  .chip.empty {
     opacity: 0.45;
   }
-  .group button.active {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: var(--shadow-sm);
+  .chip small {
+    font-size: 10px;
+    opacity: 0.75;
   }
-  .cat-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 7px;
-    background: hsl(var(--hue) 55% 90%);
-    color: hsl(var(--hue) 45% 38%);
-    transition: transform 260ms var(--ease);
+  .chip.love {
+    color: #c2405f;
   }
-  .group button:hover .cat-icon {
-    transform: rotate(-8deg) scale(1.08);
-  }
-  .group button.active .cat-icon {
-    background: hsl(var(--hue) 60% 52%);
-    color: #fff;
-    transform: scale(1.06);
-  }
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
+  .chip.love.active {
+    background: rgba(224, 96, 126, 0.16);
   }
   .search {
-    flex: 1 1 220px;
-    max-width: 380px;
+    flex: 0 1 220px;
+    min-width: 110px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -422,6 +389,7 @@
     user-select: text;
   }
   .sort {
+    flex: none;
     height: 30px;
     padding: 0 8px;
     border-radius: var(--radius-pill);
@@ -432,92 +400,107 @@
     font-weight: 600;
     color: var(--text);
   }
-  .styles {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
+  .filters {
+    position: relative;
+    flex: none;
   }
-  .chip {
-    height: 26px;
-    padding: 0 10px;
-    border-radius: var(--radius-pill);
-    background: var(--hairline);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
+  .filters > .chip {
+    height: 30px;
   }
-  .chip.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .styled-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding-left: 2px;
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .chip.love {
-    color: #c2405f;
-  }
-  .chip.love.active {
-    background: rgba(224, 96, 126, 0.16);
-  }
-  .chip small {
-    font-size: 10px;
-    opacity: 0.75;
-  }
-  .subgroups {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .chip.empty {
-    opacity: 0.45;
-  }
-  /* While something is in hand, the catalog folds away unless the pointer comes back to it. */
-  .drawer {
-    display: grid;
-    grid-template-rows: 1fr;
-    transition:
-      grid-template-rows var(--slow) var(--ease),
-      opacity var(--slow) var(--ease);
-  }
-  .drawer.folded {
-    grid-template-rows: 0fr;
-    opacity: 0;
-  }
-  .drawer-inner {
-    min-height: 0;
-    overflow: hidden;
+  .popover {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    width: 280px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    background: var(--glass-strong);
+    z-index: 3;
+  }
+  .popover .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .popover p {
+    margin: 0;
   }
   .body {
     display: flex;
     gap: 10px;
-    min-height: 0;
-    height: clamp(190px, 31vh, 420px);
+    height: var(--dock-body);
+  }
+  .cats {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(4, 28px);
+    grid-auto-rows: 28px;
+    gap: 3px;
+    align-content: start;
+    padding: 3px;
+    border-radius: var(--radius-md);
+    background: var(--hairline);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .cats button {
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    transition: background var(--fast) var(--ease);
+  }
+  .cats button:hover,
+  .cats button.active {
+    background: var(--surface);
+  }
+  .cats button.active {
+    box-shadow: var(--shadow-sm);
+  }
+  .cats button.empty {
+    opacity: 0.4;
+  }
+  .cat-icon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: hsl(var(--hue) 55% 90%);
+    color: hsl(var(--hue) 45% 38%);
+    transition: transform 260ms var(--ease);
+  }
+  .cat-icon.all {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .cats button:hover .cat-icon {
+    transform: rotate(-8deg) scale(1.08);
+  }
+  .cats button.active .cat-icon {
+    background: hsl(var(--hue) 60% 52%);
+    color: #fff;
+  }
+  .cats button.active .cat-icon.all {
+    background: var(--accent);
   }
   .items {
     flex: 1;
     min-width: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
-    grid-auto-rows: 134px;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-auto-rows: 120px;
     gap: 8px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
     margin: 0;
-    padding: 4px 6px 6px 3px;
+    padding: 2px 4px 2px 2px;
     list-style: none;
   }
   .items li {
+    scroll-snap-align: start;
     animation: deal 420ms var(--ease) backwards;
     animation-delay: calc(var(--i) * 20ms);
   }
@@ -534,68 +517,35 @@
     gap: 8px;
     padding: 12px 4px;
   }
-  .big {
-    font-size: 18px;
-  }
-  .side {
-    flex: none;
-    width: 310px;
+  /* The owned object picked or in hand: its card, at the right, out of the way of the lot. */
+  .pinned {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: min(340px, 100%);
+    max-height: min(52vh, 520px);
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    background: var(--surface);
+    background: var(--glass-strong);
+    pointer-events: auto;
   }
-  /* Something owned in hand: just its card, out of the way of the lot. */
-  .buy.held {
-    width: min(400px, calc(100vw - 2 * var(--edge)));
-  }
-  .held .side {
-    width: auto;
-    max-height: min(46vh, 520px);
-  }
-  .tip {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 12px;
-    line-height: 1.45;
-  }
-  .tip p {
-    margin: 0;
-  }
-  .tip-icon {
+  .close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-muted);
   }
   .heart {
     color: #e0607e;
-  }
-  .peek {
-    color: var(--accent);
-  }
-  @container (max-width: 1020px) {
-    .group.shop .label {
-      display: none;
-    }
-  }
-  @container (max-width: 760px) {
-    .body {
-      flex-direction: column;
-      height: auto;
-    }
-    .items {
-      max-height: 26vh;
-    }
-    .side {
-      width: auto;
-      max-height: 22vh;
-    }
   }
   .link {
     color: var(--accent);
@@ -604,12 +554,5 @@
   .muted {
     color: var(--text-muted);
     font-size: 12px;
-  }
-  kbd {
-    padding: 0 5px;
-    border-radius: 4px;
-    background: var(--hairline);
-    font-family: inherit;
-    font-size: 11px;
   }
 </style>

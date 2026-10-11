@@ -2,7 +2,8 @@
   import type { Snippet } from 'svelte';
   import Icon from '../Icon.svelte';
 
-  let { title, onclose, width = 640, children }: { title: string; onclose: () => void; width?: number; children: Snippet } = $props();
+  /** `scroll: false`: the content scrolls its own parts (one scroll area, not one inside another). */
+  let { title, onclose, width = 640, scroll = true, children }: { title: string; onclose: () => void; width?: number; scroll?: boolean; children: Snippet } = $props();
 
   // Capture phase: Escape closes the modal before game shortcuts see it.
   function onkeydown(e: KeyboardEvent) {
@@ -22,7 +23,7 @@
       <h2>{title}</h2>
       <button class="close" aria-label="Close" onclick={onclose}><Icon name="icon.ui.close" size={16} /></button>
     </header>
-    <div class="body">{@render children()}</div>
+    <div class="body" class:fixed={!scroll}>{@render children()}</div>
   </div>
 </div>
 
@@ -81,6 +82,10 @@
   .body {
     padding: 8px 26px 24px;
     overflow: auto;
+  }
+  .body.fixed {
+    overflow: hidden;
+    min-height: 0;
   }
   @keyframes fade {
     from {
