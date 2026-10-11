@@ -1,14 +1,19 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from '../Icon.svelte';
 
-  /** One setting: its name, a short hint, badges ("Next load", "Experimental") and the control. */
+  /**
+   * One setting: its name, a short hint (one line), badges ("Next load", "Experimental") and the
+   * control. The longer story, when there is one, is `details`, behind an ⓘ.
+   */
   let {
     title,
     hint,
+    details,
     badges = [],
     disabled = false,
     children,
-  }: { title: string; hint?: string; badges?: string[]; disabled?: boolean; children: Snippet } = $props();
+  }: { title: string; hint?: string; details?: string; badges?: string[]; disabled?: boolean; children: Snippet } = $props();
 </script>
 
 <div class="row" class:disabled>
@@ -16,6 +21,7 @@
     <b>
       {title}
       {#each badges as b (b)}<em class:experimental={b === 'Experimental'}>{b}</em>{/each}
+      {#if details}<span class="more" role="img" aria-label={details} title={details}><Icon name="icon.ui.info" size={14} /></span>{/if}
     </b>
     {#if hint}<span>{hint}</span>{/if}
   </div>
@@ -48,7 +54,15 @@
     gap: 6px;
     font-weight: 600;
   }
-  span {
+  .more {
+    display: inline-grid;
+    color: var(--text-muted);
+    cursor: help;
+  }
+  .more:hover {
+    color: var(--accent);
+  }
+  .text > span {
     color: var(--text-muted);
     font-size: 12.5px;
     line-height: 1.4;

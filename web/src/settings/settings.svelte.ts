@@ -66,6 +66,10 @@ export interface Settings {
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
+  /** Build mode's dock: `compact` keeps one row of the catalog (more of the lot in view), `expanded` shows several. */
+  catalogSize: 'compact' | 'expanded';
+  /** First-use tips already dismissed (ids from `FirstTip`). */
+  tipsSeen: string[];
 }
 
 export const RESTART_KEYS: readonly (keyof Settings)[] = ['renderer', 'shadowDetail', 'antiAliasing', 'allLamps', 'mirrors', 'ambientOcclusion'];
@@ -104,6 +108,8 @@ export const DEFAULT_SETTINGS: Settings = {
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
+  catalogSize: 'compact',
+  tipsSeen: [],
 };
 
 function load(): Settings {
@@ -136,8 +142,33 @@ $effect.root(() => {
   });
 });
 
-export function resetSettings(): void {
-  Object.assign(settings, DEFAULT_SETTINGS);
+/** Back to the defaults: every setting, or just `keys` (one page of Settings). */
+export function resetSettings(keys?: readonly (keyof Settings)[]): void {
+  if (!keys) return void Object.assign(settings, DEFAULT_SETTINGS, { tipsSeen: [] });
+  for (const k of keys) (settings as unknown as Record<string, unknown>)[k] = structuredClone(DEFAULT_SETTINGS[k]);
+}
+
+/** Settings › Performance's quick picks: each sets the image, light and shadow settings at once (`high`: the defaults). */
+export const GRAPHICS_PRESETS = {
+  low: { resolutionScale: 0.75, shadowDetail: QUALITY.low.shadowMapSize, antiAliasing: QUALITY.low.msaaSamples > 1, allLamps: QUALITY.low.clusteredLamps, mirrors: false, ambientOcclusion: false },
+  medium: { resolutionScale: 1, shadowDetail: QUALITY.medium.shadowMapSize, antiAliasing: QUALITY.medium.msaaSamples > 1, allLamps: QUALITY.medium.clusteredLamps, mirrors: false, ambientOcclusion: false },
+  high: {
+    resolutionScale: DEFAULT_SETTINGS.resolutionScale,
+    shadowDetail: DEFAULT_SETTINGS.shadowDetail,
+    antiAliasing: DEFAULT_SETTINGS.antiAliasing,
+    allLamps: DEFAULT_SETTINGS.allLamps,
+    mirrors: DEFAULT_SETTINGS.mirrors,
+    ambientOcclusion: DEFAULT_SETTINGS.ambientOcclusion,
+  },
+} satisfies Record<string, Partial<Settings>>;
+export type GraphicsPreset = keyof typeof GRAPHICS_PRESETS;
+
+/** The preset the graphics settings match, or `custom`. */
+export function graphicsPreset(s: Settings): GraphicsPreset | 'custom' {
+  for (const [id, preset] of Object.entries(GRAPHICS_PRESETS)) {
+    if (Object.entries(preset).every(([k, v]) => s[k as keyof Settings] === v)) return id as GraphicsPreset;
+  }
+  return 'custom';
 }
 
 /** Renderer quality from settings; `?quality=low|medium|high|ultra` still overrides for testing. */

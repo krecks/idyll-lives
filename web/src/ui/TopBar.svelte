@@ -131,7 +131,7 @@
       <Icon name={game.wallMode === 'up' ? 'icon.ui.wallsUp' : 'icon.ui.wallsDown'} />
     </button>
     <button class="tool" title="Menu (Esc)" aria-label="Pause menu" onclick={() => services.controls.openPauseMenu()}>
-      <Icon name="icon.ui.settings" />
+      <Icon name="icon.ui.menu" />
     </button>
   </div>
 </header>

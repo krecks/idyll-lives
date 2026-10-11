@@ -2,7 +2,7 @@
   import type { RoomView } from '../core/protocol';
   import { ROOM_FACTORS, roomName, scoreColor, weakest } from '../game/roomOverlay';
   import Icon from './Icon.svelte';
-  import BuildTabs from './buy/BuildTabs.svelte';
+  import BuildDock from './buy/BuildDock.svelte';
   import { clock, money, WEEKDAYS } from './format';
   import { settings } from '../settings/settings.svelte';
   import { describeHomeWish } from './planner/homeWishes';
@@ -82,9 +82,8 @@
 </script>
 
 {#if game.mode === 'build' && game.buildTab === 'home'}
-  <section class="home glass" aria-label="Home">
-    <header>
-      <BuildTabs />
+  <BuildDock label="Home">
+    {#snippet head()}
       {#if overall !== null}
         <span class="overall"><span class="total tabular" style="--c:{color(overall)}">{Math.round(overall * 100)}</span>The house as a whole</span>
       {/if}
@@ -93,7 +92,8 @@
           Rent {money(game.rent)} + bills {money(game.bills ?? 0)} every {rent ? `${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}` : 'week'}
         {/if}
       </span>
-    </header>
+    {/snippet}
+    {#snippet body()}
     <div class="body">
       {#if game.expecting || (content.adoptionCost !== null && grownUp) || broken.length || otherWishes.length}
         <div class="side">
@@ -161,28 +161,11 @@
         {/each}
       </div>
     </div>
-  </section>
+    {/snippet}
+  </BuildDock>
 {/if}
 
 <style>
-  .home {
-    position: absolute;
-    left: 50%;
-    bottom: var(--edge);
-    transform: translateX(-50%);
-    width: min(1180px, calc(100vw - 2 * var(--edge)));
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: auto;
-  }
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
   .overall {
     display: inline-flex;
     align-items: center;
@@ -209,7 +192,7 @@
     display: flex;
     gap: 10px;
     min-height: 0;
-    max-height: clamp(190px, 31vh, 420px);
+    max-height: var(--dock-body);
   }
   .side {
     flex: none;

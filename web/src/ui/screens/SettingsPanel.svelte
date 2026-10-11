@@ -1,6 +1,11 @@
+<script lang="ts" module>
+  /** The page last open, for the next time Settings opens (this visit to the page). */
+  let lastPage = 'performance';
+</script>
+
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { resetSettings, RESTART_KEYS, settings } from '../../settings/settings.svelte';
+  import { GRAPHICS_PRESETS, graphicsPreset, resetSettings, RESTART_KEYS, settings, type GraphicsPreset, type Settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { services } from '../services';
   import { game } from '../state.svelte';
@@ -28,15 +33,43 @@
     if (app.screen === 'game' && playerMoves !== game.playerMoves) services.controls.setPlayerMoves(playerMoves);
   });
 
+  /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
-    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf' },
-    { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live' },
-    { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch' },
-    { id: 'interface', label: 'Interface', icon: 'icon.ui.settings' },
-    { id: 'audio', label: 'Audio', icon: 'icon.career.music' },
-    { id: 'controls', label: 'Controls', icon: 'icon.ui.move' },
-  ] as const;
-  let page = $state<(typeof pages)[number]['id']>('performance');
+    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['resolutionScale', 'fpsCap', 'antiAliasing', 'shadowDetail', 'allLamps', 'mirrors', 'ambientOcclusion', 'renderer'] },
+    { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
+    { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours'] },
+    { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
+    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['sound', 'worldSound', 'worldVolume'] },
+    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'llmModel', 'subtitles'] },
+    { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
+  ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
+  type Page = (typeof pages)[number]['id'];
+  let page = $state<Page>(pages.some((p) => p.id === lastPage) ? (lastPage as Page) : 'performance');
+  const current = $derived(pages.find((p) => p.id === page)!);
+  /** "Reset this page" asks first. */
+  let confirmReset = $state(false);
+  function pickPage(id: Page) {
+    page = lastPage = id;
+    confirmReset = false;
+  }
+  /** ↑/↓ between the pages (they're tabs, in a column). */
+  function onTabsKey(e: KeyboardEvent) {
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = pages.findIndex((p) => p.id === page);
+    const next = (at + step + pages.length) % pages.length;
+    pickPage(pages[next].id);
+    ((e.currentTarget as HTMLElement).querySelectorAll('button')[next] as HTMLElement | undefined)?.focus();
+  }
+
+  // Performance: a preset, or "Custom" once anything is changed by hand (the rows under Fine-tune).
+  const preset = $derived(graphicsPreset(settings));
+  let fineTune = $state(graphicsPreset(settings) === 'custom');
+  function pickPreset(id: GraphicsPreset | 'custom') {
+    if (id === 'custom') return void (fineTune = true);
+    Object.assign(settings, GRAPHICS_PRESETS[id]);
+  }
 
   // Remember restart-only values when opened during a game, to show a notice if they change.
   const initial = Object.fromEntries(RESTART_KEYS.map((k) => [k, settings[k]]));
@@ -48,10 +81,7 @@
   const modelStatus = $derived.by(() => {
     if (voiceStatus.state === 'loading') return `Downloading… ${Math.round(voiceStatus.progress * 100)} %`;
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
-    return (
-      'KittenTTS nano: eight voices mixed for each resident, raised and made smaller for children. ' +
-      `Runs on the CPU; about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`
-    );
+    return `KittenTTS nano, on the CPU: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
   });
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {
@@ -86,7 +116,7 @@
   const mb = (m: (typeof models)[number]) => Math.round(downloadMb(m));
   const llmText = $derived.by(() => {
     if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
-    return `${model.about} Licence: ${model.licence}. About ${mb(model)} MB, downloaded once.`;
+    return `About ${mb(model)} MB, downloaded once.`;
   });
   const NAMES = { A: 'the GPU, voices on the CPU', B: 'the GPU, voices too', C: 'the CPU' };
   const deviceText = $derived.by(() => {
@@ -195,6 +225,7 @@
         [['L'], 'Live'],
         [['B'], 'Build'],
         [['V'], 'Build: Furnish'],
+        [['C'], 'Build: Construct (walls, rooms, paint)'],
         [['O'], 'Build: Home (how the rooms are doing)'],
         [['P'], 'Planner'],
         [['J'], 'Journal'],
@@ -224,17 +255,27 @@
 
 <div class="settings">
   <nav aria-label="Settings">
-    <ul role="tablist" aria-orientation="vertical">
+    <ul role="tablist" aria-orientation="vertical" onkeydown={onTabsKey}>
       {#each pages as p (p.id)}
         <li>
-          <button role="tab" aria-selected={page === p.id} class:active={page === p.id} onclick={() => (page = p.id)}>
+          <button role="tab" aria-selected={page === p.id} tabindex={page === p.id ? 0 : -1} class:active={page === p.id} onclick={() => pickPage(p.id)}>
             <Icon name={p.icon} size={16} />
             {p.label}
           </button>
         </li>
       {/each}
     </ul>
-    <button class="reset" onclick={resetSettings}>Reset to defaults</button>
+    {#if confirmReset}
+      <div class="confirm" role="alert">
+        <span>Put {current.label} back to the defaults?</span>
+        <div class="row">
+          <button class="btn danger small" onclick={() => (resetSettings(current.keys), (confirmReset = false))}>Reset</button>
+          <button class="btn ghost small" onclick={() => (confirmReset = false)}>Keep</button>
+        </div>
+      </div>
+    {:else}
+      <button class="reset" onclick={() => (confirmReset = true)}>Reset this page</button>
+    {/if}
   </nav>
 
   <div class="page" role="tabpanel">
@@ -243,14 +284,23 @@
     {/if}
 
     {#if page === 'performance'}
-      <p class="intro">Each of these trades looks for speed. If the game stutters, lower the resolution first: it saves the most.</p>
+      <p class="intro">If the game stutters, pick a lower quality: the resolution saves the most.</p>
       <section>
-        <h3>Image</h3>
-        <SettingRow title="Resolution" hint="How many pixels the game draws. Lower is softer but much faster.">
-          <input class="slider" type="range" min="0.5" max="1" step="0.05" aria-label="Resolution scale" bind:value={settings.resolutionScale} />
-          <output>{percent(settings.resolutionScale)}</output>
+        <h3>Quality</h3>
+        <SettingRow title="Graphics" hint="Resolution, light and shadows, set together." details="Low draws at 75% resolution with simple shadows and only the nearest lamps. High is the default. Fine-tune sets each part on its own.">
+          <Segmented
+            label="Graphics"
+            value={preset}
+            options={[
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+            onchange={pickPreset}
+          />
         </SettingRow>
-        <SettingRow title="Frame rate cap" hint="Draws at most this many frames a second. A cap saves power and keeps laptops cooler; No cap follows the display.">
+        <SettingRow title="Frame rate cap" hint="A cap saves power and keeps laptops cooler." details="No cap draws as often as the display refreshes.">
           <Segmented
             label="Frame rate cap"
             bind:value={fpsChoice}
@@ -266,51 +316,63 @@
             <input class="input fps" type="number" min={FPS_MIN} max={FPS_MAX} step="1" aria-label="Frames per second" bind:value={customFps} />
           {/if}
         </SettingRow>
-        <SettingRow title="Smooth edges" hint="Anti-aliasing: 4× multisampling removes jagged edges. Off uses a cheaper filter that blurs them a little." badges={[NEXT_LOAD]}>
-          <Toggle label="Smooth edges" bind:checked={settings.antiAliasing} />
-        </SettingRow>
       </section>
-      <section>
-        <h3>Light and shadow</h3>
-        <SettingRow title="Shadow detail" hint="How crisp shadows are. Each step up uses four times the graphics memory." badges={[NEXT_LOAD]}>
-          <Segmented
-            label="Shadow detail"
-            bind:value={settings.shadowDetail}
-            options={[
-              { value: 1024, label: 'Low' },
-              { value: 2048, label: 'Medium' },
-              { value: 4096, label: 'High' },
-            ]}
-          />
-        </SettingRow>
-        <SettingRow title="Every lamp lights" hint="On: up to 32 lamps light their rooms. Off: only the four nearest the biggest rooms. Costs little on WebGPU, more on WebGL2." badges={[NEXT_LOAD]}>
-          <Toggle label="Every lamp lights" bind:checked={settings.allLamps} />
-        </SettingRow>
-        <SettingRow title="Mirror reflections" hint="The two mirrors nearest the camera show the room. Each draws the scene once more while it is on screen." badges={[NEXT_LOAD]}>
-          <Toggle label="Mirror reflections" bind:checked={settings.mirrors} />
-        </SettingRow>
-        <SettingRow title="Ambient occlusion" hint="Soft contact shadows in corners and under furniture. Costly, and may fail to start on some WebGPU drivers." badges={['Experimental', NEXT_LOAD]}>
-          <Toggle label="Ambient occlusion" bind:checked={settings.ambientOcclusion} />
-        </SettingRow>
-      </section>
-      <section>
-        <h3>Engine</h3>
-        <SettingRow title="Graphics API" hint="WebGPU is faster; WebGL2 is the fallback if the game won't draw." badges={[NEXT_LOAD]}>
-          <Segmented
-            label="Graphics API"
-            bind:value={settings.renderer}
-            options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'webgl', label: 'WebGL2' },
-            ]}
-          />
-        </SettingRow>
-      </section>
+      <button class="disclosure" aria-expanded={fineTune} onclick={() => (fineTune = !fineTune)}>
+        <span class="chev" class:open={fineTune}><Icon name="icon.ui.chevron" size={14} /></span>Fine-tune
+      </button>
+      {#if fineTune}
+        <section>
+          <h3>Image</h3>
+          <SettingRow title="Resolution" hint="Lower is softer, but much faster.">
+            <input class="slider" type="range" min="0.5" max="1" step="0.05" aria-label="Resolution scale" bind:value={settings.resolutionScale} />
+            <output>{percent(settings.resolutionScale)}</output>
+          </SettingRow>
+          <SettingRow title="Smooth edges" hint="Removes jagged edges." details="4× multisampling. Off uses a cheaper filter that blurs edges a little." badges={[NEXT_LOAD]}>
+            <Toggle label="Smooth edges" bind:checked={settings.antiAliasing} />
+          </SettingRow>
+        </section>
+        <section>
+          <h3>Light and shadow</h3>
+          <SettingRow title="Shadow detail" hint="Each step up uses four times the graphics memory." badges={[NEXT_LOAD]}>
+            <Segmented
+              label="Shadow detail"
+              bind:value={settings.shadowDetail}
+              options={[
+                { value: 1024, label: 'Low' },
+                { value: 2048, label: 'Medium' },
+                { value: 4096, label: 'High' },
+              ]}
+            />
+          </SettingRow>
+          <SettingRow title="Every lamp lights" hint="Off: only the four lamps nearest the biggest rooms." details="On: up to 32 lamps light their rooms. Costs little on WebGPU, more on WebGL2." badges={[NEXT_LOAD]}>
+            <Toggle label="Every lamp lights" bind:checked={settings.allLamps} />
+          </SettingRow>
+          <SettingRow title="Mirror reflections" hint="The two mirrors nearest the camera show the room." details="Each draws the scene once more while it is on screen." badges={[NEXT_LOAD]}>
+            <Toggle label="Mirror reflections" bind:checked={settings.mirrors} />
+          </SettingRow>
+          <SettingRow title="Ambient occlusion" hint="Soft contact shadows in corners and under furniture." details="Costly, and may fail to start on some WebGPU drivers." badges={['Experimental', NEXT_LOAD]}>
+            <Toggle label="Ambient occlusion" bind:checked={settings.ambientOcclusion} />
+          </SettingRow>
+        </section>
+        <section>
+          <h3>Engine</h3>
+          <SettingRow title="Graphics API" hint="WebGL2 is the fallback if the game won't draw." details="WebGPU (Auto, where there is one) is faster." badges={[NEXT_LOAD]}>
+            <Segmented
+              label="Graphics API"
+              bind:value={settings.renderer}
+              options={[
+                { value: 'auto', label: 'Auto' },
+                { value: 'webgl', label: 'WebGL2' },
+              ]}
+            />
+          </SettingRow>
+        </section>
+      {/if}
     {:else if page === 'gameplay'}
       {#if app.screen === 'game'}
         <section>
           <h3>This game</h3>
-          <SettingRow title="Lifespan" hint={lifespanHint(game.lifespan)}>
+          <SettingRow title="Lifespan" hint={lifespanHint(lifespan)}>
             <Segmented
               label="Lifespan"
               bind:value={lifespan}
@@ -322,14 +384,14 @@
               ]}
             />
           </SettingRow>
-          <SettingRow title="Moving" hint="Your residents move in with partners and out of the family home on their own.">
+          <SettingRow title="Moving" hint="Residents move in with partners and out of home on their own.">
             <Toggle label="Moving" bind:checked={playerMoves} />
           </SettingRow>
         </section>
       {/if}
       <section>
         <h3>Residents</h3>
-        <SettingRow title="Free will" hint="Your residents look after their needs, friends and work by themselves. Neighbours always do.">
+        <SettingRow title="Free will" hint="Residents look after needs, friends and work themselves." details="Neighbours always do.">
           <Toggle label="Free will" bind:checked={settings.autonomy} />
         </SettingRow>
       </section>
@@ -351,7 +413,7 @@
     {:else if page === 'camera'}
       <section>
         <h3>Camera in Live</h3>
-        <SettingRow title="Back to watching" hint="After this long without input the camera follows what happens at home on its own. Any input takes it back.">
+        <SettingRow title="Back to watching" hint="With no input this long, the camera follows life at home." details="Any input takes it back.">
           <Segmented
             label="Back to watching"
             bind:value={settings.directorDelay}
@@ -373,7 +435,7 @@
             ]}
           />
         </SettingRow>
-        <SettingRow title="Quiet interface" hint="The interface fades while the camera watches; move the mouse to bring it back.">
+        <SettingRow title="Quiet interface" hint="The interface fades while the camera watches." details="Move the mouse to bring it back.">
           <Toggle label="Quiet interface" bind:checked={settings.hideHudWhileWatching} />
         </SettingRow>
       </section>
@@ -401,6 +463,19 @@
             ]}
           />
         </SettingRow>
+        <SettingRow title="Build catalog" hint="One row keeps more of your lot in view." details="The button at the end of the Build dock's header switches it too.">
+          <Segmented
+            label="Build catalog"
+            bind:value={settings.catalogSize}
+            options={[
+              { value: 'compact', label: 'One row' },
+              { value: 'expanded', label: 'Several rows' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow title="First-use tips" hint="Show the tips for each panel again.">
+          <button class="btn ghost" disabled={settings.tipsSeen.length === 0} onclick={() => (settings.tipsSeen = [])}>Show again</button>
+        </SettingRow>
         <SettingRow title="24-hour clock" hint="Otherwise AM / PM.">
           <Toggle label="24-hour clock" bind:checked={settings.clock24h} />
         </SettingRow>
@@ -420,7 +495,7 @@
         <SettingRow title="Sound effects" hint="Little sounds when you buy, build and place things.">
           <Toggle label="Sound effects" bind:checked={settings.sound} />
         </SettingRow>
-        <SettingRow title="Sounds of the world" hint="Birds by day, crickets at night, a pan sizzling, running water, the TV.">
+        <SettingRow title="Sounds of the world" hint="Birds by day, crickets at night, a pan sizzling, the TV.">
           <Toggle label="Sounds of the world" bind:checked={settings.worldSound} />
         </SettingRow>
         <SettingRow title="World volume" disabled={!settings.worldSound}>
@@ -428,11 +503,13 @@
           <output>{percent(settings.worldVolume)}</output>
         </SettingRow>
       </section>
+    {:else if page === 'voices'}
       <section>
         <h3>Voices</h3>
         <SettingRow
           title="Resident voices"
-          hint="The resident you're looking at, and conversations you start, are spoken out loud in English. Runs on this computer; the voices download about {Math.round(DOWNLOAD_MB)} MB once."
+          hint="Residents speak out loud, in English."
+          details="The resident you're looking at, and conversations you start. Runs on this computer; the voices download about {Math.round(DOWNLOAD_MB)} MB once."
           badges={['Experimental']}
         >
           <Toggle label="Resident voices" bind:checked={settings.voices} />
@@ -442,7 +519,7 @@
             <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Voice volume" bind:value={settings.voiceVolume} />
             <output>{percent(settings.voiceVolume)}</output>
           </SettingRow>
-          <SettingRow title="Voice model" hint={modelStatus}>
+          <SettingRow title="Voice model" hint={modelStatus} details="Eight voices mixed for each resident, raised and made smaller for children.">
             {#if voiceStatus.state === 'loading'}
               <Busy label="Downloading the voices" progress={voiceStatus.progress} />
             {:else}
@@ -462,7 +539,8 @@
           <h3>What residents say</h3>
           <SettingRow
             title="Lines"
-            hint="Hand-written lines, or a small language model on this computer writes each line from who the resident is and what's going on: traits, mood, plans, job, what's around them, the time of day."
+            hint="Hand-written, or written by a small language model."
+            details="The model runs on this computer and writes each line from who the resident is and what's going on: traits, mood, plans, job, what's around them, the time of day."
             badges={settings.voiceWriter === 'llm' ? ['Experimental'] : []}
           >
             <Segmented
@@ -474,14 +552,14 @@
               ]}
             />
           </SettingRow>
-          <SettingRow title="Subtitles" hint="Spoken lines also show as text in the speech bubble.">
+          <SettingRow title="Subtitles" hint="Spoken lines also show in the speech bubble.">
             <Toggle label="Subtitles" bind:checked={settings.subtitles} />
           </SettingRow>
         </section>
         {#if settings.voiceWriter === 'llm'}
           <section>
             <h3>Language model</h3>
-            <SettingRow title="Model" hint={llmText}>
+            <SettingRow title="Model" hint={llmText} details="{model.about} Licence: {model.licence}.">
               <select class="input" aria-label="Model" bind:value={settings.llmModel} disabled={deviceTest.running}>
                 <optgroup label="Built in">
                   {#each models.filter((m) => !m.added) as m (m.id)}<option value={m.id}>{m.label} · {mb(m)} MB</option>{/each}
@@ -511,13 +589,14 @@
             </SettingRow>
             <SettingRow
               title="Add a model"
-              hint={addText || 'Any small model on Hugging Face with a 4-bit ONNX build (onnx/model_q4.onnx), such as onnx-community/SmolLM2-135M-Instruct-ONNX. It downloads from Hugging Face when used.'}
+              hint={addText || 'A small Hugging Face model with a 4-bit ONNX build.'}
+              details="It needs onnx/model_q4.onnx, as onnx-community/SmolLM2-135M-Instruct-ONNX has. It downloads from Hugging Face when used."
             >
               <input class="input repo" type="text" placeholder="owner/model" aria-label="Hugging Face model" bind:value={repo} onkeydown={(e) => e.key === 'Enter' && repo.trim() && !adding && void add()} />
               <button class="btn ghost" disabled={adding || !repo.trim()} onclick={add}>{#if adding}<span class="spinner" aria-hidden="true"></span>{/if}Add</button>
             </SettingRow>
             {#if model.added}
-              <SettingRow title="Remove {model.label}" hint="Removes it from the list (its download is freed the next time a model loads).">
+              <SettingRow title="Remove {model.label}" hint="Takes it off the list." details="Its download is freed the next time a model loads.">
                 <button class="btn ghost" disabled={deviceTest.running} onclick={remove}>Remove</button>
               </SettingRow>
             {/if}
@@ -527,7 +606,7 @@
     {:else}
       <section>
         <h3>Mouse</h3>
-        <SettingRow title="Clicking residents" hint="Look first: a click opens their panel. Give orders: clicks command the selected resident straight away.">
+        <SettingRow title="Clicking residents" hint="Look first opens their panel; Give orders commands at once." details="Give orders: clicks command the selected resident straight away.">
           <Segmented
             label="Clicking residents"
             bind:value={settings.directControl}
@@ -616,6 +695,50 @@
   .reset:hover {
     background: var(--hairline);
     color: var(--bad);
+  }
+  .confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .confirm .row {
+    display: flex;
+    gap: 4px;
+  }
+  .confirm .btn {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .disclosure {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px 0 8px;
+    border-radius: var(--radius-pill);
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--text-muted);
+  }
+  .disclosure:hover {
+    background: var(--hairline);
+    color: var(--text);
+  }
+  .chev {
+    display: inline-grid;
+    transform: rotate(90deg);
+    transition: transform var(--fast) var(--ease);
+  }
+  .chev.open {
+    transform: rotate(180deg);
   }
   .page {
     display: flex;

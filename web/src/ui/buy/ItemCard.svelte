@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ObjectDef, TraitDef } from '../../content/content';
+  import type { ObjectDef } from '../../content/content';
   import Icon from '../Icon.svelte';
   import { money } from '../format';
   import { services } from '../services';
@@ -8,17 +8,14 @@
   import { summarize } from './catalog';
   import Thumb from './Thumb.svelte';
 
-  /** One catalog tile: a 3D picture, price, and what it boosts and trains at a glance. */
+  /** One catalog tile: a 3D picture, name and price (what it's worth shows on pointing: `ItemHoverCard`). */
   let {
     def,
     model,
     affordable,
     active,
-    category = null,
     owned = 0,
     lovers = [],
-    collection = null,
-    styles = 0,
     tint = 210,
     onpick,
     onpoint,
@@ -29,21 +26,15 @@
     affordable: boolean;
     /** Currently in hand. */
     active: boolean;
-    /** Category label, shown when the list mixes categories (search results). */
-    category?: string | null;
     /** How many the household already has. */
     owned?: number;
     /** First names of residents whose traits make them love it. */
     lovers?: string[];
-    /** Personality collection it comes from. */
-    collection?: TraitDef | null;
-    /** How many styles it comes in (0: one design; the style chips don't change it). */
-    styles?: number;
     /** Hue (degrees) of the picture's backdrop. */
     tint?: number;
     onpick: () => void;
-    /** Pointed at or focused (the detail pane shows it). */
-    onpoint: () => void;
+    /** Pointed at or focused (its hover card shows above it). */
+    onpoint: (card: HTMLElement) => void;
   } = $props();
 
   const content = services.content;
@@ -81,48 +72,25 @@
   style="--hue:{tint}"
   aria-disabled={!affordable}
   aria-label="{def.name}, {game.creative ? 'free' : money(def.price ?? 0)}{affordable ? '' : `, ${money(short)} short`}"
-  title={affordable ? (def.description ?? def.name) : `${money(short)} short of ${def.name}`}
   onclick={pick}
   onanimationend={(e) => {
     if (e.animationName.includes('shake')) shake = false;
     if (e.animationName.includes('pop')) popped = false;
   }}
-  onmouseenter={onpoint}
-  onfocus={onpoint}
+  onmouseenter={(e) => onpoint(e.currentTarget)}
+  onfocus={(e) => onpoint(e.currentTarget)}
 >
   <span class="stage">
     <span class="picture">
       {#if custom}<span class="custom"><Icon name={custom} size={40} /></span>{:else}<Thumb {model} footprint={def.footprint ?? [1, 1]} {glyph} />{/if}
     </span>
-    <span class="corner left">
-      {#if collection}<span class="badge coll" title="{collection.label} collection"><Icon name={collection.icon} size={11} /></span>{/if}
-      {#if styles > 0}<span class="badge styled" title="Comes in {styles} styles"><Icon name="icon.skill.creativity" size={11} />{styles}</span>{/if}
-      {#if owned > 0}<span class="badge owned" title="You have {owned}">×{owned}</span>{/if}
-    </span>
-    {#if lovers.length}<span class="badge love" title={lovesTitle}>♥</span>{/if}
+    {#if owned > 0}<span class="badge owned" aria-label="You have {owned}">×{owned}</span>{/if}
+    {#if lovers.length}<span class="badge love" aria-label={lovesTitle}>♥</span>{/if}
     {#if active}<span class="hand">In hand</span>{/if}
-    <span class="perks">
-      {#each info.boosts.slice(0, 3) as b (b.need.id)}
-        <span class="boost" title="{b.need.label} +{Math.round(b.perUse * 100)}% per use">
-          <Icon name={b.need.icon} size={11} />
-          <span class="bar"><span style="width:{Math.min(1, b.perUse) * 100}%"></span></span>
-        </span>
-      {/each}
-      {#each info.trains.slice(0, 2) as t (t.skill)}
-        <span class="skill" title="Trains {content.skill(t.skill)?.label ?? t.skill}"><Icon name={content.skill(t.skill)?.icon ?? ''} size={10} /></span>
-      {/each}
-      {#if info.feelings.length}<span class="feel" title="Can give a feeling: {info.feelings.map((f) => f.label).join(', ')}">✦</span>{/if}
-    </span>
   </span>
   <span class="text">
     <span class="name">{def.name}</span>
-    <span class="meta">
-      <span class="price tabular">{game.creative ? 'Free' : money(def.price ?? 0)}</span>
-      {#if !affordable}<span class="need tabular">{money(short)} short</span>
-      {:else if info.useCost}<span class="use tabular" title="Costs money each time it's used">+{money(info.useCost.min)}/use</span>{/if}
-      {#if info.slots > 1}<span class="slots" title="{info.slots} residents at once"><Icon name="icon.ui.relationships" size={11} />{info.slots}</span>{/if}
-      {#if category}<span class="cat">{category}</span>{/if}
-    </span>
+    <span class="price tabular">{game.creative ? 'Free' : money(def.price ?? 0)}</span>
   </span>
 </button>
 
@@ -179,7 +147,7 @@
   }
   .picture {
     position: absolute;
-    inset: 6px 8px 16px;
+    inset: 6px 8px 4px;
     transition: transform 320ms var(--ease);
   }
   .card:hover .picture {
@@ -192,16 +160,12 @@
     height: 100%;
     color: hsl(var(--hue) 45% 45%);
   }
-  .corner {
+
+
+  .badge {
     position: absolute;
     top: 5px;
-    display: flex;
-    gap: 3px;
-  }
-  .corner.left {
     left: 5px;
-  }
-  .badge {
     display: inline-grid;
     place-items: center;
     min-width: 18px;
@@ -214,17 +178,10 @@
     font-weight: 700;
     color: var(--text-muted);
   }
-  .badge.styled {
-    display: inline-flex;
-    gap: 2px;
-    color: var(--accent);
-  }
-  .badge.coll {
-    color: hsl(var(--hue) 40% 40%);
-  }
+
+
   .badge.love {
-    position: absolute;
-    top: 5px;
+    left: auto;
     right: 5px;
     color: #e0607e;
     font-size: 11px;
@@ -243,56 +200,20 @@
     font-weight: 700;
     white-space: nowrap;
   }
-  .perks {
-    position: absolute;
-    left: 5px;
-    bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    max-width: calc(100% - 10px);
-    padding: 1px 5px;
-    border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.78);
-    color: var(--text-muted);
-    font-size: 10px;
-    overflow: hidden;
-  }
-  .perks:empty {
-    display: none;
-  }
-  .boost {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-  }
-  .bar {
-    width: 14px;
-    height: 3px;
-    border-radius: 2px;
-    background: var(--hairline);
-    overflow: hidden;
-  }
-  .bar span {
-    display: block;
-    height: 100%;
-    background: var(--good);
-  }
-  .skill {
-    display: inline-grid;
-    place-items: center;
-    color: var(--accent);
-  }
-  .feel {
-    color: #c17be0;
-  }
+
+
+
+
+
+
+
 
   .text {
     flex: none;
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    padding: 5px 8px 6px;
+    gap: 0;
+    padding: 4px 8px 5px;
   }
   .name {
     font-weight: 650;
@@ -301,39 +222,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .meta {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
+
   .price {
     color: var(--good);
     font-weight: 700;
     font-size: 12px;
   }
-  .use,
-  .need {
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-  .need {
-    color: var(--bad);
-  }
-  .slots {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: var(--text-muted);
-    font-weight: 650;
-  }
-  .cat {
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+
+
+
+
 
   @keyframes pop {
     40% {
