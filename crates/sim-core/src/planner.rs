@@ -869,7 +869,7 @@ fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &Block
         return false;
     };
     match (act.task.kind, &act.phase) {
-        (TaskKind::Social { .. }, Phase::Conversing { .. }) => a.social,
+        (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => a.social,
         // Walking over to it counts too.
         (TaskKind::Use { object, interaction }, Phase::Using { .. } | Phase::Routing { .. }) => objects
             .get(object as usize)

@@ -282,6 +282,12 @@ pub enum TaskKind {
         target: u32,
         social: usize,
     },
+    /// Join the conversation `leader` started and listen (a group conversation; see
+    /// `conversation.rs`): `Routing` on the way, `Conversing` while listening, `Waiting` between
+    /// two of the leader's socials.
+    Join {
+        leader: u32,
+    },
     /// Head to the town exit for a work shift.
     Work,
     /// Walk to another household's front door and stay a while.
@@ -635,7 +641,7 @@ impl Sim {
             // cooks halfway through a recipe or people eating or washing up.
             (TaskKind::Work | TaskKind::Visit { .. } | TaskKind::GoHome | TaskKind::Answer { .. }, _) => false,
             (TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }, _) => false,
-            (TaskKind::Social { .. }, Phase::Conversing { .. }) => false,
+            (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => false,
             (_, Phase::Routing { .. }) => true,
             _ => act.tags & content.social_rules.busy_tags == 0,
         }
@@ -657,6 +663,15 @@ impl Sim {
                 let duration = conversation::duration(s, *success);
                 Some((*target, *social, *success, (elapsed / duration).min(1.0)))
             }
+            _ => None,
+        }
+    }
+
+    /// For a Sim listening in on someone else's conversation (a group conversation): the one
+    /// who started it.
+    pub fn listening_to(&self) -> Option<u32> {
+        match &self.current {
+            Some(Activity { task: Task { kind: TaskKind::Join { leader }, .. }, phase: Phase::Conversing { .. }, .. }) => Some(*leader),
             _ => None,
         }
     }
@@ -784,6 +799,9 @@ pub(crate) struct SimBrief {
     pub here: bool,
     pub adult: bool,
     pub age: f32,
+    /// In a conversation (leading it, being talked to or listening in): who started it and
+    /// the social.
+    pub conversing: Option<(u32, usize)>,
 }
 
 pub struct World {
@@ -911,6 +929,8 @@ enum Choice {
     Clean(i32, i32),
     Repair(u32),
     Social(u32, usize),
+    /// Joining the conversation this Sim started.
+    Join(u32),
     Visit(u32),
     /// A phone action, with someone or not (`phone.rs`).
     Phone(usize, Option<u32>),
@@ -1495,8 +1515,8 @@ impl World {
             if other.engaged_with == Some(id) {
                 other.engaged_with = None;
             }
-            other.queue.retain(|t| !matches!(t.kind, TaskKind::Social { target, .. } if target == id));
-            if other.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target, .. } if target == id)) {
+            other.queue.retain(|t| !matches!(t.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id));
+            if other.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id)) {
                 other.current = None;
             }
         }
@@ -1836,7 +1856,20 @@ impl World {
                 partnered: self.relationships.partner_of(s.id as usize).is_some(),
                 adult: s.adult(&self.content),
                 age: s.age,
+                conversing: None,
             });
+        }
+        // Who's in a conversation, and whose (for joining in).
+        for (i, s) in self.sims.iter().enumerate() {
+            if let Some((t, social, ..)) = s.conversation(&self.content) {
+                briefs[i].conversing = Some((i as u32, social));
+                briefs[t as usize].conversing = Some((i as u32, social));
+            }
+        }
+        for (i, s) in self.sims.iter().enumerate() {
+            if let Some(l) = s.listening_to() {
+                briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
+            }
         }
         self.briefs = briefs;
         crate::lod::plan(self);
@@ -2890,6 +2923,41 @@ fn pick_autonomous(
         }
     }
 
+    // Joining in where people are talking (nearby, a friendly social, room for one more): for
+    // the social it brings, more so with people they like.
+    for (l, leader) in ctx.briefs.iter().enumerate() {
+        let Some((_, social)) = leader.conversing.filter(|c| c.0 as usize == l && l != me) else {
+            continue;
+        };
+        let s = &content.socials[social];
+        if !s.joinable || !leader.here || leader.away {
+            continue;
+        }
+        let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
+        let same_place = match (here, leader.plot) {
+            (Some(a), Some(b)) => a == b,
+            _ => distance <= SOCIAL_RANGE,
+        };
+        if !same_place {
+            continue;
+        }
+        let members: Vec<usize> = (0..ctx.briefs.len()).filter(|&m| ctx.briefs[m].conversing.is_some_and(|c| c.0 as usize == l)).collect();
+        if members.len() >= conversation::MAX_GROUP || members.contains(&me) {
+            continue;
+        }
+        let count = members.len() as f32;
+        let liking = members.iter().map(|&m| prefer_factor(Prefer::Liked, ctx.rels.get(me, m), 0.0, 0.0)).sum::<f32>() / count;
+        let friendship = members.iter().map(|&m| ctx.rels.get(me, m).friendship).sum::<f32>() / count;
+        let score = ai::score_felt(needs, &felt, &s.target_gain, distance)
+            * s.autonomy_weight
+            * liking
+            * feel(s.tags)
+            * crate::planner::social_factor(content, sim, false, true, friendship, false);
+        if score > MIN_AUTONOMY_SCORE {
+            candidates.push((score, Choice::Join(l as u32)));
+        }
+    }
+
     // Tidying up: the dirtiest spot at home, if it's dirty enough. The worse their surroundings
     // feel, the keener they are; traits and planned chores do the rest.
     let home = ctx.households[sim.household as usize].plot;
@@ -3042,6 +3110,7 @@ fn pick_autonomous(
                 interaction,
             },
             Choice::Social(target, social) => TaskKind::Social { target, social },
+            Choice::Join(leader) => TaskKind::Join { leader },
             Choice::Visit(plot) => TaskKind::Visit { plot },
             Choice::Clean(x, z) => TaskKind::Clean { x, z },
             Choice::Repair(object) => TaskKind::Repair { object },
@@ -3175,6 +3244,19 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 goal,
                 content.socials[social].tags,
             )
+        }
+        // Over to the group (`conversation::update` finds them a place in it).
+        TaskKind::Join { leader } => {
+            let Some(other) = ctx.briefs.get(leader as usize) else {
+                return;
+            };
+            let Some((_, social)) = other.conversing.filter(|c| c.0 == leader && leader != sim.id) else {
+                return;
+            };
+            let Some(goal) = conversation::approach_tile(nav, other.pos, sim.pos) else {
+                return;
+            };
+            ([goal.0 as f32 + 0.5, goal.1 as f32 + 0.5], goal, content.socials[social].tags)
         }
     };
     let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
@@ -3584,7 +3666,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             // Home again: the toilet first, out of habit.
             sim.follow_up = habit(sim, ctx, objects, HabitTime::Home, ctx.households[sim.household as usize].plot);
         }
-        TaskKind::Social { .. } => act.phase = Phase::Waiting { ticks: 0 },
+        TaskKind::Social { .. } | TaskKind::Join { .. } => act.phase = Phase::Waiting { ticks: 0 },
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => crate::cooking::arrive(sim, ctx, objects, items),
         TaskKind::Phone { .. } => crate::phone::arrive(sim, ctx, objects),
         TaskKind::Use {

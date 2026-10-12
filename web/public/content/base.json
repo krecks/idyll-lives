@@ -1082,6 +1082,7 @@
       "icon": "icon.social.chat",
       "minutes": 20,
       "animation": "talk",
+      "joinable": true,
       "tags": [
         "social",
         "friendly"
@@ -1119,6 +1120,7 @@
       "icon": "icon.social.joke",
       "minutes": 10,
       "animation": "laugh",
+      "joinable": true,
       "tags": [
         "social",
         "friendly",
@@ -1189,6 +1191,7 @@
       "icon": "icon.social.deepTalk",
       "minutes": 40,
       "animation": "talk",
+      "joinable": true,
       "tags": [
         "social",
         "friendly"
@@ -1694,7 +1697,8 @@
     "heartbreakFeeling": "heartbroken",
     "friendshipDecay": 1.5,
     "romanceDecay": 3,
-    "singleSpark": 1.0
+    "singleSpark": 1.0,
+    "joinFriendship": 2
   },
   "careerRules": {
     "commuteMinutes": 30,

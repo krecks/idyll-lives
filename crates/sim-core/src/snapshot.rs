@@ -37,18 +37,19 @@ pub mod sim {
     pub const POSE: usize = 4;
     /// 1 while walking.
     pub const MOVING: usize = 5;
-    /// Social interaction index + 1 while in a conversation (as actor or target), else 0.
+    /// Social interaction index + 1 while in a conversation (as actor, target or listener), else 0.
     pub const SOCIAL: usize = 6;
     /// 0 = undecided/hidden, 1 = went well, 2 = went badly (revealed halfway through).
     pub const OUTCOME: usize = 7;
-    /// Conversation partner's id, or -1.
+    /// Conversation partner's id (for a listener, the one who started it), or -1.
     pub const PARTNER: usize = 8;
     /// Conversation animation code: index into `social::ANIMATIONS` + 1 ("talk", "laugh",
     /// "flirt", ...) while in a conversation, else 0. See `ACTION` for everything else.
     pub const ANIM: usize = 9;
     /// Dominant emotion index + 1, or 0.
     pub const EMOTION: usize = 10;
-    /// 1 = started the conversation, 2 = was approached, 0 = not talking.
+    /// 1 = started the conversation, 2 = was approached, 3 = joined in and listens (a group
+    /// conversation; they don't speak), 0 = not talking.
     pub const ROLE: usize = 11;
     /// 1 while away from the map (at work).
     pub const AWAY: usize = 12;
@@ -245,7 +246,7 @@ pub fn write(world: &World, out: &mut [f32]) {
             _ => 0.0,
         };
     }
-    // Conversations: write the shared state into both participants' rows.
+    // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
         let Some((t, social, success, progress)) = s.conversation(&world.content) else {
             continue;
@@ -259,7 +260,9 @@ pub fn write(world: &World, out: &mut [f32]) {
         };
         let anim = world.content.socials[social].anim as f32;
         let talk = world.content.talk_anim.map_or(-1.0, |a| a as f32);
-        for (me, other, role) in [(i, t as usize, 1.0), (t as usize, i, 2.0)] {
+        // Those listening in (a group conversation) have the one who started it as partner.
+        let listeners = world.sims.iter().filter(|l| l.listening_to() == Some(i as u32)).map(|l| (l.id as usize, i, 3.0));
+        for (me, other, role) in [(i, t as usize, 1.0), (t as usize, i, 2.0)].into_iter().chain(listeners) {
             let o = &mut out[HEADER_LEN + me * SIM_STRIDE..HEADER_LEN + (me + 1) * SIM_STRIDE];
             o[sim::SOCIAL] = social as f32 + 1.0;
             o[sim::OUTCOME] = outcome;

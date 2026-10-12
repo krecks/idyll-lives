@@ -217,6 +217,12 @@ Tags in use (64 maximum for the whole game, base plus all packs):
 Special meanings: `sleep`, `bathroom`, `hygiene`, `nap` make a resident busy (no chats, guests
 can't use them); `romantic` socials need attraction; `sleep` lasts through the night.
 
+**Group conversations:** a social with `"joinable": true` (base game: chat, joke, deep talk) can
+be joined by up to two others nearby, who listen and fill their needs by its `targetNeeds`.
+When it goes well, those listening get its `targetFeeling`, and everyone there gains
+`socialRules.joinFriendship` friendship with everyone else (default 2; the two talking get
+their social's outcome with each other instead).
+
 **Adding a tag:** reuse an existing tag whenever it fits. Add one only if a trait, emotion,
 schedule or buff must tell your objects apart. A tag exists once any interaction uses it;
 to refer to a tag before anything uses it (e.g. in a `traitPatches` preference), declare it

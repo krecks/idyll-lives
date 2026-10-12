@@ -1000,6 +1000,19 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             };
             (s.label.clone(), None, Some(target), minutes)
         }
+        // Listening in: the conversation's label and progress ("Chat · Bo", the one who started it).
+        TaskKind::Join { leader } => {
+            let talk = world.sims.get(leader as usize).and_then(|l| l.conversation(content)).filter(|_| matches!(phase, Some(Phase::Conversing { .. })));
+            let label = talk.map_or_else(|| "Join in".to_owned(), |(_, social, ..)| content.socials[social].label.clone());
+            return ActionView {
+                label,
+                object: None,
+                target: Some(leader),
+                progress: round_to(talk.map_or(0.0, |t| t.3), PERCENT),
+                directed: task.directed,
+                active: phase.is_some(),
+            };
+        }
         TaskKind::Work => ("Go to work".to_owned(), None, None, 1.0),
         TaskKind::Visit { plot } => (format!("Visit {}", host_name(world, plot)), None, None, 1.0),
         TaskKind::GoHome => ("Go home".to_owned(), None, None, 1.0),

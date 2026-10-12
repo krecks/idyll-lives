@@ -36,6 +36,7 @@ export interface SnapshotLayout {
     /** Conversation animation: index into sim-core's `social::ANIMATIONS` + 1 ('talk', 'laugh', ...), 0 = none. */
     anim: number;
     emotion: number;
+    /** 1 = started the conversation, 2 = was approached, 3 = joined in and listens (`partner`: the one who started it), 0 = not talking. */
     role: number;
     away: number;
     /** Object instance id (as in `WorldStructure.objects`) the Sim is using or walking to use, -1 = none. */

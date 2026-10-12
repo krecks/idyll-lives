@@ -182,6 +182,8 @@ pub struct SocialDef {
     pub anim: u8,
     pub autonomous: bool,
     pub autonomy_weight: f32,
+    /// Others nearby may join in and listen (a group conversation; see `conversation.rs`).
+    pub joinable: bool,
     pub tags: TagMask,
     pub requires: Requirements,
     pub acceptance: Acceptance,
@@ -221,6 +223,10 @@ pub struct SocialRules {
     /// How drawn two single grown-ups who are attracted to each other and have met are to
     /// romance before there is any (added to the flirting preference; see `prefer_factor`).
     pub single_spark: f32,
+    /// Friendship each member of a group conversation gains with each other member (both ways)
+    /// when a joinable social goes well with listeners there (the pair talking gains it with
+    /// the listeners, not with each other: their social's outcome does that).
+    pub join_friendship: f32,
 }
 
 // ---- Raw JSON --------------------------------------------------------------------------
@@ -263,6 +269,8 @@ pub(crate) struct SocialRaw {
     autonomous: bool,
     #[serde(default = "one")]
     autonomy_weight: f32,
+    #[serde(default)]
+    joinable: bool,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -317,6 +325,7 @@ pub(crate) struct SocialRulesRaw {
     friendship_decay: Option<f32>,
     romance_decay: Option<f32>,
     single_spark: Option<f32>,
+    join_friendship: Option<f32>,
 }
 
 fn default_distance() -> f32 {
@@ -450,6 +459,7 @@ pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices) -> Result<SocialDef, E
         anim,
         autonomous: raw.autonomous,
         autonomy_weight: raw.autonomy_weight,
+        joinable: raw.joinable,
         tags: tag_mask(&raw.tags, ix, ctx)?,
         requires: raw.requires,
         acceptance: raw.acceptance,
@@ -492,6 +502,7 @@ pub(crate) fn parse_rules(
         friendship_decay: raw.friendship_decay.unwrap_or(1.5),
         romance_decay: raw.romance_decay.unwrap_or(3.0),
         single_spark: raw.single_spark.unwrap_or(0.0).max(0.0),
+        join_friendship: raw.join_friendship.unwrap_or(2.0),
     })
 }
 
@@ -509,6 +520,7 @@ impl SocialRules {
             friendship_decay: 1.5,
             romance_decay: 3.0,
             single_spark: 0.0,
+            join_friendship: 2.0,
         }
     }
 }

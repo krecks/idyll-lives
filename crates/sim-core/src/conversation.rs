@@ -4,6 +4,11 @@
 //! the target is free, then both face each other for the interaction's duration.
 //! Success is rolled when the conversation starts (so the UI can show the reaction
 //! halfway through); relationship changes, feelings and events apply at the end.
+//!
+//! Others nearby may join in on a joinable social (a group conversation, up to `MAX_GROUP`
+//! people): a `Join` task walks them over, finds them a place around the pair, and they listen,
+//! filling their needs like the one talked to. When a social goes well, everyone there grows a
+//! little closer. They stay for the leader's next social with someone there, and go otherwise.
 
 use crate::MINUTES_PER_TICK;
 use crate::content::{Content, MAX_NEEDS, Pose};
@@ -21,6 +26,15 @@ const REPATH_DISTANCE: f32 = 2.4;
 const ENGAGE_SLACK: f32 = 0.8;
 /// Rejected interactions end early.
 pub(crate) const FAILURE_LENGTH: f32 = 0.4;
+/// The most people in one conversation: the two talking and those listening in.
+pub(crate) const MAX_GROUP: usize = 4;
+/// How far from the middle of a conversation someone joining in can take their place in it.
+const JOIN_RANGE: f32 = 2.6;
+/// How long someone listening in waits between two of the leader's socials (for the next one
+/// to start with someone there) before they go: long enough for the leader to choose again.
+const REGROUP_TICKS: u32 = crate::TICKS_PER_SECOND * 3;
+/// How close together the people in a group stand at the least.
+const GROUP_SPACING: f32 = 0.6;
 
 pub fn duration(s: &SocialDef, success: bool) -> f32 {
     if success {
@@ -132,6 +146,15 @@ enum State {
     Conversing(f32, bool),
 }
 
+/// Where someone joining in is at.
+#[derive(Clone, Copy)]
+enum Joining {
+    Routing { goal: [f32; 2] },
+    /// Arrived, or between two of the leader's socials.
+    Waiting(u32),
+    Listening(f32),
+}
+
 pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     let World {
@@ -230,6 +253,9 @@ pub(crate) fn update(w: &mut World) {
                 gain(actor, &s.actor_gain, s.minutes);
                 gain(other, &s.target_gain, s.minutes);
                 if elapsed >= duration(s, success) {
+                    if success && s.joinable {
+                        group_outcome(content, relationships, events, sims, i, s, tick);
+                    }
                     apply_outcome(
                         content,
                         relationships,
@@ -248,6 +274,183 @@ pub(crate) fn update(w: &mut World) {
                     set_phase(&mut sims[i], Phase::Conversing { elapsed, success });
                 }
             }
+        }
+    }
+
+    // Joining in and listening (after the socials, so they see this tick's endings).
+    for j in 0..n {
+        let Some(act) = sims[j].current.as_ref() else {
+            continue;
+        };
+        let TaskKind::Join { leader } = act.task.kind else {
+            continue;
+        };
+        let l = leader as usize;
+        let state = match &act.phase {
+            Phase::Routing { waypoints, .. } => Joining::Routing { goal: *waypoints.last().unwrap_or(&sims[j].pos) },
+            Phase::Waiting { ticks } => Joining::Waiting(*ticks),
+            Phase::Conversing { elapsed, .. } => Joining::Listening(*elapsed),
+            Phase::Using { .. } | Phase::Knocking { .. } | Phase::Queued { .. } => continue,
+        };
+        if l == j || sims.get(l).is_none_or(|s| !s.here()) || sims[j].pressed(content) {
+            end_activity(&mut sims[j], content, objects);
+            continue;
+        }
+        // The conversation they're there for: the leader's, if it's one to join in on.
+        let talk = sims[l]
+            .conversation(content)
+            .filter(|&(t, social, ..)| t as usize != j && content.socials[social].joinable)
+            .map(|(t, social, ..)| (t as usize, social));
+        match (state, talk) {
+            (Joining::Routing { goal }, Some((t, _))) => {
+                if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
+                    set_phase(&mut sims[j], Phase::Waiting { ticks: 0 });
+                } else if dist(goal, sims[l].pos) > REPATH_DISTANCE {
+                    chase(&nav, sims, j, l, content, objects);
+                }
+            }
+            (Joining::Routing { .. }, None) => {
+                if !regrouping(sims, l, j) {
+                    end_activity(&mut sims[j], content, objects);
+                }
+            }
+            (Joining::Waiting(_), Some((t, _))) => {
+                if dist(sims[j].pos, middle(sims, l, t)) > JOIN_RANGE + 0.6 {
+                    chase(&nav, sims, j, l, content, objects);
+                } else if group(sims, content, l).len() >= MAX_GROUP {
+                    end_activity(&mut sims[j], content, objects);
+                } else {
+                    take_place(&nav, relationships, events, sims, content, j, l, t, tick);
+                }
+            }
+            (Joining::Waiting(ticks), None) => {
+                if ticks < REGROUP_TICKS && regrouping(sims, l, j) {
+                    set_phase(&mut sims[j], Phase::Waiting { ticks: ticks + 1 });
+                } else {
+                    end_activity(&mut sims[j], content, objects);
+                }
+            }
+            (Joining::Listening(elapsed), Some((_, social))) => {
+                let s = &content.socials[social];
+                gain(&mut sims[j], &s.target_gain, s.minutes);
+                set_phase(&mut sims[j], Phase::Conversing { elapsed: elapsed + MINUTES_PER_TICK, success: true });
+            }
+            (Joining::Listening(_), None) => set_phase(&mut sims[j], Phase::Waiting { ticks: 0 }),
+        }
+    }
+}
+
+/// Everyone in the conversation `l` leads: `l`, the one talked to, then those listening in.
+pub(crate) fn group(sims: &[Sim], content: &Content, l: usize) -> Vec<usize> {
+    let Some((t, ..)) = sims.get(l).and_then(|s| s.conversation(content)) else {
+        return Vec::new();
+    };
+    let mut members = vec![l, t as usize];
+    members.extend((0..sims.len()).filter(|&j| sims[j].listening_to() == Some(l as u32)));
+    members
+}
+
+fn middle(sims: &[Sim], a: usize, b: usize) -> [f32; 2] {
+    let (p, q) = (sims[a].pos, sims[b].pos);
+    [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0]
+}
+
+/// Whether the leader `l` is between socials, about to start the next one with someone near
+/// `j` (or choosing what to do next), so it's worth `j` staying.
+fn regrouping(sims: &[Sim], l: usize, j: usize) -> bool {
+    let s = &sims[l];
+    if s.away_until.is_some() || s.pose == Pose::Lie {
+        return false;
+    }
+    match s.current.as_ref() {
+        None => true,
+        Some(a) => match (a.task.kind, &a.phase) {
+            (_, Phase::Conversing { .. }) => false,
+            (TaskKind::Social { target, .. }, _) => sims.get(target as usize).is_some_and(|t| dist(t.pos, sims[j].pos) <= JOIN_RANGE * 2.0),
+            _ => false,
+        },
+    }
+}
+
+/// `j` joins in on the conversation `l` is having with `t`: a free spot around the two (to one
+/// side of them first, then all round), facing the middle of the group.
+#[allow(clippy::too_many_arguments)]
+fn take_place(
+    nav: &NavGrid,
+    rels: &mut Relationships,
+    events: &mut EventLog,
+    sims: &mut [Sim],
+    content: &Content,
+    j: usize,
+    l: usize,
+    t: usize,
+    tick: u64,
+) {
+    let others: Vec<usize> = group(sims, content, l).into_iter().filter(|&m| m != j).collect();
+    let (a, b) = (sims[l].pos, sims[t].pos);
+    let mid = middle(sims, l, t);
+    let d = dist(a, b).max(0.5);
+    let across = [-(b[1] - a[1]) / d, (b[0] - a[0]) / d];
+    // (Beside the pair, the three of them in a triangle; then round them, a little further out.)
+    let side = (d * 0.87).max(0.8);
+    let round = (d * 0.5 + 0.5).max(side);
+    let from = sims[j].pos;
+    let by_distance = |p: &[f32; 2], q: &[f32; 2]| dist(*p, from).total_cmp(&dist(*q, from));
+    let mut spots: Vec<[f32; 2]> = [1.0, -1.0].iter().map(|k| [mid[0] + across[0] * side * k, mid[1] + across[1] * side * k]).collect();
+    spots.sort_by(by_distance);
+    let mut ring: Vec<[f32; 2]> = (0..12)
+        .map(|k| {
+            let angle = k as f32 * std::f32::consts::PI / 6.0;
+            [mid[0] + round * angle.sin(), mid[1] + round * angle.cos()]
+        })
+        .collect();
+    ring.sort_by(by_distance);
+    spots.extend(ring);
+    let spot = spots.into_iter().find(|&p| {
+        nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
+            && nav.line_walkable(from, p)
+            && others.iter().all(|&m| dist(sims[m].pos, p) >= GROUP_SPACING)
+    });
+    // (Nowhere free: they listen from where they are.)
+    if let Some(p) = spot {
+        sims[j].pos = p;
+    }
+    let count = others.len() as f32 + 1.0;
+    let centre = others.iter().fold(sims[j].pos, |c, &m| [c[0] + sims[m].pos[0], c[1] + sims[m].pos[1]]);
+    sims[j].yaw = facing(sims[j].pos, [centre[0] / count, centre[1] / count]);
+    for &m in &others {
+        if !rels.get(j, m).met {
+            rels.get_mut(j, m).met = true;
+            rels.get_mut(m, j).met = true;
+            events.push(tick, EventKind::Met, j, m, None);
+        }
+    }
+    set_phase(&mut sims[j], Phase::Conversing { elapsed: 0.0, success: true });
+}
+
+/// A joinable social `s` led by `l` went well: those listening in get the feeling the one talked
+/// to does, and everyone there grows a little closer to everyone else (the pair talking to each
+/// other through their social's outcome).
+fn group_outcome(content: &Content, rels: &mut Relationships, events: &mut EventLog, sims: &mut [Sim], l: usize, s: &SocialDef, tick: u64) {
+    let members = group(sims, content, l);
+    if members.len() <= 2 {
+        return;
+    }
+    let f = content.social_rules.join_friendship;
+    for (x, &a) in members.iter().enumerate() {
+        for &b in &members[(x + 1).max(2)..] {
+            let before = (*rels.get(a, b), *rels.get(b, a));
+            rels.adjust(a, b, f, 0.0);
+            rels.adjust(b, a, f, 0.0);
+            for (kind, reversed) in social::milestone_events((&before.0, &before.1), (rels.get(a, b), rels.get(b, a))) {
+                let (p, q) = if reversed { (b, a) } else { (a, b) };
+                events.push(tick, kind, p, q, None);
+            }
+        }
+    }
+    if let Some(m) = s.success.target_feeling {
+        for &j in &members[2..] {
+            social::add_feeling(&mut sims[j].feelings, m, &content.feelings, tick);
         }
     }
 }
@@ -538,7 +741,7 @@ fn facing(from: [f32; 2], to: [f32; 2]) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::social::EventKind;
-    use crate::world::{Phase, TICKS_PER_DAY};
+    use crate::world::{Phase, Task, TaskKind, TICKS_PER_DAY};
     use crate::{Command, TICKS_PER_SECOND, World};
 
     const CONTENT: &str = r#"{
@@ -552,7 +755,7 @@ mod tests {
                     {"id":"heartbroken","label":"Heartbroken","mood":-0.25,"hours":24},
                     {"id":"lost","label":"Lost a fight","mood":-0.1,"hours":4}],
         "socials":[
-          {"id":"chat","label":"Chat","minutes":10,"tags":["social","friendly"],"prefer":"liked",
+          {"id":"chat","label":"Chat","minutes":10,"tags":["social","friendly"],"prefer":"liked","joinable":true,
            "acceptance":{"base":1.0},"needs":{"social":0.4},"targetNeeds":{"social":0.4},
            "success":{"friendship":6,"targetFriendship":6,"feeling":"goodChat","targetFeeling":"goodChat"}},
           {"id":"flirt","label":"Flirt","minutes":10,"tags":["social","romantic"],"animation":"flirt","prefer":"romance",
@@ -735,5 +938,181 @@ mod tests {
         ticks(&mut w, TICKS_PER_DAY);
         assert!(w.relationships.get(0, 1).friendship < 60.0);
         assert!(w.sims[0].feelings.is_empty());
+    }
+
+    /// A and B chatting (A started it, the player's order), the others elsewhere on the lot,
+    /// nobody choosing anything for themselves yet.
+    fn chatting(others: &str) -> World {
+        let mut w = town(&format!(r#"{{"name":"A","x":5.5,"z":5.5}},{{"name":"B","x":7.5,"z":5.5}}{others}"#), "");
+        w.autonomy = false;
+        let chat = w.content.social_index("chat").unwrap();
+        w.apply(Command::Social { sim: 0, target: 1, social: chat }).unwrap();
+        for _ in 0..TICKS_PER_SECOND * 5 {
+            w.tick_once();
+            if w.sims[0].conversation(&w.content).is_some() {
+                return w;
+            }
+        }
+        panic!("A and B never started talking");
+    }
+
+    fn join(w: &mut World, sim: usize, leader: u32) {
+        w.sims[sim].queue.push_back(Task { kind: TaskKind::Join { leader }, directed: false, routine: false });
+    }
+
+    fn listeners(w: &World, leader: u32) -> usize {
+        w.sims.iter().filter(|s| s.listening_to() == Some(leader)).count()
+    }
+
+    fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
+        (p[0] - q[0]).hypot(p[1] - q[1])
+    }
+
+    #[test]
+    fn a_lonely_third_joins_in_listens_and_is_released_afterwards() {
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        w.sims[2].needs[0] = 0.05;
+        // C chooses for themselves: A is talking and B is being talked to, so joining in is all
+        // there is.
+        w.autonomy = true;
+        let mut joined = false;
+        for _ in 0..TICKS_PER_SECOND * 6 {
+            w.tick_once();
+            if w.sims[2].listening_to() == Some(0) {
+                joined = true;
+                break;
+            }
+        }
+        assert!(joined, "C never joined in");
+        w.autonomy = false;
+        let before = w.sims[2].needs[0];
+        let (c, a, b) = (w.sims[2].pos, w.sims[0].pos, w.sims[1].pos);
+        assert!(apart(c, a) < 2.0 && apart(c, b) < 2.0, "C listens from {c:?}, A at {a:?}, B at {b:?}");
+        assert!(apart(c, a) >= 0.6 && apart(c, b) >= 0.6, "C stands on someone");
+        // The snapshot: C listens to A's chat (role 3, A as partner).
+        let mut out = vec![0.0; crate::snapshot::CAPACITY];
+        crate::snapshot::write(&w, &mut out);
+        let row = |i: usize| crate::snapshot::HEADER_LEN + i * crate::snapshot::SIM_STRIDE;
+        use crate::snapshot::sim;
+        assert_eq!(out[row(2) + sim::ROLE], 3.0);
+        assert_eq!(out[row(2) + sim::PARTNER], 0.0);
+        assert_eq!(out[row(2) + sim::SOCIAL], out[row(0) + sim::SOCIAL]);
+        assert!(!w.sims[2].available_for_social(&w.content));
+
+        let friends = (w.relationships.get(2, 0).friendship, w.relationships.get(1, 2).friendship);
+        let mut ended = false;
+        for _ in 0..TICKS_PER_SECOND * 15 {
+            w.tick_once();
+            if w.sims[0].conversation(&w.content).is_none() {
+                ended = true;
+                break;
+            }
+        }
+        assert!(ended);
+        assert!(w.sims[2].needs[0] > before, "listening filled C's social need");
+        let gain = w.content.social_rules.join_friendship;
+        assert_eq!(w.relationships.get(2, 0).friendship, friends.0 + gain);
+        assert_eq!(w.relationships.get(1, 2).friendship, friends.1 + gain);
+        assert!(w.sims[2].feelings.iter().any(|f| w.content.feelings[f.def].id == "goodChat"));
+        // A doesn't talk again (nobody chooses): C goes after a little while.
+        ticks(&mut w, super::REGROUP_TICKS as u64 + 2);
+        assert!(w.sims[2].current.is_none(), "C still {:?}", w.sims[2].current.as_ref().map(|a| a.task.kind));
+        assert!(w.sims[2].available_for_social(&w.content));
+    }
+
+    #[test]
+    fn listeners_stay_for_the_next_social_with_the_group() {
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        // The player has A chat with B again right after: C stays for it.
+        let chat = w.content.social_index("chat").unwrap();
+        w.apply(Command::Social { sim: 0, target: 1, social: chat }).unwrap();
+        let mut gap = false;
+        for _ in 0..TICKS_PER_SECOND * 30 {
+            w.tick_once();
+            if w.sims[0].conversation(&w.content).is_none() {
+                gap = true;
+                assert!(
+                    matches!(w.sims[2].current.as_ref().map(|a| a.task.kind), Some(TaskKind::Join { leader: 0 })),
+                    "C left between the two"
+                );
+            } else if gap {
+                break;
+            }
+        }
+        assert!(gap && w.sims[0].conversation(&w.content).is_some());
+        ticks(&mut w, 2);
+        assert_eq!(listeners(&w, 0), 1, "C listens to the second one too");
+    }
+
+    #[test]
+    fn cancelling_or_leaving_releases_those_listening() {
+        // The leader's conversation cancelled: the listener goes.
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
+        ticks(&mut w, super::REGROUP_TICKS as u64 + 2);
+        assert!(w.sims[2].current.is_none());
+        assert_eq!(w.sims[1].engaged_with, None);
+
+        // The listener called away: the others talk on.
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        w.apply(Command::Cancel { sim: 2, index: 0 }).unwrap();
+        ticks(&mut w, 2);
+        assert_eq!(listeners(&w, 0), 0);
+        assert!(w.sims[2].current.is_none());
+        assert!(w.sims[0].conversation(&w.content).is_some());
+        assert_eq!(w.sims[1].engaged_with, Some(0));
+
+        // The one who started it leaves town: nobody waits for them.
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        w.depart(0, crate::world::GoneWhy::MovedAway);
+        assert!(w.sims[2].current.is_none());
+        ticks(&mut w, 2);
+        assert!(w.sims[2].current.is_none() && w.sims[1].engaged_with.is_none());
+    }
+
+    #[test]
+    fn a_conversation_takes_four_at_most() {
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5},{"name":"D","x":2.5,"z":9.5},{"name":"E","x":5.5,"z":1.5}"#);
+        for k in 2..5 {
+            join(&mut w, k, 0);
+        }
+        for _ in 0..TICKS_PER_SECOND * 6 {
+            w.tick_once();
+            assert!(listeners(&w, 0) <= 2);
+        }
+        assert_eq!(listeners(&w, 0), 2);
+        let group = super::group(&w.sims, &w.content, 0);
+        assert_eq!(group.len(), super::MAX_GROUP);
+        // The one left out does something else.
+        let out = (2..5).find(|&k| w.sims[k].listening_to().is_none()).unwrap();
+        assert!(w.sims[out].current.is_none());
+        // Everyone in the group stands apart.
+        for (x, &a) in group.iter().enumerate() {
+            for &b in &group[x + 1..] {
+                assert!(apart(w.sims[a].pos, w.sims[b].pos) >= 0.59, "{a} and {b} too close");
+            }
+        }
+    }
+
+    #[test]
+    fn listening_in_is_not_saved() {
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+        assert!(loaded.sims[2].current.is_none() && loaded.sims[2].queue.is_empty());
     }
 }

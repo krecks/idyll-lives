@@ -1425,8 +1425,15 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
-      const partnerRig = partner >= 0 && partner < count ? this.sims[partner] : null;
-      if (social && partnerRig && partnerRig.visible && !moving && pose === Pose.Stand) {
+      let partnerRig = partner >= 0 && partner < count ? this.sims[partner] : null;
+      // Listening in (role 3, a group conversation): `partner` started it; they look at whichever
+      // of the two is speaking, and stand the way sim-core turned them (to the middle of the group).
+      const listening = role === 3;
+      if (listening && partnerRig) {
+        const other = curr[H + partner * S + k.partner] | 0;
+        if (other >= 0 && other < count && !speaking(Math.min(partner, other), 1, time)) partnerRig = this.sims[other];
+      }
+      if (social && !listening && partnerRig && partnerRig.visible && !moving && pose === Pose.Stand) {
         faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
@@ -2864,9 +2871,9 @@ function eyesBelowTop(rig: SimRig): number {
 /** Mouth shapes for talk without a voice line (viseme indices: aa, E, O, I, U, PP, DD, SS, nn). */
 const BABBLE = [10, 11, 13, 12, 14, 1, 4, 7, 8, 10, 11];
 
-/** Whose turn it is in a conversation: the starter (role 1) and the other Sim alternate. */
+/** Whose turn it is in a conversation: the starter (role 1) and the other Sim alternate; those listening in (role 3) only listen. */
 function speaking(pair: number, role: number, time: number): boolean {
-  if (role === 0) return false;
+  if (role === 0 || role === 3) return false;
   const turn = Math.floor((time + (pair % 5) * 0.53) / 2.8);
   return (turn % 2 === 0) === (role === 1);
 }
