@@ -76,7 +76,10 @@
     templates = await loadTemplates();
   });
 
-  void menuScene.show(town);
+  // Their house as the game will show it.
+  $effect(() => {
+    void menuScene.show(town, slot);
+  });
   $effect(() => {
     menuScene.highlight({ hover, selected: slot, marked: [], outlines: false });
   });

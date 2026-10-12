@@ -14,7 +14,9 @@
  *   out of town), garden paths, driveway mouths, the road and the middle of the sidewalk. Kerb
  *   furniture stands on the road side of the sidewalk, fences only run from the house front line
  *   backwards, cars park beside the houses.
- * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk).
+ * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
+ *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
+ *   game builds it (no porch, chimney, garage, car or garden dressing), and nothing else.
  * - Static: generated once per town layout and kept across structure versions of the viewed
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the community
@@ -512,7 +514,7 @@ export class Street {
       world.meta?.seed ?? 0,
       world.width,
       world.depth,
-      view ? `${view.x},${view.z},${view.w},${view.d}` : '-',
+      view ? `${view.x},${view.z},${view.w},${view.d}` : `home ${world.meta?.home ?? '-'}`,
       world.plots.map((p) => `${p.house?.join(',') ?? ''}${p.roof ? `/${p.roof.join(',')}` : ''}`).join(';'),
       (world.meta?.paths ?? []).length,
       (world.meta?.world?.fields ?? []).length,
@@ -551,8 +553,10 @@ export class Street {
     // ---- neighbour houses -------------------------------------------------------------
     const specs: SilhouetteSpec[] = [];
     for (const L of plots) {
-      if ((L.kind !== 'house' && L.kind !== 'shop') || !L.house) continue;
-      specs.push({ ...L.house, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
+      // The player's house is the game's own on its lot; seen from the menus' town it is a shell dressed like it.
+      const home = L.kind === 'home' && !view;
+      if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
+      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
     }
     const sil = this.house.silhouettes(specs, world.openings ?? [], (world.storeys ?? 1) > 1 ? groundDepth(world) : 0);
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
@@ -942,7 +946,8 @@ export class Street {
         else if (Math.abs(plot.z - (st.z + st.d)) < 0.05) [edge, front] = [plot.z, -1];
       }
       if (edge === null) continue;
-      const home = !!view && overlaps({ x: plot.x, z: plot.z, w: plot.w, d: plot.d }, view, -0.01);
+      // The viewed lot in the game; in the menus' town the lot they treat as the player's.
+      const home = view ? overlaps({ x: plot.x, z: plot.z, w: plot.w, d: plot.d }, view, -0.01) : plot.id === world.meta?.home;
       const inside = (r: Rect) => r.x >= plot.x - 0.01 && r.x + r.w <= plot.x + plot.w + 0.01 && r.z >= plot.z - 0.01 && r.z + r.d <= plot.z + plot.d + 0.01;
       const own = paths.filter(inside);
       const path = own.find((r) => r.w < DRIVEWAY_MIN_WIDTH);

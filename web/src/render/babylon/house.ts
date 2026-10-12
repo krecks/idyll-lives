@@ -264,6 +264,10 @@ export interface SilhouetteSpec {
   z0: number;
   x1: number;
   z1: number;
+  /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house. */
+  lot: { x: number; z: number };
+  /** The player's house, dressed as the game builds it (no porch, chimney or garage). */
+  home?: boolean;
   /** Street side: 1 = the wall at z1 faces the street, -1 = the wall at z0. */
   front: 1 | -1;
   /** Centre x of the front door (where the garden path meets the house), if known. */
@@ -1329,7 +1333,8 @@ export class HouseBuilder {
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
-   * driveway. Returns the meshes (one per material for the whole street), the ones that cast
+   * driveway (the player's house in the menus' town gets none of those, as in the game). Each
+   * house's look comes from its lot's origin, as the game's house does. Returns the meshes (one per material for the whole street), the ones that cast
    * shadows, and the porch / garage lamps for the street's night lighting.
    */
   /** `storeyDepth`: rows per storey of the lot (openings upstairs are on rows `k * storeyDepth ..`). */
@@ -1357,7 +1362,7 @@ export class HouseBuilder {
     };
 
     for (const b of houses) {
-      const s = this.schemeWith(houseScheme(b.x0, b.z0), b.roof);
+      const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
       walls.color(s.wall);
@@ -1422,14 +1427,14 @@ export class HouseBuilder {
           board(a + 0.5 + 0.04, a + 1 - T - 0.1, 0.15, 0.95, 0.04);
           trim.color('#C8A64A').box(...span(o.axis, plane, n, a + 1 - T - 0.16, a + 1 - T - 0.1, 1.0, 1.06, 0.07));
           trim.color(TRIM);
-          const front = b.door !== null && o.axis === 'h' && Math.abs(a + 0.5 - b.door) < 0.6 && n[2] === b.front;
+          const front = !b.home && b.door !== null && o.axis === 'h' && Math.abs(a + 0.5 - b.door) < 0.6 && n[2] === b.front;
           if (front) this.porch(o.axis, plane, n, a + 0.5, s, walls, roof, trim, lamps);
         }
       }
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
-      if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof) this.chimney(b, s, brick, stone);
-      const g = b.garage;
+      if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone);
+      const g = b.home ? null : b.garage;
       if (g) {
         walls.color(s.wall);
         shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);

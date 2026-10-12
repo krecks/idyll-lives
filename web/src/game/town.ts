@@ -166,6 +166,8 @@ export interface TownMeta {
   paths: Rect[];
   seed: number;
   world?: WorldLook;
+  /** The menus' preview only (`previewWorld`): the plot drawn as the player's house. */
+  home?: number | null;
 }
 
 const MARGIN = 8;

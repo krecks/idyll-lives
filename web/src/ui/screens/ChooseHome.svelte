@@ -91,10 +91,10 @@
     templates = await loadTemplates();
   });
 
-  // The 3D town shows the chosen lot cleared when starting on an empty lot.
+  // The 3D town shows the chosen lot as the game will (cleared when starting on an empty lot).
   $effect(() => {
     const shown = selected ? app.homeTown(selected.index) : town;
-    if (shown) void menuScene.show(shown);
+    if (shown) void menuScene.show(shown, selected?.index ?? null);
   });
   $effect(() => {
     menuScene.highlight({ hover, selected: selected?.index ?? null, marked: vacantIds, outlines: false });
