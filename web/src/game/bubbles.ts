@@ -140,7 +140,7 @@ export class BubbleLayer {
     }
   }
 
-  /** The initiator shows the topic; the other Sim shows their reaction once it's revealed. */
+  /** The initiator shows the topic; the other Sim (and anyone listening in, role 3) shows their reaction once it's revealed. */
   private iconFor(social: number, role: number, outcome: number): string {
     const def = this.content.social(social);
     if (!def) return '';

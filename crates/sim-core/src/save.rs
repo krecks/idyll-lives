@@ -33,7 +33,7 @@
 //! kind's; `tall`, centimetres taller, absent: 0), and anything may stand off its tile's middle;
 //! doors and windows too (`looks[].sill`, `looks[].head`, centimetres; absent: their style's);
 //! 21 = story events from the phone (`invited`, `declined`); a phone action under way isn't
-//! saved. Older files load. Saves written before feelings
+//! saved, nor is joining in on a conversation (`Join` tasks). Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
 use std::collections::{BTreeMap, HashMap};
@@ -1275,8 +1275,8 @@ impl World {
                 directed: t.directed,
             },
             // (Eating and washing up start again from what's there after loading; a few minutes
-            // on the phone are simply over.)
-            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Phone { .. } => return None,
+            // on the phone are simply over, and so is listening in on a conversation.)
+            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Phone { .. } | TaskKind::Join { .. } => return None,
         })
     }
 }

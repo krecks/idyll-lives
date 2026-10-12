@@ -412,7 +412,7 @@ export class VoiceDirector {
     const partner = curr[o + k.partner];
     const partnerId = partner >= 0 ? curr[layout.headerLen + partner * layout.simStride + k.id] : -1;
     const role = curr[o + k.role];
-    // Conversations: the one who starts says the opener, the other answers once the outcome shows.
+    // Conversations: the one who starts says the opener, the other answers once the outcome shows (those listening in, role 3, say nothing).
     const base = { speaker: id, row: i, partner: partnerId, seed };
     if (next.social > 0) {
       const def = this.content.social(next.social - 1);
