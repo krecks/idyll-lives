@@ -271,6 +271,7 @@ pub(crate) fn update(w: &mut World) {
                     sims[t].engaged_with = None;
                     end_activity(&mut sims[i], content, objects);
                 } else {
+                    open_up(sims, content, i, t);
                     set_phase(&mut sims[i], Phase::Conversing { elapsed, success });
                 }
             }
@@ -373,7 +374,7 @@ fn regrouping(sims: &[Sim], l: usize, j: usize) -> bool {
 }
 
 /// `j` joins in on the conversation `l` is having with `t`: a free spot around the two (to one
-/// side of them first, then all round), facing the middle of the group.
+/// side of them first, then all round); everyone there then faces the middle of the group.
 #[allow(clippy::too_many_arguments)]
 fn take_place(
     nav: &NavGrid,
@@ -415,9 +416,6 @@ fn take_place(
     if let Some(p) = spot {
         sims[j].pos = p;
     }
-    let count = others.len() as f32 + 1.0;
-    let centre = others.iter().fold(sims[j].pos, |c, &m| [c[0] + sims[m].pos[0], c[1] + sims[m].pos[1]]);
-    sims[j].yaw = facing(sims[j].pos, [centre[0] / count, centre[1] / count]);
     for &m in &others {
         if !rels.get(j, m).met {
             rels.get_mut(j, m).met = true;
@@ -426,6 +424,29 @@ fn take_place(
         }
     }
     set_phase(&mut sims[j], Phase::Conversing { elapsed: 0.0, success: true });
+    open_up(sims, content, l, t);
+}
+
+/// The two talking (`l` and `t`) face each other, or, with others listening in, open up to the
+/// group: everyone there faces its middle (where they all are, on average), so nobody has their
+/// back turned. Called as people join and every tick of the conversation, so it follows people
+/// leaving too.
+fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
+    let members = group(sims, content, l);
+    if members.len() <= 2 {
+        sims[l].yaw = facing(sims[l].pos, sims[t].pos);
+        sims[t].yaw = facing(sims[t].pos, sims[l].pos);
+        return;
+    }
+    let count = members.len() as f32;
+    let sum = members.iter().fold([0.0, 0.0], |c, &m| [c[0] + sims[m].pos[0], c[1] + sims[m].pos[1]]);
+    let centre = [sum[0] / count, sum[1] / count];
+    for m in members {
+        // (Someone right on the middle, as can't happen with everyone apart: they stay as they are.)
+        if dist(sims[m].pos, centre) > 0.05 {
+            sims[m].yaw = facing(sims[m].pos, centre);
+        }
+    }
 }
 
 /// A joinable social `s` led by `l` went well: those listening in get the feeling the one talked
@@ -1104,6 +1125,55 @@ mod tests {
                 assert!(apart(w.sims[a].pos, w.sims[b].pos) >= 0.59, "{a} and {b} too close");
             }
         }
+    }
+
+    /// How far (radians) `sim`'s yaw is from facing `to`.
+    fn off(w: &World, sim: usize, to: [f32; 2]) -> f32 {
+        let p = w.sims[sim].pos;
+        let want = (to[0] - p[0]).atan2(to[1] - p[1]);
+        let d = (w.sims[sim].yaw - want).rem_euclid(std::f32::consts::TAU);
+        d.min(std::f32::consts::TAU - d)
+    }
+
+    fn centroid(w: &World, members: &[usize]) -> [f32; 2] {
+        let n = members.len() as f32;
+        let sum = members.iter().fold([0.0, 0.0], |c, &m| [c[0] + w.sims[m].pos[0], c[1] + w.sims[m].pos[1]]);
+        [sum[0] / n, sum[1] / n]
+    }
+
+    #[test]
+    fn the_two_talking_open_up_to_those_listening() {
+        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
+        // Just the two: face to face.
+        ticks(&mut w, 2);
+        let (a, b) = (w.sims[0].pos, w.sims[1].pos);
+        assert!(off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01, "A and B don't face each other");
+
+        join(&mut w, 2, 0);
+        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        assert_eq!(listeners(&w, 0), 1);
+        let group = super::group(&w.sims, &w.content, 0);
+        assert_eq!(group.len(), 3);
+        let centre = centroid(&w, &group);
+        for m in group {
+            assert!(off(&w, m, centre) < 0.05, "{m} doesn't face the middle of the group");
+        }
+        // Not straight at each other any more: both turned part way towards C (about 30 degrees,
+        // standing in a triangle).
+        let (a, b, c) = (w.sims[0].pos, w.sims[1].pos, w.sims[2].pos);
+        assert!(off(&w, 0, b) > 0.3 && off(&w, 1, a) > 0.3, "A and B still face each other");
+        let between = |p: [f32; 2], q: [f32; 2], r: [f32; 2]| {
+            let d = ((r[0] - p[0]).atan2(r[1] - p[1]) - (q[0] - p[0]).atan2(q[1] - p[1])).rem_euclid(std::f32::consts::TAU);
+            d.min(std::f32::consts::TAU - d)
+        };
+        assert!(off(&w, 0, c) < between(a, b, c) && off(&w, 1, c) < between(b, a, c), "they don't turn towards C");
+
+        // C goes: back to face to face.
+        w.apply(Command::Cancel { sim: 2, index: 0 }).unwrap();
+        ticks(&mut w, 2);
+        assert_eq!(listeners(&w, 0), 0);
+        let (a, b) = (w.sims[0].pos, w.sims[1].pos);
+        assert!(off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01, "A and B don't face each other again");
     }
 
     #[test]

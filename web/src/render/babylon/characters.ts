@@ -526,6 +526,8 @@ interface SimRig {
   gazeUntil: number;
   glanceYaw: number;
   glancePitch: number;
+  /** In a group conversation, someone listening in they glance at while speaking (head and eyes), instead of the one they talk with. */
+  audience: SimRig | null;
   /** Stage directions for this frame (null in game). */
   dir: StageDirection | null;
   /** Resting-face warmth from mood (0..1). */
@@ -665,6 +667,10 @@ export class Characters {
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
   /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
   private readonly spots = new Float32Array(MAX_CHARACTERS * 2).fill(NaN);
+  /** Per Sim row, for a conversation they started: how many listen in, and (up to) two of them. */
+  private readonly groups = new Int16Array(MAX_CHARACTERS * 3);
+  /** Per Sim row, for a conversation they started with others listening in: the middle of the group (x, z). */
+  private readonly groupMiddle = new Float32Array(MAX_CHARACTERS * 2);
   /** Per Sim row: projected size (px) of 5 cm of its face, from the last frame (see `faceDetail`). */
   private readonly facePx = new Float32Array(MAX_CHARACTERS).fill(1e6);
   /** Per Sim row: drawn with the low-detail body and clothes. */
@@ -1010,6 +1016,7 @@ export class Characters {
         gazeUntil: 0,
         glanceYaw: 0,
         glancePitch: 0,
+        audience: null,
         dir: null,
         warmth: 1,
         relaxArms: 0,
@@ -1345,6 +1352,32 @@ export class Characters {
     if (layout.actions && layout.actions !== this.actionTags) this.actionTags = layout.actions;
     const hasAction = k.action !== undefined && k.object !== undefined;
 
+    // Group conversations: those listening in (role 3, the one who started it as partner), and
+    // the middle of each group, everyone in it counted.
+    const groups = this.groups;
+    const middle = this.groupMiddle;
+    groups.fill(0, 0, count * 3);
+    for (let j = 0; j < count; j++) {
+      const o = H + j * S;
+      const l = curr[o + k.partner] | 0;
+      if ((curr[o + k.role] | 0) !== 3 || l < 0 || l >= count || groups[l * 3] >= 2) continue;
+      groups[l * 3 + 1 + groups[l * 3]++] = j;
+    }
+    for (let l = 0; l < count; l++) {
+      const n = groups[l * 3];
+      if (!n) continue;
+      const t = curr[H + l * S + k.partner] | 0;
+      const members = [l, t, groups[l * 3 + 1], groups[l * 3 + 2]].slice(0, n + 2).filter((m) => m >= 0 && m < count);
+      let sx = 0;
+      let sz = 0;
+      for (const m of members) {
+        sx += curr[H + m * S + k.x];
+        sz += this.groundRow(curr[H + m * S + k.z]);
+      }
+      middle[l * 2] = sx / members.length;
+      middle[l * 2 + 1] = sz / members.length;
+    }
+
     for (let i = 0; i < count; i++) {
       const rig = this.sims[i];
       const o = H + i * S;
@@ -1433,8 +1466,20 @@ export class Characters {
         const other = curr[H + partner * S + k.partner] | 0;
         if (other >= 0 && other < count && !speaking(Math.min(partner, other), 1, time)) partnerRig = this.sims[other];
       }
+      // The two talking face each other; with others listening in, they open up to the group: the
+      // body faces its middle (as sim-core turns them), the head and eyes stay on the one speaking,
+      // and while speaking themselves they glance round at those listening now and then.
+      const leader = role === 1 ? i : role === 2 ? partner : -1;
+      const listeners = leader >= 0 && leader < count ? groups[leader * 3] : 0;
+      rig.audience = null;
       if (social && !listening && partnerRig && partnerRig.visible && !moving && pose === Pose.Stand) {
-        faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
+        if (listeners) {
+          faceYaw = Math.atan2(middle[leader * 2] - rig.x, middle[leader * 2 + 1] - rig.z);
+          if (speaking(Math.min(i, partner), role, time)) {
+            const pick = Math.floor(hash(Math.floor(time / 1.4 + rig.seed * 3) * 7 + i) * (listeners + 1));
+            if (pick > 0) rig.audience = this.sims[groups[leader * 3 + pick]] ?? null;
+          }
+        } else faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
       const maxTurn = (moving ? 9 : 6) * dt;
@@ -1901,7 +1946,7 @@ export class Characters {
     } else if (dir?.still) {
       // Portraits: straight ahead.
     } else if (social && partner && partner.visible && pose !== Pose.Lie) {
-      const ph = partner.id * 3;
+      const ph = (rig.audience?.visible ? rig.audience : partner).id * 3;
       const dx = this.heads[ph] - this.heads[i * 3];
       const dz = this.heads[ph + 2] - this.heads[i * 3 + 2];
       const dy = this.heads[ph + 1] - this.heads[i * 3 + 1];
@@ -2338,8 +2383,9 @@ export class Characters {
       rig.glancePitch = (hash(Math.floor(time * 3) + i + 5) - 0.6) * 0.3;
     }
     if (!asleep && closed < 0.99) {
-      if (rig.gazeMode === 1 && partner?.visible) {
-        this.gazeAt(rig, ex, eyeY, ez, this.heads[partner.id * 3], this.heads[partner.id * 3 + 1] - eyesBelowTop(partner), this.heads[partner.id * 3 + 2]);
+      const look = rig.audience?.visible ? rig.audience : partner;
+      if (rig.gazeMode === 1 && look?.visible) {
+        this.gazeAt(rig, ex, eyeY, ez, this.heads[look.id * 3], this.heads[look.id * 3 + 1] - eyesBelowTop(look), this.heads[look.id * 3 + 2]);
         gy = this.gaze[0];
         gp = this.gaze[1];
       } else if (rig.gazeMode === 2) {
