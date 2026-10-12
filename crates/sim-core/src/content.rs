@@ -850,6 +850,22 @@ pub struct DayRhythm {
     pub ready_minutes: f32,
     /// What residents see to while away at work or school (content `dayRhythm.workBreaks`).
     pub work_breaks: Vec<WorkBreak>,
+    /// A crying baby wakes a grown-up asleep at home (content `dayRhythm.babyWakes`; None:
+    /// nobody wakes for them).
+    pub baby_wakes: Option<BabyWakes>,
+}
+
+/// A baby crying for one of `needs` (bit per need; default: all but surroundings) below
+/// `below` while every grown-up at home is asleep wakes one of them, who does the crib's care
+/// interactions for each of those needs below `tend_below` and goes back to bed, with the
+/// `feeling` (optional). The same baby wakes nobody again for `cooldown_ticks`.
+#[derive(Debug, Clone, Copy)]
+pub struct BabyWakes {
+    pub needs: u32,
+    pub below: f32,
+    pub tend_below: f32,
+    pub cooldown_ticks: u64,
+    pub feeling: Option<usize>,
 }
 
 /// A break at work or school: once `need` drops below `below`, it gains `gain` (lunch, the
@@ -1437,6 +1453,22 @@ struct DayRhythmRaw {
     habits: Vec<HabitRaw>,
     ready_minutes: Option<f32>,
     work_breaks: Vec<WorkBreakRaw>,
+    baby_wakes: Option<BabyWakesRaw>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BabyWakesRaw {
+    #[serde(default)]
+    needs: Option<Vec<String>>,
+    #[serde(default)]
+    below: Option<f32>,
+    #[serde(default)]
+    tend_below: Option<f32>,
+    #[serde(default)]
+    cooldown_minutes: Option<f32>,
+    #[serde(default)]
+    feeling: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -2938,6 +2970,26 @@ impl Content {
                     Ok::<_, Error>(WorkBreak { need, below, gain: b.gain.max(0.0), cost: b.cost.max(0) })
                 })
                 .collect::<Result<_, _>>()?,
+            baby_wakes: dr
+                .baby_wakes
+                .as_ref()
+                .map(|b| {
+                    let mask = match &b.needs {
+                        None => (0..needs.len()).filter(|&n| !needs[n].room).fold(0u32, |m, n| m | 1 << n),
+                        Some(list) => list.iter().try_fold(0u32, |m, id| {
+                            Ok::<_, Error>(m | 1 << lookup(&need_index, id, "dayRhythm.babyWakes", "need")?)
+                        })?,
+                    };
+                    let below = b.below.unwrap_or(0.3).clamp(0.0, 1.0);
+                    Ok::<_, Error>(BabyWakes {
+                        needs: mask,
+                        below,
+                        tend_below: b.tend_below.unwrap_or(0.6).clamp(below, 1.0),
+                        cooldown_ticks: (b.cooldown_minutes.unwrap_or(90.0).max(0.0) / crate::MINUTES_PER_TICK) as u64,
+                        feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
+                    })
+                })
+                .transpose()?,
         };
         let rent = raw
             .economy
