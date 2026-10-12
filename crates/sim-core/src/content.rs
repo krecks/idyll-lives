@@ -57,6 +57,9 @@ pub struct NeedDef {
     /// The environment need: instead of decaying it drifts towards the score of the room the
     /// resident is in (`roomRules.drift`).
     pub room: bool,
+    /// The level residents like to keep it at (content `comfortable`, 0 = none): below it they
+    /// see to it when it's convenient, it weighs more (`AutonomyRules::comfort_boost`).
+    pub comfortable: f32,
 }
 
 #[derive(Debug)]
@@ -819,6 +822,37 @@ pub struct DayRhythm {
     /// Below this (in what a bed's sleep fills), daytime is no reason not to go to bed, and a
     /// nap won't do.
     pub exhausted_below: f32,
+    /// What residents see to at the turning points of their day (content `habits`).
+    pub habits: Vec<Habit>,
+    /// Habits before leaving for work or school start this long before they leave.
+    pub ready_minutes: f32,
+}
+
+/// When a habit is kept (`Habit`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HabitTime {
+    /// On getting up after a night's sleep.
+    Wake,
+    /// On the way to bed.
+    Bed,
+    /// In the `ready_minutes` before leaving for work or school.
+    Leave,
+    /// On getting home from work or school.
+    Home,
+    /// After a meal (a serving eaten).
+    Meal,
+}
+
+/// Something residents see to at a turning point of their day (content `dayRhythm.habits`):
+/// unless `need` is at `below` or better already, they first go to the nearest quick thing
+/// that fills it (the toilet on getting up, before bed, before leaving, on getting home and
+/// after a meal).
+#[derive(Debug, Clone)]
+pub struct Habit {
+    pub at: HabitTime,
+    pub need: usize,
+    pub below: f32,
 }
 
 impl DayRhythm {
@@ -1114,6 +1148,8 @@ pub struct Content {
     pub grades: Vec<GradeDef>,
     pub career_categories: Vec<CategoryDef>,
     pub day_rhythm: DayRhythm,
+    /// How residents weigh their needs when they choose for themselves (`"autonomy"`).
+    pub autonomy: crate::ai::AutonomyRules,
     pub rent: Option<RentRules>,
     pub object_rules: ObjectRules,
     pub room_kinds: Vec<RoomKind>,
@@ -1187,6 +1223,8 @@ struct ContentFile {
     career_categories: Vec<CategoryRaw>,
     #[serde(default)]
     day_rhythm: DayRhythmRaw,
+    #[serde(default)]
+    autonomy: crate::ai::AutonomyRaw,
     #[serde(default)]
     object_rules: ObjectRulesRaw,
     #[serde(default)]
@@ -1342,6 +1380,20 @@ struct DayRhythmRaw {
     nap_tags: Vec<String>,
     nap_cooldown_hours: Option<f32>,
     exhausted_below: Option<f32>,
+    habits: Vec<HabitRaw>,
+    ready_minutes: Option<f32>,
+}
+
+#[derive(Deserialize)]
+struct HabitRaw {
+    at: HabitTime,
+    need: String,
+    #[serde(default = "one_f32")]
+    below: f32,
+}
+
+fn one_f32() -> f32 {
+    1.0
 }
 
 #[derive(Deserialize)]
@@ -1742,6 +1794,8 @@ struct NeedRaw {
     decay_per_hour: f32,
     #[serde(default)]
     room: bool,
+    #[serde(default)]
+    comfortable: f32,
 }
 
 #[derive(Deserialize)]
@@ -2048,6 +2102,7 @@ impl Content {
                 label: n.label.clone(),
                 decay_per_minute: n.decay_per_hour / 60.0,
                 room: n.room,
+                comfortable: n.comfortable.clamp(0.0, 1.0),
             })
             .collect();
         let need_index: HashMap<&str, usize> = needs
@@ -2462,6 +2517,14 @@ impl Content {
             return Err(Error::new("duplicate social id"));
         }
         let social_rules = social::parse_rules(&raw.social_rules, &raw.bond_presets, &ix)?;
+        let chats = socials.iter().flat_map(|s| s.actor_gain.iter().chain(&s.target_gain).enumerate());
+        let urgent = raw
+            .autonomy
+            .urgent
+            .as_ref()
+            .map(|list| list.iter().try_fold(0u32, |m, id| Ok::<_, Error>(m | 1 << lookup(&need_index, id, "autonomy.urgent", "need")?)))
+            .transpose()?;
+        let autonomy = raw.autonomy.rules(urgent, chats.filter(|(_, g)| **g > 0.0).fold(0, |m, (n, _)| m | 1 << n));
 
         let need_array =
             |map: &HashMap<String, f32>, ctx: &str| -> Result<[f32; MAX_NEEDS], Error> {
@@ -2761,6 +2824,15 @@ impl Content {
             nap_tags: tag_mask(&dr.nap_tags),
             nap_cooldown_hours: dr.nap_cooldown_hours.unwrap_or(4.0),
             exhausted_below: dr.exhausted_below.unwrap_or(0.2),
+            habits: dr
+                .habits
+                .iter()
+                .map(|h| {
+                    let need = lookup(&need_index, &h.need, "dayRhythm.habits", "need")?;
+                    Ok::<_, Error>(Habit { at: h.at, need, below: h.below.clamp(0.0, 1.0) })
+                })
+                .collect::<Result<_, _>>()?,
+            ready_minutes: dr.ready_minutes.unwrap_or(30.0).max(0.0),
         };
         let rent = raw
             .economy
@@ -3046,6 +3118,7 @@ impl Content {
             grades,
             career_categories,
             day_rhythm,
+            autonomy,
             rent,
             object_rules,
             room_kinds,

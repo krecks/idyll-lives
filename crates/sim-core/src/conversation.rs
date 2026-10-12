@@ -199,7 +199,11 @@ pub(crate) fn update(w: &mut World) {
                 }
             }
             State::Conversing(elapsed, success) => {
-                if sims[t].engaged_with != Some(i as u32) {
+                // (Either of them bursting breaks it off.)
+                if sims[t].engaged_with != Some(i as u32) || sims[i].pressed(content) || sims[t].pressed(content) {
+                    if sims[t].engaged_with == Some(i as u32) {
+                        sims[t].engaged_with = None;
+                    }
                     end_activity(&mut sims[i], content, objects);
                     continue;
                 }
