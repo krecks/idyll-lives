@@ -150,7 +150,7 @@
           {/each}
         </ol>
         {#if baby}
-          <p class="hint">A baby: the grown-ups at home feed, change and play with them at the crib. A crying baby needs someone.</p>
+          <p class="hint">A baby: the grown-ups at home feed, change, cuddle and play with them at the crib. A crying baby needs someone.</p>
         {:else if mine}
           <p class="hint">They choose for themselves. To step in, click a person to talk to, an object to use, or the floor to walk.</p>
         {/if}
