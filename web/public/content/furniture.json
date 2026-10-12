@@ -2331,6 +2331,7 @@
           "id": "shower",
           "label": "Take a shower",
           "anim": "shower",
+          "inside": true,
           "minutes": 25,
           "effects": {
             "hygiene": 1.0
@@ -2359,6 +2360,7 @@
           "id": "shower",
           "label": "Take a shower",
           "anim": "shower",
+          "inside": true,
           "minutes": 15,
           "effects": {
             "hygiene": 1.0

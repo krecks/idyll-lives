@@ -139,6 +139,7 @@
           "id": "rinse",
           "label": "Take a contrast shower",
           "anim": "shower",
+          "inside": true,
           "minutes": 15,
           "pose": "stand",
           "autonomous": true,

@@ -136,6 +136,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `tags` | Tag ids (see [Tags](#tags)): drive trait/emotion/schedule preferences, "busy" (can't be interrupted by a chat) and what counts as sleep. |
 | `skills` | Skill id → levels gained per hour of use (before the per-level slowdown). |
 | `pose` | `stand` (default), `sit` or `lie`. |
+| `inside` | Used standing on the object rather than in front of it: the resident steps in onto its centre (or its slot), facing the way it faces, and steps back out where they came from when done (the same as sitting down and getting up). Every shower has it. Default `false`. |
 | `autonomous` | `false` = only when the player asks. Default `true`. |
 | `needsTable` | Only offered while the seat faces a table it tucks under (its `seatAt`): dining at a table. A chair alone offers only its other interactions; the player's order fails with "needs a table". Needs a `seatAt`. Default `false`. |
 | `recipe` | Starts a recipe (`recipes` id; see [Cooking](#cooking)) instead of being used here alone: the resident goes round the recipe's stations (fridge, counter, stove), from whichever one they clicked, and serves a dish. `minutes` isn't needed (the steps take theirs); `effects` are then only what cooking does for the cook (`{"fun": 0.05}`), the meal's own are the recipe's. Keep the `tags` (`food`, `cooking`): kitchens, plans and traits go by them. `cost` comes from the recipe. |

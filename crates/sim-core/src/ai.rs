@@ -146,6 +146,7 @@ mod tests {
             total_gain,
             gain_per_minute: total_gain.map(|g| g / 10.0),
             pose: Pose::Stand,
+            inside: false,
             autonomous: true,
             tags: 0,
             skill_gain: [0.0; crate::content::MAX_SKILLS],

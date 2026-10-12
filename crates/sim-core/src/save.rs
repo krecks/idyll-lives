@@ -594,8 +594,9 @@ impl World {
             .iter()
             .map(|s| {
                 let mut pos = s.pos;
-                // A Sim on a bed or chair stands back up where they sat down from.
-                if let (Pose::Sit | Pose::Lie, Some(act)) = (s.pose, s.current())
+                // A Sim on a bed or chair (or in the shower) stands back up where they came from.
+                if (s.pose != Pose::Stand || s.seated_from.is_some())
+                    && let Some(act) = s.current()
                     && let TaskKind::Use { object, .. } | TaskKind::Eat { seat: Some(object), .. } = act.task.kind
                 {
                     let (fx, fz) = s.seated_from.unwrap_or_else(|| self.approach_tile(&self.objects[object as usize]));
