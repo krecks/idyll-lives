@@ -764,7 +764,13 @@
             "Tickle, tickle!"
           ],
           "tone": "happy"
-        }
+        },
+        "cuddle": [
+          "Hush now. I've got you.",
+          "There, there, little one.",
+          "Come here, snuggle bug.",
+          "All better now, sweetie."
+        ]
       }
     },
     "fridgeMini": {

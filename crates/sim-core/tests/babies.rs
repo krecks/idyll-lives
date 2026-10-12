@@ -2,7 +2,10 @@
 //! playing fill the baby's needs); a baby who needs something cries, lying awake, and stays in
 //! the crib (as does one who's rested); a crib comes with a baby who moves into a home without
 //! one (free, money or not); and a baby who grows into a child gets out, onto their feet beside
-//! it.
+//! it. With the shipped content, a baby with a grown-up at home is cuddled and stays
+//! comfortable.
+
+mod common;
 
 use sim_core::lot::SimSpawn;
 use sim_core::planner::ThoughtKind;
@@ -312,4 +315,36 @@ fn a_baby_lies_awake_in_the_crib_needing_something_or_rested_by_day() {
     until(&mut w, 3, 2.0, [1.0, 0.8, 0.05]);
     assert_eq!(action(&w), -1.0, "awake, crying, at night");
     still_in_crib(&w, lain, "all along");
+}
+
+/// The shipped content: a home with a crib, and what a grown-up needs for themselves.
+const HOME: &str = r#"{"width":16,"depth":12,
+    "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":10,"entry":[8.5,9.5]}],
+    "households":[{"name":"Home","plot":0,"player":true}],
+    "objects":[{"def":"crib","x":1,"z":5,"rot":0},{"def":"toilet","x":5,"z":1,"rot":0},{"def":"sink","x":7,"z":1,"rot":0},
+               {"def":"shower","x":9,"z":1,"rot":0},{"def":"fridge","x":13,"z":1,"rot":0},{"def":"bed","x":1,"z":1,"rot":0},
+               {"def":"sofa","x":10,"z":6,"rot":0},{"def":"tv","x":10,"z":4,"rot":0}],
+    "sims":[{"name":"Ada","traits":["kind"],"x":6.5,"z":6.5,"age":30},{"name":"Bea","traits":["cheerful"],"x":5.5,"z":6.5,"age":0.5}],
+    "relationships":[{"a":1,"b":0,"preset":"parent"}]}"#;
+
+#[test]
+fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
+    let mut w = World::from_json(&common::content(), HOME, 1).unwrap();
+    let comfort = w.content.needs.iter().position(|n| n.id == "comfort").unwrap();
+    let cuddle = w.content.objects[w.objects[0].def].interactions.iter().position(|i| i.id == "cuddle").unwrap();
+    // Two days, Ada at home (no job): she sees to Bea, cuddling her when she needs it.
+    let (mut sum, mut lowest, mut n, mut cuddled) = (0.0, 1.0f32, 0, false);
+    for _ in 0..2 * 24 * 4 {
+        for _ in 0..15 * 20 {
+            w.tick_once();
+            cuddled |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction } if interaction == cuddle));
+        }
+        sum += w.sims[1].needs[comfort];
+        lowest = lowest.min(w.sims[1].needs[comfort]);
+        n += 1;
+    }
+    let average = sum / n as f32;
+    assert!(w.objects[0].users().any(|u| u == 1), "Bea is in her crib");
+    assert!(cuddled, "Ada cuddled Bea");
+    assert!(average > 0.35 && lowest > 0.0, "Bea stayed comfortable: average {average:.2}, lowest {lowest:.2}");
 }
