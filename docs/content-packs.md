@@ -645,7 +645,7 @@ their own like they choose anything else: talking scored by `needs` × `autonomy
 
 ```json
 "phone": {
-  "fromStage": "child", "anim": "phone", "seatTags": ["lounge"], "seatRange": 5, "noAnswerMinutes": 3,
+  "fromStage": "teen", "anim": "phone", "seatTags": ["lounge"], "seatRange": 5, "noAnswerMinutes": 3,
   "actions": [
     { "id": "call", "label": "Call", "icon": "icon.phone.call", "minutes": 25, "contact": true,
       "tags": ["social", "friendly", "phone"], "prefer": "liked", "autonomyWeight": 0.5,

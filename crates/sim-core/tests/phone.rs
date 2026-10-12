@@ -88,10 +88,10 @@ fn every_resident_old_enough_has_a_phone() {
     for id in ["text", "call", "invite", "askOver", "browse"] {
         assert!(ids.contains(&id), "the phone can {id}");
     }
-    // Children and up (from the content's `fromStage`), not babies.
-    let child = w.content.life.stages.iter().find(|s| s.id == "child").unwrap().from;
-    assert_eq!(w.content.phone.from_age, child);
-    assert!(phone::has_phone(&w.content, child) && !phone::has_phone(&w.content, 0.5));
+    // Teens and up (from the content's `fromStage`), not children.
+    let teen = w.content.life.stages.iter().find(|s| s.id == "teen").unwrap().from;
+    assert_eq!(w.content.phone.from_age, teen);
+    assert!(phone::has_phone(&w.content, teen) && !phone::has_phone(&w.content, teen - 1.0));
     let mut grown_ups = 0;
     for s in w.sims.iter().filter(|s| s.adult(&w.content)) {
         grown_ups += 1;

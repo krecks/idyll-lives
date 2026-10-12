@@ -1832,7 +1832,7 @@
     "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"}
   },
   "phone": {
-    "fromStage": "child",
+    "fromStage": "teen",
     "anim": "phone",
     "seatTags": ["lounge"],
     "seatRange": 5,
