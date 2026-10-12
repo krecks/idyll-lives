@@ -2,8 +2,8 @@
 //! mountain, lakeside and forest worlds) checked by the simulation: each loads with no more
 //! residents than a town holds, every lot can be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
-//! can the houses' basements from their front doors (and what's in them), and the town keeps
-//! going for half a day.
+//! can the houses' basements from their front doors and everything residents use in the houses
+//! (on lots facing either way), and the town keeps going for half a day.
 //!
 //! Make the worlds first: `node --experimental-transform-types tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test generated_worlds -- --ignored --nocapture`.
@@ -68,12 +68,9 @@ fn generated_worlds_are_livable() {
                     failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
                 }
             }
-            // Every room in the basements, from the front door of its house; and what's in them,
-            // on lots facing the street behind them (turned round, a thing two tiles wide is used
-            // from the other of its middle tiles than the house was furnished for: so it is
-            // upstairs too).
+            // Every room in the basements, from the front door of its house; and everything residents
+            // use in the houses (upstairs, downstairs and in the basement), on lots facing either way.
             let door = |x: i32, z: i32| w.plot_at(x, z).map(|p| tile(w.plots[p as usize].arrival_point()));
-            let turned = |x: i32, z: i32| w.plot_at(x, z).is_some_and(|p| w.plots[p as usize].arrival_point()[1] > (w.plots[p as usize].z + w.plots[p as usize].d / 2) as f32);
             let down = w.storey_row(-1);
             let mut seen = std::collections::HashSet::new();
             for z in down..down + w.storey_depth() {
@@ -90,10 +87,15 @@ fn generated_worlds_are_livable() {
                     }
                 }
             }
-            for o in w.objects.iter().filter(|o| w.storey_of(o.z) == -1 && !w.content.objects[o.def].interactions.is_empty() && !turned(o.x, o.z)) {
+            for o in w.objects.iter().filter(|o| !w.content.objects[o.def].interactions.is_empty() && w.lot.room_at(o.x, o.z) != OUTDOORS) {
                 let Some(from) = door(o.x, o.z) else { continue };
                 if !surface::approach_tiles(&w.content, &nav, o).any(|t| nav.find_path(from, t).is_some()) {
-                    failures.push(format!("{label}: can't reach the {} in the basement at {},{}", w.content.objects[o.def].id, o.x, o.z));
+                    let at = match w.storey_of(o.z) {
+                        -1 => "in the basement",
+                        0 => "downstairs",
+                        _ => "upstairs",
+                    };
+                    failures.push(format!("{label}: can't reach the {} {at} at {},{}", w.content.objects[o.def].id, o.x, o.z));
                 }
             }
         }
