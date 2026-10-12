@@ -202,7 +202,7 @@ export async function startSession(
     refreshRoomOverlay();
   }
   const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
-  const worldSound = new WorldSound(renderer);
+  const worldSound = new WorldSound(renderer, content);
   const buildBuy = new BuildBuyInput(renderer, content, assets, (command) => bridge.send(command));
   game.catalog = bridge.catalog;
   /** Sims the player controls. */

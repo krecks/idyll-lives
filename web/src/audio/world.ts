@@ -2,35 +2,41 @@
  * Sounds of the world, synthesised like the interface sounds (no sound files):
  * - ambience by the game clock: a soft outdoor bed, crickets at night, and by day a few neighbourhood
  *   birds of different species, each with its own song, singing in bouts (most in the dawn chorus);
- * - things in use on the lot being looked at: a sizzling pan, running water, a TV, music. One loop
- *   per kind of sound, louder the more residents make it, placed left or right like voices;
+ * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
+ *   washing machine, a TV, music. One loop per kind of sound, louder the more residents make it,
+ *   placed left or right like voices; the water sounds are made in `water.ts`;
  * - a visitor's knock at the front door.
  *
  * Presentation only. Reads the snapshot about ten times a second; residents the renderer doesn't
  * draw (other lots, at work) make no sound.
  */
 
+import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { Renderer } from '../render/types';
 import { game } from '../ui/state.svelte';
 import { audioContext, bus, updateVolumes } from './mixer';
+import { WATER, type Stereo, type WaterKind } from './water';
+import type { WaterReply, WaterRequest } from './water.worker';
 
 const TICK_MS = 100;
 /** Seconds for a loop to fade in or out. */
 const FADE = 0.4;
+/** Seconds a bath runs before the water's turned off and the bather settles in. */
+const BATH_FILL = 7;
 
-type LoopKind = 'sizzle' | 'chop' | 'water' | 'tv' | 'music';
+type LoopKind = 'sizzle' | 'chop' | WaterKind | 'tv' | 'music';
 
-/** What each action sounds like (content animation tags; unknown tags are silent). */
+/** What each action sounds like (content animation tags; unknown tags are silent; see also `WorldSound.soundOf`). */
 const ACTION_SOUNDS: Record<string, LoopKind> = {
   cook: 'sizzle',
   // The cooking steps (content `recipes`): a knife on a board, a pan, the grill.
   chop: 'chop',
   stir: 'sizzle',
   flip: 'sizzle',
-  shower: 'water',
-  bath: 'water',
-  wash: 'water',
+  shower: 'shower',
+  bath: 'bathFill',
+  wash: 'tap',
   watch: 'tv',
   music: 'music',
   listen: 'music',
@@ -38,16 +44,25 @@ const ACTION_SOUNDS: Record<string, LoopKind> = {
 };
 
 interface LoopDef {
-  make: (ac: AudioContext) => AudioBuffer;
+  /** The raw sound, made here; or one of the water sounds, made off the main thread. */
+  make?: (ac: AudioContext) => AudioBuffer;
+  water?: WaterKind;
   /** A filter on the way out (shapes the raw buffer into the sound). */
   filter?: { type: BiquadFilterType; frequency: number; q: number };
   level: number;
+  /** How far the speed (and with it the pitch) wanders either way, so a loop doesn't sound the same each time round. */
+  drift?: number;
 }
 
 const LOOPS: Record<LoopKind, LoopDef> = {
   sizzle: { make: sizzleBuffer, filter: { type: 'highpass', frequency: 1800, q: 0.5 }, level: 0.22 },
   chop: { make: chopBuffer, filter: { type: 'bandpass', frequency: 1400, q: 0.8 }, level: 0.3 },
-  water: { make: waterBuffer, filter: { type: 'bandpass', frequency: 1800, q: 0.45 }, level: 0.3 },
+  shower: { water: 'shower', level: 0.28, drift: 0.04 },
+  tap: { water: 'tap', level: 0.22, drift: 0.04 },
+  washUp: { water: 'washUp', level: 0.24, drift: 0.03 },
+  bathFill: { water: 'bathFill', level: 0.26, drift: 0.04 },
+  bathSoak: { water: 'bathSoak', level: 0.35, drift: 0.03 },
+  washer: { water: 'washer', level: 0.2, drift: 0.02 },
   tv: { make: murmurBuffer, filter: { type: 'bandpass', frequency: 700, q: 1.1 }, level: 0.35 },
   music: { make: musicBuffer, filter: { type: 'lowpass', frequency: 2600, q: 0.7 }, level: 0.16 },
 };
@@ -66,11 +81,17 @@ export class WorldSound {
   private readonly birds = new Birds();
   /** Residents knocking last tick (by id), and when each knocks again (ms). */
   private readonly knocking = new Map<number, number>();
+  /** Residents in the bath (by id), and when they got in (ms). */
+  private readonly bathers = new Map<number, number>();
+  private readonly water = new WaterBuffers();
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
 
-  constructor(private readonly renderer: Renderer) {}
+  constructor(
+    private readonly renderer: Renderer,
+    private readonly content: Content,
+  ) {}
 
   update(frame: FrameState): void {
     const now = frame.now;
@@ -101,41 +122,69 @@ export class WorldSound {
     const paused = game.speed === 0;
     const users = new Map<LoopKind, { n: number; pan: number }>();
     const seen = new Set<number>();
+    const bathing = new Set<number>();
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
       const action = curr[o + k.action];
       const tag = action >= 0 ? layout.actions[action] : undefined;
       if (!tag || !this.renderer.simHead(i, this.head)) continue;
       const pan = this.panAt();
+      const id = curr[o + k.id];
       if (tag === 'knock') {
-        const id = curr[o + k.id];
         seen.add(id);
         const next = this.knocking.get(id) ?? 0;
         if (!quiet && !paused && now >= next) knock(ac, out, pan);
         if (now >= next) this.knocking.set(id, now + 2600 + Math.random() * 1200);
         continue;
       }
-      const kind = ACTION_SOUNDS[tag];
+      let kind = this.soundOf(tag, k.objectDef === undefined ? -1 : curr[o + k.objectDef], k.interaction === undefined ? -1 : curr[o + k.interaction]);
       if (!kind) continue;
+      if (kind === 'bathFill') {
+        // The bath runs while they get in, then it's just the water lapping.
+        bathing.add(id);
+        const since = this.bathers.get(id) ?? now;
+        this.bathers.set(id, since);
+        if (now - since > BATH_FILL * 1000) kind = 'bathSoak';
+      }
       const u = users.get(kind) ?? { n: 0, pan: 0 };
       u.pan = (u.pan * u.n + pan) / (u.n + 1);
       u.n++;
       users.set(kind, u);
     }
     for (const id of this.knocking.keys()) if (!seen.has(id)) this.knocking.delete(id);
+    for (const id of this.bathers.keys()) if (!bathing.has(id)) this.bathers.delete(id);
     for (const kind of Object.keys(LOOPS) as LoopKind[]) {
       const u = users.get(kind);
-      const target = u && !quiet && !paused ? LOOPS[kind].level * Math.min(1.6, Math.sqrt(u.n)) : 0;
+      const def = LOOPS[kind];
+      const target = u && !quiet && !paused ? def.level * Math.min(1.6, Math.sqrt(u.n)) : 0;
       let loop = this.loops.get(kind);
       if (!loop && target === 0) continue;
       if (!loop) {
-        const def = LOOPS[kind];
-        loop = this.loop(ac, out, def.make, def.filter);
+        const made = def.water ? this.water.get(def.water, ac.sampleRate) : def.make;
+        // Water still being made: it starts when it's ready.
+        if (!made) continue;
+        loop = this.loop(ac, out, made, def.filter);
         this.loops.set(kind, loop);
+        if (def.drift) loop.source.playbackRate.value = 1 + def.drift * (Math.random() * 2 - 1);
       }
       fadeTo(loop.gain, target, t);
       if (u) loop.panner.pan.setTargetAtTime(u.pan, t, 0.1);
+      if (def.drift && target > 0 && Math.random() < 0.05) loop.source.playbackRate.setTargetAtTime(1 + def.drift * (Math.random() * 2 - 1), t, 1.5);
     }
+  }
+
+  /** What a resident's action sounds like: by its animation, and for washing and cleaning by what they're washing or cleaning. */
+  private soundOf(tag: string, def: number, interaction: number): LoopKind | undefined {
+    const object = def >= 0 ? this.content.objectList[def] : undefined;
+    const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
+    if (tag === 'wash') {
+      // Clearing away after a meal washes up at the sink without an interaction of its own.
+      if (use?.id === 'washUp' || !object) return 'washUp';
+      // Getting ready at a dressing table washes without a tap.
+      return use?.tags?.includes('handwash') ? 'tap' : undefined;
+    }
+    if (tag === 'clean') return use?.id === 'laundry' && /washer|laundryCent/i.test(object?.id ?? '') ? 'washer' : undefined;
+    return ACTION_SOUNDS[tag];
   }
 
   dispose(): void {
@@ -151,6 +200,7 @@ export class WorldSound {
     }
     this.loops.clear();
     this.birds.dispose();
+    this.water.dispose();
   }
 
   /** Stereo position from where the resident is on screen; off screen counts as far to the side. */
@@ -160,10 +210,10 @@ export class WorldSound {
     return Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
   }
 
-  /** A looping buffer, silent until faded in. */
-  private loop(ac: AudioContext, out: AudioNode, make: (ac: AudioContext) => AudioBuffer, filter?: LoopDef['filter']): Loop {
+  /** A looping buffer, silent until faded in; it starts somewhere along the loop, so it never sounds the same twice. */
+  private loop(ac: AudioContext, out: AudioNode, made: AudioBuffer | ((ac: AudioContext) => AudioBuffer), filter?: LoopDef['filter']): Loop {
     const source = ac.createBufferSource();
-    source.buffer = cached(ac, make);
+    source.buffer = typeof made === 'function' ? cached(ac, made) : made;
     source.loop = true;
     const gain = ac.createGain();
     gain.gain.value = 0;
@@ -177,9 +227,60 @@ export class WorldSound {
       node = node.connect(f);
     }
     node.connect(gain).connect(panner).connect(out);
-    source.start();
+    source.start(0, Math.random() * source.buffer.duration);
     return { source, gain, panner };
   }
+}
+
+/**
+ * The water sounds as audio buffers, made by a worker (they take a moment): the one first wanted,
+ * then the rest one after another. Made on the spot if workers aren't available.
+ */
+class WaterBuffers {
+  private worker: Worker | null = null;
+  private readonly ready = new Map<WaterKind, AudioBuffer>();
+  private rate = 0;
+
+  /** The sound at the sample rate, or null while it's still being made. */
+  get(kind: WaterKind, rate: number): AudioBuffer | null {
+    if (rate !== this.rate) this.start(kind, rate);
+    let b = this.ready.get(kind);
+    if (!b && !this.worker) {
+      b = stereoBuffer(WATER[kind](rate), rate);
+      this.ready.set(kind, b);
+    }
+    return b ?? null;
+  }
+
+  dispose(): void {
+    this.worker?.terminate();
+    this.worker = null;
+  }
+
+  private start(first: WaterKind, rate: number): void {
+    this.rate = rate;
+    this.ready.clear();
+    if (!this.worker) {
+      try {
+        this.worker = new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' });
+      } catch {
+        return;
+      }
+      this.worker.onmessage = (e: MessageEvent<WaterReply>) => {
+        if (e.data.rate === this.rate) this.ready.set(e.data.kind, stereoBuffer(e.data, e.data.rate));
+      };
+      this.worker.onerror = () => this.dispose();
+    }
+    const kinds = Object.keys(WATER) as WaterKind[];
+    for (const kind of [first, ...kinds.filter((k) => k !== first)]) this.worker.postMessage({ kind, rate } satisfies WaterRequest);
+  }
+}
+
+function stereoBuffer(s: Stereo, rate: number): AudioBuffer {
+  const b = new AudioBuffer({ numberOfChannels: 2, length: s.left.length, sampleRate: rate });
+  b.copyToChannel(s.left as Float32Array<ArrayBuffer>, 0);
+  b.copyToChannel(s.right as Float32Array<ArrayBuffer>, 1);
+  return b;
 }
 
 function fadeTo(param: GainNode, value: number, t: number): void {
@@ -684,20 +785,6 @@ function chopBuffer(ac: AudioContext): AudioBuffer {
         i += Math.round((0.16 + r() * 0.08) * rate);
       }
       i += Math.round((0.4 + r() * 0.6) * rate);
-    }
-  });
-}
-
-/** Running water: rushing noise with a little flutter. */
-function waterBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(5);
-  return buffer(ac, 2, (d, rate) => {
-    let lp = 0;
-    for (let i = 0; i < d.length; i++) {
-      const w = r() * 2 - 1;
-      lp += (w - lp) * 0.35;
-      const flutter = 0.85 + 0.15 * Math.sin((2 * Math.PI * 7 * i) / rate) * Math.sin((2 * Math.PI * 0.5 * i) / rate);
-      d[i] = (lp * 0.8 + w * 0.2) * flutter;
     }
   });
 }
