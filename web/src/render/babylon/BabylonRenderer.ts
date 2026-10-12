@@ -1345,6 +1345,11 @@ export class BabylonRenderer implements Renderer {
     this.storey = k;
     this.storeyLayer?.position.set(0, k * WALL_HEIGHT, -this.rowOf(k));
     this.applyStoreys();
+    // The interior lights go to the storey now in view (also while a build is running, which skips the rebuild below).
+    if (this.lastWorld) {
+      this.placeRoomLights(this.lastWorld, this.view);
+      this.applyRoomLights();
+    }
     // Furniture and residents above it hide; the lot (every storey) is kept.
     if (this.lastWorld && !this.worldBuilding) void this.setWorld(this.lastWorld, this.view);
   }
@@ -2372,7 +2377,10 @@ export class BabylonRenderer implements Renderer {
       return !view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d);
     };
     const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
-    lights.sort((a, b) => this.storeyOf(a.z) - this.storeyOf(b.z));
+    // With few lights to go round, the storey in view gets them first, then the nearest below it
+    // (the sort is stable: within a storey, each room's first light still comes before any second).
+    const away = (z: number) => Math.abs(this.storeyOf(z) - this.storey);
+    lights.sort((a, b) => away(a.z) - away(b.z));
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];
       if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.rowOf(this.storeyOf(l.z)));
