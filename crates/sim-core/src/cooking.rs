@@ -786,13 +786,29 @@ pub(crate) struct Place<'a> {
 }
 
 impl Place<'_> {
-    /// A free spot for something of `radius` near `near` (within `range`): on an outdoor surface
-    /// first if `outdoor`, else any.
-    fn spot(&self, items: &Items, near: [f32; 2], range: f32, radius: f32, outdoor: bool) -> Option<SurfaceSpot> {
+    /// The room at `near` (None off the lot).
+    fn room_of(&self, near: [f32; 2]) -> Option<u16> {
+        let (x, z) = (near[0].floor() as i32, near[1].floor() as i32);
+        self.lot.in_bounds(x, z).then(|| self.lot.room_at(x, z))
+    }
+
+    /// Whether object `o` stands in `room` (None: anywhere).
+    fn in_room(&self, o: &ObjectInstance, room: Option<u16>) -> bool {
+        room.is_none_or(|r| self.lot.in_bounds(o.x, o.z) && self.lot.room_at(o.x, o.z) == r)
+    }
+
+    /// A free spot for something of `radius` near `near` (within `range`), on what stands in
+    /// `room` (None: anywhere): on an outdoor surface first if `outdoor`, then on a table, bar or
+    /// counter, else any.
+    fn spot(&self, items: &Items, near: [f32; 2], range: f32, radius: f32, outdoor: bool, room: Option<u16>) -> Option<SurfaceSpot> {
+        use crate::content::SurfaceKind;
         let occupied = items.occupancy(self.content);
+        let candidates: Vec<u32> = self.candidates.iter().copied().filter(|&o| self.in_room(&self.objects[o as usize], room)).collect();
+        let near_on = |candidates: &[u32], kinds: u8| {
+            surface::free_surface_spot_near(self.content, self.objects, candidates, near, range, kinds, radius, &occupied)
+        };
         if outdoor {
-            let outside: Vec<u32> = self
-                .candidates
+            let outside: Vec<u32> = candidates
                 .iter()
                 .copied()
                 .filter(|&o| {
@@ -801,15 +817,16 @@ impl Place<'_> {
                     self.lot.in_bounds(x, z) && self.lot.room_at(x, z) == crate::lot::OUTDOORS
                 })
                 .collect();
-            if let Some(s) = surface::free_surface_spot_near(self.content, self.objects, &outside, near, range, 0, radius, &occupied) {
+            if let Some(s) = near_on(&outside, 0) {
                 return Some(s);
             }
         }
-        surface::free_surface_spot_near(self.content, self.objects, self.candidates, near, range, 0, radius, &occupied)
+        let tops = SurfaceKind::Table.bit() | SurfaceKind::Bar.bit() | SurfaceKind::Counter.bit();
+        near_on(&candidates, tops).or_else(|| near_on(&candidates, 0))
     }
 
-    /// The nearest object that keeps food (a fridge).
-    fn store(&self, near: [f32; 2]) -> Option<&ObjectInstance> {
+    /// The nearest object in `room` (None: anywhere) that keeps food (a fridge).
+    fn store(&self, near: [f32; 2], room: Option<u16>) -> Option<&ObjectInstance> {
         let d = |o: &ObjectInstance| {
             let c = o.centre(self.content);
             (c[0] - near[0]).hypot(c[1] - near[1])
@@ -817,13 +834,15 @@ impl Place<'_> {
         self.candidates
             .iter()
             .map(|&o| &self.objects[o as usize])
-            .filter(|o| self.content.objects[o.def].stores)
+            .filter(|o| self.content.objects[o.def].stores && self.in_room(o, room))
             .min_by(|a, b| d(a).total_cmp(&d(b)))
     }
 
     /// Puts down what someone carries: food on a free surface near `near` (else in the fridge,
     /// else on the floor), dirty dishes on a surface or the floor; ingredients and bowls are
-    /// used up. `prefer` is a spot to try first. Returns the (first) item put down.
+    /// used up. A surface or fridge in the same room as `near` comes first (not one through the
+    /// wall that happens to be nearer). `prefer` is a spot to try first. Returns the (first) item
+    /// put down.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn put_down(
         &self,
@@ -841,17 +860,25 @@ impl Place<'_> {
         if !food && !def.dirty {
             return None;
         }
+        // In this room first, then anywhere.
+        let here = self.room_of(near);
+        let rooms = [here, None];
+        let rooms = &rooms[..if here.is_some() { 2 } else { 1 }];
         // Dirty things one by one (a stack of plates is so many plates).
         let count = if food { 1 } else { held.servings.max(1) };
         let mut first = None;
         for _ in 0..count {
-            let at = match prefer.take().or_else(|| self.spot(items, near, range, def.radius, outdoor)) {
-                Some(spot) => ItemAt::on(&spot),
-                None => match self.store(near).filter(|_| food) {
-                    Some(o) => ItemAt::Stored { x: o.x, z: o.z },
-                    None => ItemAt::Floor { x: 0, z: 0, offset: [0, 0] }.moved_to(near),
-                },
-            };
+            let at = prefer
+                .take()
+                .map(|spot| ItemAt::on(&spot))
+                .or_else(|| {
+                    rooms.iter().find_map(|&room| {
+                        self.spot(items, near, range, def.radius, outdoor, room).map(|spot| ItemAt::on(&spot)).or_else(|| {
+                            self.store(near, room).filter(|_| food).map(|o| ItemAt::Stored { x: o.x, z: o.z })
+                        })
+                    })
+                })
+                .unwrap_or_else(|| ItemAt::Floor { x: 0, z: 0, offset: [0, 0] }.moved_to(near));
             let id = items.add(ItemInstance {
                 id: 0,
                 def: held.def,
