@@ -48,6 +48,8 @@ export interface HouseTemplate {
   spawns: [number, number][];
   /** The storey above (generated two-storey houses), laid out like the ground. */
   upper?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] };
+  /** The basement (some generated houses), laid out like the ground under it: no windows, stairs standing in it come up inside the house. */
+  basement?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] };
   /** Generated houses: the rooms as planned (for checking them; the game finds rooms from the walls). */
   rooms?: PlannedRoom[];
 }
@@ -255,7 +257,7 @@ export function onLot(t: Templates, h: HouseTemplate, size: LotSize | undefined,
     windows: f.windows?.map((d) => ({ ...d, x: d.x + dx })),
     objects: f.objects.map((o) => ({ ...o, x: o.x + dx })).filter(inside),
   });
-  return { ...move(h), spawns: h.spawns.map(([x, z]) => [x + dx, z]), upper: h.upper && move(h.upper) };
+  return { ...move(h), spawns: h.spawns.map(([x, z]) => [x + dx, z]), upper: h.upper && move(h.upper), basement: h.basement && move(h.basement) };
 }
 
 /** A public place moved onto a lot of `size` like a house layout (`onLot`): centred across it, front kept at the street. */
@@ -618,6 +620,8 @@ export interface TownLayout {
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
   /** Storeys of the tallest house: storey `k`'s walls and objects are on rows `k * depth ..` (see `WorldStructure.storeys`). */
   storeys: number;
+  /** Whether a house has a basement: then basements are on the block of rows after the storeys', `storeys * depth ..`. */
+  basement: boolean;
 }
 
 /**
@@ -697,6 +701,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     const entry: [number, number] = spawn ? point(s, spawn) : [s.x + pw / 2, s.rotated ? s.z + pd - 1.5 : s.z + 1.5];
     return { name: s.name, x: s.x, z: s.z, w: pw, d: pd, public: s.kind !== 'house', entry, storeys: layoutOf(s)?.upper ? 2 : 1 };
   });
+  const storeys = Math.max(1, ...plots.map((p) => p.storeys));
+  let basement = false;
   for (const s of town.slots) {
     if (s.kind !== 'house') {
       const place = placeOf(s);
@@ -722,6 +728,12 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       shell(s, h.upper, town.depth);
       placeAll(s, h.upper.objects, town.depth);
     }
+    // The basement, on the rows after every storey's.
+    if (h.basement) {
+      shell(s, h.basement, storeys * town.depth);
+      placeAll(s, h.basement.objects, storeys * town.depth);
+      basement = true;
+    }
     // A garden path from the front door to the street.
     if (h.doors[0]) pathTo(s, h.doors[0]);
     // Neighbours get a driveway beside the house (the renderer parks a car on it); the player's
@@ -729,7 +741,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     const drive = s.index === playerSlot ? null : driveway(h, pw, pd, footprint);
     if (drive) paths.push(area(s, drive));
   }
-  return { walls, doors, windows, objects, paths, fields, plots, storeys: Math.max(1, ...plots.map((p) => p.storeys)) };
+  return { walls, doors, windows, objects, paths, fields, plots, storeys, basement };
 }
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
@@ -758,7 +770,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, plots, storeys } = layoutTown(content, t, town, playerSlot);
+  const { walls, doors, windows, objects, paths, fields, plots, storeys, basement } = layoutTown(content, t, town, playerSlot);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
   const point = (s: PlotSlot, [x, z]: [number, number]): [number, number] => {
     const { width: pw, depth: pd } = lotDims(t, s.lot);
@@ -813,5 +825,5 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
   // Residents leave town (for work) at both ends of every street.
   const exits = town.streets.flatMap((st) => [[0.5, st.z + st.d / 2], [town.width - 0.5, st.z + st.d / 2]]);
-  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, walls, doors, windows, objects, plots, households, sims, relationships, exits, meta });
+  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, meta });
 }

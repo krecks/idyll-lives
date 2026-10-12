@@ -34,7 +34,7 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateWorld, populate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, generateWorld, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
 
 const content = await Content.load(new URL('content/base.json', root).href);
@@ -55,9 +55,10 @@ for (const kind of WORLD_KINDS) {
     const file = JSON.parse(assembleTown(content, templates, town, player, home.index));
     worlds.push({ kind, seed, name: town.name, town: file });
     const farms = town.slots.filter((s) => s.lot === 'farm').length;
+    const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
     console.log(
       `${kind} ${seed}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.streets.length} street(s), ` +
-        `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}, ${town.households.length} households, ` +
+        `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
         `${file.sims.length} residents, ${file.objects.length} things`,
     );
   }
