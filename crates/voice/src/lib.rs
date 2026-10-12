@@ -1,22 +1,21 @@
 //! Resident voices (see `docs/design/voices.md`).
 //!
-//! Text goes through [`G2p`] (English to Misaki phonemes, a port of the rules of Misaki, the
-//! phonemizer Kokoro was trained with, without espeak-ng) and then through KittenTTS nano's
-//! tokenizer, [`KittenTokenizer`] (the phonemes turned into espeak-style IPA by
-//! [`misaki_to_espeak`]). The model runs in the browser with ONNX Runtime Web; its output is
-//! trimmed and resampled for the voice's size ([`resample`]), and given a track of mouth shapes
-//! ([`visemes`]). Nothing here touches the simulation.
+//! The model, Kyutai's Pocket TTS, reads plain text ([`plain_text`]) and speaks like a reference
+//! clip; it runs in the browser with ONNX Runtime Web. This crate shapes the sound around it
+//! ([`dsp`]: a resident's pitch and size put into the reference clip, their speed into each
+//! line, silence trimmed) and gives every line a track of mouth shapes ([`visemes`]) from its
+//! phonemes ([`G2p`]: English to Misaki phonemes, a port of Misaki's rules, without espeak-ng).
+//! Nothing here touches the simulation.
 
+pub mod dsp;
 mod g2p;
-mod kitten;
 mod lexicon;
 mod numbers;
 mod resample;
 mod rules;
 pub mod visemes;
 
-pub use g2p::G2p;
-pub use kitten::{KittenTokenizer, STYLE_ROWS, misaki_to_espeak, style_row};
+pub use g2p::{G2p, plain_text};
 pub use lexicon::Lexicon;
 pub use resample::resample;
 pub use visemes::VisemeTrack;
@@ -24,15 +23,15 @@ pub use visemes::VisemeTrack;
 /// The model's output rate (Hz).
 pub const SAMPLE_RATE: u32 = 24_000;
 
-/// How one resident sounds. Every field is a factor around 1.0 (the model's own voice).
+/// Shaping on top of a voice: in a reference clip ([`dsp::reference`]) or on a finished line.
+/// Every field is a factor around 1.0 (as it is).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VoiceParams {
     /// Speaking rate (durations are divided by it).
     pub speed: f32,
-    /// Multiplies the pitch curve.
+    /// Pitch, the formants kept.
     pub pitch: f32,
-    /// Size of the voice: scales the formants. Below 1 a larger voice (men), above 1 a smaller
-    /// one (children). Made by resampling, keeping pitch and speed.
+    /// Size of the voice: above 1 smaller (formants and pitch up together), below 1 larger.
     pub depth: f32,
 }
 
@@ -43,64 +42,52 @@ impl Default for VoiceParams {
 }
 
 impl VoiceParams {
-    /// Within what sounds right: speed 0.5–2, pitch 0.4–2, depth 0.75–1.3.
+    /// Within what sounds right: speed 0.5–2, pitch 0.5–2, depth 0.75–1.3.
     pub fn clamped(self) -> Self {
-        VoiceParams { speed: self.speed.clamp(0.5, 2.0), pitch: self.pitch.clamp(0.4, 2.0), depth: self.depth.clamp(0.75, 1.3) }
+        VoiceParams { speed: self.speed.clamp(0.5, 2.0), pitch: self.pitch.clamp(0.5, 2.0), depth: self.depth.clamp(0.75, 1.3) }
     }
 }
 
-/// What the model is run with for one line: `input_ids`, `speed` and `pitch` (already divided by
-/// the depth, see [`resample`]), the style row, and what to do with its output.
+/// One line for the model: the text it reads, the phonemes for its mouth shapes, and the voice
+/// to give its output (on top of the voice the model already speaks in).
 #[derive(Clone, Debug, PartialEq)]
-pub struct ModelInputs {
-    /// Phoneme ids with the model's ends; empty when there is nothing to say.
-    pub ids: Vec<i64>,
-    /// The model's `speed` and `pitch` inputs.
-    pub speed: f32,
-    pub pitch: f32,
-    /// Resample the model's output with this (1: leave it as it is).
-    pub depth: f32,
-    /// Which row of a voice's style table to use.
-    pub row: usize,
+pub struct LineInputs {
+    /// Plain text (pronunciation marks dropped); empty when there is nothing to say.
+    pub text: String,
     /// The line's Misaki phonemes (for its mouth shapes).
     pub phonemes: String,
+    pub voice: VoiceParams,
 }
 
-impl ModelInputs {
-    /// The model's output with its noisy tail and the silence around the speech dropped, turned
-    /// into the voice's size; and its mouth shapes, flat ([`VisemeTrack::flat`]).
+impl LineInputs {
+    /// The model's output with the silence around the speech dropped, at the line's pitch, size
+    /// and speed; and its mouth shapes, flat ([`VisemeTrack::flat`]).
     pub fn finish(&self, samples: &[f32]) -> (Vec<f32>, Vec<f32>) {
-        let samples = resample(kitten::trim(samples), self.depth);
+        let v = self.voice;
+        let samples = dsp::shape(dsp::trim(samples), v.pitch, v.depth, v.speed);
         let track = visemes::track(&self.phonemes, &samples, SAMPLE_RATE);
         (samples, track.flat())
     }
 }
 
-/// Phonemizer and tokenizer together: `inputs` turns a line of English into KittenTTS's inputs.
+/// The phonemizer: `line` turns a line of English into what the model and the mouth need.
 pub struct Engine {
     g2p: G2p,
-    kitten: KittenTokenizer,
 }
 
 impl Engine {
     pub fn new(g2p: G2p) -> Self {
-        Engine { g2p, kitten: KittenTokenizer::new() }
+        Engine { g2p }
     }
 
-    /// KittenTTS's inputs for a line: ids from the phonemes as espeak-style IPA, the style row
-    /// from the text's length, and the voice (speed, pitch and depth clamped to what sounds right).
-    pub fn inputs(&self, text: &str, voice: VoiceParams) -> ModelInputs {
-        let phonemes = self.g2p.phonemize(text);
-        let ipa = misaki_to_espeak(&phonemes);
-        let v = voice.clamped();
-        ModelInputs {
-            ids: self.kitten.ids(&ipa),
-            speed: (v.speed / v.depth).clamp(0.5, 2.0),
-            pitch: (v.pitch / v.depth).clamp(0.4, 2.0),
-            depth: v.depth,
-            row: style_row(text),
-            phonemes,
+    /// A line in a voice (clamped to what sounds right). The phonemes come from the marked-up
+    /// text, so a pronunciation fixed there shapes the mouth.
+    pub fn line(&self, text: &str, voice: VoiceParams) -> LineInputs {
+        let plain = plain_text(text);
+        if !plain.chars().any(char::is_alphanumeric) {
+            return LineInputs { text: String::new(), phonemes: String::new(), voice: VoiceParams::default() };
         }
+        LineInputs { text: plain, phonemes: self.g2p.phonemize(text), voice: voice.clamped() }
     }
 
     pub fn phonemize(&self, text: &str) -> String {

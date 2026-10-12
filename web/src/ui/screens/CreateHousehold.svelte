@@ -29,8 +29,9 @@
   import { services } from '../services';
   import { settings } from '../../settings/settings.svelte';
   import { playClip, type Playing } from '../../voice/player';
-  import { DOWNLOAD_MB, speak, unloadVoice, voiceStatus } from '../../voice/service.svelte';
-  import { baseVoice, childVoice, KITTEN_VOICES, VOICE_RANGE, voiceFor } from '../../voice/voices';
+  import { DOWNLOAD_MB, speak, unloadVoice, useRecording, voiceStatus } from '../../voice/service.svelte';
+  import { canRecord, MAX_SECONDS, MIN_SECONDS, recordFile, recordMicrophone, type Recorder } from '../../voice/record';
+  import { childVoice, chosenPreset, chosenRecording, presetsFor, VOICE_RANGE, voiceFor, type Recording } from '../../voice/voices';
 
   const { content, assets } = services;
   const rules = content.rules;
@@ -152,22 +153,97 @@
   // Voice: a sample line in the resident's own voice at their age (a baby's as the child they'll be).
   const voice = $derived(sim.appearance.voice);
   const voiceChanged = $derived(
-    (voice?.pitch ?? 1) !== 1 || (voice?.speed ?? 1) !== 1 || (voice?.depth ?? 1) !== 1 || baseVoice(voice) !== null,
+    (voice?.pitch ?? 1) !== 1 || (voice?.speed ?? 1) !== 1 || (voice?.depth ?? 1) !== 1 || (voice?.expressive ?? 1) !== 1 || chosenPreset(voice) !== null,
   );
   const isBaby = $derived(!!content.stageOf(sim.age)?.baby);
-  /** Teens and grown-ups speak with KittenTTS's voices as they are; children with a child's mix of them. */
+  /** Teens and grown-ups speak like one of the bundled voices (or their recording); children with a child's voice. */
   const voiceStage = $derived(isBaby ? content.lifeStages.find((s) => !s.baby)?.id : content.stageOf(sim.age)?.id);
   const grownVoice = $derived(!childVoice(voiceStage));
-  /** The voices offered: the four that fit the gender (all eight for others), besides their own mix. */
-  const voiceOptions = $derived(
-    KITTEN_VOICES.flatMap((v, i) => ((sim.gender !== 'male' && sim.gender !== 'female') || v.sex === sim.gender ? [{ index: i, name: v.name }] : [])),
-  );
-  function chooseVoice(index: number | null) {
+  /** The voices offered: the bundled ones that fit the gender (all for others), besides their own. */
+  const voiceOptions = $derived(presetsFor(sim.gender));
+  const recording = $derived(chosenRecording(voice));
+  /** Which voice is chosen: their recording, a bundled voice, or their own generated one (null). */
+  const chosen = $derived(recording ? 'recording' : chosenPreset(voice));
+  function chooseVoice(name: string | null) {
     const v = draftVoice(sim);
-    if (index === null) delete v.base;
-    else v.base = index;
+    if (name === null) delete v.preset;
+    else v.preset = name;
+    // Choosing a bundled voice sets the recording aside (removed only on purpose).
+    if (name !== null && v.recording) {
+      setAside = v.recording;
+      delete v.recording;
+    }
     // Heard at once (a child's choice is for later: they still sound like a child).
     if (grownVoice) void hear();
+  }
+  /** A recording set aside by choosing another voice, until the creator closes. */
+  let setAside = $state.raw<Recording | null>(null);
+  function useOwnRecording() {
+    if (!setAside) return;
+    draftVoice(sim).recording = setAside;
+    setAside = null;
+    if (grownVoice) void hear();
+  }
+
+  // The player's own voice: recorded with the microphone, or from a sound file.
+  let recorder = $state.raw<Recorder | null>(null);
+  let recordLevel = $state(0);
+  let recordSeconds = $state(0);
+  let recordNote = $state('');
+  let converting = $state(false);
+  let meter = 0;
+  async function startRecording() {
+    recordNote = '';
+    try {
+      const r = await recordMicrophone();
+      recorder = r;
+      const tick = () => {
+        if (recorder !== r) return;
+        recordLevel = r.level();
+        recordSeconds = r.seconds();
+        meter = requestAnimationFrame(tick);
+      };
+      tick();
+      const { recording: rec, seconds } = await r.done;
+      cancelAnimationFrame(meter);
+      recorder = null;
+      keepRecording(rec, seconds);
+    } catch (err) {
+      recorder = null;
+      recordNote = err instanceof DOMException && err.name === 'NotAllowedError' ? 'The microphone is blocked: allow it in the browser to record.' : `Couldn't record: ${String(err instanceof Error ? err.message : err)}`;
+    }
+  }
+  async function loadSound(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    recordNote = '';
+    converting = true;
+    try {
+      keepRecording(await recordFile(file, (s) => (recordSeconds = s)), MAX_SECONDS);
+    } catch (err) {
+      recordNote = `Couldn't use that sound: ${String(err instanceof Error ? err.message : err)}`;
+    } finally {
+      converting = false;
+    }
+  }
+  function keepRecording(rec: Recording, seconds: number) {
+    if (seconds < MIN_SECONDS) {
+      recordNote = `That was a bit short: say a few sentences, ${MIN_SECONDS} to ${MAX_SECONDS} seconds.`;
+      return;
+    }
+    const v = draftVoice(sim);
+    v.recording = rec;
+    setAside = null;
+    // As it is: their own voice, not moved.
+    v.pitch = v.depth = 1;
+    if (grownVoice) void hear();
+  }
+  function removeRecording() {
+    const v = draftVoice(sim);
+    delete v.recording;
+    setAside = null;
   }
   let hearing = $state(false);
   let heard = false;
@@ -183,15 +259,18 @@
         ? 'Resident voices are off in Settings → Audio: turn them on to hear residents in the game.'
         : `Resident voices are off in Settings → Audio. Hearing a sample downloads the voice once (about ${Math.round(DOWNLOAD_MB)} MB).`;
     }
-    if (!grownVoice) return 'Children have a child’s voice: the voice chosen above is theirs from their teens. Pitch, speed and depth apply now.';
+    if (!grownVoice) return 'Children have a child’s voice: the voice chosen above is theirs from their teens. Pitch, speed, depth and expression apply now.';
     return 'Voices change as residents grow up; this choice goes along.';
   });
 
   async function hear() {
-    const params = voiceFor(0, sim.gender, voiceStage, $state.snapshot(draftVoice(sim)));
+    const choice = $state.snapshot(draftVoice(sim));
+    const params = voiceFor(0, sim.gender, voiceStage, choice);
     const name = sim.name.trim();
     hearing = heard = true;
     try {
+      const rec = chosenRecording(choice);
+      if (rec && params.clip.startsWith('rec:')) await useRecording(rec);
       const clip = await speak(name ? `Hi, I'm ${name}! This is how I sound.` : 'Hi! This is how I sound.', params);
       playing?.stop();
       const p = (playing = playClip(clip.samples));
@@ -215,11 +294,15 @@
     voice.pitch = 1;
     voice.speed = 1;
     voice.depth = 1;
+    voice.expressive = 1;
+    delete voice.preset;
     delete voice.base;
   }
 
   // Hearing a sample doesn't turn voices on: with them off, the engine goes again on the way out.
   onDestroy(() => {
+    recorder?.stop();
+    cancelAnimationFrame(meter);
     playing?.stop();
     if (heard && !settings.voices) unloadVoice();
   });
@@ -447,20 +530,56 @@
           <div class="field">
             <span class="eyebrow">Voice</span>
             <div class="chips-row" role="radiogroup" aria-label="Voice">
+              {#if recording}
+                <button class="pill" role="radio" aria-checked="true" class:on={true} title="Their own voice, from your recording">Recording</button>
+              {:else if setAside}
+                <button class="pill" role="radio" aria-checked="false" title="Back to your recording" onclick={useOwnRecording}>Recording</button>
+              {/if}
               <button
                 class="pill"
                 role="radio"
-                aria-checked={baseVoice(voice) === null}
-                class:on={baseVoice(voice) === null}
-                title="A mix of two voices that is {sim.name.trim() || 'theirs'} alone"
-                onclick={() => chooseVoice(null)}>Own mix</button
+                aria-checked={chosen === null}
+                class:on={chosen === null}
+                title="A voice that is {sim.name.trim() || 'theirs'} alone"
+                onclick={() => {
+                  if (recording) removeRecording();
+                  chooseVoice(null);
+                }}>Own</button
               >
-              {#each voiceOptions as o (o.index)}
-                <button class="pill" role="radio" aria-checked={baseVoice(voice) === o.index} class:on={baseVoice(voice) === o.index} onclick={() => chooseVoice(o.index)}
-                  >{o.name}</button
-                >
+              {#each voiceOptions as name (name)}
+                <button class="pill" role="radio" aria-checked={chosen === name} class:on={chosen === name} onclick={() => chooseVoice(name)}>{name}</button>
               {/each}
             </div>
+            <div class="row record">
+              {#if recorder}
+                <button class="btn" onclick={() => recorder?.stop()}>
+                  <Icon name="icon.ui.pause" size={18} />
+                  Stop ({Math.max(0, MAX_SECONDS - recordSeconds).toFixed(0)} s)
+                </button>
+                <span class="level" aria-hidden="true"><span style:width="{Math.round(recordLevel * 100)}%"></span></span>
+              {:else}
+                <button class="btn" disabled={converting || !canRecord()} title={canRecord() ? 'Record a voice with the microphone' : 'This browser can’t record'} onclick={startRecording}>
+                  <Icon name="icon.ui.voice" size={18} />
+                  {recording ? 'Record again' : 'Record a voice'}
+                </button>
+                <label class="btn" class:disabled={converting} title="Use a sound file of someone speaking">
+                  <Icon name="icon.ui.load" size={18} />
+                  {converting ? `Reading… ${recordSeconds.toFixed(0)} s` : 'Load a sound'}
+                  <input type="file" accept="audio/*" hidden disabled={converting} onchange={loadSound} />
+                </label>
+                {#if recording}
+                  <button class="btn" aria-label="Remove the recording" title="Remove the recording" onclick={removeRecording}>
+                    <Icon name="icon.ui.close" size={18} />
+                  </button>
+                {/if}
+              {/if}
+            </div>
+            <span class="hint small">
+              {recorder
+                ? `Speak naturally for ${MIN_SECONDS}–${MAX_SECONDS} seconds: a few sentences in the voice you want.`
+                : 'Only use your own voice, or the voice of someone who agreed to it. The recording stays on this computer and in your saves.'}
+            </span>
+            {#if recordNote}<span class="hint small">{recordNote}</span>{/if}
             <label class="slider">
               <input
                 type="range"
@@ -494,6 +613,17 @@
                 bind:value={() => 2 - (voice?.depth ?? 1), (v) => (draftVoice(sim).depth = Math.round((2 - v) * 100) / 100)}
               />
               <span class="scale"><span>Smaller</span><b>Depth</b><span>Larger</span></span>
+            </label>
+            <label class="slider">
+              <input
+                type="range"
+                aria-label="Expression"
+                min={VOICE_RANGE.expressive[0]}
+                max={VOICE_RANGE.expressive[1]}
+                step="0.05"
+                bind:value={() => voice?.expressive ?? 1, (v) => (draftVoice(sim).expressive = v)}
+              />
+              <span class="scale"><span>Calmer</span><b>Expression</b><span>Livelier</span></span>
             </label>
             <div class="row">
               <button class="btn hear" disabled={hearing} onclick={hear}>
@@ -907,6 +1037,29 @@
   .row {
     display: flex;
     gap: 8px;
+  }
+  .row.record {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  label.btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  /* How loud the microphone is while recording. */
+  .level {
+    flex: 1;
+    min-width: 80px;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-muted);
+    overflow: hidden;
+  }
+  .level > span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 60ms linear;
   }
   .row .input {
     flex: 1;

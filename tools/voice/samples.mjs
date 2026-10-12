@@ -26,10 +26,7 @@ const versions = (versionArgs.length ? versionArgs : [`after=${new URL('src/voic
   return { label, path: resolve(path) };
 });
 
-/**
- * Ids chosen so the grown-ups' mixes all differ (`voiceFor`'s hash): each man and woman leads
- * with another of KittenTTS's voices. Any other id gets some other mix.
- */
+/** A spread of residents (`voiceFor`'s hash picks each one's bundled voice, pitch, depth and speed). */
 const RESIDENTS = [
   { name: 'man-1', id: 1, gender: 'male', stage: 'adult' },
   { name: 'man-2', id: 2, gender: 'male', stage: 'adult' },
@@ -51,7 +48,8 @@ const SR = 24000;
 const e = await engine();
 
 const say = (text, v) => sayLine(e, text, v);
-const describe = (v) => `${voices.KITTEN_VOICES[v.mix[0]].name}${v.mix[2] < 1 ? ` ${Math.round(v.mix[2] * 100)} % + ${voices.KITTEN_VOICES[v.mix[1]].name}` : ''}`;
+const describe = (v) =>
+  `${v.clip.replace(/^preset:/, '')} (clip ${v.clipPitch.toFixed(2)}/${v.clipDepth.toFixed(2)}, line ${v.pitch.toFixed(2)}/${v.depth.toFixed(2)}, speed ${v.speed.toFixed(2)}, expression ${v.temperature.toFixed(2)})`;
 
 function wav(samples) {
   const peak = samples.reduce((m, v) => Math.max(m, Math.abs(v)), 1e-6);
@@ -67,6 +65,8 @@ function wav(samples) {
   buf.writeUInt32LE(SR * 2, 28);
   buf.writeUInt16LE(2, 32);
   buf.writeUInt16LE(16, 34);
+  buf.write('data', 36);
+  buf.writeUInt32LE(samples.length * 2, 40);
   samples.forEach((v, i) => buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v * gain)) * 32767), 44 + i * 2));
   return buf;
 }

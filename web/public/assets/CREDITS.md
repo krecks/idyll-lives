@@ -71,16 +71,23 @@ The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, street
 
 ## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
 
-Unlike the art above, these are **Apache-2.0** (attribution required). They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
+Unlike the art above, these are **CC BY 4.0** and **Apache-2.0** (attribution required), and CC0. They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
 
 | File | Source | Authors | URL | Licence |
 |---|---|---|---|---|
-| `kitten-nano-0.8-edit2.onnx`, `kitten-nano-0.8-voices.f32` | KittenTTS nano 0.8 (fp32 ONNX `kitten_tts_nano_v0_8.onnx` and `voices.npz`, revision `7a1db645`); **modified** (see below) | KittenML (Stellon Labs) | https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32, https://github.com/KittenML/KittenTTS | Apache-2.0 |
+| `pocket-en-2026-04/*.onnx`, `bundle.json`, `bos_before_voice.npy` | Pocket TTS, English bundle `english_2026-04`, ONNX export (int8: `flow_lm_main_int8`, `flow_lm_flow_int8`, `mimi_decoder_int8`, `mimi_encoder_int8`, `text_conditioner_int8`; revision `58a6d00c`), **unchanged** | Kyutai (model); KevinAHM (ONNX export) | https://huggingface.co/kyutai/pocket-tts, https://huggingface.co/KevinAHM/pocket-tts-onnx, https://github.com/kyutai-labs/pocket-tts | CC BY 4.0 |
+| `pocket-en-2026-04/tokenizer.json` | Pocket TTS's English tokenizer (revision `575d1437`), unchanged | Kyutai | https://huggingface.co/kyutai/pocket-tts-without-voice-cloning | CC BY 4.0 |
+| `presets-2.pcm`, `presets-2.json` | 24 voice clips from Kyutai's voice repository (revision `323332d3`), each **modified**: resampled to 24 kHz, the silence around it trimmed, cut to 10 s, its loudness evened out (`crates/voice/src/dsp.rs`, `clip`), packed as 16-bit samples | see below | https://huggingface.co/kyutai/tts-voices | CC BY 4.0, CC0 |
 | `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 |
 
-**Changes to KittenTTS nano 0.8:** `kitten-nano-0.8-edit2.onnx` is the upstream `kitten_tts_nano_v0_8.onnx` changed by `tools/voice/model.mjs`: the large float weights of its convolutions, matrix products and LSTMs are stored as int8 with a float scale per output channel (`DequantizeLinear` turns them back into floats, so the arithmetic stays float but the values are rounded); an added `pitch` input multiplies the predicted pitch curve; and its two random-number nodes (`RandomNormalLike`, `RandomUniformLike`) are replaced by a deterministic hash of each value's position. `kitten-nano-0.8-voices.f32` holds the first 128 style rows of its eight voices from `voices.npz`, as raw floats, unchanged. KittenTTS's input (espeak-style phonemes and its symbol table) is rebuilt in `crates/voice/src/kitten.rs` from our phonemizer; its own code and espeak-ng are not used.
+**The bundled voices** (names as the game shows them; the list is `PRESETS` in `web/src/voice/voices.ts`):
 
-The phonemizer in `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used.
+- From the **VCTK corpus** (CSTR Voice Cloning Toolkit, Centre for Speech Technology Research, University of Edinburgh; https://datashare.ed.ac.uk/handle/10283/3443), CC BY 4.0, sentence 23 of each speaker as enhanced by Kyutai: Anna (p228), Azelma (p303), Eponine (p262), Eve (p361), Fantine (p244), Iris (p225), Jane (p339), Lucy (p253), Mary (p333), Nora (p236), Vera (p229), Charles (p254), Felix (p243), George (p315), Hugo (p232), Leon (p251), Michael (p360), Oscar (p270), Owen (p226), Paul (p259).
+- From **Voice-Zero** (a selection of LibriVox recordings, https://github.com/OwenTyme/voice-zero), CC0: Caro (Caro Davy), Bill (Bill Boerst), Peter (Peter Yearsley), Stuart (Stuart Bell).
+
+**Players' own voices.** A voice a player records (or loads from a sound file) in the household creator stays in their browser and in their saves; Pocket TTS speaks like it. Kyutai's terms forbid cloning a voice without its owner's explicit and lawful consent, so the creator asks for the player's own voice or that of someone who agreed.
+
+Our own code reads the text plain for the model and phonemizes it only for the mouth shapes: `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used. Pitch, size and speed are shaped around the model in `crates/voice/src/dsp.rs` (our own TD-PSOLA); the model's noise comes from our own hash in `web/src/voice/pocket.ts`.
 
 The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebAssembly build `ort-wasm-simd-threaded.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
 

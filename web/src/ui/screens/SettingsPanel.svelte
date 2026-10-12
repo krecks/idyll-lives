@@ -81,7 +81,7 @@
   const modelStatus = $derived.by(() => {
     if (voiceStatus.state === 'loading') return `Downloading… ${Math.round(voiceStatus.progress * 100)} %`;
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
-    return `KittenTTS nano, on the CPU: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
+    return `Kyutai's Pocket TTS, on this computer: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
   });
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {
@@ -519,7 +519,7 @@
             <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Voice volume" bind:value={settings.voiceVolume} />
             <output>{percent(settings.voiceVolume)}</output>
           </SettingRow>
-          <SettingRow title="Voice model" hint={modelStatus} details="Eight voices mixed for each resident, raised and made smaller for children.">
+          <SettingRow title="Voice model" hint={modelStatus} details="Speaks like a short recording: 24 voices to start from, each resident with their own pitch, depth and speed, children higher and smaller; or a voice you record in the household creator. Pocket TTS is © Kyutai, CC BY 4.0.">
             {#if voiceStatus.state === 'loading'}
               <Busy label="Downloading the voices" progress={voiceStatus.progress} />
             {:else}

@@ -55,7 +55,7 @@
       {@const v = t.voice}
       <h4>Voice thread</h4>
       <div><span>Language</span><b>{v.language}</b></div>
-      <div><span>Engine</span><b>KittenTTS {v.state}{v.loadMs ? ` · loaded in ${(v.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
+      <div><span>Engine</span><b>Pocket TTS {v.state} · {v.device.toUpperCase()}{v.device === 'cpu' ? `, ${v.threads} thread${v.threads === 1 ? '' : 's'}` : ''}{v.loadMs ? ` · loaded in ${(v.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
       {#if v.state === 'ready'}
         <div><span>Lines made</span><b>{v.lines}{v.queued ? ` · ${v.queued} queued` : ''}</b></div>
         {#if v.lines}

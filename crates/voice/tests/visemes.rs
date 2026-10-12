@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use voice::visemes::{self, SIL, VISEMES, VisemeTrack};
-use voice::{G2p, Lexicon, ModelInputs, SAMPLE_RATE};
+use voice::{G2p, LineInputs, Lexicon, SAMPLE_RATE, VoiceParams};
 
 const RATE: f32 = SAMPLE_RATE as f32;
 
@@ -138,10 +138,9 @@ fn flat_layout() {
 
 #[test]
 fn finish_returns_the_clip_and_its_track() {
-    // As the model gives it: lead-in silence, speech, silence and the noisy 5000-sample tail.
-    let mut model = signal(&[(0.4, false), (0.9, true), (0.3, false)]);
-    model.extend(vec![0.2; 5000]);
-    let inputs = ModelInputs { ids: vec![0, 50, 10, 0], speed: 1.0, pitch: 1.0, depth: 1.2, row: 3, phonemes: "hˈI ðˈɛɹ!".into() };
+    // As the model gives it: lead-in silence, speech, silence.
+    let model = signal(&[(0.4, false), (0.9, true), (0.3, false)]);
+    let inputs = LineInputs { text: "Hi there!".into(), phonemes: "hˈI ðˈɛɹ!".into(), voice: VoiceParams { speed: 1.2, ..Default::default() } };
     let (samples, flat) = inputs.finish(&model);
     let t = VisemeTrack::from_flat(&flat).unwrap();
     assert_eq!(t.energy.len(), samples.len().div_ceil(240));

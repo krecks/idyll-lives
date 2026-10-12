@@ -1,35 +1,37 @@
 #!/usr/bin/env node
 /**
- * Checks the voices as the browser makes them (`engine.mjs`: our phonemizer WASM, ONNX Runtime
- * Web's WASM build on one thread, the worker's own `synth.ts`), with KittenTTS nano:
+ * Checks the voices as the browser makes them (`engine.mjs`: our voice WASM, ONNX Runtime Web's
+ * WASM build, the worker's own `pocket.ts`), with Pocket TTS:
  *
  * - the same text and voice give bit-identical samples, in one session and in a fresh one (the
  *   clip cache in `web/src/voice/service.svelte.ts` relies on it), and match golden hashes (a
- *   change to the model, its edit, the phonemizer or the mixing shows up here);
- * - the voice controls work: pitch changes the sound but not the timing, speed the length,
- *   depth the brightness; mixes differ from their voices; silence is trimmed;
+ *   change to the model, the noise, the shaping or the phonemizer shows up here);
+ * - the voice controls work: pitch on a line changes the sound but not the timing, speed the
+ *   length, depth the brightness; pitch put into the clip moves the voice the model speaks in;
+ *   expressiveness changes the samples; silence is trimmed;
  * - and prints the time per line.
  *
- * Needs `pnpm voice` first. Usage (from web/): `pnpm check:voice`.
+ * Needs `pnpm voice` first. Usage (from web/): `pnpm check:voice` (`VOICE_THREADS=4` to try threads).
  */
 
 import { createHash } from 'node:crypto';
-import { SAMPLE_RATE, engine, say } from './engine.mjs';
+import { SAMPLE_RATE, engine, medianPitch, phonemizer, prepareVoice, synthesizeLine } from './engine.mjs';
 
 const LINES = [
   'Hello there!',
   "I'm so hungry, I could eat a whole pizza by myself.",
   'What a lovely garden. I should water the roses before it gets dark.',
 ];
-/** Bruno (one of KittenTTS's men), and a mix of Luna and Rosie (two women). */
-const BRUNO = { mix: [5, 5, 1], speed: 1, pitch: 1, depth: 1 };
-const MIX = { mix: [1, 2, 0.6], speed: 1.05, pitch: 1.02, depth: 0.98 };
+const plain = { clipPitch: 1, clipDepth: 1, pitch: 1, depth: 1, speed: 1, temperature: 0.7 };
+/** Charles (one of the men), and Anna (a woman) as a child would sound. */
+const CHARLES = { ...plain, clip: 'preset:Charles' };
+const CHILD = { ...plain, clip: 'preset:Anna', clipPitch: 1.2, clipDepth: 1.08, pitch: 1.03, depth: 1.01, speed: 1.04, temperature: 0.62 };
 /**
- * KittenTTS's output for `LINES` in `BRUNO`, then line 2 in `MIX` (SHA-256, first 12 hex digits).
- * WASM arithmetic is the same on every machine, so these hold everywhere; update them only on
- * purpose (a new model, edit, phonemizer rule or mixing).
+ * Pocket TTS's output for `LINES` in `CHARLES`, then line 2 as `CHILD` (SHA-256, first 12 hex
+ * digits). WASM arithmetic is the same on every machine, so these hold everywhere; update them
+ * only on purpose (a new model, noise, shaping or phonemizer rule).
  */
-const GOLDEN = ['ee17e172d952', '61899b6ba874', '848017ba7531', 'fb4a29635bcf'];
+const GOLDEN = ['85cedf692337', '9f04fb79f73a', '854d44ca42c7', 'dc9eb65ad122'];
 
 const hash = (a) => createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 12);
 const same = (a, b) => a.length === b.length && Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
@@ -67,35 +69,9 @@ function centroid(x) {
   return sum / count;
 }
 
-/** Median pitch (Hz) of the loud frames, by normalised autocorrelation. */
-function pitch(x) {
-  const n = 960;
-  const level = rms(x);
-  const found = [];
-  for (let i = 0; i + n + 400 < x.length; i += 480) {
-    let e = 0;
-    for (let k = 0; k < n; k++) e += x[i + k] ** 2;
-    if (Math.sqrt(e / n) < level) continue;
-    let best = 0;
-    let lag = 0;
-    for (let L = 48; L < 400; L++) {
-      let c = 0;
-      let e2 = 0;
-      for (let k = 0; k < n; k++) {
-        c += x[i + k] * x[i + k + L];
-        e2 += x[i + k + L] ** 2;
-      }
-      c /= Math.sqrt(e * e2) + 1e-9;
-      if (c > best) [best, lag] = [c, L];
-    }
-    if (best > 0.8) found.push(SAMPLE_RATE / lag);
-  }
-  found.sort((a, b) => a - b);
-  return found[found.length >> 1] ?? 0;
-}
-
 const first = await engine();
 const second = await engine();
+const say = async (e, text, voice) => (await synthesizeLine(e, text, voice)).samples;
 
 /** Same samples twice in one engine and once in a fresh one; prints the time. */
 async function steady(label, line, voice) {
@@ -112,35 +88,44 @@ async function steady(label, line, voice) {
   return a;
 }
 
+// Preparing a voice (shaping its clip, encoding it, feeding it to the model), then reusing it.
+const prep = await prepareVoice(first, CHARLES);
+if (!(prep.ms > 0)) fail('preparing a new voice should take time');
+if ((await prepareVoice(first, CHARLES)).ms !== 0) fail('a prepared voice should be kept');
+console.log(`voice: preparing a voice took ${prep.ms.toFixed(0)} ms (kept after that)`);
+
 const line = LINES[1];
 const got = [];
-for (const l of LINES) got.push(await steady('KittenTTS', l, BRUNO));
-got.push(await steady('KittenTTS mix', line, MIX));
+for (const l of LINES) got.push(await steady('Pocket TTS', l, CHARLES));
+got.push(await steady('Pocket TTS child', line, CHILD));
 const hashes = got.map(hash);
-if (GOLDEN.some((g, i) => g !== hashes[i])) fail(`KittenTTS: samples changed: [${hashes.join(', ')}], expected [${GOLDEN.join(', ')}] (update GOLDEN only on purpose)`);
-console.log('voice: KittenTTS: matches the golden samples');
+if (GOLDEN.some((g, i) => g !== hashes[i])) fail(`Pocket TTS: samples changed: [${hashes.join(', ')}], expected [${GOLDEN.join(', ')}] (update GOLDEN only on purpose)`);
+console.log('voice: Pocket TTS: matches the golden samples');
 
-const kBase = got[1];
-const kLow = await say(first, line, { ...BRUNO, pitch: 0.85 });
-const kFast = await say(first, line, { ...BRUNO, speed: 1.25 });
-const [p0, p1] = [pitch(kBase), pitch(kLow)];
-if (same(kLow, kBase) || !(p1 < p0 * 0.93)) fail(`KittenTTS: pitch 0.85 should lower the pitch (${p0.toFixed(0)} Hz to ${p1.toFixed(0)} Hz)`);
-if (Math.abs(kLow.length - kBase.length) > 0.05 * kBase.length) fail('KittenTTS: pitch should not change the timing');
-if (!(kFast.length < kBase.length * 0.9)) fail('KittenTTS: a faster voice should be shorter');
-const kLarge = await say(first, line, { ...BRUNO, depth: 0.88 });
-if (!(centroid(kLarge) < centroid(kBase) * 0.97)) fail('KittenTTS: a larger voice should sound darker');
-// Depth (the voice's size, by resampling): deterministic too, and keeps the length.
-for (const depth of [0.88, 1.1]) {
-  const a = await say(first, line, { ...BRUNO, depth });
-  const b = await say(second, line, { ...BRUNO, depth });
-  if (!same(a, b)) fail(`KittenTTS: depth ${depth} differs between sessions`);
-  const ratio = a.length / kBase.length;
-  if (ratio < 0.94 || ratio > 1.06) fail(`KittenTTS: depth ${depth} changed the length by ${ratio.toFixed(3)}`);
-}
-if (first.phonemizer.inputs('', 1, 1, 1).ids.length !== 0) fail('empty text should give no ids (the worker then skips the model)');
-const luna = await say(first, line, { ...MIX, mix: [1, 1, 1] });
-if (same(luna, got[3])) fail('KittenTTS: a mix should differ from its main voice');
-// Trimmed: speech starts within 0.1 s (the model's own clips start with up to 0.8 s of silence).
-const onset = kBase.findIndex((v) => Math.abs(v) > 0.05 * kBase.reduce((m, x) => Math.max(m, Math.abs(x)), 0));
-if (onset > 0.1 * SAMPLE_RATE) fail(`KittenTTS: speech starts after ${(onset / SAMPLE_RATE).toFixed(2)} s: silence not trimmed`);
-console.log(`voice: KittenTTS: pitch (${p0.toFixed(0)} to ${p1.toFixed(0)} Hz at x0.85), speed, depth and mixes work; speech starts at ${(onset / SAMPLE_RATE).toFixed(2)} s`);
+const base = got[1];
+const low = await say(first, line, { ...CHARLES, pitch: 0.85 });
+const fast = await say(first, line, { ...CHARLES, speed: 1.25 });
+const [p0, p1] = [medianPitch(base), medianPitch(low)];
+if (same(low, base) || !(p1 < p0 * 0.93)) fail(`pitch 0.85 should lower the pitch (${p0.toFixed(0)} Hz to ${p1.toFixed(0)} Hz)`);
+if (Math.abs(low.length - base.length) > 0.05 * base.length) fail('pitch should not change the timing');
+if (!(fast.length < base.length * 0.85)) fail('a faster voice should be shorter');
+// Depth on a clear voice (Charles is low and creaky: few grains to move).
+const anna = await say(first, line, { ...CHARLES, clip: 'preset:Anna' });
+const large = await say(first, line, { ...CHARLES, clip: 'preset:Anna', depth: 0.88 });
+if (!(centroid(large) < centroid(anna) * 0.95)) fail(`a larger voice should sound darker (${centroid(anna).toFixed(0)} Hz to ${centroid(large).toFixed(0)} Hz)`);
+if (Math.abs(large.length - anna.length) > 0.05 * anna.length) fail('depth should not change the timing');
+// Pitch put into the clip: the model speaks higher.
+const annaHigh = await say(first, line, { ...CHARLES, clip: 'preset:Anna', clipPitch: 1.2 });
+const [a0, a1] = [medianPitch(anna), medianPitch(annaHigh)];
+if (!(a1 > a0 * 1.08)) fail(`clip pitch 1.2 should raise the voice (${a0.toFixed(0)} Hz to ${a1.toFixed(0)} Hz)`);
+const lively = await say(first, line, { ...CHARLES, temperature: 1 });
+if (same(lively, base)) fail('expressiveness should change the samples');
+if (phonemizer.line('…', 1, 1, 1).text !== '') fail('text without words should give nothing to say (the worker then skips the model)');
+if ((await say(first, '', CHARLES)).length !== 0) fail('empty text should give no samples');
+// Trimmed: speech starts within 0.1 s.
+const peak = base.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
+const onset = base.findIndex((v) => Math.abs(v) > 0.05 * peak);
+if (onset > 0.1 * SAMPLE_RATE) fail(`speech starts after ${(onset / SAMPLE_RATE).toFixed(2)} s: silence not trimmed`);
+console.log(
+  `voice: Pocket TTS: line pitch (${p0.toFixed(0)} to ${p1.toFixed(0)} Hz at x0.85), clip pitch (${a0.toFixed(0)} to ${a1.toFixed(0)} Hz at x1.2), speed, depth and expressiveness work; speech starts at ${(onset / SAMPLE_RATE).toFixed(2)} s`,
+);

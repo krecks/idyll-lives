@@ -1,17 +1,559 @@
 # Resident voices
 
-*Plan for residents speaking their thoughts and conversations out loud. Status (0.1.0,
-2026-10-10): resident voices ship in 0.1.0 as an experimental setting. Phases 1–4 are in, with
-the guards of phase 6 that don't need Auto mode (see "Built so far"); the hand-written engine
-(phase 5) and Auto mode are next. Version numbers 0.14–0.20 below are the development builds
-before 0.1.0: Babble, a made-up language (0.14–0.19), was removed in 0.20, where residents began
-to speak English or not at all; since 0.20 the model runs on ONNX Runtime Web instead of `tract`
-(about twice as fast). In 0.20 children spoke with Paradee-8M, which was also the fallback when
-KittenTTS was too slow; for 0.1.0 Paradee was removed, and **KittenTTS nano** (eight real men's
-and women's voices, mixed per resident) speaks for everyone, children included. Our own engine
-may replace the runtime later. Measurements and research behind the choices are at the end.*
+*Plan for residents speaking their thoughts and conversations out loud. Status (2026-10-12,
+after 0.1.0): residents speak with **Kyutai's Pocket TTS**, which speaks like a short reference
+clip, so a voice is something a player can shape: one of 24 bundled voices, pitch, depth, speed
+and expression, or their own recording, all in the household creator. It replaced KittenTTS nano
+(0.20 to 0.1.0; see "History"). Phases 1–4 are in, with the guards of phase 6 that don't need
+Auto mode; Auto mode is next. Measurements and research behind the choices are at the end.*
 
 ## Built so far
+
+- **Model (`web/src/voice/pocket.ts`):** Pocket TTS, Kyutai's 100M-parameter English model
+  (CC BY 4.0), as the published int8 ONNX export of its `english_2026-04` bundle (KevinAHM),
+  unchanged, five graphs: Mimi encoder (a reference clip to embeddings), text conditioner,
+  the transformer (`flow_lm_main`, one 80 ms frame per run, with its attention caches as state),
+  the flow network (one Euler step from noise to the frame's latent) and the Mimi decoder (latents
+  to 24 kHz). The loop around them is ported from the export's reference code. It runs in the
+  voice worker on **ONNX Runtime Web** 1.30.0 (WASM with SIMD; two threads when the page is
+  cross-origin isolated and the computer has six cores or more). Lines are made one at a time;
+  the Node checks run the same `pocket.ts`.
+- **Deterministic:** the flow's noise is ours, a hash of the voice, the text and the frame
+  (Box–Muller on two counter-hashed streams), so the same line in the same voice gives
+  **bit-identical samples** (checked across runs and sessions, against golden hashes), which the
+  clip cache relies on. No graph edits are needed.
+- **Voices (`PRESETS` in `web/src/voice/voices.ts`):** 24 bundled clips, twelve women's and
+  twelve men's, from Kyutai's voice repository (VCTK, CC BY 4.0; Voice-Zero, CC0), each turned
+  by `tools/voice/fetch.mjs` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
+  loudness evened out) and packed into one 16-bit file (11.3 MB). See "Voices".
+- **Shaping (`crates/voice/src/dsp.rs`, in the voice WASM):** our own TD-PSOLA moves pitch, size
+  (formants, by resampling first) and speed independently. A voice's pitch and size can go
+  **into the clip** the model hears (the model then speaks the whole line that way) or **onto each
+  finished line** (cheap). See "Shaping a voice".
+- **Players' own voices (`web/src/voice/record.ts`):** the creator records from the microphone
+  or reads a sound file, compressed by the browser (Opus, 32 kbit/s, at most 12 s, about 50 KB)
+  and kept in the resident's appearance, so it travels with the save. See "A resident's own
+  voice".
+- **Text:** the model reads plain text (`plain_text`: pronunciation marks dropped); our Rust
+  phonemizer (`crates/voice`, Misaki's rules) now only gives the mouth shapes their phonemes.
+- **Tests:** `cargo test -p voice --release` (phonemizer against Misaki, the shaping, mouth shapes,
+  and every game line reads as plain text); `pnpm check:voice` (also in CI: ONNX Runtime Web in
+  Node with the worker's `pocket.ts`, bit-identical across runs and sessions, golden hashes;
+  pitch, depth and speed on the line, pitch in the clip, expression and trimming checked).
+- **Browser (`web/src/voice/`):** the worker with a Cache API download (`tts.worker.ts`; encoded
+  voices are kept there too), the app-wide service and speed test (`service.svelte.ts`), the
+  director with the "who may speak" rules (`index.ts`; it gets a resident's voice ready when they
+  start to be heard), lines per language (`content/voice/en.json`, packs add theirs), voices per
+  resident (`voices.ts`), stereo playback (`player.ts`), the clip cache. Settings → Voices.
+- **Measured (M3 Pro, 2026-10-12):** in Node (ONNX Runtime Web WASM) 1.6–1.8× real time on one
+  thread for whole lines (the 51-character test line: 3.3 s of audio in 2.0 s), about 2.8× on two
+  threads and 3.7× on four (the reference loop alone; the shaping adds 50–250 ms a line). In
+  Chrome for Testing (cross-origin isolated, two threads), the Settings speed test: 1.6 s per
+  line, 2.1× real time, worst frame 16.7 ms with the menu's town drawing; in a game, lines took
+  0.6–2.2 s (1.5× real time), none dropped. The device test (LFM2.5 on the GPU) uses setup A:
+  speech 1.2 s a line on the CPU, against 3.6 s on WebGPU (setup B, too slow). Getting a new voice
+  ready: about 2.4 s (encoding a 10 s clip 2.1–2.3 s, feeding it to the model 0.4 s); 0.4 s once
+  its encoding is kept. Whisper understood every test line in every voice; about one line in 140
+  starts a word late (the model's own; see "Pocket TTS").
+- **Download:** 173.5 MB once (runtime 14.2, model 146.5, voices 11.3, dictionary 1.3, our WASM
+  0.16), kept in the browser's cache.
+- **Guards (`voice/index.ts`):** as before: nothing new is said while the engine loads; it
+  unloads after 5 minutes without a line; voices pause for the session (with a toast) after three
+  lines in a row later than 4 s, or when making speech slows the frames.
+- **Not yet:** Auto mode; streaming playback (lines are played whole; if computers slower than
+  the M3 Pro need it, starting a line after its first frames is the next step).
+
+Residents speak with a text-to-speech model that runs **entirely in the browser**: no server, no
+API key, nothing leaves the player's computer.
+
+## Goals and rules
+
+- **Performance first.** Speech must never cost frames. It runs in its own worker, on the CPU or
+  the GPU depending on the model and on what this computer handles better, and a benchmark in
+  Settings decides.
+- **Quiet by default.** Residents only speak when:
+  1. **a resident is selected** (their Inspect panel is open, `game.inspected`): they speak their
+     thoughts, and they and whoever they are talking to speak their conversation; or
+  2. **the player started a conversation** (from the social menu): both residents speak that
+     conversation until it ends, even if neither is selected.
+
+  Nobody else speaks, including while the camera is watching on its own.
+- **Presentation only.** Voices never feed back into the simulation. The line a resident says is
+  picked with a hash of the resident id and event, not the sim's random number generator, so
+  saves and replays are unaffected and `sim-core` needs no changes.
+- **Every resident sounds different**, and always the same, across sessions and saves.
+- **Download on request.** The model (173 MB with the runtime and voices) is fetched when the
+  player turns voices on, or when they hear a voice in the creator, and kept.
+- **Consent.** A player's recording is their own voice or someone's who agreed (Kyutai's terms
+  for Pocket TTS forbid cloning a voice without its owner's consent; the creator says so).
+
+## The model: Pocket TTS
+
+[Pocket TTS](https://github.com/kyutai-labs/pocket-tts) (Kyutai, January 2026; weights CC BY
+4.0) is a 100M-parameter "continuous audio language model": a transformer writes 12.5 frames a
+second of Mimi codec latents, one after another, conditioned on the text and on a reference
+clip of the voice, and the Mimi decoder turns them into 24 kHz audio. Kyutai measured about 6×
+real time natively on a MacBook Air M4 CPU. We use the ONNX export by KevinAHM
+(`KevinAHM/pocket-tts-onnx`, revision `58a6d00c`, CC BY 4.0), its `english_2026-04` bundle, int8,
+as published:
+
+| File | Size | Job |
+|---|---|---|
+| `mimi_encoder_int8.onnx` | 20.8 MB | reference clip (24 kHz) → embeddings, 12.5 per second |
+| `text_conditioner_int8.onnx` | 16.4 MB | SentencePiece token ids → embeddings |
+| `flow_lm_main_int8.onnx` | 76.3 MB | the transformer: one frame per run; six layers of attention caches (1,000 positions) as state in and out |
+| `flow_lm_flow_int8.onnx` | 10.0 MB | the flow network: conditioning, noise → the frame's latent (one Euler step, `lsd_steps` 1) |
+| `mimi_decoder_int8.onnx` | 22.7 MB | latents → audio, 1,920 samples a frame, in chunks of 15 frames |
+| `bundle.json`, `bos_before_voice.npy`, `tokenizer.json` | 0.3 MB | state manifests and sizes, the embeddings put before a voice's, the tokenizer (from the ungated `kyutai/pocket-tts-without-voice-cloning`) |
+
+**One line (`pocket.ts`):** the voice's state is made once (`prepareVoice`: the clip shaped, encoded,
+`bos_before_voice` and its embeddings fed to the transformer; the result kept with each
+attention cache cut to the positions in use, about 6 MB, twelve voices). The text is cleaned up
+as the reference does (one line, a capital first, a full stop at the end, pieces of at most 50
+tokens split between sentences), embedded and fed; then frame by frame the transformer gives a
+conditioning vector and an end-of-speech score, the flow network makes the frame's latent from
+noise of deviation √temperature, and the line ends a few frames after the score passes −4 (3
+more for lines of up to four words, as the reference). The decoder makes the audio; our WASM
+trims it, shapes it and finds its mouth shapes.
+
+**The reference clip carries the voice:** pitch, timbre, pace and recording quality. Kyutai's own
+default voices include voice donations that are whispered or very creaky; ours are clear speech
+(see "Voices"). The model follows changes to the clip: measured on two voices, shaping the clip's
+pitch by ×0.88/×1.12 moved the output by 172/228 Hz from 197 (a woman's) and 77/88 from 81 (a
+man's), and pitch 1.25 with size 1.15 took a woman's 197 Hz to 288 Hz; the length stays. Speed in
+the clip moved the output's pace too (a clip read 18 % faster gave lines 14 % shorter), but speed
+is given per line instead (see below).
+
+**Expression** is the flow's noise (`temperature`): Kyutai's reference uses 0.7; ours spread 0.55–0.8
+per resident, ×0.6–1.4 in the creator, and tones move it (angry and happy livelier, sad calmer).
+
+**Dropped words:** now and then the model starts a line a word or two late ("…a lovely garden"):
+it is the model's own (its raw output already lacks the word), at some seeds and voices. Over 144
+test lines (24 voices, three lines, two temperatures; Whisper small) 4 began wrong with the clip
+trimmed to 0.1 s after the voice, 1 with 0.6 s of silence after it, so every clip now ends with
+that pause (`dsp::clip`). Lines are short and residents say many, so the rest is left as it is.
+
+**Threads and the GPU:** one thread gives about 1.6× real time for whole lines; the worker uses
+two where the page is cross-origin isolated and the computer has at least six cores (the game, the
+simulation and the language model keep the others). Kyutai saw no GPU speed-up for batch size 1;
+the device test still tries WebGPU (setup B) and keeps it only if it is faster and smooth.
+
+## Shaping a voice (`crates/voice/src/dsp.rs`)
+
+Pocket TTS has no pitch or speed inputs, so the sound is shaped around it, all in our Rust WASM
+(the same samples in every browser):
+
+- **`clip`:** any sound at any rate to the clip the encoder takes: 24 kHz (band-limited resampling,
+  `resample.rs`), the silence around it trimmed (as the output is), at most 10 s, its loudness
+  brought to −22 dBFS RMS of its sounding frames (the peak under 0.95). The bundled voices go
+  through it at build time, recordings in the worker.
+- **TD-PSOLA (`psola`):** the pitch is found every 10 ms (normalised autocorrelation, 50–500 Hz,
+  searched at half the rate and refined, the shortest strong peak taken so a multiple of the
+  period isn't, median-smoothed over five frames); the sound is cut into Hann grains two periods
+  long, one period apart (5 ms where unvoiced), and laid out again with the grains closer
+  (higher) or further apart (lower), each taken from its place in time, so pitch and length
+  change independently and the formants stay.
+- **`shape(pitch, depth, speed)`:** resample by depth (every frequency, formants included, ×depth),
+  then PSOLA puts the pitch at `pitch` and the length at 1/speed. About 50–250 ms for a line.
+- **`reference`** is `shape` on a clip without speed: what the encoder hears for a voice.
+
+**Two places for pitch and size (`VoiceParams`):** in the clip (`clipPitch`, `clipDepth`), and on
+each line (`pitch`, `depth`, `speed`). In the clip the model speaks the line that way, naturally,
+but every new value is a new voice to get ready (about 2.4 s the first time in a browser: the
+encoding is kept in the Cache API after that). On the line it costs a few milliseconds but is
+signal processing. So:
+
+- a resident's own small variation (pitch ±6 %, depth ±3 %), elders, and tones go **on the line**:
+  the 24 clips are shared by everyone;
+- children's voices (a woman's clip raised to 265 Hz and made 1.08 smaller, one per voice) and
+  the pitch and depth chosen in the creator go **into the clip**, rounded to 0.02 so similar
+  choices share one;
+- speed is always on the line.
+
+## Voices
+
+Each resident's voice comes from their **stable resident id**, gender and life stage
+(`voiceFor`); a voice chosen in the creator is saved on top (see "A resident's own voice"):
+
+```ts
+interface VoiceParams { clip: string; clipPitch: number; clipDepth: number; pitch: number; depth: number; speed: number; temperature: number }
+```
+
+**The bundled voices (`PRESETS`):** twelve women (Anna, Azelma, Caro, Eponine, Eve, Fantine,
+Iris, Jane, Lucy, Mary, Nora, Vera; 161–238 Hz) and twelve men (Bill, Charles, Felix, George,
+Hugo, Leon, Michael, Oscar, Owen, Paul, Peter, Stuart; 79–134 Hz), each with its measured pitch
+(`f0`, pYIN). Twenty are VCTK speakers (sentence 23, as enhanced by Kyutai; mostly British
+accents), four are LibriVox readers via Voice-Zero. Chosen by licence (no non-commercial sets:
+Expresso and EARS are left out) and for clear, natural speech: two of Kyutai's defaults from the
+voice donations were left out, one whispered (no voiced frames) and one very creaky, and Alba
+MacKenna's casual voice (122 Hz) for not reading clearly as a woman's.
+
+**Who speaks with what:** men from the men's voices, women from the women's, other genders from
+all 24, picked by the id. Children of any gender: a woman's voice raised to 245–290 Hz (265 Hz in
+the clip, the rest on the line) and made smaller (1.05–1.12). Babies don't speak (the creator
+plays a baby as the child they will be). On top, from the id: pitch 0.94–1.06 (teens 1.04–1.12),
+depth 0.97–1.03 (teens 1.03–1.07), speed 0.88–1.12 (children ×1.04), expression 0.55–0.8, and the
+elders' factors (women's pitch ×0.93 and depth ×0.98, men's ×1.04 and ×1.02, everyone's speed
+×0.92). Measured over eleven residents (`tools/voice/samples.mjs`): men 88–141 Hz, women
+202–251 Hz, the child 265 Hz.
+
+**Tones** (`withTone`, on the line): happy pitch ×1.06, speed ×1.06, livelier; angry ×1.04,
+×1.12, livelier still; sad ×0.94, ×0.9, calmer; flirty ×0.97, ×0.94.
+
+### A resident's own voice
+
+The household creator's *Identity* tab has a *Voice* section:
+
+- **A voice:** *Own* (the generated one) or one of the bundled voices that fit the gender (all 24
+  for other genders; picking one plays it), or *Recording* when they have one.
+- **Their own voice:** *Record a voice* (the microphone, with a level meter, 3–12 s, *Stop*) or
+  *Load a sound* (any sound file the browser can read; its first 12 s are played silently into the
+  recorder, so it is compressed the same way). Under it: "Only use your own voice, or the voice of
+  someone who agreed to it. The recording stays on this computer and in your saves." Choosing a
+  bundled voice sets a recording aside (it can be chosen again until the creator closes); a
+  separate button removes it.
+- **Pitch** (lower to higher), **Speed** (slower to faster), **Depth** (smaller to larger),
+  **Expression** (calmer to livelier), a dice (a fitting voice or a new generated one, and every
+  slider anywhere in its range; a recording stays), a button back to the default (own voice,
+  factors 1; a recording stays), and **Hear** ("Hi, I'm Ada! This is how I sound." in that voice;
+  a baby is heard as the child they will be).
+
+Every control is heard for grown-ups and children alike, except the voice choice for children,
+who keep a child's voice and take their chosen voice or recording from their teens; changing the
+gender drops a bundled voice of the other sex (a recording stays). Hearing works with resident
+voices off in Settings and doesn't turn them on; the engine is unloaded again when the creator
+closes.
+
+The choice is stored in the resident's appearance, which the simulation keeps as opaque JSON, so
+the save format doesn't change:
+
+```ts
+appearance.voice = { pitch: 1.08, speed: 0.95, depth: 0.96, expressive: 1.2, seed: 1439030069, preset: 'Mary' }
+appearance.voice = { pitch: 1, speed: 1, depth: 1, seed: 1439030069, recording: { audio: '<base64>', type: 'audio/webm;codecs=opus', sha: '3f…' } }
+```
+
+- **`preset`** (optional): a bundled voice by name, a teen's or grown-up's voice instead of the
+  generated one.
+- **`recording`** (optional, wins over `preset`): the sound (base64, as the browser compressed
+  it), its MIME type and the first 16 hex digits of its SHA-256, which names it (`rec:<sha>`). It
+  starts as recorded (pitch and depth 1; the sliders move it from there, into the clip). The main
+  thread decodes it (to 24 kHz) and hands it to the worker; a recording this browser can't decode
+  (made in another browser, say) is left out and the resident has their generated voice.
+- **`pitch`, `depth`** go into the clip; **`speed`** and **`expressive`** (a factor on the
+  temperature) are per line. Each is a factor on the generated voice (1 or missing: as generated);
+  the life stage still applies underneath. Kept within pitch 0.5–1.5, speed 0.8–1.2, depth
+  0.78–1.16, expression 0.2–1.
+- **`seed`** replaces the resident id in the generated voice: someone made in the creator has no
+  id until they move in, and the voice heard there must be the one they keep.
+- **`base`** (0.20 to 0.1.0, a KittenTTS voice by index) is ignored: those residents have their
+  generated voice.
+- Without `voice` (older saves, neighbours, newcomers, babies, random residents from the
+  creator's dice) a resident has the generated voice. Every resident sounds different from 0.1.0
+  (a new model).
+- Main-thread rewrites of the appearance keep `voice`: life-stage looks and grey hair copy it
+  along; the look expanded from a newcomer's or baby's seed keeps a voice stored next to it.
+  Portraits ignore it (their cache key leaves it out).
+
+There is no place to change a resident's look in a game yet; the Voice controls would go there too.
+
+## Phonemizer: our own, in Rust, without espeak-ng
+
+*Since Pocket TTS (which reads plain text) the phonemizer only gives the mouth shapes their
+phonemes; a pronunciation mark in a line (`[read](/ɹˈɛd/)`) now shapes the mouth, and the model
+reads the word. It was written for Paradee and KittenTTS:*
+
+Paradee, like Kokoro, needs **Misaki** phonemes. `kokoro-js` gets phonemes from **espeak-ng
+compiled to WASM, which is GPL-3**, and needs a conversion step (`web/misaki.js` in the Paradee
+repo; without it Whisper mishears about 31 % of words). The game was MIT then (GPL-3.0-or-later since
+0.1.0). We don't use espeak-ng.
+
+Existing Rust options (checked 2026-10-09):
+
+- **`misaki-rs`** (MIT, latest 0.6.0, September 2026): a port of Misaki with the dictionaries and
+  a part-of-speech tagger built in. espeak is an optional feature that is on by default; without
+  it, unknown words are spelled out letter by letter. Unclear whether it builds for `wasm32`
+  (docs.rs has failed to build it since 0.3.0); about 40 MB of source; small project (10 stars).
+- **Kokoros** (Apache-2.0), a Rust Kokoro runtime, builds espeak-ng in (`espeak-rs-sys`): same
+  GPL problem.
+- Not Rust: `@piper-plus/g2p` (MIT, rule-based, runs in the browser) outputs Piper's phonemes.
+
+**Plan: `g2p` inside `crates/voice`** (MIT):
+
+1. **Dictionary:** Misaki's English dictionaries (`us_gold`, `us_silver`; Apache-2.0, credited in
+   `CREDITS.md`). They are already in the alphabet Paradee takes, so no mapping is needed. Ship
+   them compressed; trim rare words if size matters.
+2. **Text clean-up:** punctuation, contractions, possessive and plural "s", "-ed" and "-ing"
+   endings (Misaki's suffix rules), numbers to words.
+3. **Unknown words** (mostly residents' names): public-domain letter-to-sound rules (the 1976
+   NRL rules), written in Misaki's alphabet. A tiny trained model can replace them later.
+4. **Words with two pronunciations** ("read", "live"): content lines can mark the pronunciation
+   (Misaki's `[word](/phonemes/)` markup); dynamic text accepts the occasional slip.
+5. **Build-time check:** every line in the content is phonemized in a test, and a word that falls
+   back to the rules fails it, so hand-written lines always sound right.
+
+Phase 1 also tries `misaki-rs` with `default-features = false`. If it builds for `wasm32` at an
+acceptable size, we use it (or a fork) and add only steps 3 and 5.
+
+## Settings
+
+A new **Audio** tab in Settings (`ui/screens/SettingsPanel.svelte`). "Sound effects" moves there
+from Interface. Everything applies live, so nothing is added to `RESTART_KEYS`.
+
+| Row | Control | Notes |
+|---|---|---|
+| Resident voices | Toggle | Default off. |
+| Language | (hidden while English is the only one) | Comes back as a row when a second language ships. |
+| Voice model | Status | Pocket TTS, its state, and the download (about 173 MB). (The unused `voiceModel` setting was removed with Paradee; a stored one is dropped on load.) |
+| Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "1.6 s per line, 2.1× real time, lines may start a moment late" (M3 Pro, Chrome; "smooth" needs 1.5 s or less). A result over 3 s per line says voices may pause. |
+| Voice volume | Slider | Separate from sound effects. |
+
+New keys in `settings.svelte.ts`:
+
+```ts
+voices: boolean;                          // false
+voiceLanguage: 'en';                      // 'en'
+voiceDevice: 'auto' | 'cpu' | 'gpu';      // 'auto'
+voiceVolume: number;                      // 0.8
+```
+
+The benchmark result is stored under its own localStorage key (`littlelives.voiceBench`), not in
+`Settings`, so "Reset to defaults" does not throw away a measurement.
+
+Turning voices on with English the first time: download the model (progress in the row), run the
+benchmark automatically, then speak. Until the model is ready, residents stay quiet.
+
+## Performance
+
+### Where the work runs
+
+| Work | Thread | Cost |
+|---|---|---|
+| Deciding who speaks, picking lines, playback | Main thread | Microseconds, event-driven (no per-frame work) |
+| Pocket TTS inference, shaping, mouth shapes | **Own module worker** (`voice/tts.worker.ts`) running `voice-wasm`, separate from the sim worker, lines one at a time | About 0.6–2.6 s per line on an M3 Pro (one thread), never blocks a frame; a new voice about 2.4 s once |
+
+- **Pocket TTS:** one thread, or two where the page is cross-origin isolated and there are six
+  cores or more (`voiceThreads`), leaving cores for the main thread, the sim worker and the
+  browser. A resident's voice is got ready when they start to be heard (selected, or in a
+  conversation), so the first line isn't the one that waits.
+- **Kokoro on the GPU** shares the GPU with rendering, so it is only chosen when the benchmark
+  shows frames stay smooth. Any WASM runtime files are self-hosted (bundled by Vite), following
+  the "self-host all assets" rule.
+- Model files load from Hugging Face by default (its CORS headers satisfy our COEP header) and
+  can be pointed at a self-hosted copy through the asset manifest. The browser cache keeps them.
+
+### Benchmark ("Test this computer")
+
+Runs from Settings, in the main menu (the live 3D town draws behind it, so contention is
+realistic) or in a game (speech pauses while it runs). It takes a few seconds.
+
+1. Download the model files being tested, if missing (progress shown). Kokoro is only tested if
+   it is downloaded or the player asks.
+2. For each available mode (KittenTTS on CPU; Kokoro on CPU, and on GPU if `navigator.gpu` gives
+   an adapter):
+   1. Load and say one warm-up line (measures cold start).
+   2. Say five fixed test lines of typical lengths (3, 8, 12, 20 and 30 words).
+   3. Record per line: time to finished clip and **real-time factor** (RTF = generation time ÷
+      audio length).
+   4. Meanwhile measure frame times with `requestAnimationFrame`: 2 s before as a baseline,
+      then during inference. Record the rise in 95th-percentile frame time and frames over 50 ms.
+3. Choose, per model:
+   - **GPU** (Kokoro only) if its median RTF ≤ 0.33 (a 3-second line ready within 1 s) **and**
+     frame time p95 rises ≤ 2 ms with no frames over 50 ms;
+   - otherwise **CPU** if its median RTF ≤ 0.5;
+   - otherwise the model is **too slow on this computer**: Auto falls back (Kokoro to KittenTTS,
+     KittenTTS to voices off) and the row says so. The player can still force a mode.
+4. Store `{ model, modelVersion, engineVersion, device, rtf, firstLineMs, frameP95RiseMs, cores,
+   gpuAdapter, date }`. The benchmark re-runs automatically when the model, the engine, the core
+   count or the GPU adapter changes.
+
+### Guards while playing
+
+- At most **two voices at once**, and at most one line per resident every ~8 s.
+- A line that is not ready within **2 s** is dropped (the moment has passed).
+- No generation while in Build or Creation, while the tab is hidden, or at speed 3× and above
+  (except the conversation the player started).
+- **Live watchdog:** the scheduler tracks each line's RTF and the renderer's frame times
+  (`game.stats`). If three lines in a row are late, or frame time rises past the budget while
+  inference runs, voices step down (as in the benchmark) for the session and a toast says why
+  once.
+- **No smaller model to step down to:** lines that come late or slow frames pause voices
+  (`voice/index.ts`: three lines in a row later than 4 s, or slowed frames), or leave them off
+  with the load error in Settings.
+- **Memory:** the worker is unloaded after 5 minutes without speech, and when voices are turned
+  off. Its sessions take about 300 MB (the transformer's state is 49 MB in and out per frame);
+  twelve prepared voices about 75 MB more. Finished clips are kept in an in-memory LRU cache
+  (24 MB), keyed by model, device, voice and text. Because the engine is deterministic, a cached
+  clip is exactly what would be generated again. Encoded voices are kept in the Cache API (512 KB
+  each).
+- The performance overlay (F3) shows a voice line: model, mode, last RTF, queue length, cache
+  hits.
+
+## What residents say
+
+Today's bubbles are icons only (`game/bubbles.ts`), so speech needs text: **hand-written lines as
+content data** (`content/voice/<lang>.json`), so content packs can add and translate them. The
+English file has about 1,000 lines, and the trait packs about 500 more for their own items.
+
+- **Conversations** (`social`, per social interaction id): `start` for the one who starts it,
+  `good` and `bad` for the answer once the outcome shows. Read from the snapshot fields `social`,
+  `role`, `outcome` and `partner` that the bubbles already use.
+- **Using something:** a line when the selected resident starts using an object. The snapshot
+  says which (`objectDef` and `interaction`, content indices, next to the animation tag in
+  `action`), so lines can be per item. The most specific lines win:
+  1. `object.<object id>.interactions.<interaction id>` (the gourmet meal at the fridge);
+  2. `object.<object id>.lines` (anything at the treadmill);
+  3. `interaction.<interaction id>` on any object (`water`, `smell`, `homework`);
+  4. `action.<animation tag>` (`cook`, `run`), which also covers repairs, accidents, knocking
+     and tidying up, where no object interaction is in use.
+- **Thoughts of the selected resident:** when their emotion changes (`emotion`, per emotion id)
+  and when the planner shows a thought (`thought`, per thought kind: `skipped`, `noPlace`,
+  `kept`, `goal`, `roomLoved`, `roomDisliked`, `broken`, `accident`, `crying`).
+- **Later sources plug into the same pipeline:** the optional in-browser language model for
+  thoughts (see `PLAN.md`, "Smarter thoughts").
+
+A group of lines is a list, or `{"lines": [...], "tone": ...}`; an object's `tone` applies to its
+`lines`. Tones (`happy`, `sad`, `angry`, `flirty`, `question`) adjust speed and pitch. `{name}` is
+the other resident's first name, `{me}` the speaker's; `[word](/phonemes/)` fixes a
+pronunciation (`[read](/ɹˈɛd/)` in the past tense).
+
+**Variation:** the line is picked with a hash of the resident and a counter, never the sim's
+random numbers. A resident doesn't say any of their last three lines for the same key again
+while there are others (`voice/lines.ts`), so 4–6 lines per key go a long way.
+
+**Writing lines:** short (most under 40 characters; speech is made per line), and right for
+children, teens and grown-ups alike (babies don't speak). `cargo test -p voice --release --test
+lines` phonemizes every English line, in the language file and in the packs, and fails on a word
+missing from the dictionary (fix it with a pronunciation or another word), on symbols the model
+doesn't know, on unknown placeholders or tones, and on keys that name no social, object,
+interaction, animation tag, emotion or thought kind. Words with accents (`café`, `Zoë`) are read
+as without them.
+
+**Packs** carry lines under a top-level `"voice": {"en": {...}}`, laid out like the language
+file; the web side merges them over it key by key (sim-core ignores `voice`). See
+`docs/content-packs.md`.
+
+## Playback
+
+- One shared `AudioContext` with sound effects (`ui/sfx.ts` is refactored to expose it), with
+  separate gain nodes for effects and voices.
+- Each speaking resident gets a `PannerNode` at their head position (`renderer.simHead`),
+  updated about 10 times a second, so voices come from where the resident stands.
+- The speech bubble appears straight away; the voice follows when its clip is ready.
+- **Lip sync.** Every clip comes with a viseme track (`crates/voice/src/visemes.rs`), made in Rust
+  together with the audio. Pocket TTS gives no durations, so the phonemes are mapped to the 15
+  Meta visemes and weighted by kind (vowels longer than plosives, diphthongs split in two). They
+  are spread over the clip's voiced span, and pauses are snapped to the gaps in its loudness.
+  Loudness, at 100 values a second, scales how far the mouth opens. The director passes the track
+  to the renderer when the clip starts (`setSpeech`). The face mixes the visemes into the
+  resident's face morphs a little ahead of the sound, blending each shape in over about 70 ms.
+  Talk without a voice line uses made-up syllables from the same mouth shapes.
+
+## Modules
+
+Rust: `crates/voice` (engine, phonemizer, DSP) and `crates/voice-wasm` (the `wasm-bindgen`
+wrapper), built by a `pnpm voice` script next to the existing `wasm` script.
+
+Web code lives in `web/src/voice/`, behind one small interface used by the game session:
+
+| File | Job |
+|---|---|
+| `voice/index.ts` | `VoiceDirector`: watches the frame state and UI state, applies the "who may speak" rules and guards, queues lines. The only thing `game/session.ts` talks to. |
+| `voice/lines.ts` | Picks a line for an event from content (hash-based). |
+| `voice/voices.ts` | The bundled voices (`PRESETS`), and each resident's clip, pitch, depth, speed and expression from id, gender, life stage and the voice chosen in the creator. |
+| `voice/service.svelte.ts` + `voice/tts.worker.ts` | Worker client and worker: load the model, get a voice ready, recordings handed over, `speak(text, voice) → Float32Array` (transferred, 24 kHz), clip cache, speed test, unload. |
+| `voice/pocket.ts` | One line with Pocket TTS (the worker and the Node checks share it). |
+| `voice/record.ts` | A player's own voice from the microphone or a sound file. |
+| `voice/benchmark.ts` | The benchmark and the device choice. |
+| `voice/player.ts` | Voice bus, panners, clip cache. |
+
+## Phases
+
+| Phase | Scope | Done when |
+|---|---|---|
+| 1. Baseline (2–3 days) | `crates/voice` with `tract` running Paradee plus the `pitch` graph edit, in a worker next to the running game; try `misaki-rs` without espeak on `wasm32`. (Since 0.20 the baseline is ONNX Runtime Web.) | Paradee speaks hand-written phonemes in the browser; RTF and frame impact measured in Chrome, Firefox and Safari; `misaki-rs` or our own `g2p` chosen. |
+| 2. Phonemizer (2–4 days) | `g2p` (or `misaki-rs` plus our fallback). | Every content line phonemizes from the dictionary; names get a plausible reading; no GPL code shipped. |
+| 3. Rules | Settings tab, `VoiceDirector` with the "who may speak" rules and guards, lines content, voice bus with panning. (Babble, a made-up language, was part of this phase from 0.14 to 0.19; removed in 0.20.) | Selecting a resident or starting a conversation makes them speak; nobody else does; no frame cost. |
+| 4. English | Download with progress, `VoiceSpec` (pitch, speed), clip cache, unloading, quiet while loading. | Selected residents speak English; residents sound different from each other. |
+| 5. Own engine | Planned for KittenTTS; with Pocket TTS (a transformer run frame by frame, 146 MB) ONNX Runtime Web stays. Streaming playback (a line starting after its first frames) is the next speed-up if slower computers need it. | |
+| 6. Benchmark | "Test this computer", Auto mode, re-run on change, live watchdog, F3 line; Kokoro-82M as the optional model (CPU and GPU). | Auto picks the right mode without frame drops; a slow machine steps down with a clear message. |
+| Later | Thoughts from the Planner (0.8) and from an in-browser language model; lip sync; persistent clip cache (IndexedDB, Opus via WebCodecs); a distilled male voice; more languages. | |
+
+Every phase keeps `pnpm check` clean and the frame-time budget checked, with voices on and off.
+
+## Research: a voice the player can shape (2026-10-11/12)
+
+The owner asked for a voice a player can configure "a little bit", in the browser (WASM or
+WebGPU). Options looked at (from their pages, not all measured):
+
+| Option | Size | Browser | What a player can change | Verdict |
+|---|---|---|---|---|
+| KittenTTS mini / micro 0.8 | 78 / 41 MB (dynamic int8 only) | WASM | Mix of 8 voices, speed (+ our pitch, depth) | Same 8 voices as nano; dynamic int8 ran slower than float in ONNX Runtime Web for nano |
+| Kokoro-82M (q8) | 92 MB | WASM, WebGPU | Blend of 20 American voices, speed (+ ours) | Slower than real time on one thread (2026-10-10) |
+| Supertonic 2 | | WASM, WebGPU | 10 voices | Archived 2026-07-23, weight licence unclear |
+| Piper (VITS) | 20–60 MB a voice | WASM | Speaker id, speed, noise | Research-only data for the multi-speaker English voice |
+| **Pocket TTS** | 146 MB int8 | WASM (community ports) | **Any reference clip**: presets, recordings; shaped clips | **Chosen** |
+| Chatterbox Turbo | 350M params | WebGPU (Transformers.js) | Cloning, exaggeration | Too heavy next to the game |
+| MOSS-TTS-Nano | 100M params | ONNX, browser extension only | Cloning | Unproven in a page |
+| Qwen3-TTS VoiceDesign, NeuTTS | 0.6–1.7B, 229M–0.75B | no browser build | Voice from a description / cloning | Too big |
+
+**Measured before building it (Phase 0, M3 Pro, Node, ONNX Runtime Web 1.30 WASM, the int8
+bundle):** the speed test's three lines at 1.7–2.0× real time on one thread, 2.8× on two, 3.7× on
+four (the transformer about 23 ms a frame, the decoder 17, the flow 2 on one thread); a 10 s clip
+encoded in 2.1 s (int8 and fp32 alike), fed in 0.4–0.5 s; bit-identical with our noise; Whisper
+(small) understood every line; and the output followed a clip read faster or slower (pitch and
+pace), and our PSOLA-shaped clips (pitch alone, size alone). The attention cache's length (1,000)
+is fixed in the export.
+
+**Trailing silence on the clip and dropped first words:** 144 lines (24 voices × 3 lines × 2
+temperatures) with the clip as trimmed (0.1 s after the voice): 4 began wrong; with 0.6 s of
+silence after it: 1. Adopted (`dsp::clip` adds 0.5 s).
+
+## Research: different voices (2026-10-10)
+
+The owner found men and women sounding alike. Measured (M3 Pro, ONNX Runtime Web WASM on one
+thread in Node and in Chrome for Testing; WebGPU in Chrome; UTMOS and Whisper for quality,
+WeSpeaker for how different voices are, Praat for pitch and formants; three game lines):
+
+| Option | Per line | Download | Voices | Verdict |
+|---|---|---|---|---|
+| Paradee with other style vectors | 0.2–0.5 s | 9 MB | 1 | Its voice is two learned constants (1×32, 1×16), not Kokoro's 256-number style, so Kokoro's voices can't be fed; changing them mostly breaks the voice. |
+| **KittenTTS nano 0.8**, weight-only int8 | 0.9–1.6 s | 15.5 + 1 MB | 8 + mixes | **Chosen** (above). |
+| Kokoro-82M q8, WASM | 2.8–4.5 s | 86–92 MB | 28 + blends | Slower than real time on one thread (1.0× with four threads and cross-origin isolation). |
+| Kokoro-82M, WebGPU | 1.2–1.75 s, first line up to 7 s | 155–326 MB | 28 + blends | Not the 10× reported elsewhere under our constraints; fp32 halved the frame rate on a 120 Hz screen. |
+| Kokoro-7M-Distill | 0.16–0.28 s | 31 MB | 1 | Takes Kokoro's style input but every voice comes out as the same woman. |
+| Piper LibriTTS-R medium, int8 | 0.14–0.27 s | 22 MB | 904 | Fast, real men's voices, good scores, but fine-tuned from the lessac voice, whose data licence is research-only. The from-scratch LibriTTS high voice is CC BY 4.0 but slower than real time. |
+| A distilled male Paradee | Paradee's | +9 MB per voice | 1 per model | Kept as the fallback plan (see "Voices"). |
+| Pocket TTS, Supertonic, KittenTTS 2 and others | | 100 MB–1.7 GB | | Too big, or licence or archive problems. |
+
+## Research summary (2026-10-09)
+
+| Option | Verdict |
+|---|---|
+| **Paradee-8M** | Chosen. Apache-2.0, 9 MB int8, 12–14× real time on one CPU thread (our native test), quality close to Kokoro. One voice; Misaki phonemes. |
+| Kokoro-82M | Optional larger model. Apache-2.0; q8 92 MB, fp32 326 MB; about real time on CPU with 4 threads, about 10× on WebGPU (M1 Max). 28 English voices that can be blended. |
+| Kokoro-7M-Distill | 30 MB, faster (35×) but lower quality (UTMOS 4.18) than Paradee (Paradee paper). |
+| Piper / VITS | The multi-speaker English voice is trained on a dataset that forbids commercial use; lower quality. |
+| Kitten TTS | 25–78 MB, only 8 voices; the maker calls the browser builds legacy. (Chosen on 2026-10-10 for teens and grown-ups after measuring: 15.5 MB as weight-only int8, see above.) |
+| Supertonic | Archived in September 2026; restrictive licence. |
+| MMS-TTS | Non-commercial licence. |
+| Chatterbox, OuteTTS, CSM, Dia, Orpheus | Too big or too slow next to a 3D game. |
+| Browser `speechSynthesis` | Free, but voices differ per player, it can't be positioned in 3D and only one voice plays at a time. |
+
+Sources: [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0),
+[Paradee code](https://github.com/sahilmahendrakar/paradee),
+[Kokoro-82M ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX),
+[Misaki](https://github.com/hexgrad/misaki),
+[misaki-rs](https://github.com/MicheleYin/misaki-rs),
+[tract](https://github.com/sonos/tract),
+[ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) (MIT, [npm](https://www.npmjs.com/package/onnxruntime-web)),
+[browser TTS benchmarks](https://briantung.me/blog/tts-engines-in-the-browser/),
+[lessac dataset licence](https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html).
+## History: KittenTTS nano and Paradee-8M (0.20 to 0.1.0)
+
+*Residents spoke with these before Pocket TTS. Kept for the measurements and the reasoning; the
+files, the graph edits (`tools/voice/model.mjs`) and the KittenTTS tokenizer are gone.*
+
+### Built for KittenTTS (0.1.0)
 
 - **Phonemizer (`crates/voice`, `crates/voice-wasm`):** Misaki's English rules ported to Rust
   (`g2p.rs`; matches Python Misaki 0.9.4 on all 25 test sentences in `tests/data`), the merged
@@ -87,31 +629,7 @@ may replace the runtime later. Measurements and research behind the choices are 
 - **Not yet:** Auto mode, our own engine. Kokoro-82M was measured again on 2026-10-10 and is not
   planned for now (see "Research").
 
-Residents speak with text-to-speech models that run **entirely in the browser**: no server, no
-API key, nothing leaves the player's computer. English uses **KittenTTS nano** (15.5 MB, eight
-voices) for everyone, phonemized by our own Rust code compiled to WebAssembly and run by ONNX
-Runtime Web (later perhaps by our own engine).
-
-## Goals and rules
-
-- **Performance first.** Speech must never cost frames. It runs in its own worker, on the CPU or
-  the GPU depending on the model and on what this computer handles better, and a benchmark in
-  Settings decides.
-- **Quiet by default.** Residents only speak when:
-  1. **a resident is selected** (their Inspect panel is open, `game.inspected`): they speak their
-     thoughts, and they and whoever they are talking to speak their conversation; or
-  2. **the player started a conversation** (from the social menu): both residents speak that
-     conversation until it ends, even if neither is selected.
-
-  Nobody else speaks, including while the camera is watching on its own.
-- **Presentation only.** Voices never feed back into the simulation. The line a resident says is
-  picked with a hash of the resident id and event, not the sim's random number generator, so
-  saves and replays are unaffected and `sim-core` needs no changes.
-- **Every resident sounds different**, and always the same, across sessions and saves.
-- **Small download, on request.** The model (32 MB with the runtime) is fetched when the player
-  turns voices on, or when they hear a voice in the creator.
-
-## The model: Paradee-8M (removed for 0.1.0)
+### The model: Paradee-8M (removed for 0.1.0)
 
 *Children spoke with Paradee-8M in 0.20, and it stood in when KittenTTS was too slow; it was
 removed for 0.1.0 so only KittenTTS is used. Kept here for the measurements and the
@@ -158,7 +676,7 @@ lengths at about 0.5 s of re-optimisation per line), and dequantises the weights
   input gave a median pitch of 157 Hz at ×0.7, 209 Hz at ×1.0 and 261 Hz at ×1.3, with the same
   length and intact audio.
 
-## Our engine (`crates/voice`)
+### Our engine (`crates/voice`)
 
 **Runtime today (0.20): ONNX Runtime Web.** It is a JavaScript dependency with its own 14 MB
 WASM runtime (larger than the model) and treats the model as a black box, but it is about twice
@@ -228,7 +746,7 @@ ratio. A benchmark test fails if real-time factor regresses.
 
 If the hand-written engine stalls, ONNX Runtime Web stays.
 
-## KittenTTS nano (teens and grown-ups, 0.20)
+### KittenTTS nano (teens and grown-ups, 0.20)
 
 [KittenTTS](https://github.com/KittenML/KittenTTS) nano 0.8 (Apache-2.0, KittenML) is a
 StyleTTS2-style model like Kokoro's, about 15M parameters, with **eight voices**: Bella, Luna,
@@ -273,7 +791,7 @@ A speaker-recognition model (WeSpeaker ResNet34) heard all of Paradee's resident
 same person (similarity 0.92 within a sex, 0.81 across; one real person scores about 0.6–0.8);
 KittenTTS's mixes 0.56 within a sex and 0.16 across.
 
-## Voices
+### Voices (KittenTTS)
 
 Each resident gets a voice derived from their **stable resident id** (release 0.7), gender and
 life stage, computed on the main thread (`voiceFor`); a voice chosen in the creator is saved on
@@ -346,304 +864,3 @@ their ranges, two lines each): the spectral centroid of voiced frames below 5 kH
 formants, is 16 % lower for men than for women (829 against 986 Hz; it was 3 % with pitch alone),
 and over the whole band men went from brighter than women (2164 against 2052 Hz) to clearly darker
 (1617 against 1922 Hz). Median pitch: men 133–151 Hz, women 185–246 Hz, the child 273 Hz.
-
-### A resident's own voice
-
-The household creator's *Identity* tab has a *Voice* section: a row with **Own mix** and the
-four KittenTTS voices that fit the gender (all eight for other genders; picking one plays it),
-**Pitch** (lower to higher), **Speed** (slower to faster), **Depth** (smaller to larger), a dice
-(a fitting voice or a new mix, and pitch, speed and depth anywhere in their range), a button back
-to the default (own mix, factors 1), and **Hear** (the resident says "Hi, I'm Ada! This is how I
-sound." in that voice; a baby is heard as the child they will be). Every control is heard for
-grown-ups and children alike, except the voice row for children, who keep a child's voice and
-take their chosen voice from their teens; changing the gender drops a voice of the other sex.
-Hearing works with resident voices off in Settings and doesn't turn them on; the engine is
-unloaded again when the creator closes. The note under the button shows the engine loading or
-downloading, an error, or that voices are off.
-
-The choice is stored in the resident's appearance, which the simulation keeps as opaque JSON, so
-the save format doesn't change:
-
-```ts
-appearance.voice = { pitch: 1.08, speed: 0.95, depth: 0.96, seed: 1439030069, base: 5 }
-```
-
-- **`base`** (0.20, optional): a KittenTTS voice (`KITTEN_VOICES` index: 0–3 the women's, 4–7 the
-  men's) as the voice instead of the resident's mix; missing: the mix from `seed`. Older choices
-  have no `base` and keep their factors, which now apply to their KittenTTS voice.
-
-- **Factors on the generated voice** (`voiceFor`), 1 (or missing) being as generated: pitch and
-  speed 0.88–1.12 (about two semitones of pitch), depth 0.92–1.08 (the slider runs from smaller
-  to larger, so it shows 2 − depth). The life stage still applies underneath, so a child made "a bit
-  higher" is a bit higher than their generated teen voice once grown. The result is kept within pitch
-  0.5–1.5, speed 0.8–1.2 and depth 0.78–1.16, and line tones (`withTone`) go on top.
-- **`seed`** replaces the resident id in the generated voice: someone made in the creator has no
-  id until they move in, and the voice heard there must be the one they keep. It is set the first
-  time the Voice section is used.
-- **Without `voice`** (older saves, neighbours, newcomers, babies, random residents from the
-  creator's dice) a resident has the generated voice. The generated voices changed in 0.20
-  (depth, wider ranges), so every resident sounds different from 0.19.
-- **Without `depth`** (choices made before it existed) the factor is 1.
-- Main-thread rewrites of the appearance keep `voice`: life-stage looks and grey hair copy it
-  along; the look expanded from a newcomer's or baby's seed keeps a voice stored next to it.
-  Portraits ignore it (their cache key leaves it out).
-
-There is no place to change a resident's look in a game yet; the Voice controls would go there too.
-
-## Phonemizer: our own, in Rust, without espeak-ng
-
-Paradee, like Kokoro, needs **Misaki** phonemes. `kokoro-js` gets phonemes from **espeak-ng
-compiled to WASM, which is GPL-3**, and needs a conversion step (`web/misaki.js` in the Paradee
-repo; without it Whisper mishears about 31 % of words). The game was MIT then (GPL-3.0-or-later since
-0.1.0). We don't use espeak-ng.
-
-Existing Rust options (checked 2026-10-09):
-
-- **`misaki-rs`** (MIT, latest 0.6.0, September 2026): a port of Misaki with the dictionaries and
-  a part-of-speech tagger built in. espeak is an optional feature that is on by default; without
-  it, unknown words are spelled out letter by letter. Unclear whether it builds for `wasm32`
-  (docs.rs has failed to build it since 0.3.0); about 40 MB of source; small project (10 stars).
-- **Kokoros** (Apache-2.0), a Rust Kokoro runtime, builds espeak-ng in (`espeak-rs-sys`): same
-  GPL problem.
-- Not Rust: `@piper-plus/g2p` (MIT, rule-based, runs in the browser) outputs Piper's phonemes.
-
-**Plan: `g2p` inside `crates/voice`** (MIT):
-
-1. **Dictionary:** Misaki's English dictionaries (`us_gold`, `us_silver`; Apache-2.0, credited in
-   `CREDITS.md`). They are already in the alphabet Paradee takes, so no mapping is needed. Ship
-   them compressed; trim rare words if size matters.
-2. **Text clean-up:** punctuation, contractions, possessive and plural "s", "-ed" and "-ing"
-   endings (Misaki's suffix rules), numbers to words.
-3. **Unknown words** (mostly residents' names): public-domain letter-to-sound rules (the 1976
-   NRL rules), written in Misaki's alphabet. A tiny trained model can replace them later.
-4. **Words with two pronunciations** ("read", "live"): content lines can mark the pronunciation
-   (Misaki's `[word](/phonemes/)` markup); dynamic text accepts the occasional slip.
-5. **Build-time check:** every line in the content is phonemized in a test, and a word that falls
-   back to the rules fails it, so hand-written lines always sound right.
-
-Phase 1 also tries `misaki-rs` with `default-features = false`. If it builds for `wasm32` at an
-acceptable size, we use it (or a fork) and add only steps 3 and 5.
-
-## Settings
-
-A new **Audio** tab in Settings (`ui/screens/SettingsPanel.svelte`). "Sound effects" moves there
-from Interface. Everything applies live, so nothing is added to `RESTART_KEYS`.
-
-| Row | Control | Notes |
-|---|---|---|
-| Resident voices | Toggle | Default off. |
-| Language | (hidden while English is the only one) | Comes back as a row when a second language ships. |
-| Voice model | Status | KittenTTS nano, its state, and the download (about 32 MB). Runs on the CPU. (The unused `voiceModel` setting was removed with Paradee; a stored one is dropped on load.) |
-| Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "1.2 s per line, 2.2× real time, smooth". A result over 3 s per line says voices may pause. |
-| Voice volume | Slider | Separate from sound effects. |
-
-New keys in `settings.svelte.ts`:
-
-```ts
-voices: boolean;                          // false
-voiceLanguage: 'en';                      // 'en'
-voiceDevice: 'auto' | 'cpu' | 'gpu';      // 'auto'
-voiceVolume: number;                      // 0.8
-```
-
-The benchmark result is stored under its own localStorage key (`littlelives.voiceBench`), not in
-`Settings`, so "Reset to defaults" does not throw away a measurement.
-
-Turning voices on with English the first time: download the model (progress in the row), run the
-benchmark automatically, then speak. Until the model is ready, residents stay quiet.
-
-## Performance
-
-### Where the work runs
-
-| Work | Thread | Cost |
-|---|---|---|
-| Deciding who speaks, picking lines, playback | Main thread | Microseconds, event-driven (no per-frame work) |
-| Phonemes and KittenTTS inference | **Own module worker** (`voice/tts.worker.ts`) running `voice-wasm`, separate from the sim worker, lines one at a time | About 0.5–1.3 s per line on an M3 Pro, never blocks a frame |
-
-- **KittenTTS:** one thread is enough. Two voices at once can use two engine instances if the
-  benchmark shows spare cores (`navigator.hardwareConcurrency` ≥ 6), leaving cores for the main
-  thread, the sim worker and the browser.
-- **Kokoro on the GPU** shares the GPU with rendering, so it is only chosen when the benchmark
-  shows frames stay smooth. Any WASM runtime files are self-hosted (bundled by Vite), following
-  the "self-host all assets" rule.
-- Model files load from Hugging Face by default (its CORS headers satisfy our COEP header) and
-  can be pointed at a self-hosted copy through the asset manifest. The browser cache keeps them.
-
-### Benchmark ("Test this computer")
-
-Runs from Settings, in the main menu (the live 3D town draws behind it, so contention is
-realistic) or in a game (speech pauses while it runs). It takes a few seconds.
-
-1. Download the model files being tested, if missing (progress shown). Kokoro is only tested if
-   it is downloaded or the player asks.
-2. For each available mode (KittenTTS on CPU; Kokoro on CPU, and on GPU if `navigator.gpu` gives
-   an adapter):
-   1. Load and say one warm-up line (measures cold start).
-   2. Say five fixed test lines of typical lengths (3, 8, 12, 20 and 30 words).
-   3. Record per line: time to finished clip and **real-time factor** (RTF = generation time ÷
-      audio length).
-   4. Meanwhile measure frame times with `requestAnimationFrame`: 2 s before as a baseline,
-      then during inference. Record the rise in 95th-percentile frame time and frames over 50 ms.
-3. Choose, per model:
-   - **GPU** (Kokoro only) if its median RTF ≤ 0.33 (a 3-second line ready within 1 s) **and**
-     frame time p95 rises ≤ 2 ms with no frames over 50 ms;
-   - otherwise **CPU** if its median RTF ≤ 0.5;
-   - otherwise the model is **too slow on this computer**: Auto falls back (Kokoro to KittenTTS,
-     KittenTTS to voices off) and the row says so. The player can still force a mode.
-4. Store `{ model, modelVersion, engineVersion, device, rtf, firstLineMs, frameP95RiseMs, cores,
-   gpuAdapter, date }`. The benchmark re-runs automatically when the model, the engine, the core
-   count or the GPU adapter changes.
-
-### Guards while playing
-
-- At most **two voices at once**, and at most one line per resident every ~8 s.
-- A line that is not ready within **2 s** is dropped (the moment has passed).
-- No generation while in Build or Creation, while the tab is hidden, or at speed 3× and above
-  (except the conversation the player started).
-- **Live watchdog:** the scheduler tracks each line's RTF and the renderer's frame times
-  (`game.stats`). If three lines in a row are late, or frame time rises past the budget while
-  inference runs, voices step down (as in the benchmark) for the session and a toast says why
-  once.
-- **No smaller model to step down to:** in 0.20 KittenTTS gave way to Paradee for the session
-  when its lines came late, slowed frames or it couldn't load. With Paradee removed, those cases
-  pause voices (`voice/index.ts`: three lines in a row later than 4 s, or slowed frames), or leave
-  them off with the load error in Settings.
-- **Memory:** the worker is unloaded after 5 minutes without speech, and when voices are turned
-  off. Finished clips are kept in an in-memory LRU cache as 16-bit audio, capped at about 8 MB
-  (a few hundred lines), keyed by `hash(model, engineVersion, voice, text)`. Because the engine is
-  deterministic, a cached clip is exactly what would be generated again.
-- The performance overlay (F3) shows a voice line: model, mode, last RTF, queue length, cache
-  hits.
-
-## What residents say
-
-Today's bubbles are icons only (`game/bubbles.ts`), so speech needs text: **hand-written lines as
-content data** (`content/voice/<lang>.json`), so content packs can add and translate them. The
-English file has about 1,000 lines, and the trait packs about 500 more for their own items.
-
-- **Conversations** (`social`, per social interaction id): `start` for the one who starts it,
-  `good` and `bad` for the answer once the outcome shows. Read from the snapshot fields `social`,
-  `role`, `outcome` and `partner` that the bubbles already use.
-- **Using something:** a line when the selected resident starts using an object. The snapshot
-  says which (`objectDef` and `interaction`, content indices, next to the animation tag in
-  `action`), so lines can be per item. The most specific lines win:
-  1. `object.<object id>.interactions.<interaction id>` (the gourmet meal at the fridge);
-  2. `object.<object id>.lines` (anything at the treadmill);
-  3. `interaction.<interaction id>` on any object (`water`, `smell`, `homework`);
-  4. `action.<animation tag>` (`cook`, `run`), which also covers repairs, accidents, knocking
-     and tidying up, where no object interaction is in use.
-- **Thoughts of the selected resident:** when their emotion changes (`emotion`, per emotion id)
-  and when the planner shows a thought (`thought`, per thought kind: `skipped`, `noPlace`,
-  `kept`, `goal`, `roomLoved`, `roomDisliked`, `broken`, `accident`, `crying`).
-- **Later sources plug into the same pipeline:** the optional in-browser language model for
-  thoughts (see `PLAN.md`, "Smarter thoughts").
-
-A group of lines is a list, or `{"lines": [...], "tone": ...}`; an object's `tone` applies to its
-`lines`. Tones (`happy`, `sad`, `angry`, `flirty`, `question`) adjust speed and pitch. `{name}` is
-the other resident's first name, `{me}` the speaker's; `[word](/phonemes/)` fixes a
-pronunciation (`[read](/ɹˈɛd/)` in the past tense).
-
-**Variation:** the line is picked with a hash of the resident and a counter, never the sim's
-random numbers. A resident doesn't say any of their last three lines for the same key again
-while there are others (`voice/lines.ts`), so 4–6 lines per key go a long way.
-
-**Writing lines:** short (most under 40 characters; speech is made per line), and right for
-children, teens and grown-ups alike (babies don't speak). `cargo test -p voice --release --test
-lines` phonemizes every English line, in the language file and in the packs, and fails on a word
-missing from the dictionary (fix it with a pronunciation or another word), on symbols the model
-doesn't know, on unknown placeholders or tones, and on keys that name no social, object,
-interaction, animation tag, emotion or thought kind. Words with accents (`café`, `Zoë`) are read
-as without them.
-
-**Packs** carry lines under a top-level `"voice": {"en": {...}}`, laid out like the language
-file; the web side merges them over it key by key (sim-core ignores `voice`). See
-`docs/content-packs.md`.
-
-## Playback
-
-- One shared `AudioContext` with sound effects (`ui/sfx.ts` is refactored to expose it), with
-  separate gain nodes for effects and voices.
-- Each speaking resident gets a `PannerNode` at their head position (`renderer.simHead`),
-  updated about 10 times a second, so voices come from where the resident stands.
-- The speech bubble appears straight away; the voice follows when its clip is ready.
-- **Lip sync.** Every clip comes with a viseme track (`crates/voice/src/visemes.rs`), made in Rust
-  together with the audio. KittenTTS gives no durations, so the phonemes are mapped to the 15
-  Meta visemes and weighted by kind (vowels longer than plosives, diphthongs split in two). They
-  are spread over the clip's voiced span, and pauses are snapped to the gaps in its loudness.
-  Loudness, at 100 values a second, scales how far the mouth opens. The director passes the track
-  to the renderer when the clip starts (`setSpeech`). The face mixes the visemes into the
-  resident's face morphs a little ahead of the sound, blending each shape in over about 70 ms.
-  Talk without a voice line uses made-up syllables from the same mouth shapes.
-
-## Modules
-
-Rust: `crates/voice` (engine, phonemizer, DSP) and `crates/voice-wasm` (the `wasm-bindgen`
-wrapper), built by a `pnpm voice` script next to the existing `wasm` script.
-
-Web code lives in `web/src/voice/`, behind one small interface used by the game session:
-
-| File | Job |
-|---|---|
-| `voice/index.ts` | `VoiceDirector`: watches the frame state and UI state, applies the "who may speak" rules and guards, queues lines. The only thing `game/session.ts` talks to. |
-| `voice/lines.ts` | Picks a line for an event from content (hash-based). |
-| `voice/voices.ts` | Model, KittenTTS mix, pitch, speed and depth from resident id, gender, life stage and the voice chosen in the creator. |
-| `voice/service.svelte.ts` + `voice/tts.worker.ts` | Worker client and worker: load a model, `speak(text, voice) → Float32Array` (transferred, 24 kHz), clip cache, speed test, unload. |
-| `voice/synth.ts` | One line from either model (the worker and the Node checks share it). |
-| `voice/benchmark.ts` | The benchmark and the device choice. |
-| `voice/player.ts` | Voice bus, panners, clip cache. |
-
-## Phases
-
-| Phase | Scope | Done when |
-|---|---|---|
-| 1. Baseline (2–3 days) | `crates/voice` with `tract` running Paradee plus the `pitch` graph edit, in a worker next to the running game; try `misaki-rs` without espeak on `wasm32`. (Since 0.20 the baseline is ONNX Runtime Web.) | Paradee speaks hand-written phonemes in the browser; RTF and frame impact measured in Chrome, Firefox and Safari; `misaki-rs` or our own `g2p` chosen. |
-| 2. Phonemizer (2–4 days) | `g2p` (or `misaki-rs` plus our fallback). | Every content line phonemizes from the dictionary; names get a plausible reading; no GPL code shipped. |
-| 3. Rules | Settings tab, `VoiceDirector` with the "who may speak" rules and guards, lines content, voice bus with panning. (Babble, a made-up language, was part of this phase from 0.14 to 0.19; removed in 0.20.) | Selecting a resident or starting a conversation makes them speak; nobody else does; no frame cost. |
-| 4. English | Download with progress, `VoiceSpec` (pitch, speed), clip cache, unloading, quiet while loading. | Selected residents speak English; residents sound different from each other. |
-| 5. Own engine (about 2.5 weeks) | Hand-written inference, golden tests against ONNX Runtime on the edited model. (0.20 did the runtime swap to ONNX Runtime Web, the model edits in Node, deterministic noise and the voice's size by resampling.) | At least 8× real time in the browser on one thread; WASM under 1.5 MB; male voices that sound male (or decide to distil a male voice). |
-| 6. Benchmark | "Test this computer", Auto mode, re-run on change, live watchdog, F3 line; Kokoro-82M as the optional model (CPU and GPU). | Auto picks the right mode without frame drops; a slow machine steps down with a clear message. |
-| Later | Thoughts from the Planner (0.8) and from an in-browser language model; lip sync; persistent clip cache (IndexedDB, Opus via WebCodecs); a distilled male voice; more languages. | |
-
-Every phase keeps `pnpm check` clean and the frame-time budget checked, with voices on and off.
-
-## Research: different voices (2026-10-10)
-
-The owner found men and women sounding alike. Measured (M3 Pro, ONNX Runtime Web WASM on one
-thread in Node and in Chrome for Testing; WebGPU in Chrome; UTMOS and Whisper for quality,
-WeSpeaker for how different voices are, Praat for pitch and formants; three game lines):
-
-| Option | Per line | Download | Voices | Verdict |
-|---|---|---|---|---|
-| Paradee with other style vectors | 0.2–0.5 s | 9 MB | 1 | Its voice is two learned constants (1×32, 1×16), not Kokoro's 256-number style, so Kokoro's voices can't be fed; changing them mostly breaks the voice. |
-| **KittenTTS nano 0.8**, weight-only int8 | 0.9–1.6 s | 15.5 + 1 MB | 8 + mixes | **Chosen** (above). |
-| Kokoro-82M q8, WASM | 2.8–4.5 s | 86–92 MB | 28 + blends | Slower than real time on one thread (1.0× with four threads and cross-origin isolation). |
-| Kokoro-82M, WebGPU | 1.2–1.75 s, first line up to 7 s | 155–326 MB | 28 + blends | Not the 10× reported elsewhere under our constraints; fp32 halved the frame rate on a 120 Hz screen. |
-| Kokoro-7M-Distill | 0.16–0.28 s | 31 MB | 1 | Takes Kokoro's style input but every voice comes out as the same woman. |
-| Piper LibriTTS-R medium, int8 | 0.14–0.27 s | 22 MB | 904 | Fast, real men's voices, good scores, but fine-tuned from the lessac voice, whose data licence is research-only. The from-scratch LibriTTS high voice is CC BY 4.0 but slower than real time. |
-| A distilled male Paradee | Paradee's | +9 MB per voice | 1 per model | Kept as the fallback plan (see "Voices"). |
-| Pocket TTS, Supertonic, KittenTTS 2 and others | | 100 MB–1.7 GB | | Too big, or licence or archive problems. |
-
-## Research summary (2026-10-09)
-
-| Option | Verdict |
-|---|---|
-| **Paradee-8M** | Chosen. Apache-2.0, 9 MB int8, 12–14× real time on one CPU thread (our native test), quality close to Kokoro. One voice; Misaki phonemes. |
-| Kokoro-82M | Optional larger model. Apache-2.0; q8 92 MB, fp32 326 MB; about real time on CPU with 4 threads, about 10× on WebGPU (M1 Max). 28 English voices that can be blended. |
-| Kokoro-7M-Distill | 30 MB, faster (35×) but lower quality (UTMOS 4.18) than Paradee (Paradee paper). |
-| Piper / VITS | The multi-speaker English voice is trained on a dataset that forbids commercial use; lower quality. |
-| Kitten TTS | 25–78 MB, only 8 voices; the maker calls the browser builds legacy. (Chosen on 2026-10-10 for teens and grown-ups after measuring: 15.5 MB as weight-only int8, see above.) |
-| Supertonic | Archived in September 2026; restrictive licence. |
-| MMS-TTS | Non-commercial licence. |
-| Chatterbox, OuteTTS, CSM, Dia, Orpheus | Too big or too slow next to a 3D game. |
-| Browser `speechSynthesis` | Free, but voices differ per player, it can't be positioned in 3D and only one voice plays at a time. |
-
-Sources: [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0),
-[Paradee code](https://github.com/sahilmahendrakar/paradee),
-[Kokoro-82M ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX),
-[Misaki](https://github.com/hexgrad/misaki),
-[misaki-rs](https://github.com/MicheleYin/misaki-rs),
-[tract](https://github.com/sonos/tract),
-[ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) (MIT, [npm](https://www.npmjs.com/package/onnxruntime-web)),
-[browser TTS benchmarks](https://briantung.me/blog/tts-engines-in-the-browser/),
-[lessac dataset licence](https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html).

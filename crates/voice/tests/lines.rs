@@ -1,14 +1,14 @@
 //! Every spoken line in the content (`web/public/content/voice/en.json` and the `voice.en` of
-//! every content file `base.json` includes) phonemizes from the dictionary into symbols
-//! KittenTTS knows (espeak-style IPA), and every key names something that exists. Needs `node tools/voice/fetch.mjs`
-//! first for the phonemizer part.
+//! every content file `base.json` includes) phonemizes from the dictionary (for its mouth
+//! shapes), has plain text for the model to read, and every key names something that exists.
+//! Needs `node tools/voice/fetch.mjs` first for the phonemizer part.
 
 use std::collections::{BTreeSet, HashMap};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
-use voice::{G2p, KittenTokenizer, Lexicon, misaki_to_espeak};
+use voice::{G2p, Lexicon, plain_text};
 
 const TONES: [&str; 5] = ["happy", "sad", "angry", "flirty", "question"];
 /// Short lines: each one is made into speech on its own while the game runs.
@@ -108,25 +108,18 @@ fn every_line_phonemizes_from_the_dictionary() {
 }
 
 #[test]
-fn every_line_tokenises_for_kitten() {
-    let Some(g2p) = g2p() else { return };
-    let kitten = KittenTokenizer::new();
+fn every_line_reads_as_plain_text() {
     let mut all = Vec::new();
     for (name, file) in line_files() {
         lines(&file, &name, &mut all);
     }
     let mut wrong = Vec::new();
     for (at, text) in &all {
-        let text = text.replace("{me}", "Anna").replace("{name}", "Ben");
-        let ipa = misaki_to_espeak(&g2p.phonemize(&text));
-        let odd = kitten.unknown(&ipa);
-        let ids = kitten.ids(&ipa);
-        if !odd.is_empty() {
-            wrong.push(format!("{at}: {text}\n  symbols KittenTTS doesn't know {odd:?} in {ipa}"));
-        } else if ids.len() < 4 {
-            wrong.push(format!("{at}: {text}\n  nothing to say: {ipa:?}"));
-        } else if ids.len() > 512 {
-            wrong.push(format!("{at}: {text}\n  too long for the model"));
+        let plain = plain_text(&text.replace("{me}", "Anna").replace("{name}", "Ben"));
+        if !plain.chars().any(char::is_alphanumeric) {
+            wrong.push(format!("{at}: {text}\n  nothing for the model to read: {plain:?}"));
+        } else if plain.contains("](/") {
+            wrong.push(format!("{at}: {text}\n  a pronunciation mark the model would read aloud: {plain:?}"));
         }
     }
     assert!(wrong.is_empty(), "{} of {} lines:\n{}", wrong.len(), all.len(), wrong.join("\n"));

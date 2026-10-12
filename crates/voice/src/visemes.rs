@@ -1,4 +1,4 @@
-//! Mouth shapes for a line of speech. KittenTTS gives audio only (no durations), so the track is
+//! Mouth shapes for a line of speech. The model gives audio only (no durations), so the track is
 //! made from the line's Misaki phonemes and the finished clip: each phoneme becomes one of the 15
 //! Oculus/Meta visemes with a weight for how long it usually lasts, the weights are spread over
 //! the clip's voiced span, and pauses (commas, sentence ends) are moved onto the quiet gaps the
@@ -44,7 +44,7 @@ const COMMA: f32 = 1.5;
 const SENTENCE_END: f32 = 2.5;
 
 /// Analysis frames: 10 ms. A frame is voiced when its RMS is over 5 % of the loudest frame's
-/// (as `kitten::trim` decides what to keep).
+/// (as `dsp::trim` decides what to keep).
 const FRAMES_PER_SECOND: u32 = 100;
 const VOICED: f32 = 0.05;
 /// A pause can land on a gap: frames under 8 % of the line's 95th percentile, 40 ms or more.

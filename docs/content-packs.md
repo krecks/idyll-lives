@@ -327,7 +327,8 @@ replaces lines, under a top-level `voice` key with the same layout, per language
   `lines`, then the interaction id, then the animation tag.
 - A group is a list of lines or `{"lines": [...], "tone": "..."}`; tones are `happy`, `sad`,
   `angry`, `flirty` and `question`. `{name}` is the other resident's first name, `{me}` the
-  speaker's. `[word](/phonemes/)` fixes a pronunciation in Misaki's alphabet.
+  speaker's. `[word](/phonemes/)` gives a word's phonemes in Misaki's alphabet for the mouth
+  shapes (the voice model reads the word itself).
 - Packs merge in `include` order, key by key: a later pack's list replaces an earlier one for the
   same key, other keys stay. Prefer adding lines for your own objects to replacing the base game's.
 - Write 3–6 lines per key (a resident doesn't repeat their last few), short (most under 40

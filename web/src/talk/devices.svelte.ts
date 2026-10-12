@@ -29,6 +29,7 @@ import { hasWebGpu, type Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
 import { toast } from '../ui/state.svelte';
 import { synthesize, useVoiceDevice, voiceDevice } from '../voice/service.svelte';
+import type { VoiceParams } from '../voice/voices';
 import { cleanLine } from './clean';
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from './prompt';
 import { WRITE_MS } from './writer';
@@ -97,7 +98,7 @@ const KEY = 'littlelives.deviceTests';
 const LINE_MS = WRITE_MS;
 /** Speech alone must be made within this (the voice speed test's "ok"). */
 const SPEECH_MS = 3000;
-const VOICE = { mix: [5, 5, 1] as [number, number, number], speed: 1, pitch: 1, depth: 1 };
+const VOICE: VoiceParams = { clip: 'preset:Charles', clipPitch: 1, clipDepth: 1, pitch: 1, depth: 1, speed: 1, temperature: 0.7 };
 
 export const deviceTest = $state({
   running: false,

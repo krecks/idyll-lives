@@ -3,7 +3,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, LifeStageDef } from '../content/content';
 import { GARMENTS, pickOutfit } from '../render/babylon/characters/outfit';
-import { baseVoice, KITTEN_VOICES, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
+import { chosenPreset, presetByName, presetsFor, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
 
 /** Hairstyles (character parts `hair.<style>`), and bald. */
 export const HAIR_STYLES = [
@@ -222,9 +222,9 @@ export function regender(content: Content, sim: SimDraft, from: string, taken: r
   if (look.top && !tops.includes(look.top)) look.top = tops.includes(similar[look.top]) ? similar[look.top] : tops[0];
   if (look.bottom && !bottoms.includes(look.bottom)) look.bottom = bottoms.includes(similar[look.bottom]) ? similar[look.bottom] : bottoms[0];
   if (look.beard && to !== 'male') look.beard = false;
-  // A chosen voice of the other sex goes back to the resident's own mix.
-  const base = baseVoice(look.voice);
-  if (look.voice && base !== null && (to === 'male' || to === 'female') && KITTEN_VOICES[base].sex !== to) delete look.voice.base;
+  // A chosen voice of the other sex goes back to the resident's own (a recording stays: it's theirs).
+  const preset = chosenPreset(look.voice);
+  if (look.voice && preset !== null && (to === 'male' || to === 'female') && presetByName(preset)?.sex !== to) delete look.voice.preset;
 }
 
 /** Drafts made before garments could be chosen get a random outfit (kept from then on). */
@@ -242,23 +242,25 @@ export function draftVoice(sim: SimDraft): VoiceChoice {
 }
 
 /**
- * The creator's dice for the voice: one of KittenTTS's voices that fits the gender (any for
- * others) or a new mix of their own, and pitch, speed and depth anywhere in the range.
+ * The creator's dice for the voice: one of the bundled voices that fits the gender (any for
+ * others), or a new generated one, and pitch, speed, size and expressiveness anywhere in the
+ * range. A recording stays (the dice don't throw away someone's own voice).
  */
 export function randomVoice(sim: SimDraft): void {
   const voice = draftVoice(sim);
   const roll = ([lo, hi]: readonly [number, number]) => Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
-  const fits = KITTEN_VOICES.flatMap((v, i) => (sim.gender !== 'male' && sim.gender !== 'female') || v.sex === sim.gender ? [i] : []);
+  const fits = presetsFor(sim.gender);
   const pick = Math.floor(Math.random() * (fits.length + 1));
   if (pick === fits.length) {
-    delete voice.base;
+    delete voice.preset;
     voice.seed = Math.floor(Math.random() * 2 ** 31);
   } else {
-    voice.base = fits[pick];
+    voice.preset = fits[pick];
   }
   voice.pitch = roll(VOICE_RANGE.pitch);
   voice.speed = roll(VOICE_RANGE.speed);
   voice.depth = roll(VOICE_RANGE.depth);
+  voice.expressive = roll(VOICE_RANGE.expressive);
 }
 
 export function randomSim(content: Content, assets: AssetRegistry, taken: readonly string[] = []): SimDraft {

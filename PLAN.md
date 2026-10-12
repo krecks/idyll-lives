@@ -247,7 +247,7 @@ idyll-lives/
 ├─ crates/
 │  ├─ sim-core/        # pure Rust simulation, no browser deps, native tests
 │  ├─ sim-wasm/        # thin wasm-bindgen layer
-│  ├─ voice/           # resident voices: English phonemizer, KittenTTS input, resampling
+│  ├─ voice/           # resident voices: phonemizer (mouth shapes), voice shaping (PSOLA), resampling
 │  └─ voice-wasm/      # thin wasm-bindgen layer for the voice worker
 ├─ web/
 │  ├─ public/content/  # gameplay data: needs, objects, careers, houses, voice lines (JSON)
@@ -302,7 +302,7 @@ The snapshot memory layout is **defined once in Rust** (`sim-core/src/snapshot.r
 
 | Release | Theme | Done when |
 |---|---|---|
-| next | Voices III: own engine | Voices phases 5 and 6: hand-written inference for KittenTTS (at least 8× real time in the browser, WASM under 1.5 MB), then Auto mode. About 2.5 weeks (research in 0.20, on Paradee-8M: ~0.38 s per line estimated, ~0.4 MB WASM); ONNX Runtime Web ships until then. The voice's size (formants) already shipped in 0.20 as a resample of the output, which an own engine keeps. Kokoro-82M is dropped for now (measured 2026-10-10: slower than real time on one CPU thread, 1.2–1.75 s per line on WebGPU, 86–326 MB). |
+| next | Voices III: Auto mode | Since 0.1.0 residents speak with Kyutai's **Pocket TTS** (CC BY 4.0, 146 MB int8, about 1.6× real time on one CPU thread in the browser): it speaks like a reference clip, so players shape a voice in the creator (24 bundled voices, pitch, depth, speed, expression) or record their own (see `docs/design/voices.md`). Next: Auto mode, and streaming playback (a line starting after its first frames) if slower computers need it. The hand-written engine planned for KittenTTS is dropped; ONNX Runtime Web stays. |
 | later | Smarter thoughts (research) | An optional small language model in the browser (Chrome's built-in Gemini Nano, or a ~0.6–0.8B Qwen model through Transformers.js) writes thoughts and dialogue for actions the utility AI already chose, feeding Resident voices. The utility AI keeps deciding; a model may at most re-rank its top-3 shortlist, entering the sim as a recorded command so saves and replays stay deterministic. Jev/OpenJev-style decision models were assessed (2026-10-09): no browser builds, 200–800 MB and slow next to utility scoring, so not used. |
 
 Every release ships with native sim tests (including the town soak), `pnpm check`, and the frame-time budget checked.
@@ -328,7 +328,7 @@ Every release ships with native sim tests (including the town soak), `pnpm check
 1. **Devices:** desktop only.
 2. **Art direction:** modern, minimalist and stylised; all art is replaceable through the manifest.
 3. **Name:** Idyll Lives (`idyll-lives` in slugs).
-4. **Licence:** Idyll Lives is free software, released under the GNU General Public License v3.0 (or later). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. (MIT until 0.1.0.) Third-party parts keep their own licences (art CC0, voice model and dictionary Apache-2.0; see `web/public/assets/CREDITS.md`).
+4. **Licence:** Idyll Lives is free software, released under the GNU General Public License v3.0 (or later). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. (MIT until 0.1.0.) Third-party parts keep their own licences (art CC0; voice model and voices CC BY 4.0 and CC0, dictionary Apache-2.0; see `web/public/assets/CREDITS.md`).
 
 ### Naming
 

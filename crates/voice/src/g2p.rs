@@ -480,6 +480,26 @@ fn unaccented(word: &str) -> Option<String> {
     plain.is_ascii().then_some(plain)
 }
 
+/// The text with its pronunciation marks dropped (`[read](/ɹˈɛd/)` becomes `read`), spaces
+/// tidied: what the model reads.
+pub fn plain_text(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '['
+            && let Some((word, _, len)) = parse_link(&chars[i..])
+        {
+            out.push_str(&word);
+            i += len;
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn tokenize(text: &str) -> Vec<Token> {
     let text = text.replace(['‘', '’'], "'").replace('–', "—");
     let chars: Vec<char> = text.chars().collect();
@@ -572,6 +592,12 @@ fn parse_link(chars: &[char]) -> Option<(String, String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_text_drops_pronunciations() {
+        assert_eq!(plain_text("I [read](/ɹˈɛd/) it,  [Kokoro](/kˈOkəɹˌO/)!"), "I read it, Kokoro!");
+        assert_eq!(plain_text("a [b] c (d)"), "a [b] c (d)");
+    }
 
     #[test]
     fn stress_rules() {

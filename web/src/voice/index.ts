@@ -11,8 +11,9 @@
  * resident is and what's going on (`talk/`, the `voiceWriter` setting): a `LineWriter` turns
  * what happened into words. With subtitles on, the speech bubble shows the line while it plays.
  *
- * Everyone speaks with KittenTTS (`voices.ts`); babies don't speak. If lines keep coming late
- * or slow the frames, voices pause for the session.
+ * Everyone speaks with Pocket TTS (`voices.ts`); babies don't speak. A resident's voice is got
+ * ready when they start to be heard (selected, or in a conversation), so their first line isn't
+ * late. If lines keep coming late or slow the frames, voices pause for the session.
  *
  * Presentation only: nothing goes back to the simulation. Work per frame is a cheap check; the
  * snapshot is read about ten times a second.
@@ -29,9 +30,10 @@ import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { cachedClip, ensureVoice, speak, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { voiceKey } from './pocket';
+import { brokenRecordings, cachedClip, ensureVoice, prepareVoice, speak, unloadVoice, useRecording, voiceGeneration, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
-import { voiceFor, withTone } from './voices';
+import { chosenRecording, voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
 
 const TICK_MS = 100;
@@ -115,6 +117,9 @@ export class VoiceDirector {
     /** Lines the language model is writing, by resident (a newer event replaces theirs). */
   private readonly writing = new Map<number, AbortController>();
   private readonly sims = new Map<number, SimState>();
+  /** The voice got ready for each resident, in the worker counted by `readiedIn` (`voiceKey`). */
+  private readonly readied = new Map<number, string>();
+  private readiedIn = -1;
   /** Each resident's snapshot index at the last tick. */
   private readonly rows = new Map<number, number>();
   private readonly speaking: Speaking[] = [];
@@ -231,6 +236,13 @@ export class VoiceDirector {
         if (curr[o + k.social] > 0 && partner >= 0 && partner < count) voiced.add(idAt(partner));
       }
     }
+    if (voiceReady()) {
+      if (this.readiedIn !== voiceGeneration()) {
+        this.readied.clear();
+        this.readiedIn = voiceGeneration();
+      }
+      for (const id of voiced) this.ready(id);
+    }
     if (talk) {
       const busy = [talk.a, talk.b].some((id) => {
         for (let i = 0; i < count; i++) if (idAt(i) === id) return curr[row(i) + k.social] > 0;
@@ -268,6 +280,27 @@ export class VoiceDirector {
     }
 
     this.pan(frame);
+  }
+
+  /** A resident's voice: their own (a recording handed to the worker first; one this browser can't read is left out). */
+  private voiceOf(id: number): VoiceParams | null {
+    const info = game.roster.find((s) => s.id === id);
+    if (!info || info.stage === 'baby') return null;
+    let choice = info.appearance?.voice;
+    const rec = chosenRecording(choice);
+    if (rec && brokenRecordings.has(rec.sha)) choice = { ...choice, recording: undefined };
+    else if (rec) void useRecording(rec).catch(() => {});
+    return voiceFor(id, info.gender, info.stage, choice);
+  }
+
+  /** Gets a resident's voice ready before their first line (once per voice while the engine stays loaded). */
+  private ready(id: number): void {
+    const voice = this.voiceOf(id);
+    if (!voice) return;
+    const key = voiceKey(voice);
+    if (this.readied.get(id) === key) return;
+    this.readied.set(id, key);
+    prepareVoice(voice);
   }
 
   /** For the debug overlay. */
@@ -427,11 +460,11 @@ export class VoiceDirector {
 
   /** Says a line: its speech from the cache or made, then played. `requested`: when the moment was; `budget`: how late it may be. */
   private say(id: number, index: number, line: Line, partnerId: number, thought: boolean, now: number, requested: number, budget: number): void {
-    const info = game.roster.find((s) => s.id === id);
-    if (info?.stage === 'baby') return;
+    const own = this.voiceOf(id);
+    if (!own) return;
     const text = fill(line.text, this.firstName(id), partnerId >= 0 ? this.firstName(partnerId) : '');
     if (this.debug && this.heard.push(`${id} ${line.key}: ${text}`) > 50) this.heard.shift();
-    const voice = withTone(voiceFor(id, info?.gender, info?.stage, info?.appearance?.voice), line.tone);
+    const voice = withTone(own, line.tone);
     // A line said before plays at once, even while the engine is unloaded.
     const cached = cachedClip(text, voice);
     if (!cached) {

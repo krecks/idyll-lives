@@ -1,14 +1,15 @@
 /**
  * The voice engine for the whole app (settings preview, benchmark, creator, the game): one
- * worker with KittenTTS nano, started and loaded the first time a voice is needed, and a status
- * the settings screen shows.
+ * worker with Kyutai's Pocket TTS, started and loaded the first time a voice is needed, and a
+ * status the settings screen shows. Players' recordings are decoded here and handed to the
+ * worker as clips (`useRecording`).
  */
 
 import type { Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker } from './protocol';
 import { parseVisemes, type VisemeTrack } from './visemes';
-import type { VoiceParams } from './voices';
+import type { Recording, VoiceParams } from './voices';
 
 /** One line of speech: 24 kHz mono and its mouth shapes. */
 export interface Clip {
@@ -34,6 +35,9 @@ export type ModelState = 'off' | 'loading' | 'ready' | 'error';
 /** How the voice worker is doing (for the debug overlay). */
 export interface VoiceThreadStats {
   state: ModelState;
+  /** Where the model runs and on how many threads. */
+  device: Device;
+  threads: number;
   /** Time to load the engine, ms (0 until ready). */
   loadMs: number;
   /** Lines made since the engine started, and lines waiting to be made. */
@@ -54,8 +58,8 @@ export interface VoiceThreadStats {
 
 // Before `voiceStatus`, which reads stored results with them.
 const BENCH_KEY = 'littlelives.voiceBench';
-/** The model, its edit and the runtime: a new id discards old speed-test results and cached clips. */
-export const MODEL_ID = 'kitten-nano-0.8@7a1db64+int8+edit2/ort-web@1.30.0';
+/** The model, its voices and the runtime: a new id discards old speed-test results and cached clips. */
+export const MODEL_ID = 'pocket-tts-en-2026-04@58a6d00+int8+presets2/ort-web@1.30.0';
 
 export const voiceStatus = $state({
   state: 'off' as ModelState,
@@ -66,19 +70,30 @@ export const voiceStatus = $state({
   bench: readBench(),
 });
 
-/** The download, MB: runtime, phonemizer and dictionary (about 15.8 MB) and the model with its voices (16.5 MB). */
-export const DOWNLOAD_MB = 32.3;
+/** The download, MB: runtime, our WASM and dictionary (about 15.7 MB), the model (146.5 MB with its tokenizer) and its voices (11.3 MB). */
+export const DOWNLOAD_MB = 173.5;
 const BENCH_LINES = [
   'Hello there!',
   "I'm so hungry, I could eat a whole pizza by myself.",
   'What a lovely garden. I should water the roses before it gets dark.',
 ];
-/** The voice the speed test uses: one of KittenTTS's men (Bruno). */
-const BENCH_VOICE: VoiceParams = { mix: [5, 5, 1], speed: 1, pitch: 1, depth: 1 };
+/** The voice the speed test uses: one of the bundled men's (Charles), as he is. */
+const BENCH_VOICE: VoiceParams = { clip: 'preset:Charles', clipPitch: 1, clipDepth: 1, pitch: 1, depth: 1, speed: 1, temperature: 0.7 };
 
 let worker: Worker | null = null;
+/** Counts workers started: what one knew (prepared voices), the next doesn't. */
+let generation = 0;
+export const voiceGeneration = () => generation;
 /** Where the model runs: the CPU, unless the device test found the GPU better (`useVoiceDevice`). */
 let device: Device = 'cpu';
+/**
+ * The runtime's threads: two where the page is cross-origin isolated and the computer has six
+ * cores or more (about 1.6 times as fast as one; the game, the simulation and a language model
+ * keep the rest), else one.
+ */
+export function voiceThreads(): number {
+  return self.crossOriginIsolated && (navigator.hardwareConcurrency ?? 0) >= 6 ? 2 : 1;
+}
 let nextId = 1;
 const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error) => void }>();
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -127,6 +142,7 @@ function onMessage(msg: FromVoiceWorker): void {
 export function ensureVoice(): Promise<void> {
   if (voiceStatus.state === 'ready' && worker) return Promise.resolve();
   if (!worker) {
+    generation++;
     worker = new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<FromVoiceWorker>) => onMessage(e.data);
     worker.onerror = (e) => onMessage({ type: 'error', message: e.message || 'voice worker failed' });
@@ -135,7 +151,9 @@ export function ensureVoice(): Promise<void> {
     voiceStatus.progress = 0;
     voiceStatus.error = '';
     voiceStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device });
+    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device, threads: voiceThreads() });
+    // A new worker knows no recordings yet.
+    for (const [sha, r] of recordings) void r.then((pcm) => post({ type: 'clip', sha, samples: pcm.samples.slice(), rate: pcm.rate })).catch(() => {});
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
 }
@@ -168,9 +186,9 @@ const making = new Map<string, Promise<Clip>>();
 const cache = { bytes: 0, hits: 0 };
 
 function clipKey(text: string, voice: VoiceParams): string {
-  const mix = `${voice.mix[0]}/${voice.mix[1]}/${voice.mix[2].toFixed(3)}`;
+  const v = [voice.clipPitch, voice.clipDepth, voice.pitch, voice.depth, voice.speed, voice.temperature].map((x) => x.toFixed(3)).join('|');
   // The GPU's arithmetic differs a little from the CPU's: clips are kept per device.
-  return `${settings.voiceLanguage}|${MODEL_ID}|${device}|${mix}|${voice.speed.toFixed(3)}|${voice.pitch.toFixed(3)}|${voice.depth.toFixed(3)}|${text}`;
+  return `${settings.voiceLanguage}|${MODEL_ID}|${device}|${voice.clip}|${v}|${text}`;
 }
 
 /** The clip for this line and voice if it was made before (and keeps it fresh), else null. */
@@ -221,11 +239,61 @@ function clipBytes(c: Clip): number {
 /** Audio for one line (24 kHz mono) and its mouth shapes, always made fresh (the speed test). Lines are made one after another in the worker. */
 export async function synthesize(text: string, voice: VoiceParams): Promise<Clip> {
   await ensureVoice();
+  await recordingFor(voice);
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    post({ type: 'speak', id, text, voice: { ...voice, mix: [...voice.mix] } });
+    post({ type: 'speak', id, text, voice: { ...voice } });
   });
+}
+
+/**
+ * Gets a voice ready ahead of its first line (when a resident is selected, or a voice is chosen
+ * in the creator): about two seconds the first time a voice is heard in this browser, a fraction
+ * of that after.
+ */
+export function prepareVoice(voice: VoiceParams): void {
+  if (!worker || voiceStatus.state === 'off' || voiceStatus.state === 'error') return;
+  void recordingFor(voice)
+    .then(() => post({ type: 'prepare', voice: { ...voice } }))
+    .catch(() => {});
+}
+
+/** Players' recordings by SHA: decoded to 24 kHz once, given to every worker started. */
+const recordings = new Map<string, Promise<{ samples: Float32Array; rate: number }>>();
+/** Recordings this browser couldn't decode (made in another browser, say): those residents use their generated voice. */
+export const brokenRecordings = new Set<string>();
+
+/** Decodes a recording (once) and hands it to the worker as clip `rec:<sha>`; rejects if this browser can't read it. */
+export function useRecording(rec: Recording): Promise<void> {
+  let r = recordings.get(rec.sha);
+  if (!r) {
+    r = decodeRecording(rec);
+    recordings.set(rec.sha, r);
+    r.catch(() => {
+      recordings.delete(rec.sha);
+      brokenRecordings.add(rec.sha);
+    });
+    void r.then((pcm) => post({ type: 'clip', sha: rec.sha, samples: pcm.samples.slice(), rate: pcm.rate })).catch(() => {});
+  }
+  return r.then(() => {});
+}
+
+/** Waits for a recording a voice uses (it must have been handed over with `useRecording`). */
+function recordingFor(voice: VoiceParams): Promise<void> {
+  if (!voice.clip.startsWith('rec:')) return Promise.resolve();
+  const r = recordings.get(voice.clip.slice(4));
+  return r ? r.then(() => {}) : Promise.reject(new Error('recording not loaded'));
+}
+
+/** A recording's sound at 24 kHz (the browser decodes and resamples it). */
+async function decodeRecording(rec: Recording): Promise<{ samples: Float32Array; rate: number }> {
+  const bin = atob(rec.audio);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ctx = new OfflineAudioContext(1, SAMPLE_RATE, SAMPLE_RATE);
+  const audio = await ctx.decodeAudioData(bytes.buffer);
+  return { samples: audio.getChannelData(0).slice(), rate: audio.sampleRate };
 }
 
 export function voiceThreadStats(): VoiceThreadStats {
@@ -233,6 +301,8 @@ export function voiceThreadStats(): VoiceThreadStats {
   const recentMs = counters.recent.filter((r) => r.at >= now - BUSY_WINDOW_MS).reduce((n, r) => n + r.ms, 0);
   return {
     state: voiceStatus.state,
+    device,
+    threads: voiceThreads(),
     loadMs: counters.loadMs,
     lines: counters.lines,
     queued: pending.size,
@@ -272,8 +342,8 @@ export function benchVerdict(b: BenchResult): BenchVerdict {
 
 /**
  * "Test this computer": makes three typical lines while the scene keeps drawing, and measures
- * how fast speech is made and whether frames stay smooth. The model runs on the CPU only (a
- * model this small gains nothing from the GPU, which the game needs).
+ * how fast speech is made and whether frames stay smooth (on the CPU unless the device test
+ * found the GPU better).
  */
 export async function runBenchmark(): Promise<BenchResult> {
   voiceStatus.benchmarking = true;
@@ -293,7 +363,7 @@ export async function runBenchmark(): Promise<BenchResult> {
 
 async function bench(): Promise<BenchResult> {
   await ensureVoice();
-  await synthesize('Ready.', BENCH_VOICE); // warm-up
+  await synthesize('Ready.', BENCH_VOICE); // warm-up (and the voice prepared)
   let worstFrameMs = 0;
   let last = performance.now();
   let watching = true;

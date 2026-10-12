@@ -1,6 +1,6 @@
 [package]
 name = "voice"
-description = "Resident voices: English text to Misaki phonemes and KittenTTS nano's input ids."
+description = "Resident voices: Misaki phonemes for mouth shapes, and the sound shaped around Pocket TTS (pitch, size, speed)."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

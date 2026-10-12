@@ -1,6 +1,6 @@
 [package]
 name = "voice-wasm"
-description = "Thin wasm-bindgen layer exposing the phonemizer to the voice worker."
+description = "Thin wasm-bindgen layer exposing the phonemizer and voice shaping to the voice worker."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
