@@ -947,9 +947,13 @@ impl World {
         let mut world = Self::empty(content, Lot::from_file(lot_file)?, Rng::new(seed));
         // Storeys from the file before its objects (stairs, furniture upstairs).
         let storeys = lot_file.storeys.unwrap_or(1).clamp(1, 4);
-        if storeys > 1 {
+        if storeys > 1 || lot_file.basement {
             world.storeys = storeys;
             world.stairs.depth = lot_file.depth as i32;
+        }
+        // The basement's block after the storeys' (storeys the content adds go after it).
+        if lot_file.basement {
+            world.stairs.basement = storeys as i32;
         }
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;

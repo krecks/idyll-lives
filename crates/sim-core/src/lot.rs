@@ -164,6 +164,10 @@ pub struct LotFile {
     /// objects of storey `k` are given on rows `k * depth ..` (see `storeys.rs`).
     #[serde(default)]
     pub storeys: Option<u8>,
+    /// Whether the file's houses have a basement (default not): its walls, doors and objects are
+    /// given on the block of rows after the storeys', `storeys * depth ..` (see `storeys.rs`).
+    #[serde(default)]
+    pub basement: bool,
     /// Wall segments `[x0, z0, x1, z1]` along grid lines.
     #[serde(default)]
     pub walls: Vec<[u16; 4]>,
@@ -353,8 +357,8 @@ impl Lot {
         if w == 0 || d == 0 || w > 256 || d > 256 {
             return Err(Error::new("lot size must be within 1..=256"));
         }
-        // Every storey's rows (see `storeys.rs`).
-        let d = d * file.storeys.unwrap_or(1).clamp(1, 4) as usize;
+        // Every storey's rows, and the basement's after them (see `storeys.rs`).
+        let d = d * (file.storeys.unwrap_or(1).clamp(1, 4) as usize + usize::from(file.basement));
         let mut lot = Self::new(w, d);
         for &[x0, z0, x1, z1] in &file.walls {
             let (x0, z0, x1, z1) = (x0 as usize, z0 as usize, x1 as usize, z1 as usize);

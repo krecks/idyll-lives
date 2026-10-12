@@ -263,6 +263,36 @@ fn a_house_with_a_basement_goes_through_a_blueprint() {
 }
 
 #[test]
+fn a_town_file_can_bring_a_basement() {
+    // One storey and a basement: the basement's walls and things on the block after the
+    // ground's (rows 16..32), the stairs down from the room above; the storey the content adds
+    // goes after it.
+    let room = |z: i32| -> String {
+        format!("[4,{z},10,{z}],[4,{b},10,{b}],[4,{z},4,{b}],[10,{z},10,{b}]", b = z + 6)
+    };
+    let town = format!(
+        r#"{{"width":20,"depth":16,"storeys":1,"basement":true,
+        "walls":[{},{}],"doors":[{{"x":5,"z":8,"axis":"x"}}],
+        "objects":[{{"def":"stairs","x":9,"z":19,"rot":0}},{{"def":"chair","x":5,"z":19,"rot":0}}],
+        "plots":[{{"name":"Home","x":2,"z":1,"w":16,"d":12,"entry":[9.5,12.5]}}],
+        "households":[{{"name":"Player","plot":0,"player":true}}],
+        "sims":[{{"name":"Ada","x":9.5,"z":11.5}}]}}"#,
+        room(2),
+        room(2 + UP)
+    );
+    let mut w = World::from_json(&content(2, true), &town, 1).unwrap();
+    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    assert_eq!((w.storeys, w.lowest_storey(), w.lot.depth), (2, -1, 48));
+    assert_eq!((w.storey_row(-1), w.storey_row(1)), (UP, DOWN), "the basement where the file put it, the storey added after");
+    assert_ne!(w.lot.room_at(6, 4 + UP), OUTDOORS);
+    let s = w.stair_map().stairs[0];
+    assert_eq!(s.landing, (9, 2), "up into the room on the ground");
+    let chair = w.objects.len() as u32 - 1;
+    walk_to_sit(&mut w, chair);
+    assert_eq!((w.sims[0].pose, w.storey_of(w.sims[0].tile().1)), (Pose::Sit, -1), "went down to sit");
+}
+
+#[test]
 fn a_shipped_house_gets_a_basement() {
     // The shipped content allows one: dug out under the player's house, stairs down from
     // inside, a gym and a den down there, and a resident who goes down to work out.

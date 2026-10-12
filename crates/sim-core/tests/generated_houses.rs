@@ -5,7 +5,14 @@
 //! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
 //! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
 //! room has lights enough for all of it at night and is lit well (windows enough by day where
-//! it has an outside wall), and nothing stands just inside a door.
+//! it has an outside wall), every room can be walked into, and nothing stands just inside a
+//! door. A good share of houses on medium and large lots have a basement: under the house, no
+//! windows, its rooms lit and reached by stairs down that come up inside a living room, an
+//! entrance hall, a dining room or a kitchen.
+//!
+//! With `DUMP_STATES=1`, the first house with a basement is written to `debug-states/` as
+//! `generated-basement` (with a resident at the door), to open in the game with
+//! `?state=generated-basement`.
 //!
 //! Make the houses first: `node --experimental-strip-types tools/housegen/sample.ts houses.json`,
 //! then `HOUSES=houses.json cargo test -p sim-core --test generated_houses -- --ignored --nocapture`.
@@ -33,6 +40,8 @@ fn generated_houses_are_livable() {
     let (mut dining, mut tops) = (0, 0);
     let (mut large, mut islands) = (0, 0);
     let (mut rooms, mut bright) = (0, 0);
+    let (mut bigger, mut basements, mut below) = (0, 0, 0);
+    let mut dumped = false;
     for h in &houses {
         let label = format!("{} {} ({})", h["size"], h["seed"], h["description"]);
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
@@ -105,6 +114,72 @@ fn generated_houses_are_livable() {
                 failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
             }
         }
+        // Every room can be walked into from the front door (upstairs and in the basement too).
+        for r in h["rooms"].as_array().into_iter().flatten() {
+            let kind = r["kind"].as_str().unwrap();
+            let [x, z, rw, rd] = ["x", "z", "w", "d"].map(|k| r[k].as_i64().unwrap() as i32);
+            let mut tiles = (z..z + rd).flat_map(|tz| (x..x + rw).map(move |tx| (tx, tz)));
+            if !tiles.any(|t| nav.tile_free(t.0, t.1) && nav.find_path(start, t).is_some()) {
+                failures.push(format!("{label}: can't get into the {kind} at {x},{z}"));
+            }
+        }
+        // The basement: under the house, underground (no windows), stairs down from a room
+        // everyone uses, its rooms lit.
+        bigger += usize::from(h["size"] != "small");
+        // (The shipped content gives every lot a basement storey; the house says whether it has one.)
+        if h["town"]["basement"] == true {
+            basements += 1;
+            let (down, depth, p) = (w.storey_row(-1), w.storey_depth(), &w.plots[0]);
+            let (lw, ld) = (w.lot.width as i32, w.lot.depth as i32);
+            let on_plot = |x: i32, z: i32| x >= p.x && x <= p.x + p.w && z >= down + p.z && z <= down + p.z + p.d;
+            for z in down..=(down + depth).min(ld) {
+                for x in 0..=lw {
+                    let h_edge = if x < lw { w.lot.h_edge(x as usize, z as usize) } else { Edge::Open };
+                    let v_edge = if z < ld && z < down + depth { w.lot.v_edge(x as usize, z as usize) } else { Edge::Open };
+                    for (edge, ex, ez) in [(h_edge, x, z), (v_edge, x, z)] {
+                        if matches!(edge, Edge::Window | Edge::Fence | Edge::Gate) {
+                            failures.push(format!("{label}: a {edge:?} in the basement at {ex},{ez}"));
+                        } else if edge != Edge::Open && !on_plot(ex, ez) {
+                            failures.push(format!("{label}: a basement wall off the plot at {ex},{ez}"));
+                        }
+                    }
+                }
+            }
+            let planned = |x: i32, z: i32| {
+                h["rooms"].as_array().into_iter().flatten().find(|r| {
+                    let [rx, rz, rw, rd] = ["x", "z", "w", "d"].map(|k| r[k].as_i64().unwrap() as i32);
+                    (rx..rx + rw).contains(&x) && (rz..rz + rd).contains(&z)
+                })
+            };
+            let flights: Vec<_> = w.stair_map().stairs.iter().filter(|s| w.storey_of(s.bottom.1) == -1).collect();
+            if flights.is_empty() {
+                failures.push(format!("{label}: a basement with no stairs down"));
+            }
+            for s in flights {
+                // The stairwell (over the steps) and the landing in one room on the ground floor.
+                let (lx, lz) = s.landing;
+                let room = planned(lx, lz);
+                let kind = room.and_then(|r| r["kind"].as_str()).unwrap_or("garden");
+                let well = (0..s.len).map(|i| (s.bottom.0 + s.dir.0 * i, w.ground_z(s.bottom.1 + s.dir.1 * i)));
+                if !["living", "entry", "dining", "kitchen"].contains(&kind) || w.storey_of(lz) != 0 {
+                    failures.push(format!("{label}: the stairs down come up in the {kind} at {lx},{lz}"));
+                } else if !well.clone().all(|(x, z)| planned(x, z) == room) {
+                    failures.push(format!("{label}: the stairwell at {:?} isn't all in the {kind}", well.collect::<Vec<_>>()));
+                }
+            }
+            for r in h["rooms"].as_array().into_iter().flatten() {
+                let [x, z] = ["x", "z"].map(|k| r[k].as_i64().unwrap() as i32);
+                below += usize::from(w.storey_of(z) == -1 && w.room_at_tile(x, z).is_some());
+            }
+            if !dumped && std::env::var_os("DUMP_STATES").is_some() {
+                // With someone living there, standing at the door.
+                let mut town = h["town"].clone();
+                town["sims"] = serde_json::json!([{ "name": "Ada", "x": entry[0], "z": entry[1], "traits": ["foodie"] }]);
+                let lived = World::from_json(&content, &town.to_string(), 1).unwrap();
+                common::dump_state(&lived, "generated-basement");
+                dumped = true;
+            }
+        }
         // Every room has a light, enough for all of it at night (an open kitchen and living room
         // share theirs), and windows enough by day that the room overlay doesn't call it dim.
         let lamp_tiles = w.content.room_rules.lamp_tiles;
@@ -164,6 +239,7 @@ fn generated_houses_are_livable() {
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
     eprintln!("  {bright} of {rooms} rooms lit well");
+    eprintln!("  {basements} of {bigger} houses on medium and large lots with a basement, {below} rooms down there (lit by lamps alone)");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
     }
@@ -171,4 +247,5 @@ fn generated_houses_are_livable() {
     assert!(dining * 10 >= houses.len() * 8, "most houses have a table to sit at");
     assert!(tops * 10 >= houses.len() * 9, "most houses have things on their tops");
     assert!(islands * 4 >= large, "a good share of large houses have a kitchen island with stools");
+    assert!(basements * 5 >= bigger, "a good share of houses on medium and large lots have a basement");
 }

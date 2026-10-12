@@ -249,6 +249,63 @@
       "wall": [{ "one": ["mirrorRound", "printFramed", "wallClock"], "chance": 0.7 }],
       "ceiling": [{ "one": ["ceilingPendant", "ceilingLight"], "chance": 0.5 }],
       "rug": [{ "one": ["rugRunner"], "chance": 0.5 }]
+    },
+    "gym": {
+      "weight": 2.5,
+      "minSide": 3,
+      "maxSide": [4, 5],
+      "furniture": [
+        { "one": ["treadmill", "exerciseBike", "weightBench"] },
+        { "one": ["treadmill", "exerciseBike", "weightBench", "dumbbells"], "count": [1, 2], "chance": 0.7 },
+        { "one": ["yogaMat", "dumbbells", "stereo", "boombox"], "chance": 0.5 },
+        { "one": ["plant", "cubeShelf", "laundryBasket"], "chance": 0.4 }
+      ],
+      "surfaces": [{ "on": ["shelf"], "one": ["towelStack", "trophy"], "count": [1, 2] }],
+      "wall": [{ "one": ["wallClock", "printFramed"], "chance": 0.5 }],
+      "ceiling": [{ "one": ["ceilingLight", "trackLights"], "chance": 0.6 }]
+    },
+    "games": {
+      "weight": 3.5,
+      "minSide": 3,
+      "maxSide": [5, 6],
+      "furniture": [
+        { "one": ["poolTable", "foosball", "arcadeCabinet", "poolTable"] },
+        { "one": ["sofa", "loveseat", "sofaBed"], "chance": 0.6 },
+        { "one": ["tv", "tvRetro"], "opposite": "sofa", "chance": 0.6 },
+        { "one": ["foosball", "arcadeCabinet", "computerGaming", "drumKit", "guitarElectric", "stereo", "barCart"], "count": [1, 2], "chance": 0.7 },
+        { "one": ["beanBag", "recliner", "plant", "floorLampSimple"], "chance": 0.5 }
+      ],
+      "dining": [{ "tables": ["tableSquare2"], "chairs": ["chairFolding"], "seats": [2, 4], "chance": 0.3 }],
+      "surfaces": [{ "on": ["table", "low"], "one": ["mugs", "snowGlobe", "trophy", "booksUpright"], "chance": 0.5 }],
+      "wall": [{ "one": ["printFramed", "photoPrint", "wallClock", "wallSconce"], "count": [0, 2] }],
+      "ceiling": [{ "one": ["pendantIndustrial", "ceilingLight", "trackLights"], "chance": 0.6 }],
+      "rug": [{ "one": ["rugLarge", "rugPattern"], "chance": 0.4 }]
+    },
+    "workshop": {
+      "weight": 2.5,
+      "minSide": 3,
+      "maxSide": [4, 5],
+      "furniture": [
+        { "one": ["workbench"] },
+        { "one": ["shelvingIndustrial", "cubeShelf"] },
+        { "one": ["craftTable", "potteryWheel", "sewingTable", "chemistrySet", "filingCabinet", "workbench"], "count": [1, 2], "chance": 0.6 }
+      ],
+      "surfaces": [{ "on": ["shelf"], "one": ["booksUpright", "potSmall", "tableClock", "trophy"], "count": [1, 2] }],
+      "wall": [{ "one": ["corkboard", "wallShelf", "kitchenShelfWall"], "count": [0, 2] }],
+      "ceiling": [{ "one": ["pendantIndustrial", "trackLights"], "chance": 0.6 }]
+    },
+    "storage": {
+      "weight": 1.5,
+      "minSide": 2,
+      "maxSide": [3, 4],
+      "furniture": [
+        { "one": ["shelvingIndustrial"] },
+        { "one": ["shelvingIndustrial", "cubeShelf", "cedarChest", "filingCabinet", "wardrobeSingle", "bathCabinetTall"], "count": [1, 2] },
+        { "one": ["fridgeMini", "laundryWasher", "laundryBasket"], "chance": 0.3 }
+      ],
+      "surfaces": [{ "on": ["shelf", "low"], "one": ["booksUpright", "potSmall", "toyBlocks", "vaseSmall"], "count": [0, 2] }],
+      "wall": [{ "one": ["wallShelf", "kitchenShelfWall"], "chance": 0.4 }],
+      "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]
     }
   },
 
@@ -269,6 +326,19 @@
   "windows": { "spacing": [2, 3], "daylight": 0.5 },
 
   "stairs": "stairs",
+
+  "$basement": "A share of houses (`chance` per lot size) get a basement under them: stairs down from the living room, the entrance hall or the dining room, along a side wall, a hall at their foot and `count` rooms off it of the kinds in `rooms` (by `weight`; none the house has already; fewer if they don't fit). Basements have no windows: their rooms get ceiling lights enough (`lights` below). `label` names a room in the house's description.",
+  "basement": {
+    "chance": { "small": 0, "medium": 0.45, "large": 0.7 },
+    "count": [1, 2],
+    "rooms": [
+      { "kind": "games", "label": "a games room", "weight": 3 },
+      { "kind": "gym", "label": "a gym", "weight": 2 },
+      { "kind": "workshop", "label": "a workshop", "weight": 2 },
+      { "kind": "laundry", "label": "a laundry", "weight": 2 },
+      { "kind": "storage", "label": "a storeroom", "weight": 1.5 }
+    ]
+  },
 
   "$lights": "Every room gets lights enough for all of it at night (one lamp lights `roomRules.lampTiles` tiles in base.json; lamps already in it count): more from the ceiling, spread over the room, picked from the room's own `ceiling` lights, else from these (the upstairs hall).",
   "lights": ["ceilingLight", "ceilingPendant"],

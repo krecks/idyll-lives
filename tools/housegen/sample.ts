@@ -37,7 +37,7 @@ const info = objectInfos({ object: (id) => byId.get(id), radius: (d) => Math.max
 const out = process.argv[2] ?? 'houses.json';
 const perSize = Number(process.argv[3] ?? 60);
 const towns: unknown[] = [];
-const stats = { tried: 0, made: 0, two: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0 };
+const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0 };
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
 // A farm lot's house is a large lot's (town.ts `houseLot`).
@@ -48,13 +48,14 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     if (!h) continue;
     stats.made++;
     if (h.upper) stats.two++;
-    const all = [...h.objects, ...(h.upper?.objects ?? [])];
+    if (h.basement) stats.basements++;
+    const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
     stats.value += all.reduce((n, o) => n + (byId.get(o.def)?.price ?? 0), 0);
     const seats = all.filter((o) => byId.get(o.def)?.seatAt).length;
     stats.seats += seats;
     if (seats) stats.dining++;
     stats.tops += all.filter((o) => byId.get(o.def)?.layer === 'surface').length;
-    for (const r of [...(h.rooms ?? []), ...(h.upper?.rooms ?? [])]) {
+    for (const r of [...(h.rooms ?? []), ...(h.upper?.rooms ?? []), ...(h.basement?.rooms ?? [])]) {
       const k = kinds.get(r.kind) ?? { n: 0, area: 0, most: 0, long: 0 };
       kinds.set(r.kind, { n: k.n + 1, area: k.area + r.w * r.d, most: Math.max(k.most, r.w * r.d), long: Math.max(k.long, r.w, r.d) });
       stats.rooms++;
@@ -62,26 +63,39 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     // Back on the lot (the layouts' frame is a medium lot's).
     const dx = Math.floor((lot.width - houses.plot.width) / 2);
     const depth = lot.depth;
+    // The basement on the rows after every storey's (as `town.ts` puts it).
+    const storeys = h.upper ? 2 : 1;
+    const down = storeys * depth;
     const moveDoor = (lift: number) => (d: { x: number; z: number; axis: string }) => ({ x: d.x + dx, z: d.z + lift, axis: d.axis });
     const walls = [
       ...h.walls.map(([a, b, c, d]) => [a + dx, b, c + dx, d]),
       ...(h.upper?.walls ?? []).map(([a, b, c, d]) => [a + dx, b + depth, c + dx, d + depth]),
+      ...(h.basement?.walls ?? []).map(([a, b, c, d]) => [a + dx, b + down, c + dx, d + down]),
     ];
     towns.push({
       size,
       seed: seed * 7919,
       name: h.name,
       description: h.description,
-      // The rooms as planned, on the lot (the storey above `depth` rows down, like the town).
-      rooms: [...(h.rooms ?? []).map((r) => ({ ...r, x: r.x + dx })), ...(h.upper?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + depth }))],
+      // The rooms as planned, on the lot (the storey above `depth` rows down, the basement after it, like the town).
+      rooms: [
+        ...(h.rooms ?? []).map((r) => ({ ...r, x: r.x + dx })),
+        ...(h.upper?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + depth })),
+        ...(h.basement?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + down })),
+      ],
       town: {
         width: lot.width,
         depth,
-        storeys: h.upper ? 2 : 1,
+        storeys,
+        ...(h.basement ? { basement: true } : {}),
         walls,
-        doors: [...h.doors.map(moveDoor(0)), ...(h.upper?.doors ?? []).map(moveDoor(depth))],
-        windows: [...(h.windows ?? []).map(moveDoor(0)), ...(h.upper?.windows ?? []).map(moveDoor(depth))],
-        objects: [...h.objects.map((o) => ({ ...o, x: o.x + dx })), ...(h.upper?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + depth }))],
+        doors: [...h.doors.map(moveDoor(0)), ...(h.upper?.doors ?? []).map(moveDoor(depth)), ...(h.basement?.doors ?? []).map(moveDoor(down))],
+        windows: [...(h.windows ?? []).map(moveDoor(0)), ...(h.upper?.windows ?? []).map(moveDoor(depth)), ...(h.basement?.windows ?? []).map(moveDoor(down))],
+        objects: [
+          ...h.objects.map((o) => ({ ...o, x: o.x + dx })),
+          ...(h.upper?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + depth })),
+          ...(h.basement?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + down })),
+        ],
         plots: [{ name: 'Home', x: 0, z: 0, w: lot.width, d: depth, entry: h.spawns[0] && [h.spawns[0][0] + dx, h.spawns[0][1]] }],
         households: [{ name: 'Test', plot: 0, player: true }],
         sims: [],
@@ -90,7 +104,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
   }
 }
 writeFileSync(out, JSON.stringify(towns));
-console.log(`${stats.made} of ${stats.tried} houses made (${stats.two} with two storeys) → ${out}`);
+console.log(`${stats.made} of ${stats.tried} houses made (${stats.two} with two storeys, ${stats.basements} with a basement) → ${out}`);
 const per = (n: number) => (n / Math.max(1, stats.made)).toFixed(1);
 console.log(`  per house: $${per(stats.value)} of things, ${per(stats.seats)} chairs at tables (${stats.dining} houses with some), ${per(stats.tops)} things on tops`);
 console.log(`  ${per(stats.rooms)} rooms per house; by kind (count, mean and largest floor, longest side):`);

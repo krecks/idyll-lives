@@ -8,7 +8,9 @@
  * 2. doors join the rooms (a tree from the entrance, preferring doors onto the living room or
  *    kitchen), the front door faces the street; kitchen and living room may share an open space;
  * 3. two-storey houses get stairs along an outside wall of the living room, an upstairs hall over
- *    them, and the bedrooms and a bathroom off that hall;
+ *    them, and the bedrooms and a bathroom off that hall; some houses get a basement: stairs down
+ *    along a wall of the living room (or the entrance hall, the dining room, the kitchen), a hall
+ *    at their foot and a room or two off it (a games room, a gym, a workshop...), under the house;
  * 4. windows go along the outside walls, daylight enough for every room that has one; kitchens
  *    get a counter run along one wall (sink, stove); furniture goes against the walls (doors and
  *    stairs kept clear, every piece reachable), tables stand free with chairs round them, small
@@ -18,7 +20,8 @@
  *
  * Seeded: the same seed, lot size and config always give the same house, so a town keeps only
  * `gen:<lot size>:<seed>` per lot (see `town.ts`). Output is a `HouseTemplate` in the layouts'
- * frame (drawn for a medium lot, front to the street at z = 0), with `upper` for storey 1.
+ * frame (drawn for a medium lot, front to the street at z = 0), with `upper` for storey 1 and
+ * `basement` for storey -1 (both on the same rows as the ground).
  */
 
 import type { ObjectDef, SurfaceKind } from '../content/content';
@@ -40,6 +43,7 @@ export interface HouseGenConfig {
   garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
   /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall). */
   lights?: string[];
+  basement?: BasementSpec;
   names: { first: string[]; second: Record<string, string[]> };
 }
 
@@ -71,6 +75,17 @@ interface ExtraRoom {
   minBedrooms?: number;
   floor?: 'ground' | 'upper';
   label?: string;
+}
+
+/**
+ * Basements: a share of houses (`chance`, a number or per lot size) get one, with `count` rooms
+ * of the kinds in `rooms` (picked by `weight`, none the house has already; `label` names them in
+ * the house's description), off a hall at the foot of the stairs down.
+ */
+interface BasementSpec {
+  chance: number | Record<string, number>;
+  count: [number, number];
+  rooms: { kind: Kind; weight?: number; label?: string }[];
 }
 
 interface RoomSpec {
@@ -195,6 +210,8 @@ interface Floor {
   taken: Set<string>;
   /** Tiles taken on the wall, ceiling and rug layers (`wall:x:z`, ...). */
   layers?: Set<string>;
+  /** Tiles open to the stairs down to the basement (the stairwell): nothing hangs or lies there either. */
+  well?: Set<string>;
 }
 
 const key = (x: number, z: number) => `${x}:${z}`;
@@ -218,8 +235,12 @@ export function random(seed: number): () => number {
 export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
-    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt), lampTiles, windowTiles);
-    if (!house) continue;
+    // The basement draws numbers of its own: a house without one is laid out as it was before
+    // there were any (as is one whose stairs down leave no room for its furniture, without them).
+    const n = seed * 31 + attempt;
+    let house = attemptHouse(cfg, info, lot, lotSize, random(n), random(n ^ 0x5bd1e995), lampTiles, windowTiles);
+    if (house === 'basement') house = attemptHouse(cfg, info, lot, lotSize, random(n), null, lampTiles, windowTiles);
+    if (!house || house === 'basement') continue;
     // Into the layouts' frame (centred on lots of other widths by `onLot`).
     const dx = -Math.floor((lot.width - medium.width) / 2);
     const shift = (h: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] }) => {
@@ -231,6 +252,7 @@ export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { wid
     };
     shift(house);
     if (house.upper) shift(house.upper);
+    if (house.basement) shift(house.basement);
     house.spawns = house.spawns.map(([x, z]) => [x + dx, z]);
     house.id = `gen:${lotSize}:${seed}`;
     return house;
@@ -254,7 +276,11 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
   return entries[entries.length - 1]?.[0] ?? null;
 }
 
-function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, lampTiles: number, windowTiles: number): HouseTemplate | null {
+/**
+ * `belowRng`: the random numbers for the basement (null: no basement). `'basement'`: there's no
+ * room for the house's furniture with the stairs down (it may do without a basement).
+ */
+function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, belowRng: (() => number) | null, lampTiles: number, windowTiles: number): HouseTemplate | null | 'basement' {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -294,9 +320,9 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
   const add = (kind: Kind, list: Kind[]) => {
     if (stretched(list) && (kind === 'bathroom' || !list.includes(kind)) && (least(list) + cfg.rooms[kind].minSide ** 2) * LEAST_SLACK <= floorOf(list)) list.push(kind);
   };
-  const chanceOf = (e: ExtraRoom) => (typeof e.chance === 'number' ? e.chance : (e.chance[lotSize] ?? 0));
-  const extras = (cfg.extras ?? []).filter((e) => cfg.rooms[e.kind] && bedrooms >= (e.minBedrooms ?? 0) && chanceOf(e) > 0);
-  for (const e of extras.filter((e) => rng() < chanceOf(e))) add(e.kind, two && e.floor === 'upper' ? upstairs : ground);
+  const chanceOf = (chance: number | Record<string, number>) => (typeof chance === 'number' ? chance : (chance[lotSize] ?? 0));
+  const extras = (cfg.extras ?? []).filter((e) => cfg.rooms[e.kind] && bedrooms >= (e.minBedrooms ?? 0) && chanceOf(e.chance) > 0);
+  for (const e of extras.filter((e) => rng() < chanceOf(e.chance))) add(e.kind, two && e.floor === 'upper' ? upstairs : ground);
   // Rooms need some floor besides their own (their shapes don't fit together perfectly).
   while (lists.some(stretched)) {
     const [w, d] = W >= D ? [W - 1, D] : [W, D - 1];
@@ -338,9 +364,33 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     if (!up) return null;
   }
   const has = new Set([...ground, ...upstairs]);
+  // A basement, if the house gets one and it fits (fewer rooms down there if they don't); with
+  // `belowRng` null, none.
+  let basement: Floor | null = null;
+  const below: Kind[] = [];
+  const spec = cfg.basement;
+  if (spec && belowRng && belowRng() < chanceOf(spec.chance)) {
+    // The kinds in an order drawn by weight: the first `count`, fewer if they don't fit, else one of the others alone.
+    const n = between(belowRng, spec.count);
+    const order: Kind[] = [];
+    for (const options = spec.rooms.filter((r) => cfg.rooms[r.kind] && !has.has(r.kind)); options.length; ) {
+      const kind = weighted(belowRng, Object.fromEntries(options.map((o) => [o.kind, o.weight ?? 1])))!;
+      order.push(kind);
+      options.splice(options.findIndex((o) => o.kind === kind), 1);
+    }
+    const plans = [...Array.from({ length: n }, (_, i) => order.slice(0, n - i)), ...order.slice(n).map((k) => [k])].filter((p) => p.length);
+    for (const kinds of plans) {
+      basement = basementFloor(cfg, info, belowRng, house, g, kinds, new Set([...has, ...kinds]), lampTiles);
+      if (!basement) continue;
+      below.push(...kinds);
+      break;
+    }
+    for (const k of below) has.add(k);
+  }
   windows(cfg, rng, g, house, windowTiles);
   if (up) windows(cfg, rng, up, house, windowTiles);
-  if (!furnish(cfg, info, rng, g, has, lampTiles)) return null;
+  // A stairwell that leaves the ground floor without room for what must be there: try the house without a basement.
+  if (!furnish(cfg, info, rng, g, has, lampTiles)) return basement ? 'basement' : null;
   if (up && !furnish(cfg, info, rng, up, has, lampTiles)) return null;
   garden(cfg, info, rng, g, house, lot);
 
@@ -361,8 +411,9 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     ground.includes('living') ? (hasOpenPlan(g) ? 'an open kitchen and living room' : 'a living room') : null,
     extraBath ? 'two bathrooms' : null,
     ...new Set([...ground.slice(baseGround), ...upstairs.slice(baseUp)].map((k) => cfg.extras?.find((e) => e.kind === k)?.label)),
+    below.length ? `a basement with ${listOf(below.map((k) => spec?.rooms.find((r) => r.kind === k)?.label ?? `a ${k}`))}` : null,
   ].filter((p): p is string => !!p);
-  const listed = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  const listed = listOf(parts);
   const description = `A ${two ? 'two-storey ' : ''}${cls.label} with ${listed}.`;
 
   const out = (f: Floor) => {
@@ -379,7 +430,13 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     ...out(g),
     spawns,
     ...(up ? { upper: out(up) } : {}),
+    ...(basement ? { basement: out(basement) } : {}),
   };
+}
+
+/** `a, b and c`. */
+function listOf(parts: string[]): string {
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
 }
 
 // ---- floor plans ------------------------------------------------------------------------
@@ -562,6 +619,8 @@ function hasOpenPlan(f: Floor): boolean {
 
 /** Rooms the stairs may go up from. */
 const STAIR_ROOMS: RoomKind[] = ['living', 'entry', 'dining'];
+/** Rooms the stairs down to the basement may start in (a kitchen too, if none of those has room). */
+const DOWN_ROOMS: RoomKind[] = [...STAIR_ROOMS, 'kitchen'];
 
 /**
  * Stairs along an outside wall of the living room, the entrance hall or the dining room
@@ -588,18 +647,8 @@ function upperFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, h
       const hall: Rect = { x: left ? c : c - 1, z: house.z, w: 2, d: house.d };
       if (landing >= house.z + house.d) continue;
       const rest: Rect = left ? { x: c + 2, z: house.z, w: house.w - 2, d: house.d } : { x: house.x, z: house.z, w: house.w - 2, d: house.d };
-      const plan = upperRooms(cfg, rng, rest, kinds);
-      if (!plan) continue;
-      const { rooms, corridor } = plan;
-      // The hall and corridor have no furniture of their own; they're one space.
-      const halls: Room[] = [{ ...hall, kind: 'hall' }, ...(corridor ? [{ ...corridor, kind: 'hall' as const }] : [])];
-      const up: Floor = { rooms: [...halls, ...rooms], edges: new Map(), objects: [], fronts: [], keep: new Set(), taken: new Set() };
-      walls(up);
-      if (corridor) for (const e of shared(hall, corridor)) up.edges.delete(e);
-      for (const r of rooms) {
-        const edges = (corridor && shared(corridor, r).length ? shared(corridor, r) : null) ?? shared(hall, r);
-        if (!door(up, rng, edges)) return null;
-      }
+      const up = offHall(cfg, rng, hall, rest, kinds);
+      if (!up) continue;
       // Stairs below, their stairwell and landing above.
       g.objects.push({ def: cfg.stairs, x: c, z, rot: 2 });
       g.fronts.push([[c, z - 1]]);
@@ -609,6 +658,125 @@ function upperFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, h
       up.keep.add(key(c, landing));
       for (let zz = house.z; zz < house.z + house.d; zz++) up.keep.add(key(left ? c + 1 : c - 1, zz));
       return up;
+    }
+  }
+  return null;
+}
+
+/**
+ * A floor of `hall` with rooms of `kinds` in `rest` beside it, each with a door off the hall (or
+ * off a corridor from it across `rest`, if they need one: see `upperRooms`); the hall and the
+ * corridor are one space, with no furniture of their own. `across`: the hall runs along x, `rest`
+ * before or behind it (upstairs, it runs along z with `rest` to a side). Null if the rooms don't fit.
+ */
+function offHall(cfg: HouseGenConfig, rng: () => number, hall: Rect, rest: Rect, kinds: Kind[], across = false): Floor | null {
+  // Planned turned a quarter (x for z) if the hall runs along x.
+  const turn = <T extends Rect>(r: T): T => (across ? { ...r, x: r.z, z: r.x, w: r.d, d: r.w } : r);
+  const plan = upperRooms(cfg, rng, turn(rest), kinds);
+  if (!plan) return null;
+  const rooms = plan.rooms.map(turn);
+  const corridor = plan.corridor && turn(plan.corridor);
+  const halls: Room[] = [{ ...hall, kind: 'hall' }, ...(corridor ? [{ ...corridor, kind: 'hall' as const }] : [])];
+  const f: Floor = { rooms: [...halls, ...rooms], edges: new Map(), objects: [], fronts: [], keep: new Set(), taken: new Set() };
+  walls(f);
+  if (corridor) for (const e of shared(hall, corridor)) f.edges.delete(e);
+  for (const r of rooms) {
+    const edges = (corridor && shared(corridor, r).length ? shared(corridor, r) : null) ?? shared(hall, r);
+    if (!door(f, rng, edges)) return null;
+  }
+  return f;
+}
+
+/** How many basement plans (`offHall`) are tried at most: for one place of the stairs, and in all. */
+const BASEMENT_TRIES = [40, 400];
+
+/**
+ * A basement under the house: stairs down from a ground-floor room (the living room, the
+ * entrance hall or the dining room; else the kitchen), along one of its walls, climbing either
+ * way, their top and landing in the room (which stays walkable round the stairwell). Below, a
+ * hall two tiles wide holding the stairs, at least as long as they and their foot, and the rooms
+ * of `kinds` off it (as upstairs) on the side away from the stairs, under the house; the
+ * basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
+ * once it all fits does the ground keep the stairwell and landing clear. Null if it doesn't.
+ */
+function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[], has: Set<Kind>, lampTiles: number): Floor | null {
+  const [, len] = info(cfg.stairs)?.footprint ?? [1, 4];
+  // Sizes the rooms fill side by side along the hall, each across the whole width (`row`).
+  const longest = (k: Kind, w: number) => {
+    const [a, b] = cap(cfg, k);
+    return w < cfg.rooms[k].minSide || w > b ? 0 : w > a ? a : b;
+  };
+  const could = (w: number, d: number) => kinds.every((k) => longest(k, w) >= cfg.rooms[k].minSide) && d >= kinds.reduce((n, k) => n + cfg.rooms[k].minSide, 0) && d <= kinds.reduce((n, k) => n + longest(k, w), 0);
+  // Worked out along z, the stairs in column `u` climbing along `v`; stairs along x (`across`)
+  // the same with x and z swapped.
+  type Spot = { across: boolean; u: number; first: boolean; room: Room };
+  const spots: Spot[] = [];
+  for (const room of g.rooms.filter((r) => DOWN_ROOMS.includes(r.kind)).sort(() => rng() - 0.5)) {
+    for (const across of [false, true]) {
+      const [u0, n] = across ? [room.z, room.d] : [room.x, room.w];
+      // Against the room's first wall (the hall past the stairs, the rooms past it), or its last.
+      spots.push({ across, u: u0, first: true, room }, { across, u: u0 + n - 1, first: false, room });
+    }
+  }
+  spots.sort(() => rng() - 0.5).sort((a, b) => Number(a.room.kind === 'kitchen') - Number(b.room.kind === 'kitchen'));
+  let total = 0;
+  for (const { across, u, first, room } of spots) {
+    const at = (a: number, b: number): [number, number] => (across ? [b, a] : [a, b]);
+    const turn = (r: Rect): Rect => (across ? { x: r.z, z: r.x, w: r.d, d: r.w } : r);
+    const [R, H] = [turn(room), turn(house)];
+    const starts = Array.from({ length: Math.max(0, R.d - len + 1) }, (_, i) => R.z + i).sort(() => rng() - 0.5);
+    for (const v of starts) {
+      for (const up of [true, false].sort(() => rng() - 0.5)) {
+        // Climbing towards higher `v` (the foot before the steps, the landing past them), or lower.
+        const lv = up ? v + len : v - 1;
+        const foot = up ? v - 1 : v + len;
+        if (!inside(R, u, lv) || foot < H.z || foot >= H.z + H.d) continue;
+        const well = Array.from({ length: len }, (_, i) => key(...at(u, v + i)));
+        const landing = key(...at(u, lv));
+        if ([...well, landing].some((t) => g.keep.has(t) || g.taken.has(t))) continue;
+        // The room above stays walkable round the stairwell, to its landing.
+        for (const t of well) g.taken.add(t);
+        g.keep.add(landing);
+        const open = reachable(g, room);
+        for (const t of well) g.taken.delete(t);
+        g.keep.delete(landing);
+        if (!open) continue;
+        // The rooms beside the hall, under the house (the biggest that work); the hall the stairs'
+        // column and the one beside it (kept clear), along the steps and their foot and the rooms.
+        const wide = first ? H.x + H.w - u - 2 : u - 1 - H.x;
+        const [top, bottom] = [Math.min(v, foot), Math.max(v + len - 1, foot)];
+        const sizes: { z: number; d: number; w: number; hz: number; hd: number; score: number }[] = [];
+        for (let z0 = H.z; z0 < H.z + H.d; z0++) {
+          for (let z1 = z0 + 1; z1 <= H.z + H.d; z1++) {
+            const [hz, hd] = [Math.min(z0, top), Math.max(z1, bottom + 1) - Math.min(z0, top)];
+            for (let w = 2; w <= wide; w++) if (could(w, z1 - z0)) sizes.push({ z: z0, d: z1 - z0, w, hz, hd, score: w * (z1 - z0) - (hd - (z1 - z0)) + rng() });
+          }
+        }
+        sizes.sort((a, b) => b.score - a.score);
+        let tries = 0;
+        for (const size of sizes) {
+          if (tries++ >= BASEMENT_TRIES[0] || total >= BASEMENT_TRIES[1]) break;
+          total++;
+          const hall = turn({ x: first ? u : u - 1, z: size.hz, w: 2, d: size.hd });
+          const rest = turn({ x: first ? u + 2 : u - 1 - size.w, z: size.z, w: size.w, d: size.d });
+          const b = offHall(cfg, rng, hall, rest, kinds, across);
+          if (!b) continue;
+          // The stairs as placed: their corner, turned to climb the right way (they climb away from their front).
+          const [x, z] = at(u, v);
+          b.objects.push({ def: cfg.stairs, x, z, rot: across ? (up ? 3 : 1) : up ? 2 : 0 });
+          b.fronts.push([at(u, foot)]);
+          for (const t of well) b.taken.add(t);
+          b.keep.add(key(...at(u, foot)));
+          for (let s = size.hz; s < size.hz + size.hd; s++) b.keep.add(key(...at(first ? u + 1 : u - 1, s)));
+          if (!furnish(cfg, info, rng, b, has, lampTiles)) continue;
+          // The stairwell above, and its landing.
+          for (const t of well) g.taken.add(t);
+          g.keep.add(landing);
+          g.well = new Set(well);
+          return b;
+        }
+        if (total >= BASEMENT_TRIES[1]) return null;
+      }
     }
   }
   return null;
@@ -1075,8 +1243,9 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     const [w, d] = o.rot % 2 === 0 ? [sw, sd] : [sd, sw];
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
   }
-  // Nor over the stairwell upstairs (all a hall has taken).
+  // Nor over the stairwell upstairs (all a hall has taken), nor over the one down to the basement.
   if (r.kind === 'hall') for (const t of f.taken) stairs.add(t);
+  for (const t of f.well ?? []) stairs.add(t);
   const fits = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) {
       for (let dx = 0; dx < w; dx++) {

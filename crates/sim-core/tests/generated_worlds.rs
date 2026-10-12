@@ -1,8 +1,9 @@
 //! Generated worlds (web/src/game/world.ts and town.ts: towns of three sizes, farms, seaside,
 //! mountain, lakeside and forest worlds) checked by the simulation: each loads with no more
 //! residents than a town holds, every lot can be reached from the ends of every street and back,
-//! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, and
-//! the town keeps going for half a day.
+//! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
+//! can the houses' basements from their front doors (and what's in them), and the town keeps
+//! going for half a day.
 //!
 //! Make the worlds first: `node --experimental-transform-types tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test generated_worlds -- --ignored --nocapture`.
@@ -42,6 +43,7 @@ fn generated_worlds_are_livable() {
         if w.exits.is_empty() {
             failures.push(format!("{label}: no way out of town"));
         }
+        let mut cellars = 0;
         {
             let nav = NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
             let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
@@ -66,6 +68,34 @@ fn generated_worlds_are_livable() {
                     failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
                 }
             }
+            // Every room in the basements, from the front door of its house; and what's in them,
+            // on lots facing the street behind them (turned round, a thing two tiles wide is used
+            // from the other of its middle tiles than the house was furnished for: so it is
+            // upstairs too).
+            let door = |x: i32, z: i32| w.plot_at(x, z).map(|p| tile(w.plots[p as usize].arrival_point()));
+            let turned = |x: i32, z: i32| w.plot_at(x, z).is_some_and(|p| w.plots[p as usize].arrival_point()[1] > (w.plots[p as usize].z + w.plots[p as usize].d / 2) as f32);
+            let down = w.storey_row(-1);
+            let mut seen = std::collections::HashSet::new();
+            for z in down..down + w.storey_depth() {
+                for x in 0..w.lot.width as i32 {
+                    let room = w.lot.room_at(x, z);
+                    if room == OUTDOORS || !nav.tile_free(x, z) || !seen.insert(room) {
+                        continue;
+                    }
+                    let Some(from) = door(x, z) else { continue };
+                    cellars += 1;
+                    let walked = (z..down + w.storey_depth()).flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
+                    if !walked.filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz)).take(8).any(|t| nav.find_path(from, t).is_some()) {
+                        failures.push(format!("{label}: can't get into the basement room at {x},{z}"));
+                    }
+                }
+            }
+            for o in w.objects.iter().filter(|o| w.storey_of(o.z) == -1 && !w.content.objects[o.def].interactions.is_empty() && !turned(o.x, o.z)) {
+                let Some(from) = door(o.x, o.z) else { continue };
+                if !surface::approach_tiles(&w.content, &nav, o).any(|t| nav.find_path(from, t).is_some()) {
+                    failures.push(format!("{label}: can't reach the {} in the basement at {},{}", w.content.objects[o.def].id, o.x, o.z));
+                }
+            }
         }
         common::check(&w);
         // Half a day of everyone's free will.
@@ -77,7 +107,7 @@ fn generated_worlds_are_livable() {
                 common::check(&w);
             }
         }
-        eprintln!("  {label}: {}×{}, {} residents, {} things", w.lot.width, w.lot.depth, w.sims.len(), w.objects.len());
+        eprintln!("  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements", w.lot.width, w.lot.depth, w.sims.len(), w.objects.len());
     }
     eprintln!("{} worlds checked, {} problems", worlds.len(), failures.len());
     for f in failures.iter().take(30) {
