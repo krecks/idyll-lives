@@ -808,7 +808,7 @@ fn is_farewell(content: &Content, task: &Task) -> bool {
 /// member of the household living there who is around, awake and free to talk (or already
 /// talking with the guest), close enough to get to in `farewellMinutes`. Nobody wakes up, comes
 /// out of the bathroom or leaves something the player asked for to see a guest off.
-fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)> {
+pub(crate) fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)> {
     let content = &w.content;
     let rules = &content.visits;
     let guest = &w.sims[i];

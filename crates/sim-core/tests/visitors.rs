@@ -531,3 +531,39 @@ fn a_guest_may_use_the_hosts_toilet() {
     assert!(guest_uses_the_toilet(&toilet_content(r#"["bathroom"]"#)), "Bo never used Ada's toilet");
     assert!(!guest_uses_the_toilet(&toilet_content("[]")), "without guestTags the toilet is the household's");
 }
+
+#[test]
+fn a_guest_sent_home_says_goodbye_first() {
+    let mut w = visiting();
+    w.apply(Command::GoHome { sim: 1 }).unwrap();
+    let start = w.tick;
+    let (mut said, mut walked_after) = (false, false);
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        assert!(w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        said |= saying_goodbye(&w) && w.sims[0].engaged_with == Some(1);
+        let going = w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        assert!(!going || said, "Bo set off without saying goodbye");
+        walked_after |= going;
+    }
+    assert!(said && walked_after, "Bo said goodbye to Ada, then walked home");
+}
+
+#[test]
+fn a_guest_sent_home_while_the_host_sleeps_just_goes() {
+    let mut w = visiting();
+    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    while !in_bed(&w) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Ada never got into bed");
+    }
+    w.apply(Command::GoHome { sim: 1 }).unwrap();
+    assert!(w.sims[1].queue().all(|t| matches!(t.kind, TaskKind::GoHome)), "no goodbye to a sleeper");
+    let start = w.tick;
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        assert!(w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        assert!(!saying_goodbye(&w), "Bo went to say goodbye to a sleeping host");
+    }
+    assert!(in_bed(&w), "Ada is still asleep");
+}

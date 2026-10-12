@@ -2235,7 +2235,21 @@ impl World {
                 }
                 self.enqueue(sim, TaskKind::Visit { plot })?;
             }
-            Command::GoHome { sim } => self.enqueue(sim, TaskKind::GoHome)?,
+            Command::GoHome { sim } => {
+                // A guest sent home says goodbye to one of the hosts first, if one is free (as at
+                // the end of any visit), leaving whatever they chose to do themselves.
+                let s = self.sim(sim)?;
+                let goodbye = s.visiting.and_then(|v| crate::life::farewell(self, sim as usize, v.plot));
+                if let Some((host, social)) = goodbye.filter(|_| self.sims[sim as usize].queue.len() + 1 < MAX_QUEUE) {
+                    let World { sims, content, objects, .. } = self;
+                    let s = &mut sims[sim as usize];
+                    if s.current.as_ref().is_some_and(|a| !a.task.directed) {
+                        end_activity(s, content, objects);
+                    }
+                    s.queue.push_back(Task { kind: TaskKind::Social { target: host as u32, social }, directed: false, routine: false });
+                }
+                self.enqueue(sim, TaskKind::GoHome)?;
+            }
             Command::Phone { sim, action, contact } => {
                 self.sim(sim)?;
                 crate::phone::check_order(self, sim as usize, action, contact)?;
