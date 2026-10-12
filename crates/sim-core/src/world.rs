@@ -22,6 +22,8 @@ const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// Sims further apart than this don't start socials on their own.
 const SOCIAL_RANGE: f32 = 45.0;
+/// A baby with a need below this cries for someone (and lies awake in the crib).
+const BABY_CRIES_BELOW: f32 = 0.3;
 pub const TICKS_PER_DAY: u64 = (24.0 * 60.0 / MINUTES_PER_TICK) as u64;
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
@@ -530,6 +532,15 @@ impl Sim {
         self.current.as_ref().is_some_and(|a| {
             a.tags & content.day_rhythm.sleep_tags != 0 && matches!(a.phase, Phase::Using { .. })
         })
+    }
+
+    /// A baby in the crib lies awake while they need something (crying for it) or once they're
+    /// rested in the daytime, and sleeps otherwise.
+    pub fn awake_in_crib(&self, content: &Content, hour: f32) -> bool {
+        let rhythm = &content.day_rhythm;
+        let crying = (0..content.needs.len()).any(|n| !content.needs[n].room && self.needs[n] < BABY_CRIES_BELOW);
+        let rested = rhythm.rest_need.is_none_or(|n| self.needs[n] >= 0.999);
+        crying || (rested && !rhythm.is_night(hour, rhythm.wake_hour))
     }
 
     /// Stops whatever they're doing and drops what they meant to do (their object slots are
@@ -2570,7 +2581,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             .filter(|&n| !content.needs[n].room)
             .min_by(|&a, &b| sim.needs[a].total_cmp(&sim.needs[b]));
         if let Some(n) = lowest
-            && sim.needs[n] < 0.3
+            && sim.needs[n] < BABY_CRIES_BELOW
             && sim.planner.thought.is_none()
         {
             crate::planner::think(sim, crate::planner::ThoughtKind::Crying, n, ctx.tick);
@@ -3601,7 +3612,12 @@ fn use_object(
         }
     }
     let sleep = inter.tags & rhythm.sleep_tags != 0;
-    let done = if sleep && crate::planner::planned_now(content, sim, inter) {
+    let done = if inter.baby {
+        // A baby lies in the crib until they grow out of it (`lifecycle.rs`), asleep or awake:
+        // needing something doesn't get them up (they can't: they cry, and a carer comes), nor
+        // does being rested.
+        false
+    } else if sleep && crate::planner::planned_now(content, sim, inter) {
         // A planned night's sleep lasts the block unless a need that wakes people gets urgent.
         wakes
     } else if sleep {

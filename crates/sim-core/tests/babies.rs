@@ -1,7 +1,8 @@
 //! Babies: they lie in a crib at home and grown-ups care for them there (feeding, changing,
-//! playing fill the baby's needs); a baby who needs something cries; a crib comes with a baby
-//! who moves into a home without one (free, money or not); and a baby who grows into a child
-//! gets out, onto their feet beside it.
+//! playing fill the baby's needs); a baby who needs something cries, lying awake, and stays in
+//! the crib (as does one who's rested); a crib comes with a baby who moves into a home without
+//! one (free, money or not); and a baby who grows into a child gets out, onto their feet beside
+//! it.
 
 use sim_core::lot::SimSpawn;
 use sim_core::planner::ThoughtKind;
@@ -199,4 +200,116 @@ fn neighbours_adopt_now_and_then() {
     minutes(&mut w, 24 * 60);
     assert!(w.events.iter().any(|e| e.kind == sim_core::social::EventKind::Adopted), "the neighbours adopted");
     assert_eq!(w.households[0].funds, 4500);
+}
+
+/// Bladder too (and a toilet at home, which a baby can't get up for), a grown-up to change the
+/// baby, and the shipped content's needs that wake sleepers and are urgent, and what a night's
+/// sleep fills (energy, from a bed).
+const NURSERY: &str = r#"{
+    "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.0},{"id":"energy","label":"Energy","decayPerHour":0.02},
+             {"id":"bladder","label":"Bladder","decayPerHour":0.1}],
+    "objects":[{"id":"crib","name":"Crib","price":350,"footprint":[2,1],"slots":2,"interactions":[
+        {"id":"lie","label":"Lie in the crib","anim":"sleep","minutes":720,"pose":"lie","baby":true,"autonomous":false,"effects":{"energy":1.0},"tags":["rest"]},
+        {"id":"change","label":"Change the baby","minutes":10,"care":{"bladder":1.0},"tags":["care"]}]},
+      {"id":"armchair","name":"Armchair","price":100,"interactions":[]},
+      {"id":"toilet","name":"Toilet","price":100,"interactions":[
+        {"id":"use","label":"Use","minutes":5,"effects":{"bladder":1.0},"tags":["toilet"]}]},
+      {"id":"bed","name":"Bed","price":300,"interactions":[
+        {"id":"sleep","label":"Sleep","anim":"sleep","minutes":480,"pose":"lie","effects":{"energy":1.0},"tags":["sleep"]}]}],
+    "animations":["sleep"],
+    "dayRhythm":{"sleepTags":["sleep"],"wakeFor":["bladder","hunger"]},
+    "autonomy":{"urgent":["hunger","energy","bladder"],"urgentBelow":0.1},
+    "life":{"daysPerYear":2,"stages":[
+        {"id":"baby","label":"Baby","from":0,"baby":true},
+        {"id":"adult","label":"Adult","from":18}]},
+    "bondPresets":{"parent":{"friendship":50,"kin":"parent"}},
+    "economy":{"startingFunds":1000}}"#;
+
+fn nursery() -> World {
+    let town = TOWN.replace(r#"{"def":"armchair","x":6,"z":6}"#, r#"{"def":"armchair","x":6,"z":6},{"def":"toilet","x":8,"z":2}"#);
+    World::from_json(NURSERY, &town, 1).unwrap()
+}
+
+/// How long (minutes) Bea has been lying in the crib, while she's in it (lying there, using it).
+fn in_crib(w: &World) -> Option<f32> {
+    let a = w.sims[1].current()?;
+    let lying = matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 0 });
+    let sim_core::world::Phase::Using { elapsed } = a.phase else { return None };
+    (lying && w.sims[1].pose == sim_core::content::Pose::Lie && w.objects[0].users().any(|u| u == 1)).then_some(elapsed)
+}
+
+/// Bea is still in the crib, the same stay as `last` (it hasn't started over): how long now.
+fn still_in_crib(w: &World, last: f32, what: &str) -> f32 {
+    let now = in_crib(w).unwrap_or_else(|| panic!("{what}: Bea left the crib at tick {}", w.tick));
+    assert!(now > last, "{what}: Bea's crib stay started over at tick {} ({last} minutes, now {now})", w.tick);
+    now
+}
+
+#[test]
+fn a_baby_stays_in_the_crib_needing_something_or_rested() {
+    for (need, level) in [(2, 0.05), (1, 1.0)] {
+        let mut w = nursery();
+        // Nobody to see to her: Ada is out of the way.
+        w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+        minutes(&mut w, 1);
+        let mut lain = in_crib(&w).expect("Bea is in the crib");
+        // Wet (or wide awake), for two hours: she lies there, the same stay all along.
+        for _ in 0..2 * 60 * 20 {
+            w.sims[1].needs[need] = level;
+            w.tick_once();
+            lain = still_in_crib(&w, lain, &format!("need {need} at {level}"));
+        }
+    }
+}
+
+#[test]
+fn a_wet_baby_is_changed_in_the_crib() {
+    let mut w = nursery();
+    minutes(&mut w, 1);
+    let mut lain = in_crib(&w).expect("Bea is in the crib");
+    w.sims[1].needs[2] = 0.05;
+    let mut changed = false;
+    for _ in 0..90 * 20 {
+        w.tick_once();
+        changed |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 1 }));
+        lain = still_in_crib(&w, lain, "wet");
+        if w.sims[1].needs[2] > 0.9 {
+            break;
+        }
+    }
+    assert!(changed, "Ada changed the baby");
+    assert!(w.sims[1].needs[2] > 0.9, "and Bea's dry: {}", w.sims[1].needs[2]);
+}
+
+#[test]
+fn a_baby_lies_awake_in_the_crib_needing_something_or_rested_by_day() {
+    use sim_core::snapshot::{self, HEADER_LEN, SIM_STRIDE, sim};
+    let action = |w: &World| {
+        let mut out = vec![0.0; snapshot::CAPACITY];
+        snapshot::write(w, &mut out);
+        out[HEADER_LEN + SIM_STRIDE + sim::ACTION]
+    };
+    let mut w = nursery();
+    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    let until = |w: &mut World, day: u32, hour: f32, needs: [f32; 3]| {
+        let at = sim_core::clock::tick_at(day, hour * 60.0).unwrap();
+        while w.tick < at {
+            w.sims[1].needs[..3].copy_from_slice(&needs);
+            w.tick_once();
+            assert!(in_crib(w).is_some(), "Bea left the crib at tick {}", w.tick);
+        }
+    };
+    minutes(&mut w, 1);
+    // Asleep in the night, and in the day until she's rested.
+    until(&mut w, 2, 2.0, [1.0, 0.8, 1.0]);
+    let lain = in_crib(&w).expect("Bea is in the crib");
+    assert_eq!(action(&w), 0.0, "asleep at night");
+    until(&mut w, 2, 12.0, [1.0, 0.8, 1.0]);
+    assert_eq!(action(&w), 0.0, "napping by day");
+    // Rested by day, awake; wet in the night, awake (crying).
+    until(&mut w, 2, 13.0, [1.0, 1.0, 1.0]);
+    assert_eq!(action(&w), -1.0, "awake, rested, by day");
+    until(&mut w, 3, 2.0, [1.0, 0.8, 0.05]);
+    assert_eq!(action(&w), -1.0, "awake, crying, at night");
+    still_in_crib(&w, lain, "all along");
 }

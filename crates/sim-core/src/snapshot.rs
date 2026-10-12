@@ -187,8 +187,11 @@ fn doing(world: &World, s: &Sim) -> Doing {
     let Some(obj) = world.objects.get(*object as usize) else {
         return Doing::NOTHING;
     };
+    let inter = &world.content.objects[obj.def].interactions[*interaction];
+    // A baby lying awake in the crib isn't shown asleep.
     let action = match phase {
-        Phase::Using { .. } => world.content.objects[obj.def].interactions[*interaction].anim,
+        Phase::Using { .. } if inter.baby && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
+        Phase::Using { .. } => inter.anim,
         _ => None,
     };
     Doing {
