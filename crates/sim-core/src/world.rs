@@ -475,6 +475,9 @@ pub struct Sim {
     pub(crate) conceived: Option<u32>,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
+    /// When they last woke someone crying (a baby), or were woken by a crying baby (a
+    /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
+    pub(crate) night_woken: u64,
     /// An object they broke or repaired, or an accident they had, this tick (applied after
     /// the step).
     pub(crate) news: Option<News>,
@@ -1450,6 +1453,7 @@ impl World {
             planner: Default::default(),
             mess: None,
             care_out: None,
+            night_woken: 0,
             conceived: None,
             news: None,
             accident_at: [0; crate::content::MAX_ACCIDENTS],
@@ -1792,6 +1796,84 @@ impl World {
         }
     }
 
+    /// A baby crying (content `dayRhythm.babyWakes`) in the crib at home with every grown-up of
+    /// the household there asleep wakes one of them: family first, then someone not worn out,
+    /// then whoever's turn it is (woken longest ago: partners take turns), then the most rested.
+    /// They do the crib's care for each need that's low and go back to bed (night still picks
+    /// it); and the same baby wakes nobody again for a while. With someone at home awake, they
+    /// see to the baby themselves (autonomy, `pick_autonomous`).
+    fn wake_for_crying_babies(&mut self) {
+        let Some(rules) = self.content.day_rhythm.baby_wakes else { return };
+        for b in 0..self.sims.len() {
+            let Some((carer, tasks)) = self.woken_for(b, &rules) else { continue };
+            let content = &self.content;
+            let sim = &mut self.sims[carer];
+            end_activity(sim, content, &mut self.objects);
+            sim.follow_up = None;
+            for task in tasks.into_iter().rev() {
+                sim.queue.push_front(task);
+            }
+            sim.queue.truncate(MAX_QUEUE);
+            sim.night_woken = self.tick;
+            if let Some(f) = rules.feeling {
+                social::add_feeling(&mut sim.feelings, f, &content.feelings, self.tick);
+            }
+            self.sims[b].night_woken = self.tick;
+        }
+    }
+
+    /// Who baby `b`'s crying wakes (`wake_for_crying_babies`), and the care they do.
+    fn woken_for(&self, b: usize, rules: &crate::content::BabyWakes) -> Option<(usize, Vec<Task>)> {
+        let content = &self.content;
+        let baby = &self.sims[b];
+        let cooling = baby.night_woken != 0 && self.tick < baby.night_woken + rules.cooldown_ticks;
+        if !baby.here() || baby.away_until.is_some() || !content.life.baby(baby.age) || cooling {
+            return None;
+        }
+        let wants = |n: usize, below: f32| rules.needs & (1 << n) != 0 && baby.needs[n] < below;
+        if !(0..content.needs.len()).any(|n| wants(n, rules.below)) {
+            return None;
+        }
+        let h = baby.household as usize;
+        let plot = self.households[h].plot.filter(|_| self.autonomy && self.households[h].free_will)?;
+        // In a crib at home, with care for what they're crying for.
+        let crib = self.objects.iter().find(|o| o.users().any(|u| u as usize == b) && self.object_plot[o.id as usize] == Some(plot))?;
+        let def = &content.objects[crib.def];
+        let care = |i: &crate::content::Interaction, below: f32| {
+            i.cares() && (0..content.needs.len()).any(|n| i.care[n] > 0.0 && wants(n, below))
+        };
+        if !def.interactions.iter().any(|i| care(i, rules.below)) || !crib.has_free_slot(def.slots) {
+            return None;
+        }
+        // The grown-ups at home; any of them up sees to the baby themselves.
+        let home: Vec<usize> = (0..self.sims.len())
+            .filter(|&j| {
+                let s = &self.sims[j];
+                let (x, z) = s.tile();
+                s.here() && s.household as usize == h && s.away_until.is_none() && s.visiting.is_none()
+                    && s.adult(content) && self.plot_at(x, z) == Some(plot)
+            })
+            .collect();
+        if home.iter().any(|&j| !self.sims[j].asleep(content)) {
+            return None;
+        }
+        let rhythm = &content.day_rhythm;
+        let rest = |j: usize| rhythm.rest_need.map_or(1.0, |n| self.sims[j].needs[n]);
+        let key = |j: usize| {
+            let family = self.relationships.kin(j, b) != crate::social::Kin::None;
+            (family, rest(j) >= rhythm.exhausted_below, std::cmp::Reverse(self.sims[j].night_woken))
+        };
+        let carer = home.into_iter().max_by(|&x, &y| key(x).cmp(&key(y)).then(rest(x).total_cmp(&rest(y))))?;
+        let tasks = def
+            .interactions
+            .iter()
+            .enumerate()
+            .filter(|(_, i)| care(i, rules.tend_below))
+            .map(|(i, _)| Task { kind: TaskKind::Use { object: crib.id, interaction: i }, directed: false, routine: false })
+            .collect();
+        Some((carer, tasks))
+    }
+
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.structure_version {
@@ -1943,6 +2025,7 @@ impl World {
             }
         }
         self.apply_messes();
+        self.wake_for_crying_babies();
         conversation::update(self);
         crate::phone::update(self);
         crate::life::update(self);

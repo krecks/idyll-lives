@@ -317,6 +317,118 @@ fn a_baby_lies_awake_in_the_crib_needing_something_or_rested_by_day() {
     still_in_crib(&w, lain, "all along");
 }
 
+/// Two parents asleep in their beds and a baby in the crib who gets hungry in the night (the
+/// grown-ups don't, asleep), with a crying baby waking someone (`dayRhythm.babyWakes`).
+const NIGHT: &str = r#"{
+    "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},{"id":"energy","label":"Energy","decayPerHour":0.02}],
+    "objects":[{"id":"crib","name":"Crib","price":350,"footprint":[2,1],"slots":2,"interactions":[
+        {"id":"lie","label":"Lie in the crib","anim":"sleep","minutes":720,"pose":"lie","baby":true,"autonomous":false,"effects":{"energy":1.0},"tags":["rest"]},
+        {"id":"feed","label":"Feed the baby","minutes":15,"care":{"hunger":0.8},"tags":["care"]}]},
+      {"id":"bed","name":"Bed","price":300,"interactions":[
+        {"id":"sleep","label":"Sleep","anim":"sleep","minutes":480,"pose":"lie","effects":{"energy":1.0},"tags":["sleep"]}]},
+      {"id":"fridge","name":"Fridge","price":100,"interactions":[
+        {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.6}}]}],
+    "animations":["sleep"],
+    "feelings":[{"id":"brokenSleep","label":"Up in the night","mood":-0.05,"hours":8}],
+    "dayRhythm":{"sleepTags":["sleep"],"wakeFor":["hunger"],"asleepDecay":{"hunger":0.0},
+                 "babyWakes":{"below":0.3,"cooldownMinutes":60,"feeling":"brokenSleep"}},
+    "life":{"daysPerYear":2,"stages":[
+        {"id":"baby","label":"Baby","from":0,"baby":true},
+        {"id":"adult","label":"Adult","from":18}]},
+    "bondPresets":{"partners":{"friendship":55,"romance":75,"partners":true},"parent":{"friendship":50,"kin":"parent"}},
+    "economy":{"startingFunds":1000}}"#;
+
+const NIGHT_TOWN: &str = r#"{"width":12,"depth":12,
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}],
+    "households":[{"name":"Moss","plot":0,"player":true}],
+    "objects":[{"def":"crib","x":2,"z":2},{"def":"bed","x":6,"z":2},{"def":"bed","x":9,"z":2},{"def":"fridge","x":9,"z":9}],
+    "sims":[{"name":"Ada","x":4.5,"z":8.5,"age":30},{"name":"Ben","x":5.5,"z":8.5,"age":32},{"name":"Bea","x":6.5,"z":8.5,"age":0.5}],
+    "relationships":[{"a":0,"b":1,"preset":"partners"},{"a":2,"b":0,"preset":"parent"},{"a":2,"b":1,"preset":"parent"}]}"#;
+
+/// On until `hour` (of day 2: the first night's small hours) with Bea's hunger held at `hunger`
+/// (None: it falls), calling `each` every tick; how low her hunger got.
+fn night_until(w: &mut World, hour: f32, hunger: Option<f32>, mut each: impl FnMut(&World)) -> f32 {
+    let at = sim_core::clock::tick_at(2, hour * 60.0).unwrap();
+    let mut lowest = 1.0f32;
+    while w.tick < at {
+        if let Some(h) = hunger {
+            w.sims[2].needs[0] = h;
+        }
+        w.tick_once();
+        lowest = lowest.min(w.sims[2].needs[0]);
+        each(w);
+    }
+    lowest
+}
+
+/// Both parents in bed at one in the morning (tired at bedtime), Bea fed until then.
+fn night() -> World {
+    let mut w = World::from_json(NIGHT, NIGHT_TOWN, 1).unwrap();
+    let bedtime = sim_core::clock::tick_at(1, 22.0 * 60.0).unwrap();
+    while w.tick < bedtime {
+        w.tick_once();
+    }
+    w.sims[0].needs[1] = 0.3;
+    w.sims[1].needs[1] = 0.35;
+    night_until(&mut w, 1.0, Some(1.0), |_| {});
+    let doing = |i: usize| w.sims[i].current().map(|a| a.task.kind);
+    assert!(w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content), "both asleep at one: {:?} {:?}", doing(0), doing(1));
+    w
+}
+
+fn feeding(w: &World, i: usize) -> bool {
+    w.sims[i].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 1 }))
+}
+
+#[test]
+fn a_crying_baby_wakes_one_parent_at_night_who_feeds_her_and_goes_back_to_bed() {
+    let mut w = night();
+    // Getting hungry: below the crying level in half an hour.
+    w.sims[2].needs[0] = 0.35;
+    let (mut woke, mut fed) = ([false; 2], [false; 2]);
+    let lowest = night_until(&mut w, 3.0, None, |w| {
+        for i in 0..2 {
+            woke[i] |= !w.sims[i].asleep(&w.content);
+            fed[i] |= feeding(w, i);
+        }
+    });
+    assert_eq!(woke.iter().filter(|&&x| x).count(), 1, "one parent woke: {woke:?}");
+    let (up, other) = if woke[0] { (0, 1) } else { (1, 0) };
+    assert!(fed[up], "{} fed the baby", w.sims[up].name);
+    assert!(!fed[other] && w.sims[other].asleep(&w.content), "{} slept on", w.sims[other].name);
+    assert!(w.sims[up].asleep(&w.content), "{} is back in bed", w.sims[up].name);
+    assert!(w.sims[up].feelings.iter().any(|f| w.content.feelings[f.def].id == "brokenSleep"), "up in the night");
+    assert!(w.sims[2].needs[0] > 0.8, "Bea is fed: {}", w.sims[2].needs[0]);
+    // And she's looked after till morning (she gets hungry again before then).
+    let lowest = lowest.min(night_until(&mut w, 6.5, None, |_| {}));
+    assert!(lowest > 0.2, "Bea's hunger never fell far: {lowest}");
+}
+
+#[test]
+fn partners_take_turns_getting_up_for_the_baby() {
+    let mut w = night();
+    let mut up = Vec::new();
+    for hour in [1.0, 2.5, 4.0] {
+        night_until(&mut w, hour, Some(1.0), |_| {});
+        w.sims[2].needs[0] = 0.25;
+        let mut who = None;
+        night_until(&mut w, hour + 1.0, None, |w| {
+            who = who.or((0..2).find(|&i| feeding(w, i)));
+        });
+        up.push(who.expect("someone fed her"));
+    }
+    assert!(up[0] != up[1] && up[1] != up[2], "turn and turn about: {up:?}");
+}
+
+#[test]
+fn nobody_wakes_when_the_baby_needs_nothing() {
+    let mut w = night();
+    // Not hungry enough to cry: everyone sleeps through.
+    night_until(&mut w, 6.0, Some(0.4), |w| {
+        assert!(w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content), "woken at tick {}", w.tick);
+    });
+}
+
 /// The shipped content: a home with a crib, and what a grown-up needs for themselves.
 const HOME: &str = r#"{"width":16,"depth":12,
     "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":10,"entry":[8.5,9.5]}],

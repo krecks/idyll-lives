@@ -449,6 +449,13 @@ better bed shortens a night a little. Naps (`napTags`) can't follow each other w
 daytime damping on sleep is lifted, naps count a quarter; and a nap is allowed again, on the
 sofa when no bed is free). On a work or school day the alarm goes off: a sleep ends
 `wakeBeforeWorkMinutes` before they leave, rested or not, and nobody goes back to bed then.
+`dayRhythm.babyWakes` (without it, nobody gets up for a baby) has a baby in their crib at home,
+crying for one of its `needs` (default: all but surroundings) under `below` (default 0.3) while
+every grown-up of the household at home is asleep, wake one of them: family first, then someone
+not worn out, then whoever was woken longest ago (partners take turns), then the most rested.
+They do the crib's care interactions for each of those needs under `tendBelow` (default 0.6)
+and go back to bed, with the `feeling` (optional); the same baby wakes nobody again for
+`cooldownMinutes` (default 90). The base game wakes for hunger, bladder and hygiene.
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 
 **Needs and autonomy:** a need's `comfortable` (0..1, default 0) is the level residents like to

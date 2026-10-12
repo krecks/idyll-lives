@@ -1043,7 +1043,8 @@
     },
     {"id": "gotWish", "label": "Got what they wanted", "emotion": "happy", "mood": 0.15, "hours": 24},
     {"id": "deniedAgain", "label": "Told no again", "emotion": "angry", "mood": -0.12, "hours": 12},
-    {"id": "fedUp", "label": "Fed up with being told no", "emotion": "angry", "mood": -0.25, "hours": 24}
+    {"id": "fedUp", "label": "Fed up with being told no", "emotion": "angry", "mood": -0.25, "hours": 24},
+    {"id": "brokenSleep", "label": "Up in the night with the baby", "emotion": "sad", "mood": -0.04, "hours": 8}
   ],
   "socials": [
     {
@@ -3468,7 +3469,8 @@
       {"need": "bladder", "below": 0.35, "gain": 1},
       {"need": "energy", "below": 0.3, "gain": 0.15, "cost": 3},
       {"need": "hygiene", "below": 0.3, "gain": 0.2}
-    ]
+    ],
+    "babyWakes": {"needs": ["hunger", "bladder", "hygiene"], "below": 0.3, "tendBelow": 0.6, "cooldownMinutes": 90, "feeling": "brokenSleep"}
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "objectRules": {
