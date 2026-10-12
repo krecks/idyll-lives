@@ -220,15 +220,22 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
 
 /**
  * The tiles beside a footprint a resident could use it from, best first (sim-core
- * `approach_tiles`): the front, then (seats used from `around`) behind, left and right of its
- * middle. Each comes with the tile of its own it's next to; the caller checks it's free and open.
+ * `approach_tiles`): the front (and, along an even front edge, the other middle tile: the
+ * simulation uses that one should the front be taken), then (seats used from `around`) behind,
+ * left and right of its middle. Each comes with the tile of its own it's next to; the caller
+ * checks it's free and open.
  */
 export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number, size?: readonly [number, number]): { tile: [number, number]; inner: [number, number] }[] {
   const [w, d] = sizeOf(def, rot, size);
   const front = frontTile(x, z, w, d, rot);
   if (def?.approach !== 'around') {
     const inner: [number, number] = [front[0] - [0, 1, 0, -1][rot % 4], front[1] - [1, 0, -1, 0][rot % 4]];
-    return [{ tile: front, inner }];
+    const along = rot % 2 === 0 ? [1, 0, w] : [0, 1, d];
+    if (along[2] % 2 !== 0) return [{ tile: front, inner }];
+    return [
+      { tile: front, inner },
+      { tile: [front[0] + along[0], front[1] + along[1]], inner: [inner[0] + along[0], inner[1] + along[1]] },
+    ];
   }
   const [cx, cz] = [x + Math.floor((w - 1) / 2), z + Math.floor((d - 1) / 2)];
   // Beside each side (+z, +x, -z, -x).
