@@ -3290,7 +3290,7 @@
     "asleepDecay": {
       "energy": 0,
       "hunger": 0.3,
-      "bladder": 0.25,
+      "bladder": 0.15,
       "hygiene": 0.5,
       "fun": 0.2,
       "comfort": 0.3,
@@ -3310,7 +3310,7 @@
       "social": 0.3
     },
     "wakeBeforeWorkMinutes": 75,
-    "lieInHours": 1.5,
+    "lieInHours": 0.5,
     "sleepQualityBonus": 0.06,
     "napTags": [
       "nap"

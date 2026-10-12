@@ -92,7 +92,8 @@ impl Lookup {
                 } else if i.tags & self.handwash != 0 || (self.handwash == 0 && i.tags & self.hygiene != 0 && i.minutes <= 10.0) {
                     // Without a `handwash` tag: a short hygiene interaction (a sink, not a shower).
                     Doing::Wash
-                } else if i.tags & self.food != 0 && gains(self.hunger) {
+                } else if i.tags & self.food != 0 && gains(self.hunger) && i.eats.is_none() {
+                    // (Fetching food to eat sitting down counts when they eat it, as a serving.)
                     Doing::Food { object, seated: s.pose == Pose::Sit }
                 } else {
                     Doing::Other

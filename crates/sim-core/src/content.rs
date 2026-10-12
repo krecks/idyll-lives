@@ -2756,7 +2756,7 @@ impl Content {
             },
             wake_before_work_minutes: dr.wake_before_work_minutes.unwrap_or(75.0),
             rest_need: (0..MAX_NEEDS).filter(|&n| slept[n] > 0.0).max_by(|&a, &b| slept[a].total_cmp(&slept[b])),
-            lie_in_hours: dr.lie_in_hours.unwrap_or(1.5),
+            lie_in_hours: dr.lie_in_hours.unwrap_or(0.5),
             sleep_quality_bonus: dr.sleep_quality_bonus.unwrap_or(0.06),
             nap_tags: tag_mask(&dr.nap_tags),
             nap_cooldown_hours: dr.nap_cooldown_hours.unwrap_or(4.0),

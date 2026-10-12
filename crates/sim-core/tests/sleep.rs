@@ -58,13 +58,13 @@ fn using(w: &World) -> Option<(u32, String)> {
     })
 }
 
-/// Sends the resident to bed with `energy` at 22:30 on day 1 and returns the hour of the next
-/// morning they get up (day 2; past 24 is the afternoon after).
-fn night(object: u32, quality: u8, energy: f32) -> f32 {
+/// Sends the resident to bed with `energy` at `bedtime` on day 1 and returns the hour of the
+/// next morning they get up (day 2; past 24 is the afternoon after).
+fn night(object: u32, quality: u8, energy: f32, bedtime: f32) -> f32 {
     let mut w = world();
     w.autonomy = false;
     w.objects[object as usize].quality = quality;
-    until(&mut w, 1, 22.5);
+    until(&mut w, 1, bedtime);
     rested_but(&mut w, energy);
     let sleep = interaction(&w, object, "sleep");
     w.apply(Command::Use { sim: 0, object, interaction: sleep }).unwrap();
@@ -83,20 +83,24 @@ fn night(object: u32, quality: u8, energy: f32) -> f32 {
 
 #[test]
 fn tired_out_they_sleep_about_eight_hours_less_on_a_better_bed() {
-    let standard = night(BED, 0, 0.0);
-    assert!((6.0..=7.0).contains(&standard), "up at {standard:.2} after a night from empty (8 h ±30 min)");
-    let best = night(BED, 3, 0.0);
+    // To bed late and worn out: they get up once rested.
+    let standard = night(BED, 0, 0.0, 23.5);
+    assert!((7.0..=8.0).contains(&standard), "up at {standard:.2} after a night from empty (8 h ±30 min)");
+    let best = night(BED, 3, 0.0, 23.5);
     assert!(best < standard - 0.5, "a 3-star bed: up at {best:.2}, not {standard:.2}");
-    assert!(best >= 5.4, "but not in the middle of the night ({best:.2})");
-    let futon = night(FUTON, 0, 0.0);
+    assert!(best >= 6.4, "but not before morning ({best:.2})");
+    let futon = night(FUTON, 0, 0.0, 23.5);
     assert!(futon > standard + 0.5, "a futon: up at {futon:.2}, not {standard:.2}");
-    assert!(futon < 8.5, "about 9 hours on a futon ({futon:.2})");
+    assert!(futon < 9.5, "about 9 hours on a futon ({futon:.2})");
+    // To bed at the usual time worn out: about 8 hours.
+    let usual = night(BED, 0, 0.0, 22.5);
+    assert!((6.0..=7.0).contains(&usual), "up at {usual:.2} after going to bed at 22:30");
 }
 
 #[test]
 fn not_very_tired_they_still_sleep_until_near_morning() {
-    let up = night(BED, 0, 0.7);
-    assert!((5.4..=7.0).contains(&up), "rested by 1 am, up at {up:.2} (not in the middle of the night)");
+    let up = night(BED, 0, 0.7, 22.5);
+    assert!((6.4..=7.0).contains(&up), "rested by 1 am, up at {up:.2} (not in the middle of the night)");
 }
 
 #[test]

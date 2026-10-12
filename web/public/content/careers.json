@@ -20,7 +20,7 @@
       "description": "Chase stories, check facts and keep the public informed.",
       "payFactor": 0.95,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.3, "fun": -0.05, "social": 0.15 },
+      "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.05, "social": 0.15 },
       "tracks": [
         {
           "id": "journalism.print",
@@ -56,7 +56,7 @@
       "description": "Keep the streets safe and crack the cases nobody else can.",
       "payFactor": 1.0,
       "shift": { "start": 7, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.25, "energy": -0.35, "hygiene": -0.15, "social": 0.1 },
+      "workEffects": { "hunger": -0.25, "energy": -0.175, "hygiene": -0.15, "social": 0.1 },
       "tracks": [
         {
           "id": "detective.patrol",
@@ -92,7 +92,7 @@
       "description": "Run toward danger to fight fires and save lives.",
       "payFactor": 0.95,
       "shift": { "start": 8, "hours": 12, "days": [0, 2, 4, 6] },
-      "workEffects": { "hunger": -0.35, "energy": -0.45, "hygiene": -0.4, "fun": 0.05, "social": 0.1 },
+      "workEffects": { "hunger": -0.35, "energy": -0.225, "hygiene": -0.4, "fun": 0.05, "social": 0.1 },
       "tracks": [
         {
           "id": "firefighter.firefighting",
@@ -128,7 +128,7 @@
       "description": "Build an audience online and turn likes into a living.",
       "payFactor": 0.9,
       "shift": { "start": 11, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.15, "energy": -0.2, "comfort": 0.05, "fun": 0.2, "social": 0.2 },
+      "workEffects": { "hunger": -0.15, "energy": -0.1, "comfort": 0.05, "fun": 0.2, "social": 0.2 },
       "tracks": [
         {
           "id": "influencer.lifestyle",
@@ -164,7 +164,7 @@
       "description": "Build, run and protect the software the world depends on.",
       "payFactor": 1.25,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.3, "comfort": -0.05, "fun": -0.1, "social": -0.05 },
+      "workEffects": { "hunger": -0.2, "energy": -0.15, "comfort": -0.05, "fun": -0.1, "social": -0.05 },
       "tracks": [
         {
           "id": "it.software",
@@ -199,7 +199,7 @@
       "description": "Make the shows and movies everyone talks about.",
       "payFactor": 1.1,
       "shift": { "start": 10, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.25, "energy": -0.35, "fun": 0.15, "social": 0.15 },
+      "workEffects": { "hunger": -0.25, "energy": -0.175, "fun": 0.15, "social": 0.15 },
       "tracks": [
         {
           "id": "tv.acting",
@@ -235,7 +235,7 @@
       "description": "Design, build and fix the machines that keep things moving.",
       "payFactor": 1.05,
       "shift": { "start": 7.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.3, "energy": -0.35, "hygiene": -0.3, "fun": 0.05 },
+      "workEffects": { "hunger": -0.3, "energy": -0.175, "hygiene": -0.3, "fun": 0.05 },
       "tracks": [
         {
           "id": "mechanics.car",
@@ -270,7 +270,7 @@
       "description": "Manage money, markets and the deals that move them.",
       "payFactor": 1.3,
       "shift": { "start": 8.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.35, "comfort": 0.05, "fun": -0.15, "social": 0.05 },
+      "workEffects": { "hunger": -0.2, "energy": -0.175, "comfort": 0.05, "fun": -0.15, "social": 0.05 },
       "tracks": [
         {
           "id": "finance.banking",
@@ -307,7 +307,7 @@
       "description": "Diagnose, treat and care for patients when they need it most.",
       "payFactor": 1.3,
       "shift": { "start": 7, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.25, "energy": -0.4, "hygiene": -0.15, "fun": -0.05, "social": 0.1 },
+      "workEffects": { "hunger": -0.25, "energy": -0.2, "hygiene": -0.15, "fun": -0.05, "social": 0.1 },
       "tracks": [
         {
           "id": "medicine.general",
@@ -344,7 +344,7 @@
       "description": "Cook, bake and mix your way to culinary fame.",
       "payFactor": 0.9,
       "shift": { "start": 15, "hours": 9, "days": [1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": 0.1, "energy": -0.4, "hygiene": -0.3, "comfort": -0.1, "social": 0.05 },
+      "workEffects": { "hunger": 0.1, "energy": -0.2, "hygiene": -0.3, "comfort": -0.1, "social": 0.05 },
       "tracks": [
         {
           "id": "culinary.chef",
@@ -382,7 +382,7 @@
       "description": "Turn ideas into images, objects and designs people love.",
       "payFactor": 0.85,
       "shift": { "start": 10, "hours": 7, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.2, "comfort": 0.05, "fun": 0.2, "social": -0.05 },
+      "workEffects": { "hunger": -0.2, "energy": -0.1, "comfort": 0.05, "fun": 0.2, "social": -0.05 },
       "tracks": [
         {
           "id": "arts.painting",
@@ -417,7 +417,7 @@
       "description": "Write, play and produce music that gets stuck in people's heads.",
       "payFactor": 0.95,
       "shift": { "start": 14, "hours": 6, "days": [1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.2, "energy": -0.25, "fun": 0.3, "social": 0.15 },
+      "workEffects": { "hunger": -0.2, "energy": -0.125, "fun": 0.3, "social": 0.15 },
       "tracks": [
         {
           "id": "music.performance",
@@ -454,7 +454,7 @@
       "description": "Teach, inspire and shape the minds of the next generation.",
       "payFactor": 0.95,
       "shift": { "start": 8, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.35, "fun": 0.05, "social": 0.2 },
+      "workEffects": { "hunger": -0.2, "energy": -0.175, "fun": 0.05, "social": 0.2 },
       "tracks": [
         {
           "id": "education.primary",
@@ -490,7 +490,7 @@
       "description": "Ask big questions and run the experiments that answer them.",
       "payFactor": 1.15,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.25, "energy": -0.3, "hygiene": -0.05, "fun": 0.05, "social": -0.05 },
+      "workEffects": { "hunger": -0.25, "energy": -0.15, "hygiene": -0.05, "fun": 0.05, "social": -0.05 },
       "tracks": [
         {
           "id": "science.biology",
@@ -526,7 +526,7 @@
       "description": "Argue cases, draft contracts and uphold the rule of law.",
       "payFactor": 1.3,
       "shift": { "start": 9, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.35, "comfort": 0.05, "fun": -0.15, "social": 0.1 },
+      "workEffects": { "hunger": -0.2, "energy": -0.175, "comfort": 0.05, "fun": -0.15, "social": 0.1 },
       "tracks": [
         {
           "id": "law.corporate",
@@ -561,7 +561,7 @@
       "description": "Sell, stock and run the shops where everyone spends.",
       "payFactor": 0.8,
       "shift": { "start": 10, "hours": 8, "days": [1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.2, "energy": -0.3, "comfort": -0.1, "fun": -0.05, "social": 0.15 },
+      "workEffects": { "hunger": -0.2, "energy": -0.15, "comfort": -0.1, "fun": -0.05, "social": 0.15 },
       "tracks": [
         {
           "id": "retail.store",
@@ -598,7 +598,7 @@
       "description": "Build homes, wire buildings and craft things that last.",
       "payFactor": 1.0,
       "shift": { "start": 7, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.35, "energy": -0.4, "hygiene": -0.35, "comfort": -0.1, "social": 0.05 },
+      "workEffects": { "hunger": -0.35, "energy": -0.2, "hygiene": -0.35, "comfort": -0.1, "social": 0.05 },
       "tracks": [
         {
           "id": "trades.carpentry",
@@ -634,7 +634,7 @@
       "description": "Train hard, compete and help others get in shape.",
       "payFactor": 1.0,
       "shift": { "start": 8, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.4, "energy": -0.45, "hygiene": -0.4, "fun": 0.2, "social": 0.1 },
+      "workEffects": { "hunger": -0.4, "energy": -0.225, "hygiene": -0.4, "fun": 0.2, "social": 0.1 },
       "tracks": [
         {
           "id": "sports.athlete",
@@ -671,7 +671,7 @@
       "description": "Serve with discipline on land, at sea and in the air.",
       "payFactor": 1.0,
       "shift": { "start": 6, "hours": 10, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.4, "energy": -0.45, "hygiene": -0.35, "fun": -0.1, "social": 0.1 },
+      "workEffects": { "hunger": -0.4, "energy": -0.225, "hygiene": -0.35, "fun": -0.1, "social": 0.1 },
       "tracks": [
         {
           "id": "military.army",
@@ -707,7 +707,7 @@
       "description": "Win votes, write policy and run the country.",
       "payFactor": 1.05,
       "shift": { "start": 9, "hours": 9, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.3, "fun": -0.05, "social": 0.25 },
+      "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.05, "social": 0.25 },
       "tracks": [
         {
           "id": "politics.elected",
@@ -742,7 +742,7 @@
       "description": "Move people and goods safely by road and by air.",
       "payFactor": 1.05,
       "shift": { "start": 6, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.3, "energy": -0.35, "comfort": -0.15, "fun": -0.05 },
+      "workEffects": { "hunger": -0.3, "energy": -0.175, "comfort": -0.15, "fun": -0.05 },
       "tracks": [
         {
           "id": "transport.pilot",
@@ -779,7 +779,7 @@
       "description": "Grow food, tend gardens and look after the wild outdoors.",
       "payFactor": 0.85,
       "shift": { "start": 6, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.35, "energy": -0.4, "hygiene": -0.35, "comfort": -0.05, "fun": 0.1 },
+      "workEffects": { "hunger": -0.35, "energy": -0.2, "hygiene": -0.35, "comfort": -0.05, "fun": 0.1 },
       "tracks": [
         {
           "id": "nature.farming",
@@ -817,7 +817,7 @@
       "description": "Welcome guests, plan events and make every trip memorable.",
       "payFactor": 0.85,
       "shift": { "start": 12, "hours": 8, "days": [2, 3, 4, 5, 6] },
-      "workEffects": { "hunger": -0.25, "energy": -0.35, "comfort": -0.1, "fun": 0.05, "social": 0.2 },
+      "workEffects": { "hunger": -0.25, "energy": -0.175, "comfort": -0.1, "fun": 0.05, "social": 0.2 },
       "tracks": [
         {
           "id": "hospitality.hotel",
@@ -854,7 +854,7 @@
       "description": "Style looks, design clothes and set the trends.",
       "payFactor": 0.95,
       "shift": { "start": 10, "hours": 8, "days": [1, 2, 3, 4, 5] },
-      "workEffects": { "hunger": -0.2, "energy": -0.25, "hygiene": 0.05, "fun": 0.1, "social": 0.15 },
+      "workEffects": { "hunger": -0.2, "energy": -0.125, "hygiene": 0.05, "fun": 0.1, "social": 0.15 },
       "tracks": [
         {
           "id": "fashion.design",
@@ -889,7 +889,7 @@
       "description": "Lead teams, launch brands and grow companies.",
       "payFactor": 1.15,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
-      "workEffects": { "hunger": -0.2, "energy": -0.3, "fun": -0.1, "social": 0.15 },
+      "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.1, "social": 0.15 },
       "tracks": [
         {
           "id": "business.marketing",

@@ -418,7 +418,7 @@ traits whose `tagPreference` dislikes an activity's tags skip it more. A pack's 
 (default: all; the base game wakes for `bladder` and `hunger` only), and
 `dayRhythm.workDecay` multiplies need decay while at work. A sleep (`sleepTags`) lasts until
 the need beds fill most (energy) is full, at most the planner's `maxSleepMinutes`; at night a
-rested sleeper lies in until `lieInHours` (default 1.5) before they'd get up (and nobody goes
+rested sleeper lies in until `lieInHours` (default 0.5) before they'd get up (and nobody goes
 back to bed nearly rested outside the night). A bed's stars add
 `sleepQualityBonus` each (default 0.06) to sleep, instead of `objectRules.qualityBonus`, so a
 better bed shortens a night a little. Naps (`napTags`) can't follow each other within
