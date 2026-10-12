@@ -27,6 +27,22 @@ export async function prune(cache: Cache | null, keep: string[]): Promise<void> 
   }
 }
 
+/**
+ * A model file shipped gzipped (by `tools/llm/fetch.mjs` and `tools/voice/fetch.mjs`): its name
+ * ends in `z` (`model_q4.onnx_dataz`), not `.gz`, which servers would send with
+ * `Content-Encoding: gzip` for the browser to unpack on its own. Kept packed in the cache.
+ */
+export function packed(url: string): boolean {
+  return /\.onnx(_data)?z$/.test(url);
+}
+
+/** Unpacks gzipped bytes (as they are if a server already unpacked them). */
+export async function gunzip(bytes: ArrayBuffer): Promise<ArrayBuffer> {
+  const head = new Uint8Array(bytes, 0, 2);
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return bytes;
+  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+}
+
 /** Unpacks a gzipped file, or reads it as text if a server already unpacked it. */
 export async function gunzipText(bytes: ArrayBuffer): Promise<string> {
   const head = new Uint8Array(bytes, 0, 2);
@@ -34,7 +50,7 @@ export async function gunzipText(bytes: ArrayBuffer): Promise<string> {
   return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 
-/** Each file once per worker (a load tried again after failing only fetches what it's missing). */
+/** Each file once per worker (a load tried again after failing only fetches what it's missing); a `packed` one comes unpacked. */
 const fetched = new Map<string, Promise<ArrayBuffer>>();
 export function fetchOnce(cache: Cache | null, url: string, progress: (bytes: number) => void, sha256?: string): Promise<ArrayBuffer> {
   let p = fetched.get(url);
@@ -55,13 +71,18 @@ export function forget(url: string): void {
   fetched.delete(url);
 }
 
-/** The file's bytes from the cache, or downloaded (with progress), checked against `sha256` if given, and cached. */
+/**
+ * The file's bytes from the cache, or downloaded (with progress), checked against `sha256` if
+ * given, and cached. A `packed` file is cached as it came and unpacked here; `sha256` is the
+ * unpacked file's (checked on download).
+ */
 export async function fetchCached(cache: Cache | null, url: string, progress: (bytes: number) => void, sha256?: string): Promise<ArrayBuffer> {
+  const unpack = packed(url);
   const hit = await cache?.match(url);
   if (hit) {
     const bytes = await hit.arrayBuffer();
     progress(bytes.byteLength);
-    return bytes;
+    return unpack ? gunzip(bytes) : bytes;
   }
   const res = await fetch(url);
   if (!res.ok || !res.body) throw new Error(`${url}: HTTP ${res.status}`);
@@ -81,9 +102,10 @@ export async function fetchCached(cache: Cache | null, url: string, progress: (b
     bytes.set(c, at);
     at += c.byteLength;
   }
-  if (sha256 && (await sha256Hex(bytes.buffer)) !== sha256) throw new Error(`${url}: not the file expected (SHA-256 differs)`);
+  const file = unpack ? await gunzip(bytes.buffer) : bytes.buffer;
+  if (sha256 && (await sha256Hex(file)) !== sha256) throw new Error(`${url}: not the file expected (SHA-256 differs)`);
   await cache?.put(url, new Response(bytes, { headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream' } })).catch(() => {});
-  return bytes.buffer;
+  return file;
 }
 
 /** SHA-256 of some bytes, as hex. */

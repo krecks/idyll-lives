@@ -49,7 +49,7 @@ const e = await engine();
 
 const say = (text, v) => sayLine(e, text, v);
 const describe = (v) =>
-  `${v.clip.replace(/^preset:/, '')} (clip ${v.clipPitch.toFixed(2)}/${v.clipDepth.toFixed(2)}, line ${v.pitch.toFixed(2)}/${v.depth.toFixed(2)}, speed ${v.speed.toFixed(2)}, expression ${v.temperature.toFixed(2)})`;
+  `${v.style} (pitch ${v.pitch.toFixed(2)}, depth ${v.depth.toFixed(2)}, speed ${v.speed.toFixed(2)})`;
 
 function wav(samples) {
   const peak = samples.reduce((m, v) => Math.max(m, Math.abs(v)), 1e-6);

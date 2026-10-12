@@ -1,10 +1,9 @@
 /**
  * Where a resident's line comes from: the voice director (`index.ts`) says what happened (a
- * `LineRequest`) and a writer turns it into words. `ScriptWriter` picks a hand-written line
- * (`lines.ts`) at once; `talk/writer.ts` asks the language model, which takes a moment.
+ * `LineRequest`) and it's turned into words: `scripted` picks a hand-written line (`lines.ts`)
+ * at once; `LlmWriter` (`talk/writer.ts`) asks the language model, which takes a moment.
  */
 
-import type { FrameState } from '../core/bridge';
 import type { Line, Lines } from './lines';
 
 /** What a resident's line is about, by content id. */
@@ -27,24 +26,6 @@ export interface LineRequest {
   thoughtSubject?: number;
   /** Variation: picks among lines, seeds sampling. */
   seed: number;
-}
-
-export interface LineWriter {
-  /** Takes a while (the line may come too late to say). */
-  readonly slow: boolean;
-  /** The line for a request, or null for nothing to say (or `signal` aborted it). */
-  write(req: LineRequest, frame: FrameState, signal: AbortSignal): Promise<Line | null>;
-}
-
-/** Hand-written lines, picked by hash. */
-export class ScriptWriter implements LineWriter {
-  readonly slow = false;
-
-  constructor(private readonly lines: Lines) {}
-
-  write(req: LineRequest): Promise<Line | null> {
-    return Promise.resolve(scripted(this.lines, req));
-  }
 }
 
 /** The hand-written line for a request (`Lines` remembers what each resident said lately). */

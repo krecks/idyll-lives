@@ -71,37 +71,29 @@ The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, street
 
 ## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
 
-Unlike the art above, these are **CC BY 4.0** and **Apache-2.0** (attribution required), and CC0. They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
+Unlike the art above, these come with their own licences: the model under the **BigScience OpenRAIL-M** licence (with use restrictions), the dictionary under **Apache-2.0**. They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
 
 | File | Source | Authors | URL | Licence |
 |---|---|---|---|---|
-| `pocket-en-2026-04/*.onnx`, `bundle.json`, `bos_before_voice.npy` | Pocket TTS, English bundle `english_2026-04`, ONNX export (int8: `flow_lm_main_int8`, `flow_lm_flow_int8`, `mimi_decoder_int8`, `mimi_encoder_int8`, `text_conditioner_int8`; revision `58a6d00c`), **unchanged** | Kyutai (model); KevinAHM (ONNX export) | https://huggingface.co/kyutai/pocket-tts, https://huggingface.co/KevinAHM/pocket-tts-onnx, https://github.com/kyutai-labs/pocket-tts | CC BY 4.0 |
-| `pocket-en-2026-04/tokenizer.json` | Pocket TTS's English tokenizer (revision `575d1437`), unchanged | Kyutai | https://huggingface.co/kyutai/pocket-tts-without-voice-cloning | CC BY 4.0 |
-| `presets-2.pcm`, `presets-2.json` | 24 voice clips from Kyutai's voice repository (revision `323332d3`), each **modified**: resampled to 24 kHz, the silence around it trimmed, cut to 10 s, its loudness evened out (`crates/voice/src/dsp.rs`, `clip`), packed as 16-bit samples | see below | https://huggingface.co/kyutai/tts-voices | CC BY 4.0, CC0 |
+| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`tools/voice/fp16.mjs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE`) |
+| `supertonic-3/tts.json`, `unicode_indexer.json`, `F1.json`…`F5.json`, `M1.json`…`M5.json` | Supertonic 3 (revision `3cadd1ee`): config, text indexer and ten voice styles, **unchanged** | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3 | BigScience OpenRAIL-M (`supertonic-3/LICENSE`) |
 | `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 |
 
-**The bundled voices** (names as the game shows them; the list is `PRESETS` in `web/src/voice/voices.ts`):
+**Use restrictions.** Supertonic 3's licence (`supertonic-3/LICENSE`, shipped with it) forbids certain uses of the model and of what it makes, among them breaking the law, harming or exploiting minors, spreading verifiably false information to harm others, defamation and harassment, and impersonation for harm; see its Attachment A. Anyone who gets the game with the model is bound by the same restrictions. The voice names the game shows (Ada, Bea, Cleo, Dora, Elsie, Arlo, Ben, Cal, Dex, Ezra) are ours; the model calls its voices F1–F5 and M1–M5.
 
-- From the **VCTK corpus** (CSTR Voice Cloning Toolkit, Centre for Speech Technology Research, University of Edinburgh; https://datashare.ed.ac.uk/handle/10283/3443), CC BY 4.0, sentence 23 of each speaker as enhanced by Kyutai: Anna (p228), Azelma (p303), Eponine (p262), Eve (p361), Fantine (p244), Iris (p225), Jane (p339), Lucy (p253), Mary (p333), Nora (p236), Vera (p229), Charles (p254), Felix (p243), George (p315), Hugo (p232), Leon (p251), Michael (p360), Oscar (p270), Owen (p226), Paul (p259).
-- From **Voice-Zero** (a selection of LibriVox recordings, https://github.com/OwenTyme/voice-zero), CC0: Caro (Caro Davy), Bill (Bill Boerst), Peter (Peter Yearsley), Stuart (Stuart Bell).
+Our own code reads the text plain for the model and phonemizes it only for the mouth shapes: `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used. Pitch, size and the 24 kHz resampling are done around the model in `crates/voice/src/dsp.rs` and `resample.rs` (our own TD-PSOLA and resampler); the model's starting noise comes from our own hash in `web/src/voice/supertonic.ts`.
 
-**Players' own voices.** A voice a player records (or loads from a sound file) in the household creator stays in their browser and in their saves; Pocket TTS speaks like it. Kyutai's terms forbid cloning a voice without its owner's explicit and lawful consent, so the creator asks for the player's own voice or that of someone who agreed.
+The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebGPU build `ort-wasm-simd-threaded.asyncify.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
 
-Our own code reads the text plain for the model and phonemizes it only for the mouth shapes: `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used. Pitch, size and speed are shaped around the model in `crates/voice/src/dsp.rs` (our own TD-PSOLA); the model's noise comes from our own hash in `web/src/voice/pocket.ts`.
+## The language model for residents' lines
 
-The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebAssembly build `ort-wasm-simd-threaded.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
-
-## Language models for residents' lines
-
-Optional (Settings → Audio → What residents say → Language model), downloaded by the player's browser only when chosen, each as its 4-bit ONNX build, unchanged. The default is fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git); the others download from Hugging Face at a pinned revision, checked by SHA-256. Models a player adds from Hugging Face keep their own licences.
+Optional (Settings → Voices → Lines → Language model), its 4-bit ONNX build, unchanged; the weights file is shipped gzipped and unpacked by the player's browser. Fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git).
 
 | Model | Files | By | Source | Licence |
 |---|---|---|---|---|
-| LFM2.5-350M (default) | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_data`, `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 |
-| SmolLM2-360M-Instruct | `onnx/model_q4.onnx`, tokenizer (revision `a10cc151`), from Hugging Face | Hugging Face | https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct | Apache-2.0 |
-| Gemma 3 270M (instruction-tuned) | `onnx/model_q4.onnx`, `model_q4.onnx_data`, tokenizer (revision `2dbbfdb1`), from Hugging Face | Google (model), onnx-community (export) | https://huggingface.co/onnx-community/gemma-3-270m-it-ONNX | Gemma Terms of Use |
+| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser), `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 |
 
-The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. On the GPU the model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
+The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. The model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
 
 ## Decoders (`../decoders/`, refreshed by `tools/assets/decoders.mjs`)
 

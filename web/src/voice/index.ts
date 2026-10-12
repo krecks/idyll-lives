@@ -8,12 +8,10 @@
  * - both sides of a conversation the player started from the social menu.
  *
  * Lines are hand-written (`lines.ts`), or written by a small language model from who the
- * resident is and what's going on (`talk/`, the `voiceWriter` setting): a `LineWriter` turns
- * what happened into words. With subtitles on, the speech bubble shows the line while it plays.
+ * resident is and what's going on (`talk/`, the `voiceWriter` setting), from what happened. With subtitles on, the speech bubble shows the line while it plays.
  *
- * Everyone speaks with Pocket TTS (`voices.ts`); babies don't speak. A resident's voice is got
- * ready when they start to be heard (selected, or in a conversation), so their first line isn't
- * late. If lines keep coming late or slow the frames, voices pause for the session.
+ * Everyone speaks with Supertonic 3 on the GPU (`voices.ts`); babies don't speak. If lines keep
+ * coming late or slow the frames, voices pause for the session.
  *
  * Presentation only: nothing goes back to the simulation. Work per frame is a cheap check; the
  * snapshot is read about ten times a second.
@@ -25,15 +23,14 @@ import type { WorldStructure } from '../core/protocol';
 import { llmReady, llmStatus, unloadLlm } from '../llm';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
-import { deviceTest, ensureTalk, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
+import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { voiceKey } from './pocket';
-import { brokenRecordings, ensureVoice, hasClip, prepareVoice, speak, unloadVoice, useRecording, voiceGeneration, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { hasClip, speak, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
-import { chosenRecording, voiceFor, withTone, type VoiceParams } from './voices';
+import { voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
 
 const TICK_MS = 100;
@@ -46,14 +43,14 @@ const MAX_WAIT_MS = 4000;
 const MAX_WAIT_LLM_MS = 6000;
 /** Lines being written by the language model at once (it writes one after another). */
 const MAX_WRITING = 2;
+/** A line made ahead while its resident walks over is dropped if they haven't arrived by then. */
+const AHEAD_MS = 60_000;
 /** Lines this late, so many times in a row, pause voices for the session. */
 const LATE_RUN = 3;
 /** Frames this slow, in this share of the frames drawn while speech is being made, pause them too. */
 const SLOW_FRAME_MS = 50;
 const SLOW_SHARE = 0.1;
 const FRAME_WINDOW = 120;
-/** The engine is unloaded after this long without a line (it reloads from the cache). */
-const IDLE_UNLOAD_MS = 5 * 60_000;
 /** An answer waits this long at most for the other side to finish their line. */
 const ANSWER_WAIT_MS = 15000;
 /** A subtitle stays this long after its line ends. */
@@ -82,8 +79,9 @@ interface SimState {
 export interface VoiceDirectorStats {
   speaking: number;
   inFlight: number;
-  /** Lines the language model is writing. */
+  /** Lines the language model is writing, and lines made ahead for residents on their way somewhere. */
   writing: number;
+  ahead: number;
   spoken: number;
   dropped: number;
   language: 'off' | 'english' | 'paused';
@@ -120,10 +118,13 @@ export class VoiceDirector {
   private primed: number | null = null;
     /** Lines the language model is writing, by resident (a newer event replaces theirs). */
   private readonly writing = new Map<number, AbortController>();
+  /**
+   * Lines made ahead, by resident: what they set out to use (`useKey`), whether the dice said
+   * to speak, and the line with its speech on the way (null: nothing written ahead; the
+   * animation, unknown while walking, may still find a hand-written line on arrival).
+   */
+  private readonly ahead = new Map<number, { key: string; speak: boolean; line: Promise<Line | null> | null; at: number; control?: AbortController }>();
   private readonly sims = new Map<number, SimState>();
-  /** The voice got ready for each resident, in the worker counted by `readiedIn` (`voiceKey`). */
-  private readonly readied = new Map<number, string>();
-  private readiedIn = -1;
   /** Each resident's snapshot index at the last tick. */
   private readonly rows = new Map<number, number>();
   private readonly speaking: Speaking[] = [];
@@ -137,9 +138,6 @@ export class VoiceDirector {
   private lastFrame = 0;
   /** Frames drawn while speech was being made, and those over `SLOW_FRAME_MS`; the same while not. */
   private readonly frames = { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 };
-  /** Last line asked for; the engine was unloaded for being idle. */
-  private lastLine = performance.now();
-  private asleep = false;
   private lastTick = 0;
   private counter = 0;
   private disposed = false;
@@ -164,12 +162,6 @@ export class VoiceDirector {
     return this.llmWriter;
   }
 
-  /** Loads the engines (the language model too when it writes the lines). */
-  private wake(): void {
-    this.asleep = false;
-    if (voiceStatus.state === 'off') void ensureVoice().catch(() => {});
-    if (llmWrites() && llmStatus.state === 'off') void ensureTalk().catch(() => {});
-  }
 
   /** Lines for the voice language, (re)loaded when it changes. */
   private ensureLines(): void {
@@ -202,12 +194,6 @@ export class VoiceDirector {
       return;
     }
     this.ensureLines();
-    if (!this.asleep) this.wake();
-    if (voiceStatus.state === 'ready' && this.inFlight === 0 && !this.writing.size && performance.now() - this.lastLine > IDLE_UNLOAD_MS) {
-      unloadVoice();
-      if (llmStatus.state === 'ready') unloadLlm();
-      this.asleep = true;
-    }
     updateVoiceVolume();
 
     const { curr, layout } = frame;
@@ -218,6 +204,7 @@ export class VoiceDirector {
 
     this.rows.clear();
     for (let i = 0; i < count; i++) this.rows.set(idAt(i), i);
+    for (const [id, a] of this.ahead) if (now - a.at > AHEAD_MS || !this.rows.has(id)) this.dropAhead(id);
 
     // Who may speak this tick.
     const voiced = new Set<number>();
@@ -239,13 +226,6 @@ export class VoiceDirector {
         const partner = curr[o + k.partner];
         if (curr[o + k.social] > 0 && partner >= 0 && partner < count) voiced.add(idAt(partner));
       }
-    }
-    if (voiceReady()) {
-      if (this.readiedIn !== voiceGeneration()) {
-        this.readied.clear();
-        this.readiedIn = voiceGeneration();
-      }
-      for (const id of voiced) this.ready(id);
     }
     if (talk) {
       const busy = [talk.a, talk.b].some((id) => {
@@ -279,6 +259,7 @@ export class VoiceDirector {
       // At high speed only the conversation the player started is voiced.
       const playerSide = !!talk && (id === talk.a || id === talk.b || this.isPartnerOf(curr, row, k, i, talk));
       if (fast && !playerSide) continue;
+      this.setOut(prev, next, frame, i, id, now);
       const e = this.event(prev, next, frame, i, id, now);
       if (e) this.write(e, frame, now);
     }
@@ -286,25 +267,11 @@ export class VoiceDirector {
     this.pan(frame);
   }
 
-  /** A resident's voice: their own (a recording handed to the worker first; one this browser can't read is left out). */
+  /** A resident's voice (babies don't speak). */
   private voiceOf(id: number): VoiceParams | null {
     const info = game.roster.find((s) => s.id === id);
     if (!info || info.stage === 'baby') return null;
-    let choice = info.appearance?.voice;
-    const rec = chosenRecording(choice);
-    if (rec && brokenRecordings.has(rec.sha)) choice = { ...choice, recording: undefined };
-    else if (rec) void useRecording(rec).catch(() => {});
-    return voiceFor(id, info.gender, info.stage, choice);
-  }
-
-  /** Gets a resident's voice ready before their first line (once per voice while the engine stays loaded). */
-  private ready(id: number): void {
-    const voice = this.voiceOf(id);
-    if (!voice) return;
-    const key = voiceKey(voice);
-    if (this.readied.get(id) === key) return;
-    this.readied.set(id, key);
-    prepareVoice(voice);
+    return voiceFor(id, info.gender, info.stage, info.appearance?.voice);
   }
 
   /** For the debug overlay. */
@@ -317,6 +284,7 @@ export class VoiceDirector {
       dropped: this.dropped,
       language,
       writing: this.writing.size,
+      ahead: this.ahead.size,
       writer: llmWrites() ? 'llm' : 'lines',
     };
   }
@@ -377,8 +345,66 @@ export class VoiceDirector {
     return pid === talk.a || pid === talk.b;
   }
 
-  /** What just changed for resident `id` (row `i`) that is worth a line, if anything. */
-  private event(prev: SimState, next: SimState, frame: FrameState, i: number, id: number, now: number): { req: LineRequest; thought: boolean } | null {
+  /**
+   * A resident setting out to use something (the object and interaction show while they walk,
+   * the animation only once there): the dice decide now whether they'll speak, and if so the
+   * line is written and its speech made on the way, so it plays the moment they arrive
+   * (`event`). A plan given up on the way is forgotten.
+   */
+  private setOut(prev: SimState, next: SimState, frame: FrameState, i: number, id: number, now: number): void {
+    const going = next.action < 0 && next.def >= 0 && next.interaction >= 0;
+    const key = going ? useKey(next) : '';
+    const have = this.ahead.get(id);
+    // Off somewhere else before arriving: that plan is forgotten.
+    if (have && have.key !== key && next.action < 0) this.dropAhead(id);
+    if (!going || this.ahead.get(id)?.key === key || (next.def === prev.def && next.interaction === prev.interaction)) return;
+    // In their quiet time after a line: decided on arrival instead.
+    if (now < next.quietUntil) return;
+    const seed = id * 7919 + ++this.counter;
+    if (!chance(seed + 1, ACTION_CHANCE)) {
+      this.ahead.set(id, { key, speak: false, line: null, at: now });
+      return;
+    }
+    const object = this.content.objectList[next.def];
+    const interaction = object?.interactions[next.interaction]?.id;
+    const req: LineRequest = { speaker: id, row: i, partner: -1, seed, kind: 'use', object: object?.id, interaction };
+    const writer = llmWrites() ? this.llmWriter : null;
+    let line: Promise<Line | null> | null = null;
+    let control: AbortController | undefined;
+    if (!writer) {
+      const l = this.lines ? scripted(this.lines, req) : null;
+      if (l) line = Promise.resolve(l);
+    } else if (llmReady() && this.writing.size < MAX_WRITING) {
+      this.writing.get(id)?.abort();
+      control = new AbortController();
+      const own = control;
+      this.writing.set(id, own);
+      line = writer
+        .write(req, frame, own.signal)
+        .catch(() => null)
+        .then((l) => {
+          if (this.writing.get(id) === own) this.writing.delete(id);
+          return own.signal.aborted ? null : l;
+        });
+    }
+    this.ahead.set(id, { key, speak: true, line, at: now, control });
+    // The speech too, so arriving plays it from the cache.
+    if (line) void line.then((l) => l && this.make(id, l));
+  }
+
+  /** Forgets the line made ahead for resident `id` (and stops writing it, if it still is). */
+  private dropAhead(id: number): void {
+    const a = this.ahead.get(id);
+    if (!a) return;
+    this.ahead.delete(id);
+    if (a.control && this.writing.get(id) === a.control) {
+      a.control.abort();
+      this.writing.delete(id);
+    }
+  }
+
+  /** What just changed for resident `id` (row `i`) that is worth a line, if anything. `line`: one made ahead. */
+  private event(prev: SimState, next: SimState, frame: FrameState, i: number, id: number, now: number): { req: LineRequest; thought: boolean; line?: Promise<Line | null> } | null {
     const { curr, layout } = frame;
     const k = layout.sim;
     const o = layout.headerLen + i * layout.simStride;
@@ -409,10 +435,16 @@ export class VoiceDirector {
     }
     // Starting something, or going on to another thing with the same animation (a snack, then a meal).
     const started = next.action !== prev.action || next.def !== prev.def || next.interaction !== prev.interaction;
-    if (next.action >= 0 && started && chance(seed + 1, ACTION_CHANCE)) {
+    if (next.action >= 0 && started) {
+      // Arrived where they set out to: what was decided (and made) on the way holds.
+      const ahead = this.ahead.get(id);
+      const arrived = !!ahead && ahead.key === useKey(next);
+      if (arrived) this.ahead.delete(id);
+      if (arrived ? !ahead.speak : !chance(seed + 1, ACTION_CHANCE)) return null;
       const object = next.def >= 0 ? this.content.objectList[next.def] : undefined;
       const interaction = next.interaction >= 0 ? object?.interactions[next.interaction]?.id : undefined;
-      return { req: { ...alone, kind: 'use', object: object?.id, interaction, tag: layout.actions[next.action] }, thought: true };
+      const req: LineRequest = { ...alone, kind: 'use', object: object?.id, interaction, tag: layout.actions[next.action] };
+      return { req, thought: true, line: arrived && ahead.line ? ahead.line : undefined };
     }
     return null;
   }
@@ -421,9 +453,16 @@ export class VoiceDirector {
    * The line for an event: hand-written at once, or written by the language model (one at a
    * time per resident, a newer event replacing theirs); then said.
    */
-  private write({ req, thought }: { req: LineRequest; thought: boolean }, frame: FrameState, now: number): void {
+  private write({ req, thought, line: ahead }: { req: LineRequest; thought: boolean; line?: Promise<Line | null> }, frame: FrameState, now: number): void {
     const id = req.speaker;
     const requested = performance.now();
+    if (ahead) {
+      // Made on the way over: said from the cache (or as soon as it's there).
+      void ahead.then((line) => {
+        if (line && !this.disposed) this.say(id, req.row, line, req.partner, thought, performance.now(), requested, MAX_WAIT_MS);
+      });
+      return;
+    }
     const writer = llmWrites() ? this.llmWriter : null;
     if (!writer) {
       const line = this.lines ? scripted(this.lines, req) : null;
@@ -431,10 +470,7 @@ export class VoiceDirector {
       return;
     }
     // Nothing is written while the model loads: the moment passes.
-    if (!llmReady()) {
-      this.wake();
-      return;
-    }
+    if (!llmReady()) return;
     this.writing.get(id)?.abort();
     this.writing.delete(id);
     if (this.writing.size >= MAX_WRITING) {
@@ -445,7 +481,6 @@ export class VoiceDirector {
     if (thought && state) state.quietUntil = now + THOUGHT_GAP_MS;
     const control = new AbortController();
     this.writing.set(id, control);
-    this.lastLine = requested;
     void writer
       .write(req, frame, control.signal)
       .catch(() => null)
@@ -468,20 +503,15 @@ export class VoiceDirector {
    * while one plays. `requested`: when the moment was; `budget`: how late its first piece may be.
    */
   private say(id: number, index: number, line: Line, partnerId: number, thought: boolean, now: number, requested: number, budget: number): void {
-    const own = this.voiceOf(id);
-    if (!own) return;
-    const text = fill(line.text, this.firstName(id), partnerId >= 0 ? this.firstName(partnerId) : '');
+    const spoken = this.spokenAs(id, line, partnerId);
+    if (!spoken) return;
+    const { text, voice, pieces } = spoken;
     if (this.debug && this.heard.push(`${id} ${line.key}: ${text}`) > 50) this.heard.shift();
-    const voice = withTone(own, line.tone);
-    const pieces = speechPieces(text);
     // A line said before plays at once, even while the engine is unloaded.
     const cached = pieces.every((p) => hasClip(p, voice));
     if (!cached) {
-      // Nothing new is said while the engine loads (or reloads after being idle): the moment passes.
-      if (!voiceReady()) {
-        if (voiceStatus.state === 'off') this.wake();
-        return;
-      }
+      // Nothing new is said while the engine loads: the moment passes.
+      if (!voiceReady()) return;
       if (this.inFlight >= MAX_IN_FLIGHT) {
         this.dropped++;
         return;
@@ -499,7 +529,6 @@ export class VoiceDirector {
     for (const c of clips) c.catch(() => {});
     if (!cached) {
       this.inFlight++;
-      this.lastLine = performance.now();
       void Promise.allSettled(clips).then(() => this.inFlight--);
       void clips[0].then(() => this.timed(performance.now() - requested, budget)).catch(() => {});
     }
@@ -550,6 +579,27 @@ export class VoiceDirector {
       });
   }
 
+  /** A line as resident `id` says it: the names filled in, their voice with the line's tone, and the pieces it's spoken in. */
+  private spokenAs(id: number, line: Line, partnerId: number): { text: string; voice: VoiceParams; pieces: string[] } | null {
+    const own = this.voiceOf(id);
+    if (!own) return null;
+    const text = fill(line.text, this.firstName(id), partnerId >= 0 ? this.firstName(partnerId) : '');
+    return { text, voice: withTone(own, line.tone), pieces: speechPieces(text) };
+  }
+
+  /** Makes a line's speech into the cache without playing it (for a resident on their way somewhere). */
+  private make(id: number, line: Line): void {
+    const spoken = this.spokenAs(id, line, -1);
+    if (!spoken || !voiceReady() || this.inFlight >= MAX_IN_FLIGHT) return;
+    const { voice, pieces } = spoken;
+    if (pieces.every((p) => hasClip(p, voice))) return;
+    this.inFlight++;
+    void pieces
+      .reduce((before, piece) => before.then(() => speak(piece, voice)).then(() => {}), Promise.resolve())
+      .catch(() => {})
+      .finally(() => this.inFlight--);
+  }
+
   /** How long a line took to make (waiting included); too many late ones in a row pause voices. */
   private timed(ms: number, budget: number): void {
     this.lateRun = ms > budget ? this.lateRun + 1 : 0;
@@ -596,12 +646,18 @@ export class VoiceDirector {
   private stopAll(): void {
     for (const w of this.writing.values()) w.abort();
     this.writing.clear();
+    this.ahead.clear();
     const playing = this.speaking.splice(0);
     for (const s of playing) {
       s.playing.stop();
       this.renderer.setSpeech(s.row, null, 0);
     }
   }
+}
+
+/** What a resident is using or walking to use, as one key. */
+function useKey(s: SimState): string {
+  return `${s.def}:${s.interaction}`;
 }
 
 function chance(seed: number, p: number): boolean {

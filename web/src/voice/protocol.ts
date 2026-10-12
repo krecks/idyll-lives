@@ -3,23 +3,16 @@
 import type { VoiceParams } from './voices';
 
 export type ToVoiceWorker =
-  /** `base`: the app's base URL, where `voice/` lives; `threads`: the runtime's (always on the CPU). */
-  | { type: 'load'; base: string; language: string; threads?: number }
-  /** A player's recording (any rate, decoded on the main thread), as clip `rec:<sha>`. */
-  | { type: 'clip'; sha: string; samples: Float32Array; rate: number }
-  /** Get a voice ready ahead of its first line (shape, encode, condition); no reply. */
-  | { type: 'prepare'; voice: VoiceParams }
+  /** `base`: the app's base URL, where `voice/` lives. */
+  | { type: 'load'; base: string; language: string }
   | { type: 'speak'; id: number; text: string; voice: VoiceParams };
 
 export type FromVoiceWorker =
   /** Download progress (bytes). */
   | { type: 'progress'; loaded: number; total: number }
   | { type: 'ready'; ms: number }
-  /**
-   * 24 kHz mono and its mouth shapes (flat, `parseVisemes`); `ms`: how long the engine took,
-   * `prepMs` of it for getting the voice ready (0 if it was).
-   */
-  | { type: 'audio'; id: number; samples: Float32Array; visemes: Float32Array; ms: number; prepMs: number }
+  /** 24 kHz mono and its mouth shapes (flat, `parseVisemes`); `ms`: how long the engine took. */
+  | { type: 'audio'; id: number; samples: Float32Array; visemes: Float32Array; ms: number }
   /** A line that failed (`id`), or the engine couldn't load or the worker failed. */
   | { type: 'error'; id?: number; message: string };
 

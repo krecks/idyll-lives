@@ -65,6 +65,13 @@ export interface GenParams {
    * lines in the prompt show the tone without being copied.
    */
   avoidStart?: string[];
+  /**
+   * Exactly this many sentences of plain speech: until the last one is finished only plain
+   * text can be written (`PLAIN`: nothing that would end the reply, like the end of the turn, a
+   * quote or a line break, and no emoji or other scripts), and the reply ends with it. Small
+   * models asked for more than two sentences often stop at two, or drift off once they can't.
+   */
+  sentences?: number;
 }
 
 export interface GenResult {
@@ -145,6 +152,52 @@ export interface LlmEngine {
   /** Token ids that end a reply. */
   stopIds: ReadonlySet<number>;
   prefixes: PrefixCache;
+}
+
+/** A finished sentence: its closing punctuation (and a closing quote or bracket), then a space or the end. */
+const SENTENCE_END = /[.!?…]+["'”’)\]]*(?=\s|$)/g;
+
+/** How many sentences `text` has finished. */
+export function sentencesIn(text: string): number {
+  return text.match(SENTENCE_END)?.length ?? 0;
+}
+
+/** Plain speech: Latin letters (with accents), digits, spaces and plain punctuation (as `talk/clean.ts` keeps). */
+const PLAIN = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,!?'’\-—…:;]+$/;
+
+/** A sentence's end with a closing quote or bracket in one token (`."`, `!”`): the punctuation alone stands in for it. */
+const END_AND_QUOTE = /^(\s?[.!?…]+)["'”’」』)\]]+\s*$/;
+
+/**
+ * For writing plain speech only, per engine (one pass over the vocabulary, about 70 ms, once):
+ * the tokens that aren't plain (special tokens, quotes, line breaks, emoji, other scripts), and
+ * those that end a sentence with a quote, each with the plain punctuation token written instead.
+ */
+interface PlainOnly {
+  barred: number[];
+  ends: Map<number, number>;
+}
+const plainOnly = new WeakMap<LlmEngine, PlainOnly>();
+function plainTokens(engine: LlmEngine, vocab: number): PlainOnly {
+  let p = plainOnly.get(engine);
+  if (!p) {
+    const { tokenizer } = engine;
+    p = { barred: [], ends: new Map() };
+    for (let id = 0; id < vocab; id++) {
+      if (engine.stopIds.has(id)) {
+        p.barred.push(id);
+        continue;
+      }
+      const t = tokenizer.decode([id], { skip_special_tokens: true });
+      if (PLAIN.test(t)) continue;
+      const end = END_AND_QUOTE.exec(t);
+      const plain = end ? tokenizer.encode(end[1], { add_special_tokens: false }).ids : [];
+      if (plain.length === 1) p.ends.set(id, plain[0]);
+      else p.barred.push(id);
+    }
+    plainOnly.set(engine, p);
+  }
+  return p;
 }
 
 /** The output that carries an input's next state (`past_key_values.2.key` → `present.2.key`, `past_conv.0` → `present_conv.0`). */
@@ -283,11 +336,17 @@ export async function generate(
   let text = '';
   let stop: GenResult['stop'] = 'length';
   let nonFinite = false;
+  const wanted = params.sentences ?? 0;
   for (;;) {
     const logits = ran.logits!;
     nonFinite ||= !allFinite(logits);
     if (!ids.length) for (const id of barred) logits[id] = -Infinity;
-    const id = sample(logits, params, ids, rand);
+    // Not done yet: only plain speech, so it can't end (or drift off) here.
+    const plain = wanted > 0 && sentencesIn(text) < wanted ? plainTokens(engine, logits.length) : null;
+    if (plain) for (const id of plain.barred) logits[id] = -Infinity;
+    let id = sample(logits, params, ids, rand);
+    // A sentence's end with a closing quote: the sentence ends, the quote doesn't come.
+    if (plain) id = plain.ends.get(id) ?? id;
     if (engine.stopIds.has(id)) {
       stop = 'eos';
       break;
@@ -306,6 +365,11 @@ export async function generate(
     const at = firstOf(text, params.stopAt);
     if (at >= 0) {
       text = text.slice(0, at);
+      stop = 'text';
+      break;
+    }
+    // The last sentence wanted is finished: that's the reply.
+    if (wanted > 0 && /[.!?…]["'”’)\]]*$/.test(text.trimEnd()) && sentencesIn(text.trimEnd()) >= wanted) {
       stop = 'text';
       break;
     }

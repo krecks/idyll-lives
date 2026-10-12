@@ -1,10 +1,8 @@
 //! Shaping a voice by its sound: pitch, size and speed by TD-PSOLA, and the silence around a
 //! clip trimmed.
 //!
-//! Pocket TTS has no pitch or speed inputs; it speaks like the reference clip it is given. So a
-//! resident's pitch and size are put into that clip ([`reference`]: the model then speaks the
-//! whole line in the changed voice, measured 2026-10-12), and their speed into each finished
-//! line ([`stretch`]).
+//! Supertonic 3 speaks in ten fixed voices at a given speed; a resident's own pitch and size
+//! are put onto each finished line ([`shape`]), so everyone sounds a little different.
 //!
 //! TD-PSOLA: the clip is cut into grains two pitch periods long, centred one period apart (5 ms
 //! apart where it isn't voiced), and put back together with the grains closer (higher) or
@@ -36,9 +34,6 @@ const THRESHOLD: f32 = 0.05;
 const LEAD: usize = 1200;
 const TRAIL: usize = 2400;
 
-/// The longest reference clip used (the voice encoder's cost grows with it): 10 s.
-pub const MAX_REFERENCE: usize = 10 * SAMPLE_RATE as usize;
-
 /// `samples` without the silence around the sound.
 pub fn trim(samples: &[f32]) -> &[f32] {
     let rms: Vec<f32> = samples.chunks(FRAME).map(|f| (f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32).sqrt()).collect();
@@ -52,46 +47,6 @@ pub fn trim(samples: &[f32]) -> &[f32] {
     let start = (first * FRAME).saturating_sub(LEAD);
     let end = ((last + 1) * FRAME + TRAIL).min(samples.len());
     &samples[start..end]
-}
-
-/// Loudness every reference clip is brought to: RMS of its sounding frames (about −22 dBFS),
-/// the peak kept under 0.95. Presets and players' recordings then reach the encoder alike.
-const REFERENCE_RMS: f32 = 0.08;
-const REFERENCE_PEAK: f32 = 0.95;
-/// Silence added after a clip (on top of the 0.1 s trimming keeps): with a pause after the voice
-/// the model starts its line more cleanly (over 144 test lines, 1 began wrong against 4 without).
-const PAUSE: usize = SAMPLE_RATE as usize / 2;
-
-/// A voice clip as the encoder takes it, from any sound at any rate: 24 kHz, the silence around
-/// it trimmed, at most [`MAX_REFERENCE`] long, its loudness evened out, then a short pause. Used
-/// for the presets at build time and for players' recordings.
-pub fn clip(samples: &[f32], rate: u32) -> Vec<f32> {
-    let at_24k = if rate == SAMPLE_RATE || rate == 0 { samples.to_vec() } else { resample(samples, rate as f32 / SAMPLE_RATE as f32) };
-    let trimmed = trim(&at_24k);
-    let mut out = trimmed[..trimmed.len().min(MAX_REFERENCE)].to_vec();
-    let rms: Vec<f32> = out.chunks(FRAME).map(|f| (f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32).sqrt()).collect();
-    let loudest = rms.iter().copied().fold(0.0, f32::max);
-    let sounding: Vec<f32> = rms.into_iter().filter(|r| *r > loudest * THRESHOLD).collect();
-    if !sounding.is_empty() {
-        let level = (sounding.iter().map(|r| r * r).sum::<f32>() / sounding.len() as f32).sqrt();
-        let peak = out.iter().fold(0.0f32, |m, v| m.max(v.abs()));
-        let gain = (REFERENCE_RMS / level).min(REFERENCE_PEAK / peak);
-        out.iter_mut().for_each(|v| *v *= gain);
-    }
-    out.resize(out.len() + PAUSE, 0.0);
-    out
-}
-
-/// A clip (from [`clip`]) with its pitch times `pitch` and its formants times `depth` (above 1 a
-/// smaller voice, below 1 a larger one; the pitch stays `pitch`), its length kept: what the
-/// voice encoder hears for a resident.
-pub fn reference(clip: &[f32], pitch: f32, depth: f32) -> Vec<f32> {
-    shape(clip, pitch, depth, 1.0)
-}
-
-/// A finished line at `speed` (above 1 faster), its pitch kept.
-pub fn stretch(samples: &[f32], speed: f32) -> Vec<f32> {
-    shape(samples, 1.0, 1.0, speed)
 }
 
 /// Pitch × `pitch`, formants × `depth` and speed × `speed` in one pass (resample by `depth`,
@@ -298,7 +253,7 @@ mod tests {
         let x = vowel(150.0, 1.0);
         let c0 = centroid(&x);
         for factor in [0.8, 1.2] {
-            let y = reference(&x, factor, 1.0);
+            let y = shape(&x, factor, 1.0, 1.0);
             let p = median_pitch(&y) as f64;
             assert!((p - 150.0 * factor as f64).abs() < 150.0 * 0.03, "x{factor}: {p} Hz");
             assert!((y.len() as f64 - x.len() as f64).abs() < x.len() as f64 * 0.02, "x{factor}: length {}", y.len());
@@ -313,7 +268,7 @@ mod tests {
         let x = vowel(150.0, 1.0);
         let c0 = centroid(&x);
         for depth in [0.85f32, 1.15] {
-            let y = reference(&x, 1.0, depth);
+            let y = shape(&x, 1.0, depth, 1.0);
             let p = median_pitch(&y) as f64;
             assert!((p - 150.0).abs() < 150.0 * 0.03, "depth {depth}: {p} Hz");
             assert!((y.len() as f64 - x.len() as f64).abs() < x.len() as f64 * 0.02);
@@ -326,16 +281,16 @@ mod tests {
     fn speed_changes_length_not_pitch() {
         let x = vowel(200.0, 1.0);
         for speed in [0.85f32, 1.2] {
-            let y = stretch(&x, speed);
+            let y = shape(&x, 1.0, 1.0, speed);
             assert!((y.len() as f64 - x.len() as f64 / speed as f64).abs() < 2.0);
             let p = median_pitch(&y) as f64;
             assert!((p - 200.0).abs() < 4.0, "speed {speed}: {p} Hz");
         }
-        assert_eq!(stretch(&x, 1.0), x);
+        assert_eq!(shape(&x, 1.0, 1.0, 1.0), x);
     }
 
     #[test]
-    fn trims_silence_and_caps_the_reference() {
+    fn trims_silence() {
         let mut x = vec![0.0f32; 24_000];
         for (i, v) in x[9_600..14_400].iter_mut().enumerate() {
             *v = (i as f32 * 0.1).sin() * 0.5;
@@ -343,21 +298,11 @@ mod tests {
         let t = trim(&x);
         assert_eq!(t.len(), 4_800 + LEAD + TRAIL);
         assert_eq!(t[LEAD], x[9_600]);
-        let long = vowel(120.0, 12.0);
-        assert_eq!(clip(&long, SAMPLE_RATE).len(), MAX_REFERENCE + PAUSE);
-        // From 48 kHz, quiet: half as many samples, brought up to the reference loudness.
-        let quiet: Vec<f32> = vowel(120.0, 2.0).iter().map(|v| v * 0.1).collect();
-        let c = clip(&quiet, 48_000);
-        assert!((c.len() as f64 - 24_000.0 - PAUSE as f64).abs() < 2_000.0, "{}", c.len());
-        assert!(c[c.len() - PAUSE..].iter().all(|v| *v == 0.0));
-        let c = &c[..c.len() - PAUSE];
-        let rms = (c.iter().map(|v| v * v).sum::<f32>() / c.len() as f32).sqrt();
-        assert!((rms - REFERENCE_RMS).abs() < 0.01 || c.iter().any(|v| v.abs() >= REFERENCE_PEAK * 0.99), "rms {rms}");
     }
 
     #[test]
     fn deterministic() {
         let x = vowel(130.0, 0.6);
-        assert_eq!(reference(&x, 1.1, 0.9), reference(&x, 1.1, 0.9));
+        assert_eq!(shape(&x, 1.1, 0.9, 1.05), shape(&x, 1.1, 0.9, 1.05));
     }
 }

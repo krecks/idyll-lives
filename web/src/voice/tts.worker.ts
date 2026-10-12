@@ -1,19 +1,19 @@
 /**
  * Voice worker: turns lines of text into 24 kHz audio, one at a time, off the main thread.
- * Kyutai's Pocket TTS runs on ONNX Runtime Web, always on the CPU (its WASM build with SIMD:
- * WebGPU was about four times slower, docs/design/voices.md), and our Rust/WASM (`crates/voice-wasm`) shapes the voices, finds the
- * mouth shapes and reads the text plain. `pocket.ts` makes each line.
+ * Supertone's Supertonic 3 runs on ONNX Runtime Web, only on the GPU (WebGPU: a whole line in
+ * a few large passes, about 30 times faster than it plays; docs/design/voices.md), and our
+ * Rust/WASM (`crates/voice-wasm`) shapes the voices, finds the mouth shapes and reads the text
+ * plain. `supertonic.ts` makes each line.
  *
  * Everything is self-hosted, fetched once and kept in the Cache API, so the next session starts
- * without downloading; encoded voices are kept there too, so a voice is encoded once.
+ * without downloading.
  */
 
-import { Tokenizer } from '@huggingface/tokenizers';
-import { fetchOnce, openCache, prune, gunzipText } from '../ml/assets';
-import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
-import init, { clip, reference, Voice } from './wasm-pkg/voice_wasm.js';
+import { fetchOnce, gunzipText, openCache, prune } from '../ml/assets';
+import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
+import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
-import { prepareVoice, synthesizeLine, type Bundle, type EmbeddingStore, type Engine, type Phonemizer, type Session } from './pocket';
+import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Phonemizer, type Session, type StyleFile } from './supertonic';
 import type { FromVoiceWorker, ToVoiceWorker } from './protocol';
 import type { VoiceParams } from './voices';
 
@@ -25,30 +25,31 @@ const scope = self as unknown as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
-const CACHE = `${CACHE_PREFIX}v3`;
-/** Encoded voices, per model and clip shaping: bumped when either changes (older ones are deleted). */
-const VOICES_PREFIX = 'littlelives-voices-';
-const VOICES_CACHE = `${VOICES_PREFIX}pocket-en-2026-04-shape2`;
+const CACHE = `${CACHE_PREFIX}v5`;
+/** Pocket TTS's encoded voices, no longer used: deleted. */
+const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
-/** Files under `voice/` (made by `tools/voice/fetch.mjs`), with sizes in bytes for the progress bar. */
+/**
+ * Files under `voice/` (made by `tools/voice/fetch.mjs`), with sizes in bytes for the progress
+ * bar. The graphs come with their weights in 16-bit floats, gzipped (`.onnxz`: unpacked by
+ * `fetchOnce`).
+ */
 type File = [name: string, bytes: number];
-const MODEL_DIR = 'pocket-en-2026-04/';
+const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
-  encoder: ['mimi_encoder_int8.onnx', 20_779_616],
-  text: ['text_conditioner_int8.onnx', 16_388_384],
-  main: ['flow_lm_main_int8.onnx', 76_341_079],
-  flow: ['flow_lm_flow_int8.onnx', 9_962_530],
-  decoder: ['mimi_decoder_int8.onnx', 22_684_077],
+  duration: ['duration_predictor.onnxz', 1_628_944],
+  text: ['text_encoder.onnxz', 16_780_989],
+  vector: ['vector_estimator.onnxz', 119_568_968],
+  vocoder: ['vocoder.onnxz', 47_204_410],
 } satisfies Record<keyof Engine['sessions'], File>;
+/** A voice style file is about 291 KB. */
+const STYLE_BYTES = 291_500;
 const SMALL: File[] = [
-  [`${MODEL_DIR}bundle.json`, 24_381],
-  [`${MODEL_DIR}bos_before_voice.npy`, 4_224],
-  [`${MODEL_DIR}tokenizer.json`, 245_020],
-  ['presets-2.json', 1_188],
-  ['presets-2.pcm', 11_329_820],
+  [`${MODEL_DIR}tts.json`, 8_253],
+  [`${MODEL_DIR}unicode_indexer.json`, 277_676],
   ['en-us.lexz', 1_320_518],
 ];
-const VOICE_WASM_BYTES = 158_000;
+const VOICE_WASM_BYTES = 162_000;
 
 let engine: Engine | null = null;
 let loading: Promise<void> | null = null;
@@ -59,34 +60,17 @@ scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
     if (!loading) {
-      loading = load(msg.base, msg.threads ?? 1).catch((err) => {
+      loading = load(msg.base).catch((err) => {
         loading = null;
-        scope.postMessage({ type: 'error', message: String(err) });
+        scope.postMessage({ type: 'error', message: String(err instanceof Error ? err.message : err) });
         throw err;
       });
       loading.catch(() => {});
     }
-  } else if (msg.type === 'clip') {
-    // After loading (the WASM shapes it), before any line asks for it.
-    queue = queue.then(async () => {
-      await loading?.catch(() => {});
-      if (engine) engine.clips.set(`rec:${msg.sha}`, clip(msg.samples, msg.rate));
-    });
-  } else if (msg.type === 'prepare') {
-    queue = queue.then(() => prepare(msg.voice));
   } else if (msg.type === 'speak') {
     queue = queue.then(() => speak(msg.id, msg.text, msg.voice));
   }
 };
-
-async function prepare(voice: VoiceParams): Promise<void> {
-  try {
-    await loading;
-    if (engine) await prepareVoice(engine, voice);
-  } catch {
-    // Said again when the line comes; its error goes with it.
-  }
-}
 
 async function speak(id: number, text: string, voice: VoiceParams): Promise<void> {
   try {
@@ -94,58 +78,36 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     await loading;
     if (!engine) throw new Error('voice model not loaded');
     const start = performance.now();
-    const { samples, visemes, prepMs } = await synthesizeLine(engine, text, voice);
-    scope.postMessage({ type: 'audio', id, samples, visemes, ms: performance.now() - start, prepMs }, [samples.buffer, visemes.buffer]);
+    const { samples, visemes } = await synthesizeLine(engine, text, voice);
+    scope.postMessage({ type: 'audio', id, samples, visemes, ms: performance.now() - start }, [samples.buffer, visemes.buffer]);
   } catch (err) {
     scope.postMessage({ type: 'error', id, message: String(err) });
   }
 }
 
-/** Encoded voices in the Cache API (a few hundred KB each), so the next session doesn't encode them again. */
-async function embeddingStore(): Promise<EmbeddingStore | null> {
+/** Deletes caches an older voice model left (Pocket TTS's encoded voices). */
+async function dropOldCaches(): Promise<void> {
   try {
-    const cache = await openCache(VOICES_PREFIX, VOICES_CACHE);
-    if (!cache) return null;
-    const url = (key: string) => `https://voices.invalid/${encodeURIComponent(key)}`;
-    return {
-      async get(key) {
-        const hit = await cache.match(url(key));
-        return hit ? new Float32Array(await hit.arrayBuffer()) : null;
-      },
-      async put(key, embeddings) {
-        await cache.put(url(key), new Response(embeddings.slice().buffer));
-      },
-    };
+    for (const name of await caches.keys()) if (name.startsWith(OLD_VOICES_PREFIX)) await caches.delete(name);
   } catch {
-    return null;
+    // Only space.
   }
 }
 
-/** The bundled voices, as clips by name. */
-function presetClips(pcm: ArrayBuffer, index: { name: string; offset: number; length: number }[]): Map<string, Float32Array> {
-  const all = new Int16Array(pcm);
-  const clips = new Map<string, Float32Array>();
-  for (const { name, offset, length } of index) clips.set(`preset:${name}`, Float32Array.from(all.subarray(offset, offset + length), (v) => v / 32768));
-  return clips;
-}
-
-/** `bos_before_voice.npy` (float32, little-endian) as a flat array. */
-function npy(bytes: ArrayBuffer): Float32Array {
-  const header = new DataView(bytes).getUint16(8, true);
-  return new Float32Array(bytes.slice(10 + header));
-}
-
-/** Downloads (or takes from the cache) the runtime, our WASM, the model and the voices, and starts its sessions. */
-async function load(base: string, threads: number): Promise<void> {
+/** Downloads (or takes from the cache) the runtime, our WASM, the model and its voices, and starts its sessions on the GPU. */
+async function load(base: string): Promise<void> {
   const start = performance.now();
+  if (!(await hasWebGpu())) throw new Error('voices need a graphics card that supports WebGPU');
+  void dropOldCaches();
   const names = Object.keys(MODELS) as (keyof typeof MODELS)[];
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt wasm would
   // otherwise come back stale from the cache; those are fetched fresh there.
   const files: { url: string; size: number; built?: boolean }[] = [
-    { url: ORT_WASM.cpu.url, size: ORT_WASM.cpu.bytes, built: true },
+    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true },
     { url: wasmUrl, size: VOICE_WASM_BYTES, built: true },
     ...names.map((k) => ({ url: `${base}voice/${MODEL_DIR}${MODELS[k][0]}`, size: MODELS[k][1] })),
     ...SMALL.map(([name, size]) => ({ url: `${base}voice/${name}`, size })),
+    ...STYLE_IDS.map((id) => ({ url: `${base}voice/${MODEL_DIR}${id}.json`, size: STYLE_BYTES })),
   ];
   const total = files.reduce((n, f) => n + f.size, 0);
   const done = files.map(() => 0);
@@ -162,27 +124,23 @@ async function load(base: string, threads: number): Promise<void> {
   void prune(cache, files.map((f) => f.url));
   const [ortWasm, wasm, ...rest] = bytes;
   const models = rest.slice(0, names.length);
-  const [bundleJson, bos, tokenizerJson, presetIndex, presetPcm, lexicon] = rest.slice(names.length);
+  const [config, indexer, lexicon, ...styles] = rest.slice(names.length);
   await init({ module_or_path: wasm });
-  const text = (b: ArrayBuffer) => new TextDecoder().decode(b);
+  const json = <T>(b: ArrayBuffer) => JSON.parse(new TextDecoder().decode(b)) as T;
   // No proxy worker (this is the worker); the runtime comes from our own download.
-  const ort = await importOrt('cpu');
-  configureOrt(ort, 'cpu', threads, ortWasm);
+  const ort = await importOrt();
+  configureOrt(ort, ortWasm);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
   for (const [i, k] of names.entries()) {
-    sessions[k] = (await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions('cpu'))) as unknown as Session;
+    sessions[k] = (await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions())) as unknown as Session;
   }
   engine = {
     ort: ort as unknown as Engine['ort'],
     sessions,
-    tokenizer: new Tokenizer(JSON.parse(text(tokenizerJson)), {}),
-    bundle: JSON.parse(text(bundleJson)) as Bundle,
-    bos: npy(bos),
+    config: json<Config>(config),
+    indexer: json<number[]>(indexer),
+    styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
     phonemizer: new Voice(await gunzipText(lexicon)) as unknown as Phonemizer,
-    reference,
-    clips: presetClips(presetPcm, JSON.parse(text(presetIndex))),
-    voices: new Map(),
-    store: await embeddingStore(),
   };
   scope.postMessage({ type: 'ready', ms: performance.now() - start });
 }

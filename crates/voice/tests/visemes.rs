@@ -141,7 +141,7 @@ fn finish_returns_the_clip_and_its_track() {
     // As the model gives it: lead-in silence, speech, silence.
     let model = signal(&[(0.4, false), (0.9, true), (0.3, false)]);
     let inputs = LineInputs { text: "Hi there!".into(), phonemes: "hˈI ðˈɛɹ!".into(), voice: VoiceParams { speed: 1.2, ..Default::default() } };
-    let (samples, flat) = inputs.finish(&model);
+    let (samples, flat) = inputs.finish(&model, RATE as u32);
     let t = VisemeTrack::from_flat(&flat).unwrap();
     assert_eq!(t.energy.len(), samples.len().div_ceil(240));
     assert_monotonic(&t);
@@ -149,6 +149,9 @@ fn finish_returns_the_clip_and_its_track() {
     // Trimmed to 50 ms before the voice, then 1/1.2 as long.
     assert!((t.times[0] - 0.05 / 1.2).abs() <= 0.015, "starts at {}", t.times[0]);
     assert!(*t.times.last().unwrap() <= seconds && *t.times.last().unwrap() > seconds - 0.15);
+    // The model's 44.1 kHz output comes out at 24 kHz, as long.
+    let (at_44k, _) = inputs.finish(&voice::resample(&model, RATE / 44_100.0), 44_100);
+    assert!((at_44k.len() as f32 - samples.len() as f32).abs() < samples.len() as f32 * 0.01, "{} vs {}", at_44k.len(), samples.len());
 }
 
 fn g2p() -> Option<G2p> {

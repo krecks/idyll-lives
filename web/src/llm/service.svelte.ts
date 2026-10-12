@@ -1,38 +1,38 @@
 /**
- * The language model for the whole app: one worker, started and loaded the first time a reply
- * is wanted, on the device asked for (`ensureLlm`), and a status for settings screens. Replies
- * are written one after another; each has a deadline after which it's no longer wanted.
+ * The language model for the whole app: one worker with LFM2.5 350M on the GPU, started and
+ * loaded by `ensureLlm` (when the game starts, if residents' lines are the model's), and a
+ * status for settings screens. Replies are written one after another; each has a deadline
+ * after which it's no longer wanted.
  *
  * Knows nothing about the game: callers pass chat messages and get text back (`talk/` writes
  * residents' lines with it).
  */
 
-import type { Device } from '../ml/ort';
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
-import { allModels, modelById } from './library.svelte';
-import { DEFAULT_MODEL, type ModelSpec } from './models';
+import { MODEL } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
 export type LlmState = 'off' | 'loading' | 'ready' | 'error';
+
+// Models players added from Hugging Face (until 2026-10-12): no longer offered.
+try {
+  localStorage.removeItem('littlelives.llmModels');
+} catch {
+  // Storage unavailable.
+}
 
 export const llmStatus = $state({
   state: 'off' as LlmState,
   /** Download progress 0..1 while loading. */
   progress: 0,
   error: '',
-  /** What runs now (once ready). */
-  model: DEFAULT_MODEL.id,
-  device: 'cpu' as Device,
-  threads: 0,
 });
 
 /** How the LLM worker is doing (for the debug overlay). */
 export interface LlmStats {
   state: LlmState;
   model: string;
-  device: Device;
-  threads: number;
   loadMs: number;
   /** Replies written, and those skipped (late or aborted). */
   replies: number;
@@ -49,7 +49,6 @@ export interface LlmStats {
 }
 
 let worker: Worker | null = null;
-let loaded = { model: '', device: 'cpu' as Device };
 let nextId = 1;
 const pending = new Map<number, { resolve: (r: GenResult | null) => void; reject: (e: Error) => void }>();
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -66,8 +65,6 @@ function onMessage(msg: FromLlmWorker): void {
   } else if (msg.type === 'ready') {
     counters.loadMs = msg.ms;
     llmStatus.progress = 1;
-    llmStatus.device = msg.device;
-    llmStatus.threads = msg.threads;
     llmStatus.state = 'ready';
     waiters.forEach((w) => w.resolve());
     waiters = [];
@@ -102,28 +99,19 @@ function onMessage(msg: FromLlmWorker): void {
   }
 }
 
-/**
- * Starts the worker and the model's download if needed; resolves when it can write. Asking for
- * another device or model than the one loaded unloads it first.
- */
-export function ensureLlm(options: { device?: Device; model?: string } = {}): Promise<void> {
-  const device = options.device ?? loaded.device;
-  const model = modelById(options.model ?? DEFAULT_MODEL.id).id;
-  if (worker && (loaded.device !== device || loaded.model !== model)) unloadLlm();
+/** Starts the worker and the model's download if needed; resolves when it can write. */
+export function ensureLlm(): Promise<void> {
   if (llmStatus.state === 'ready' && worker) return Promise.resolve();
   if (!worker) {
     worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<FromLlmWorker>) => onMessage(e.data);
     worker.onerror = (e) => onMessage({ type: 'error', message: e.message || 'language model worker failed' });
-    loaded = { model, device };
   }
   if (llmStatus.state !== 'loading') {
     llmStatus.progress = 0;
     llmStatus.error = '';
     llmStatus.state = 'loading';
-    llmStatus.model = model;
-    llmStatus.device = device;
-    post({ type: 'load', base: import.meta.env.BASE_URL, model: $state.snapshot(modelById(model)), device, keep: allModels().flatMap(fileUrls) });
+    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
 }
@@ -145,25 +133,22 @@ export async function generateText(
   params: Partial<GenParams> = {},
   options: { reply?: string; lead?: string; deadline?: number; signal?: AbortSignal } = {},
 ): Promise<GenResult | null> {
-  await ensureLlm({ device: loaded.device, model: loaded.model || undefined });
+  await ensureLlm();
   const id = nextId++;
-  const spec = modelById(loaded.model);
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
     if (options.signal) {
       if (options.signal.aborted) post({ type: 'abort', id });
       else options.signal.addEventListener('abort', () => post({ type: 'abort', id }), { once: true });
     }
-    post({ type: 'generate', id, messages, reply: options.reply ?? '', lead: options.lead ?? '', params: { ...spec.defaults, ...params }, deadline: options.deadline ?? Number.MAX_SAFE_INTEGER });
+    post({ type: 'generate', id, messages, reply: options.reply ?? '', lead: options.lead ?? '', params: { ...MODEL.defaults, ...params }, deadline: options.deadline ?? Number.MAX_SAFE_INTEGER });
   });
 }
 
 export function llmStats(): LlmStats {
   return {
     state: llmStatus.state,
-    model: llmStatus.model,
-    device: llmStatus.device,
-    threads: llmStatus.threads,
+    model: MODEL.label,
     loadMs: counters.loadMs,
     replies: counters.replies,
     skipped: counters.skipped,
@@ -191,10 +176,4 @@ function stop(): void {
   pending.clear();
   waiters.forEach((w) => w.reject(new Error('language model unloaded')));
   waiters = [];
-}
-
-/** Where a model's files are (to keep them in the cache). */
-function fileUrls(m: ModelSpec): string[] {
-  const dir = new URL(m.url, new URL(import.meta.env.BASE_URL, location.href)).href;
-  return [m.tokenizer, m.tokenizerConfig, m.graph, ...(m.data ? [m.data] : [])].map(([name]) => dir + name);
 }

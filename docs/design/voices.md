@@ -1,80 +1,85 @@
 # Resident voices
 
-*Plan for residents speaking their thoughts and conversations out loud. Status (2026-10-12,
-after 0.1.0): residents speak with **Kyutai's Pocket TTS**, which speaks like a short reference
-clip, so a voice is something a player can shape: one of 24 bundled voices, pitch, depth, speed
-and expression, or their own recording, all in the household creator. It replaced KittenTTS nano
-(0.20 to 0.1.0; see "History"). Phases 1–4 are in, with the guards of phase 6 that don't need
-Auto mode; Auto mode is next. Measurements and research behind the choices are at the end.*
+*Plan for residents speaking their thoughts and conversations out loud. Status (2026-10-12):
+residents speak with **Supertone's Supertonic 3** on the graphics card (WebGPU): ten bundled
+voices, each resident with their own pitch, depth and speed. It replaced Kyutai's Pocket TTS the
+same day (0.1.0 to 2026-10-12; it spoke like a reference clip, so players could record their own
+voice, but on the CPU a line took 1–2 s and on WebGPU it was four times slower; see "History:
+Pocket TTS"). The sections "The model: Pocket TTS", "Voices" and "A resident's own voice"
+describe that model and are kept as history. Phases 1–4 are in, with the guards of phase 6 that
+don't need Auto mode. Measurements and research behind the choices are at the end.*
 
 ## Built so far
 
-- **Model (`web/src/voice/pocket.ts`):** Pocket TTS, Kyutai's 100M-parameter English model
-  (CC BY 4.0), as the published int8 ONNX export of its `english_2026-04` bundle (KevinAHM),
-  unchanged, five graphs: Mimi encoder (a reference clip to embeddings), text conditioner,
-  the transformer (`flow_lm_main`, one 80 ms frame per run, with its attention caches as state),
-  the flow network (one Euler step from noise to the frame's latent) and the Mimi decoder (latents
-  to 24 kHz). The loop around them is ported from the export's reference code. It runs in the
-  voice worker on **ONNX Runtime Web** 1.30.0 (WASM with SIMD; two threads when the page is
-  cross-origin isolated and the computer has six cores or more). Lines are made one at a time;
-  the Node checks run the same `pocket.ts`.
-- **Deterministic:** the flow's noise is ours, a hash of the voice, the text and the frame
-  (Box–Muller on two counter-hashed streams), so the same line in the same voice gives
-  **bit-identical samples** (checked across runs and sessions, against golden hashes), which the
-  clip cache relies on. No graph edits are needed.
-- **Voices (`PRESETS` in `web/src/voice/voices.ts`):** 24 bundled clips, twelve women's and
-  twelve men's, from Kyutai's voice repository (VCTK, CC BY 4.0; Voice-Zero, CC0), each turned
-  by `tools/voice/fetch.mjs` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
-  loudness evened out) and packed into one 16-bit file (11.3 MB). See "Voices".
-- **Shaping (`crates/voice/src/dsp.rs`, in the voice WASM):** our own TD-PSOLA moves pitch, size
-  (formants, by resampling first) and speed independently. A voice's pitch and size can go
-  **into the clip** the model hears (the model then speaks the whole line that way) or **onto each
-  finished line** (cheap). See "Shaping a voice".
-- **Players' own voices (`web/src/voice/record.ts`):** the creator records from the microphone
-  or reads a sound file, compressed by the browser (Opus, 32 kbit/s, at most 12 s, about 50 KB)
-  and kept in the resident's appearance, so it travels with the save. See "A resident's own
-  voice".
-- **Text:** the model reads plain text (`plain_text`: pronunciation marks dropped); our Rust
-  phonemizer (`crates/voice`, Misaki's rules) now only gives the mouth shapes their phonemes.
-- **Tests:** `cargo test -p voice --release` (phonemizer against Misaki, the shaping, mouth shapes,
-  and every game line reads as plain text); `pnpm check:voice` (also in CI: ONNX Runtime Web in
-  Node with the worker's `pocket.ts`, bit-identical across runs and sessions, golden hashes;
-  pitch, depth and speed on the line, pitch in the clip, expression and trimming checked).
-- **Browser (`web/src/voice/`):** the worker with a Cache API download (`tts.worker.ts`; encoded
-  voices are kept there too), the app-wide service and speed test (`service.svelte.ts`), the
-  director with the "who may speak" rules (`index.ts`; it gets a resident's voice ready when they
-  start to be heard), lines per language (`content/voice/en.json`, packs add theirs), voices per
-  resident (`voices.ts`), stereo playback (`player.ts`), the clip cache. Settings → Voices.
-- **Measured (M3 Pro, 2026-10-12):** in Node (ONNX Runtime Web WASM) 1.6–1.8× real time on one
-  thread for whole lines (the 51-character test line: 3.3 s of audio in 2.0 s), about 2.8× on two
-  threads and 3.7× on four (the reference loop alone; the shaping adds 50–250 ms a line). In
-  Chrome for Testing (cross-origin isolated, two threads), the Settings speed test: 1.6 s per
-  line, 2.1× real time, worst frame 16.7 ms with the menu's town drawing; in a game, lines took
-  0.6–2.2 s (1.5× real time), none dropped. The device test (LFM2.5 on the GPU) uses setup A:
-  speech 1.2 s a line on the CPU, against 3.6 s on WebGPU (setup B, too slow). Lines of 1–5
-  sentences (the model's, since 2026-10-12) are spoken a piece at a time (`speechPieces`): on the
-  CPU the first sound comes after 1.1–1.7 s whatever the length and speech is made in 0.6–0.9 of
-  its length, so the next piece is always ready; on WebGPU 5–7 s and 3–3.7, with gaps of up to
-  15 s in a five-sentence line. So Pocket TTS only runs on the CPU (setup B is gone). Getting a
-  new voice ready: about 2.4 s (encoding a 10 s clip 2.1–2.3 s, feeding it to the model 0.4 s);
-  0.4 s once its encoding is kept. Whisper understood every test line in every voice; about one line in 140
-  starts a word late (the model's own; see "Pocket TTS").
-- **Download:** 173.5 MB once (runtime 14.2, model 146.5, voices 11.3, dictionary 1.3, our WASM
-  0.16), kept in the browser's cache.
-- **Guards (`voice/index.ts`):** as before: nothing new is said while the engine loads; it
-  unloads after 5 minutes without a line; voices pause for the session (with a toast) after three
-  lines in a row later than 4 s, or when making speech slows the frames.
-- **Not yet:** Auto mode; streaming within a piece (lines are played a sentence or so at a time;
-  if computers slower than the M3 Pro need it, starting a piece after its first frames is next).
+- **Model (`web/src/voice/supertonic.ts`):** Supertonic 3 (Supertone, BigScience OpenRAIL-M),
+  four ONNX graphs with their weights stored as 16-bit floats (`tools/voice/fp16.mjs`, cast back
+  to 32-bit when the model loads, so the GPU does the same arithmetic) and gzipped (`.onnxz`,
+  unpacked in the worker): 185 MB instead of 398 as published. Measured against the published
+  weights, on the GPU, a line differs less than it does between two random seeds (spectral
+  match 0.61–0.77, against 0.55–0.59), with the same timing and the same pitch per voice. 4-bit
+  doesn't fit: 91 % of the weights are convolutions, which ONNX Runtime has no 4-bit form of on
+  WebGPU (and the int8 build ran its int8 operators on the CPU: 25 times slower). The graphs:
+  duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
+  passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
+  ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
+  **ONNX Runtime Web** 1.30.0, **only on WebGPU**: without it, voices are off (like the language
+  model). Lines are made one at a time; the Node checks run the same `supertonic.ts` (on the CPU).
+- **Deterministic:** the starting noise is ours, a hash of the voice, speed and text, so the
+  same line in the same voice gives the same samples (bit-identical in the Node check, against
+  golden hashes), which the clip cache relies on.
+- **Voices (`PRESETS` in `web/src/voice/voices.ts`):** Supertonic's ten voice styles, five
+  women's (Ada, Bea, Cleo, Dora, Elsie) and five men's (Arlo, Ben, Cal, Dex, Ezra; the names are
+  ours). Speed goes to the model; each resident's own pitch and size go onto every finished line
+  (our TD-PSOLA, `crates/voice/src/dsp.rs`). Children: one of the higher women's voices (Ada,
+  Bea, Dora, 188–216 Hz) raised to 245–290 Hz and made smaller. No voice cloning: the creator's
+  "Record a voice" and the expression slider (Pocket's temperature) are gone; saves keep a
+  recording but it isn't used.
+- **Text:** the model reads plain text (`plain_text`, then the reference's clean-up); our Rust
+  phonemizer (`crates/voice`, Misaki's rules) only gives the mouth shapes their phonemes. The
+  model's 44.1 kHz output is resampled to 24 kHz (`LineInputs::finish`) before trimming and
+  shaping, so the mouth shapes and playback are as before.
+- **Tests:** `cargo test -p voice --release`; `pnpm check:voice` (ONNX Runtime Web in Node with
+  the worker's `supertonic.ts`: bit-identical across runs and sessions, golden hashes, every voice
+  speaks and its median pitch, pitch, depth, speed and trimming checked).
+- **Measured (M3 Pro, Chrome, 2026-10-12):** lines of 1–5 sentences, spoken a piece at a time:
+  the first sound 0.23–0.25 s after asking (8 passes; 4 passes: 0.12–0.14 s), a whole
+  five-sentence line (10.5 s of audio) in 0.37 s, about 28× faster than it plays; frames at
+  16.7 ms. On the CPU (two threads) it would be 0.9–1.3 s and 2.5× real time, still faster than
+  Pocket TTS, but voices run on the GPU only. The device test with LFM2.5: 0.44 s from asking for
+  a line to hearing it (Pocket TTS on the CPU: 2.1 s); speech made in 0.14 of its length. The
+  first line after loading takes about 1 s more (the GPU sets up its kernels).
+- **Download:** 216.7 MB once (the model 185.2, the runtime's WebGPU build 26.8, voices and text
+  files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
+- **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
+  its seed (1: 20 %, 2: 25 %, 3: 25 %, 4: 15 %, 5: 15 %; `lineSentences` in `talk/writer.ts`),
+  and the generation keeps to it (`GenParams.sentences` in `llm/generate.ts`): until the last
+  sentence is finished only plain speech can be written (no end of turn, quotes, line breaks,
+  emoji or other scripts), a full stop joined to a closing quote (`."`) is written as the full
+  stop alone, and the line ends with its last sentence. Asked alone, LFM2.5 350M wrote two
+  sentences when asked for three to five. 20 of 20 sampled lines had the length asked for, 125–600
+  ms each on the GPU.
+- **Made ahead (`voice/index.ts`, `setOut`):** the snapshot shows what a resident is walking to
+  use (`objectDef`, `interaction`) before the animation starts, so when they set out the dice
+  decide whether they'll speak and, if so, the line is written and its speech made on the way;
+  arriving plays it from the clip cache at once. A plan given up on the way is forgotten (and a
+  line made ahead expires after a minute). The animation isn't known while walking, so an object
+  with only `action:` lines is still picked on arrival.
+- **Loaded at launch:** the voice model loads when the game starts (while voices are on;
+  `voice/service.svelte.ts`), the language model too while residents' lines are its own
+  (`talk/talk.svelte.ts`), and both stay loaded; switching them off unloads them.
+- **Guards (`voice/index.ts`):** nothing new is said while the engine loads; voices pause for the
+  session (with a toast) after three lines in a row later than 4 s, or when making speech slows
+  the frames.
+- **Not yet:** Auto mode; blending voice styles for more than ten voices.
 
 Residents speak with a text-to-speech model that runs **entirely in the browser**: no server, no
 API key, nothing leaves the player's computer.
 
 ## Goals and rules
 
-- **Performance first.** Speech must never cost frames. It runs in its own worker, on the CPU
-  (the GPU draws the game, and Pocket TTS was slower there), and a benchmark in Settings checks
-  that this computer keeps up.
+- **Performance first.** Speech must never cost frames. It runs in its own worker on the GPU
+  (a line in a few large passes, well under a frame's worth of GPU time per 16 ms), and a
+  benchmark in Settings and the device test check that this computer keeps up.
 - **Quiet by default.** Residents only speak when:
   1. **a resident is selected** (their Inspect panel is open, `game.inspected`): they speak their
      thoughts, and they and whoever they are talking to speak their conversation; or
@@ -552,6 +557,71 @@ Sources: [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0),
 [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) (MIT, [npm](https://www.npmjs.com/package/onnxruntime-web)),
 [browser TTS benchmarks](https://briantung.me/blog/tts-engines-in-the-browser/),
 [lessac dataset licence](https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html).
+## History: Pocket TTS (0.1.0 to 2026-10-12)
+
+Kyutai's Pocket TTS spoke like a short reference clip, so a player could record their own voice.
+It made speech one 80 ms frame at a time: 1.6–2× real time on the CPU, and on WebGPU about four
+times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was built:
+
+- **Model (`web/src/voice/pocket.ts`):** Pocket TTS, Kyutai's 100M-parameter English model
+  (CC BY 4.0), as the published int8 ONNX export of its `english_2026-04` bundle (KevinAHM),
+  unchanged, five graphs: Mimi encoder (a reference clip to embeddings), text conditioner,
+  the transformer (`flow_lm_main`, one 80 ms frame per run, with its attention caches as state),
+  the flow network (one Euler step from noise to the frame's latent) and the Mimi decoder (latents
+  to 24 kHz). The loop around them is ported from the export's reference code. It runs in the
+  voice worker on **ONNX Runtime Web** 1.30.0 (WASM with SIMD; two threads when the page is
+  cross-origin isolated and the computer has six cores or more). Lines are made one at a time;
+  the Node checks run the same `pocket.ts`.
+- **Deterministic:** the flow's noise is ours, a hash of the voice, the text and the frame
+  (Box–Muller on two counter-hashed streams), so the same line in the same voice gives
+  **bit-identical samples** (checked across runs and sessions, against golden hashes), which the
+  clip cache relies on. No graph edits are needed.
+- **Voices (`PRESETS` in `web/src/voice/voices.ts`):** 24 bundled clips, twelve women's and
+  twelve men's, from Kyutai's voice repository (VCTK, CC BY 4.0; Voice-Zero, CC0), each turned
+  by `tools/voice/fetch.mjs` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
+  loudness evened out) and packed into one 16-bit file (11.3 MB). See "Voices".
+- **Shaping (`crates/voice/src/dsp.rs`, in the voice WASM):** our own TD-PSOLA moves pitch, size
+  (formants, by resampling first) and speed independently. A voice's pitch and size can go
+  **into the clip** the model hears (the model then speaks the whole line that way) or **onto each
+  finished line** (cheap). See "Shaping a voice".
+- **Players' own voices (`web/src/voice/record.ts`):** the creator records from the microphone
+  or reads a sound file, compressed by the browser (Opus, 32 kbit/s, at most 12 s, about 50 KB)
+  and kept in the resident's appearance, so it travels with the save. See "A resident's own
+  voice".
+- **Text:** the model reads plain text (`plain_text`: pronunciation marks dropped); our Rust
+  phonemizer (`crates/voice`, Misaki's rules) now only gives the mouth shapes their phonemes.
+- **Tests:** `cargo test -p voice --release` (phonemizer against Misaki, the shaping, mouth shapes,
+  and every game line reads as plain text); `pnpm check:voice` (also in CI: ONNX Runtime Web in
+  Node with the worker's `pocket.ts`, bit-identical across runs and sessions, golden hashes;
+  pitch, depth and speed on the line, pitch in the clip, expression and trimming checked).
+- **Browser (`web/src/voice/`):** the worker with a Cache API download (`tts.worker.ts`; encoded
+  voices are kept there too), the app-wide service and speed test (`service.svelte.ts`), the
+  director with the "who may speak" rules (`index.ts`; it gets a resident's voice ready when they
+  start to be heard), lines per language (`content/voice/en.json`, packs add theirs), voices per
+  resident (`voices.ts`), stereo playback (`player.ts`), the clip cache. Settings → Voices.
+- **Measured (M3 Pro, 2026-10-12):** in Node (ONNX Runtime Web WASM) 1.6–1.8× real time on one
+  thread for whole lines (the 51-character test line: 3.3 s of audio in 2.0 s), about 2.8× on two
+  threads and 3.7× on four (the reference loop alone; the shaping adds 50–250 ms a line). In
+  Chrome for Testing (cross-origin isolated, two threads), the Settings speed test: 1.6 s per
+  line, 2.1× real time, worst frame 16.7 ms with the menu's town drawing; in a game, lines took
+  0.6–2.2 s (1.5× real time), none dropped. The device test (LFM2.5 on the GPU) uses setup A:
+  speech 1.2 s a line on the CPU, against 3.6 s on WebGPU (setup B, too slow). Lines of 1–5
+  sentences (the model's, since 2026-10-12) are spoken a piece at a time (`speechPieces`): on the
+  CPU the first sound comes after 1.1–1.7 s whatever the length and speech is made in 0.6–0.9 of
+  its length, so the next piece is always ready; on WebGPU 5–7 s and 3–3.7, with gaps of up to
+  15 s in a five-sentence line. So Pocket TTS only runs on the CPU (setup B is gone). Getting a
+  new voice ready: about 2.4 s (encoding a 10 s clip 2.1–2.3 s, feeding it to the model 0.4 s);
+  0.4 s once its encoding is kept. Whisper understood every test line in every voice; about one line in 140
+  starts a word late (the model's own; see "Pocket TTS").
+- **Download:** 173.5 MB once (runtime 14.2, model 146.5, voices 11.3, dictionary 1.3, our WASM
+  0.16), kept in the browser's cache.
+- **Guards (`voice/index.ts`):** as before: nothing new is said while the engine loads; it
+  unloads after 5 minutes without a line; voices pause for the session (with a toast) after three
+  lines in a row later than 4 s, or when making speech slows the frames.
+- **Not yet:** Auto mode; streaming within a piece (lines are played a sentence or so at a time;
+  if computers slower than the M3 Pro need it, starting a piece after its first frames is next).
+
+
 ## History: KittenTTS nano and Paradee-8M (0.20 to 0.1.0)
 
 *Residents spoke with these before Pocket TTS. Kept for the measurements and the reasoning; the

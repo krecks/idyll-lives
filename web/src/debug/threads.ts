@@ -55,8 +55,8 @@ export function threadStats(
   const mainBusy = Math.min(1, (render.cpuMs * render.fps) / 1000);
   const voice = { ...voiceThreadStats(), ...director };
   const llm = llmStats();
-  // On the CPU the model keeps all its threads busy while it writes; on the GPU about one.
-  const llmCores = llm.busy * (llm.device === 'cpu' ? Math.max(1, llm.threads) : 1);
+  // On the GPU the model keeps about one core busy while it writes.
+  const llmCores = llm.busy;
   return {
     overall: {
       cores: navigator.hardwareConcurrency ?? 0,

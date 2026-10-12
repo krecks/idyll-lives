@@ -23,6 +23,10 @@ export interface TalkText {
   /** The ask in a conversation: says to {name}. */
   askTo: string;
   examples: string;
+  /** How long the line should be (`{subject}`: one of `sentences`). */
+  length: string;
+  /** "one short sentence" … "five short sentences" (1 to 5). */
+  sentences: string[];
   /** The reply's first words, written for the model (`Mia: "`): it writes only what's said, up to the closing quote. */
   reply: string;
   /** Worked examples before the real moment: a resident of their own (`me`, `person`, `personality`), a moment with `{me}`, and the line. */
@@ -124,7 +128,8 @@ export function eventText(text: TalkText, me: string, e: LineEvent): string | nu
   }
 }
 
-export function situationMessage(text: TalkText, me: string, s: Situation, event: string, examples: readonly string[], to?: string): string {
+/** `sentences`: how many the line should have (1–5; none: as the model likes). */
+export function situationMessage(text: TalkText, me: string, s: Situation, event: string, examples: readonly string[], to?: string, sentences?: number): string {
   const w = text.situation;
   const lines = [`${fillIn(w.when, { subject: s.when })}, ${s.place}.`];
   if (s.weather) lines.push(fillIn(w.weather, { me, subject: s.weather }));
@@ -136,13 +141,16 @@ export function situationMessage(text: TalkText, me: string, s: Situation, event
   lines.push(fillIn(w.now, { me, subject: event }));
   if (examples.length) lines.push(`${fillIn(text.examples, { me })} ${examples.map((x) => `"${x}"`).join(' / ')}`);
   lines.push(to ? fillIn(text.askTo, { me, name: to }) : fillIn(text.ask, { me }));
+  const length = sentences ? text.sentences?.[sentences - 1] : undefined;
+  if (length && text.length) lines.push(fillIn(text.length, { me, subject: length }));
   return lines.join('\n');
 }
 
 /**
  * The messages for one line, the persona that opens the last of them (`lead`) and the reply's
  * first words (`TalkText.reply`), or null if the event can't be put in words. Everything before
- * the last message (rules, worked examples) is the same for everyone.
+ * the last message (rules, worked examples) is the same for everyone. `sentences`: how many the
+ * line should have (1–5).
  */
 export function buildMessages(
   text: TalkText,
@@ -150,6 +158,7 @@ export function buildMessages(
   situation: Situation,
   event: LineEvent,
   examples: readonly string[],
+  sentences?: number,
 ): { messages: ChatMessage[]; lead: string; reply: string } | null {
   const me = persona.first;
   const now = eventText(text, me, event);
@@ -162,7 +171,7 @@ export function buildMessages(
     { role: 'assistant', content: `${fillIn(text.reply, { me: d.me })}${d.line}${quote}` },
   ]);
   return {
-    messages: [{ role: 'system', content: text.rules }, ...demos, { role: 'user', content: situationMessage(text, me, situation, now, examples, to) }],
+    messages: [{ role: 'system', content: text.rules }, ...demos, { role: 'user', content: situationMessage(text, me, situation, now, examples, to, sentences) }],
     lead: `${personaText(text, persona)}\n`,
     reply,
   };

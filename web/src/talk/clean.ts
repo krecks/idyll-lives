@@ -29,7 +29,7 @@ const ALLOWED = /[^A-Za-zÀ-ÖØ-öø-ÿ0-9 .,!?'’\-—…:;]/g;
 const NARRATION_VERBS = 'says|said|smiles|smiled|laughs|laughed|nods|nodded|sighs|sighed|replies|replied|asks|asked|grins|grinned|looks|looked|whispers|whispered|shouts|shouted|thinks|thought|feels|felt|giggles|giggled|is|was|walks|turns|voice';
 
 export function cleanLine(raw: string, o: CleanOptions): string | null {
-  const max = o.maxLength ?? 360;
+  const max = o.maxLength ?? 420;
   let s = raw.replace(/<\|[^|]*\|>/g, ' ').trim();
   // The first line only (a reply should be one).
   s = s.split(/\n/)[0].trim();

@@ -9,7 +9,7 @@ import type { FrameState } from '../core/bridge';
 import { generateText, type GenResult } from '../llm';
 import { fill, type Line, type Lines } from '../voice/lines';
 import { hashUnit } from '../voice/voices';
-import type { LineRequest, LineWriter } from '../voice/writer';
+import type { LineRequest } from '../voice/writer';
 import { cleanLine } from './clean';
 import { gatherMoment, type TalkSources } from './context';
 import { buildMessages, type TalkText } from './prompt';
@@ -17,7 +17,19 @@ import { buildMessages, type TalkText } from './prompt';
 /** Time the model has to write a line, ms (speech is made after); cut short, it keeps the sentences finished. */
 export const WRITE_MS = 3500;
 /** Tokens a line may take: five short sentences. */
-export const LINE_TOKENS = 96;
+export const LINE_TOKENS = 160;
+/** How often a line is asked to have 1, 2, 3, 4 or 5 sentences. */
+const LENGTHS = [0.2, 0.25, 0.25, 0.15, 0.15];
+
+/** How many sentences a line is asked for, by its seed (1–5). */
+export function lineSentences(seed: number): number {
+  let u = hashUnit(seed, 13);
+  for (const [i, share] of LENGTHS.entries()) {
+    if (u < share) return i + 1;
+    u -= share;
+  }
+  return LENGTHS.length;
+}
 /** A persona read ahead may wait this long for the model. */
 const PRIME_MS = 30_000;
 /** Hand-written lines shown as examples. */
@@ -34,8 +46,7 @@ export interface WriterLog {
   stats?: Pick<GenResult, 'promptTokens' | 'cachedTokens' | 'prefillMs' | 'decodeMs' | 'stop'> & { tokens: number };
 }
 
-export class LlmWriter implements LineWriter {
-  readonly slow = true;
+export class LlmWriter {
   readonly log: WriterLog[] = [];
   private readonly debug = new URLSearchParams(location.search).has('debug');
 
@@ -63,13 +74,14 @@ export class LlmWriter implements LineWriter {
     const scripted = this.lines()?.candidates(req) ?? null;
     const other = moment.names[0] ?? '';
     const examples = pick(scripted?.lines ?? [], req.seed, EXAMPLES).map((l) => fill(l, moment.me, other));
-    const built = buildMessages(this.text, moment.persona, moment.situation, moment.event, examples);
+    const sentences = lineSentences(req.seed);
+    const built = buildMessages(this.text, moment.persona, moment.situation, moment.event, examples, sentences);
     if (!built) return null;
     const quote = built.reply.trim().slice(-1);
     const start = performance.now();
     const result = await generateText(
       built.messages,
-      { seed: (req.seed * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, '"', '“', '”'], avoidStart: examples },
+      { seed: (req.seed * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, '"', '“', '”'], avoidStart: examples, sentences },
       { reply: built.reply, lead: built.lead, deadline: Date.now() + WRITE_MS, signal },
     ).catch(() => null);
     const line = result && !result.nonFinite ? cleanLine(result.text, { me: moment.me, names: moment.names, blocklist: this.text.blocklist, cut: cutShort(result) }) : null;

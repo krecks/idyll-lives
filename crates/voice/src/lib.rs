@@ -1,10 +1,11 @@
 //! Resident voices (see `docs/design/voices.md`).
 //!
-//! The model, Kyutai's Pocket TTS, reads plain text ([`plain_text`]) and speaks like a reference
-//! clip; it runs in the browser with ONNX Runtime Web. This crate shapes the sound around it
-//! ([`dsp`]: a resident's pitch and size put into the reference clip, their speed into each
-//! line, silence trimmed) and gives every line a track of mouth shapes ([`visemes`]) from its
-//! phonemes ([`G2p`]: English to Misaki phonemes, a port of Misaki's rules, without espeak-ng).
+//! The model, Supertone's Supertonic 3, reads plain text ([`plain_text`]) in one of ten voices at
+//! a given speed; it runs in the browser with ONNX Runtime Web on WebGPU. This crate shapes the
+//! sound around it ([`dsp`]: its output brought to 24 kHz, the silence around it trimmed, a
+//! resident's own pitch and size put onto each line) and gives every line a track of mouth
+//! shapes ([`visemes`]) from its phonemes ([`G2p`]: English to Misaki phonemes, a port of Misaki's
+//! rules, without espeak-ng).
 //! Nothing here touches the simulation.
 
 pub mod dsp;
@@ -20,10 +21,10 @@ pub use lexicon::Lexicon;
 pub use resample::resample;
 pub use visemes::VisemeTrack;
 
-/// The model's output rate (Hz).
+/// The rate lines are finished at and played (Hz): the model's output is resampled to it.
 pub const SAMPLE_RATE: u32 = 24_000;
 
-/// Shaping on top of a voice: in a reference clip ([`dsp::reference`]) or on a finished line.
+/// Shaping on top of a voice, on a finished line.
 /// Every field is a factor around 1.0 (as it is).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VoiceParams {
@@ -60,11 +61,13 @@ pub struct LineInputs {
 }
 
 impl LineInputs {
-    /// The model's output with the silence around the speech dropped, at the line's pitch, size
-    /// and speed; and its mouth shapes, flat ([`VisemeTrack::flat`]).
-    pub fn finish(&self, samples: &[f32]) -> (Vec<f32>, Vec<f32>) {
+    /// The model's output (at `rate` Hz) at [`SAMPLE_RATE`], with the silence around the speech
+    /// dropped, at the line's pitch, size and speed; and its mouth shapes, flat
+    /// ([`VisemeTrack::flat`]).
+    pub fn finish(&self, samples: &[f32], rate: u32) -> (Vec<f32>, Vec<f32>) {
         let v = self.voice;
-        let samples = dsp::shape(dsp::trim(samples), v.pitch, v.depth, v.speed);
+        let at_rate = if rate == SAMPLE_RATE || rate == 0 { samples.to_vec() } else { resample(samples, rate as f32 / SAMPLE_RATE as f32) };
+        let samples = dsp::shape(dsp::trim(&at_rate), v.pitch, v.depth, v.speed);
         let track = visemes::track(&self.phonemes, &samples, SAMPLE_RATE);
         (samples, track.flat())
     }
@@ -88,9 +91,5 @@ impl Engine {
             return LineInputs { text: String::new(), phonemes: String::new(), voice: VoiceParams::default() };
         }
         LineInputs { text: plain, phonemes: self.g2p.phonemize(text), voice: voice.clamped() }
-    }
-
-    pub fn phonemize(&self, text: &str) -> String {
-        self.g2p.phonemize(text)
     }
 }

@@ -8,21 +8,23 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { gunzipSync } from 'node:zlib';
 
 const web = new URL('../../web/', import.meta.url);
 const require = createRequire(new URL('package.json', web));
 export const ort = require('onnxruntime-web');
 // Its ES module (`require.resolve` finds the CommonJS build next to it).
 const { Tokenizer } = await import(require.resolve('@huggingface/tokenizers').replace(/\.cjs$/, '.mjs'));
-export const { generate, PrefixCache, countTokens } = await import(new URL('src/llm/generate.ts', web).href);
+export const { generate, PrefixCache, countTokens, sentencesIn } = await import(new URL('src/llm/generate.ts', web).href);
 export const { formatChat } = await import(new URL('src/llm/chat.ts', web).href);
 
 /** The default model, as `web/src/llm/models.ts` has it. */
 export const SPEC = {
   dir: new URL('public/llm/lfm2.5-350m/', web),
   graph: 'model_q4.onnx',
-  data: 'model_q4.onnx_data',
-  chat: { kind: 'chatml', bos: '<|startoftext|>' },
+  /** The weights, gzipped as the site ships them (`tools/llm/fetch.mjs`); the graph names them without the `z`. */
+  data: 'model_q4.onnx_dataz',
+  chat: { bos: '<|startoftext|>' },
   stop: ['<|im_end|>', '<|endoftext|>'],
 };
 
@@ -37,7 +39,7 @@ export async function engine(threads = 1) {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
     logSeverityLevel: 3,
-    externalData: [{ path: SPEC.data, data: readFileSync(new URL(SPEC.data, SPEC.dir)) }],
+    externalData: [{ path: SPEC.data.replace(/z$/, ''), data: gunzipSync(readFileSync(new URL(SPEC.data, SPEC.dir))) }],
   });
   const stopIds = new Set(SPEC.stop.map((t) => tokenizer.token_to_id(t)).filter((id) => id !== undefined));
   return { ort, session, tokenizer, stopIds, prefixes: new PrefixCache(4) };

@@ -222,7 +222,7 @@ export function regender(content: Content, sim: SimDraft, from: string, taken: r
   if (look.top && !tops.includes(look.top)) look.top = tops.includes(similar[look.top]) ? similar[look.top] : tops[0];
   if (look.bottom && !bottoms.includes(look.bottom)) look.bottom = bottoms.includes(similar[look.bottom]) ? similar[look.bottom] : bottoms[0];
   if (look.beard && to !== 'male') look.beard = false;
-  // A chosen voice of the other sex goes back to the resident's own (a recording stays: it's theirs).
+  // A chosen voice of the other sex goes back to the resident's own.
   const preset = chosenPreset(look.voice);
   if (look.voice && preset !== null && (to === 'male' || to === 'female') && presetByName(preset)?.sex !== to) delete look.voice.preset;
 }
@@ -243,8 +243,7 @@ export function draftVoice(sim: SimDraft): VoiceChoice {
 
 /**
  * The creator's dice for the voice: one of the bundled voices that fits the gender (any for
- * others), or a new generated one, and pitch, speed, size and expressiveness anywhere in the
- * range. A recording stays (the dice don't throw away someone's own voice).
+ * others), or a new generated one, and pitch, speed and size anywhere in the range.
  */
 export function randomVoice(sim: SimDraft): void {
   const voice = draftVoice(sim);
@@ -260,7 +259,7 @@ export function randomVoice(sim: SimDraft): void {
   voice.pitch = roll(VOICE_RANGE.pitch);
   voice.speed = roll(VOICE_RANGE.speed);
   voice.depth = roll(VOICE_RANGE.depth);
-  voice.expressive = roll(VOICE_RANGE.expressive);
+  delete voice.expressive;
 }
 
 export function randomSim(content: Content, assets: AssetRegistry, taken: readonly string[] = []): SimDraft {

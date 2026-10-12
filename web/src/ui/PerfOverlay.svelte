@@ -55,7 +55,7 @@
       {@const v = t.voice}
       <h4>Voice thread</h4>
       <div><span>Language</span><b>{v.language}</b></div>
-      <div><span>Engine</span><b>Pocket TTS {v.state} · CPU, {v.threads} thread{v.threads === 1 ? '' : 's'}{v.loadMs ? ` · loaded in ${(v.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
+      <div><span>Engine</span><b>Supertonic 3 {v.state} · GPU{v.loadMs ? ` · loaded in ${(v.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
       {#if v.state === 'ready'}
         <div><span>Lines made</span><b>{v.lines}{v.queued ? ` · ${v.queued} queued` : ''}</b></div>
         {#if v.lines}
@@ -73,9 +73,9 @@
       {@const l = t.llm}
       {#if v.writer === 'llm' || l.state !== 'off'}
         <h4>Language model thread</h4>
-        <div><span>Model</span><b>{l.model} {l.state}{l.state === 'ready' ? ` · ${l.device.toUpperCase()}${l.device === 'cpu' ? ` × ${l.threads}` : ''}` : ''}{l.loadMs ? ` · loaded in ${(l.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
+        <div><span>Model</span><b>{l.model} {l.state}{l.state === 'ready' ? ' · GPU' : ''}{l.loadMs ? ` · loaded in ${(l.loadMs / 1000).toFixed(1)} s` : ''}</b></div>
         {#if l.state === 'ready'}
-          <div><span>Lines written</span><b>{l.replies}{l.queued ? ` · ${l.queued} queued` : ''}{v.writing ? ` · ${v.writing} writing` : ''} · {l.skipped} skipped</b></div>
+          <div><span>Lines written</span><b>{l.replies}{l.queued ? ` · ${l.queued} queued` : ''}{v.writing ? ` · ${v.writing} writing` : ''}{v.ahead ? ` · ${v.ahead} ahead` : ''} · {l.skipped} skipped</b></div>
           {#if l.replies}
             <div><span>Prompt</span><b>{l.lastPrefillMs.toFixed(0)} ms · {pct(l.lastCachedShare)} cached</b></div>
             <div><span>Writing</span><b>{l.lastTokPerS.toFixed(0)} tokens/s · avg {l.avgTokPerS.toFixed(0)}</b></div>

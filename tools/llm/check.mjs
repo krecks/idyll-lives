@@ -12,15 +12,15 @@
  *   model's state after the parts they share (a new resident's first line only reads their
  *   persona and the moment);
  * - greedy replies are the same in one session (the persona's state cached) and in a fresh
- *   one, and match golden text (a change to the model, the prompt or the loop shows up here);
+ *   one, have the sentences asked for (1 to 5), and match golden text (a change to the model, the prompt or the loop shows up here);
  * - sampled replies differ by seed;
  * - and prints the time per line.
  *
- * Needs `pnpm llm` first. Usage (from web/): `pnpm check:llm`.
+ * Needs `pnpm llm` first. Usage (from web/): `pnpm check:llm` (`DEBUG=1` also prints the raw replies).
  */
 
 import { readFileSync } from 'node:fs';
-import { countTokens, engine, formatChat, generate, SPEC, tokenizer } from './engine.mjs';
+import { countTokens, engine, formatChat, generate, sentencesIn, SPEC, tokenizer } from './engine.mjs';
 
 const web = new URL('../../web/', import.meta.url);
 const P = await import(new URL('src/talk/prompt.ts', web).href);
@@ -82,24 +82,26 @@ const MOMENTS = [
   [LILY, { when: 'Sunday midday', place: 'in the garden', feeling: ['energized'], mind: [], nearby: ['rose bush', 'swing set'] }, { kind: 'use', action: 'water (rose bush)' }],
   [LILY, { when: 'Wednesday afternoon', place: 'at home, in the kitchen', feeling: ['happy'], mind: [], nearby: ['fridge'] }, { kind: 'emotion', emotion: 'inspired' }],
 ];
+/** Sentences each moment asks for (the game picks 1–5 per line). */
+const SENTENCES = [1, 2, 3, 4, 5, 3];
 /** Tokens at most per part: rules and worked examples (everyone's), the persona (cached per resident), the moment. */
 const BUDGET = [380, 80, 160];
-const asks = MOMENTS.map(([persona, situation, event]) => {
-  const built = P.buildMessages(text, persona, situation, event, []);
+const asks = MOMENTS.map(([persona, situation, event], i) => {
+  const built = P.buildMessages(text, persona, situation, event, [], SENTENCES[i]);
   if (!built) fail(`no prompt for ${JSON.stringify(event)}`);
   const prompt = formatChat(SPEC.chat, built.messages, built.reply, built.lead);
   if (prompt.parts.length !== 3) fail(`prompt for ${persona.first} ${event.kind}: ${prompt.parts.length} parts, expected 3`);
   const tokens = prompt.parts.map((p) => countTokens(tokenizer, p));
   if (tokens.some((n, i) => n > BUDGET[i])) fail(`prompt for ${persona.first} ${event.kind}: ${tokens.join(' + ')} tokens, over ${BUDGET.join(' + ')}`);
   if (prompt.parts[0].includes(persona.first) || !prompt.parts[1].includes(persona.first)) fail('the persona must be in the second part, not the shared one');
-  return { persona, prompt, tokens };
+  return { persona, prompt, tokens, sentences: SENTENCES[i] };
 });
 if (asks.some((a) => a.prompt.parts[0] !== asks[0].prompt.parts[0])) fail('every resident must share the first part');
 if (asks[0].prompt.parts[1] !== asks[1].prompt.parts[1]) fail('two lines of the same resident must share the persona part');
 
 // ---- replies ------------------------------------------------------------------------------------
 
-const GREEDY = { maxTokens: 96, temperature: 0, topK: 1, topP: 1, repetitionPenalty: 1.15, seed: 1, stopAtNewline: true, stopAt: ['"'] };
+const GREEDY = { maxTokens: 160, temperature: 0, topK: 1, topP: 1, repetitionPenalty: 1.15, seed: 1, stopAtNewline: true, stopAt: ['"'] };
 /**
  * Greedy replies to `MOMENTS`, cleaned. WASM arithmetic is the same on every machine (with the
  * same threads), so these hold everywhere; update them only on purpose (a new model, prompt
@@ -107,19 +109,19 @@ const GREEDY = { maxTokens: 96, temperature: 0, topK: 1, topP: 1, repetitionPena
  */
 const THREADS = 4;
 const GOLDEN = [
-  "Cookin' level 5, a kitchen full of food. The fridge is just out here.",
-  "Hey Tom, you’re not the first to mention your lunch spot. The garden bench is perfect for a quick bite.",
-  "You were really funny last night. I didn't even notice.",
-  "Looks like the shower broke. I had to scramble for a change of clothes and maybe a quick bath.",
-  "Roses are red, and I love them. The swing set is perfect for a sunny afternoon. Water the garden before it gets too hot.",
-  "I can't believe I did it again! The plants are so happy, and the fridge is full of fresh herbs. It's amazing how much they make me feel.",
+  "Cookin' level 5, a kitchen full of food and laughter.",
+  "Hey Tom, you’re not the first to mention your lunch order. I’ve got a fresh salad ready.",
+  "You're not from around here. What's your story? I've got a long day ahead.",
+  "Late for the job. The rain was early, and I didn't want to wait. My hands were shaking. Maybe tomorrow's weather is different.",
+  "Roses are red, and I love them. The swing set is perfect for a morning run. My garden feels alive with blooming flowers. A rose bush looks like it could use some extra water. Water the roses!",
+  "I can't believe I did it again. The plants are so vibrant, they just burst into bloom. My heart feels lighter.",
 ];
 
 const e1 = await engine(THREADS);
 const times = [];
 const first = [];
 for (const [i, a] of asks.entries()) {
-  const r = await generate(e1, a.prompt, GREEDY);
+  const r = await generate(e1, a.prompt, { ...GREEDY, sentences: a.sentences });
   if (r.nonFinite) fail(`logits that aren't numbers for ${a.persona.first}`);
   // A resident's first line reads their persona; the rules and worked examples come from the cache.
   const firstOfTheirs = asks.findIndex((x) => x.persona === a.persona) === i;
@@ -131,7 +133,7 @@ for (const [i, a] of asks.entries()) {
 // The same in the same session (state from the cache), read in one go, and in a fresh session.
 // (4-bit on the CPU is slow: the first two moments are enough.)
 for (const [i, a] of asks.slice(0, 2).entries()) {
-  const again = await generate(e1, a.prompt, GREEDY);
+  const again = await generate(e1, a.prompt, { ...GREEDY, sentences: a.sentences });
   if (again.cachedTokens === 0) fail('the second reply to the same persona should reuse the cached state');
   if (again.text !== first[i].text) fail(`same session, different reply: ${JSON.stringify(again.text)} vs ${JSON.stringify(first[i].text)}`);
   const whole = await generate(e1, a.prompt, GREEDY, () => false, false);
@@ -139,15 +141,18 @@ for (const [i, a] of asks.slice(0, 2).entries()) {
 }
 const e2 = await engine(THREADS);
 for (const [i, a] of asks.slice(0, 2).entries()) {
-  const fresh = await generate(e2, a.prompt, GREEDY);
+  const fresh = await generate(e2, a.prompt, { ...GREEDY, sentences: a.sentences });
   if (fresh.text !== first[i].text) fail(`fresh session, different reply: ${JSON.stringify(fresh.text)} vs ${JSON.stringify(first[i].text)}`);
 }
 const lines = first.map((r, i) => clean(r.text, MOMENTS[i][2].other ? [MOMENTS[i][2].other] : []));
+if (process.env.DEBUG) for (const [i, r] of first.entries()) console.log(`raw ${i} (${r.stop}, ${r.ids.length} tokens): ${JSON.stringify(r.text)}`);
 if (GOLDEN[0] === 'PENDING') {
   console.log(`llm check: golden lines not pinned yet:\n${JSON.stringify(lines, null, 2)}`);
 } else if (JSON.stringify(lines) !== JSON.stringify(GOLDEN)) {
   fail(`replies changed:\n${JSON.stringify(lines, null, 2)}\nexpected\n${JSON.stringify(GOLDEN, null, 2)}`);
 }
+// Each reply has the sentences it was asked for (`GenParams.sentences`).
+for (const [i, l] of lines.entries()) if (l && sentencesIn(l) !== SENTENCES[i]) fail(`${MOMENTS[i][0].first} was asked for ${SENTENCES[i]} sentences and wrote ${sentencesIn(l)}: ${l}`);
 if (lines.filter(Boolean).length < Math.ceil(lines.length / 2)) fail(`most greedy replies should pass cleanLine: ${JSON.stringify(lines)}`);
 
 // Sampling: different seeds, different lines (most of the time).
@@ -161,4 +166,4 @@ console.log(
     `${THREADS} threads on the CPU: prompt ${avg((r) => r.prefillMs).toFixed(0)} ms (nothing cached: ${times[0].prefillMs.toFixed(0)} ms; a new resident: ${times[2].prefillMs.toFixed(0)} ms), ` +
     `${(avg((r) => r.ids.length) / (avg((r) => r.decodeMs) / 1000)).toFixed(1)} tokens/s, ${avg((r) => r.prefillMs + r.decodeMs).toFixed(0)} ms per line`,
 );
-for (const [i, l] of lines.entries()) console.log(`  ${MOMENTS[i][0].first} ${MOMENTS[i][2].kind}: ${JSON.stringify(l ?? `✗ ${first[i].text}`)}`);
+for (const [i, l] of lines.entries()) console.log(`  ${MOMENTS[i][0].first} ${MOMENTS[i][2].kind} (${SENTENCES[i]} asked): ${JSON.stringify(l ?? `✗ ${first[i].text}`)}`);

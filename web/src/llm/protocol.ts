@@ -2,12 +2,11 @@
 
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
-import type { Device } from '../ml/ort';
 import type { ModelSpec } from './models';
 
 export type ToLlmWorker =
-  /** `base`: the app's base URL (a model's `url` may be under it); `model`: what to load; `keep`: other models' files to keep in the cache. */
-  | { type: 'load'; base: string; model: ModelSpec; device: Device; keep: string[] }
+  /** `base`: the app's base URL (the model's `url` is under it); `model`: what to load. */
+  | { type: 'load'; base: string; model: ModelSpec }
   /**
    * `reply`: the reply's first words, written for the model, and `lead` the last message's
    * start, kept as its own part (`formatChat`); `deadline`:
@@ -19,8 +18,7 @@ export type ToLlmWorker =
 export type FromLlmWorker =
   /** Download progress (bytes). */
   | { type: 'progress'; loaded: number; total: number }
-  /** `threads`: the runtime's threads (on the CPU; 1 on the GPU). */
-  | { type: 'ready'; ms: number; device: Device; threads: number }
+  | { type: 'ready'; ms: number }
   | { type: 'done'; id: number; result: GenResult }
   /** A reply not written: its deadline passed before it started, or it was aborted. */
   | { type: 'skipped'; id: number }

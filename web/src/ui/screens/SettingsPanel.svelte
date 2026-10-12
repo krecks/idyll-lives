@@ -19,9 +19,9 @@
   import { benchVerdict, DOWNLOAD_MB, runBenchmark, speak, voiceStatus } from '../../voice/service.svelte';
   import { playClip } from '../../voice/player';
   import { voiceFor } from '../../voice/voices';
-  import { addModel, allModels, downloadMb, llmStatus, removeModel } from '../../llm';
+  import { downloadMb, llmStatus, MODEL } from '../../llm';
   import { hasWebGpu } from '../../ml/ort';
-  import { currentModel, deviceTest, reportFor, reportKey, sampleLine, stopDeviceTest, testDevices } from '../../talk';
+  import { deviceTest, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
 
   // This game's lifespan (sent to the simulation when picked).
   let lifespan = $state<Lifespan>(game.lifespan);
@@ -40,7 +40,7 @@
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
     { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['sound', 'worldSound', 'worldVolume'] },
-    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'llmModel', 'subtitles'] },
+    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
   type Page = (typeof pages)[number]['id'];
@@ -81,7 +81,7 @@
   const modelStatus = $derived.by(() => {
     if (voiceStatus.state === 'loading') return `Downloading… ${Math.round(voiceStatus.progress * 100)} %`;
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
-    return `Kyutai's Pocket TTS, on this computer: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
+    return gpuAvailable ? `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.` : 'No WebGPU here: voices need a graphics card that supports it.';
   });
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {
@@ -107,30 +107,25 @@
   // The language model that writes lines.
   let gpuAvailable = $state(true);
   void hasWebGpu().then((ok) => (gpuAvailable = ok));
-  const model = $derived(currentModel());
-  /** The chosen model is downloading (or loading). */
+  /** The model is downloading (or starting). */
   const downloading = $derived(llmStatus.state === 'loading');
   /** What loading shows: the download, then starting the model (the files are in). */
-  const loadLabel = $derived(llmStatus.progress < 1 ? `Downloading ${model.label}` : `Starting ${model.label}`);
-  const models = $derived(allModels());
-  const mb = (m: (typeof models)[number]) => Math.round(downloadMb(m));
+  const loadLabel = $derived(llmStatus.progress < 1 ? `Downloading ${MODEL.label}` : `Starting ${MODEL.label}`);
   const llmText = $derived.by(() => {
     if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
-    return `About ${mb(model)} MB, downloaded once.`;
+    return `${MODEL.label}, on this computer's graphics card: about ${Math.round(downloadMb(MODEL))} MB, downloaded once.`;
   });
-  const NAMES = { A: 'the GPU, voices on the CPU', C: 'the CPU' };
   const deviceText = $derived.by(() => {
     if (deviceTest.running) return deviceTest.step || 'Testing…';
-    const r = reportFor(model);
-    if (!r && deviceTest.stopped.includes(reportKey(model))) return 'Test stopped. Until it has run, residents say hand-written lines.';
-    if (!r) return gpuAvailable ? 'Not tested here yet: it tests itself when chosen.' : 'No WebGPU here: the model would run on the CPU, which is usually too slow. It tests itself when chosen.';
-    const ran = r.results.filter((x) => x.ran);
-    if (!r.pick) {
-      const why = ran.length ? `${ran.map((x) => `${(x.lineMs / 1000).toFixed(1)} s a line on ${NAMES[x.id]}${x.ok ? '' : ' (wrong text)'}`).join('; ')}.` : 'It couldn\'t load.';
+    const r = report();
+    if (!r && deviceTest.stopped) return 'Test stopped. Until it has run, residents say hand-written lines.';
+    if (!r) return gpuAvailable ? 'Not tested here yet: it tests itself when chosen.' : 'No WebGPU here: the model needs it, so residents say hand-written lines.';
+    const x = r.result;
+    if (!r.usable) {
+      const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${x.ok ? '' : ' (wrong text)'}.` : "It couldn't load.";
       return `Doesn't run well enough here, so residents say hand-written lines. ${why}`;
     }
-    const best = r.results.find((x) => x.id === r.pick!.setup)!;
-    return `Runs on ${NAMES[r.pick.setup]}: ${(best.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
+    return `Runs on the GPU, voices too: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
   });
   let writing = $state(false);
   let written = $state('');
@@ -146,29 +141,6 @@
       writing = false;
     }
   }
-  let repo = $state('');
-  let adding = $state(false);
-  let addText = $state('');
-  async function add() {
-    adding = true;
-    addText = 'Looking it up…';
-    try {
-      const spec = await addModel(repo);
-      settings.llmModel = spec.id;
-      addText = `Added ${spec.label} (${mb(spec)} MB). It's tested before residents use it.`;
-      repo = '';
-    } catch (e) {
-      addText = (e as Error).message;
-    } finally {
-      adding = false;
-    }
-  }
-  function remove() {
-    const id = model.id;
-    settings.llmModel = models[0].id;
-    removeModel(id);
-  }
-
   const percent = (v: number) => `${Math.round(v * 100)}%`;
 
   // Frame rate cap: a preset, or a number of the player's own (`custom`, -1 in the control).
@@ -519,7 +491,7 @@
             <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Voice volume" bind:value={settings.voiceVolume} />
             <output>{percent(settings.voiceVolume)}</output>
           </SettingRow>
-          <SettingRow title="Voice model" hint={modelStatus} details="Speaks like a short recording: 24 voices to start from, each resident with their own pitch, depth and speed, children higher and smaller; or a voice you record in the household creator. Pocket TTS is © Kyutai, CC BY 4.0.">
+          <SettingRow title="Voice model" hint={modelStatus} details="Ten voices, five women's and five men's, each resident with their own pitch, depth and speed, children higher and smaller. Runs on the graphics card (WebGPU). Supertonic 3 is © Supertone, BigScience OpenRAIL-M licence (its use restrictions apply).">
             {#if voiceStatus.state === 'loading'}
               <Busy label="Downloading the voices" progress={voiceStatus.progress} />
             {:else}
@@ -559,24 +531,19 @@
         {#if settings.voiceWriter === 'llm'}
           <section>
             <h3>Language model</h3>
-            <SettingRow title="Model" hint={llmText} details="{model.about} Licence: {model.licence}.">
-              <select class="input" aria-label="Model" bind:value={settings.llmModel} disabled={deviceTest.running}>
-                <optgroup label="Built in">
-                  {#each models.filter((m) => !m.added) as m (m.id)}<option value={m.id}>{m.label} · {mb(m)} MB</option>{/each}
-                </optgroup>
-                {#if models.some((m) => m.added)}
-                  <optgroup label="Added">
-                    {#each models.filter((m) => m.added) as m (m.id)}<option value={m.id}>{m.label} · {mb(m)} MB</option>{/each}
-                  </optgroup>
-                {/if}
-              </select>
+            <SettingRow title="Model" hint={llmText} details="{MODEL.about} Licence: {MODEL.licence}.">
+              {#if downloading && !deviceTest.running}
+                <Busy label={loadLabel} progress={llmStatus.progress < 1 ? llmStatus.progress : null} />
+              {:else}
+                <output>{llmStatus.state === 'ready' ? 'Ready' : llmStatus.state === 'error' ? 'Failed' : llmStatus.state === 'loading' ? 'Loading' : 'Not loaded'}</output>
+              {/if}
             </SettingRow>
-            <SettingRow title="On this computer" hint={deviceTest.running ? 'Writes and speaks a few lines where it can run, to find the fastest that works.' : deviceText}>
+            <SettingRow title="On this computer" hint={deviceTest.running ? 'Writes and speaks a few lines, to see that it runs well enough here.' : deviceText}>
               {#if deviceTest.running}
                 <Busy label={downloading ? loadLabel : deviceTest.step} progress={downloading && llmStatus.progress < 1 ? llmStatus.progress : deviceTest.progress} />
                 <button class="btn ghost" disabled={deviceTest.stopping} onclick={stopDeviceTest}>Stop</button>
               {:else}
-                <button class="btn ghost" onclick={() => void testDevices().catch(() => {})}>{reportFor(model) ? 'Test again' : 'Test'}</button>
+                <button class="btn ghost" onclick={() => void testDevices().catch(() => {})}>{report() ? 'Test again' : 'Test'}</button>
               {/if}
             </SettingRow>
             <SettingRow title="Try the model" hint={written ? `“${written}”` : 'Writes a line for a sample moment and says it.'}>
@@ -587,19 +554,6 @@
                 {#if writing}<span class="spinner" aria-hidden="true"></span>{/if}{writing && !downloading ? 'Writing…' : 'Write a sample line'}
               </button>
             </SettingRow>
-            <SettingRow
-              title="Add a model"
-              hint={addText || 'A small Hugging Face model with a 4-bit ONNX build.'}
-              details="It needs onnx/model_q4.onnx, as onnx-community/SmolLM2-135M-Instruct-ONNX has. It downloads from Hugging Face when used."
-            >
-              <input class="input repo" type="text" placeholder="owner/model" aria-label="Hugging Face model" bind:value={repo} onkeydown={(e) => e.key === 'Enter' && repo.trim() && !adding && void add()} />
-              <button class="btn ghost" disabled={adding || !repo.trim()} onclick={add}>{#if adding}<span class="spinner" aria-hidden="true"></span>{/if}Add</button>
-            </SettingRow>
-            {#if model.added}
-              <SettingRow title="Remove {model.label}" hint="Takes it off the list." details="Its download is freed the next time a model loads.">
-                <button class="btn ghost" disabled={deviceTest.running} onclick={remove}>Remove</button>
-              </SettingRow>
-            {/if}
           </section>
         {/if}
       {/if}
@@ -778,12 +732,6 @@
   }
   .slider {
     width: 170px;
-  }
-  select.input {
-    width: 280px;
-  }
-  .repo {
-    width: 220px;
   }
   .fps {
     width: 76px;

@@ -58,8 +58,6 @@ export interface Settings {
    * in the browser, from who they are and what's going on (`talk/`; downloads the model).
    */
   voiceWriter: 'lines' | 'llm';
-  /** The language model that writes lines (`llm/library.svelte.ts`: built in, or added from Hugging Face). */
-  llmModel: string;
   /** Spoken lines also show as text in the speech bubble. */
   subtitles: boolean;
   /** Birds, crickets, and things in use at home (audio/world.ts). */
@@ -104,7 +102,6 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceLanguage: 'en',
   voiceVolume: 0.8,
   voiceWriter: 'lines',
-  llmModel: 'lfm2.5-350m',
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,

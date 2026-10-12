@@ -1,6 +1,6 @@
 [package]
 name = "voice"
-description = "Resident voices: Misaki phonemes for mouth shapes, and the sound shaped around Pocket TTS (pitch, size, speed)."
+description = "Resident voices: Misaki phonemes for mouth shapes, and the sound shaped around Supertonic 3 (pitch, size, speed)."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

@@ -1,8 +1,7 @@
 /**
  * Language model worker: writes replies to chat messages, one at a time, off the main thread.
- * ONNX Runtime Web runs the model on the CPU (WASM, up to four threads when the page is
- * cross-origin isolated) or the GPU (WebGPU); the tokenizer is `@huggingface/tokenizers`;
- * `generate.ts` writes each reply. Knows nothing about the game.
+ * ONNX Runtime Web runs the model on the GPU (WebGPU); the tokenizer is
+ * `@huggingface/tokenizers`; `generate.ts` writes each reply. Knows nothing about the game.
  *
  * Everything is self-hosted, fetched once and kept in the Cache API, so the next session starts
  * without downloading.
@@ -10,7 +9,7 @@
 
 import { Tokenizer } from '@huggingface/tokenizers';
 import { fetchOnce, forget, openCache, prune } from '../ml/assets';
-import { configureOrt, importOrt, ORT_WASM, ortThreads, sessionOptions, type Device } from '../ml/ort';
+import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import { formatChat, type ChatMessage } from './chat';
 import { generate, PrefixCache, type GenParams, type LlmEngine, type LlmSession, type TensorCtor } from './generate';
 import type { ModelSpec } from './models';
@@ -37,7 +36,7 @@ scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
     if (!loading) {
-      loading = load(msg.base, msg.model, msg.device, msg.keep).catch((err) => {
+      loading = load(msg.base, msg.model).catch((err) => {
         loading = null;
         scope.postMessage({ type: 'error', message: String(err) });
         throw err;
@@ -72,14 +71,14 @@ async function write(id: number, messages: ChatMessage[], reply: string, lead: s
 }
 
 /** Downloads (or takes from the cache) the runtime, tokenizer and model, and starts its session. */
-async function load(base: string, model: ModelSpec, device: Device, keep: string[]): Promise<void> {
+async function load(base: string, model: ModelSpec): Promise<void> {
   const start = performance.now();
   const dir = new URL(model.url, new URL(base, location.href)).href;
   const { graph, data } = model;
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt runtime would
   // otherwise come back stale from the cache; those are fetched fresh there.
   const files: { url: string; size: number; sha256?: string; built?: boolean }[] = [
-    { url: ORT_WASM[device].url, size: ORT_WASM[device].bytes, built: true },
+    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true },
     ...[model.tokenizer, model.tokenizerConfig, graph, ...(data ? [data] : [])].map(([name, size, sha256]) => ({ url: dir + name, size, sha256 })),
   ];
   const total = files.reduce((n, f) => n + f.size, 0);
@@ -99,20 +98,18 @@ async function load(base: string, model: ModelSpec, device: Device, keep: string
       ),
     ),
   );
-  // Keeps the other models' files (switching back shouldn't download again) and both runtimes.
-  void prune(cache, [...files.map((f) => f.url), ORT_WASM.cpu.url, ORT_WASM.gpu.url, ...keep]);
+  void prune(cache, files.map((f) => f.url));
   const [ortWasm, tokenizerJson, tokenizerConfig, graphBytes, dataBytes] = bytes;
-  const ort = await importOrt(device);
-  const threads = device === 'cpu' ? ortThreads() : 1;
-  configureOrt(ort, device, threads, ortWasm);
+  const ort = await importOrt();
+  configureOrt(ort, ortWasm);
   const decode = (b: ArrayBuffer) => JSON.parse(new TextDecoder().decode(b)) as object;
   const tokenizer = new Tokenizer(decode(tokenizerJson), decode(tokenizerConfig));
   const session = await ort.InferenceSession.create(new Uint8Array(graphBytes), {
-    ...sessionOptions(device),
-    // The weights file is named in the graph by its name alone.
-    ...(data ? { externalData: [{ path: data[0].split('/').pop()!, data: new Uint8Array(dataBytes) }] } : {}),
+    ...sessionOptions(),
+    // The weights file is named in the graph by its name alone (a packed one without its `z`).
+    ...(data ? { externalData: [{ path: data[0].split('/').pop()!.replace(/(\.onnx_data)z$/, '$1'), data: new Uint8Array(dataBytes) }] } : {}),
     // The model's state stays on the GPU between steps; only the logits come back.
-    ...(device === 'gpu' ? { preferredOutputLocation: 'gpu-buffer' as const } : {}),
+    preferredOutputLocation: 'gpu-buffer' as const,
   });
   // The session has its own copy of the weights.
   if (data) forget(dir + data[0]);
@@ -126,5 +123,5 @@ async function load(base: string, model: ModelSpec, device: Device, keep: string
     prefixes: new PrefixCache(8),
   };
   spec = model;
-  scope.postMessage({ type: 'ready', ms: performance.now() - start, device, threads });
+  scope.postMessage({ type: 'ready', ms: performance.now() - start });
 }
