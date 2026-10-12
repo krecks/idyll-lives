@@ -42,6 +42,8 @@ const CONTENT: &str = r#"{
         {"id":"meal","label":"Make a meal","recipe":"meal","effects":{"fun":0.05},"tags":["food","cooking"],"skills":{}},
         {"id":"gourmet","label":"Cook a gourmet meal","recipe":"gourmet","tags":["food","cooking"]}]},
       {"id":"counter","name":"Counter","price":100,"stations":["prep"],"surface":{"height":0.9,"kind":"counter"}},
+      {"id":"vanity","name":"Vanity","price":100,"surface":{"height":0.9,"kind":"counter"}},
+      {"id":"nightstand","name":"Nightstand","price":50,"surface":{"height":0.5,"kind":"low"}},
       {"id":"stove","name":"Stove","price":400,"stations":["stove","oven"],"interactions":[
         {"id":"cook","label":"Cook dinner","recipe":"meal","effects":{"fun":0.05},"tags":["food","cooking"]},
         {"id":"wipe","label":"Wipe it down","minutes":30,"autonomous":false,"effects":{"comfort":0.1},"tags":["chores"]}]},
@@ -566,4 +568,46 @@ fn the_last_serving_from_the_fridge_brings_the_empty_pot_out_to_be_washed() {
         ticks(&mut w, 30.0);
         assert!(w.items.get(pot).is_none(), "washed up");
     }
+}
+
+/// A house clear of the lot's edge (walls round 1..11 × 1..9; one touching the edge would be
+/// outdoors) split down the middle by a wall at x = 6 (a door at z = 7): a kitchen on the left
+/// (the stove at 4,2) and a bathroom on the right, its vanity just through the wall from the stove.
+fn split_house(kitchen: &str) -> World {
+    let town = format!(
+        r#"{{"width":16,"depth":16,
+        "walls":[[1,1,11,1],[1,9,11,9],[1,1,1,9],[11,1,11,9],[6,1,6,9]],
+        "doors":[{{"x":3,"z":9,"axis":"x"}},{{"x":6,"z":7,"axis":"z"}}],
+        "plots":[{{"name":"Home","x":0,"z":0,"w":16,"d":14,"entry":[8.5,12.5]}}],
+        "households":[{{"name":"Player","plot":0,"player":true}}],
+        "objects":[{kitchen},{{"def":"vanity","x":6,"z":2,"rot":0}}],
+        "sims":[{{"name":"Ada","household":0,"x":4.5,"z":7.5}}]}}"#
+    );
+    let mut w = World::from_json(CONTENT, &town, 3).unwrap();
+    w.autonomy = false;
+    for s in &mut w.sims {
+        s.needs = [1.0; 8];
+    }
+    assert_ne!(w.lot.room_at(5, 2), w.lot.room_at(6, 2), "the wall makes two rooms");
+    w
+}
+
+#[test]
+fn cooks_put_the_food_down_in_the_kitchen_not_through_the_wall() {
+    // A counter across the kitchen, further than the vanity next door (and than a nightstand by
+    // the stove, if there is one): the food goes on the counter.
+    let kitchen = r#"{"def":"fridge","x":2,"z":2,"rot":0},{"def":"stove","x":4,"z":2,"rot":0},{"def":"counter","x":2,"z":6,"rot":0}"#;
+    for objects in [kitchen.to_string(), format!(r#"{kitchen},{{"def":"nightstand","x":5,"z":2,"rot":0}}"#)] {
+        let mut w = split_house(&objects);
+        order(&mut w, 0, 1, "cook");
+        ticks(&mut w, 60.0);
+        let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner");
+        assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(2), "on the kitchen counter: {:?}", pot.at);
+    }
+    // Nowhere to put it in the kitchen: in the fridge, not next door.
+    let mut w = split_house(r#"{"def":"fridge","x":2,"z":2,"rot":0},{"def":"stove","x":4,"z":2,"rot":0}"#);
+    order(&mut w, 0, 1, "cook");
+    ticks(&mut w, 60.0);
+    let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner");
+    assert!(matches!(pot.at, ItemAt::Stored { x: 2, z: 2 }), "in the kitchen fridge: {:?}", pot.at);
 }
