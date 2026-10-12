@@ -336,6 +336,15 @@ pub enum TaskKind {
         station: Option<u32>,
         stage: u8,
     },
+    /// On the phone (`phone.rs`; index into `content.phone.actions`): with `contact`, if the
+    /// action is with someone; on `seat` once one is found (none: standing); `answer`: how the
+    /// other end took it.
+    Phone {
+        action: usize,
+        contact: Option<u32>,
+        seat: Option<u32>,
+        answer: crate::phone::Answer,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -460,6 +469,8 @@ pub struct Sim {
     pub(crate) invited_until: u64,
     /// A dish they served this tick (an item; the household is told after the step).
     pub(crate) served: Option<u32>,
+    /// A phone action that ended this tick (applied after the step, see `phone::update`).
+    pub(crate) hung_up: Option<crate::phone::HungUp>,
     /// The last day they went to (or skipped) school.
     pub school_day: u32,
     /// How they do at school, 0..100 (pupils; see `SchoolRules::letter`).
@@ -876,6 +887,8 @@ enum Choice {
     Repair(u32),
     Social(u32, usize),
     Visit(u32),
+    /// A phone action, with someone or not (`phone.rs`).
+    Phone(usize, Option<u32>),
 }
 
 impl World {
@@ -1377,6 +1390,7 @@ impl World {
             held: None,
             invited_until: 0,
             served: None,
+            hung_up: None,
             retired: false,
             pension: 0,
             school_day: 0,
@@ -1846,6 +1860,7 @@ impl World {
         }
         self.apply_messes();
         conversation::update(self);
+        crate::phone::update(self);
         crate::life::update(self);
         crate::lifecycle::update(self);
         crate::planner::update(self);
@@ -2140,6 +2155,11 @@ impl World {
                 self.enqueue(sim, TaskKind::Visit { plot })?;
             }
             Command::GoHome { sim } => self.enqueue(sim, TaskKind::GoHome)?,
+            Command::Phone { sim, action, contact } => {
+                self.sim(sim)?;
+                crate::phone::check_order(self, sim as usize, action, contact)?;
+                self.enqueue(sim, TaskKind::Phone { action, contact, seat: None, answer: crate::phone::Answer::Pending })?;
+            }
             Command::Buy {
                 household,
                 object,
@@ -2806,6 +2826,13 @@ fn pick_autonomous(
         }
     }
 
+    // The phone: texting, calling or inviting people who aren't here, scrolling (`phone.rs`).
+    for (s, action, contact) in crate::phone::candidates(sim, ctx, &feel) {
+        if s > MIN_AUTONOMY_SCORE {
+            candidates.push((s, Choice::Phone(action, contact)));
+        }
+    }
+
     // Residents visit friends who are home.
     let household = &ctx.households[sim.household as usize];
     let visits = &content.visits;
@@ -2855,6 +2882,7 @@ fn pick_autonomous(
             Choice::Repair(object) => TaskKind::Repair { object },
             Choice::Eat(item) => TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 },
             Choice::Dishes(item) => TaskKind::Dishes { item, station: None, stage: 0 },
+            Choice::Phone(action, contact) => TaskKind::Phone { action, contact, seat: None, answer: crate::phone::Answer::Pending },
         },
         directed: false,
     })
@@ -2895,6 +2923,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
             return crate::cooking::start(sim, task, ctx, objects, items);
         }
+        TaskKind::Phone { .. } => return crate::phone::start(sim, task, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -3139,7 +3168,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
                     crate::cooking::using(sim, ctx, objects, items, elapsed, minutes)
                 }
-                _ => unreachable!("only Use, Repair, Spot, Clean, Cook, Eat and Dishes tasks have a Using phase"),
+                TaskKind::Phone { .. } => {
+                    let task = act.task;
+                    crate::phone::using(sim, content, task, elapsed, minutes)
+                }
+                _ => unreachable!("only Use, Repair, Spot, Clean, Cook, Eat, Dishes and Phone tasks have a Using phase"),
             }
         }
         // Conversations are driven by `conversation::update`, which sees both Sims.
@@ -3291,6 +3324,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         }
         TaskKind::Social { .. } => act.phase = Phase::Waiting { ticks: 0 },
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => crate::cooking::arrive(sim, ctx, objects, items),
+        TaskKind::Phone { .. } => crate::phone::arrive(sim, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -3386,7 +3420,7 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     let held = sim.current.take().and_then(|act| match act.task.kind {
         TaskKind::Use { object, .. } => Some(object),
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
-        TaskKind::Eat { seat, .. } => seat,
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,
     });
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {

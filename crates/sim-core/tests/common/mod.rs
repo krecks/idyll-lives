@@ -100,7 +100,7 @@ pub fn check(w: &World) {
             let ok = s.current().is_some_and(|a| match a.task.kind {
                 TaskKind::Use { object, .. } => object == o.id,
                 TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
-                TaskKind::Eat { seat, .. } => seat == Some(o.id),
+                TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
                 _ => false,
             });
             assert!(

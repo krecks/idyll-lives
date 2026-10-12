@@ -345,6 +345,25 @@ struct ActionView {
     active: bool,
 }
 
+/// A resident's phone (`phone.rs`): why they can't use it now, if so, and the people they can
+/// reach.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PhoneView {
+    off: Option<&'static str>,
+    contacts: Vec<ContactView>,
+}
+
+/// Someone in a resident's phone: what keeps them from it (asleep, at work...), and per phone
+/// action (content order) why it's out with them right now, if it is.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContactView {
+    id: u32,
+    status: Option<&'static str>,
+    why: Vec<Option<&'static str>>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RelView {
@@ -549,6 +568,7 @@ struct DetailsSent {
     feelings: u64,
     actions: u64,
     skills: u64,
+    phone: u64,
     plan: u64,
     plan_parts: PlanSent,
 }
@@ -832,6 +852,7 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
     // Skill levels in content order (rounded down: the whole number is the level).
     let skills: Vec<f32> = s.skills[..content.skills.len()].iter().map(|&v| floor_to(v, PERCENT)).collect();
     o.changed("skills", &skills, &mut d.skills);
+    o.changed_opt("phone", phone_view(world, s).as_ref(), &mut d.phone);
 
     // Routines, goals and wishes (the player's household only), part by part.
     if !world.households[s.household as usize].player {
@@ -858,6 +879,31 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
         o.out.truncate(mark);
         o.fields = fields;
     }
+}
+
+/// Their phone, if the content gives residents one: everyone they've met who has one too.
+fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
+    let content = &world.content;
+    if content.phone.actions.is_empty() {
+        return None;
+    }
+    let me = s.id as usize;
+    let off = crate::phone::unusable(world, me);
+    let contacts = world
+        .sims
+        .iter()
+        .filter(|t| off.is_none() && t.id != s.id && t.here() && crate::phone::has_phone(content, t.age))
+        .filter(|t| world.relationships.get(me, t.id as usize).met)
+        .map(|t| {
+            let c = t.id as usize;
+            ContactView {
+                id: t.id,
+                status: crate::phone::status_for(world, me, c),
+                why: (0..content.phone.actions.len()).map(|a| crate::phone::why_not(world, me, c, a)).collect(),
+            }
+        })
+        .collect();
+    Some(PhoneView { off, contacts })
 }
 
 /// "Visit the Smiths", or the plot's name when nobody lives there.
@@ -943,6 +989,11 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
         TaskKind::Dishes { .. } => {
             let rules = &content.cooking;
             (rules.dishes_label.clone(), None, None, rules.dishes_minutes)
+        }
+        // "Call · Bo" (the UI adds who).
+        TaskKind::Phone { action, contact, answer, .. } => {
+            let label = content.phone.actions.get(action).map_or_else(String::new, |a| a.label.clone());
+            (label, None, contact, crate::phone::length(content, action, answer))
         }
     };
     let progress = match phase {

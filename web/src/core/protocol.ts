@@ -22,6 +22,8 @@ export type Command =
   | { type: 'quitCareer'; sim: number }
   | { type: 'visit'; sim: number; plot: number }
   | { type: 'goHome'; sim: number }
+  /** Use the phone: `action` indexes content `phone.actions`; `contact` for texting, calling, inviting over or asking to come over. */
+  | { type: 'phone'; sim: number; action: number; contact?: number }
   | { type: 'cancel'; sim: number; index: number }
   /** Build and buy are addressed to a household: its home may have nobody living in it yet. */
   /**
@@ -508,8 +510,27 @@ export interface SimView {
   actions: ActionView[];
   /** Skill levels in content order (whole number = level; in 1 % steps, rounded down). */
   skills: number[];
+  /** Their phone (with content `phone`): why it's out of use, and who they can reach. */
+  phone?: PhoneView;
   /** Routines, goals and wishes (the player's household only). */
   plan?: PlanView;
+}
+
+/** A resident's phone (`phone.rs`). */
+export interface PhoneView {
+  /** Why they can't use it now ("Too young for a phone", "At work"), or null. */
+  off: string | null;
+  /** Everyone they've met who has a phone too. */
+  contacts: ContactView[];
+}
+
+/** Someone in a resident's phone. */
+export interface ContactView {
+  id: number;
+  /** What keeps them from the phone ("Asleep", "At work", "Busy"...), or null when free. */
+  status: string | null;
+  /** Per phone action (content order): why it's out with them right now, or null. */
+  why: (string | null)[];
 }
 
 /**

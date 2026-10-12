@@ -208,6 +208,7 @@ Tags in use (64 maximum for the whole game, base plus all packs):
 | `outdoors` | bench, flowerbed, telescope |
 | `social`, `friendly`, `fun`, `touch`, `romantic`, `breakup`, `mean`, `violent`, `makeup` | socials (conversations) |
 | `visit` | built in: visiting another household |
+| `phone` | the phone's actions (`phone.actions`): texting, calling, inviting, scrolling |
 
 Special meanings: `sleep`, `bathroom`, `hygiene`, `nap` make a resident busy (no chats, guests
 can't use them); `romantic` socials need attraction; `sleep` lasts through the night.
@@ -267,7 +268,7 @@ voices pick their lines by them.
 | `garden` | other garden work (bird feeder refills, feeding fish); prefer one of the four above |
 | `clean` | mopping, laundry, tidying |
 | `talk` | conversations (automatic); talking to a mirror |
-| `phone` | calls and video calls, radio chats |
+| `phone` | calls and video calls, radio chats; everyone's smartphone (`phone.anim`) |
 | `meditate` | breathing, counting to ten |
 | `idle` | standing at an object with nothing better to show (donation jar) |
 | `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
@@ -622,6 +623,68 @@ them away) and are saved with the game.
 without a `surface`), `serveRange` 6 (m), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
 `dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6.
 Packs merge `cooking` key by key and append to `items` and `recipes`.
+
+## Phone
+
+Everyone from `phone.fromStage` on carries a smartphone and uses it wherever they are: on a free
+seat within `seatRange` metres if there is one, else standing, with the `anim` animation (the
+renderer plays it standing and as an upper-body layer seated). With someone on the other end,
+it's decided once the phone is out whether they answer: someone asleep never does; a call (not
+a `message`) also doesn't get through to someone at work, at school, busy or on another call;
+nobody phones people on the same lot (they talk face to face). Those who answer say yes or no
+by `acceptance`, like the target of a social. While connected the caller's `needs` fill; on
+hanging up the contact gets `contactNeeds`, and `success` or `failure` changes the
+relationship both ways like a conversation (milestones included). Nobody answering changes
+nothing. After a yes, `meet` sends someone: `"here"` (an invitation) brings the contact over
+to the caller's home, `"there"` sends the caller to the contact's home; both are ordinary
+visits (they knock and are let in, see `visits.door`), only within `visits.earliestHour` and
+`latestHour`, between different households, and `here` only from home. Residents phone on
+their own like they choose anything else: talking scored by `needs` × `autonomyWeight` ×
+`prefer` (like a social), meeting up scored like a visit (`visits.needs`, friendship), without
+`contact` like a pastime. The player orders any of it from the resident's **Phone** tab.
+
+```json
+"phone": {
+  "fromStage": "child", "anim": "phone", "seatTags": ["lounge"], "seatRange": 5, "noAnswerMinutes": 3,
+  "actions": [
+    { "id": "call", "label": "Call", "icon": "icon.phone.call", "minutes": 25, "contact": true,
+      "tags": ["social", "friendly", "phone"], "prefer": "liked", "autonomyWeight": 0.5,
+      "acceptance": { "base": 0.75, "friendship": 0.004, "mood": 0.4 },
+      "needs": { "social": 0.28, "fun": 0.04 }, "contactNeeds": { "social": 0.2 },
+      "success": { "friendship": 2, "targetFriendship": 2 }, "failure": { "friendship": -1, "feeling": "awkward" } },
+    { "id": "invite", "label": "Invite over", "icon": "icon.phone.invite", "minutes": 5, "contact": true, "meet": "here" },
+    { "id": "browse", "label": "Scroll the phone", "icon": "icon.phone.browse", "minutes": 20, "tags": ["fun", "phone"], "needs": { "fun": 0.15 } }
+  ]
+}
+```
+
+| `phone` key | Meaning |
+|---|---|
+| `fromStage` | The life stage (`life.stages` id) from which residents have a phone. Default: the first that isn't `baby`. |
+| `anim` | Animation tag while on the phone (default `phone`). |
+| `seatTags`, `seatAvoid`, `seatRange` | Seats to sit on: sitting interactions with any of `seatTags` (default `lounge`) and none of `seatAvoid` (default `spa`, `hygiene`, `bathroom`, `sleep`) within `seatRange` metres (default 5; 0: always standing). |
+| `noAnswerMinutes` | How long they try when nobody answers (default 3). |
+| `actions` | What there is to do on the phone, in the order the UI shows them (below). |
+
+| Action field | Meaning |
+|---|---|
+| `id`, `label`, `icon` | Its id, its name ("Call", shown with who: "Call · Bo") and its icon (an asset key). |
+| `minutes` | How long it takes (a no ends after 40 % of it). |
+| `contact` | With someone (default false: on their own, like scrolling). |
+| `message` | A message, not a call: reaches anyone awake. |
+| `meet` | After a yes, `here` (they come over) or `there` (the caller goes over). |
+| `tags`, `autonomous`, `autonomyWeight`, `prefer`, `requires`, `acceptance` | As for socials. `requires` defaults to having met. |
+| `needs`, `contactNeeds` | Need gains over the whole action for the caller (while connected) and, on hanging up, for the contact. |
+| `success`, `failure` | Outcomes as for socials (`friendship`, `targetFriendship`, `romance`, `targetRomance`, `feeling`, `targetFeeling`, `needs`, `targetNeeds`), without an `effect`. |
+
+The base game: text (10 min, a message), call (25 min), invite over and ask to come over (5
+min; the player's only, `autonomous: false`) and scrolling (20 min, fun). A call fills somewhat
+less than a chat face to face, so residents still meet. **Story texts** (`events`): `invited`
+(`{a}` invited `{b}` over, and they're coming) and `declined` (`{b}` said no to meeting up with
+`{a}`), told for the player's household. Packs replace `phone` key by key (a pack's `actions`
+replaces the whole list). Content without `phone` has no phones. The market square's phone box
+(`phoneBooth`) is no longer placed; it stays in the catalogue as street furniture, and nobody
+walks to it on their own any more.
 
 ## Balance guidance
 

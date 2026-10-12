@@ -1,5 +1,6 @@
 <script lang="ts">
   import CareerTab from './CareerTab.svelte';
+  import PhoneTab from './PhoneTab.svelte';
   import SkillsTab from './SkillsTab.svelte';
   import Icon from './Icon.svelte';
   import { gradeLetter, moodLabel, needColor } from './format';
@@ -10,7 +11,7 @@
   import { goalText } from './story';
   import { game } from './state.svelte';
 
-  const allTabs = ['Now', 'People', 'Feelings', 'Career', 'Skills'] as const;
+  const allTabs = ['Now', 'People', 'Feelings', 'Career', 'Skills', 'Phone'] as const;
   let tab = $state<(typeof allTabs)[number]>('Now');
 
   /** The resident being looked at; orders only for the player's household. */
@@ -21,7 +22,10 @@
   const grownUp = $derived(!sim || services.content.isAdult(sim.age ?? 30));
   /** Babies don't plan or choose: they're cared for at the crib. */
   const baby = $derived(!!sim && !!services.content.lifeStages.find((s) => s.id === sim.stage)?.baby);
-  const tabs = $derived(mine && grownUp ? allTabs : allTabs.filter((t) => t !== 'Career'));
+  // The phone takes orders: the player's household only.
+  const tabs = $derived(allTabs.filter((t) => (t !== 'Career' || (mine && grownUp)) && (t !== 'Phone' || mine)));
+  /** The tab shown: a neighbour has no Career or Phone tab. */
+  const shown = $derived(tabs.includes(tab) ? tab : 'Now');
   const homeName = $derived(sim ? game.households[sim.household]?.name : undefined);
   const emotion = $derived(services.content.emotion(sim?.emotion ?? null));
   // By id: the list is rebuilt when relationships change, not with every change to the resident.
@@ -106,13 +110,13 @@
 
       <div class="tabs" role="tablist">
         {#each tabs as t (t)}
-          <button role="tab" aria-selected={tab === t} class:active={tab === t} onclick={() => (tab = t)}>
+          <button role="tab" aria-selected={shown === t} class:active={shown === t} onclick={() => (tab = t)}>
             {t}{#if t === 'Feelings' && sim.feelings.length}<span class="count">{sim.feelings.length}</span>{/if}
           </button>
         {/each}
       </div>
 
-      {#if tab === 'Now'}
+      {#if shown === 'Now'}
         {#if mine && !baby}
           <div class="plan">
             <TodayTimeline {sim} height={14} labels />
@@ -150,7 +154,7 @@
         {:else if mine}
           <p class="hint">They choose for themselves. To step in, click a person to talk to, an object to use, or the floor to walk.</p>
         {/if}
-      {:else if tab === 'People'}
+      {:else if shown === 'People'}
         <ul class="people">
           {#each people as p (p.rel.b)}
             {@const romance = romanceLabel(p.rel)}
@@ -173,10 +177,12 @@
             <li class="idle">{sim.name} hasn't met anyone yet.</li>
           {/each}
         </ul>
-      {:else if tab === 'Career'}
+      {:else if shown === 'Career'}
         <CareerTab {sim} />
-      {:else if tab === 'Skills'}
+      {:else if shown === 'Skills'}
         <SkillsTab {sim} />
+      {:else if shown === 'Phone'}
+        <PhoneTab {sim} />
       {:else}
         <ul class="feelings">
           {#each sim.feelings as m (m.id)}

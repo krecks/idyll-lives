@@ -1113,6 +1113,9 @@ pub struct Content {
     pub cooking: crate::cooking::CookingRules,
     pub items: Vec<crate::cooking::ItemDef>,
     pub recipes: Vec<crate::cooking::RecipeDef>,
+    /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
+    /// `phone.rs`).
+    pub phone: crate::phone::PhoneRules,
     object_index: HashMap<String, usize>,
 }
 
@@ -1208,6 +1211,8 @@ struct ContentFile {
     items: Vec<crate::cooking::ItemRaw>,
     #[serde(default)]
     recipes: Vec<crate::cooking::RecipeRaw>,
+    #[serde(default)]
+    phone: crate::phone::PhoneRaw,
 }
 
 #[derive(Deserialize)]
@@ -2023,6 +2028,11 @@ impl Content {
         }
         for t in &raw.tags {
             intern(&mut tags, t)?;
+        }
+        for a in &raw.phone.actions {
+            for t in &a.tags {
+                intern(&mut tags, t)?;
+            }
         }
         // Built-in tag for visiting other households (schedules and traits can refer to it).
         intern(&mut tags, VISIT_TAG)?;
@@ -2938,6 +2948,7 @@ impl Content {
         let talk_anim = anim_index(TALK_ANIM);
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
+        let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
         Ok(Self {
             needs,
             objects,
@@ -2979,6 +2990,7 @@ impl Content {
             cooking,
             items,
             recipes,
+            phone,
             object_index,
         })
     }

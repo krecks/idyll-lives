@@ -40,7 +40,7 @@ fn world(crowded: bool) -> World {
 }
 
 /// Fields the UI drops when a resident's details stop (`SimView.detail`).
-const DETAILS: [&str; 8] = ["grade", "needs", "mood", "emotion", "feelings", "actions", "skills", "plan"];
+const DETAILS: [&str; 9] = ["grade", "needs", "mood", "emotion", "feelings", "actions", "skills", "phone", "plan"];
 
 /// The UI's copy of the view, kept the way `game/uiUpdates.ts` keeps it.
 #[derive(Default, Debug, PartialEq)]

@@ -31,8 +31,9 @@
 //! aren't saved, they start again from what's there; absent: none of it); 20 = objects
 //! resized by the player (`size`, centimetres across and deep before turning, absent: their
 //! kind's; `tall`, centimetres taller, absent: 0), and anything may stand off its tile's middle;
-//! doors and windows too (`looks[].sill`, `looks[].head`, centimetres; absent: their style's).
-//! Older files load. Saves written before feelings
+//! doors and windows too (`looks[].sill`, `looks[].head`, centimetres; absent: their style's);
+//! 21 = story events from the phone (`invited`, `declined`); a phone action under way isn't
+//! saved. Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
 use std::collections::{BTreeMap, HashMap};
@@ -49,7 +50,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 20;
+pub const SAVE_VERSION: u32 = 21;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1234,8 +1235,9 @@ impl World {
                 skipped,
                 directed: t.directed,
             },
-            // (Eating and washing up start again from what's there after loading.)
-            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => return None,
+            // (Eating and washing up start again from what's there after loading; a few minutes
+            // on the phone are simply over.)
+            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Phone { .. } => return None,
         })
     }
 }
