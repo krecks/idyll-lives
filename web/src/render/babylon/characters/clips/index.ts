@@ -2,8 +2,9 @@
  * The residents' animation clips, made in code (`dsl.ts`) and baked when the character set loads.
  * Every name the runtime plays (characters.ts `ACTIONS`, `choose`, reactions) must be here; see
  * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
- * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. Arm and leg
- * placement uses the IK helpers in `ik.ts` (on the reference skeleton, while the clips bake).
+ * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. A baby in
+ * the crib has its own lying clips (`baby.ts`). Arm and leg placement uses the IK helpers in
+ * `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
  * pose bench updates without a reload.
@@ -11,6 +12,7 @@
 
 import type { CharacterSet, Clip } from '../data';
 import { actionClips } from './action';
+import { babyClips } from './baby';
 import { bake, type ClipDef } from './dsl';
 import { gardenClips } from './garden';
 import { idleClips } from './idle';
@@ -21,7 +23,7 @@ import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips()];
 }
 
 const live = new Set<CharacterSet>();

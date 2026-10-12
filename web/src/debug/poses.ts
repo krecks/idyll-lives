@@ -65,8 +65,10 @@ interface Station {
   held?: string;
   /** Walks to and fro across the cell. */
   walk?: boolean;
-  /** A baby lies (awake) in the object's first slot (a crib); the station's Sim sees to them from the front. */
-  baby?: boolean;
+  /** A baby lies (awake, or 'asleep') in the object's first slot (a crib); the station's Sim sees to them from the front. */
+  baby?: boolean | 'asleep';
+  /** Only the baby: no grown-up at the crib. */
+  alone?: boolean;
   /** The station's Sim's height and build (appearance; 1 = average). */
   height?: number;
   build?: number;
@@ -97,7 +99,9 @@ const STATIONS: Station[] = [
   { label: 'sleep', def: 'bed', tag: 'sleep', pose: P.Lie },
   { label: 'nap hammock', def: 'natureLover.gardenHammock', tag: 'nap', pose: P.Lie, female: true },
   { label: 'bench press', def: 'weightBench', tag: 'lift', pose: P.Lie },
-  // The baby's crib: feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
+  // The baby's crib: on their own (asleep, and awake), feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
+  { label: 'baby asleep in crib', def: 'crib', baby: 'asleep', alone: true },
+  { label: 'baby awake in crib', def: 'crib', baby: true, alone: true },
   { label: 'feed baby', def: 'crib', tag: 'tend', baby: true, female: true },
   { label: 'cuddle baby', def: 'crib', script: CUDDLING, baby: true, female: true },
   { label: 'cuddle baby tall broad', def: 'crib', script: CUDDLING, baby: true, height: 1.15, build: 1.2 },
@@ -344,7 +348,7 @@ await Promise.all(
       const slots = def?.slots ?? 1;
       const slotX = ox + w / 2 + (0 - (slots - 1) / 2) * (w / slots);
       const inside = def?.interactions?.some((it) => it.inside) ?? false;
-      actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
+      if (!s.alone) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
       if (s.baby) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
@@ -420,9 +424,9 @@ function writeSnapshot(): void {
       tag = step.tag ?? '';
     }
     if (a.baby) {
-      // Lying awake in the crib (sim-core shows no action for a baby awake in it).
+      // Lying in the crib: asleep (the crib's `sleep`), or awake (sim-core shows no action for a baby awake in it).
       pose = P.Lie;
-      tag = '';
+      tag = s.baby === 'asleep' ? 'sleep' : '';
     }
     const standing = pose === P.Stand && a.object >= 0 && !a.inside;
     snap[o + k.id] = i;
