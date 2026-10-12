@@ -345,6 +345,19 @@ pub struct LifeRules {
     pub adoption_cost: Option<i64>,
     /// The daily chance a household of grown-ups without children adopts on its own.
     pub adoption_chance: f32,
+    /// A babysitter for a baby left with no grown-up at home while someone is at work (None:
+    /// nobody looks after them, and nobody stays home for them either).
+    pub childcare: Option<ChildcareRules>,
+}
+
+/// A babysitter (content `life.childcare`): booked for the day, for `cost`, once the last
+/// grown-up at home leaves a baby to go to work; while no grown-up is home, they feed, change
+/// and play with the baby (the care interactions of the baby's crib) whenever a need those fill
+/// is below `below`. Without the money for one, the last grown-up stays home from work.
+#[derive(Debug, Clone, Copy)]
+pub struct ChildcareRules {
+    pub cost: i64,
+    pub below: f32,
 }
 
 /// A successful *Try for a baby* means a baby with a chance of `chance`, born `days` later, for
@@ -1484,6 +1497,15 @@ struct LifeRaw {
     school: Option<SchoolRaw>,
     pregnancy: Option<PregnancyRaw>,
     adoption: Option<AdoptionRaw>,
+    childcare: Option<ChildcareRaw>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChildcareRaw {
+    cost: i64,
+    #[serde(default)]
+    below: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -2694,6 +2716,7 @@ impl Content {
             }),
             adoption_cost: raw.life.adoption.as_ref().map(|a| a.cost.max(0)),
             adoption_chance: raw.life.adoption.as_ref().map_or(0.0, |a| a.neighbours.clamp(0.0, 1.0)),
+            childcare: raw.life.childcare.as_ref().map(|c| ChildcareRules { cost: c.cost.max(0), below: c.below.unwrap_or(0.45).clamp(0.0, 1.0) }),
             newcomers: raw.life.newcomers.as_ref().map(|n| NewcomerRules {
                 hour: n.hour.unwrap_or(12.0).clamp(0.0, 23.9),
                 days: n.days.unwrap_or(3.0).max(1.0),

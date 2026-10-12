@@ -185,6 +185,7 @@ pub(crate) fn update(w: &mut World) {
             schedule_school(w, i, day);
             end_visit_if_due(w, i, hour);
         }
+        childcare(w, i);
         report_skill_ups(w, i);
     }
     doors(w);
@@ -314,72 +315,156 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     if tick < leave {
         return;
     }
-    let heading_out = matches!(sim.current.as_ref().map(|a| a.task.kind), Some(TaskKind::Work))
-        || matches!(sim.queue.front().map(|t| t.kind), Some(TaskKind::Work));
-    if !heading_out {
+    if !heading_out(sim) {
         end_activity(sim, content, objects);
         sim.engaged_with = None;
         sim.queue.push_front(Task { kind: TaskKind::Work, directed: true, routine: false });
     }
 }
 
-/// Leave for work when it's time; count a shift as missed if the Sim never left.
+/// Leave for work when it's time; count a shift as missed if the Sim never left. The last
+/// grown-up at home with a baby and no money for a babysitter stays home instead.
 fn schedule_work(w: &mut World, i: usize, day: u32) {
-    let World {
-        content,
-        sims,
-        objects,
-        events,
-        tick,
-        ..
-    } = w;
-    let tick = *tick;
-    let sim = &mut sims[i];
-    let Some(job) = sim.job.as_mut() else { return };
+    let tick = w.tick;
+    let sim = &w.sims[i];
+    let Some(job) = sim.job.as_ref() else { return };
     if job.last_shift_day == day {
         return;
     }
-    let Some((leave, start, _)) = shift_today(content, job, &sim.skills, tick) else {
+    let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
-    let late = start + ticks(content.career_rules.late_minutes);
-    if tick > late {
-        job.last_shift_day = day;
-        job.performance = (job.performance - content.career_rules.missed_penalty).max(0.0);
-        job.missed = job.missed.saturating_add(1);
-        if let Some(m) = content.career_rules.missed_feeling {
+    if tick > start + ticks(w.content.career_rules.late_minutes) {
+        miss_shift(w, i, day);
+        return;
+    }
+    if tick < leave || heading_out(sim) {
+        return;
+    }
+    if let Some(baby) = stays_home_for(w, i) {
+        // No shift today, and no pay: not held against them at work.
+        if let Some(job) = w.sims[i].job.as_mut() {
+            job.last_shift_day = day;
+        }
+        w.events.push(tick, EventKind::StayedHome, i, baby, None);
+        return;
+    }
+    // Work comes first: drop what they're doing and go.
+    let World { content, sims, objects, .. } = w;
+    let sim = &mut sims[i];
+    end_activity(sim, content, objects);
+    sim.engaged_with = None;
+    sim.queue.push_front(Task {
+        kind: TaskKind::Work,
+        directed: true,
+        routine: false,
+    });
+}
+
+/// On their way to work or school (or about to set off).
+fn heading_out(sim: &Sim) -> bool {
+    matches!(sim.current.as_ref().map(|a| a.task.kind), Some(TaskKind::Work)) || matches!(sim.queue.front().map(|t| t.kind), Some(TaskKind::Work))
+}
+
+/// A shift they never left for.
+fn miss_shift(w: &mut World, i: usize, day: u32) {
+    let World { content, sims, events, tick, .. } = w;
+    let tick = *tick;
+    let sim = &mut sims[i];
+    let Some(job) = sim.job.as_mut() else { return };
+    job.last_shift_day = day;
+    job.performance = (job.performance - content.career_rules.missed_penalty).max(0.0);
+    job.missed = job.missed.saturating_add(1);
+    if let Some(m) = content.career_rules.missed_feeling {
+        social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
+    }
+    events.push(tick, EventKind::MissedWork, i, i, None);
+    if let Some(market) = &content.career_rules.market
+        && job.missed >= market.fire_after_missed
+    {
+        let (career, level) = (job.career, job.level);
+        sim.job = None;
+        sim.job_search_from = day + market.cooldown_days;
+        if let Some(m) = market.fired_feeling {
             social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
         }
-        events.push(tick, EventKind::MissedWork, i, i, None);
-        if let Some(market) = &content.career_rules.market
-            && job.missed >= market.fire_after_missed
-        {
-            let (career, level) = (job.career, job.level);
-            sim.job = None;
-            sim.job_search_from = day + market.cooldown_days;
-            if let Some(m) = market.fired_feeling {
-                social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
+        events.push_career(tick, EventKind::Fired, i, career, Some(level as i64));
+    }
+}
+
+// ---- Childcare ----------------------------------------------------------------------------
+
+/// Whether a grown-up of household `h` other than `except` is at home on `plot` to look after
+/// a baby (not about to leave for work).
+fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
+    w.sims.iter().enumerate().any(|(j, s)| {
+        Some(j) != except
+            && s.here()
+            && s.household as usize == h
+            && s.away_until.is_none()
+            && s.visiting.is_none()
+            && !heading_out(s)
+            && s.adult(&w.content)
+            && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
+    })
+}
+
+/// Who `i` would stay home for if they left for work now: a baby at home with no other
+/// grown-up there, no babysitter booked for today and no money for one (content
+/// `life.childcare`; without it, nobody stays home).
+fn stays_home_for(w: &World, i: usize) -> Option<usize> {
+    let rules = w.content.life.childcare?;
+    let h = w.sims[i].household as usize;
+    let household = &w.households[h];
+    let plot = household.plot?;
+    if household.sitter_day == Some(clock::day(w.tick)) || affordable(rules.cost, household.funds) {
+        return None;
+    }
+    let baby = w.sims.iter().position(|s| s.here() && s.household as usize == h && w.content.life.baby(s.age))?;
+    (!carer_home(w, h, plot, Some(i))).then_some(baby)
+}
+
+/// A babysitter for baby `b` (content `life.childcare`): booked (and paid) for the day once
+/// the baby is left with no grown-up at home while one of them is at work; while nobody's
+/// home, the babysitter does the care interactions of the baby's crib whenever a need they
+/// fill is low.
+fn childcare(w: &mut World, b: usize) {
+    let Some(rules) = w.content.life.childcare else { return };
+    if !w.content.life.baby(w.sims[b].age) {
+        return;
+    }
+    let h = w.sims[b].household as usize;
+    let Some(plot) = w.households[h].plot else { return };
+    if carer_home(w, h, plot, None) {
+        return;
+    }
+    // The baby's crib (or the home's), for what caring for them takes.
+    let content = &w.content;
+    let is_crib = |o: &crate::world::ObjectInstance| content.objects[o.def].interactions.iter().any(|i| i.baby);
+    let crib = w
+        .objects
+        .iter()
+        .find(|o| o.users().any(|u| u as usize == b))
+        .or_else(|| w.objects.iter().zip(&w.object_plot).find(|&(o, &p)| p == Some(plot) && is_crib(o)).map(|(o, _)| o))
+        .map(|o| o.def);
+    let Some(crib) = crib else { return };
+    let day = clock::day(w.tick);
+    if w.households[h].sitter_day != Some(day) {
+        let at_work = w.sims.iter().position(|s| s.here() && s.household as usize == h && s.job.is_some() && s.away_until.is_some());
+        let Some(parent) = at_work.filter(|_| affordable(rules.cost, w.households[h].funds)) else { return };
+        w.households[h].funds -= rules.cost;
+        w.households[h].sitter_day = Some(day);
+        w.events.push_amount(w.tick, EventKind::Babysitter, parent, b, rules.cost);
+    }
+    let content = &w.content;
+    let baby = &mut w.sims[b];
+    for inter in content.objects[crib].interactions.iter().filter(|i| i.cares()) {
+        let low = (0..content.needs.len()).any(|n| inter.care[n] > 0.0 && baby.needs[n] < rules.below);
+        if low {
+            for (n, g) in inter.care.iter().enumerate().take(content.needs.len()) {
+                baby.needs[n] = (baby.needs[n] + g).clamp(0.0, 1.0);
             }
-            events.push_career(tick, EventKind::Fired, i, career, Some(level as i64));
         }
-        return;
-    }
-    if tick < leave {
-        return;
-    }
-    let heading_out = matches!(
-        sim.current.as_ref().map(|a| a.task.kind),
-        Some(TaskKind::Work)
-    ) || matches!(sim.queue.front().map(|t| t.kind), Some(TaskKind::Work));
-    if !heading_out {
-        // Work comes first: drop what they're doing and go.
-        end_activity(sim, content, objects);
-        sim.engaged_with = None;
-        sim.queue.push_front(Task {
-            kind: TaskKind::Work,
-            directed: true,
-            routine: false,
-        });
     }
 }
 

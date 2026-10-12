@@ -241,6 +241,7 @@ fn household_for(w: &mut World, plot: u32, name: &str, style: u8) -> usize {
         free_will: true,
         routines: Vec::new(),
         expecting: None,
+        sitter_day: None,
     });
     id as usize
 }

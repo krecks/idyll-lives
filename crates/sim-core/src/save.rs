@@ -547,6 +547,9 @@ pub struct HouseholdSave {
     /// A baby on the way (absent before v14: none).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expecting: Option<crate::world::Expecting>,
+    /// The day a babysitter was booked for (absent: none).
+    #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
+    pub sitter_day: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -737,6 +740,7 @@ impl World {
                     free_will: Some(h.free_will),
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
+                    sitter_day: h.sitter_day,
                 })
                 .collect(),
             plots: self
@@ -891,6 +895,7 @@ impl World {
                 free_will: save.autonomy,
                 routines: Vec::new(),
                 expecting: None,
+                sitter_day: None,
             }]
         } else {
             save.households
@@ -912,6 +917,7 @@ impl World {
                         .filter_map(|r| routine_load(&world.content, r))
                         .collect(),
                     expecting: h.expecting,
+                    sitter_day: h.sitter_day,
                 })
                 .collect()
         };

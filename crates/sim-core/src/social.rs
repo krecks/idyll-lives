@@ -839,6 +839,10 @@ pub enum EventKind {
     Bought,
     /// `a` was told no again about the `object` (`n`: how many times).
     DeniedAgain,
+    /// `a`'s household paid `n` for a babysitter for `b` while they're at work.
+    Babysitter,
+    /// `a` stayed home from work to look after `b` (no money for a babysitter).
+    StayedHome,
 }
 
 impl EventKind {
@@ -851,9 +855,9 @@ impl EventKind {
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
-            | DeniedAgain => 1,
+            | DeniedAgain | StayedHome => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
-            | Declined => 0,
+            | Declined | Babysitter => 0,
         }
     }
 }
@@ -970,6 +974,23 @@ impl EventLog {
             c: None,
             n,
             skill: skill.map(|s| s as u32),
+            career: None,
+            goal: None,
+            object: None,
+        });
+    }
+
+    /// An event about two Sims, with a number (an amount of money).
+    pub fn push_amount(&mut self, tick: u64, kind: EventKind, a: usize, b: usize, n: i64) {
+        self.add(SocialEvent {
+            id: 0,
+            tick,
+            kind,
+            a: a as u32,
+            b: b as u32,
+            c: None,
+            n: Some(n),
+            skill: None,
             career: None,
             goal: None,
             object: None,
