@@ -608,7 +608,8 @@ for outdoor recipes, else in the fridge: one serving for each of the household a
 the recipe's `servings`. The ingredients are paid at the first step (`costPerServing` × servings).
 Housemates are told dinner's ready (a thought bubble); whoever's hungry takes a serving, sits
 down with it (a chair at a table, then a table with seats of its own, then any seat in
-`cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table. Someone
+`cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table (whoever takes the last serving from the fridge
+puts the empty pot down next to it, to be washed up). Someone
 clears away later (a chore, like tidying up): they pick up the dish and the dirty things next to
 it, up to `carryDishes` at a time, scrape any food off into a `bin` station (the pedal bin; with
 none, at the sink), wash up at a sink or dishwasher and put the clean things away at a counter (`putAwayAt`;

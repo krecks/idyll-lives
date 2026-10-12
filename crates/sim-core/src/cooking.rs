@@ -1199,6 +1199,14 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
                 sim.current = None;
                 return;
             }
+            // The last of it from the fridge: the empty pot comes out too, to be washed up.
+            if items.get(id).is_some_and(|it| matches!(it.at, ItemAt::Stored { .. }) && it.to_clear(content))
+                && let Some(empty) = items.remove(id)
+            {
+                let dirty = Held { servings: 1, ..Held::of(empty.def) };
+                let at = place(ctx, objects, empty.household);
+                at.put_down(items, dirty, empty.household, sim.pos, content.cooking.serve_range, false, None, ctx.tick);
+            }
             let next = Task { kind: TaskKind::Eat { item: Some(id), seat: None, plate: None, stage: 1 }, ..task };
             eat_next(sim, next, ctx, objects, items);
         }

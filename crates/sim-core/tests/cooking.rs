@@ -537,3 +537,33 @@ fn without_a_counter_the_chopping_happens_at_the_stove_not_the_fridge() {
     assert_eq!(step_minutes(&mut w, 0, "meal"), [(0, 0, 33)]);
     assert!(w.items.list.iter().any(|it| it.servings > 0), "dinner's made: {:?}", w.items.list);
 }
+
+#[test]
+fn the_last_serving_from_the_fridge_brings_the_empty_pot_out_to_be_washed() {
+    use sim_core::command::ItemAction;
+    for (objects, on_counter) in [
+        (r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#, true),
+        (r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#, false),
+    ] {
+        let mut w = world_with(objects, 1, false);
+        order(&mut w, 0, FRIDGE, "meal");
+        ticks(&mut w, 50.0);
+        // Leftovers in the fridge, one serving left.
+        let pot = w.items.list.iter_mut().find(|it| it.servings > 0).expect("a meal");
+        let id = pot.id;
+        pot.at = ItemAt::Stored { x: 1, z: 1 };
+        pot.servings = 1;
+        w.sims[0].needs[0] = 0.3;
+        w.apply(Command::UseItem { sim: 0, item: id, action: ItemAction::Eat }).unwrap();
+        ticks(&mut w, 40.0);
+        let dirty = item_def(&w, "potDirty");
+        let pot = w.items.list.iter().find(|it| it.def == dirty).expect("the empty pot, to be washed up");
+        assert!(!matches!(pot.at, ItemAt::Stored { .. }), "not left in the fridge: {:?}", pot.at);
+        assert_eq!(matches!(pot.at, ItemAt::Surface { .. }), on_counter, "on the counter if there is one: {:?}", pot.at);
+        // Out where it can be seen, and cleared away.
+        let pot = pot.id;
+        w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+        ticks(&mut w, 30.0);
+        assert!(w.items.get(pot).is_none(), "washed up");
+    }
+}
