@@ -147,9 +147,15 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(seat.map_or(-1.0, |o| o as f32), anim);
     }
-    // Washing up: at the sink, the washing animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, .. }, .. }, phase, .. }) = s.current() {
-        let anim = world.content.cooking.dishes_anim.filter(|_| matches!(phase, Phase::Using { .. }));
+    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
+    if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
+        let rules = &world.content.cooking;
+        let anim = match stage {
+            1 => rules.scrape_anim,
+            3 => rules.put_away_anim,
+            _ => rules.dishes_anim,
+        };
+        let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(station.map_or(-1.0, |o| o as f32), anim);
     }
     // Tidying up: no object, the clean animation while at it.

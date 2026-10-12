@@ -798,7 +798,10 @@
       "price": 25,
       "category": "kitchen",
       "group": "counters",
-      "description": "A stainless steel pedal bin.",
+      "description": "A stainless steel pedal bin. Leftovers are scraped in here when the dishes are cleared away.",
+      "stations": [
+        "bin"
+      ],
       "interactions": []
     },
     {

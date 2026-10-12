@@ -3678,7 +3678,14 @@
       "cleaning"
     ],
     "dishesAnim": "wash",
-    "dishesInterest": 0.6
+    "dishesInterest": 0.6,
+    "scrapeMinutes": 1,
+    "scrapeAnim": "clean",
+    "putAwayMinutes": 2,
+    "putAwayAnim": "fetch",
+    "putAwayAt": [
+      "prep"
+    ]
   },
   "items": [
     {

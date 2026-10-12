@@ -940,9 +940,9 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             let food = r.map_or("something", |r| &content.items[r.item].label);
             (format!("{} {food}", rules.eat_label), None, None, r.map_or(rules.eat_minutes, |r| r.eat_minutes))
         }
-        TaskKind::Dishes { .. } => {
+        TaskKind::Dishes { stage, scraps, .. } => {
             let rules = &content.cooking;
-            (rules.dishes_label.clone(), None, None, rules.dishes_minutes)
+            (rules.dishes_label.clone(), None, None, crate::cooking::clearing_minutes(rules, stage, scraps, held).max(1.0))
         }
     };
     let progress = match phase {
