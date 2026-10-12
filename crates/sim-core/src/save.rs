@@ -1039,6 +1039,7 @@ impl World {
                     // Visits without an end (player visits before v8) last as long as a
                     // player visit does now.
                     until: after(left.unwrap_or(content.visits.directed_hours * 60.0)),
+                    idle: 0,
                 })
             });
             for t in &s.tasks {

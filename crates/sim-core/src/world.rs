@@ -2892,6 +2892,11 @@ fn pick_autonomous(
         // Partner lookups scan everyone: only when a goal asks for it.
         let single = !sim.planner.goals.is_empty() && ctx.rels.partner_of(j).is_none();
         let grown_ups = ctx.briefs[me].adult && other.adult;
+        // A guest keeps the hosts company, even with nothing in particular to talk about.
+        let company = match sim.visiting {
+            Some(v) if here == Some(v.plot) && ctx.households[other.household as usize].plot == Some(v.plot) => content.visits.company,
+            _ => 0.0,
+        };
         // Two singles who like the look of each other: a spark before there's any romance.
         let spark = if grown_ups && attracted && rel.met && !ctx.briefs[me].partnered && !other.partnered && rel.kin.is_none() {
             content.social_rules.single_spark
@@ -2912,7 +2917,9 @@ fn pick_autonomous(
             }
             let romantic = s.tags & content.social_rules.romantic_tags != 0;
             let friendly = matches!(s.prefer, Prefer::Any | Prefer::Liked);
-            let score = ai::score_felt(needs, &felt, &s.actor_gain, distance)
+            let gains = ai::score_felt(needs, &felt, &s.actor_gain, distance);
+            let gains = if s.prefer == Prefer::Liked && !romantic { gains.max(company) } else { gains };
+            let score = gains
                 * s.autonomy_weight
                 * prefer_factor(s.prefer, rel, chemistry, spark)
                 * feel(s.tags)
@@ -2954,7 +2961,12 @@ fn pick_autonomous(
         let count = members.len() as f32;
         let liking = members.iter().map(|&m| prefer_factor(Prefer::Liked, ctx.rels.get(me, m), 0.0, 0.0)).sum::<f32>() / count;
         let friendship = members.iter().map(|&m| ctx.rels.get(me, m).friendship).sum::<f32>() / count;
-        let score = ai::score_felt(needs, &felt, &s.target_gain, distance)
+        // A guest joins in where the hosts are talking (keeping them company).
+        let company = match sim.visiting {
+            Some(v) if here == Some(v.plot) && members.iter().any(|&m| ctx.households[ctx.briefs[m].household as usize].plot == Some(v.plot)) => content.visits.company,
+            _ => 0.0,
+        };
+        let score = ai::score_felt(needs, &felt, &s.target_gain, distance).max(company)
             * s.autonomy_weight
             * liking
             * feel(s.tags)

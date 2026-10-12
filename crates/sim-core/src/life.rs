@@ -54,6 +54,9 @@ pub struct Visit {
     pub plot: u32,
     /// Guests head home after this tick.
     pub until: u64,
+    /// Ticks in a row they've had nothing to do (`visits.boredMinutes`; not saved).
+    #[serde(skip)]
+    pub idle: u32,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -411,7 +414,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 visits.hours
             };
             let until = tick + ticks(hours * 60.0);
-            w.sims[i].visiting = Some(Visit { plot, until });
+            w.sims[i].visiting = Some(Visit { plot, until, idle: 0 });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
                 return;
@@ -737,7 +740,8 @@ fn charge_rent(w: &mut World, day: u32) {
     }
 }
 
-/// Guests go home when the visit is over, it's late, or they need something.
+/// Guests go home when the visit is over, it's late, they need something, or there's nothing
+/// for them to do.
 fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     let tick = w.tick;
     let Some(visit) = w.sims[i].visiting else { return };
@@ -752,15 +756,28 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
         && !w.plots[visit.plot as usize].public
         && !hosts.is_empty()
         && hosts.iter().all(|s| s.away_until.is_some());
+    // Left standing around with nothing to do (the hosts busy, nothing they may use) for long
+    // enough, a guest with free will says it's time they went (without, they're the player's
+    // to send home).
+    let free_will = w.autonomy && w.households[w.sims[i].household as usize].free_will;
     let content = &w.content;
     let sim = &mut w.sims[i];
+    let idle = if sim.current.is_none() && sim.queue.is_empty() && sim.follow_up.is_none() && sim.engaged_with.is_none() {
+        visit.idle.saturating_add(sim.steps)
+    } else {
+        0
+    };
+    if let Some(v) = sim.visiting.as_mut() {
+        v.idle = idle;
+    }
+    let bored = free_will && content.visits.bored_minutes.is_some_and(|m| idle as f32 * MINUTES_PER_TICK >= m);
     let tired = content.needs.iter().zip(&sim.needs).any(|(d, &n)| !d.room && n < 0.15);
     let late = !(6.0..22.0).contains(&hour) || hosts_out;
     let busy = sim
         .current
         .as_ref()
         .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome | TaskKind::Work));
-    if (tick >= visit.until || tired || late)
+    if (tick >= visit.until || tired || late || bored)
         && !busy
         && sim.engaged_with.is_none()
         && !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome))

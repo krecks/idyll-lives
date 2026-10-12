@@ -2,6 +2,7 @@
 //! turns them away, and with nobody to answer they go home again.
 
 use sim_core::social::EventKind;
+use sim_core::world::TaskKind;
 use sim_core::{Command, World, clock};
 
 const CONTENT: &str = r#"{
@@ -166,4 +167,95 @@ fn someone_in_a_garden_that_isnt_theirs_still_walks_out_of_it() {
     minutes(&mut w, 60.0);
     let (x, z) = w.sims[1].tile();
     assert_eq!(w.plot_at(x, z), Some(2), "home at {x},{z}");
+}
+
+/// The test content with guests who keep their hosts company and go home when there's nothing
+/// to do, and a desk for a long stretch of study.
+fn bored_content() -> String {
+    CONTENT
+        .replace(
+            r#""tags":["lounge"]}]}]"#,
+            r#""tags":["lounge"]}]},
+            {"id":"desk","name":"Desk","interactions":[{"id":"study","label":"Study","minutes":240,"effects":{},"tags":["study"]}]}]"#,
+        )
+        .replace(r#""acceptance":{"base":1.0}"#, r#""acceptance":{"base":1.0},"prefer":"liked""#)
+        .replace(r#""latestHour":21,"#, r#""latestHour":21,"company":0.05,"boredMinutes":30,"#)
+}
+
+/// Bo let in at Ada's (who has a desk), free will on from then on, and neither needing
+/// anything (so nothing appeals to the guest but company).
+fn let_in(content: &str) -> World {
+    let town = town("friends").replace(
+        r#"{"def":"chair","x":3,"z":2,"rot":0}"#,
+        r#"{"def":"chair","x":3,"z":2,"rot":0},{"def":"desk","x":8,"z":2,"rot":0}"#,
+    );
+    let mut w = World::from_json(content, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+    }
+    w.autonomy = true;
+    for s in &mut w.sims {
+        s.needs = [1.0; sim_core::content::MAX_NEEDS];
+    }
+    w
+}
+
+/// Whether Bo has nothing to do.
+fn idle(w: &World) -> bool {
+    w.sims[1].current().is_none() && w.sims[1].engaged_with.is_none()
+}
+
+#[test]
+fn a_guest_with_nothing_to_do_while_the_host_is_busy_goes_home() {
+    let mut w = let_in(&bored_content());
+    let arrived = w.tick;
+    let until = w.sims[1].visiting.unwrap().until;
+    // Ada settles down at her desk for hours.
+    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    let (mut stood, mut worst, mut walked, mut jump) = (0.0f32, 0.0f32, false, 0.0f32);
+    let mut prev = w.sims[1].pos;
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        assert!(w.tick < arrived + (90.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo stayed on with nothing to do");
+        stood = if idle(&w) { stood + sim_core::MINUTES_PER_TICK } else { 0.0 };
+        worst = worst.max(stood);
+        walked |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        let pos = w.sims[1].pos;
+        jump = jump.max((pos[0] - prev[0]).hypot(pos[1] - prev[1]));
+        prev = pos;
+    }
+    assert!(w.tick < until, "left before the visit was over");
+    assert!(worst <= 35.0, "Bo stood around for {worst:.0} minutes");
+    assert!(walked && jump < 0.5, "walked home (no teleporting)");
+    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
+    let studying = w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: 1, .. }));
+    assert!(studying, "Ada is still at her desk");
+}
+
+#[test]
+fn a_guest_keeps_the_host_company() {
+    let mut w = let_in(&bored_content());
+    // Nothing to talk about (Bo needs nothing), but Ada is free: Bo goes over for a chat.
+    let mut chatted = false;
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        chatted |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target: 0, .. }));
+    }
+    assert!(chatted, "Bo never talked to Ada");
+    assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
+}
+
+#[test]
+fn without_free_will_a_guest_waits_for_the_player() {
+    let mut w = let_in(&bored_content());
+    w.apply(Command::SetAutonomy { enabled: false, household: Some(1) }).unwrap();
+    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    minutes(&mut w, 60.0);
+    assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
 }
