@@ -29,7 +29,7 @@
 
 import { Color3, type Material, type Mesh, type PBRMaterial, type Scene } from './core';
 import type { DoorStyleDef, FloorCoveringDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
-import { objectCentre, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
+import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { MaterialLibrary } from './materials';
@@ -221,6 +221,8 @@ export interface LampLight {
 export interface StoreyBuild {
   /** Above the ground: no stone base, no garden. */
   upper?: boolean;
+  /** The basement (with `upper`: no garden): outside its walls is earth, faced in stone all the way up. */
+  basement?: boolean;
   /** Tiles with a room upstairs (no roof over them here). */
   covered?: (x: number, z: number) => boolean;
   /** Stairwell tiles (`z * width + x`): open to the storey below, so no floor. */
@@ -321,9 +323,16 @@ const ROOM_KIND_DEFS = new Set([...BATH, ...KITCHEN, ...BEDROOM, ...LIVING]);
  * The objects `HouseBuilder.build` depends on, as a key: room-kind furniture, and
  * whatever stands on the lot's tree spots; on a lot that isn't the player's home (it gets a
  * garden border around its furniture) every object. Other objects can change without
- * rebuilding the house.
+ * rebuilding the house. Stairs (`stairs`) on any storey of the lot in view count too: their
+ * stairwells open the floor above.
  */
-export function houseObjectKey(world: WorldStructure, view: ViewRect | null): string {
+export function houseObjectKey(world: WorldStructure, view: ViewRect | null, stairs: (def: string) => boolean = () => false): string {
+  const D = world.storeyDepth ?? world.depth;
+  const flights = world.objects.filter((o) => stairs(o.def) && (!view || (o.x >= view.x && o.z % D >= view.z && o.x < view.x + view.w && o.z % D < view.z + view.d)));
+  return `${houseObjectKeyOf(world, view)}|${flights.map((o) => `${o.x},${o.z},${o.rot}`).join(';')}`;
+}
+
+function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null): string {
   const inView = (x: number, z: number) => !view || (x >= view.x && z >= view.z && x < view.x + view.w && z < view.z + view.d);
   const homeId = world.households?.find((h) => h.player)?.plot;
   const home = homeId == null ? undefined : world.plots?.[homeId];
@@ -442,7 +451,7 @@ export class HouseBuilder {
   build(world: WorldStructure, view: ViewRect | null, storey: StoreyBuild = {}): HouseBuild | null {
     if (!world.walls || !world.openings) return null;
     // Upstairs: walls start at the floor (no stone base), and there's no garden.
-    const plinth = storey.upper ? 0 : PLINTH;
+    const plinth = storey.basement ? WALL_HEIGHT : storey.upper ? 0 : PLINTH;
     const W = world.width;
     const D = world.depth;
     const room = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < D ? world.rooms[z * W + x] : 0);
@@ -1332,8 +1341,8 @@ export class HouseBuilder {
    * driveway. Returns the meshes (one per material for the whole street), the ones that cast
    * shadows, and the porch / garage lamps for the street's night lighting.
    */
-  /** `storeyDepth`: rows per storey of the lot (openings upstairs are on rows `k * storeyDepth ..`). */
-  silhouettes(houses: readonly SilhouetteSpec[], openings: readonly Opening[], storeyDepth = 0): SilhouetteBuild {
+  /** `layout`: where each storey's rows of the lot are (openings upstairs are on theirs; see `storeyRow`). */
+  silhouettes(houses: readonly SilhouetteSpec[], openings: readonly Opening[], layout: StoreyLayout | null = null): SilhouetteBuild {
     const siding = new Geo();
     const brick = new Geo();
     const stone = new Geo().color('#D8D2C8');
@@ -1366,9 +1375,10 @@ export class HouseBuilder {
       const [x0, z0, x1, z1] = [b.x0 - T, b.z0 - T, b.x1 + T, b.z1 + T];
       for (const lot of openings) {
         // Openings upstairs: on the same face, a storey higher.
-        const k = storeyDepth > 0 ? Math.floor(lot.z / storeyDepth) : 0;
-        if (k >= (b.storeys ?? 1) || (k > 0 && lot.kind !== 'window')) continue;
-        const o = k ? { ...lot, z: lot.z - k * storeyDepth } : lot;
+        // (Nothing of the basement shows from the street.)
+        const k = layout ? storeyOfRow(layout, lot.z) : 0;
+        if (k < 0 || k >= (b.storeys ?? 1) || (k > 0 && lot.kind !== 'window')) continue;
+        const o = k && layout ? { ...lot, z: lot.z - storeyRow(layout, k) } : lot;
         const SILL = SILL0 + k * H;
         const HEAD = HEAD0 + k * H;
         // Which face of the box the opening lies on (if any).

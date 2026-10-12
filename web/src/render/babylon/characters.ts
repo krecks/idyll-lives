@@ -60,7 +60,7 @@ import { BakedVertexAnimationManager } from '@babylonjs/core/BakedVertexAnimatio
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content, ItemDef, ObjectDef } from '../../content/content';
 import type { FrameState } from '../../core/bridge';
-import { objectCentre, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
+import { objectCentre, storeyShown, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
 import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
@@ -904,7 +904,7 @@ export class Characters {
    * animation state of Sims whose row stays (previews restyling a Sim without restarting it).
    * A Sim may carry `outfitId`, the id its outfit is derived from when it differs from its row.
    */
-  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number }, keep = false): Promise<void> {
+  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number; basement?: number }, keep = false): Promise<void> {
     if (!(await this.init())) return;
     const set = this.set!;
     // Life stages other than the base bodies' (children, teens, elders …) load on demand, the
@@ -921,7 +921,7 @@ export class Characters {
       }),
     );
     // Positions arrive in lot rows, which hold every storey (see `WorldStructure.storeys`).
-    this.storeyDepth = (world.storeys ?? 1) > 1 ? (world.storeyDepth ?? 0) : 0;
+    this.storeyDepth = (world.storeys ?? 1) > 1 || world.basement !== undefined ? (world.storeyDepth ?? 0) : 0;
     const kept = keep ? this.sims : [];
     this.sims = [];
     this.ghosts = [];
@@ -1317,7 +1317,7 @@ export class Characters {
    * Poses every Sim for this frame. `inView(x, z)` decides visibility; contact-shadow matrices
    * (one 4x4 per Sim row) are written into `shadows`.
    */
-  /** `storey`: the storey in view; residents above it aren't drawn. */
+  /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
     const set = this.set;
     if (!set) return;
@@ -1365,7 +1365,7 @@ export class Characters {
       const away = curr[o + k.away] !== 0;
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
-      const show = !!rig && !away && inView(tx, tz) && Math.floor(th + 0.01) <= storey;
+      const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
       if (!rig || !show) {
         if (this.visible[i]) {
           this.data.fill(0, this.row(i), this.row(i) + NB * 16);

@@ -554,7 +554,7 @@ export class Street {
       if ((L.kind !== 'house' && L.kind !== 'shop') || !L.house) continue;
       specs.push({ ...L.house, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
     }
-    const sil = this.house.silhouettes(specs, world.openings ?? [], (world.storeys ?? 1) > 1 ? groundDepth(world) : 0);
+    const sil = this.house.silhouettes(specs, world.openings ?? [], world);
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
     this.meshes.push(...sil.meshes);
     this.casters.push(...sil.casters);

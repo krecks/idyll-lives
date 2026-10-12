@@ -86,7 +86,7 @@ export interface GameControls {
   upgrade(objectId: number): void;
   /** Build mode: arms (or disarms) the eyedropper: the next click picks up a look (E). */
   toggleEyedropper(): void;
-  /** Which storey is in view (0: the ground); higher ones are hidden, and building happens on it. */
+  /** Which storey is in view (0: the ground, -1: the basement); higher ones are hidden, and building happens on it. */
   setStorey(storey: number): void;
   /** Build mode: the roof over the home (a roof style and colour). */
   setRoof(style: number, color: number): void;

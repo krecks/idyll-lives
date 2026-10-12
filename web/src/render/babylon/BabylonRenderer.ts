@@ -51,7 +51,7 @@ import {
   type AbstractEngine,
 } from './core';
 import type { FrameState } from '../../core/bridge';
-import { groundDepth, objectCentre, type ItemPlacement, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -82,6 +82,7 @@ import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
+import { Geo } from './geometry';
 import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
@@ -98,6 +99,8 @@ import { GameCameraRig } from './cameraRig';
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
 const HIDDEN_Y = -100;
+/** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
+const PIT_MARGIN = 0.3;
 /** Height of the fence and gate preview while drawing. */
 const FENCE_PREVIEW_HEIGHT = 1.0;
 /** Game minutes between lighting updates (with / without snapshot rendering). */
@@ -208,6 +211,10 @@ export class BabylonRenderer implements Renderer {
   private lotRooms: RoomTiles | null = null;
   /** Where coverings lie in the viewed house (null: plain fallback meshes). */
   private lotSurfaces: HouseSurfaces | null = null;
+  /** Openings in the ground floor over stairs down to the basement (ground rows), seen from the ground up. */
+  private stairwells: ViewRect[] = [];
+  /** The viewed lot's garden trees and shrubs (`placeDecor`): hidden while its basement is in view. */
+  private readonly decorMeshes = new Set<Mesh>();
   /** The Paint and Floor tools' previews in the real look: what they show, and the mesh. */
   private laid = {
     faces: { keys: [] as string[], cover: null as number | null, shown: '', mesh: null as Mesh | null },
@@ -289,8 +296,12 @@ export class BabylonRenderer implements Renderer {
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
-  /** Storeys (sim-core `storeys.rs`): how many, rows per storey, and the one in view (higher ones are hidden). */
-  private storeys = { count: 1, depth: 0 };
+  /**
+   * Storeys (sim-core `storeys.rs`): how many at and above the ground, the lowest (-1 with a
+   * basement), where their rows are, and the one in view (see `storeyShown`: higher ones are
+   * hidden, and in the basement only it shows).
+   */
+  private storeys = { count: 1, lowest: 0, layout: { depth: 0 } as StoreyLayout };
   private storey = 0;
   /** Build helpers (cursor, ghost, grid, previews) work in lot rows; this lifts them to the storey in view. */
   private storeyLayer!: TransformNode;
@@ -456,8 +467,8 @@ export class BabylonRenderer implements Renderer {
 
   async setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.lastWorld = world;
-    this.storeys = { count: world.storeys ?? 1, depth: groundDepth(world) };
-    if (this.storey >= this.storeys.count) this.setStorey(this.storeys.count - 1);
+    this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
+    if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
     this.beginBuild();
     this.worldBuilding = true;
     this.sliceStart = performance.now();
@@ -494,7 +505,7 @@ export class BabylonRenderer implements Renderer {
       this.lotParts.key,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
-      houseObjectKey(world, view),
+      houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs),
     ]);
   }
 
@@ -647,7 +658,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Food and dishes for the lot and storeys in view. */
   private showItems(): void {
-    this.items.show({ storey: this.storey, depth: this.storeys.depth, storeyHeight: WALL_HEIGHT, inView: (x, z) => this.inView(x, z, 0) });
+    this.items.show({ storey: this.storey, storeyOf: (z) => this.storeyOf(z), shown: (k) => storeyShown(k, this.storey), groundZ: (z) => z - this.rowOf(this.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z) => this.inView(x, z, 0) });
   }
 
   pick(x: number, y: number): PickResult {
@@ -661,7 +672,7 @@ export class BabylonRenderer implements Renderer {
     const floor = this.storey * WALL_HEIGHT;
     if (d.y < -1e-6 && o.y > floor) {
       const t = (floor - o.y) / d.y;
-      ground = { x: o.x + d.x * t, z: o.z + d.z * t + this.storey * this.storeys.depth };
+      ground = { x: o.x + d.x * t, z: o.z + d.z * t + this.rowOf(this.storey) };
     }
     let objectId: number | null = null;
     let nearest = Infinity;
@@ -687,10 +698,9 @@ export class BabylonRenderer implements Renderer {
   }
 
   setResizeHandles(handles: readonly ResizeHandle[] | null, hot: string | null = null): void {
-    const D = this.storeys.depth;
     this.handles.set(handles, (h) => {
       const k = this.storeyOf(h.z);
-      return new Vector3(h.x, k * WALL_HEIGHT + h.y, h.z - k * D);
+      return new Vector3(h.x, k * WALL_HEIGHT + h.y, h.z - this.rowOf(k));
     }, hot);
   }
 
@@ -701,7 +711,7 @@ export class BabylonRenderer implements Renderer {
   pickVertical(x: number, z: number): number | null {
     const [o, d] = [this.pickOrigin, this.pickDir];
     const k = this.storeyOf(z);
-    const pz = z - k * this.storeys.depth;
+    const pz = z - this.rowOf(k);
     // The upright plane through the point, square to the camera's view across the floor.
     const fx = this.camera.target.x - this.camera.globalPosition.x;
     const fz = this.camera.target.z - this.camera.globalPosition.z;
@@ -717,14 +727,14 @@ export class BabylonRenderer implements Renderer {
   pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null {
     const [o, d] = [this.pickOrigin, this.pickDir];
     const k = this.storeyOf(storeyRow);
-    const D = this.storeys.depth;
+    const D = this.rowOf(k);
     // The wall's plane in render space (rows of upper storeys are drawn at the ground's).
-    const plane = axis === 'h' ? line - k * D : line;
+    const plane = axis === 'h' ? line - D : line;
     const across = axis === 'h' ? d.z : d.x;
     if (Math.abs(across) < 1e-6) return null;
     const t = (plane - (axis === 'h' ? o.z : o.x)) / across;
     if (t <= 0) return null;
-    return { along: axis === 'h' ? o.x + d.x * t : o.z + d.z * t + k * D, y: o.y + d.y * t - k * WALL_HEIGHT };
+    return { along: axis === 'h' ? o.x + d.x * t : o.z + d.z * t + D, y: o.y + d.y * t - k * WALL_HEIGHT };
   }
 
   objectBox(id: number): { height: number; bottom: number } | null {
@@ -737,7 +747,7 @@ export class BabylonRenderer implements Renderer {
     const y = this.storey * WALL_HEIGHT + height;
     if (d.y > -1e-6 || o.y <= y) return null;
     const t = (y - o.y) / d.y;
-    return { x: o.x + d.x * t, z: o.z + d.z * t + this.storey * this.storeys.depth };
+    return { x: o.x + d.x * t, z: o.z + d.z * t + this.rowOf(this.storey) };
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -913,7 +923,7 @@ export class BabylonRenderer implements Renderer {
   buildEffect(fx: BuildEffect): void {
     if (this.townMode) return;
     const k = this.storeyOf(fx.z);
-    this.fx.play({ ...fx, z: fx.z - k * this.storeys.depth, y: k * WALL_HEIGHT });
+    this.fx.play({ ...fx, z: fx.z - this.rowOf(k), y: k * WALL_HEIGHT });
     const placed = fx.objectId === undefined ? undefined : this.placed.find((p) => p.id === fx.objectId);
     if (placed && placed.id !== this.heldId) this.fx.pop(placed.pop);
   }
@@ -1068,8 +1078,8 @@ export class BabylonRenderer implements Renderer {
       }
     }
     if (walls.length || diagonals.length) {
-      const view = this.view ? { ...this.view, z: this.view.z + this.storey * this.storeys.depth } : null;
-      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey > 0, preview: true });
+      const view = this.view ? { ...this.view, z: this.view.z + this.rowOf(this.storey) } : null;
+      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true });
       if (house) next.push(...house.meshes);
       hole = this.holeFor(standing);
     }
@@ -1102,7 +1112,7 @@ export class BabylonRenderer implements Renderer {
   /** The stretch of wall `edges` cover (in one line: a door or window and the wall it goes into), for `swapBuilt` to hide. */
   private holeFor(edges: readonly EdgePreview[]): number[] | null {
     // In the world, this storey's rows lie over the ground's (see `setStorey`).
-    const shift = this.storey * this.storeys.depth;
+    const shift = this.rowOf(this.storey);
     const ends = edges.map((e): [number, number, number, number] => {
       const t = e.axis === 'h' || e.axis === 'v' ? WALL_HALF : WALL_HALF * Math.SQRT1_2;
       const z = e.z - shift;
@@ -1305,23 +1315,28 @@ export class BabylonRenderer implements Renderer {
   }
 
   setStorey(storey: number): void {
-    const k = Math.max(0, Math.min(this.storeys.count - 1, Math.round(storey)));
+    const k = Math.max(this.storeys.lowest, Math.min(this.storeys.count - 1, Math.round(storey)));
     if (k === this.storey && this.storeyLayer) return;
     this.storey = k;
-    this.storeyLayer?.position.set(0, k * WALL_HEIGHT, -k * this.storeys.depth);
+    this.storeyLayer?.position.set(0, k * WALL_HEIGHT, -this.rowOf(k));
     this.applyStoreys();
     // Furniture and residents above it hide; the lot (every storey) is kept.
     if (this.lastWorld && !this.worldBuilding) void this.setWorld(this.lastWorld, this.view);
   }
 
-  /** The storey a lot row is on. */
+  /** The storey a lot row is on (-1: the basement). */
   private storeyOf(z: number): number {
-    return this.storeys.count > 1 && this.storeys.depth > 0 ? Math.max(0, Math.min(this.storeys.count - 1, Math.floor(z / this.storeys.depth))) : 0;
+    return Math.max(this.storeys.lowest, Math.min(this.storeys.count - 1, storeyOfRow(this.storeys.layout, z)));
+  }
+
+  /** The first lot row of storey `k`. */
+  private rowOf(k: number): number {
+    return storeyRow(this.storeys.layout, k);
   }
 
   /** Roofs show with walls up, over the storeys in view. */
   private showRoofs(): void {
-    for (const roof of this.roofs) roof.setEnabled(this.roofShown && ((roof.metadata as { storey?: number } | null)?.storey ?? 0) <= this.storey);
+    for (const roof of this.roofs) roof.setEnabled(this.roofShown && storeyShown((roof.metadata as { storey?: number } | null)?.storey ?? 0, this.storey));
   }
 
   /** Storeys above the one in view are hidden (walls, floors, roofs). */
@@ -1330,8 +1345,13 @@ export class BabylonRenderer implements Renderer {
       const k = (mesh.metadata as { storey?: number } | null)?.storey;
       if (k === undefined) continue;
       const roof = this.roofs.includes(mesh);
-      mesh.setEnabled(k <= this.storey && (!roof || this.roofShown));
+      mesh.setEnabled(storeyShown(k, this.storey) && (!roof || this.roofShown));
     }
+    for (const mesh of this.decorMeshes) {
+      if (mesh.isDisposed()) this.decorMeshes.delete(mesh);
+      else mesh.isVisible = this.storey >= 0;
+    }
+    this.applyDig();
     this.resetSnapshot();
   }
 
@@ -1584,6 +1604,7 @@ export class BabylonRenderer implements Renderer {
   private enterTown(): void {
     const cam = this.camera;
     this.townMode = true;
+    this.applyDig();
     copyPose(cam, this.parked);
     cam.detachControl();
     cam.inertialAlphaOffset = cam.inertialBetaOffset = cam.inertialRadiusOffset = 0;
@@ -1605,6 +1626,7 @@ export class BabylonRenderer implements Renderer {
   private leaveTown(): void {
     const cam = this.camera;
     this.townMode = false;
+    this.applyDig();
     this.warmFrames = 0;
     cam.layerMask = LAYER_WORLD;
     copyPose(this.parked, cam);
@@ -1707,6 +1729,8 @@ export class BabylonRenderer implements Renderer {
         for (const mesh of nature.meshes) {
           mesh.freezeWorldMatrix();
           mesh.layerMask = 0;
+          // Dug away over a basement in view.
+          this.lib.digInto(mesh.material);
         }
       });
       this.natures.set(key, (set = created));
@@ -2177,15 +2201,19 @@ export class BabylonRenderer implements Renderer {
 
   /** The viewed house (walls, trims, windows, floors, roof, room lights); returns shadow casters. */
   private async buildLot(world: WorldStructure): Promise<Mesh[]> {
-    const { count, depth } = this.storeys;
+    const { count, lowest } = this.storeys;
     const W = world.width;
     const rooms = world.rooms;
-    // Stairwells: the tiles above each flight of stairs are open to the storey below.
+    // Rows from storey `k` up to the one above it (not always `storeyDepth`: the basement's rows come last).
+    const up = (k: number) => this.rowOf(k + 1) - this.rowOf(k);
+    // Stairwells: the tiles above each flight of stairs are open to the storey below (the
+    // ground's too, over stairs down to the basement).
     const holes = new Set<number>();
     const landings = new Set<number>();
     for (const o of world.objects) {
       if (!this.deps.content.object(o.def)?.stairs) continue;
-      for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) holes.add((z + depth) * W + x);
+      const lift = up(this.storeyOf(o.z));
+      for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) holes.add((z + lift) * W + x);
       // The tile past the top step, on the storey above (as sim-core `storeys::stair_of`).
       const [lx, lz] = [
         [o.x + Math.floor((o.w - 1) / 2), o.z - 1],
@@ -2193,28 +2221,44 @@ export class BabylonRenderer implements Renderer {
         [o.x + Math.floor((o.w - 1) / 2), o.z + o.d],
         [o.x + o.w, o.z + Math.floor((o.d - 1) / 2)],
       ][o.rot % 4];
-      landings.add((lz + depth) * W + lx);
+      landings.add((lz + lift) * W + lx);
     }
     const builds = [];
-    for (let k = 0; k < count; k++) {
-      const shift = k * depth;
+    // The ground first (its garden dressing is the lot's), then upstairs, then the basement.
+    const order = [...Array.from({ length: count }, (_, k) => k), ...(lowest < 0 ? [-1] : [])];
+    let topped = false;
+    for (const k of order) {
+      if (k > 0 && topped) continue;
+      const shift = this.rowOf(k);
       const view = this.view ? { ...this.view, z: this.view.z + shift } : null;
-      // Nothing up there yet: no storey to build.
-      if (k > 0 && view && !(world.walls ?? []).some((e) => e.z >= view.z && e.z <= view.z + view.d && e.x >= view.x && e.x <= view.x + view.w)) break;
-      const covered = (x: number, z: number) => k + 1 < count && (rooms[(z + depth) * W + x] ?? 0) !== 0;
-      if (k > 0) await this.pace();
-      const built = this.house.build(world, view, k === 0 ? { covered } : { upper: true, covered, holes, landings });
+      // Nothing up (or down) there yet: no storey to build.
+      if (k !== 0 && view && !(world.walls ?? []).some((e) => e.z >= view.z && e.z <= view.z + view.d && e.x >= view.x && e.x <= view.x + view.w)) {
+        topped ||= k > 0;
+        continue;
+      }
+      // No roof where a room upstairs stands on this one (the ground covers the whole basement).
+      const covered = (x: number, z: number) => k < 0 || (k + 1 < count && (rooms[(z + up(k)) * W + x] ?? 0) !== 0);
+      if (k !== 0) await this.pace();
+      const built = this.house.build(world, view, k === 0 ? { covered, holes, landings } : { upper: true, basement: k < 0, covered, holes, landings });
       if (!built) {
         if (k === 0) break;
         continue;
       }
-      // Lifted to its height, back over the ground rows.
+      // Lifted (or lowered) to its height, back over the ground rows.
       for (const mesh of built.meshes) {
         mesh.position.set(0, k * WALL_HEIGHT, -shift);
         mesh.metadata = { storey: k };
       }
       builds.push(built);
     }
+    // Stairs down: from the ground, a shaft round each flight (the rest of the basement stays hidden).
+    this.stairwells = [];
+    for (const o of world.objects) {
+      if (!this.deps.content.object(o.def)?.stairs || this.storeyOf(o.z) !== -1 || !this.inView(o.x + o.w / 2, o.z - this.rowOf(-1) + o.d / 2, 0)) continue;
+      this.stairwells.push({ x: o.x, z: o.z - this.rowOf(-1), w: o.w, d: o.d });
+    }
+    if (lowest < 0 && this.view) this.buildPit(this.view);
+    for (const r of this.stairwells) this.buildPit(r, 0, 0);
     const built = builds.length
       ? {
           meshes: builds.flatMap((b) => b.meshes),
@@ -2255,18 +2299,56 @@ export class BabylonRenderer implements Renderer {
     return built.casters;
   }
 
+  /**
+   * The dug-out lot under the ground, seen while its basement is in view (the landscape over it
+   * is cut away then, see `applyDig`): earth walls round the plot and a floor below the basement's.
+   */
+  private buildPit(view: ViewRect, margin = PIT_MARGIN, storey = -1): void {
+    const [x0, z0, x1, z1] = [view.x - margin, view.z - margin, view.x + view.w + margin, view.z + view.d + margin];
+    const [y0, y1] = [-WALL_HEIGHT - 0.03, 0];
+    const geo = new Geo().color('#6B5440');
+    geo.poly([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, 1, 0]);
+    geo.color('#4A3A2C');
+    geo.poly([[x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]], [0, 0, 1]);
+    geo.poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, -1]);
+    geo.poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [1, 0, 0]);
+    geo.poly([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [-1, 0, 0]);
+    const mesh = geo.toMesh('basementPit', this.scene, { colors: true });
+    if (!mesh) return;
+    mesh.material = this.lib.surface('material.soil', { vertexColors: true, doubleSided: true });
+    mesh.receiveShadows = true;
+    mesh.metadata = { storey };
+    this.worldMeshes.push(mesh);
+  }
+
+  /** In the basement, the ground over the viewed lot is dug away (terrain and lawn; see `DigState`). */
+  private applyDig(): void {
+    const dig = this.lib.dig;
+    const v = this.view;
+    // From the ground up, only over the stairs down (the floors round them cover the rest).
+    const wells = this.storey < 0 ? [] : this.stairwells;
+    const on = !this.townMode && !!v && (this.storey < 0 || wells.length > 0);
+    if (wells.length) {
+      dig.rect.set(Math.min(...wells.map((r) => r.x)), Math.min(...wells.map((r) => r.z)), Math.max(...wells.map((r) => r.x + r.w)), Math.max(...wells.map((r) => r.z + r.d)));
+    } else if (v) dig.rect.set(v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN);
+    if (dig.on === on && !on) return;
+    if (dig.on === on) return;
+    dig.on = on;
+    this.resetSnapshot();
+  }
+
   /** The household's lamps (then dim fills for rooms without one) on the interior lights. */
   private placeRoomLights(world: WorldStructure, view: ViewRect | null): void {
     // Rooms and lamps on every storey shown (in lot rows: lifted to their height here).
-    const shown = (z: number) => this.storeyOf(z) <= this.storey;
-    const views = Array.from({ length: this.storeys.count }, (_, k) => (view ? { ...view, z: view.z + k * this.storeys.depth } : null));
+    const shown = (z: number) => storeyShown(this.storeyOf(z), this.storey);
+    const views = Array.from({ length: this.storeys.count - this.storeys.lowest }, (_, i) => (view ? { ...view, z: view.z + this.rowOf(i + this.storeys.lowest) } : null));
     const lights = this.lotRooms
       ? views.flatMap((v) => placeLights(world, v, this.lotRooms!, (def) => this.deps.content.object(def)?.light)).filter((l) => shown(l.z))
       : [];
     lights.sort((a, b) => this.storeyOf(a.z) - this.storeyOf(b.z));
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];
-      if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.storeyOf(l.z) * this.storeys.depth);
+      if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.rowOf(this.storeyOf(l.z)));
       else light.position.y = HIDDEN_Y;
       return l ?? null;
     });
@@ -2289,6 +2371,9 @@ export class BabylonRenderer implements Renderer {
       mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
       mesh.thinInstanceRefreshBoundingInfo(false);
       mesh.receiveShadows = true;
+      // The garden goes with the ground dug away over the basement.
+      this.decorMeshes.add(mesh);
+      mesh.isVisible = this.storey >= 0;
     }
     this.resetSnapshot();
   }
@@ -2403,8 +2488,9 @@ export class BabylonRenderer implements Renderer {
 
   private async buildObjects(world: WorldStructure): Promise<void> {
     // Things on the storeys up to the one in view, each lifted to its storey (from its lot rows).
-    const D = this.storeys.depth;
-    const shown = world.objects.filter((o) => this.storeyOf(o.z) <= this.storey && this.inView(o.x + o.w / 2, o.z - this.storeyOf(o.z) * D + o.d / 2, 0));
+    // From the ground up, stairs down to the basement show in their stairwell too.
+    const down = (o: ObjectPlacement) => this.storey >= 0 && this.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
+    const shown = world.objects.filter((o) => (storeyShown(this.storeyOf(o.z), this.storey) || down(o)) && this.inView(o.x + o.w / 2, o.z - this.rowOf(this.storeyOf(o.z)) + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
     // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
@@ -2430,13 +2516,14 @@ export class BabylonRenderer implements Renderer {
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const k = this.storeyOf(o.z);
+        const D = this.rowOf(k);
         // Things on a top stand on it.
-        const [y0, z] = [k * WALL_HEIGHT + (o.lift ?? 0), o.z - k * D];
+        const [y0, z] = [k * WALL_HEIGHT + (o.lift ?? 0), o.z - D];
         // Things that stand anywhere on their tile are moved off its middle (picking and the shadow follow).
         const centre = objectCentre(o);
         const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
         Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.qTmp);
-        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(centre.x, y0, centre.z - k * D), this.mOut);
+        Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(centre.x, y0, centre.z - D), this.mOut);
         this.mOut.copyToArray(matrices, i * 16);
         const def = this.deps.content.object(o.def);
         const layer = def?.layer;
@@ -2444,7 +2531,7 @@ export class BabylonRenderer implements Renderer {
         // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
         // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
         // never past its tiles.
-        let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - k * D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
+        let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
         let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
         const shape = template.outline;
         if (layer !== 'surface' && shape) {
@@ -2456,7 +2543,7 @@ export class BabylonRenderer implements Renderer {
           for (const mx of [shape.minX, shape.maxX]) {
             for (const mz of [shape.minZ, shape.maxZ]) {
               xs.push(centre.x + (mx * c + mz * s) * size);
-              zs.push(centre.z - k * D + (-mx * s + mz * c) * size);
+              zs.push(centre.z - D + (-mx * s + mz * c) * size);
             }
           }
           const [x0, x1] = [Math.max(o.x + ox, Math.min(...xs) - 0.03), Math.min(o.x + ox + o.w, Math.max(...xs) + 0.03)];
@@ -2488,6 +2575,7 @@ export class BabylonRenderer implements Renderer {
     shown.forEach((o, i) => {
       const k = i * 16;
       const s = this.storeyOf(o.z);
+      const D = this.rowOf(s);
       // Nothing on a wall, the ceiling or the floor's surface (rugs) sits on a contact shadow;
       // things on a top get a small one there, the size of what they take on it.
       const def = this.deps.content.object(o.def);
@@ -2500,7 +2588,7 @@ export class BabylonRenderer implements Renderer {
       const centre = objectCentre(o);
       blobs[k + 12] = centre.x;
       blobs[k + 13] = 0.018 + s * WALL_HEIGHT + (o.lift ?? 0);
-      blobs[k + 14] = centre.z - s * D;
+      blobs[k + 14] = centre.z - D;
       blobs[k + 15] = 1;
     });
     if (!shown.length) return;

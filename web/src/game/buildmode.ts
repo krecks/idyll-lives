@@ -22,7 +22,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { groundDepth, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
@@ -228,6 +228,7 @@ export class BuildBuyInput {
 
   /** Keeps the current walls, doors and windows (from each new world structure). */
   setStructure(world: WorldStructure): void {
+    this.layout = { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement };
     const refs = [world.walls, world.openings, world.diagonals, world.fences, world.floors, world.rooms];
     if (refs.every((r, i) => r === this.lotRefs[i])) return;
     this.lotRefs = refs;
@@ -277,6 +278,8 @@ export class BuildBuyInput {
 
   /** Rows per storey of the lot (see `WorldStructure.storeys`). */
   private storeyDepth = 0;
+  /** Where each storey's rows are (see `storeyRow`). */
+  private layout: StoreyLayout = { depth: 0 };
 
   /**
    * The player's home plot, where everything in Build mode happens: on the storey in
@@ -285,7 +288,7 @@ export class BuildBuyInput {
   home(): PlotInfo | null {
     const plot = game.households.find((h) => h.player)?.plot;
     const p = plot == null ? null : (game.plots[plot] ?? null);
-    return p && game.storey > 0 ? { ...p, z: p.z + game.storey * this.storeyDepth } : p;
+    return p && game.storey !== 0 ? { ...p, z: p.z + storeyRow(this.layout, game.storey) } : p;
   }
 
   /** Called when the mode changes: shows the grid and clears old previews. */

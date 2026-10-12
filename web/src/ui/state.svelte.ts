@@ -140,9 +140,14 @@ class GameState {
   placing = $state.raw<Placing | null>(null);
   /** Owned object picked in Build mode's catalog. */
   buySelection = $state<number | null>(null);
-  /** The storey in view (0: the ground) and how many the lot has; higher storeys are hidden. */
+  /**
+   * The storey in view (0: the ground, -1: the basement), how many the lot has at and above the
+   * ground and the lowest (-1 with a basement); higher storeys are hidden, and in the basement
+   * only it shows.
+   */
   storey = $state(0);
   storeys = $state(1);
+  lowestStorey = $state(0);
   /** Build mode's tab, and the Build tab's tool (both kept between visits). */
   buildTab = $state<BuildTab>('furnish');
   buildTool = $state<BuildTool>('wall');

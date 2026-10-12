@@ -460,10 +460,16 @@ export interface WorldStructure {
   depth: number;
   /**
    * Storeys (sim-core `storeys.rs`): storey `k` is rows `k * storeyDepth ..` of the lot, laid out
-   * like the ground. Absent in older structures: one storey.
+   * like the ground (`storeys`: the ground and those above it). Absent in older structures: one
+   * storey. Use `storeyOfRow` and `storeyRow` rather than multiplying: the basement has rows too.
    */
   storeys?: number;
   storeyDepth?: number;
+  /**
+   * The block of `storeyDepth` rows holding the basement (storey -1); blocks after it hold the
+   * storeys above `basement - 1` (one up each). Absent: no basement.
+   */
+  basement?: number;
   objects: ObjectPlacement[];
   /** Every slot, gone residents included (ids index this list); `roster` in the UI leaves them out. */
   sims: SimInfo[];
@@ -814,9 +820,41 @@ export function groundDepth(world: { depth: number; storeyDepth?: number }): num
   return world.storeyDepth ?? world.depth;
 }
 
-/** The storey a lot row is on (0: the ground). */
-export function storeyOfRow(world: { depth: number; storeyDepth?: number; storeys?: number }, z: number): number {
-  return (world.storeys ?? 1) > 1 ? Math.max(0, Math.floor(z / groundDepth(world))) : 0;
+/** What `storeyOfRow` and `storeyRow` need of a world. */
+export type StoreyLayout = { depth: number; storeyDepth?: number; storeys?: number; basement?: number };
+
+/** Whether the lot holds more than the ground's rows (storeys above, or a basement). */
+function layered(world: StoreyLayout): boolean {
+  return ((world.storeys ?? 1) > 1 || world.basement !== undefined) && groundDepth(world) > 0;
+}
+
+/** The storey a lot row is on (0: the ground, -1: the basement). */
+export function storeyOfRow(world: StoreyLayout, z: number): number {
+  if (!layered(world)) return 0;
+  const k = Math.max(0, Math.floor(z / groundDepth(world)));
+  const b = world.basement;
+  return b === undefined || k < b ? k : k === b ? -1 : k - 1;
+}
+
+/** The first lot row of storey `k` (the basement: -1). */
+export function storeyRow(world: StoreyLayout, k: number): number {
+  if (!layered(world)) return 0;
+  const b = world.basement;
+  const block = k < 0 ? (b ?? 0) : b !== undefined && k >= b ? k + 1 : k;
+  return block * groundDepth(world);
+}
+
+/** The lowest storey: -1 with a basement, else 0 (the ground). */
+export function lowestStorey(world: { basement?: number }): number {
+  return world.basement !== undefined ? -1 : 0;
+}
+
+/**
+ * Whether storey `k` shows while storey `view` is in view: the ground up to it, or (viewing the
+ * basement) the basement alone.
+ */
+export function storeyShown(k: number, view: number): boolean {
+  return view < 0 ? k === view : k >= 0 && k <= view;
 }
 
 /** How far an object can stand off the middle of its footprint (centimetres per axis; sim-core `MAX_OFFSET`). */
