@@ -12,7 +12,7 @@ use crate::clock;
 use crate::content::{CareerLevel, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule};
 use crate::conversation;
 use crate::social::{self, EventKind};
-use crate::world::{Activity, GameMode, Phase, Sim, Task, TaskKind, World, affordable, end_activity, practise};
+use crate::world::{Activity, Ctx, GameMode, Phase, Sim, SimBrief, Task, TaskKind, World, affordable, end_activity, practise};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -395,14 +395,13 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
 // ---- Childcare ----------------------------------------------------------------------------
 
 /// Whether a grown-up of household `h` other than `except` is at home on `plot` to look after
-/// a baby (not about to leave for work).
+/// a baby (not about to leave for work; back from a visit once they're on the lot).
 fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
     w.sims.iter().enumerate().any(|(j, s)| {
         Some(j) != except
             && s.here()
             && s.household as usize == h
             && s.away_until.is_none()
-            && s.visiting.is_none()
             && !heading_out(s)
             && s.adult(&w.content)
             && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
@@ -424,10 +423,35 @@ fn stays_home_for(w: &World, i: usize) -> Option<usize> {
     (!carer_home(w, h, plot, Some(i))).then_some(baby)
 }
 
+/// Who `i` would leave alone at home by going out now (visiting, say): a baby there with no
+/// other grown-up at home, no babysitter booked for today and no money for one. Only the last
+/// grown-up at home can.
+pub(crate) fn no_cover_for(w: &World, i: usize) -> Option<usize> {
+    let s = &w.sims[i];
+    let plot = w.households[s.household as usize].plot?;
+    let home = s.away_until.is_none() && s.visiting.is_none() && w.plot_at(s.tile().0, s.tile().1) == Some(plot);
+    home.then(|| stays_home_for(w, i)).flatten()
+}
+
+/// Whether `sim` is the last grown-up at home with a baby of theirs there (content
+/// `life.childcare`): they don't go out on their own (visits, outings to public places) and
+/// leave the baby alone; sent out by the player, a babysitter comes (see `childcare`).
+pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
+    let content = ctx.content;
+    if content.life.childcare.is_none() || !sim.adult(content) {
+        return false;
+    }
+    let Some(home) = ctx.households[sim.household as usize].plot else { return false };
+    let me = sim.id as usize;
+    let at_home = |b: &SimBrief| b.here && !b.away && b.household == sim.household && b.plot == Some(home);
+    // (Anyone else on their way out won't be home for long.)
+    at_home(&ctx.briefs[me]) && ctx.briefs.iter().any(|b| b.baby && at_home(b)) && !ctx.briefs.iter().enumerate().any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
+}
+
 /// A babysitter for baby `b` (content `life.childcare`): booked (and paid) for the day once
-/// the baby is left with no grown-up at home while one of them is at work; while nobody's
-/// home, the babysitter does the care interactions of the baby's crib whenever a need they
-/// fill is low.
+/// the baby is left with no grown-up at home while they're out (at work, visiting, wherever);
+/// while nobody's home, the babysitter does the care interactions of the baby's crib whenever
+/// a need they fill is low.
 fn childcare(w: &mut World, b: usize) {
     let Some(rules) = w.content.life.childcare else { return };
     if !w.content.life.baby(w.sims[b].age) {
@@ -450,8 +474,12 @@ fn childcare(w: &mut World, b: usize) {
     let Some(crib) = crib else { return };
     let day = clock::day(w.tick);
     if w.households[h].sitter_day != Some(day) {
-        let at_work = w.sims.iter().position(|s| s.here() && s.household as usize == h && s.job.is_some() && s.away_until.is_some());
-        let Some(parent) = at_work.filter(|_| affordable(rules.cost, w.households[h].funds)) else { return };
+        // Booked by a grown-up out at work, or else whoever else is out (with no grown-up in
+        // the household at all, there's nobody to book one).
+        let out = |s: &&Sim| s.here() && s.household as usize == h && s.adult(&w.content);
+        let at_work = w.sims.iter().position(|s| out(&s) && s.job.is_some() && s.away_until.is_some());
+        let parent = at_work.or_else(|| w.sims.iter().position(|s| out(&s)));
+        let Some(parent) = parent.filter(|_| affordable(rules.cost, w.households[h].funds)) else { return };
         w.households[h].funds -= rules.cost;
         w.households[h].sitter_day = Some(day);
         w.events.push_amount(w.tick, EventKind::Babysitter, parent, b, rules.cost);

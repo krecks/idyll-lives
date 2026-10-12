@@ -632,7 +632,8 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
                     let their_home = ctx.households[other.household as usize].plot;
                     let ok = match meet {
                         Meet::Here => here == household.plot && other.household != sim.household,
-                        Meet::There => their_home.is_some() && other.plot == their_home && other.household != sim.household,
+                        // (Not leaving a baby home alone: `life::minding_baby`.)
+                        Meet::There => their_home.is_some() && other.plot == their_home && other.household != sim.household && !crate::life::minding_baby(sim, ctx),
                     };
                     if !ok || rel.friendship < visits.min_friendship {
                         continue;

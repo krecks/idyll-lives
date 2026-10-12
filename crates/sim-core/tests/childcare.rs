@@ -1,10 +1,11 @@
 //! Childcare: a baby is never left alone at home for a workday. When the last grown-up leaves
 //! for work, the household books a babysitter for the day (content `life.childcare`), who feeds
 //! and changes the baby while nobody's home; a grandparent at home looks after the baby instead,
-//! for free; and without the money for a babysitter, the last grown-up stays home.
+//! for free; and without the money for a babysitter, the last grown-up stays home. Nor does the
+//! last grown-up at home go out on their own: sent out by the player, a babysitter comes too.
 
 use sim_core::social::EventKind;
-use sim_core::{World, clock};
+use sim_core::{Command, World, clock};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},{"id":"bladder","label":"Bladder","decayPerHour":0.12},
@@ -119,4 +120,162 @@ fn without_money_for_a_babysitter_someone_stays_home() {
     assert!(w.sims[home].away_until.is_none() && w.sims[away].away_until.is_some(), "the other went to work");
     assert!(!w.events.iter().any(|e| e.kind == EventKind::MissedWork), "not held against them");
     assert!(average > 0.5 && lowest > 0.25, "Cleo was looked after: average {average:.2}, lowest {lowest:.2}");
+}
+
+// ---- Going out ----------------------------------------------------------------------------
+//
+// The last grown-up at home with a baby doesn't go out on their own (to friends, or to the
+// park); sent out visiting by the player, a babysitter comes, and without the money for one
+// they can't be sent.
+
+const OUT: &str = r#"{
+    "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},{"id":"bladder","label":"Bladder","decayPerHour":0.12},
+             {"id":"energy","label":"Energy","decayPerHour":0.02},{"id":"social","label":"Social","decayPerHour":0.15}],
+    "objects":[{"id":"crib","name":"Crib","price":350,"footprint":[2,1],"slots":2,"interactions":[
+        {"id":"lie","label":"Lie in the crib","minutes":720,"pose":"lie","baby":true,"autonomous":false,"effects":{"energy":1.0},"tags":["rest"]},
+        {"id":"feed","label":"Feed the baby","minutes":15,"care":{"hunger":0.8},"tags":["care"]},
+        {"id":"change","label":"Change the baby","minutes":10,"care":{"bladder":1.0},"tags":["care"]}]},
+      {"id":"fridge","name":"Fridge","price":100,"interactions":[
+        {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.5},"tags":["food"]}]},
+      {"id":"toilet","name":"Toilet","price":100,"interactions":[
+        {"id":"use","label":"Use","minutes":5,"effects":{"bladder":1.0},"tags":["bathroom"]}]},
+      {"id":"bench","name":"Bench","price":100,"interactions":[
+        {"id":"watch","label":"Watch people go by","minutes":60,"effects":{"social":0.6},"tags":["lounge"]}]}],
+    "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
+    "visits":{"needs":{"social":0.8},"hours":2,"minFriendship":10,"earliestHour":9,"latestHour":21},
+    "life":{"daysPerYear":2,"stages":[
+        {"id":"baby","label":"Baby","from":0,"baby":true},
+        {"id":"child","label":"Child","from":2,"school":true},
+        {"id":"adult","label":"Adult","from":18},
+        {"id":"elder","label":"Elder","from":60}],
+        "childcare":{"cost":40,"below":0.45}},
+    "bondPresets":{"friends":{"friendship":70},"parent":{"friendship":50,"kin":"parent"}},
+    "economy":{"startingFunds":1000}}"#;
+
+/// Ada (no job) at home with baby Cleo (`baby`; else Cleo's grown up) and `extra` anyone else;
+/// the park next door (a bench, the only thing for company bar visiting) and her friend Bo's
+/// house beyond it.
+fn street(baby: bool, extra: &str) -> String {
+    let age = if baby { 0.5 } else { 30.0 };
+    format!(
+        r#"{{"width":36,"depth":12,
+        "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[5.5,9.5]}},
+                 {{"name":"Park","x":12,"z":0,"w":12,"d":10,"entry":[17.5,9.5],"public":true}},
+                 {{"name":"Bo's","x":24,"z":0,"w":12,"d":10,"entry":[29.5,9.5]}}],
+        "households":[{{"name":"Park","plot":0,"player":true}},{{"name":"Bo","plot":2}}],
+        "objects":[{{"def":"crib","x":2,"z":2}},{{"def":"fridge","x":8,"z":2}},{{"def":"toilet","x":10,"z":6}},
+                   {{"def":"bench","x":17,"z":4}},{{"def":"fridge","x":26,"z":2}},{{"def":"toilet","x":34,"z":6}}],
+        "sims":[{{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30}},
+                {{"name":"Cleo","household":0,"x":3.5,"z":8.5,"age":{age}}},
+                {{"name":"Bo","household":1,"x":28.5,"z":5.5,"age":31}}{extra}],
+        "relationships":[{{"a":0,"b":2,"preset":"friends"}},{{"a":1,"b":0,"preset":"parent"}}]}}"#
+    )
+}
+
+/// The street, with Bo staying in (always home for a visit, and not coming over himself).
+fn street_world(baby: bool, extra: &str) -> World {
+    let mut w = World::from_json(OUT, &street(baby, extra), 1).unwrap();
+    w.households[1].free_will = false;
+    w
+}
+
+/// Whether `i` is somewhere other than home (plot 0), or on a visit.
+fn out(w: &World, i: usize) -> bool {
+    let (x, z) = w.sims[i].tile();
+    w.sims[i].visiting.is_some() || w.plot_at(x, z) != Some(0)
+}
+
+/// From 9:00 to 21:00 on day 1, lonely: how many quarter hours Ada was out.
+fn lonely_day(w: &mut World) -> usize {
+    until(w, 1, 9.0);
+    let mut away = 0;
+    while clock::hour(w.tick) < 21.0 {
+        w.sims[0].needs[3] = w.sims[0].needs[3].min(0.3);
+        for _ in 0..15 * 20 {
+            w.tick_once();
+        }
+        away += usize::from(out(w, 0));
+    }
+    away
+}
+
+/// From 10:00 to 14:00 on day 1, the baby's needs each quarter hour (the lowest and the
+/// average), and whether Ada was at Bo's.
+fn while_out(w: &mut World) -> (f32, f32, bool) {
+    let (mut lowest, mut sum, mut n, mut visited) = (1.0f32, 0.0, 0, false);
+    while clock::hour(w.tick) < 14.0 {
+        for _ in 0..15 * 20 {
+            w.tick_once();
+        }
+        visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
+        for k in 0..2 {
+            lowest = lowest.min(w.sims[1].needs[k]);
+            sum += w.sims[1].needs[k];
+            n += 1;
+        }
+    }
+    (lowest, sum / n as f32, visited)
+}
+
+#[test]
+fn the_only_grown_up_at_home_with_a_baby_does_not_go_out() {
+    // Without a baby to look after, lonely Ada goes out: to Bo's or the park.
+    let mut w = street_world(false, "");
+    assert!(lonely_day(&mut w) > 0, "without a baby, Ada goes out");
+
+    let mut w = street_world(true, "");
+    assert_eq!(lonely_day(&mut w), 0, "Ada stays home with Cleo");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "nobody needed");
+}
+
+#[test]
+fn sent_out_visiting_the_last_grown_up_gets_a_babysitter() {
+    let mut w = street_world(true, "");
+    until(&mut w, 1, 10.0);
+    let funds = w.households[0].funds;
+    // Cleo is getting hungry and wet: she'll need looking after while Ada's out.
+    w.sims[1].needs[0] = 0.5;
+    w.sims[1].needs[1] = 0.5;
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+    let (lowest, average, visited) = while_out(&mut w);
+    assert!(visited, "Ada went to Bo's");
+    let booked = told(&w, EventKind::Babysitter, 1);
+    assert_eq!(booked.len(), 1, "a babysitter for the day");
+    assert_eq!((booked[0].a, booked[0].b, booked[0].n), (0, 1, Some(40)), "for Cleo, for $40");
+    assert_eq!(w.households[0].funds, funds - 40, "paid from the household");
+    assert!(average > 0.5 && lowest > 0.25, "Cleo was looked after: average {average:.2}, lowest {lowest:.2}");
+
+    // Out again the same day: still the one booking.
+    until(&mut w, 1, 15.0);
+    assert!(!out(&w, 0), "back home");
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+    until(&mut w, 1, 17.0);
+    assert!(w.sims[0].visiting.is_some(), "out again");
+    assert_eq!(told(&w, EventKind::Babysitter, 1).len(), 1, "once a day");
+}
+
+#[test]
+fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_out() {
+    let mut w = street_world(true, "");
+    until(&mut w, 1, 10.0);
+    w.households[0].funds = 10;
+    let err = w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap_err();
+    assert!(err.to_string().contains("Cleo"), "told why: {err}");
+    until(&mut w, 1, 12.0);
+    assert!(!out(&w, 0), "Ada stayed home");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
+}
+
+#[test]
+fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
+    let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
+    let mut w = street_world(true, grandma);
+    until(&mut w, 1, 10.0);
+    w.sims[1].needs[0] = 0.5;
+    w.sims[1].needs[1] = 0.5;
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+    let (lowest, average, visited) = while_out(&mut w);
+    assert!(visited, "Ada went to Bo's");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
+    assert!(average > 0.5 && lowest > 0.25, "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}");
 }

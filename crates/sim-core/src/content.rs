@@ -345,15 +345,16 @@ pub struct LifeRules {
     pub adoption_cost: Option<i64>,
     /// The daily chance a household of grown-ups without children adopts on its own.
     pub adoption_chance: f32,
-    /// A babysitter for a baby left with no grown-up at home while someone is at work (None:
-    /// nobody looks after them, and nobody stays home for them either).
+    /// A babysitter for a baby left with no grown-up at home while they're out (None: nobody
+    /// looks after them, and nobody stays home for them either).
     pub childcare: Option<ChildcareRules>,
 }
 
 /// A babysitter (content `life.childcare`): booked for the day, for `cost`, once the last
-/// grown-up at home leaves a baby to go to work; while no grown-up is home, they feed, change
-/// and play with the baby (the care interactions of the baby's crib) whenever a need those fill
-/// is below `below`. Without the money for one, the last grown-up stays home from work.
+/// grown-up at home leaves a baby (for work, a visit, anywhere); while no grown-up is home, they
+/// feed, change and play with the baby (the care interactions of the baby's crib) whenever a
+/// need those fill is below `below`. Without the money for one, the last grown-up stays home
+/// from work, and can't be sent out visiting. On their own, the last one doesn't go out at all.
 #[derive(Debug, Clone, Copy)]
 pub struct ChildcareRules {
     pub cost: i64,
