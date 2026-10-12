@@ -154,8 +154,9 @@
         {
           "id": "snack",
           "label": "Grab a couch snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": { "item": "snack", "minutes": 8 },
           "autonomous": true,
           "effects": { "hunger": 0.3, "fun": 0.05 },
           "tags": ["food", "cozy"]
@@ -163,9 +164,9 @@
         {
           "id": "takeout",
           "label": "Order takeout",
-          "anim": "eat",
-          "minutes": 40,
-          "pose": "sit",
+          "anim": "fetch",
+          "minutes": 5,
+          "eat": { "item": "takeout", "minutes": 25 },
           "autonomous": true,
           "effects": { "hunger": 0.8, "fun": 0.1 },
           "tags": ["food"],

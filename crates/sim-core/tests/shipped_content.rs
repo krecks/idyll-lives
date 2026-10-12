@@ -513,7 +513,8 @@ fn recipes_are_cookable_and_every_home_can_make_a_meal() {
     // Every step names stations some object is, and what it leaves resolves (content
     // validates the names); every dish has servings to take and something left to wash.
     let all = content.objects.iter().fold(0, |m, o| m | o.stations);
-    for r in &content.recipes {
+    // (Food fetched to eat at a table has a hidden recipe of its own: nothing to cook.)
+    for r in content.recipes.iter().filter(|r| !r.hidden) {
         assert!(r.possible(all), "nothing in the catalogue can make {}", r.id);
         assert!(r.steps.iter().all(|s| s.anim.is_some()), "{}: a step without an animation", r.id);
         let dish = &content.items[r.item];

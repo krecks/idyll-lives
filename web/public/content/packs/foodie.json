@@ -39,8 +39,9 @@
         {
           "id": "nibble",
           "label": "Grab a gourmet nibble",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": { "item": "snack", "minutes": 8 },
           "pose": "stand",
           "autonomous": true,
           "effects": { "hunger": 0.35, "fun": 0.05 },
@@ -49,8 +50,9 @@
         {
           "id": "cheeseBoard",
           "label": "Put together a cheese board",
-          "anim": "eat",
-          "minutes": 25,
+          "anim": "cook",
+          "minutes": 5,
+          "eat": { "item": "cheeseBoard", "minutes": 20 },
           "pose": "stand",
           "autonomous": true,
           "effects": { "hunger": 0.55, "fun": 0.1, "comfort": 0.05 },

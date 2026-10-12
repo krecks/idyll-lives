@@ -312,7 +312,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     if !heading_out {
         end_activity(sim, content, objects);
         sim.engaged_with = None;
-        sim.queue.push_front(Task { kind: TaskKind::Work, directed: true });
+        sim.queue.push_front(Task { kind: TaskKind::Work, directed: true, routine: false });
     }
 }
 
@@ -371,6 +371,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
         sim.queue.push_front(Task {
             kind: TaskKind::Work,
             directed: true,
+            routine: false,
         });
     }
 }
@@ -464,7 +465,7 @@ fn doors(w: &mut World) {
             if s.current.is_some() {
                 end_activity(s, content, objects);
             }
-            s.queue.push_front(Task { kind: TaskKind::Answer { guest: i as u32 }, directed: false });
+            s.queue.push_front(Task { kind: TaskKind::Answer { guest: i as u32 }, directed: false, routine: false });
             Some(h as u32)
         });
         if let Some(Activity { phase: Phase::Knocking { host: h, .. }, .. }) = w.sims[i].current.as_mut() {
@@ -475,7 +476,7 @@ fn doors(w: &mut World) {
             let sim = &mut w.sims[i];
             sim.current = None;
             if !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome)) {
-                sim.queue.push_front(Task { kind: TaskKind::GoHome, directed: false });
+                sim.queue.push_front(Task { kind: TaskKind::GoHome, directed: false, routine: false });
             }
             let household = w.households.iter().position(|h| h.plot == Some(plot));
             if let Some(member) = household.and_then(|h| w.sims.iter().position(|s| s.here() && s.household as usize == h)) {
@@ -533,13 +534,13 @@ fn answer(w: &mut World, h: usize, guest: usize) {
     if welcome {
         w.events.push(tick, EventKind::Visited, guest, h, None);
         if let Some(greet) = rules.greet {
-            w.sims[h].queue.push_front(Task { kind: TaskKind::Social { target: guest as u32, social: greet }, directed: false });
+            w.sims[h].queue.push_front(Task { kind: TaskKind::Social { target: guest as u32, social: greet }, directed: false, routine: false });
         }
         return;
     }
     let World { sims, content, events, .. } = &mut *w;
     let sim = &mut sims[guest];
-    sim.queue.push_front(Task { kind: TaskKind::GoHome, directed: false });
+    sim.queue.push_front(Task { kind: TaskKind::GoHome, directed: false, routine: false });
     if let Some(m) = rules.turned_away {
         social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
     }
@@ -574,7 +575,7 @@ fn at_work(w: &mut World, i: usize) {
             sim.grade = (sim.grade + school.attend + (mood - 0.5) * 2.0 * school.mood).clamp(0.0, 100.0);
         }
         sim.away_until = None;
-        sim.queue.push_back(Task { kind: TaskKind::GoHome, directed: false });
+        sim.queue.push_back(Task { kind: TaskKind::GoHome, directed: false, routine: false });
         return;
     };
     let career = &content.careers[job.career];
@@ -623,6 +624,7 @@ fn at_work(w: &mut World, i: usize) {
     sim.queue.push_back(Task {
         kind: TaskKind::GoHome,
         directed: false,
+        routine: false,
     });
 }
 
@@ -744,6 +746,7 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
         sim.queue.push_back(Task {
             kind: TaskKind::GoHome,
             directed: false,
+            routine: false,
         });
     }
 }

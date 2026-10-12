@@ -2203,8 +2203,12 @@
         {
           "id": "snack",
           "label": "Grab a snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.3
           },
@@ -2267,12 +2271,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.15
+            "hygiene": 0.04
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         }
       ],
@@ -2338,7 +2343,8 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
-          "minutes": 8,
+          "minutes": 5,
+          "after": "handwash",
           "pose": "sit",
           "effects": {
             "bladder": 1.0
@@ -3781,6 +3787,59 @@
       "model": "item.sandwich",
       "hold": "hand",
       "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "snack",
+      "label": "Snack",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "toast",
+      "label": "Toast",
+      "model": "item.sandwich",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "leftovers",
+      "label": "Reheated meal",
+      "model": "item.mealPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "cheeseBoard",
+      "label": "Cheese board",
+      "model": "item.tastingBoard",
+      "hold": "both",
+      "emptyAs": "platterDirty",
+      "radius": 0.2
+    },
+    {
+      "id": "smoothie",
+      "label": "Smoothie",
+      "model": "item.prepBowl",
+      "hold": "hand",
+      "radius": 0.12
+    },
+    {
+      "id": "noodles",
+      "label": "Noodles",
+      "model": "item.prepBowl",
+      "hold": "hand",
+      "radius": 0.12
+    },
+    {
+      "id": "takeout",
+      "label": "Takeout",
+      "model": "item.mealPlate",
+      "hold": "hand",
       "radius": 0.13
     },
     {

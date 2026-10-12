@@ -22,7 +22,8 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
-          "minutes": 8,
+          "minutes": 5,
+          "after": "handwash",
           "pose": "sit",
           "effects": {
             "bladder": 1.0
@@ -55,7 +56,8 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
-          "minutes": 8,
+          "minutes": 5,
+          "after": "handwash",
           "pose": "sit",
           "effects": {
             "bladder": 1.0
@@ -151,12 +153,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.15
+            "hygiene": 0.04
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         }
       ]
@@ -179,12 +182,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.15
+            "hygiene": 0.04
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         }
       ]

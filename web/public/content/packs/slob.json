@@ -15,8 +15,9 @@
         {
           "id": "nuke",
           "label": "Nuke a frozen dinner",
-          "anim": "eat",
-          "minutes": 15,
+          "anim": "cook",
+          "minutes": 4,
+          "eat": { "item": "leftovers", "minutes": 10 },
           "pose": "stand",
           "autonomous": true,
           "effects": { "hunger": 0.55 },

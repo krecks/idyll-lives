@@ -102,6 +102,13 @@ pub struct Interaction {
     /// Needs this fills for the baby lying in the object, over the whole interaction (feeding,
     /// changing); only with a baby there, and only grown-ups do it.
     pub care: [f32; MAX_NEEDS],
+    /// Done afterwards (content `after`, a tag): once a use finishes, the resident goes on to
+    /// the nearest object with an interaction of that tag (washing hands after the toilet).
+    pub after: TagMask,
+    /// Food fetched here and eaten sitting down (content `eat`; index into
+    /// `Content::recipes`, a hidden recipe made for it): `minutes` is the fetching, and what
+    /// it gives (its `total_gain`) comes from eating, at a table if there is one.
+    pub eats: Option<usize>,
 }
 
 impl Interaction {
@@ -1855,6 +1862,20 @@ struct InteractionRaw {
     /// Animation tag (one of the content's `animations`).
     #[serde(default)]
     anim: Option<String>,
+    /// A tag: what's done straight afterwards (see `Interaction::after`).
+    #[serde(default)]
+    after: Option<String>,
+    /// Food to eat sitting down once fetched (see `Interaction::eats`).
+    #[serde(default)]
+    eat: Option<EatRaw>,
+}
+
+/// An interaction's `eat`: the item handed over and how long eating it takes.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EatRaw {
+    pub item: String,
+    pub minutes: f32,
 }
 
 #[derive(Deserialize, Default)]
@@ -1957,7 +1978,10 @@ fn default_anim(it: &InteractionRaw) -> &'static str {
         .max_by(|a, b| a.1.total_cmp(b.1).then(b.0.cmp(a.0)))
         .map(|(n, _)| n.as_str());
     let seated = it.pose != Pose::Stand;
-    if has("reading") {
+    if it.eat.is_some() {
+        // Getting food to eat elsewhere.
+        "cook"
+    } else if has("reading") {
         "read"
     } else if has("cooking") {
         // Cooking at a table is eating what was cooked.
@@ -2132,7 +2156,7 @@ impl Content {
             skills: &skill_index,
         };
 
-        let (cooking, items, recipes) = crate::cooking::parse(
+        let (cooking, items, mut recipes) = crate::cooking::parse(
             &raw.cooking,
             &raw.items,
             &raw.recipes,
@@ -2173,6 +2197,27 @@ impl Content {
                         *t += e;
                     }
                 }
+                // Food eaten sitting down: what it gives comes from eating it (a hidden recipe
+                // of its own), and fetching it gives nothing but its costs. Residents weigh it
+                // all the same.
+                let eats = match &it.eat {
+                    Some(_) if recipe.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `eat` and `recipe` don't go together")));
+                    }
+                    Some(e) => {
+                        let mut eaten = [0.0; MAX_NEEDS];
+                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                            *eat = std::mem::take(own);
+                        }
+                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &e.item, e.minutes, eaten)?);
+                        Some(recipes.len() - 1)
+                    }
+                    None => None,
+                };
+                let after = match it.after.as_deref() {
+                    Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
+                    None => 0,
+                };
                 let mut care = [0.0; MAX_NEEDS];
                 for (need, gain) in &it.care {
                     care[lookup(&need_index, need, &ctx, "need")?] = gain.max(0.0);
@@ -2235,6 +2280,8 @@ impl Content {
                     homework: it.homework.max(0.0),
                     care,
                     recipe,
+                    after,
+                    eats,
                 });
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {

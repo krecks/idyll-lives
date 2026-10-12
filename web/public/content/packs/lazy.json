@@ -141,8 +141,9 @@
         {
           "id": "takeout",
           "label": "Order takeout",
-          "anim": "eat",
-          "minutes": 30,
+          "anim": "fetch",
+          "minutes": 5,
+          "eat": { "item": "takeout", "minutes": 20 },
           "effects": { "hunger": 0.8, "fun": 0.1 },
           "tags": ["food"],
           "cost": 10,
@@ -151,8 +152,9 @@
         {
           "id": "noodles",
           "label": "Order cheap noodles",
-          "anim": "eat",
-          "minutes": 20,
+          "anim": "fetch",
+          "minutes": 4,
+          "eat": { "item": "noodles", "minutes": 12 },
           "effects": { "hunger": 0.55 },
           "tags": ["food"],
           "cost": 5

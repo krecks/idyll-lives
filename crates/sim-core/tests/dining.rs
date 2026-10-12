@@ -7,7 +7,7 @@ mod common;
 use sim_core::content::Pose;
 use sim_core::path::NavGrid;
 use sim_core::surface::{DiningRank, Links, dining_seat, faced_table, spot_for_seat};
-use sim_core::world::TaskKind;
+use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -244,4 +244,67 @@ fn long_seats_spread_their_sitters_across_their_width() {
     let mut xs: Vec<f32> = w.sims.iter().map(|s| s.pos[0]).collect();
     xs.sort_by(f32::total_cmp);
     assert_eq!(xs, [2.5, 3.5, 4.5], "one to a place");
+}
+
+/// The shipped content on the open plot (resident 0 a bookworm, whose food does for them what
+/// it does for anyone): a fridge, and maybe a dining table.
+fn kitchen(table: bool) -> (World, u32, Option<u32>) {
+    let town = TOWN.replace(r#""z":10.5}"#, r#""z":10.5,"traits":["bookworm"]}"#);
+    let mut w = World::from_json(&common::content(), &town, 1).unwrap();
+    w.autonomy = false;
+    let fridge = buy(&mut w, "fridge", 2, 2, 0).unwrap();
+    let table = table.then(|| buy(&mut w, "diningTable", 8, 6, 0).unwrap());
+    (w, fridge, table)
+}
+
+#[test]
+fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
+    for with_table in [true, false] {
+        let (mut w, fridge, table) = kitchen(with_table);
+        let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+        w.sims[0].needs[hunger] = 0.3;
+        let snack = interaction(&w, fridge, "snack");
+        let gain = w.content.objects[w.objects[fridge as usize].def].interactions[snack].total_gain[hunger];
+        w.apply(Command::Use { sim: 0, object: fridge, interaction: snack }).unwrap();
+        // Fetched at the fridge, then eaten: sitting at the table with the plate on it, or
+        // standing with it in hand.
+        let mut eating = None;
+        for _ in 0..4000 {
+            w.tick_once();
+            if let Some(a) = w.sims[0].current()
+                && let TaskKind::Eat { seat, plate, .. } = a.task.kind
+                && matches!(a.phase, Phase::Using { .. })
+            {
+                eating = Some((seat, plate));
+                break;
+            }
+        }
+        let (seat, plate) = eating.expect("eats the snack");
+        if with_table {
+            assert_eq!(seat, table, "at the table");
+            assert_eq!(w.sims[0].pose, Pose::Sit);
+            assert!(plate.is_some() && w.sims[0].held.is_none(), "the plate on the table");
+        } else {
+            assert_eq!(seat, None, "nowhere to sit");
+            assert_eq!(w.sims[0].pose, Pose::Stand);
+            assert!(w.sims[0].held.is_some(), "the plate in hand");
+            // The snack (a recipe made for the fridge's `eat`) is still food after a reload
+            // (put down, as eating starts again from what's there).
+            let loaded = World::from_save_json(&common::content(), &w.save_json()).unwrap();
+            let recipe = w.sims[0].held.and_then(|h| h.recipe);
+            assert!(recipe.is_some_and(|r| loaded.content.recipes[r].hidden));
+            assert!(loaded.items.list.iter().any(|it| it.recipe == recipe && it.edible()), "the snack is still there");
+        }
+        for _ in 0..4000 {
+            w.tick_once();
+            if w.sims[0].current().is_none() {
+                break;
+            }
+        }
+        assert!(w.sims[0].current().is_none(), "done eating");
+        assert!(w.sims[0].needs[hunger] > 0.3 + gain - 0.05, "the snack fed them: {}", w.sims[0].needs[hunger]);
+        let dirty = w.items.list.iter().filter(|it| w.content.items[it.def].dirty).count();
+        assert_eq!(dirty, 1, "a plate to wash up");
+        common::check(&w);
+    }
 }
