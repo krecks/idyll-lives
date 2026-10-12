@@ -65,7 +65,19 @@ interface Station {
   held?: string;
   /** Walks to and fro across the cell. */
   walk?: boolean;
+  /** A baby lies (awake) in the object's first slot (a crib); the station's Sim sees to them from the front. */
+  baby?: boolean;
+  /** The station's Sim's height and build (appearance; 1 = average). */
+  height?: number;
+  build?: number;
 }
+
+/** At the crib: a cuddle (as long as the content's, 15 minutes: picked up, held, put back), and standing by. */
+const CUDDLING: Step[] = [
+  { seconds: 3, pose: P.Stand, tag: 'idle' },
+  { seconds: 15, pose: P.Stand, tag: 'cuddle' },
+  { seconds: 3, pose: P.Stand, tag: 'idle' },
+];
 
 const STATIONS: Station[] = [
   // Gardening
@@ -85,6 +97,23 @@ const STATIONS: Station[] = [
   { label: 'sleep', def: 'bed', tag: 'sleep', pose: P.Lie },
   { label: 'nap hammock', def: 'natureLover.gardenHammock', tag: 'nap', pose: P.Lie, female: true },
   { label: 'bench press', def: 'weightBench', tag: 'lift', pose: P.Lie },
+  // The baby's crib: feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
+  { label: 'feed baby', def: 'crib', tag: 'tend', baby: true, female: true },
+  { label: 'cuddle baby', def: 'crib', script: CUDDLING, baby: true, female: true },
+  { label: 'cuddle baby tall broad', def: 'crib', script: CUDDLING, baby: true, height: 1.15, build: 1.2 },
+  { label: 'cuddle baby short slim', def: 'crib', script: CUDDLING, baby: true, female: true, height: 0.85, build: 0.85 },
+  { label: 'cuddle baby elder', def: 'crib', script: CUDDLING, baby: true, stage: 'elder' },
+  // Cut short (the sim ends it early): the baby settles back into the crib.
+  {
+    label: 'cuddle baby cut short',
+    def: 'crib',
+    baby: true,
+    script: [
+      { seconds: 2, pose: P.Stand, tag: 'idle' },
+      { seconds: 7, pose: P.Stand, tag: 'cuddle' },
+      { seconds: 3, pose: P.Stand, tag: 'idle' },
+    ],
+  },
   {
     label: 'get into / out of bed',
     def: 'bed',
@@ -259,13 +288,15 @@ interface Actor {
   frontZ?: number;
   /** Used standing inside (a shower): on the slot, facing out, like sitting. */
   inside?: boolean;
+  /** The baby lying in the station's crib. */
+  baby?: boolean;
 }
 const objects: ObjectPlacement[] = [];
 const actors: Actor[] = [];
 const labels = document.getElementById('labels')!;
 const spots: { at: Vector3; el: HTMLSpanElement }[] = [];
 const centres: Vector3[] = [];
-const look = (id: number, female: boolean, stage?: string): SimInfo => ({
+const look = (id: number, female: boolean, stage?: string, height = 1, build = 1): SimInfo => ({
   id,
   name: '',
   household: 0,
@@ -276,7 +307,8 @@ const look = (id: number, female: boolean, stage?: string): SimInfo => ({
     skin: ['#C08A64', '#8D5A3B', '#E8C0A0', '#6B4430'][id % 4],
     hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][id % 4],
     hairStyle: female ? 'long' : 'short',
-    height: 1,
+    height,
+    build,
     ...(stage ? { stage } : {}),
   },
   traits: [],
@@ -313,6 +345,7 @@ await Promise.all(
       const slotX = ox + w / 2 + (0 - (slots - 1) / 2) * (w / slots);
       const inside = def?.interactions?.some((it) => it.inside) ?? false;
       actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
+      if (s.baby) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
@@ -325,8 +358,11 @@ await Promise.all(
   }),
 );
 actors.sort((a, b) => a.station - b.station);
-// Stations load in any order: row i is actor i after sorting.
-const actorSims = actors.map((a, i) => look(i, stations[a.station].social ? a.role === 2 : !!stations[a.station].female, stations[a.station].stage));
+// Stations load in any order: row i is actor i after sorting (a station's own actors keep their order).
+const actorSims = actors.map((a, i) => {
+  const s = stations[a.station];
+  return a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female, s.stage, s.height, s.build);
+});
 for (let i = 0; i < actors.length; i++) {
   const a = actors[i];
   if (a.partner >= 0) a.partner = actors[i].role === 1 ? i + 1 : i - 1;
@@ -383,12 +419,17 @@ function writeSnapshot(): void {
       pose = step.pose;
       tag = step.tag ?? '';
     }
+    if (a.baby) {
+      // Lying awake in the crib (sim-core shows no action for a baby awake in it).
+      pose = P.Lie;
+      tag = '';
+    }
     const standing = pose === P.Stand && a.object >= 0 && !a.inside;
     snap[o + k.id] = i;
     snap[o + k.x] = standing ? a.frontX! : a.x;
     snap[o + k.z] = standing ? a.frontZ! : a.z;
-    // Scripted stations stand up facing away, as sim-core leaves them (it keeps the yaw).
-    snap[o + k.yaw] = standing && !s.script ? Math.PI : a.yaw;
+    // Scripted stations stand up facing away, as sim-core leaves them (it keeps the yaw), unless the step uses the object.
+    snap[o + k.yaw] = standing && (!s.script || tag) ? Math.PI : a.yaw;
     snap[o + k.pose] = pose;
     snap[o + k.moving] = 0;
     if (s.walk) {
@@ -400,7 +441,7 @@ function writeSnapshot(): void {
       snap[o + k.yaw] = back ? Math.PI : 0;
       snap[o + k.moving] = 1;
     }
-    snap[o + k.held!] = s.held ? items.indexOf(s.held) + 1 : 0;
+    snap[o + k.held!] = s.held && !a.baby ? items.indexOf(s.held) + 1 : 0;
     const social = s.social ? SOCIAL[s.social] : 0;
     snap[o + k.social] = social ? 1 : 0;
     snap[o + k.anim] = social;
@@ -409,7 +450,7 @@ function writeSnapshot(): void {
     snap[o + k.role] = a.role;
     snap[o + k.emotion] = 0;
     snap[o + k.away] = 0;
-    snap[o + k.object] = s.script && pose === P.Stand ? -1 : a.object;
+    snap[o + k.object] = s.script && pose === P.Stand && !tag ? -1 : a.object;
     snap[o + k.action] = social ? actions.indexOf('talk') : tag ? actions.indexOf(tag) : -1;
     snap[o + k.mood!] = 0.8;
   });
