@@ -259,3 +259,52 @@ fn without_free_will_a_guest_waits_for_the_player() {
     minutes(&mut w, 60.0);
     assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
 }
+
+/// A bladder and a toilet at Ada's (`bathroom` makes a resident busy); guests may use it when
+/// `guestTags` says so.
+fn toilet_content(guest_tags: &str) -> String {
+    bored_content()
+        .replace(
+            r#"{"id":"social","label":"Social","decayPerHour":0.01}]"#,
+            r#"{"id":"social","label":"Social","decayPerHour":0.01},{"id":"bladder","label":"Bladder","decayPerHour":0.01}]"#,
+        )
+        .replace(
+            r#""tags":["study"]}]}]"#,
+            r#""tags":["study"]}]},
+            {"id":"toilet","name":"Toilet","interactions":[{"id":"use","label":"Use","minutes":5,"effects":{"bladder":0.9},"tags":["bathroom"]}]}]"#,
+        )
+        .replace(r#""economy":"#, &format!(r#""socialRules":{{"busyTags":["bathroom"],"guestTags":{guest_tags}}},"economy":"#))
+}
+
+fn guest_uses_the_toilet(content: &str) -> bool {
+    let town = town("friends").replace(
+        r#"{"def":"chair","x":3,"z":2,"rot":0}"#,
+        r#"{"def":"chair","x":3,"z":2,"rot":0},{"def":"desk","x":8,"z":2,"rot":0},{"def":"toilet","x":14,"z":2,"rot":0}"#,
+    );
+    let mut w = World::from_json(content, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+    }
+    w.autonomy = true;
+    let toilet = w.objects.iter().find(|o| w.content.objects[o.def].id == "toilet").unwrap().id;
+    let bladder = w.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    w.sims[1].needs[bladder] = 0.2;
+    let mut used = false;
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        used |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == toilet));
+    }
+    used
+}
+
+#[test]
+fn a_guest_may_use_the_hosts_toilet() {
+    assert!(guest_uses_the_toilet(&toilet_content(r#"["bathroom"]"#)), "Bo never used Ada's toilet");
+    assert!(!guest_uses_the_toilet(&toilet_content("[]")), "without guestTags the toilet is the household's");
+}

@@ -210,6 +210,8 @@ pub struct BondPreset {
 pub struct SocialRules {
     /// Interactions with these tags can't be interrupted by socials (sleeping, bathroom...).
     pub busy_tags: TagMask,
+    /// Of the busy tags, those a guest may still use at the host's (the toilet).
+    pub guest_tags: TagMask,
     pub romantic_tags: TagMask,
     pub default_bond: Option<BondPreset>,
     pub jealousy_range: f32,
@@ -313,6 +315,7 @@ pub(crate) struct OutcomeRaw {
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct SocialRulesRaw {
     busy_tags: Vec<String>,
+    guest_tags: Vec<String>,
     romantic_tags: Vec<String>,
     default_bond: Option<String>,
     jealousy_range: Option<f32>,
@@ -492,6 +495,7 @@ pub(crate) fn parse_rules(
     };
     Ok(SocialRules {
         busy_tags: mask(&raw.busy_tags),
+        guest_tags: mask(&raw.guest_tags),
         romantic_tags: mask(&raw.romantic_tags),
         default_bond,
         jealousy_range: raw.jealousy_range.unwrap_or(8.0),
@@ -510,6 +514,7 @@ impl SocialRules {
     pub fn empty() -> Self {
         Self {
             busy_tags: 0,
+            guest_tags: 0,
             romantic_tags: 0,
             default_bond: None,
             jealousy_range: 8.0,

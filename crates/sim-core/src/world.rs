@@ -2804,7 +2804,7 @@ fn pick_autonomous(
                 || (woken && inter.tags & rest != 0)
                 || (rested && inter.tags & rhythm.sleep_tags != 0)
                 || (napped && !exhausted && inter.tags & rhythm.nap_tags != 0)
-                || (allowed == Access::Guest && inter.tags & content.social_rules.busy_tags != 0)
+                || (allowed == Access::Guest && inter.tags & content.social_rules.busy_tags & !content.social_rules.guest_tags != 0)
                 || !affordable(inter.cost, funds)
             {
                 continue;

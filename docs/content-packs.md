@@ -215,7 +215,8 @@ Tags in use (64 maximum for the whole game, base plus all packs):
 | `phone` | the phone's actions (`phone.actions`): texting, calling, inviting, scrolling |
 
 Special meanings: `sleep`, `bathroom`, `hygiene`, `nap` make a resident busy (no chats, guests
-can't use them); `romantic` socials need attraction; `sleep` lasts through the night.
+can't use them, except those in `socialRules.guestTags`: `bathroom`, so a guest may use the
+toilet); `romantic` socials need attraction; `sleep` lasts through the night.
 
 **Group conversations:** a social with `"joinable": true` (base game: chat, joke, deep talk) can
 be joined by up to two others nearby, who listen and fill their needs by its `targetNeeds`.
