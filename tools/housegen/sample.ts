@@ -22,7 +22,7 @@ const { generateHouse, objectInfos } = await import('../../web/src/game/housegen
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const cfg = JSON.parse(readFileSync(new URL('housegen.json', root), 'utf8')) as HouseGenConfig;
-type ContentFile = { objects?: ObjectDef[]; include?: string[] };
+type ContentFile = { objects?: ObjectDef[]; include?: string[]; roomRules?: { lampTiles?: number } };
 const baseFile = JSON.parse(readFileSync(new URL('base.json', root), 'utf8')) as ContentFile;
 // Objects of base.json and the files it includes (the catalogue in furniture.json, the garden, packs).
 const base = {
@@ -44,7 +44,7 @@ const kinds = new Map<string, { n: number; area: number; most: number; long: num
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
-    const h = generateHouse(cfg, info, lot, houses.plot, size, seed * 7919);
+    const h = generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles);
     if (!h) continue;
     stats.made++;
     if (h.upper) stats.two++;

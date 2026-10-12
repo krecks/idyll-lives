@@ -12,7 +12,8 @@
  * 4. windows go along the outside walls; kitchens get a counter run along one wall (sink, stove);
  *    furniture goes against the walls (doors and stairs kept clear, every piece reachable), tables
  *    stand free with chairs round them, small things go on tops (counters, tables, shelves),
- *    and a few things (a patio set) into the garden.
+ *    floor lamps and such keep to corners and out of doorways, every room gets ceiling lights
+ *    enough for all of it at night, and a few things (a patio set) go into the garden.
  *
  * Seeded: the same seed, lot size and config always give the same house, so a town keeps only
  * `gen:<lot size>:<seed>` per lot (see `town.ts`). Output is a `HouseTemplate` in the layouts'
@@ -35,6 +36,8 @@ export interface HouseGenConfig {
   windows: { spacing: [number, number] };
   stairs: string;
   garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
+  /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall). */
+  lights?: string[];
   names: { first: string[]; second: Record<string, string[]> };
 }
 
@@ -143,6 +146,8 @@ export interface ObjectInfo extends Shape {
   radius: number;
   /** Whether it has interactions: someone must be able to get to it. */
   used: boolean;
+  /** Whether it gives light (content `light`): it counts for its room's light at night. */
+  lamp: boolean;
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -154,7 +159,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0, lamp: !!o.light });
     }
     return known.get(def);
   };
@@ -204,10 +209,11 @@ export function random(seed: number): () => number {
   };
 }
 
-export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number): HouseTemplate | null {
+/** `lampTiles`: tiles one lamp lights at night (content `roomRules.lampTiles`); every room gets lights enough for all of it. */
+export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10): HouseTemplate | null {
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
-    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt));
+    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt), lampTiles);
     if (!house) continue;
     // Into the layouts' frame (centred on lots of other widths by `onLot`).
     const dx = -Math.floor((lot.width - medium.width) / 2);
@@ -243,7 +249,7 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
   return entries[entries.length - 1]?.[0] ?? null;
 }
 
-function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number): HouseTemplate | null {
+function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, lampTiles: number): HouseTemplate | null {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -329,8 +335,8 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
   const has = new Set([...ground, ...upstairs]);
   windows(cfg, rng, g, house);
   if (up) windows(cfg, rng, up, house);
-  if (!furnish(cfg, info, rng, g, has)) return null;
-  if (up && !furnish(cfg, info, rng, up, has)) return null;
+  if (!furnish(cfg, info, rng, g, has, lampTiles)) return null;
+  if (up && !furnish(cfg, info, rng, up, has, lampTiles)) return null;
   garden(cfg, info, rng, g, house, lot);
 
   // Spawns in front of the front door.
@@ -697,13 +703,16 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect):
 /**
  * Furnishes each room: its counter run, the furniture that must come, its tables and chairs
  * (some only in houses with or without a room of some kind: `has`), the rest of its furniture,
- * small things on the tops, then things on the walls, ceiling and floor. False if a piece that
- * must come doesn't fit.
+ * small things on the tops, then things on the walls, ceiling and floor, and lights enough
+ * (halls get only those). False if a piece that must come doesn't fit.
  */
-function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor, has: Set<Kind>): boolean {
+function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor, has: Set<Kind>, lampTiles: number): boolean {
   const shapes: Shapes = { object: info, radius: (d) => d?.radius ?? 0.12 };
   for (const r of f.rooms) {
-    if (r.kind === 'hall') continue;
+    if (r.kind === 'hall') {
+      lights(cfg, info, f, r, lampTiles);
+      continue;
+    }
     const spec = cfg.rooms[r.kind];
     if (spec.run && !counterRun(f, r, info, rng, spec.run)) return false;
     const sideOf = new Map<string, number>();
@@ -716,7 +725,11 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
         let done = false;
         for (const def of options) {
           const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
-          const side = place(f, r, def, info(def)!, rng, across === undefined ? undefined : (across + 2) % 4);
+          const prefer = across === undefined ? undefined : (across + 2) % 4;
+          // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
+          // one that must come goes wherever it fits if it has to.
+          const aside = !info(def)!.used;
+          const side = place(f, r, def, info(def)!, rng, prefer, aside) ?? (aside && required(slot) ? place(f, r, def, info(def)!, rng, prefer) : null);
           if (side !== null) {
             sideOf.set(def, side);
             for (const o of slot.one) sideOf.set(o, side);
@@ -747,8 +760,50 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
         }
       }
     }
+    lights(cfg, info, f, r, lampTiles);
   }
   return true;
+}
+
+/**
+ * Lights from the ceiling until room `r` is lit right through at night: one lamp lights
+ * `lampTiles` tiles (as the simulation scores rooms), and lamps already in it (on the floor,
+ * on tops, on walls, from the ceiling) count. They spread over the room, each in the middle of
+ * its share of it, all alike: the light already hanging there, else one of the room's own
+ * ceiling lights (else of `lights`). Draws nothing from the house's random numbers.
+ */
+function lights(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, lampTiles: number): void {
+  const want = Math.ceil((r.w * r.d) / Math.max(lampTiles, 0.1));
+  const lamps = () => f.objects.filter((o) => inside(r, o.x, o.z) && info(o.def)?.lamp);
+  if (lamps().length >= want) return;
+  const hanging = (d: string) => !!info(d)?.lamp && info(d)?.layer === 'ceiling';
+  const own = (cfg.rooms[r.kind]?.ceiling ?? []).flatMap((s) => s.one).filter(hanging);
+  const options = own.length ? own : (cfg.lights ?? []).filter(hanging);
+  const def = lamps().find((o) => hanging(o.def))?.def ?? options[(r.x + r.z) % options.length];
+  if (!def) return;
+  // Hanging from the ceiling draws no random numbers.
+  const rng = () => 0.5;
+  // The room in `want` shares (or a few more), as near square as can be.
+  let grid: [number, number] = [want, 1];
+  let best = Infinity;
+  for (let cols = 1; cols <= want; cols++) {
+    const rows = Math.ceil(want / cols);
+    const score = cols * rows * 100 + Math.abs(r.w / cols - r.d / rows);
+    if (score < best) [best, grid] = [score, [cols, rows]];
+  }
+  const [cols, rows] = grid;
+  const spots: [number, number][] = [];
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) spots.push([r.x + ((i + 0.5) * r.w) / cols - 0.5, r.z + ((j + 0.5) * r.d) / rows - 0.5]);
+  for (const [sx, sz] of spots) {
+    if (lamps().length >= want) return;
+    // A share with a ceiling light over it already (one hung above) is lit.
+    if (lamps().some((o) => info(o.def)?.layer === 'ceiling' && Math.hypot(o.x - sx, o.z - sz) < 1.5)) continue;
+    mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng, undefined, [sx, sz]);
+  }
+  // Shares that were lit already, or had no free ceiling: wherever there's room.
+  for (let n = lamps().length; n < want; n++) {
+    if (!mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng)) return;
+  }
 }
 
 /** Tiles of a footprint (min corner, rotated size). */
@@ -983,8 +1038,9 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
  * One thing on the wall, ceiling or rug layer of room `r` (it never blocks anything): on a wall,
  * its back on wall or window edges; from the ceiling, over a free spot; a rug, in the middle of
  * the room. Never on the stairs, and its front (where the simulation checks for walls) inside the room.
+ * `near`: from the ceiling, as near this tile as there's room (else near the middle).
  */
-function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number, over?: string[]): boolean {
+function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number, over?: string[], near?: [number, number]): boolean {
   const layers = (f.layers ??= new Set());
   const stairs = new Set<string>();
   for (const o of f.objects) {
@@ -993,6 +1049,8 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     const [w, d] = o.rot % 2 === 0 ? [sw, sd] : [sd, sw];
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
   }
+  // Nor over the stairwell upstairs (all a hall has taken).
+  if (r.kind === 'hall') for (const t of f.taken) stairs.add(t);
   const fits = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) {
       for (let dx = 0; dx < w; dx++) {
@@ -1043,13 +1101,19 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     return false;
   }
   if (layer === 'ceiling') {
-    const spots: [number, number][] = [];
-    for (let z = r.z; z + fd <= r.z + r.d; z++) for (let x = r.x; x + fw <= r.x + r.w; x++) spots.push([x, z]);
-    // Near the middle of the room.
-    const cx = r.x + (r.w - fw) / 2;
-    const cz = r.z + (r.d - fd) / 2;
+    // Turned whichever way has its front in the room (along a corridor a tile wide, too).
+    const spots: [number, number, number][] = [];
+    for (const rot of [0, 1, 2, 3]) {
+      const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      for (let z = r.z; z + d <= r.z + r.d; z++) for (let x = r.x; x + w <= r.x + r.w; x++) spots.push([x, z, rot]);
+    }
+    // Near the middle of the room (or of the share a light is for).
+    const [cx, cz] = near ?? [r.x + (r.w - fw) / 2, r.z + (r.d - fd) / 2];
     spots.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) - Math.hypot(b[0] - cx, b[1] - cz));
-    for (const [x, z] of spots) if (fits(x, z, fw, fd, 0)) return take(x, z, fw, fd, 0);
+    for (const [x, z, rot] of spots) {
+      const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      if (fits(x, z, w, d, rot)) return take(x, z, w, d, rot);
+    }
     return false;
   }
   for (const rot of [0, 1]) {
@@ -1064,35 +1128,57 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
 /**
  * One piece against a wall of room `r`, facing into it (`prefer`: a side first, 0 the side
  * towards the street, then clockwise). Returns the side, or null if there's no place for it.
+ * `aside` (things nobody uses: a floor lamp): in a corner if it can be, and never next to the
+ * tile inside a door (it would make the way in a squeeze).
  */
-function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectInfo, rng: () => number, prefer?: number): number | null {
+function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectInfo, rng: () => number, prefer?: number, aside = false): number | null {
+  // Tiles round the tiles inside the room's doors.
+  const doorway = new Set<string>();
+  if (aside) {
+    for (const [e, v] of f.edges) {
+      if (v !== 'door') continue;
+      for (const [x, z] of sides(e)) {
+        if (!inside(r, x, z)) continue;
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) doorway.add(key(x + dx, z + dz));
+      }
+    }
+  }
   const sideList = [0, 1, 2, 3].sort(() => rng() - 0.5);
   if (prefer !== undefined) sideList.sort((a, b) => (a === prefer ? -1 : b === prefer ? 1 : 0));
-  for (const side of sideList) {
-    // Back to the wall on `side`, front into the room: rot 0 faces +z (back to the street-side wall).
-    const rot = [0, 3, 2, 1][side];
-    const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
-    const spots: [number, number][] = [];
-    if (side === 0) for (let x = r.x; x + w <= r.x + r.w; x++) spots.push([x, r.z]);
-    if (side === 2) for (let x = r.x; x + w <= r.x + r.w; x++) spots.push([x, r.z + r.d - d]);
-    if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x, z]);
-    if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z]);
-    spots.sort(() => rng() - 0.5);
-    for (const [x, z] of spots) {
-      const tiles = tilesOf(x, z, w, d);
-      const front = frontTile(x, z, w, d, rot);
-      if (!inside(r, front[0], front[1])) continue;
-      if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || f.taken.has(key(front[0], front[1]))) continue;
-      const n = f.objects.length;
-      for (const t of tiles) f.taken.add(t);
-      f.objects.push({ def, x, z, rot });
-      f.fronts.push([front]);
-      if (reachable(f, r)) {
-        f.keep.add(key(front[0], front[1]));
-        return side;
-      }
-      undo(f, n, tiles);
+  type Spot = { side: number; rot: number; w: number; d: number; x: number; z: number };
+  // Side by side (each side's spots shuffled only once it's reached).
+  function* walls(): Generator<Spot> {
+    for (const side of sideList) {
+      // Back to the wall on `side`, front into the room: rot 0 faces +z (back to the street-side wall).
+      const rot = [0, 3, 2, 1][side];
+      const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      const along: [number, number][] = [];
+      if (side === 0) for (let x = r.x; x + w <= r.x + r.w; x++) along.push([x, r.z]);
+      if (side === 2) for (let x = r.x; x + w <= r.x + r.w; x++) along.push([x, r.z + r.d - d]);
+      if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) along.push([r.x, z]);
+      if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) along.push([r.x + r.w - w, z]);
+      along.sort(() => rng() - 0.5);
+      for (const [x, z] of along) yield { side, rot, w, d, x, z };
     }
+  }
+  // Out of the way: corners first, whichever side they're on.
+  const corner = (s: Spot) => Number((s.x === r.x || s.x + s.w === r.x + r.w) && (s.z === r.z || s.z + s.d === r.z + r.d));
+  const spots = aside ? [...walls()].sort((a, b) => corner(b) - corner(a)) : walls();
+  for (const { side, rot, w, d, x, z } of spots) {
+    const tiles = tilesOf(x, z, w, d);
+    const front = frontTile(x, z, w, d, rot);
+    if (!inside(r, front[0], front[1])) continue;
+    if (aside && tiles.some((t) => doorway.has(t))) continue;
+    if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || f.taken.has(key(front[0], front[1]))) continue;
+    const n = f.objects.length;
+    for (const t of tiles) f.taken.add(t);
+    f.objects.push({ def, x, z, rot });
+    f.fronts.push([front]);
+    if (reachable(f, r)) {
+      f.keep.add(key(front[0], front[1]));
+      return side;
+    }
+    undo(f, n, tiles);
   }
   return null;
 }

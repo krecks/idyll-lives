@@ -395,6 +395,48 @@ fn house_templates_have_closed_bathrooms() {
     }
 }
 
+/// Every room of every house template has lights enough for all of it at night, and nothing
+/// stands just inside a door.
+#[test]
+fn house_templates_light_every_room_and_keep_doorways_clear() {
+    use sim_core::lot::Edge;
+    let content = content();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");
+    let houses: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("houses.json")).unwrap()).unwrap();
+    let (w, d) = (&houses["plot"]["width"], &houses["plot"]["depth"]);
+    for h in houses["houses"].as_array().unwrap() {
+        let lot = serde_json::json!({
+            "width": w, "depth": d,
+            "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d}],
+            "walls": h["walls"], "doors": h["doors"], "windows": h["windows"], "objects": h["objects"],
+        });
+        let world = World::from_json(&content, &lot.to_string(), 1).unwrap();
+        let lamp_tiles = world.content.room_rules.lamp_tiles;
+        for room in world.rooms().iter().filter(|r| !r.garden) {
+            assert!(
+                f32::from(room.lamps) * lamp_tiles >= room.tiles,
+                "{}: the room at {:?} has {} lights for {} tiles",
+                h["id"],
+                room.centre,
+                room.lamps,
+                room.tiles
+            );
+        }
+        let blocked = world.blocked();
+        let lot = &world.lot;
+        let clear = |x: i32, z: i32| !lot.in_bounds(x, z) || !blocked[lot.tile_index(x, z)];
+        for z in 0..=lot.depth as i32 {
+            for x in 0..=lot.width as i32 {
+                let h_door = x < lot.width as i32 && lot.h_edge(x as usize, z as usize) == Edge::Door;
+                let v_door = z < lot.depth as i32 && lot.v_edge(x as usize, z as usize) == Edge::Door;
+                assert!(!h_door || (clear(x, z - 1) && clear(x, z)), "{}: something stands in the doorway at {x},{z}", h["id"]);
+                assert!(!v_door || (clear(x - 1, z) && clear(x, z)), "{}: something stands in the doorway at {x},{z}", h["id"]);
+            }
+        }
+    }
+}
+
 /// The merged content's objects, as JSON (to check keys the simulation itself doesn't read).
 fn raw_objects() -> Vec<serde_json::Value> {
     let merged: serde_json::Value = serde_json::from_str(&content()).unwrap();

@@ -40,7 +40,7 @@ const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
 const content = await Content.load(new URL('content/base.json', root).href);
 const assets = await AssetRegistry.load(new URL('assets/manifest.json', root).href);
 const read = (name: string) => JSON.parse(readFileSync(fileURLToPath(new URL(`content/${name}`, root)), 'utf8'));
-const templates: Templates = { ...(read('houses.json') as Templates), gen: read('housegen.json') as HouseGenConfig, info: objectInfos(content) };
+const templates: Templates = { ...(read('houses.json') as Templates), gen: read('housegen.json') as HouseGenConfig, info: objectInfos(content), lampTiles: content.lampTiles };
 
 const out = process.argv[2] ?? 'worlds.json';
 const perKind = Number(process.argv[3] ?? 3);

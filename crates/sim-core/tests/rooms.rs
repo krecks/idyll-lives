@@ -106,6 +106,26 @@ fn scores_follow_the_house_as_it_changes() {
     assert!((room(&w, 1, 1).scores.clean - 0.75).abs() < 1e-4);
 }
 
+/// A lamp nobody uses could stand anywhere that leaves the rest reachable; it keeps out of
+/// doorways (the tiles either side of a door), bought or moved there.
+#[test]
+fn lamps_keep_out_of_doorways() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let buy = |w: &mut World, x: i32, z: i32, rot: i32| w.apply(Command::Buy { household: 0, object: "lamp".into(), at: Some([x, z, rot]), style: None, turn: None, offset: None, size: None, tall: None });
+    // The living room's door is on its bottom wall at x 6: (6, 4) inside, (6, 5) outside.
+    for (x, z, rot) in [(6, 4, 2), (6, 5, 0)] {
+        let err = buy(&mut w, x, z, rot).unwrap_err().to_string();
+        assert!(err.contains("doorway"), "{x},{z}: {err}");
+    }
+    buy(&mut w, 8, 4, 2).expect("further along the wall is fine");
+    // Nor moved there.
+    let lamp = w.objects.iter().position(|o| w.content.objects[o.def].id == "lamp" && (o.x, o.z) == (5, 1)).unwrap() as u32;
+    let to = |x, z| Command::MoveObject { household: 0, object: lamp, x, z, rot: 2, turn: None, offset: None, size: None, tall: None };
+    assert!(w.apply(to(6, 4)).unwrap_err().to_string().contains("doorway"));
+    assert_eq!((w.objects[lamp as usize].x, w.objects[lamp as usize].z), (5, 1), "it stays put");
+    w.apply(to(9, 4)).expect("into a corner");
+}
+
 /// Two equal rooms with a sofa each: the left one bright and decorated, the right one dark and
 /// dirty. Ada stands halfway between the sofas.
 const TWO_ROOMS: &str = r#"{"width":20,"depth":10,
