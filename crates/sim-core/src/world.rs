@@ -2243,6 +2243,8 @@ impl World {
                         inter.label, inter.cost
                     )));
                 }
+                // Something in a public place or at someone else's: not leaving a baby home alone.
+                crate::life::check_cover_at(self, sim as usize, self.object_plot.get(object as usize).copied().flatten())?;
                 self.enqueue(
                     sim,
                     TaskKind::Use {
@@ -2283,6 +2285,7 @@ impl World {
                 if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
                     return Err(Error::new("move target is off the lot"));
                 }
+                crate::life::check_cover_at(self, sim as usize, self.plot_at(x.floor() as i32, z.floor() as i32))?;
                 self.enqueue(sim, TaskKind::MoveTo { x, z })?;
             }
             Command::Social {
@@ -2302,6 +2305,9 @@ impl World {
                         def.label
                     )));
                 }
+                // Walking over to someone out of the house (in the park, say).
+                let (tx, tz) = t.tile();
+                crate::life::check_cover_at(self, sim as usize, self.plot_at(tx, tz))?;
                 self.enqueue(sim, TaskKind::Social { target, social })?;
             }
             Command::JoinCareer { sim, career, level } => {
@@ -2340,10 +2346,7 @@ impl World {
                     return Err(Error::new(format!("unknown plot {plot}")));
                 }
                 // Not leaving a baby home alone with no money for a babysitter.
-                if let Some(baby) = crate::life::no_cover_for(self, sim as usize) {
-                    let cost = self.content.life.childcare.map_or(0, |c| c.cost);
-                    return Err(Error::new(format!("nobody to look after {}: not enough money for a babysitter (${cost})", self.sims[baby].name)));
-                }
+                crate::life::check_cover_at(self, sim as usize, Some(plot))?;
                 self.enqueue(sim, TaskKind::Visit { plot })?;
             }
             Command::GoHome { sim } => {

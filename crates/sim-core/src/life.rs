@@ -433,6 +433,20 @@ pub(crate) fn no_cover_for(w: &World, i: usize) -> Option<usize> {
     home.then(|| stays_home_for(w, i)).flatten()
 }
 
+/// Refuses a player's order that takes `i` off the home lot (a visit, the park, the shops,
+/// over to a friend's) when it would leave a baby alone at home: `no_cover_for`.
+pub(crate) fn check_cover(w: &World, i: usize) -> Result<(), crate::Error> {
+    let Some(baby) = no_cover_for(w, i) else { return Ok(()) };
+    let cost = w.content.life.childcare.map_or(0, |c| c.cost);
+    Err(crate::Error::new(format!("nobody to look after {}: not enough money for a babysitter (${cost})", w.sims[baby].name)))
+}
+
+/// Refuses a player's order that takes `i` to `plot` (None: off every plot) when that's away
+/// from home and would leave a baby alone there (`check_cover`); orders at home go ahead.
+pub(crate) fn check_cover_at(w: &World, i: usize, plot: Option<u32>) -> Result<(), crate::Error> {
+    if plot != w.households[w.sims[i].household as usize].plot { check_cover(w, i) } else { Ok(()) }
+}
+
 /// Whether `sim` is the last grown-up at home with a baby of theirs there (content
 /// `life.childcare`): they don't go out on their own (visits, outings to public places) and
 /// leave the baby alone; sent out by the player, a babysitter comes (see `childcare`).

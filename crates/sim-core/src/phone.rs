@@ -389,6 +389,10 @@ pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u
     if let Some(why) = unusable(w, me) {
         return Err(Error::new(format!("{}: {}", w.sims[me].name, why.to_lowercase())));
     }
+    // Going over to theirs: not leaving a baby home alone.
+    if act.meet == Some(Meet::There) {
+        crate::life::check_cover(w, me)?;
+    }
     match (act.contact, contact) {
         (false, None) => Ok(()),
         (false, Some(_)) => Err(Error::new(format!("{} is just for {}", act.label, w.sims[me].name))),
