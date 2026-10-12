@@ -22,7 +22,7 @@ use serde::Deserialize;
 use crate::Error;
 use crate::content::{Content, MAX_NEEDS, Pose, TagMask};
 use crate::social::{self, Acceptance, EventKind, Indices, Outcome, OutcomeRaw, Prefer, Requirements};
-use crate::world::{Access, Activity, Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, World, access, end_activity, prefer_factor, route};
+use crate::world::{Access, Activity, Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, World, access, end_activity, prefer_factor, walk_route};
 
 /// After a yes, who goes where (`phone.actions[].meet`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -422,7 +422,7 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
     if let Some(seat) = seat_near(sim, ctx, objects) {
         let o = &objects[seat as usize];
         let (fx, fz) = ctx.index.links.approach_of(seat).unwrap_or_else(|| o.front_tile(content));
-        if let Some(waypoints) = route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
+        if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
             let o = &mut objects[seat as usize];
             if o.reserve(sim.id, content.objects[o.def].slots) {
                 let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };

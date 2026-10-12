@@ -11,6 +11,11 @@
 //! `World::storeys`). Above the ground only rooms have a floor to stand on. Stairs are walked
 //! up from their foot, step by step, and the top step leads straight to the landing on the
 //! storey above.
+//!
+//! Gardens: the town is one grid, so nothing in it stops a resident cutting across the
+//! neighbours' lawns. Given `Grounds`, a step onto another household's plot costs a long
+//! detour, and the smoothed line keeps off the plots the path kept off: residents go round
+//! by the street, and only cross a garden when there's no other way.
 
 use std::cell::RefCell;
 use std::cmp::Reverse;
@@ -97,6 +102,33 @@ pub const STOREY_WALK: f32 = 4.0;
 
 const ORTHO: u32 = 10;
 const DIAG: u32 = 14;
+/// Extra cost of stepping onto a tile of someone else's plot: twenty tiles of walking.
+const TRESPASS: u32 = ORTHO * 20;
+
+/// Which plots one resident may walk across (their home, public places, where they're going);
+/// the rest are other people's gardens, kept off unless there's no other way.
+pub struct Grounds<'a> {
+    /// Plot per tile of the ground storey (upper storeys are over the same ground).
+    pub tile_plot: &'a [Option<u32>],
+    /// Per plot (by id): whether this resident may walk across it.
+    pub open: Vec<bool>,
+}
+
+impl Grounds<'_> {
+    /// The plot a tile is on (on any storey).
+    pub fn plot(&self, nav: &NavGrid, x: i32, z: i32) -> Option<u32> {
+        let z = nav.stairs.ground_z(z);
+        if x < 0 || z < 0 || x >= nav.lot.width as i32 {
+            return None;
+        }
+        self.tile_plot.get(z as usize * nav.lot.width + x as usize).copied().flatten()
+    }
+
+    /// The plot a tile is on, if it's one this resident shouldn't walk across.
+    fn foreign(&self, nav: &NavGrid, x: i32, z: i32) -> Option<u32> {
+        self.plot(nav, x, z).filter(|&p| !self.open.get(p as usize).copied().unwrap_or(true))
+    }
+}
 
 /// Read-only view of what is walkable: lot edges plus tiles blocked by objects, storeys and stairs.
 pub struct NavGrid<'a> {
@@ -170,6 +202,12 @@ impl NavGrid<'_> {
 
     /// A* from `start` to `goal` (tile coordinates). The start tile may be blocked.
     pub fn find_path(&self, start: (i32, i32), goal: (i32, i32)) -> Option<Vec<(i32, i32)>> {
+        self.find_path_with(start, goal, None)
+    }
+
+    /// `find_path`, round other people's gardens when there are `grounds` to mind. (Their
+    /// cost only adds to a step's, so the heuristic still never overestimates.)
+    pub fn find_path_with(&self, start: (i32, i32), goal: (i32, i32), grounds: Option<&Grounds>) -> Option<Vec<(i32, i32)>> {
         let lot = self.lot;
         if !lot.in_bounds(start.0, start.1) || !self.tile_free(goal.0, goal.1) {
             return None;
@@ -206,7 +244,10 @@ impl NavGrid<'_> {
                         continue;
                     }
                     let ni = lot.tile_index(nx, nz);
-                    let cost = g[i] + if dx != 0 && dz != 0 && !linked { DIAG } else { ORTHO };
+                    let mut cost = g[i] + if dx != 0 && dz != 0 && !linked { DIAG } else { ORTHO };
+                    if grounds.is_some_and(|gr| gr.foreign(self, nx, nz).is_some()) {
+                        cost += TRESPASS;
+                    }
                     if cost < cost_to(g, stamp, ni) {
                         (g[ni], came[ni], stamp[ni]) = (cost, i as u32, search);
                         open.push(Reverse((cost + heuristic((nx, nz), goal), ni as u32)));
@@ -234,6 +275,11 @@ impl NavGrid<'_> {
 
     /// Removes unnecessary waypoints where a straight line is walkable. Returns tile centres.
     pub fn smooth(&self, path: &[(i32, i32)]) -> Vec<[f32; 2]> {
+        self.smooth_with(path, None)
+    }
+
+    /// `smooth`, with no straight line across a garden the path went round (`line_walkable_with`).
+    pub fn smooth_with(&self, path: &[(i32, i32)], grounds: Option<&Grounds>) -> Vec<[f32; 2]> {
         let centre = |(x, z): (i32, i32)| [x as f32 + 0.5, z as f32 + 0.5];
         let mut out = Vec::with_capacity(path.len());
         let Some(&first) = path.first() else {
@@ -243,7 +289,7 @@ impl NavGrid<'_> {
         out.push(centre(first));
         let mut i = 2;
         while i < path.len() {
-            if !self.line_walkable(centre(path[anchor]), centre(path[i])) {
+            if !self.line_walkable_with(centre(path[anchor]), centre(path[i]), grounds) {
                 anchor = i - 1;
                 out.push(centre(path[anchor]));
             }
@@ -257,9 +303,17 @@ impl NavGrid<'_> {
 
     /// Samples the segment and checks every tile transition it makes.
     pub fn line_walkable(&self, a: [f32; 2], b: [f32; 2]) -> bool {
+        self.line_walkable_with(a, b, None)
+    }
+
+    /// `line_walkable`, and with `grounds`, the line keeps off other people's plots, except
+    /// the one either end is on (someone already in a garden walks straight out of it).
+    pub fn line_walkable_with(&self, a: [f32; 2], b: [f32; 2], grounds: Option<&Grounds>) -> bool {
         let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
         let steps = ((dx.abs().max(dz.abs())) / 0.1).ceil().max(1.0) as i32;
         let (mut tx, mut tz) = (a[0].floor() as i32, a[1].floor() as i32);
+        let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+        let ends = grounds.map(|g| [tile(a), tile(b)].map(|(x, z)| g.foreign(self, x, z)));
         for s in 1..=steps {
             let t = s as f32 / steps as f32;
             let (nx, nz) = (
@@ -268,6 +322,12 @@ impl NavGrid<'_> {
             );
             if (nx, nz) != (tx, tz) {
                 if (nx - tx).abs() > 1 || (nz - tz).abs() > 1 || !self.can_step(tx, tz, nx, nz) {
+                    return false;
+                }
+                if let (Some(g), Some(ends)) = (grounds, ends)
+                    && let Some(p) = g.foreign(self, nx, nz)
+                    && !ends.contains(&Some(p))
+                {
                     return false;
                 }
                 (tx, tz) = (nx, nz);
@@ -534,6 +594,65 @@ mod tests {
             stairs: &NO_STAIRS,
         };
         assert!(nav.find_path((0, 0), (3, 3)).is_none());
+    }
+
+    /// Three gardens side by side, x 0..10, 10..20 and 20..30 (plots 0, 1, 2) over rows
+    /// 0..10, with the street along rows 10..14. No fences: only the plots tell them apart.
+    fn three_gardens(walls: &str) -> (Lot, Vec<Option<u32>>) {
+        let json = format!(r#"{{"width":30,"depth":14,"walls":[{walls}]}}"#);
+        let lot = Lot::from_file(&serde_json::from_str::<LotFile>(&json).unwrap()).unwrap();
+        let tile_plot = (0..30 * 14).map(|i| (i / 30 < 10).then_some((i % 30 / 10) as u32)).collect();
+        (lot, tile_plot)
+    }
+
+    fn in_middle_garden((x, z): (i32, i32)) -> bool {
+        (10..20).contains(&x) && z < 10
+    }
+
+    #[test]
+    fn residents_go_round_by_the_street_not_through_the_neighbours_garden() {
+        let (lot, tile_plot) = three_gardens("");
+        let blocked = nav_of(&lot);
+        let nav = NavGrid { lot: &lot, blocked: &blocked, stairs: &NO_STAIRS };
+        // Without plots to mind, straight across the middle garden.
+        let direct = nav.find_path((5, 8), (25, 8)).unwrap();
+        assert!(direct.iter().any(|&t| in_middle_garden(t)), "{direct:?}");
+        // From the front of the first to the front of the third: the middle one isn't theirs.
+        let grounds = Grounds { tile_plot: &tile_plot, open: vec![true, false, true] };
+        let path = nav.find_path_with((5, 8), (25, 8), Some(&grounds)).unwrap();
+        assert_walkable(&nav, &path);
+        assert!(!path.iter().any(|&t| in_middle_garden(t)), "through the neighbours' garden: {path:?}");
+        assert!(path.iter().any(|&(_, z)| z >= 10), "by the street: {path:?}");
+        // The smoothed line doesn't cut back across it either.
+        let smooth = nav.smooth_with(&path, Some(&grounds));
+        for w in smooth.windows(2) {
+            assert!(nav.line_walkable_with(w[0], w[1], Some(&grounds)), "{w:?}");
+            for k in 0..=100 {
+                let t = k as f32 / 100.0;
+                let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t];
+                assert!(!in_middle_garden((p[0].floor() as i32, p[1].floor() as i32)), "smoothed across at {p:?}");
+            }
+        }
+        assert!(!nav.line_walkable_with([5.5, 8.5], [25.5, 8.5], Some(&grounds)));
+        assert!(nav.line_walkable([5.5, 8.5], [25.5, 8.5]), "only the plots stand in the way");
+    }
+
+    #[test]
+    fn a_garden_is_crossed_when_there_is_no_other_way() {
+        // The street is closed off in front of the middle garden.
+        let (lot, tile_plot) = three_gardens("[10,10,10,14],[20,10,20,14]");
+        let blocked = nav_of(&lot);
+        let nav = NavGrid { lot: &lot, blocked: &blocked, stairs: &NO_STAIRS };
+        let grounds = Grounds { tile_plot: &tile_plot, open: vec![true, false, true] };
+        let path = nav.find_path_with((5, 12), (25, 12), Some(&grounds)).expect("through the garden");
+        assert_walkable(&nav, &path);
+        assert!(path.iter().any(|&t| in_middle_garden(t)));
+        // Someone standing in a garden they shouldn't be in can still get out of it, the
+        // shortest way (not across the gardens either side).
+        let grounds = Grounds { tile_plot: &tile_plot, open: vec![false; 3] };
+        let out = nav.find_path_with((15, 2), (15, 12), Some(&grounds)).expect("out to the street");
+        assert_eq!(out.len(), 11, "straight down: {out:?}");
+        assert_eq!(nav.smooth_with(&out, Some(&grounds)).len(), 2, "in one straight line");
     }
 
     #[test]

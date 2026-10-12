@@ -7,10 +7,10 @@
 
 use crate::MINUTES_PER_TICK;
 use crate::content::{Content, MAX_NEEDS, Pose};
-use crate::path::NavGrid;
+use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
 use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef};
-use crate::world::{ObjectInstance, Phase, Sim, TaskKind, World, end_activity, route};
+use crate::world::{ObjectInstance, Phase, Sim, TaskKind, World, end_activity, grounds, route};
 
 /// How long an actor waits for a busy target before giving up.
 const WAIT_LIMIT_TICKS: u32 = (10.0 / MINUTES_PER_TICK) as u32;
@@ -144,9 +144,14 @@ pub(crate) fn update(w: &mut World) {
         events,
         rng,
         stairs,
+        households,
+        plots,
+        tile_plot,
         ..
     } = w;
     let nav = NavGrid { lot, blocked, stairs };
+    // (Round other people's gardens, as for any walk.)
+    let walk = |sim: &Sim, goal| grounds(tile_plot, plots, households, &nav, sim, goal);
     let n = sims.len();
 
     // Drop engagements whose actor stopped talking (cancelled, interrupted, finished).
@@ -184,12 +189,12 @@ pub(crate) fn update(w: &mut World) {
                 if gap <= s.distance + ENGAGE_SLACK {
                     set_phase(&mut sims[i], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[t].pos) > REPATH_DISTANCE {
-                    chase(&nav, sims, i, t, content, objects);
+                    chase(&nav, &walk, sims, i, t, content, objects);
                 }
             }
             State::Waiting(ticks) => {
                 if gap > s.distance + ENGAGE_SLACK + 0.6 {
-                    chase(&nav, sims, i, t, content, objects);
+                    chase(&nav, &walk, sims, i, t, content, objects);
                 } else if sims[t].available_for_social(content) {
                     engage(
                         content,
@@ -254,8 +259,9 @@ fn set_phase(sim: &mut Sim, phase: Phase) {
 }
 
 /// Re-route toward a target that moved; give up if they're unreachable.
-fn chase(
+fn chase<'a>(
     nav: &NavGrid,
+    walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
     sims: &mut [Sim],
     i: usize,
     t: usize,
@@ -270,6 +276,7 @@ fn chase(
             sims[i].tile(),
             goal,
             [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5],
+            Some(&walk(&sims[i], goal)),
         )
     });
     match rerouted {
