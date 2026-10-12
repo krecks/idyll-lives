@@ -354,7 +354,8 @@ pub struct LifeRules {
 /// grown-up at home leaves a baby (for work, a visit, anywhere); while no grown-up is home, they
 /// feed, change and play with the baby (the care interactions of the baby's crib) whenever a
 /// need those fill is below `below`. Without the money for one, the last grown-up stays home
-/// from work, and can't be sent out visiting. On their own, the last one doesn't go out at all.
+/// from work, and can't be sent off the lot (on a visit, to the park). On their own, the last
+/// one doesn't go out at all.
 #[derive(Debug, Clone, Copy)]
 pub struct ChildcareRules {
     pub cost: i64,

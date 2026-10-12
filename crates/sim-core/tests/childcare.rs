@@ -125,8 +125,8 @@ fn without_money_for_a_babysitter_someone_stays_home() {
 // ---- Going out ----------------------------------------------------------------------------
 //
 // The last grown-up at home with a baby doesn't go out on their own (to friends, or to the
-// park); sent out visiting by the player, a babysitter comes, and without the money for one
-// they can't be sent.
+// park); sent out by the player (visiting, to the park), a babysitter comes, and without the
+// money for one they can't be sent.
 
 const OUT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},{"id":"bladder","label":"Bladder","decayPerHour":0.12},
@@ -143,6 +143,8 @@ const OUT: &str = r#"{
         {"id":"watch","label":"Watch people go by","minutes":60,"effects":{"social":0.6},"tags":["lounge"]}]}],
     "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
     "visits":{"needs":{"social":0.8},"hours":2,"minFriendship":10,"earliestHour":9,"latestHour":21},
+    "phone":{"seatRange":0,"actions":[
+      {"id":"askOver","label":"Ask to come over","minutes":5,"contact":true,"meet":"there","autonomous":false,"tags":["social"],"acceptance":{"base":1.0}}]},
     "life":{"daysPerYear":2,"stages":[
         {"id":"baby","label":"Baby","from":0,"baby":true},
         {"id":"child","label":"Child","from":2,"school":true},
@@ -278,4 +280,60 @@ fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
     assert!(visited, "Ada went to Bo's");
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
     assert!(average > 0.5 && lowest > 0.25, "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}");
+}
+
+/// From now until `hour` on day 1: whether Ada was ever in the park (plot 1).
+fn at_the_park_until(w: &mut World, hour: f32) -> bool {
+    let mut seen = false;
+    while clock::hour(w.tick) < hour {
+        for _ in 0..5 * 20 {
+            w.tick_once();
+        }
+        let (x, z) = w.sims[0].tile();
+        seen |= w.plot_at(x, z) == Some(1);
+    }
+    seen
+}
+
+#[test]
+fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_anywhere_else() {
+    let mut w = street_world(true, "");
+    until(&mut w, 1, 10.0);
+    w.households[0].funds = 10;
+    let refused = |err: sim_core::Error| assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
+    // The bench in the park, a walk to the park, a chat with Bo at his, asking Bo on the phone
+    // to come over to his.
+    refused(w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap_err());
+    refused(w.apply(Command::MoveTo { sim: 0, x: 17.5, z: 6.5 }).unwrap_err());
+    refused(w.apply(Command::Social { sim: 0, target: 2, social: 0 }).unwrap_err());
+    refused(w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).unwrap_err());
+    assert!(!at_the_park_until(&mut w, 12.0) && !out(&w, 0), "Ada stayed home");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
+    // Things at home are fine.
+    w.apply(Command::MoveTo { sim: 0, x: 6.5, z: 6.5 }).unwrap();
+    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+}
+
+#[test]
+fn sent_to_the_park_the_last_grown_up_gets_a_babysitter() {
+    let mut w = street_world(true, "");
+    until(&mut w, 1, 10.0);
+    w.households[0].funds = 500;
+    w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap();
+    assert!(at_the_park_until(&mut w, 12.0), "Ada went to the park");
+    let booked = told(&w, EventKind::Babysitter, 1);
+    assert_eq!(booked.len(), 1, "a babysitter for the day");
+    assert_eq!((booked[0].a, booked[0].b, booked[0].n), (0, 1, Some(40)), "for Cleo, for $40");
+    assert_eq!(w.households[0].funds, 460, "paid from the household");
+}
+
+#[test]
+fn with_a_grandparent_at_home_the_last_parent_goes_to_the_park_without_a_babysitter() {
+    let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
+    let mut w = street_world(true, grandma);
+    until(&mut w, 1, 10.0);
+    w.households[0].funds = 10;
+    w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap();
+    assert!(at_the_park_until(&mut w, 12.0), "Ada went to the park");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
 }
