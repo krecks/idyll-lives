@@ -957,6 +957,12 @@ pub struct VisitRules {
     /// A guest with free will left with nothing to do for this long heads home (`boredMinutes`);
     /// None: they stay until the visit is over.
     pub bored_minutes: Option<f32>,
+    /// What a guest says goodbye to a host with as the visit ends (`farewell`, socials): the
+    /// first of them the guest may do with that host. Empty: they just leave.
+    pub farewell: Vec<usize>,
+    /// How long a leaving guest spends getting to a host to say goodbye (`farewellMinutes`):
+    /// hosts further away than that aren't asked, and a goodbye not started by then is skipped.
+    pub farewell_minutes: f32,
 }
 
 /// A visitor at the door: someone at home answers and lets them in or turns them away.
@@ -1812,6 +1818,8 @@ struct VisitRaw {
     door: Option<DoorRaw>,
     company: Option<f32>,
     bored_minutes: Option<f32>,
+    farewell: Vec<String>,
+    farewell_minutes: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]
@@ -3085,6 +3093,12 @@ impl Content {
             tags: 1 << tag_index[VISIT_TAG],
             company: v.company.unwrap_or(0.0).max(0.0),
             bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),
+            farewell: v
+                .farewell
+                .iter()
+                .map(|id| socials.iter().position(|s| &s.id == id).ok_or_else(|| Error::new(format!("visits.farewell: unknown social '{id}'"))))
+                .collect::<Result<_, _>>()?,
+            farewell_minutes: v.farewell_minutes.unwrap_or(10.0).max(1.0),
             door: match &v.door {
                 None => None,
                 Some(d) => Some(DoorRules {

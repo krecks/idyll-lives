@@ -102,6 +102,7 @@ const Anim = {
   Fight: 5,
   Hug: 6,
   Kiss: 7,
+  Wave: 8,
 } as const;
 /** Sim ticks per frame step at each game speed (`clock::TICKS_PER_STEP`). */
 const GAME_RATE = [0, 1, 3, 10, 30, 60];
@@ -1756,6 +1757,11 @@ export class Characters {
           key = 'idle';
           reach = 0.22;
           reachRate = 6;
+          break;
+        case Anim.Wave:
+          // Goodbye: both wave, again and again while it lasts.
+          key = 'wave';
+          repeat = true;
           break;
         default:
           key = me ? 'talk' : 'idle';

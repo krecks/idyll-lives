@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::MINUTES_PER_TICK;
 use crate::clock;
 use crate::content::{CareerLevel, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule};
+use crate::conversation;
 use crate::social::{self, EventKind};
 use crate::world::{Activity, GameMode, Phase, Sim, Task, TaskKind, World, affordable, end_activity, practise};
 
@@ -57,6 +58,9 @@ pub struct Visit {
     /// Ticks in a row they've had nothing to do (`visits.boredMinutes`; not saved).
     #[serde(skip)]
     pub idle: u32,
+    /// Ticks spent getting to a host to say goodbye (`visits.farewellMinutes`; not saved).
+    #[serde(skip)]
+    pub farewell: u32,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -414,7 +418,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 visits.hours
             };
             let until = tick + ticks(hours * 60.0);
-            w.sims[i].visiting = Some(Visit { plot, until, idle: 0 });
+            w.sims[i].visiting = Some(Visit { plot, until, idle: 0, farewell: 0 });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
                 return;
@@ -741,10 +745,11 @@ fn charge_rent(w: &mut World, day: u32) {
 }
 
 /// Guests go home when the visit is over, it's late, they need something, or there's nothing
-/// for them to do.
+/// for them to do (saying goodbye to one of the hosts first, if one is free).
 fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     let tick = w.tick;
     let Some(visit) = w.sims[i].visiting else { return };
+    give_up_farewell(w, i);
     // A guest left with nothing to do while the hosts are all off at work goes home (hosts
     // just out visiting come back; parks have no hosts).
     let hosts: Vec<&crate::world::Sim> = w
@@ -782,11 +787,74 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
         && sim.engaged_with.is_none()
         && !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome))
     {
-        sim.queue.push_back(Task {
+        if let Some((host, social)) = farewell(w, i, visit.plot) {
+            w.sims[i].queue.push_back(Task { kind: TaskKind::Social { target: host as u32, social }, directed: false, routine: false });
+        }
+        w.sims[i].queue.push_back(Task {
             kind: TaskKind::GoHome,
             directed: false,
             routine: false,
         });
+    }
+}
+
+/// Whether `task` is a guest's goodbye to a host (`visits.farewell`) rather than something the
+/// player asked for.
+fn is_farewell(content: &Content, task: &Task) -> bool {
+    matches!(task.kind, TaskKind::Social { social, .. } if content.visits.farewell.contains(&social)) && !task.directed
+}
+
+/// Who guest `i` leaving `plot` says goodbye to, and how (`visits.farewell`): the nearest
+/// member of the household living there who is around, awake and free to talk (or already
+/// talking with the guest), close enough to get to in `farewellMinutes`. Nobody wakes up, comes
+/// out of the bathroom or leaves something the player asked for to see a guest off.
+fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)> {
+    let content = &w.content;
+    let rules = &content.visits;
+    let guest = &w.sims[i];
+    if rules.farewell.is_empty() || guest.pressed(content) || w.plots[plot as usize].public {
+        return None;
+    }
+    let household = w.households.iter().position(|h| h.plot == Some(plot))?;
+    let reach = crate::world::WALK_SPEED * guest.mods.walk_speed / MINUTES_PER_TICK * rules.farewell_minutes;
+    w.sims
+        .iter()
+        .enumerate()
+        .filter(|&(j, s)| {
+            j != i
+                && s.here()
+                && s.household as usize == household
+                && s.away_until.is_none()
+                && s.visiting.is_none()
+                && !content.life.baby(s.age)
+                && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
+                && (s.available_for_social(content) || s.engaged_with == Some(i as u32))
+                && !s.queue.front().is_some_and(|t| t.directed)
+        })
+        .filter_map(|(j, s)| {
+            let social = rules.farewell.iter().copied().find(|&f| conversation::social_allowed(content, &w.relationships, guest, s, &content.socials[f]))?;
+            Some((j, social, (s.pos[0] - guest.pos[0]).hypot(s.pos[1] - guest.pos[1])))
+        })
+        .filter(|&(.., d)| d <= reach)
+        .min_by(|a, b| a.2.total_cmp(&b.2))
+        .map(|(j, social, _)| (j, social))
+}
+
+/// A goodbye that hasn't started within `visits.farewellMinutes` (the host went off, or got
+/// busy) is skipped: the guest just leaves.
+fn give_up_farewell(w: &mut World, i: usize) {
+    let World { sims, content, objects, .. } = &mut *w;
+    let sim = &mut sims[i];
+    let starting = sim.current.as_ref().is_some_and(|a| is_farewell(content, &a.task) && !matches!(a.phase, Phase::Conversing { .. }));
+    let Some(visit) = sim.visiting.as_mut() else { return };
+    if !starting {
+        visit.farewell = 0;
+        return;
+    }
+    visit.farewell = visit.farewell.saturating_add(sim.steps);
+    if visit.farewell as f32 * MINUTES_PER_TICK >= content.visits.farewell_minutes {
+        visit.farewell = 0;
+        end_activity(sim, content, objects);
     }
 }
 

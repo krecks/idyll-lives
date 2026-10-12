@@ -125,7 +125,9 @@
     "prank": { "start": "{me} plays a harmless prank on {name}.", "reply": "{name} just pranked {me}" },
     "fight": { "start": "{me} picks a scuffle with {name}.", "reply": "{name} picks a scuffle with {me}" },
     "apologize": { "start": "{me} apologises to {name}.", "reply": "{name} apologises to {me}" },
-    "tryForBaby": { "start": "{me} tells {name} they would love a baby together.", "reply": "{name} says they would love a baby with {me}" }
+    "tryForBaby": { "start": "{me} tells {name} they would love a baby together.", "reply": "{name} says they would love a baby with {me}" },
+    "goodbyeHug": { "start": "{me} hugs {name} goodbye before going home.", "reply": "{name} hugs {me} goodbye before going home" },
+    "goodbye": { "start": "{me} says goodbye to {name} before going home.", "reply": "{name} says goodbye to {me} before going home" }
   },
   "outcome": { "good": ", and {me} likes it.", "bad": ", and {me} doesn't like it." },
   "use": "{me} is about to {action}.",

@@ -41,7 +41,7 @@ import { installNature } from '../render/babylon/nature';
 
 const P = Pose;
 /** Conversation animation codes (`social::ANIMATIONS` + 1). */
-const SOCIAL = { talk: 1, laugh: 2, flirt: 3, argue: 4, fight: 5, hug: 6, kiss: 7 } as const;
+const SOCIAL = { talk: 1, laugh: 2, flirt: 3, argue: 4, fight: 5, hug: 6, kiss: 7, wave: 8 } as const;
 
 interface Step {
   seconds: number;
@@ -163,6 +163,7 @@ const STATIONS: Station[] = [
   // Socials
   { label: 'hug', social: 'hug' },
   { label: 'kiss', social: 'kiss' },
+  { label: 'wave goodbye', social: 'wave' },
   { label: 'laugh', social: 'laugh' },
   { label: 'flirt', social: 'flirt' },
   { label: 'argue', social: 'argue' },

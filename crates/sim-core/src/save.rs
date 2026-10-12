@@ -1040,6 +1040,7 @@ impl World {
                     // player visit does now.
                     until: after(left.unwrap_or(content.visits.directed_hours * 60.0)),
                     idle: 0,
+                    farewell: 0,
                 })
             });
             for t in &s.tasks {

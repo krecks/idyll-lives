@@ -16,7 +16,7 @@ use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_SECOND, ai, conversation
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
-const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
+pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
 const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
@@ -642,6 +642,8 @@ impl Sim {
             (TaskKind::Work | TaskKind::Visit { .. } | TaskKind::GoHome | TaskKind::Answer { .. }, _) => false,
             (TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }, _) => false,
             (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => false,
+            // A guest on their way to say goodbye (`visits.farewell`) is leaving.
+            (TaskKind::Social { social, .. }, _) if content.visits.farewell.contains(&social) => false,
             (_, Phase::Routing { .. }) => true,
             _ => act.tags & content.social_rules.busy_tags == 0,
         }

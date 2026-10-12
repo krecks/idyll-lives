@@ -104,7 +104,8 @@ pub(crate) fn accepts(
     p.clamp(0.0, 1.0)
 }
 
-/// Social options `actor` has toward `target`: `(social index, success chance)`.
+/// Social options `actor` has toward `target`: `(social index, success chance)`. (Goodbyes at
+/// the end of a visit, `visits.farewell`, aren't on offer: guests say them as they leave.)
 pub fn options(w: &World, actor: usize, target: usize) -> Vec<(usize, f32)> {
     let (Some(a), Some(t)) = (w.sims.get(actor), w.sims.get(target)) else {
         return Vec::new();
@@ -113,7 +114,7 @@ pub fn options(w: &World, actor: usize, target: usize) -> Vec<(usize, f32)> {
         .socials
         .iter()
         .enumerate()
-        .filter(|(_, s)| social_allowed(&w.content, &w.relationships, a, t, s))
+        .filter(|(i, s)| !w.content.visits.farewell.contains(i) && social_allowed(&w.content, &w.relationships, a, t, s))
         .map(|(i, s)| (i, acceptance_chance(&w.content, &w.relationships, a, t, s)))
         .collect()
 }
@@ -537,13 +538,22 @@ fn engage(
 
     // Stand at the interaction's distance, facing each other.
     let (ap, tp) = (sims[i].pos, sims[t].pos);
-    let d = dist(ap, tp).max(1e-3);
-    let spot = [
-        tp[0] + (ap[0] - tp[0]) / d * s.distance,
-        tp[1] + (ap[1] - tp[1]) / d * s.distance,
-    ];
-    if nav.tile_free(spot[0].floor() as i32, spot[1].floor() as i32) && nav.line_walkable(ap, spot)
-    {
+    let d = dist(ap, tp);
+    let at = |dir: [f32; 2]| [tp[0] + dir[0] * s.distance, tp[1] + dir[1] * s.distance];
+    let open = |spot: [f32; 2]| nav.tile_free(spot[0].floor() as i32, spot[1].floor() as i32) && nav.line_walkable(ap, spot);
+    let spot = if d > 0.05 {
+        Some(at([(ap[0] - tp[0]) / d, (ap[1] - tp[1]) / d])).filter(|&p| open(p))
+    } else {
+        // On top of each other (someone answering the door from right where the visitor
+        // stands): the actor steps back, or to one side if there's no room behind them.
+        let back = sims[i].yaw + std::f32::consts::PI;
+        [0.0f32, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0]
+            .iter()
+            .map(|k| back + k * std::f32::consts::FRAC_PI_4)
+            .map(|a| at([a.sin(), a.cos()]))
+            .find(|&p| open(p))
+    };
+    if let Some(spot) = spot {
         sims[i].pos = spot;
     }
     sims[i].yaw = facing(sims[i].pos, tp);
