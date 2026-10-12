@@ -490,3 +490,50 @@ fn the_player_can_have_a_resident_eat_or_clear_away_food() {
     ticks(&mut w, 40.0);
     assert!(w.items.get(pot).is_none(), "cleared away");
 }
+
+/// Each step of a recipe ordered from `object`, as it starts: (step, station, minutes).
+fn step_minutes(w: &mut World, object: u32, id: &str) -> Vec<(u8, u32, u16)> {
+    order(w, 0, object, id);
+    let mut steps: Vec<(u8, u32, u16)> = Vec::new();
+    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        common::check(w);
+        if let Some(a) = w.sims[0].current()
+            && let (TaskKind::Cook { step, station: Some(s), minutes, .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
+            && steps.last().is_none_or(|l| l.0 != step)
+        {
+            steps.push((step, s, minutes));
+        }
+    }
+    steps
+}
+
+#[test]
+fn without_a_counter_the_chopping_happens_at_the_stove_not_the_fridge() {
+    // The shipped meal: ingredients 3 min, prep 10 (optional), cook 20.
+    let content = common::content();
+    let all: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let meal = all["recipes"].as_array().unwrap().iter().find(|r| r["id"] == "meal").unwrap();
+    let minutes: Vec<f64> = meal["steps"].as_array().unwrap().iter().map(|s| s["minutes"].as_f64().unwrap()).collect();
+    assert_eq!(minutes, [3.0, 10.0, 20.0]);
+    let traits = format!(r#""household":0,"traits":[{}]"#, all["traits"][0]["id"]);
+    let world = |objects: &str| {
+        let mut w = World::from_json(&content, &town(objects, 1).replace(r#""household":0"#, &traits), 3).unwrap();
+        w.autonomy = false;
+        w.sims[0].needs = [1.0; 8];
+        w
+    };
+    // Fridge and stove, no counter: a quick trip to the fridge, then chopping and cooking at the stove.
+    let mut w = world(r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"stoveGas","x":3,"z":1,"rot":0}"#);
+    assert_eq!(step_minutes(&mut w, 1, "cook"), [(0, 0, 3), (2, 1, 30)]);
+    assert!(w.items.list.iter().any(|it| it.servings > 0), "dinner's made: {:?}", w.items.list);
+    // With a counter, each step at its own station.
+    let mut w = world(
+        r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},{"def":"stoveGas","x":3,"z":1,"rot":0}"#,
+    );
+    assert_eq!(step_minutes(&mut w, 2, "cook"), [(0, 0, 3), (1, 1, 10), (2, 2, 20)]);
+    // Only a fridge: the whole meal is made there.
+    let mut w = world(r#"{"def":"fridge","x":1,"z":1,"rot":0}"#);
+    assert_eq!(step_minutes(&mut w, 0, "meal"), [(0, 0, 33)]);
+    assert!(w.items.list.iter().any(|it| it.servings > 0), "dinner's made: {:?}", w.items.list);
+}

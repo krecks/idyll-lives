@@ -578,7 +578,7 @@ dish offers **Eat** and **Clear away**.
   "id": "meal", "label": "Make a meal", "item": "mealPot", "servings": [1, 4], "costPerServing": 3,
   "effects": { "hunger": 1.0 },
   "steps": [
-    { "label": "Get ingredients", "at": ["ingredients"], "minutes": 5, "anim": "fetch", "holds": "ingredients" },
+    { "label": "Get ingredients", "at": ["ingredients"], "minutes": 3, "anim": "fetch", "holds": "ingredients" },
     { "label": "Prep", "at": ["prep"], "minutes": 10, "anim": "chop", "optional": true, "holds": "prepBowl" },
     { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir", "optional": true }
   ]
@@ -595,12 +595,13 @@ dish offers **Eat** and **Clear away**.
 | `eatMinutes` | How long eating a serving takes (default `cooking.eatMinutes`). |
 | `eatNow` | The cook eats it at once (a sandwich): no dish is served. |
 | `outdoor` | A barbecue: outdoor stations first, served on an outdoor table. |
-| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the step before) and `holds` (an item carried away from it). |
+| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the next step that has a station, or, with none after it, at the last one that has: no counter means chopping by the stove, a fridge-only kitchen makes the whole meal at the fridge) and `holds` (an item carried away from it). |
 
 Residents choose a recipe only if their home has a station for every step that isn't
 optional; a long recipe tempts them less, a hungry family more, and food already made hardly
 at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
-keep the prep and cooking steps of everyday recipes optional. A station that's busy is waited
+keep the prep and cooking steps of everyday recipes optional, and fetching the ingredients
+the shortest step (3 minutes in the shipped ones). A station that's busy is waited
 for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
 (a snack, toast, a coffee, reheating) stays a plain interaction.
 

@@ -595,6 +595,8 @@ fn cook_tags(content: &Content, objects: &[ObjectInstance], origin: Option<u32>,
 
 /// Goes on to the recipe's next step that can be done (or serves it): to its station, or
 /// waiting for a busy one (`waited` ticks so far). `last` is the station of the step just done.
+/// The minutes of optional steps done without are carried in the task's `minutes` to the next
+/// step that has a station (no counter: they chop by the stove).
 fn cook_next(
     sim: &mut Sim,
     mut task: Task,
@@ -606,7 +608,7 @@ fn cook_next(
 ) {
     let content = ctx.content;
     sim.current = None;
-    let TaskKind::Cook { recipe, step, origin, servings, skipped, .. } = task.kind else {
+    let TaskKind::Cook { recipe, step, origin, servings, skipped, minutes: carried, .. } = task.kind else {
         return;
     };
     let r = &content.recipes[recipe];
@@ -617,12 +619,12 @@ fn cook_next(
         return cannot_cook(sim, ctx, tags);
     }
     let give_up = waited.is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= content.cooking.station_wait_minutes);
-    let (mut step, mut skipped) = (step, skipped);
+    let (mut step, mut skipped, mut carried) = (step, skipped, carried);
     while let Some(s) = r.steps.get(step as usize) {
-        task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: 0 };
+        task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: carried };
         match find_station(sim, ctx, objects, s.mask, &s.at, origin, r.outdoor) {
             Found::At(o) => {
-                let at = Task { kind: TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: 0 }, ..task };
+                let at = Task { kind: TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried }, ..task };
                 if go_to(sim, at, ctx, objects, o, tags) {
                     return;
                 }
@@ -636,7 +638,8 @@ fn cook_next(
         if !s.optional {
             return cannot_cook(sim, ctx, tags);
         }
-        // Done without (no counter: chopped on the fridge door).
+        // Done without (no counter: chopped at the next station).
+        carried = carried.saturating_add(s.minutes.round() as u16);
         step += 1;
         skipped += 1;
     }
@@ -983,10 +986,14 @@ pub(crate) fn queued(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
     }
 }
 
-/// Minutes of the recipe's later optional steps the home has no station for: done here
-/// instead (a fridge-only kitchen makes the whole meal at the fridge).
-fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask) -> f32 {
-    r.steps.iter().skip(step + 1).filter(|s| s.optional && s.mask & mask == 0).map(|s| s.minutes).sum()
+/// Minutes of the recipe's optional steps done without that are spent at step `step` instead:
+/// `carried`, those skipped since the step before (see `cook_next`), and when no later step has
+/// a station in `mask`, all the later ones too (a fridge-only kitchen makes the whole meal at
+/// the fridge).
+fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) -> f32 {
+    let later = &r.steps[(step + 1).min(r.steps.len())..];
+    let trailing = if later.iter().all(|s| s.optional && s.mask & mask == 0) { later.iter().map(|s| s.minutes).sum() } else { 0.0 };
+    f32::from(carried) + trailing
 }
 
 /// Turns to face `o`, standing.
@@ -1003,7 +1010,7 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
         return;
     };
     match task.kind {
-        TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, .. } => {
+        TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried } => {
             let r = &content.recipes[recipe];
             // The ingredients are paid for at the first step; if the money ran out, never mind.
             let servings = match servings {
@@ -1013,7 +1020,9 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
                 },
                 n => n,
             };
-            let minutes = r.steps[step as usize].minutes + extra_minutes(r, step as usize, station_mask(sim, ctx, objects));
+            let at_origin = origin.and_then(|o| objects.get(o as usize)).map_or(0, |o| content.objects[o.def].stations);
+            let mask = station_mask(sim, ctx, objects) | at_origin;
+            let minutes = r.steps[step as usize].minutes + extra_minutes(r, step as usize, mask, carried);
             face(sim, content, &objects[o as usize]);
             let act = sim.current.as_mut().expect("checked above");
             act.task.kind = TaskKind::Cook {

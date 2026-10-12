@@ -312,7 +312,8 @@ pub enum TaskKind {
     /// `station` once one is found, started from `origin` (the object whose interaction it was;
     /// its skills and feeling count). `servings` is 0 until the ingredients are paid for (at
     /// the first step), then how many it makes; `skipped` counts steps done without their
-    /// station; `minutes` is how long the current step takes.
+    /// station; `minutes` is how long the current step takes (until it starts, the minutes of
+    /// the steps just done without, carried over to it).
     Cook {
         recipe: usize,
         step: u8,

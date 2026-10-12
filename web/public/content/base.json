@@ -3818,7 +3818,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -3865,7 +3865,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -3909,7 +3909,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -3952,7 +3952,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -3997,7 +3997,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -4040,7 +4040,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -4084,7 +4084,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -4127,7 +4127,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 5,
+          "minutes": 3,
           "anim": "fetch",
           "holds": "ingredients"
         },
@@ -4171,7 +4171,7 @@
           "at": [
             "ingredients"
           ],
-          "minutes": 3,
+          "minutes": 2,
           "anim": "fetch",
           "holds": "ingredients"
         },
