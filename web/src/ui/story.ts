@@ -47,6 +47,8 @@ const ICONS: Record<string, string> = {
   wantsToBuy: 'icon.ui.funds',
   bought: 'icon.ui.funds',
   deniedAgain: 'icon.bubble.angry',
+  babysitter: 'icon.ui.funds',
+  stayedHome: 'icon.ui.home',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);

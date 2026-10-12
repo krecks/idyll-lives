@@ -2010,7 +2010,9 @@
     "declined": "{b} couldn't meet up with {a} just now",
     "wantsToBuy": "{a} would like to buy a {object}",
     "bought": "{a} bought a {object}",
-    "deniedAgain": "{a} is cross about being told no again about the {object}"
+    "deniedAgain": "{a} is cross about being told no again about the {object}",
+    "babysitter": "{a}'s household paid {money} for a babysitter for {b}",
+    "stayedHome": "{a} stayed home from work to look after {b}"
   },
   "activities": [
     {
@@ -3565,6 +3567,7 @@
     "newcomers": {"hour": 12, "days": 3},
     "pregnancy": {"chance": 0.35, "days": 3, "maxAge": 50},
     "adoption": {"cost": 1500, "neighbours": 0.02},
+    "childcare": {"cost": 40, "below": 0.45},
     "moving": {"hour": 11, "partners": 0.2, "romance": 60, "leaveHomeAge": 23, "leaveHome": 0.1, "leaveTownAge": 30, "leaveTown": 0.05},
     "stages": [
       {"id": "baby", "label": "Baby", "from": 0, "baby": true, "scale": 0.36, "head": 1.6, "story": "was born"},

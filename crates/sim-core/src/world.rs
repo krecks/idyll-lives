@@ -747,6 +747,8 @@ pub struct Household {
     pub routines: Vec<crate::planner::Routine>,
     /// A baby on the way (see `lifecycle::conceive`).
     pub expecting: Option<Expecting>,
+    /// The day a babysitter was booked for (see `life::childcare`).
+    pub sitter_day: Option<u32>,
 }
 
 /// A household expecting a baby: the parents and the day it's due.
@@ -989,6 +991,7 @@ impl World {
                 free_will: true,
                 routines: Vec::new(),
                 expecting: None,
+                sitter_day: None,
             }]
         } else {
             lot_file
@@ -1005,6 +1008,7 @@ impl World {
                     free_will: true,
                     routines: Vec::new(),
                     expecting: None,
+                    sitter_day: None,
                 })
                 .collect()
         };
