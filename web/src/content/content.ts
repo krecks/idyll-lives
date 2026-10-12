@@ -410,10 +410,10 @@ export interface ActivityDef {
 
 export interface GoalDef {
   id: string;
-  /** With `{skill}`, `{n}` and `{category}`. */
+  /** With `{skill}`, `{n}`, `{category}` and `{object}`. */
   label: string;
   icon: string;
-  kind: 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds';
+  kind: 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds' | 'own';
 }
 
 export interface PlannerRules {

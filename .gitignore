@@ -7,4 +7,5 @@ node_modules
 /web/public/llm
 .DS_Store
 /debug-reports
+/debug-states
 /web/.assets

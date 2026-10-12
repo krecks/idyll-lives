@@ -64,7 +64,10 @@ export type Command =
   /** Higher on the list steers more. */
   | { type: 'moveGoal'; sim: number; index: number; to: number }
   | { type: 'acceptSuggestion'; sim: number; index: number }
-  | { type: 'dismissSuggestion'; sim: number; index: number };
+  | { type: 'dismissSuggestion'; sim: number; index: number }
+  /** Yes or no to what a resident asked to buy (a yes buys and places it). */
+  | { type: 'acceptPurchase'; sim: number }
+  | { type: 'declinePurchase'; sim: number };
 
 /** A routine block: an activity (content `activities` id) on weekdays (bit 0 = Monday) from `start` (minute of the day) for `minutes`. */
 export interface RoutineIn {
@@ -84,6 +87,8 @@ export interface GoalIn {
   def: string;
   skill?: string;
   category?: string;
+  /** Object id, for an `own` goal (its price is the target). */
+  object?: string;
   target?: number;
 }
 
@@ -110,7 +115,16 @@ export interface BlockView {
   done: number;
 }
 
-export type GoalKind = 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds';
+export type GoalKind = 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds' | 'own';
+
+/** What a goal still takes: a skill level a career goal needs (reached ones drop off), the
+ * performance bar (of 100), or the money for something they want. */
+export interface GoalStep {
+  kind: 'skill' | 'performance' | 'funds';
+  skill: string | null;
+  have: number;
+  need: number;
+}
 
 /** A goal; its text comes from the content's goal template (see `goalText`), so it can be translated. */
 export interface GoalView {
@@ -123,8 +137,19 @@ export interface GoalView {
   trend: number;
   skill: string | null;
   category: string | null;
+  /** Object id, for things they want (`target` is its price). */
+  object: string | null;
   target: number;
   sinceDay: number;
+  steps: GoalStep[];
+}
+
+/** Something a resident asks to buy, waiting for a yes or no. */
+export interface PurchaseView {
+  object: string;
+  price: number;
+  /** Times they were told no for it before (from the second no on, they're cross). */
+  declines: number;
 }
 
 export interface HomeWish {
@@ -152,6 +177,7 @@ export interface PlanView {
   homeWishes: HomeWish[];
   /** How well they stick to plans (1 = average), in 0.05 steps rounded down. */
   adherence: number;
+  purchase: PurchaseView | null;
 }
 
 /** A floor tile to cover: `covering` 0 for the automatic floor, else a floor covering + 1. */
@@ -718,6 +744,8 @@ export interface SocialEvent {
   career?: number;
   /** Goal definition index (content `goals`), for goal events (`n` the target, `skill`). */
   goal?: number;
+  /** Object definition index, for things residents want (and their goals). */
+  object?: number;
   /** 0 everyday, 1 notable, 2 a milestone. */
   importance: number;
 }

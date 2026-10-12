@@ -243,7 +243,7 @@
       "maxSide": [3, 5],
       "furniture": [
         { "one": ["coatRack"] },
-        { "one": ["consoleTable", "bench", "plant", "sideTable"], "chance": 0.7 }
+        { "one": ["consoleTable", "benchBedEnd", "plant", "sideTable"], "chance": 0.7 }
       ],
       "surfaces": [{ "on": ["low"], "one": ["vaseSmall", "potSucculent", "photoFrame", "vaseFlowers"], "count": [1, 2] }],
       "wall": [{ "one": ["mirrorRound", "printFramed", "wallClock"], "chance": 0.7 }],

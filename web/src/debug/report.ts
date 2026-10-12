@@ -98,3 +98,48 @@ export async function loadDebugReport(name: string): Promise<string> {
   pendingPose = report.camera;
   return record.id;
 }
+
+/** Game minutes per simulation tick (sim-core `MINUTES_PER_TICK`). */
+const MINUTES_PER_TICK = 1 / 20;
+
+/**
+ * Puts a pasted game state into a save slot and returns its id: the simulation's own save
+ * (`World::save_json`, what the tests write with `DUMP_STATES=1`) or a whole debug report.
+ */
+export async function loadState(text: string, name = 'Pasted state'): Promise<string> {
+  let parsed: { tick?: number; households?: { name: string; player: boolean }[]; sims?: { name: string; household: number }[]; save?: string };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("That isn't a game state (it isn't JSON).");
+  }
+  // A debug report carries the state as `save`.
+  const data = typeof parsed.save === 'string' ? parsed.save : text;
+  const state = data === text ? parsed : JSON.parse(data);
+  if (typeof state.tick !== 'number' || !Array.isArray(state.households) || !Array.isArray(state.sims)) {
+    throw new Error("That isn't a game state (no tick, households and residents).");
+  }
+  const player = state.households.findIndex((h: { player: boolean }) => h.player);
+  const minutes = Math.floor(state.tick * MINUTES_PER_TICK);
+  const record: SaveRecord = {
+    id: 'debug-state',
+    name: `Debug: ${name}`,
+    household: state.households[player]?.name ?? '',
+    members: state.sims.filter((s: { household: number }) => s.household === player).map((s: { name: string }) => s.name),
+    day: Math.floor(minutes / 1440) + 1,
+    minute: minutes % 1440,
+    savedAt: Date.now(),
+    thumbnail: null,
+    autosave: false,
+    data,
+  };
+  await writeSave(record);
+  return record.id;
+}
+
+/** `?state=<name>` (dev server): a state the simulation's tests wrote to `debug-states/`. */
+export async function fetchState(name: string): Promise<string> {
+  const res = await fetch(`/__debug/states/${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(`Game state "${name}" not found (run the tests with DUMP_STATES=1)`);
+  return loadState(await res.text(), name);
+}

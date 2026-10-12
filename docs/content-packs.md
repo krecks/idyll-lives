@@ -394,7 +394,8 @@ the catalog filtered to it).
   "keptShare": 0.75, "maxMinutes": 240, "maxSleepMinutes": 720, "reviewHour": 7,
   "maxGoals": 10, "maxSuggestions": 2, "goalFalloff": 0.15, "suggestionDays": 2,
   "discipline": { "lazy": 0.6, "energetic": 1.3 },
-  "keptFeeling": "keptPlan", "noPlaceFeeling": "nowhereToDoIt", "goalFeeling": "goalReached"
+  "keptFeeling": "keptPlan", "noPlaceFeeling": "nowhereToDoIt", "goalFeeling": "goalReached",
+  "askAgainDays": 3, "wishFeeling": "gotWish", "deniedFeelings": ["deniedAgain", "fedUp"]
 }
 ```
 
@@ -407,7 +408,14 @@ traits whose `tagPreference` dislikes an activity's tags skip it more. A pack's 
 `discipline` map if you change it.
 
 **Goals** pick from a fixed set of kinds: `hasJob` (label may use `{category}`), `jobLevel`,
-`promoted`, `skill` (`{skill}`, `{n}`), `friends` (`{n}`), `partner`, `funds` (`{n}`).
+`promoted`, `skill` (`{skill}`, `{n}`), `friends` (`{n}`), `partner`, `funds` (`{n}`),
+`own` (`{object}`: something from the catalog they'd like to have). A career goal (`promoted`,
+`jobLevel`) takes the skill levels its grades need: they count toward it, and residents train
+them harder. For `own`, residents pick what suits them (their traits' liked tags, skills they're
+after, somewhere for a planned activity, or a better one of something they have), save up, and
+once they can afford it with a week's rent and bills left over they ask the player
+(`askAgainDays` after a no; `wishFeeling` on getting it; `deniedFeelings` from the second no for
+the same thing on). Households nobody plays buy it themselves.
 `weight` plus per-trait `traits` weights decide how often residents suggest them; `feeling`
 (optional) is granted on reaching it.
 
@@ -417,7 +425,12 @@ traits whose `tagPreference` dislikes an activity's tags skip it more. A pack's 
 
 **Day rhythm:** `dayRhythm.wakeFor` lists the needs that wake a sleeper when they get urgent
 (default: all; the base game wakes for `bladder` and `hunger` only), and
-`dayRhythm.workDecay` multiplies need decay while at work. A sleep (`sleepTags`) lasts until
+`dayRhythm.workDecay` multiplies need decay while at work. `dayRhythm.workBreaks` are what
+they see to there (and at school): each `{ "need", "below", "gain", "cost" }` tops `need` up by
+`gain` once it drops under `below`, paid from the household at work (school lunch is free; a
+break they can't afford is skipped). The base game has lunch (hunger under 0.5: +0.6, $10), the
+toilet (bladder under 0.35), a coffee (energy under 0.3: +0.15, $3) and a wash (hygiene under
+0.3: +0.2). A sleep (`sleepTags`) lasts until
 the need beds fill most (energy) is full, at most the planner's `maxSleepMinutes`; at night a
 rested sleeper lies in until `lieInHours` (default 0.5) before they'd get up (and nobody goes
 back to bed nearly rested outside the night). A bed's stars add
@@ -790,7 +803,7 @@ consumables bought from outside, such as takeout or deliveries; never for using 
 0.12, hygiene 0.045, fun 0.06, comfort 0.06, social 0.06. Asleep (`dayRhythm.asleepDecay`):
 energy 0, hunger ×0.3, bladder ×0.15, hygiene ×0.5, comfort ×0.3, fun and social ×0.1. At work or
 school (`workDecay`, a career's `workEffects` on top): hunger ×0.2, energy ×0.35, bladder ×0.1,
-hygiene ×0.3, fun and comfort ×0.2, social ×0.1. Awake at night energy goes ×1.8 (`nightDecay`).
+hygiene ×0.3, fun and comfort ×0.2, social ×0.1, with `workBreaks` on top. Awake at night energy goes ×1.8 (`nightDecay`).
 Walking takes time too (1.5 tiles a game minute): `crates/sim-core/tests/routines.rs` prints
 residents' days (toilet visits, how low needs go and what they were doing then, hours a day
 walking, eating, asleep...). With these numbers residents go to the toilet about 4 times a day

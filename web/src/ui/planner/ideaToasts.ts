@@ -1,6 +1,7 @@
 /**
  * A toast with Accept / Decline when someone in the player's household comes up with a goal
- * idea or a wish. Goal ideas are taken on or dismissed (as in the planner). A wish is acted on
+ * idea, asks to buy something, or has a wish. Goal ideas are taken on or dismissed (as in the
+ * planner); a purchase is bought or turned down (they ask again later). A wish is acted on
  * (the catalog, Build mode, a repair); declining only closes the toast, since the wish stays in
  * the planner until it comes true. A toast goes by itself once its idea or wish is gone.
  */
@@ -8,6 +9,7 @@
 import type { GoalView, SimView } from '../../core/protocol';
 import { services } from '../services';
 import { askToast, dropToast } from '../state.svelte';
+import { money } from '../format';
 import { goalText } from '../story';
 import { actOnWish, brokenAtHome, describeHomeWish } from './homeWishes';
 import { activityLabel } from './planner';
@@ -51,10 +53,22 @@ export function ideaToasts() {
       for (const g of plan.suggestions) {
         const key = goalKey(g);
         out.set(`${s.id}|goal|${key}`, {
-          text: `${s.name} has an idea: ${goalText(g.def, g.target, g.skill, g.category)}`,
+          text: `${s.name} has an idea: ${goalText(g.def, g.target, g.skill, g.category, g.object)}`,
           icon: g.icon || 'icon.ui.calendar',
           accept: () => withSuggestion(s.id, key, (i) => controls.acceptSuggestion(s.id, i)),
           decline: () => withSuggestion(s.id, key, (i) => controls.dismissSuggestion(s.id, i)),
+        });
+      }
+      const buy = plan.purchase;
+      if (buy) {
+        const thing = (content.object(buy.object)?.name ?? 'something').toLowerCase();
+        const article = /^[aeiou]/.test(thing) ? 'an' : 'a';
+        out.set(`${s.id}|buy|${buy.object}:${buy.declines}`, {
+          text: `${s.name} ${buy.declines ? 'asks again for' : 'would like to buy'} ${article} ${thing} (${money(buy.price)})`,
+          icon: content.object(buy.object)?.icon || 'icon.ui.funds',
+          title: 'Buy it and place it at home',
+          accept: () => controls.acceptPurchase(s.id),
+          decline: () => controls.declinePurchase(s.id),
         });
       }
       for (const [activity, skill] of plan.wishes) {

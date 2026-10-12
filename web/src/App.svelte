@@ -2,7 +2,7 @@
   import { onMount, type Component } from 'svelte';
   import { host } from './game/host';
   import { menuScene } from './game/menuScene';
-  import { loadDebugReport } from './debug/report';
+  import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave } from './persistence/saves';
   import { settings } from './settings/settings.svelte';
@@ -66,7 +66,7 @@
         }),
       );
       const latest = await latestSave().catch(() => undefined);
-      if (latest && !new URLSearchParams(location.search).has('debugReport')) {
+      if (latest && !['debugReport', 'state'].some((k) => new URLSearchParams(location.search).has(k))) {
         // The save's own steps fill the rest of the bar.
         const stop = $effect.root(() => {
           $effect(() => {
@@ -94,12 +94,15 @@
     root.classList.toggle('reduce-motion', settings.reducedMotion);
   });
 
-  /** `?debugReport=<name>` (dev server): starts straight into a saved debug report's game. */
+  /** `?debugReport=<name>` (dev server): starts straight into a saved debug report's game;
+   * `?state=<name>` into a state the simulation's tests wrote. */
   async function openDebugReport() {
-    const name = new URLSearchParams(location.search).get('debugReport');
-    if (!name || !import.meta.env.DEV) return;
+    const params = new URLSearchParams(location.search);
+    const name = params.get('debugReport');
+    const state = params.get('state');
+    if ((!name && !state) || !import.meta.env.DEV) return;
     try {
-      app.start({ kind: 'load', saveId: await loadDebugReport(name) });
+      app.start({ kind: 'load', saveId: name ? await loadDebugReport(name) : await fetchState(state!) });
     } catch (err) {
       console.error(err);
       toast(err instanceof Error ? err.message : String(err), 6000);

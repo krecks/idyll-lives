@@ -58,6 +58,14 @@ pub enum Command {
         sim: u32,
         index: usize,
     },
+    /// Say yes to what the resident asked to buy (it's bought and placed at home).
+    AcceptPurchase {
+        sim: u32,
+    },
+    /// Say no to what the resident asked to buy.
+    DeclinePurchase {
+        sim: u32,
+    },
     /// Turn "free will" on or off for a household (default: the player's).
     SetAutonomy {
         enabled: bool,

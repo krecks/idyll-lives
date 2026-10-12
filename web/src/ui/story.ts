@@ -44,10 +44,13 @@ const ICONS: Record<string, string> = {
   graduated: 'icon.skill.intelligence',
   turnedAway: 'icon.ui.door',
   nobodyHome: 'icon.ui.door',
+  wantsToBuy: 'icon.ui.funds',
+  bought: 'icon.ui.funds',
+  deniedAgain: 'icon.bubble.angry',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);
-const BAD = new Set(['died', 'becameEnemies', 'brokeUp', 'fight', 'jealous', 'proposalRejected', 'missedWork', 'rentDebt', 'fired', 'broke', 'accident', 'turnedAway']);
+const BAD = new Set(['died', 'becameEnemies', 'brokeUp', 'fight', 'jealous', 'proposalRejected', 'missedWork', 'rentDebt', 'fired', 'broke', 'accident', 'turnedAway', 'deniedAgain']);
 
 export function storyIcon(e: SocialEvent): string {
   if (e.kind === 'skillUp') return services.content.skills[e.skill ?? -1]?.icon ?? 'icon.ui.skills';
@@ -56,7 +59,21 @@ export function storyIcon(e: SocialEvent): string {
 }
 
 /** A goal's text: its label with the skill, target and career category filled in. */
-export function goalText(def: number | string | undefined, target?: number, skill?: number | string | null, category?: number | string | null): string {
+/** Fills in `{object}` with an object's name in lower case (`a {object}` gets "an" where it fits). */
+function fillObject(text: string, object: number | string | null | undefined): string {
+  const content = services.content;
+  const def = typeof object === 'number' ? content.objectList[object] : object ? content.object(object) : undefined;
+  const thing = (def?.name ?? 'something').toLowerCase();
+  return text.replace(/\ba \{object\}/, `${/^[aeiou]/.test(thing) ? 'an' : 'a'} {object}`).replace('{object}', thing);
+}
+
+export function goalText(
+  def: number | string | undefined,
+  target?: number,
+  skill?: number | string | null,
+  category?: number | string | null,
+  object?: number | string | null,
+): string {
   const content = services.content;
   const goal = typeof def === 'string' ? content.goals.find((g) => g.id === def) : def === undefined ? undefined : content.goals[def];
   if (!goal) return 'a goal';
@@ -65,7 +82,8 @@ export function goalText(def: number | string | undefined, target?: number, skil
   return goal.label
     .replace('{skill}', skillDef?.label ?? '')
     .replace('{n}', target === undefined ? '' : Math.round(target).toLocaleString())
-    .replace('{category}', cat?.label ?? 'any field');
+    .replace('{category}', cat?.label ?? 'any field')
+    .replace(/.*\{object\}.*/, (text) => fillObject(text, object));
 }
 
 export function storyTone(e: SocialEvent): 'love' | 'bad' | 'good' {
@@ -91,10 +109,10 @@ export function storyText(e: SocialEvent): string {
     .replace('{c}', name(e.c))
     .replace('{and c}', e.c === undefined || e.c === null ? '' : ` and ${name(e.c)}`)
     .replace('{job}', job(e))
-    .replace('{goal}', goalText(e.goal, e.n, e.skill, e.career))
+    .replace('{goal}', goalText(e.goal, e.n, e.skill, e.career, e.object))
     .replace('{accident}', services.content.accidents[e.n ?? -1]?.story ?? 'had a bad moment')
     .replace('{stage}', services.content.lifeStages[e.n ?? -1]?.story ?? 'is a year older')
-    .replace('{object}', (services.content.objectList[e.n ?? -1]?.name ?? 'something').toLowerCase())
+    .replace(/.*\{object\}.*/, (text) => fillObject(text, e.object ?? e.n))
     .replace('{grade}', (() => {
       const l = gradeLetter(e.n ?? 0);
       return `${l === 'A' || l === 'F' ? 'an' : 'a'} ${l}`;

@@ -271,6 +271,7 @@
       "id": "kind.songbirdFeeder",
       "name": "Songbird feeding station",
       "model": "model.kind.songbirdFeeder",
+      "outdoors": true,
       "footprint": [
         1,
         1

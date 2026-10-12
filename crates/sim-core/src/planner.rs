@@ -27,7 +27,7 @@ use crate::clock;
 use crate::content::{Content, Interaction, TagMask};
 use crate::social::FeelingDef;
 use crate::social::{self, EventKind};
-use crate::world::{Phase, Sim, TaskKind, World};
+use crate::world::{Layout, Phase, Sim, TaskKind, World};
 use crate::Error;
 
 // ---- Content ------------------------------------------------------------------------------
@@ -92,6 +92,13 @@ pub struct PlannerRules {
     pub goal_falloff: f32,
     /// Days before an idea nobody answered is taken on anyway (residents with free will).
     pub suggestion_days: u32,
+    /// Days a resident waits after being told no before asking for the same thing again.
+    pub ask_again_days: u32,
+    /// Getting something they wanted.
+    pub wish_feeling: Option<usize>,
+    /// Told no again for the same thing: the first on the second no, the next on the third,
+    /// and so on (the last one from then on).
+    pub denied_feelings: Vec<usize>,
 }
 
 impl Default for PlannerRules {
@@ -114,6 +121,9 @@ impl Default for PlannerRules {
             max_suggestions: 2,
             goal_falloff: 0.15,
             suggestion_days: 2,
+            ask_again_days: 3,
+            wish_feeling: None,
+            denied_feelings: Vec::new(),
         }
     }
 }
@@ -135,6 +145,8 @@ pub enum GoalKind {
     Partner,
     /// Household funds of `target` dollars.
     Funds,
+    /// Have `object` at home (saving up to `target`, its price).
+    Own,
 }
 
 #[derive(Debug, Clone)]
@@ -189,6 +201,9 @@ pub(crate) struct PlannerRaw {
     max_suggestions: Option<usize>,
     goal_falloff: Option<f32>,
     suggestion_days: Option<u32>,
+    ask_again_days: Option<u32>,
+    wish_feeling: Option<String>,
+    denied_feelings: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -272,6 +287,13 @@ pub(crate) fn parse(
         max_suggestions: planner.max_suggestions.unwrap_or(d.max_suggestions),
         goal_falloff: planner.goal_falloff.unwrap_or(d.goal_falloff).max(0.0),
         suggestion_days: planner.suggestion_days.unwrap_or(d.suggestion_days),
+        ask_again_days: planner.ask_again_days.unwrap_or(d.ask_again_days),
+        wish_feeling: feeling(&planner.wish_feeling, "planner")?,
+        denied_feelings: planner
+            .denied_feelings
+            .iter()
+            .map(|f| feeling(&Some(f.clone()), "planner.deniedFeelings").map(|f| f.expect("given")))
+            .collect::<Result<_, _>>()?,
     };
     let mut defs = Vec::with_capacity(goals.len());
     for g in goals {
@@ -417,6 +439,8 @@ pub struct Goal {
     pub skill: Option<usize>,
     /// Career category (index into `Content::career_categories`), for job goals.
     pub category: Option<usize>,
+    /// Object type, for things they want to have.
+    pub object: Option<usize>,
     pub target: f32,
     pub since_day: u32,
     /// Where they started (job level for promotions).
@@ -429,7 +453,8 @@ pub struct Goal {
 impl Goal {
     /// The same goal (what, which skill or field, how far), whenever it was taken on.
     pub fn same(&self, other: &Goal) -> bool {
-        (self.def, self.skill, self.category, self.target) == (other.def, other.skill, other.category, other.target)
+        (self.def, self.skill, self.category, self.object, self.target)
+            == (other.def, other.skill, other.category, other.object, other.target)
     }
 }
 
@@ -464,6 +489,20 @@ pub enum ThoughtKind {
     Crying = 9,
     /// Dinner's ready: someone at home cooked (subject: the recipe).
     DinnerReady = 10,
+    /// Would like to buy something (subject: object type).
+    WantsToBuy = 11,
+}
+
+/// Something a resident asked to buy (their top `Own` goal), and how often they were told no.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PurchaseRequest {
+    /// Object type.
+    pub object: usize,
+    /// Waiting for an answer (asked on `day`); else told no on `day`.
+    pub open: bool,
+    pub day: u32,
+    /// Times they were told no for this thing.
+    pub declines: u8,
 }
 
 /// A wish about the home itself (beyond somewhere for a planned activity).
@@ -508,6 +547,10 @@ pub struct Planner {
     pub thought: Option<Thought>,
     /// The day goals were last reviewed.
     pub reviewed: u32,
+    /// Something a goal may hang on just changed: check goals on the next update.
+    pub recheck: bool,
+    /// What they asked to buy (the player says yes or no).
+    pub purchase: Option<PurchaseRequest>,
 }
 
 /// What a household's home (plus the public places) offers: activity bits and trainable skills.
@@ -617,8 +660,9 @@ pub(crate) fn update(w: &mut World) {
         if w.sims[i].planner.thought.is_some_and(|t| t.until <= tick) {
             w.sims[i].planner.thought = None;
         }
-        // Goals: progress every game ten minutes (staggered), reviews once a day.
-        if (tick + i as u64).is_multiple_of(200) {
+        // Goals: progress every game ten minutes (staggered) or straight after a promotion, a
+        // new skill level or a purchase; reviews once a day.
+        if (tick + i as u64).is_multiple_of(200) || std::mem::take(&mut w.sims[i].planner.recheck) {
             check_goals(w, i);
         }
         if review && w.sims[i].planner.reviewed != day {
@@ -906,11 +950,18 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
             .as_ref()
             .filter(|j| job_ok(j.career))
             .map_or(0.0, |j| (j.level + 1) as f32 / target),
+        // The skills the next level needs count as much as the performance bar.
         GoalKind::Promoted => sim.job.as_ref().map_or(0.0, |j| {
             if j.level as f32 > g.start {
                 1.0
             } else {
-                j.performance / 100.0 * 0.9
+                let needs = goal_skills(content, sim, g);
+                let ready = if needs.is_empty() {
+                    1.0
+                } else {
+                    needs.iter().map(|&(s, l)| (sim.skills[s] / l).min(1.0)).sum::<f32>() / needs.len() as f32
+                };
+                (ready + j.performance / 100.0) * 0.5 * 0.9
             }
         }),
         GoalKind::Skill => g.skill.map_or(0.0, |s| sim.skills[s] / target),
@@ -932,12 +983,52 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
             }
         }
         GoalKind::Funds => w.households[sim.household as usize].funds as f32 / target,
+        GoalKind::Own => match g.object {
+            Some(d) if has_at_home(w, sim.household as usize, d) => 1.0,
+            // Saving up for it: it's only had once it's home.
+            _ => (w.households[sim.household as usize].funds as f32 / target).min(1.0) * 0.9,
+        },
     };
     p.clamp(0.0, 1.0)
 }
 
+/// Skill levels a career goal takes (the next level's for a promotion; every level's up to the
+/// target for a job level, in their current job), highest per skill.
+pub fn goal_skills(content: &Content, sim: &Sim, g: &Goal) -> Vec<(usize, f32)> {
+    let Some(job) = &sim.job else { return Vec::new() };
+    let career = &content.careers[job.career];
+    let levels = match content.goals[g.def].kind {
+        GoalKind::Promoted => job.level + 1..job.level + 2,
+        GoalKind::JobLevel if g.category.is_none_or(|c| career.category == Some(c)) => {
+            job.level + 1..g.target.max(0.0) as usize
+        }
+        _ => return Vec::new(),
+    };
+    let mut out: Vec<(usize, f32)> = Vec::new();
+    for level in career.levels.get(levels).unwrap_or_default() {
+        for &(s, l) in &level.requires {
+            match out.iter_mut().find(|o| o.0 == s) {
+                Some(o) => o.1 = o.1.max(l),
+                None if l > 0.0 => out.push((s, l)),
+                None => {}
+            }
+        }
+    }
+    out
+}
+
 fn check_goals(w: &mut World, i: usize) {
     let tick = w.tick;
+    // Ideas that came true meanwhile just go.
+    let mut k = 0;
+    while k < w.sims[i].planner.suggestions.len() {
+        let goal = w.sims[i].planner.suggestions[k];
+        if progress(w, i, &goal) >= 1.0 {
+            w.sims[i].planner.suggestions.remove(k);
+        } else {
+            k += 1;
+        }
+    }
     let mut k = 0;
     while k < w.sims[i].planner.goals.len() {
         let goal = w.sims[i].planner.goals[k];
@@ -954,6 +1045,15 @@ fn check_goals(w: &mut World, i: usize) {
         if let Some(f) = feeling {
             social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
         }
+        // Got what they wanted (whoever bought it).
+        if goal.object.is_some() {
+            if let Some(f) = content.planner.wish_feeling {
+                social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
+            }
+            if sim.planner.purchase.is_some_and(|p| Some(p.object) == goal.object) {
+                sim.planner.purchase = None;
+            }
+        }
         think(sim, ThoughtKind::Goal, goal.def, tick);
         w.events.push_goal(tick, EventKind::GoalReached, i, &goal);
     }
@@ -969,6 +1069,7 @@ fn review_goals(w: &mut World, i: usize, day: u32) {
         g.progress = p;
         g.history = [p, g.history[0], g.history[1]];
     }
+    ask_to_buy(w, i, day);
     let rules = &w.content.planner;
     let player = w.households[w.sims[i].household as usize].player;
     let free = w.autonomy && w.households[w.sims[i].household as usize].free_will;
@@ -1013,6 +1114,7 @@ fn review_goals(w: &mut World, i: usize, day: u32) {
 
 /// A goal that suits the resident now, weighted by their traits.
 fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
+    let wanted = if w.content.goals.iter().any(|d| d.kind == GoalKind::Own) { wanted_object(w, i) } else { None };
     let content = &w.content;
     let sim = &w.sims[i];
     let taken = |kind: GoalKind, skill: Option<usize>| {
@@ -1026,9 +1128,18 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
         .filter(|&j| j != i && w.relationships.get(i, j).friendship >= 50.0)
         .count() as f32;
     let funds = w.households[sim.household as usize].funds;
+    // Skills a career goal of theirs takes already (no separate goal for those).
+    let implied: Vec<usize> = sim
+        .planner
+        .goals
+        .iter()
+        .chain(&sim.planner.suggestions)
+        .flat_map(|g| goal_skills(content, sim, g))
+        .map(|(s, _)| s)
+        .collect();
     // The skill they're best at learning (traits), else their strongest.
     let skill = (0..content.skills.len())
-        .filter(|&s| sim.skills[s] < content.skill_rules.max_level - 1.0)
+        .filter(|&s| sim.skills[s] < content.skill_rules.max_level - 1.0 && !implied.contains(&s))
         .max_by(|&a, &b| {
             let key = |s: usize| sim.mods.skill_gain[s] * 2.0 + sim.skills[s] * 0.1;
             key(a).total_cmp(&key(b))
@@ -1039,6 +1150,7 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
             def: d,
             skill,
             category: None,
+            object: None,
             target,
             since_day: day,
             start,
@@ -1068,6 +1180,13 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
             GoalKind::Funds if funds < 50_000 => {
                 make(None, (((funds.max(0) + 2500) / 500) * 500) as f32, 0.0)
             }
+            GoalKind::Own => match wanted {
+                Some(o) => Goal {
+                    object: Some(o),
+                    ..make(None, content.objects[o].price.unwrap_or(0) as f32, 0.0)
+                },
+                None => continue,
+            },
             _ => continue,
         };
         if taken(def.kind, goal.skill) {
@@ -1087,6 +1206,245 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
         pick -= weight;
     }
     None
+}
+
+// ---- Things they want ---------------------------------------------------------------------
+
+/// Whether household `h` has an object of type `def` at home.
+pub fn has_at_home(w: &World, h: usize, def: usize) -> bool {
+    let Some(plot) = w.households[h].plot else { return false };
+    w.objects.iter().zip(&w.object_plot).any(|(o, p)| *p == Some(plot) && o.def == def)
+}
+
+/// Two object types for the same thing (a better bed for a bed): the same catalog group and
+/// some use in common.
+fn same_kind(content: &Content, a: usize, b: usize) -> bool {
+    let (a, b) = (&content.objects[a], &content.objects[b]);
+    !a.group.is_empty()
+        && a.group == b.group
+        && a.interactions.iter().any(|x| b.interactions.iter().any(|y| x.id == y.id))
+}
+
+/// The cheaper thing at home that `def` would replace (an upgrade), if any.
+fn replaces(w: &World, h: usize, def: usize) -> Option<u32> {
+    let plot = w.households[h].plot?;
+    let price = w.content.objects[def].price?;
+    w.objects
+        .iter()
+        .zip(&w.object_plot)
+        .filter(|(o, p)| **p == Some(plot) && o.def != def && same_kind(&w.content, o.def, def))
+        .filter(|(o, _)| w.content.objects[o.def].price.is_some_and(|p| p < price))
+        .min_by_key(|(o, _)| w.content.objects[o.def].price)
+        .map(|(o, _)| o.id)
+}
+
+/// Something from the catalog that suits the resident and is within reach of the household's
+/// money: what their traits like, trains the skills they're after, or gives a planned activity
+/// a place; or a better one of something they have. One of the best few, at random.
+fn wanted_object(w: &mut World, i: usize) -> Option<usize> {
+    let pick = w.rng.next_f32();
+    let content = &w.content;
+    let sim = &w.sims[i];
+    let h = sim.household as usize;
+    let plot = w.households[h].plot?;
+    let reach = w.households[h].funds.max(0) as f32 * 1.5 + 1000.0;
+    let home: Vec<usize> = w
+        .objects
+        .iter()
+        .zip(&w.object_plot)
+        .filter(|(_, p)| **p == Some(plot))
+        .map(|(o, _)| o.def)
+        .collect();
+    let (targets, keen) = crate::world::job_goals(sim, content);
+    let mut options: Vec<(f32, usize)> = Vec::new();
+    for (d, def) in content.objects.iter().enumerate() {
+        let Some(price) = def.price else { continue };
+        if price <= 0
+            || price as f32 > reach
+            || home.contains(&d)
+            || sim.planner.goals.iter().chain(&sim.planner.suggestions).any(|g| g.object == Some(d))
+        {
+            continue;
+        }
+        let uses: Vec<&Interaction> = def.interactions.iter().filter(|it| it.autonomous && !it.baby).collect();
+        if uses.is_empty() {
+            continue;
+        }
+        // Something as good for the same thing at home already: no need.
+        let same: Vec<usize> = home.iter().copied().filter(|&o| same_kind(content, o, d)).collect();
+        if same.iter().any(|&o| content.objects[o].price.unwrap_or(0) >= price) {
+            continue;
+        }
+        let liking = uses.iter().map(|it| sim.mods.preference(it.tags)).fold(0.0f32, f32::max);
+        let mut score = (liking - 1.0).max(0.0) * 2.0;
+        for it in &uses {
+            for (s, &gain) in it.skill_gain.iter().enumerate() {
+                if gain > 0.0 && targets[s] > sim.skills[s] {
+                    score += keen[s].min(1.0);
+                }
+            }
+            for &(a, skill) in &sim.planner.wishes {
+                if content.activities[a].fits(it, skill) {
+                    score += 3.0;
+                }
+            }
+        }
+        if !same.is_empty() {
+            score += 0.5;
+        }
+        if score > 0.0 {
+            options.push((score, d));
+        }
+    }
+    options.sort_by(|a, b| b.0.total_cmp(&a.0));
+    options.truncate(3);
+    let total: f32 = options.iter().map(|o| o.0).sum();
+    let mut pick = pick * total;
+    for (score, d) in options {
+        if pick < score {
+            return Some(d);
+        }
+        pick -= score;
+    }
+    None
+}
+
+/// Once a day: a resident whose top `Own` goal they can afford (with a week's rent and bills
+/// left over) asks the player for it, or, in a household nobody plays, just buys it. After a
+/// no, they wait a few days before asking for the same thing again.
+fn ask_to_buy(w: &mut World, i: usize, day: u32) {
+    let h = w.sims[i].household as usize;
+    if !w.autonomy || !w.households[h].free_will || w.sims[i].away_until.is_some() {
+        return;
+    }
+    let content = &w.content;
+    let sim = &w.sims[i];
+    let Some(object) = sim
+        .planner
+        .goals
+        .iter()
+        .find(|g| content.goals[g.def].kind == GoalKind::Own)
+        .and_then(|g| g.object)
+    else {
+        return;
+    };
+    if has_at_home(w, h, object) {
+        return;
+    }
+    let price = content.objects[object].price.unwrap_or(0);
+    let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
+    if w.households[h].funds - w.build_price(price) < reserve {
+        return;
+    }
+    let mut request = match sim.planner.purchase {
+        Some(p) if p.object == object => p,
+        _ => PurchaseRequest { object, open: false, day, declines: 0 },
+    };
+    // Waiting for an answer since today, or after a no.
+    if request.open && request.day == day
+        || !request.open && request.declines > 0 && day < request.day + content.planner.ask_again_days
+    {
+        return;
+    }
+    if !w.households[h].player {
+        // Nobody to ask: they go ahead (and try again in a few days if there's no room).
+        if buy_wanted(w, i, object).is_err() {
+            w.sims[i].planner.purchase = Some(PurchaseRequest { object, open: false, day, declines: 1 });
+        }
+        return;
+    }
+    request.open = true;
+    request.day = day;
+    let tick = w.tick;
+    let sim = &mut w.sims[i];
+    sim.planner.purchase = Some(request);
+    think(sim, ThoughtKind::WantsToBuy, object, tick);
+    w.events.push_object(tick, EventKind::WantsToBuy, i, object, Some(price));
+}
+
+/// Buys `object` for resident `i`'s home: in place of the cheaper one it replaces if there is
+/// one (sold, the new one where it stood if there's no other room), else at a free spot.
+pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, Error> {
+    let h = w.sims[i].household;
+    let id = w.content.objects[object].id.clone();
+    let old = replaces(w, h as usize, object);
+    let bought = match w.buy_at(h, &id, None, None, Default::default()) {
+        Ok(new) => {
+            // The old one goes (ids after it shift down).
+            match old {
+                Some(o) if w.sell(h, o).is_ok() && o < new => Ok(new - 1),
+                _ => Ok(new),
+            }
+        }
+        Err(e) => match old {
+            Some(o) => swap_in(w, h, o, &id).ok_or(e),
+            None => Err(e),
+        },
+    }?;
+    w.events.push_object(w.tick, EventKind::Bought, i, object, None);
+    w.sims[i].planner.recheck = true;
+    Ok(bought)
+}
+
+/// No free spot: sells `old` and puts `id` where it stood (or anywhere now free). If even that
+/// doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody uses.
+fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
+    let o = w.objects.get(old as usize)?.clone();
+    if o.users.iter().any(Option::is_some) || !crate::surface::riders(&w.content, &w.objects, old).is_empty() {
+        return None;
+    }
+    let (hh, plot) = w.home_of(h).ok()?;
+    let before = w.households[hh].funds;
+    w.sell(h, old).ok()?;
+    let refund = w.households[hh].funds - before;
+    let placed = w
+        .buy_at(h, id, Some([o.x, o.z, o.rot as i32]), None, Default::default())
+        .or_else(|_| w.buy_at(h, id, None, None, Default::default()));
+    if let Ok(new) = placed {
+        return Some(new);
+    }
+    // Put it back (and the money).
+    if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.style, o.quality, o.value) {
+        let b = &mut w.objects[back as usize];
+        (b.turn, b.wear) = (o.turn, o.wear);
+    }
+    w.households[hh].funds -= refund;
+    None
+}
+
+/// The player says yes to what resident `i` asked for: it's bought (their goal is reached).
+pub(crate) fn accept_purchase(w: &mut World, i: usize) -> Result<(), Error> {
+    let Some(request) = w.sims[i].planner.purchase.filter(|p| p.open) else {
+        return Err(Error::new(format!("{} isn't asking for anything", w.sims[i].name)));
+    };
+    buy_wanted(w, i, request.object)?;
+    w.sims[i].planner.purchase = None;
+    check_goals(w, i);
+    Ok(())
+}
+
+/// The player says no: they'll ask again in a few days, and from the second no for the same
+/// thing on, they're cross about it.
+pub(crate) fn decline_purchase(w: &mut World, i: usize) -> Result<(), Error> {
+    let day = clock::day(w.tick);
+    let tick = w.tick;
+    let content = &w.content;
+    let sim = &mut w.sims[i];
+    let Some(request) = sim.planner.purchase.as_mut().filter(|p| p.open) else {
+        return Err(Error::new(format!("{} isn't asking for anything", sim.name)));
+    };
+    request.open = false;
+    request.day = day;
+    request.declines = request.declines.saturating_add(1);
+    let (object, declines) = (request.object, request.declines);
+    let denied = &content.planner.denied_feelings;
+    if declines >= 2
+        && let Some(&f) = denied.get((declines as usize - 2).min(denied.len().saturating_sub(1)))
+    {
+        social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
+        w.events.push_object(tick, EventKind::DeniedAgain, i, object, Some(declines as i64));
+    }
+    Ok(())
 }
 
 // ---- How plans and goals steer choices (used by `World::pick_autonomous`) ----------------
@@ -1124,7 +1482,7 @@ pub(crate) fn object_factor(content: &Content, sim: &Sim, inter: &Interaction, n
         }
     }
     if inter.cost > 0 {
-        factor *= scaled(0.3, kind_strength(content, sim, &[GoalKind::Funds]));
+        factor *= scaled(0.3, kind_strength(content, sim, &[GoalKind::Funds, GoalKind::Own]));
     }
     let Some(run) = active(sim) else {
         return (factor, 0.0);
@@ -1219,11 +1577,22 @@ fn active(sim: &Sim) -> Option<&BlockRun> {
 /// with the job's).
 pub(crate) fn skill_targets(content: &Content, sim: &Sim, targets: &mut [f32], keen: &mut [f32]) {
     for (rank, g) in sim.planner.goals.iter().enumerate() {
-        if content.goals[g.def].kind == GoalKind::Skill
-            && let Some(s) = g.skill
-        {
-            targets[s] = targets[s].max(g.target);
-            keen[s] = keen[s].max(goal_strength(&content.planner, rank));
+        let strength = goal_strength(&content.planner, rank);
+        match content.goals[g.def].kind {
+            GoalKind::Skill => {
+                if let Some(s) = g.skill {
+                    targets[s] = targets[s].max(g.target);
+                    keen[s] = keen[s].max(strength);
+                }
+            }
+            // A career goal takes its skills: keener on them than the job alone makes them.
+            GoalKind::Promoted | GoalKind::JobLevel => {
+                for (s, l) in goal_skills(content, sim, g) {
+                    targets[s] = targets[s].max(l);
+                    keen[s] = keen[s].max(1.0 + strength);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -1266,6 +1635,8 @@ pub struct GoalIn {
     pub skill: Option<String>,
     #[serde(default)]
     pub category: Option<String>,
+    #[serde(default)]
+    pub object: Option<String>,
     #[serde(default)]
     pub target: Option<f32>,
 }
@@ -1350,6 +1721,19 @@ pub(crate) fn goal_from(content: &Content, g: &GoalIn, sim: &Sim, day: u32) -> R
                 .ok_or_else(|| Error::new(format!("unknown career category '{c}'")))
         })
         .transpose()?;
+    let object = g
+        .object
+        .as_deref()
+        .map(|o| content.object_index(o).ok_or_else(|| Error::new(format!("unknown object '{o}'"))))
+        .transpose()?;
+    let price = match (kind, object) {
+        (GoalKind::Own, None) => return Err(Error::new("pick an item")),
+        (GoalKind::Own, Some(o)) => match content.objects[o].price {
+            Some(p) => Some(p as f32),
+            None => return Err(Error::new(format!("{} isn't for sale", content.objects[o].name))),
+        },
+        _ => None,
+    };
     let start = match kind {
         GoalKind::Promoted => sim.job.as_ref().map_or(0.0, |j| j.level as f32),
         _ => 0.0,
@@ -1358,7 +1742,8 @@ pub(crate) fn goal_from(content: &Content, g: &GoalIn, sim: &Sim, day: u32) -> R
         def,
         skill,
         category,
-        target: g.target.unwrap_or(1.0).max(0.0),
+        object: object.filter(|_| kind == GoalKind::Own),
+        target: price.unwrap_or(g.target.unwrap_or(1.0)).max(0.0),
         since_day: day,
         start,
         progress: 0.0,

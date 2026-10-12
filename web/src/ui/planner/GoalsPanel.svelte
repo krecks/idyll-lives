@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { GoalView, SimView } from '../../core/protocol';
+  import type { GoalStep, GoalView, SimView } from '../../core/protocol';
   import Icon from '../Icon.svelte';
   import { money } from '../format';
   import { services } from '../services';
@@ -20,7 +20,18 @@
   let skill = $state(content.skills[0]?.id ?? '');
   let category = $state(content.careerCategories[0]?.id ?? '');
   let target = $state(5);
+  let object = $state('');
   const picked = $derived(content.goals.find((g) => g.id === def));
+  /** What can be wanted: everything for sale that can be used, by catalog category. */
+  const wantable = $derived.by(() => {
+    const out = new Map<string, { id: string; name: string; price: number }[]>();
+    for (const o of content.objectList) {
+      if (o.price === undefined || !o.interactions.length) continue;
+      const cat = content.buyCategories.find((c) => c.id === o.category)?.label ?? 'Other';
+      out.set(cat, [...(out.get(cat) ?? []), { id: o.id, name: o.name, price: o.price }]);
+    }
+    return [...out];
+  });
   $effect(() => {
     // A sensible default target for the kind of goal picked.
     const kind = picked?.kind;
@@ -32,10 +43,12 @@
 
   function add() {
     if (!picked) return;
+    if (picked.kind === 'own' && !object) return;
     services.controls.addGoal(sim.id, {
       def: picked.id,
       skill: picked.kind === 'skill' ? skill : undefined,
       category: picked.label.includes('{category}') ? category : undefined,
+      object: picked.kind === 'own' ? object : undefined,
       target: ['skill', 'friends', 'funds', 'jobLevel'].includes(picked.kind) ? target : undefined,
     });
     def = '';
@@ -58,7 +71,15 @@
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
 
-  const label = (g: GoalView) => goalText(g.def, g.target, g.skill, g.category);
+  const label = (g: GoalView) => goalText(g.def, g.target, g.skill, g.category, g.object);
+  /** A step still to take, short: "Cooking 2.4/4", "Performance 60%", "$300 of $450". */
+  function stepText(s: GoalStep): string {
+    if (s.kind === 'skill') return `${content.skill(s.skill ?? '')?.label ?? s.skill} ${Math.floor(s.have)}/${s.need}`;
+    if (s.kind === 'performance') return `Performance ${Math.round(s.have)}%`;
+    return s.have >= s.need ? `${money(s.need)} saved` : `${money(Math.max(0, s.have))} of ${money(s.need)}`;
+  }
+  const stepDone = (s: GoalStep) => s.have >= s.need;
+  const buying = $derived(plan?.purchase ? content.object(plan.purchase.object) : undefined);
   const trend = (g: GoalView) => (g.progress >= 1 ? '' : g.trend > 0.01 ? '▲' : g.trend < -0.01 ? '▼' : '–');
   const trendTitle = (g: GoalView) => (g.trend > 0.01 ? 'Getting there' : g.trend < -0.01 ? 'Slipping' : 'No progress lately');
 
@@ -84,6 +105,23 @@
           Sticks to plans: {plan.adherence >= 1.15 ? 'very well' : plan.adherence >= 0.9 ? 'fairly well' : plan.adherence >= 0.65 ? 'now and then' : 'hardly'}
         </span>
       </div>
+    {/if}
+
+    {#if plan.purchase}
+      <h3>{sim.name} would like</h3>
+      <ul>
+        <li class="goal idea">
+          <span class="icon"><Icon name={buying?.icon || 'icon.ui.funds'} size={15} /></span>
+          <div class="body">
+            <span class="label">{buying?.name ?? plan.purchase.object} · {money(plan.purchase.price)}</span>
+            {#if plan.purchase.declines}
+              <span class="muted hint">Asked before. Another no and {sim.name} will be cross.</span>
+            {/if}
+          </div>
+          <button class="btn small primary" title="Buy it and place it at home" onclick={() => services.controls.acceptPurchase(sim.id)}>Buy</button>
+          <button class="btn small" onclick={() => services.controls.declinePurchase(sim.id)}>No</button>
+        </li>
+      </ul>
     {/if}
 
     <h3>Goals</h3>
@@ -116,6 +154,11 @@
           <div class="body">
             <span class="label">{label(g)}</span>
             <span class="bar"><span style="width:{g.progress * 100}%"></span></span>
+            {#if g.steps.length}
+              <span class="steps">
+                {#each g.steps as s, k (k)}<span class="step" class:done={stepDone(s)}>{stepText(s)}</span>{/each}
+              </span>
+            {/if}
           </div>
           <span class="trend" title={trendTitle(g)}>{trend(g)}</span>
           <button class="x" aria-label="Drop goal {label(g)}" onclick={() => services.controls.removeGoal(sim.id, i)}><Icon name="icon.ui.close" size={11} /></button>
@@ -146,12 +189,20 @@
       <div class="add">
         <select bind:value={def} aria-label="New goal">
           <option value="">Add a goal…</option>
-          {#each content.goals as g (g.id)}<option value={g.id}>{g.label.replace('{skill}', 'a skill').replace('{n}', 'N').replace('{category}', 'a field').replace('$N', 'money')}</option>{/each}
+          {#each content.goals as g (g.id)}<option value={g.id}>{g.label.replace('{skill}', 'a skill').replace('{n}', 'N').replace('{category}', 'a field').replace('$N', 'money').replace('a {object}', 'something')}</option>{/each}
         </select>
         {#if picked}
           <div class="params">
             {#if picked.kind === 'skill'}
               <select bind:value={skill} aria-label="Skill">{#each content.skills as s (s.id)}<option value={s.id}>{s.label}</option>{/each}</select>
+            {/if}
+            {#if picked.kind === 'own'}
+              <select bind:value={object} aria-label="Item">
+                <option value="">Pick an item…</option>
+                {#each wantable as [cat, items] (cat)}
+                  <optgroup label={cat}>{#each items as o (o.id)}<option value={o.id}>{o.name} · {money(o.price)}</option>{/each}</optgroup>
+                {/each}
+              </select>
             {/if}
             {#if picked.label.includes('{category}')}
               <select bind:value={category} aria-label="Field">{#each content.careerCategories as c (c.id)}<option value={c.id}>{c.label}</option>{/each}</select>
@@ -265,6 +316,22 @@
     height: 100%;
     background: var(--good);
     transition: width var(--slow) var(--ease);
+  }
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .step {
+    padding: 1px 6px;
+    border-radius: 99px;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .step.done {
+    color: var(--good);
   }
   .trend {
     width: 14px;

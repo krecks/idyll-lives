@@ -326,6 +326,21 @@ pub struct PlannerSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub waited_day: Option<u32>,
     pub reviewed: u32,
+    /// What they asked to buy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purchase: Option<PurchaseSave>,
+}
+
+/// Something a resident asked to buy (`object`: object id).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PurchaseSave {
+    pub object: String,
+    #[serde(default)]
+    pub open: bool,
+    pub day: u32,
+    #[serde(default)]
+    pub declines: u8,
 }
 
 /// A wish about the home: a better room (`room`: room kind id, "garden", or absent for a room
@@ -393,6 +408,9 @@ pub struct GoalSave {
     pub skill: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
+    /// Object id, for things they want.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
     pub target: f32,
     pub since_day: u32,
     pub start: f32,
@@ -1491,6 +1509,7 @@ fn goal_save(content: &Content, g: &Goal) -> GoalSave {
         def: content.goals[g.def].id.clone(),
         skill: skill_id(content, g.skill),
         category: g.category.map(|c| content.career_categories[c].id.clone()),
+        object: g.object.map(|o| content.objects[o].id.clone()),
         target: g.target,
         since_day: g.since_day,
         start: g.start,
@@ -1510,6 +1529,10 @@ fn goal_load(content: &Content, g: &GoalSave) -> Option<Goal> {
             .category
             .as_deref()
             .and_then(|c| content.career_categories.iter().position(|d| d.id == c)),
+        object: match &g.object {
+            Some(o) => Some(content.object_index(o)?),
+            None => None,
+        },
         target: g.target,
         since_day: g.since_day,
         start: g.start,
@@ -1576,6 +1599,12 @@ fn planner_save(content: &Content, p: &Planner) -> Option<PlannerSave> {
         home_wishes: p.home_wishes.iter().map(|w| home_wish_save(content, w)).collect(),
         waited_day: p.waited_day,
         reviewed: p.reviewed,
+        purchase: p.purchase.map(|r| PurchaseSave {
+            object: content.objects[r.object].id.clone(),
+            open: r.open,
+            day: r.day,
+            declines: r.declines,
+        }),
     };
     let empty = save.routines.is_empty()
         && save.skip_household.is_empty()
@@ -1584,7 +1613,8 @@ fn planner_save(content: &Content, p: &Planner) -> Option<PlannerSave> {
         && save.history.is_empty()
         && save.wishes.is_empty()
         && save.home_wishes.is_empty()
-        && save.waited_day.is_none();
+        && save.waited_day.is_none()
+        && save.purchase.is_none();
     (!empty || save.reviewed != 0).then_some(save)
 }
 
@@ -1634,6 +1664,15 @@ fn planner_load(content: &Content, p: &PlannerSave) -> Planner {
         waited_day: p.waited_day,
         thought: None,
         reviewed: p.reviewed,
+        recheck: false,
+        purchase: p.purchase.as_ref().and_then(|r| {
+            Some(crate::planner::PurchaseRequest {
+                object: content.object_index(&r.object)?,
+                open: r.open,
+                day: r.day,
+                declines: r.declines,
+            })
+        }),
     }
 }
 

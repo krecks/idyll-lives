@@ -133,6 +133,7 @@
       "id": "foodie.pizzaOven",
       "name": "Wood-fired pizza oven",
       "model": "model.foodie.pizzaOven",
+      "outdoors": true,
       "stations": ["oven", "grill"],
       "footprint": [2, 1],
       "price": 1400,
