@@ -40,19 +40,30 @@ fn a_planned_workout_happens_most_days() {
     // Life gets in the way sometimes (visits, a full bladder, a mess to tidy, a bad mood), but
     // most blocks get real time: counted over eight towns, as one town's week can be unlucky
     // (with four, the mean swung from 0.13 to 0.15 with changes elsewhere in town life).
+    // (The towns run side by side: one after another they were most of the test suite's time.)
+    let weeks: Vec<World> = std::thread::scope(|s| {
+        let runs: Vec<_> = (1..=8)
+            .map(|seed| {
+                s.spawn(move || {
+                    let mut w = town(seed);
+                    homebody(&mut w);
+                    w.buy(0, "weightBench", None, None)
+                        .expect("room for a weight bench");
+                    routines(
+                        &mut w,
+                        0,
+                        json!([{"activity": "train", "skill": "strength", "days": EVERY_DAY, "start": 18 * 60, "minutes": 60}]),
+                    );
+                    until(&mut w, 6, 20.0);
+                    w
+                })
+            })
+            .collect();
+        runs.into_iter().map(|run| run.join().unwrap()).collect()
+    });
     let (mut real, mut kept, mut total) = (0, 0, 0);
     let mut strength = Vec::new();
-    for seed in 1..=8 {
-        let mut w = town(seed);
-        homebody(&mut w);
-        w.buy(0, "weightBench", None, None)
-            .expect("room for a weight bench");
-        routines(
-            &mut w,
-            0,
-            json!([{"activity": "train", "skill": "strength", "days": EVERY_DAY, "start": 18 * 60, "minutes": 60}]),
-        );
-        until(&mut w, 6, 20.0);
+    for w in &weeks {
         let blocks: Vec<_> = w.sims[0].planner.history.iter().filter(|b| b.day >= 2).collect();
         total += blocks.len();
         kept += blocks.iter().filter(|b| b.outcome == Outcome::Kept).count();
