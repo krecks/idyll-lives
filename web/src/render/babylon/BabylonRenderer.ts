@@ -52,7 +52,7 @@ import {
 } from './core';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -126,6 +126,13 @@ const CLUSTERED_LIGHTS = 32;
 const LAMP_POWER = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
+/**
+ * A basement in view gets no sun, only this much of the sky fill and the environment (as seen,
+ * intensity times exposure: the same by day and by night), and its lamps on as at night.
+ */
+const BASEMENT_SKY = 0.12;
+const BASEMENT_ENV = 0.12;
+const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
@@ -332,6 +339,8 @@ export class BabylonRenderer implements Renderer {
   private sleepActions: { tags: readonly string[]; ids: Set<number> } | null = null;
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`). */
   private lampsLevel = 0;
+  /** The camera's exposure at the last lighting update (without the look's overall scale). */
+  private exposure = 1;
   private readonly lampColor = new Color3();
   private readonly glowColor = new Color3();
   private readonly emissiveTmp = new Color3();
@@ -564,8 +573,15 @@ export class BabylonRenderer implements Renderer {
       await this.pace();
       this.lotCasters = await this.buildLot(world);
       await this.pace();
-      const fences = buildFences(this.scene, world.fences ?? [], this.deps.content.fenceStyles);
-      if (fences) this.worldMeshes.push(fences);
+      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
+      const v = view;
+      const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
+      for (const [list, storey] of [[(world.fences ?? []).filter(onLot), 0], [(world.fences ?? []).filter((f) => !onLot(f)), undefined]] as const) {
+        const fences = buildFences(this.scene, list, this.deps.content.fenceStyles);
+        if (!fences) continue;
+        if (storey !== undefined) fences.metadata = { storey };
+        this.worldMeshes.push(fences);
+      }
       // What was just built belongs to the lot layer; objects follow in `worldMeshes`.
       this.lotMeshes = this.worldMeshes;
       this.worldMeshes = [];
@@ -625,7 +641,7 @@ export class BabylonRenderer implements Renderer {
     }
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
-    if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
+    if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
@@ -2349,9 +2365,11 @@ export class BabylonRenderer implements Renderer {
     if (wells.length) {
       dig.rect.set(Math.min(...wells.map((r) => r.x)), Math.min(...wells.map((r) => r.z)), Math.max(...wells.map((r) => r.x + r.w)), Math.max(...wells.map((r) => r.z + r.d)));
     } else if (v) dig.rect.set(v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN);
-    if (dig.on === on && !on) return;
-    if (dig.on === on) return;
+    // The basement itself in view: no daylight down there (its lamps light it, see `applyRoomLights`).
+    const under = on && this.storey < 0;
+    if (dig.on === on && dig.under === under) return;
     dig.on = on;
+    dig.under = under;
     this.resetSnapshot();
   }
 
@@ -2916,6 +2934,10 @@ export class BabylonRenderer implements Renderer {
       }
     }
 
+    // Under the ground (a basement in view, see `applyDig`) daylight doesn't reach.
+    const seen = Math.max(l.exposure, 1e-3);
+    this.lib.dig.lit.set(0, Math.min(1, BASEMENT_SKY / Math.max(l.skyIntensity * seen, 1e-3)), Math.min(1, BASEMENT_ENV / Math.max(l.envIntensity * seen, 1e-3)), 0);
+    this.exposure = seen;
     // Warm lamps inside, glowing windows outside at night; cool daylight in the panes by day.
     this.lampsLevel = l.lamps;
     this.applyRoomLights();
@@ -2936,7 +2958,8 @@ export class BabylonRenderer implements Renderer {
     this.roomLights.forEach((light, i) => {
       // The overview has no interiors: the game house's lamps stay off behind it.
       const use = this.townMode ? null : (this.roomLightUse[i] ?? null);
-      const lit = this.lampsLevel * (this.roomLightOn[i] ?? 1);
+      // Down in the basement they're on by day too, as bright as at night (by day the exposure is lower).
+      const lit = (this.storey < 0 ? NIGHT_EXPOSURE / this.exposure : this.lampsLevel) * (this.roomLightOn[i] ?? 1);
       if (!use) {
         light.intensity = 0;
       } else if (use.kind === 'lamp') {

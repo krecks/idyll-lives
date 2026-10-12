@@ -204,6 +204,10 @@ export async function startSession(
   const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
   const worldSound = new WorldSound(renderer);
   const buildBuy = new BuildBuyInput(renderer, content, assets, (command) => bridge.send(command));
+  buildBuy.showStorey = (storey) => {
+    storeyChosenAt = performance.now();
+    setStorey(storey);
+  };
   game.catalog = bridge.catalog;
   /** Sims the player controls. */
   const playerSims = () => game.roster.filter((s) => game.households[s.household]?.player).map((s) => s.id);
