@@ -197,7 +197,7 @@ Tags in use (64 maximum for the whole game, base plus all packs):
 | `entertainment` | TV, read, chess, browse, piano |
 | `rest` | sleep, nap, sofa |
 | `sleep` | bed sleep (counts as a night's sleep: `dayRhythm.sleepTags`) |
-| `nap` | bed nap |
+| `nap` | bed nap, sofa doze (`dayRhythm.napTags`: short, and not again for a while) |
 | `lounge` | sofa, armchair, bench, coffee |
 | `spa` | whirlpool tub (example pack), baths and hot tubs; declared in base.json `tags` |
 | `toys` | kids' things (toy box, play mat, doll house…); grown-up life stages like them far less (`tagPreference` 0.15, teens 0.4); declared in furniture.json `tags` |
@@ -413,7 +413,15 @@ traits whose `tagPreference` dislikes an activity's tags skip it more. A pack's 
 
 **Day rhythm:** `dayRhythm.wakeFor` lists the needs that wake a sleeper when they get urgent
 (default: all; the base game wakes for `bladder` and `hunger` only), and
-`dayRhythm.workDecay` multiplies need decay while at work. **Jobs:**
+`dayRhythm.workDecay` multiplies need decay while at work. A sleep (`sleepTags`) lasts until
+the need beds fill most (energy) is full, at most the planner's `maxSleepMinutes`; at night a
+rested sleeper lies in until `lieInHours` (default 1.5) before they'd get up (and nobody goes
+back to bed nearly rested outside the night). A bed's stars add
+`sleepQualityBonus` each (default 0.06) to sleep, instead of `objectRules.qualityBonus`, so a
+better bed shortens a night a little. Naps (`napTags`) can't follow each other within
+`napCooldownHours` (default 4), aren't taken when woken by an urgent need, and below
+`exhaustedBelow` energy (default 0.2) residents go to bed whatever the hour (the schedule's
+daytime damping on sleep is lifted, naps count a quarter). **Jobs:**
 `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 
 ## Life: ages, family, moving
@@ -680,7 +688,8 @@ consumables bought from outside, such as takeout or deliveries; never for using 
 | fridge snack / meal / gourmet | hunger 1.8 / 1.28 / 0.76 |
 | toilet | bladder 7.5 |
 | shower / sink | hygiene 3.0 / 2.25 |
-| bed sleep / nap | energy 0.125 (+ comfort 0.05) / energy 0.25 |
+| bed sleep / nap | energy 0.125 (+ comfort 0.05): 8 h from empty; futon 0.11, bunk/kids/daybed 0.12, queen/canopy 0.13, king 0.14 / nap energy 0.24 (30 min) |
+| sofa / lounger doze | energy 0.2 (30 min) / 0.16 (45 min) |
 | sofa / armchair / bench | comfort 1.2 / 1.5 / 0.7 |
 | TV / browse / read | fun 0.7 / 0.6 / 0.6 |
 | coffee | comfort 0.75, energy 0.24 |

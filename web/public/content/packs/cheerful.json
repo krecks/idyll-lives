@@ -136,10 +136,10 @@
           "id": "doze",
           "label": "Doze in the sun",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 45,
           "pose": "lie",
           "autonomous": true,
-          "effects": { "energy": 0.2, "comfort": 0.25 },
+          "effects": { "energy": 0.12, "comfort": 0.18 },
           "tags": ["rest", "nap", "outdoors"]
         }
       ]

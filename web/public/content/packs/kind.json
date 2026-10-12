@@ -360,12 +360,12 @@
           "id": "quiltNap",
           "label": "Nap under the quilt",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 40,
           "pose": "lie",
           "autonomous": true,
           "effects": {
-            "energy": 0.25,
-            "comfort": 0.3
+            "energy": 0.14,
+            "comfort": 0.2
           },
           "tags": [
             "rest",

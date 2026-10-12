@@ -157,10 +157,10 @@
           "id": "doze",
           "label": "Doze in the hammock",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 45,
           "pose": "lie",
           "autonomous": true,
-          "effects": { "energy": 0.22, "comfort": 0.15 },
+          "effects": { "energy": 0.13, "comfort": 0.1 },
           "tags": ["rest", "nap", "outdoors"],
           "feeling": "natureLover.freshAir"
         }

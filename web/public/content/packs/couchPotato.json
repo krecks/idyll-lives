@@ -131,10 +131,10 @@
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "sit",
           "autonomous": true,
-          "effects": { "energy": 0.15, "comfort": 0.2 },
+          "effects": { "energy": 0.1, "comfort": 0.13 },
           "tags": ["rest", "nap"]
         }
       ]

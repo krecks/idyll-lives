@@ -283,6 +283,9 @@ pub struct SimSave {
     /// First day to look for work again (after quitting or being let go).
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub job_search_from: u32,
+    /// Minutes until they'd nap again (absent: any time).
+    #[serde(default, skip_serializing_if = "is_unworn")]
+    pub nap_minutes: f32,
     /// Minutes left at work, if away.
     #[serde(default)]
     pub away_minutes: Option<f32>,
@@ -630,6 +633,7 @@ impl World {
                         shift_mood: Some(j.shift_mood),
                     }),
                     job_search_from: s.job_search_from,
+                    nap_minutes: minutes_left(s.nap_until),
                     away_minutes: s.away_until.map(minutes_left),
                     visiting: s
                         .visiting
@@ -976,6 +980,9 @@ impl World {
                 Some(job)
             });
             sim.job_search_from = s.job_search_from;
+            if s.nap_minutes > 0.0 {
+                sim.nap_until = after(s.nap_minutes);
+            }
             if let Some(p) = &s.planner {
                 sim.planner = planner_load(content, p);
             }

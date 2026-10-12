@@ -432,6 +432,8 @@ pub struct Sim {
     pub(crate) skill_ups: u32,
     /// Grows while practising and fades otherwise, so Sims don't train for hours on end.
     pub(crate) practice_fatigue: f32,
+    /// No nap until this tick (the last one was too recent; see `DayRhythm::nap_cooldown_hours`).
+    pub(crate) nap_until: u64,
     /// The first day this Sim looks for work again (after quitting or being let go).
     pub job_search_from: u32,
     /// Routines, goals and how planned blocks went (see `planner`).
@@ -1364,6 +1366,7 @@ impl World {
             skills,
             skill_ups: 0,
             practice_fatigue: 0.0,
+            nap_until: 0,
             job_search_from: 0,
             planner: Default::default(),
             mess: None,
@@ -2310,6 +2313,31 @@ fn is_night(sim: &Sim, ctx: &Ctx) -> bool {
     rhythm.is_night(ctx.hour, wake_hour(sim, ctx))
 }
 
+/// What an object's quality adds to an interaction: a bed's stars make a night only a little
+/// shorter (`DayRhythm::sleep_quality_bonus`), anything else's do more.
+fn quality_boost(content: &Content, inter: &crate::content::Interaction, quality: u8) -> f32 {
+    let rhythm = &content.day_rhythm;
+    if inter.tags & rhythm.sleep_tags != 0 {
+        rhythm.sleep_quality_factor(quality)
+    } else {
+        content.object_rules.quality_factor(quality)
+    }
+}
+
+/// Worn out: what a night's sleep fills is nearly empty (bed, not a nap, whatever the hour).
+fn exhausted(sim: &Sim, content: &Content) -> bool {
+    let rhythm = &content.day_rhythm;
+    rhythm.rest_need.is_some_and(|n| sim.needs[n] < rhythm.exhausted_below)
+}
+
+/// The middle of the night: a rested sleeper stays in bed until a little before they'd get up.
+fn before_dawn(sim: &Sim, ctx: &Ctx) -> bool {
+    is_night(sim, ctx) && {
+        let wake = wake_hour(sim, ctx);
+        !(wake - ctx.content.day_rhythm.lie_in_hours..wake).contains(&ctx.hour)
+    }
+}
+
 /// Target skill levels (what probation and the next promotion need, and skill goals) and how
 /// keen they are on each (the job's fully, a goal's by its place on the list).
 fn job_goals(sim: &Sim, content: &Content) -> ([f32; MAX_SKILLS], [f32; MAX_SKILLS]) {
@@ -2562,6 +2590,13 @@ fn pick_autonomous(
     // started now would end at once (see `use_object`), over and over.
     let rhythm = &content.day_rhythm;
     let woken = (0..content.needs.len()).any(|n| needs[n] < 0.08 && rhythm.wake_for & (1 << n) != 0);
+    // (Not a nap either: the sofa won't help.) Worn out, it's bed whatever the hour, not a nap;
+    // and no nap again too soon after the last.
+    let rest = rhythm.sleep_tags | rhythm.nap_tags;
+    let exhausted = exhausted(sim, content);
+    let napped = ctx.tick < sim.nap_until;
+    // Nor back to bed rested, unless it's the middle of the night (it would end at once).
+    let rested = !before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95);
     // Only what they may use: at home and in public places, or where they're a guest.
     let usable = match sim.visiting {
         Some(visit) => ctx.index.on(visit.plot),
@@ -2637,15 +2672,16 @@ fn pick_autonomous(
                 }
             }
             if !inter.autonomous
-                || (woken && inter.tags & rhythm.sleep_tags != 0)
+                || (woken && inter.tags & rest != 0)
+                || (rested && inter.tags & rhythm.sleep_tags != 0)
+                || (napped && inter.tags & rhythm.nap_tags != 0)
                 || (allowed == Access::Guest && inter.tags & content.social_rules.busy_tags != 0)
                 || !affordable(inter.cost, funds)
             {
                 continue;
             }
             // Better objects and more skilled Sims get more out of it, and know it.
-            let boost = object_rules.quality_factor(obj.quality)
-                * inter.skill_factor(&content.skill_rules, &sim.skills);
+            let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
             let gains = ai::score_gains(needs, &inter.total_gain.map(|g| g * boost), distance);
             let mut s = match inter.recipe {
                 // A recipe: only at home with every station it needs. Long ones tempt less, a
@@ -2669,7 +2705,13 @@ fn pick_autonomous(
             }
             // The plan: a block's activity is the favourite (even with full needs); goals.
             let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
-            let s = s.max(floor) * feel(inter.tags) * plan * place;
+            let mut s = s.max(floor) * feel(inter.tags) * plan * place;
+            if exhausted && inter.tags & rhythm.sleep_tags != 0 {
+                // (The schedule's daytime damping on sleep doesn't apply.)
+                s /= schedule.preference(inter.tags & rhythm.sleep_tags).clamp(1e-3, 1.0);
+            } else if exhausted && inter.tags & rhythm.nap_tags != 0 {
+                s *= 0.25;
+            }
             if s > MIN_AUTONOMY_SCORE {
                 candidates.push((s, Choice::Object(obj.id, i)));
             }
@@ -3173,8 +3215,12 @@ fn use_object(
     let content = ctx.content;
     let inter = &content.objects[obj.def].interactions[interaction];
     // Quality and skill scale what the Sim gets out of it (not what it costs).
-    let boost = content.object_rules.quality_factor(obj.quality)
-        * inter.skill_factor(&content.skill_rules, &sim.skills);
+    let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
+    let rhythm = &content.day_rhythm;
+    // Napping: no other nap until a while after this one.
+    if inter.tags & rhythm.nap_tags != 0 {
+        sim.nap_until = ctx.tick + social::minutes_to_ticks(rhythm.nap_cooldown_hours * 60.0);
+    }
     if inter.cares()
         && let Some(baby) = obj.users().find(|&u| u != sim.id)
     {
@@ -3204,9 +3250,17 @@ fn use_object(
             practise(sim, content, s, inter.skill_gain[s] * boost, minutes);
         }
     }
-    let done = if inter.tags & content.day_rhythm.sleep_tags != 0 && is_night(sim, ctx) {
-        // A night's sleep lasts until morning unless a need that wakes people gets urgent.
+    let sleep = inter.tags & rhythm.sleep_tags != 0;
+    let done = if sleep && crate::planner::planned_now(content, sim, inter) {
+        // A planned night's sleep lasts the block unless a need that wakes people gets urgent.
         wakes
+    } else if sleep {
+        // One sleep until rested (only the need it's for counts: about 8 hours from tired,
+        // less in a better bed), but nobody gets up in the middle of the night: once rested,
+        // they lie in until a little before they'd get up anyway.
+        let rested = rhythm.rest_need.is_none_or(|n| sim.needs[n] >= 0.999);
+        let longest = f32::from(content.planner.max_sleep_minutes);
+        wakes || elapsed >= longest || (rested && !before_dawn(sim, ctx))
     } else {
         // Workouts and other draining activities stop before they empty a need. Planned
         // activities go on for their time even once the needs they fill are full.
