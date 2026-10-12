@@ -225,7 +225,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
   goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS` in
   characters.ts, or the content's `seat`). Lying plays `lie` turned flat on the mattress (`LIE_*`);
-  the blanket is fitted to `lie` too.
+  the blanket is fitted to `lie` too. A baby lying (in the crib) plays its own clips the same way,
+  `babyLieAsleep` or `babyLieAwake`, centred on the mattress.
 - Carried things sit on the palms (`grip`): the right one, or between both.
 - Every name the runtime plays, with its loop flag and length (seconds; the runtime sequences
   object use, sitting down and standing up on these lengths):
@@ -248,6 +249,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body) |
 | carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
 | lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
+| babyLieAsleep, babyLieAwake | yes | 9, 6 | a baby lying in the crib, asleep (still, quick breaths, a twitch) or awake (kicking, waving, turning the head); legs drawn up, hands by the head; turned flat like `lie`, played at full speed |
 | foldArms | yes | 2.5 | watching, relaxing, idle variations |
 | yes / no | no / yes | 2.5 | listening, arguing |
 | phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |

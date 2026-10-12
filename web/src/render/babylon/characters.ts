@@ -206,6 +206,11 @@ function lieCentre(rig: SimRig): number {
 function lieBack(rig: SimRig): number {
   return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK) * rig.scale;
 }
+/** A baby in the crib plays its own lying clips (clips/baby.ts: legs drawn up, hands by the head), asleep or awake, at their own speed; crossfaded over `BABY_LIE_FADE` s when the baby falls asleep or wakes. */
+const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
+const BABY_LIE_FADE = 1.6;
+/** Every lying clip (`lie`, and the baby's). */
+const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
 /**
  * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
  * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,
@@ -932,7 +937,7 @@ export class Characters {
     m.fill(0);
     const id = this.selected;
     const rig = id !== null ? this.sims[id] : null;
-    if (rig && rig.visible && rig.cur.key !== 'lie') {
+    if (rig && rig.visible && !LYING.has(rig.cur.key)) {
       const r = 0.95 * rig.scale * (1 + Math.sin(time * 2.4) * 0.03);
       const a = time * 0.5;
       m[0] = Math.cos(a) * r;
@@ -1800,7 +1805,7 @@ export class Characters {
         this.pA.set(set.sourcePelvis);
       }
       // Pyjamas in bed.
-      const asleep = pose === Pose.Lie && rig.cur.key === 'lie' && w > 0.5 && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
+      const asleep = pose === Pose.Lie && LYING.has(rig.cur.key) && w > 0.5 && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
       if (asleep !== rig.asleep && rig.day && rig.night) {
         rig.asleep = asleep;
         writeOutfit(asleep ? rig.night : rig.day, this.data, this.row(i) + NB * 16);
@@ -1811,15 +1816,16 @@ export class Characters {
       // Procedural layers.
       resetAdditive(this.add);
       this.procedural(rig, i, social, role, partnerRig, pose, moving, time, dt);
-      // A baby in someone's arms: knees drawn up a little.
+      // A baby in someone's arms: knees drawn up a little (the baby's lying clips have them drawn up already).
       const holder = this.heldBy[i] >= 0 ? this.sims[this.heldBy[i]] : null;
       const inArms = holder?.visible ? smooth(holder.liftW) : 0;
       if (inArms > 0) {
         const B = set.bone;
-        addRotation(this.add, B.thigh_l, 1, 0, 0, -0.55 * inArms);
-        addRotation(this.add, B.thigh_r, 1, 0, 0, -0.4 * inArms);
-        addRotation(this.add, B.calf_l, 1, 0, 0, 0.8 * inArms);
-        addRotation(this.add, B.calf_r, 1, 0, 0, 0.65 * inArms);
+        const k = inArms * (rig.cur.key === 'lie' ? 1 : 0.3);
+        addRotation(this.add, B.thigh_l, 1, 0, 0, -0.55 * k);
+        addRotation(this.add, B.thigh_r, 1, 0, 0, -0.4 * k);
+        addRotation(this.add, B.calf_l, 1, 0, 0, 0.8 * k);
+        addRotation(this.add, B.calf_r, 1, 0, 0, 0.65 * k);
       }
 
       // Placement (root offsets blend with the clips).
@@ -1950,6 +1956,16 @@ export class Characters {
         rootFwd = LIE_ENTRY * rig.scale - sp.z * rig.scale;
         fade = 0.35;
         if (rig.cur.key !== 'sitDown') rig.actTime = 0;
+      } else if (rig.body.stage === 'baby') {
+        // A baby: on the back in the middle of the crib, curled up asleep or kicking awake (its own
+        // clips, made standing like `lie` and turned flat the same way).
+        key = !known || tag === 'sleep' || tag === 'nap' ? BABY_LIE.asleep : BABY_LIE.awake;
+        rootY = rig.bedH + lieBack(rig);
+        rootFwd = lieCentre(rig);
+        pitch = -Math.PI / 2;
+        fade = LYING.has(rig.cur.key) ? BABY_LIE_FADE : 0.45;
+        rig.lieX = rig.x;
+        rig.lieZ = rig.z;
       } else {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
@@ -2160,7 +2176,7 @@ export class Characters {
       cur.rootPitch = pitch;
     }
 
-    if (rig.fromBed && rig.prev.key === 'lie') rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig);
+    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig);
 
     // Upper-body layer.
     if (upper) {
@@ -2199,7 +2215,7 @@ export class Characters {
     c.clip = clip;
     c.key = key;
     // Walk cycles of the previous walk keep their phase.
-    c.time = sameLoop ? c.time : key === 'idle' || key === 'sit' ? (rig.seed * 7) % clip.duration : 0;
+    c.time = sameLoop ? c.time : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
     c.rate = rate;
     c.repeat = repeat;
     c.rootY = rootY;
@@ -2579,7 +2595,7 @@ export class Characters {
     if (!mixer || B.eye_l === undefined) return;
     const add = this.add;
     const pair = partner ? Math.min(i, partner.id) : i;
-    const asleep = pose === Pose.Lie && rig.cur.key === 'lie' && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
+    const asleep = pose === Pose.Lie && LYING.has(rig.cur.key) && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
 
     // Target expression: the emotion, then the conversation / activity on top.
     const tgt = this.faceTmp;
@@ -2844,7 +2860,7 @@ export class Characters {
     const blanket = this.blankets.get(rig.body.family);
     if (!blanket) return;
     const bed = rig.bed;
-    const under = pose === Pose.Lie && rig.cur.key === 'lie' && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
+    const under = pose === Pose.Lie && LYING.has(rig.cur.key) && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
     rig.cover = clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
     const m = blanket.matrices;
     const o = i * 16;
