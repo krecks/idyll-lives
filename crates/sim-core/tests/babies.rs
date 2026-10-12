@@ -1,6 +1,7 @@
 //! Babies: they lie in a crib at home and grown-ups care for them there (feeding, changing,
 //! playing fill the baby's needs); a baby who needs something cries; a crib comes with a baby
-//! who moves into a home without one; and a baby who grows into a child gets out.
+//! who moves into a home without one (free, money or not); and a baby who grows into a child
+//! gets out, onto their feet beside it.
 
 use sim_core::lot::SimSpawn;
 use sim_core::planner::ThoughtKind;
@@ -61,6 +62,48 @@ fn babies_lie_in_the_crib_and_are_fed() {
     }
     assert!(!w.content.life.baby(w.sims[1].age));
     assert!(!w.objects[0].users().any(|u| u == 1), "out of the crib");
+}
+
+#[test]
+fn a_baby_lying_in_the_crib_grows_up_and_climbs_out() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    // Fed, and never quite rested: she lies in the crib until the night she's a child.
+    w.sims[1].age = 1.99;
+    let midnight = sim_core::clock::tick_at(2, 0.0).unwrap();
+    while w.tick < midnight - 1 {
+        w.sims[1].needs[..2].copy_from_slice(&[1.0, 0.5]);
+        w.tick_once();
+    }
+    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "in the crib at midnight");
+    w.tick_once();
+    assert!(!w.content.life.baby(w.sims[1].age), "a child now");
+    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Stand);
+    let (x, z) = w.sims[1].tile();
+    assert!(!(2..4).contains(&x) || z != 2, "standing in the crib at {x},{z}");
+    w.apply(Command::Use { sim: 1, object: 1, interaction: 0 }).unwrap();
+    minutes(&mut w, 10);
+    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Sit, "she walked over and sat down");
+}
+
+#[test]
+fn a_baby_in_a_home_with_no_money_gets_a_crib_and_is_looked_after() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let spawn = |name: &str, age: f32| -> SimSpawn {
+        serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 11.5, "age": age})).unwrap()
+    };
+    w.households[1].funds = 0;
+    w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Cal", 28.0), spawn("Dot", 0.2)], bonds: vec![] }).unwrap();
+    assert_eq!(w.households[1].funds, 0, "the crib was free");
+    let crib = w.objects.iter().position(|o| w.content.objects[o.def].id == "crib" && o.x >= 10).expect("a crib next door");
+    // Two days: Cal feeds her whenever she's hungry.
+    let (mut sum, mut lowest) = (0.0, 1.0f32);
+    for _ in 0..48 {
+        minutes(&mut w, 60);
+        sum += w.sims[3].needs[0];
+        lowest = lowest.min(w.sims[3].needs[0]);
+    }
+    assert!(w.objects[crib].users().any(|u| u == 3), "Dot is in her crib");
+    assert!(sum / 48.0 > 0.5 && lowest > 0.2, "Dot was fed: average {:.2}, lowest {lowest:.2}", sum / 48.0);
 }
 
 #[test]

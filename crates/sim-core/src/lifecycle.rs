@@ -97,8 +97,10 @@ pub(crate) fn update(w: &mut World) {
             }
         }
         let sim = &mut w.sims[i];
-        // Out of the crib.
+        // Out of the crib, onto their feet beside it (not left standing inside it, where
+        // there's no way out).
         if rules.stages[before].baby && !rules.stages[stage].baby {
+            crate::world::end_activity(sim, &w.content, &mut w.objects);
             sim.clear_activity();
             for o in &mut w.objects {
                 o.release(i as u32);
