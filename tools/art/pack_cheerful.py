@@ -18,7 +18,7 @@ p = [box([0.74, 0.08, 0.5], [0, 0.04, -0.2], CHROME, 'chrome', radius=0.02),    
      cyl([0.6, 0.47, 0.6], [0, 1.08, -0.2], AMBER, 'gloss', rotate=[90, 0, 0], segments=32),    # glowing arch band
      cyl([0.5, 0.48, 0.5], [0, 1.08, -0.2], '#FFE29A', 'gloss', rotate=[90, 0, 0], segments=32),
      cyl([0.4, 0.49, 0.4], [0, 1.08, -0.2], '#5B3A8C', 'gloss', rotate=[90, 0, 0], segments=32),  # window
-     box([0.4, 0.2, 0.47], [0, 0.98, -0.2], '#5B3A8C', 'gloss', radius=0.01),
+     box([0.4, 0.2, 0.485], [0, 0.98, -0.2], '#5B3A8C', 'gloss', radius=0.01),
      cyl([0.26, 0.012, 0.26], [0, 1.02, 0.045], '#2B2433', 'gloss', rotate=[90, 0, 0]),         # record
      cyl([0.08, 0.014, 0.08], [0, 1.02, 0.047], SUN, 'gloss', rotate=[90, 0, 0]),
      box([0.5, 0.3, 0.02], [0, 0.42, 0.035], '#E9D8B0', 'fabric', radius=0.01),                 # speaker grille

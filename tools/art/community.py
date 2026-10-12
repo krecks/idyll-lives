@@ -419,8 +419,8 @@ def wheel(x, z, r=0.17):
 def ice_cream_cart():
     body, stripe = '#F4EFE6', '#E9A6B4'
     p = [box([1.3, 0.62, 0.62], [-0.15, 0.62, 0.0], body, 'gloss', radius=0.03),
-         box([1.3, 0.1, 0.63], [-0.15, 0.5, 0.0], stripe, 'gloss', radius=0.01),
-         box([1.3, 0.1, 0.63], [-0.15, 0.74, 0.0], stripe, 'gloss', radius=0.01),
+         box([1.31, 0.1, 0.63], [-0.15, 0.5, 0.0], stripe, 'gloss', radius=0.01),
+         box([1.31, 0.1, 0.63], [-0.15, 0.74, 0.0], stripe, 'gloss', radius=0.01),
          box([1.22, 0.04, 0.56], [-0.15, 0.95, 0.0], '#C3C7CB', 'metal', radius=0.01),
          wheel(-0.62, 0.27), wheel(-0.62, -0.27), wheel(0.38, 0.27), wheel(0.38, -0.27),
          rod([0.5, 0.86, -0.22], [0.82, 1.0, -0.22], 0.03, '#C3C7CB', 'metal'),                             # push bar
@@ -597,7 +597,7 @@ def grocery_shelf():
                 for z in (-0.1, 0.04):
                     p.append(cyl([0.09, 0.12, 0.09], [x + w / 2, y + 0.073, z], c, 'gloss', segments=10))
             else:                                                                                              # packets
-                w = 0.13 + (k % 3) * 0.03
+                w = min(0.13 + (k % 3) * 0.03, 0.93 - x)                                                      # not through the side
                 h = 0.18 + (k % 4) * 0.04
                 p.append(box([w - 0.02, h, 0.26], [x + w / 2, y + 0.0125 + h / 2, -0.05], c, 'gloss', radius=0.008))
             x += w + 0.015
@@ -743,7 +743,7 @@ def barn():
               rod([x1, y0, z + 0.02], [x0, y1, z + 0.02], 0.09, TRIM, 'wood', shape='box', t2=0.06)]
     for x in (-w / 2, w / 2):                                                                          # corner boards
         for zz in (-d / 2, d / 2):
-            p.append(box([0.14, h, 0.14], [x * 0.99, h / 2, zz * 0.99], TRIM, 'wood'))
+            p.append(box([0.14, h - 0.02, 0.14], [x * 0.99, h / 2 - 0.01, zz * 0.99], TRIM, 'wood'))      # ending under the wall top
     p += [cyl([0.04, 0.7, 0.04], [0, 5.65, 0], '#2B302E', 'satin', segments=6),                        # weathervane
           box([0.6, 0.03, 0.12], [0, 5.9, 0], '#2B302E', 'satin'),
           cone([0.14, 0.2, 0.14], [0.32, 5.9, 0], '#2B302E', 'satin', rotate=[0, 0, -90], segments=6)]
@@ -824,7 +824,7 @@ add('farm.hayStack', hay_stack(), (2, 1))
 def scarecrow():
     """A scarecrow on a post: a plaid shirt, straw hands, a sack head and a floppy hat."""
     p = [cyl([0.07, 1.9, 0.07], [0, 0.95, -0.05], '#7A5A3A', 'wood', segments=8),
-         box([0.96, 0.06, 0.06], [0, 1.45, -0.05], '#7A5A3A', 'wood'),
+         box([0.94, 0.06, 0.07], [0, 1.45, -0.05], '#7A5A3A', 'wood'),
          box([0.44, 0.62, 0.24], [0, 1.25, 0], '#B8322B', 'fabric', radius=0.05),                      # shirt
          box([0.46, 0.06, 0.26], [0, 1.05, 0], '#2E4E7A', 'fabric'),                                   # belt of twine
          box([0.8, 0.16, 0.16], [0, 1.45, 0], '#B8322B', 'fabric', radius=0.04),                       # sleeves

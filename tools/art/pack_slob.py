@@ -138,8 +138,8 @@ def arcade_cabinet():
     p = []
     for x in (-0.33, 0.33):                                                                          # side panels
         p += [box([0.04, 1.84, 0.6], [x, 0.92, -0.145], SIDE, 'gloss', radius=0.015),
-              box([0.042, 0.2, 0.6], [x, 0.5, -0.145], '#F2A541', 'gloss', radius=0.01),        # side art stripes
-              box([0.042, 0.06, 0.6], [x, 0.66, -0.145], '#E8473B', 'gloss', radius=0.01)]
+              box([0.042, 0.2, 0.602], [x, 0.5, -0.145], '#F2A541', 'gloss', radius=0.01),      # side art stripes
+              box([0.042, 0.06, 0.602], [x, 0.66, -0.145], '#E8473B', 'gloss', radius=0.01)]
     p += [box([0.62, 0.84, 0.56], [0, 0.42, -0.17], BODY, 'satin', radius=0.012),              # lower body
           box([0.62, 1.0, 0.1], [0, 1.34, -0.4], BODY, 'satin', radius=0.012),               # back
           box([0.66, 0.06, 0.6], [0, 1.85, -0.145], SIDE, 'gloss', radius=0.012),             # top
@@ -158,7 +158,7 @@ def arcade_cabinet():
     p += [box([0.22, 0.26, 0.012], [0, 0.5, 0.115], '#3A3D41', 'satin', radius=0.01),           # coin door
           box([0.03, 0.06, 0.004], [-0.05, 0.55, 0.122], '#E8473B', 'gloss', radius=0.006),
           box([0.03, 0.06, 0.004], [0.05, 0.55, 0.122], '#E8473B', 'gloss', radius=0.006),
-          box([0.62, 0.05, 0.56], [0, 0.025, -0.17], '#2B2C2E', 'satin', radius=0.006)]
+          box([0.6, 0.05, 0.54], [0, 0.025, -0.17], '#2B2C2E', 'satin', radius=0.006)]
     p += can(0.38, 0.2, 0.0, '#6CC27A') + wrapper(-0.3, 0.32, '#F2D14E')
     return placeholder(p)
 

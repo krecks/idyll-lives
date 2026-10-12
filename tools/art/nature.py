@@ -873,7 +873,7 @@ def herbs():
     for x in (-0.38, 0.38):
         for z in (-0.19, 0.19):
             p.append(box([0.055, 0.52, 0.055], [x, 0.26, z], WOOD, 'wood', radius=0.008))
-    p.append(box([0.78, 0.02, 0.4], [0, 0.72, 0], SOIL, 'matte', radius=0))
+    p.append(box([0.78, 0.02, 0.4], [0, 0.725, 0], SOIL, 'matte', radius=0))                    # a little above the rim
     p += [blob([0.2, 0.15, 0.2], [-0.29, 0.79, -0.05], '#6AAE3E', noise=0.35), blob([0.16, 0.12, 0.16], [-0.25, 0.8, 0.1], '#5E9E38', noise=0.35)]   # basil
     for i in range(7):                                                                            # rosemary
         p.append(leaf_blade([-0.06 + rng.uniform(-0.05, 0.05), 0.72, rng.uniform(-0.1, 0.1)], rng.uniform(0.2, 0.28), 0.04, rng.uniform(0, 18), rng.uniform(0, 360), '#3E5E3A'))

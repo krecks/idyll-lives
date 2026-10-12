@@ -105,9 +105,10 @@ def flare(size, at, color, finish, t, **kw):
 
 
 def case(w, h, d, x, y, z, color, fin, back=None):
-    """An open box (back, sides, top and bottom) `w` x `h` x `d` centred on (x, z), bottom at y."""
+    """An open box (back, sides, top and bottom) `w` x `h` x `d` centred on (x, z), bottom at y. The back fits
+    between the other boards, so a back of another colour shares no face with them."""
     t = 0.022
-    return [box([w, h, t], [x, y + h / 2, z - d / 2 + t / 2], back or color, fin, radius=0.003),
+    return [box([w - 2 * t, h - 2 * t, t], [x, y + h / 2, z - d / 2 + t / 2], back or color, fin, radius=0.003),
             box([t, h, d], [x - w / 2 + t / 2, y + h / 2, z], color, fin, radius=0.003),
             box([t, h, d], [x + w / 2 - t / 2, y + h / 2, z], color, fin, radius=0.003),
             box([w, t, d], [x, y + h - t / 2, z], color, fin, radius=0.003),
@@ -345,7 +346,7 @@ for y in (0.98, 1.56):
     p += [box([0.6, 0.5, 0.03], [0, y, 0.2], '#2B2C2E', 'gloss', radius=0.01),
           box([0.46, 0.26, 0.01], [0, y - 0.04, 0.218], '#4A3B30', 'gloss', radius=0.02),       # warm window
           handle_h(0, y + 0.19, 0.235, CHROME, 'chrome', w=0.46),
-          box([0.6, 0.05, 0.02], [0, y + 0.235, 0.205], '#3A3D41', 'gloss', radius=0.004)]
+          box([0.58, 0.05, 0.02], [0, y + 0.235, 0.21], '#3A3D41', 'gloss', radius=0.004)]
 p += doors(0, 0.7, CAB, 'satin', y0=0.12, y1=0.68, z=0.2, n=1) + doors(0, 0.7, CAB, 'satin', y0=1.86, y1=2.06, z=0.2, n=1)
 add('wallOven', p)
 
@@ -1772,18 +1773,22 @@ for i, x in enumerate((-0.32, -0.16, 0.0, 0.16, 0.32)):
           sph([0.06, 0.05, 0.06], [x - 0.04, 0.6, -0.16], ['#F2C14E', '#E07BC3', '#D9483B', '#F2F0EA', '#F2C14E'][i], 'satin', segments=8)]
 add('planterBox', p)
 RB = '#9A7452'
-p = [box([1.84, 0.34, 0.86], [0, 0.17, 0], RB, 'wood', radius=0.012), box([1.76, 0.02, 0.78], [0, 0.33, 0], SOIL, 'matte', radius=0.005)]
-p += [box([0.08, 0.38, 0.08], [x, 0.19, z], '#7A5A40', 'wood', radius=0.01) for x in (-0.88, 0.88) for z in (-0.39, 0.39)]
+# Four side boards round the soil (open top, the soil 2 cm below the rim) and corner posts standing a little
+# proud of the boards: faces of different parts never share a plane, so nothing flickers.
+p = [box([1.84, 0.34, 0.06], [0, 0.17, z], RB, 'wood', radius=0.012) for z in (-0.4, 0.4)]
+p += [box([0.06, 0.34, 0.74], [x, 0.17, 0], RB, 'wood', radius=0.012) for x in (-0.89, 0.89)]
+p += [box([1.74, 0.03, 0.76], [0, 0.305, 0], SOIL, 'matte', radius=0)]
+p += [box([0.09, 0.38, 0.09], [x, 0.19, z], '#7A5A40', 'wood', radius=0.01) for x in (-0.885, 0.885) for z in (-0.395, 0.395)]
 for row, z in enumerate((-0.24, 0.0, 0.24)):
     for i in range(6):
         x = -0.7 + i * 0.28
         if row == 0:
-            p.append(part('blob', [0.18, 0.12, 0.18], [x, 0.4, z], '#7FB35A', 'foliage', noise=0.35))
+            p.append(part('blob', [0.18, 0.12, 0.18], [x, 0.38, z], '#7FB35A', 'foliage', noise=0.35))
         elif row == 1:
-            p += [cone([0.04, 0.14, 0.04], [x + d, 0.42, z], '#5E8F4E', 'foliage', segments=5) for d in (-0.03, 0.03)]
-            p.append(cone([0.05, 0.06, 0.05], [x, 0.33, z], '#E07A2E', 'satin', segments=8, rotate=[180, 0, 0]))
+            p += [cone([0.04, 0.14, 0.04], [x + d, 0.4, z], '#5E8F4E', 'foliage', segments=5) for d in (-0.03, 0.03)]
+            p.append(cone([0.05, 0.06, 0.05], [x, 0.31, z], '#E07A2E', 'satin', segments=8, rotate=[180, 0, 0]))
         else:
-            p += [part('blob', [0.2, 0.18, 0.2], [x, 0.43, z], '#4F7A3E', 'foliage', noise=0.3), sph([0.05, 0.05, 0.05], [x + 0.05, 0.46, z + 0.05], RED, 'satin', segments=8)]
+            p += [part('blob', [0.2, 0.18, 0.2], [x, 0.41, z], '#4F7A3E', 'foliage', noise=0.3), sph([0.05, 0.05, 0.05], [x + 0.05, 0.44, z + 0.05], RED, 'satin', segments=8)]
 add('raisedBed', p, (2, 1))
 SH, SHR = '#8FA79A', '#5A4A3E'
 p = [box([1.8, 1.7, 1.6], [0, 0.85, -0.1], SH, 'wood', radius=0.01),
@@ -1812,7 +1817,7 @@ for z in (-1.38, -0.69, 0.0, 0.69, 1.38):
 for x in (-0.89, 0.89):
     p.append(box([0.04, 0.04, 2.8], [x, 1.8, 0], GHF, 'satin', radius=0.004))
 p += [box([0.06, 0.06, 2.84], [0, 2.36, 0], GHF, 'satin', radius=0.004), box([0.62, 1.7, 0.03], [0, 0.95, 1.4], GHF, 'satin', radius=0.006),
-      box([0.54, 1.6, 0.01], [0, 0.95, 1.41], GH, 'glass', radius=0.004)]
+      box([0.54, 1.6, 0.01], [0, 0.95, 1.415], GH, 'glass', radius=0.004)]
 for x in (-0.6, 0.6):
     p.append(box([0.5, 0.04, 2.3], [x, 0.78, -0.1], '#9C7A58', 'wood', radius=0.006))
     for z in (-1.0, -0.6, -0.2, 0.2, 0.6):
