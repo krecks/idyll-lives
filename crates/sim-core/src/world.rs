@@ -3552,10 +3552,11 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             let obj = &objects[object as usize];
             let inter = &content.objects[obj.def].interactions[interaction];
             let c = obj.centre(content);
-            if inter.pose == Pose::Stand {
+            if inter.pose == Pose::Stand && !inter.inside {
                 sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
             } else {
-                // They stand back up where they came from (see `end_activity`).
+                // Onto the seat or bed, or into the shower, facing the way it faces; they step
+                // back off where they came from (see `end_activity`).
                 sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
                 sim.pos = obj.slot_position(content, obj.slot_of(sim.id).unwrap_or(0));
                 sim.yaw = obj.yaw();
@@ -3814,7 +3815,7 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 }
 
 /// Stops what they're doing: the object they used (or cooked at, sat at to eat, washed up at)
-/// is free again, and they stand up in front of it. What they carry is put down after the step
+/// is free again, and they stand up in front of it (or step out of the shower). What they carry is put down after the step
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     let held = sim.current.take().and_then(|act| match act.task.kind {
@@ -3825,7 +3826,7 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     });
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
         objects[o].release(sim.id);
-        if sim.pose != Pose::Stand {
+        if sim.pose != Pose::Stand || sim.seated_from.is_some() {
             let (fx, fz) = sim.seated_from.unwrap_or_else(|| objects[o].front_tile(content));
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
@@ -3991,6 +3992,51 @@ mod tests {
         run_ticks(&mut w, TICKS_PER_SECOND * 60);
         assert!(!w.objects[0].in_use());
         assert!(w.sims[0].pos[0] > 10.0, "stayed home");
+    }
+
+    #[test]
+    fn showering_happens_in_the_shower() {
+        let content = r#"{
+            "needs":[{"id":"hygiene","label":"Hygiene","decayPerHour":0.05}],
+            "objects":[{"id":"shower","name":"Shower","interactions":[
+              {"id":"shower","label":"Shower","minutes":20,"inside":true,"effects":{"hygiene":1.0}}]}]}"#;
+        let lot = r#"{"width":10,"depth":10,
+            "objects":[{"def":"shower","x":2,"z":2,"rot":0}],
+            "sims":[{"name":"Ada","x":6.5,"z":6.5}]}"#;
+        let mut w = World::from_json(content, lot, 1).unwrap();
+        w.autonomy = false;
+        w.sims[0].needs[0] = 0.1;
+        w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+        let using = |w: &World| w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Using { .. }));
+        for _ in 0..TICKS_PER_SECOND * 60 {
+            if using(&w) {
+                break;
+            }
+            w.tick_once();
+        }
+        assert!(using(&w), "never got to the shower");
+        let front = w.objects[0].front_tile(&w.content);
+        let s = &w.sims[0];
+        assert_eq!(s.tile(), (2, 2), "showers in the shower, not in front of it");
+        assert_eq!(s.pose, Pose::Stand);
+        assert!((s.yaw - w.objects[0].yaw()).abs() < 1e-4, "faces out of the shower");
+        assert_eq!(s.seated_from, Some(front));
+
+        // Saved mid-shower: back out in front of it.
+        let loaded = World::from_save_json(content, &w.save_json()).unwrap();
+        assert_eq!(loaded.sims[0].tile(), front);
+
+        // Done: out where they stepped in from.
+        for _ in 0..TICKS_PER_SECOND * 600 {
+            if !using(&w) {
+                break;
+            }
+            w.tick_once();
+        }
+        assert!(!using(&w) && !w.objects[0].in_use(), "still showering");
+        assert!(w.sims[0].needs[0] > 0.5);
+        assert_eq!(w.sims[0].tile(), front);
+        assert_eq!(w.sims[0].seated_from, None);
     }
 }
 

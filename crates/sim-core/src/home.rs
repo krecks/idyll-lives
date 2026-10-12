@@ -409,7 +409,7 @@ impl World {
     /// Whether a resident stands where `obj` would go (or would stand up there from a seat).
     fn sim_in_the_way(&self, obj: &ObjectInstance) -> bool {
         self.sims.iter().any(|s| {
-            let seated = s.seated_from.filter(|_| s.pose != crate::content::Pose::Stand);
+            let seated = s.seated_from;
             s.away_until.is_none() && obj.tiles(&self.content).any(|t| t == s.tile() || Some(t) == seated)
         })
     }

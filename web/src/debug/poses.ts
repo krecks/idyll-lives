@@ -146,6 +146,13 @@ const STATIONS: Station[] = [
   { label: 'mop', def: 'neat.steamMopDock', tag: 'clean' },
   { label: 'laundry', def: 'neat.laundryCenter', tag: 'clean', female: true },
   { label: 'sing', def: 'cheerful.karaokeMachine', tag: 'sing', female: true },
+  // Showers (used standing inside)
+  { label: 'shower', def: 'shower', tag: 'shower' },
+  { label: 'shower stall', def: 'showerStall', tag: 'shower', female: true },
+  { label: 'shower walk-in', def: 'showerWalkIn', tag: 'shower' },
+  { label: 'shower cedar', def: 'natureLover.cedarShower', tag: 'shower', female: true },
+  { label: 'shower contrast', def: 'energetic.contrastShower', tag: 'shower' },
+  { label: 'shower rain tower', def: 'neat.rainShowerTower', tag: 'shower', female: true },
   // Exercise
   { label: 'trampoline', def: 'energetic.trampoline', tag: 'exercise' },
   { label: 'bouldering', def: 'energetic.boulderingWall', tag: 'exercise', female: true },
@@ -211,6 +218,7 @@ interface DefRaw {
   model?: string;
   footprint?: [number, number];
   slots?: number;
+  interactions?: { inside?: boolean }[];
 }
 const PACKS = ['bookworm', 'cheerful', 'couchPotato', 'energetic', 'foodie', 'gloomy', 'hotHeaded', 'kind', 'lazy', 'loner', 'natureLover', 'neat', 'outgoing', 'romantic', 'slob'];
 const files = await Promise.all(
@@ -248,6 +256,8 @@ interface Actor {
   /** Standing use: the front tile's centre. */
   frontX?: number;
   frontZ?: number;
+  /** Used standing inside (a shower): on the slot, facing out, like sitting. */
+  inside?: boolean;
 }
 const objects: ObjectPlacement[] = [];
 const actors: Actor[] = [];
@@ -296,11 +306,12 @@ await Promise.all(
         mesh.receiveShadows = true;
         shadowGen.addShadowCaster(mesh);
       }
-      // Standing use: centred on the front tile, facing the object; sitting / lying: on the
-      // (first) slot, facing out (as sim-core places them).
+      // Standing use: centred on the front tile, facing the object; sitting / lying (or
+      // standing inside, a shower): on the (first) slot, facing out (as sim-core places them).
       const slots = def?.slots ?? 1;
       const slotX = ox + w / 2 + (0 - (slots - 1) / 2) * (w / slots);
-      actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5 });
+      const inside = def?.interactions?.some((it) => it.inside) ?? false;
+      actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
@@ -371,7 +382,7 @@ function writeSnapshot(): void {
       pose = step.pose;
       tag = step.tag ?? '';
     }
-    const standing = pose === P.Stand && a.object >= 0;
+    const standing = pose === P.Stand && a.object >= 0 && !a.inside;
     snap[o + k.id] = i;
     snap[o + k.x] = standing ? a.frontX! : a.x;
     snap[o + k.z] = standing ? a.frontZ! : a.z;

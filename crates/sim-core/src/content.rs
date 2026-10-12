@@ -71,6 +71,9 @@ pub struct Interaction {
     pub total_gain: [f32; MAX_NEEDS],
     pub gain_per_minute: [f32; MAX_NEEDS],
     pub pose: Pose,
+    /// Used standing on the object rather than in front of it (content `inside`: a shower):
+    /// the resident steps onto its centre, facing out, and back off where they came from.
+    pub inside: bool,
     /// Whether Sims may choose this on their own.
     pub autonomous: bool,
     pub tags: TagMask,
@@ -1929,6 +1932,9 @@ struct InteractionRaw {
     effects: HashMap<String, f32>,
     #[serde(default)]
     pose: Pose,
+    /// Used standing on the object (see `Interaction::inside`).
+    #[serde(default)]
+    inside: bool,
     #[serde(default = "yes")]
     autonomous: bool,
     #[serde(default)]
@@ -2357,6 +2363,7 @@ impl Content {
                     total_gain,
                     gain_per_minute: own_gain.map(|g| g / minutes),
                     pose: it.pose,
+                    inside: it.inside,
                     autonomous: it.autonomous,
                     tags: mask,
                     skill_gain: skill_array(&it.skills, &ctx)?,

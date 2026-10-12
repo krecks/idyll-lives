@@ -76,6 +76,7 @@
           "id": "steamShower",
           "label": "Take a rainfall steam shower",
           "anim": "shower",
+          "inside": true,
           "minutes": 25,
           "pose": "stand",
           "autonomous": true,

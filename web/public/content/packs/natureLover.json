@@ -183,6 +183,7 @@
           "id": "rinse",
           "label": "Shower in the open air",
           "anim": "shower",
+          "inside": true,
           "minutes": 25,
           "pose": "stand",
           "autonomous": true,

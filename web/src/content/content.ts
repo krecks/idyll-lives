@@ -23,6 +23,8 @@ export interface InteractionDef {
   /** Needs it fills for the baby lying in the object (cribs). */
   care?: Record<string, number>;
   pose?: 'stand' | 'sit' | 'lie';
+  /** Used standing on the object, not in front of it (a shower): in on its centre, facing out. */
+  inside?: boolean;
   autonomous?: boolean;
   tags?: string[];
   /** Skill levels gained per hour. */
