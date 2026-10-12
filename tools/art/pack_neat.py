@@ -124,7 +124,7 @@ def organizer_desk():
     HZ, HD = 0.37, 0.16
     p += [box([1.6, 0.02, HD], [0, 1.22, HZ], W, 'satin', radius=0.006),
           box([1.6, 0.02, HD], [0, 0.99, HZ], W, 'satin', radius=0.006),
-          box([1.6, 0.5, 0.012], [0, 1.0, HZ + HD / 2 - 0.006], BIRCH, 'wood', radius=0.004)]
+          box([1.6, 0.5, 0.012], [0, 1.0, HZ + HD / 2 - 0.001], BIRCH, 'wood', radius=0.004)]
     for i in range(6):
         p.append(box([0.02, 0.48, HD], [-0.79 + i * 0.316, 1.0, HZ], W, 'satin', radius=0.004))
     for r, y in enumerate((0.765, 1.0)):

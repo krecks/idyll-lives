@@ -531,7 +531,7 @@ def chef_stove():
     """2x1 range cooker: six burners, double oven, backsplash and a chimney hood."""
     steel, dark = STEEL, '#3A3D41'
     p = [box([1.6, 0.86, 0.62], [0, 0.45, -0.14], steel, 'metal', radius=0.015),               # body
-         box([1.6, 0.06, 0.62], [0, 0.03, -0.14], dark, 'satin', radius=0.008),                  # kick plate
+         box([1.58, 0.06, 0.6], [0, 0.03, -0.14], dark, 'satin', radius=0.008),                  # kick plate, set in
          box([1.62, 0.04, 0.62], [0, 0.9, -0.13], '#2F3236', 'satin', radius=0.01),              # hob top
          box([1.6, 0.5, 0.03], [0, 1.17, -0.44], '#E7E5E0', 'gloss', radius=0.006),              # backsplash tiles
          box([1.2, 0.5, 0.44], [0, 1.82, -0.23], steel, 'metal', radius=0.015),                 # hood

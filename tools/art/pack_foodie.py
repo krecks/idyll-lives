@@ -70,7 +70,7 @@ E['model.foodie.herbGarden'] = herb_garden(); FOOT['model.foodie.herbGarden'] = 
 # ---- deliPantry (1x1): tall cream pantry, glass upper doors, hanging salami, cheese, bread -----
 def deli_pantry():
     BODY, TRIM = '#EDE4D0', HONEY
-    p = [box([0.84, 0.92, 0.46], [0, 0.5, -0.22], BODY, 'satin', radius=0.012),             # lower carcass
+    p = [box([0.84, 0.9, 0.46], [0, 0.49, -0.22], BODY, 'satin', radius=0.012),             # lower carcass (up to the ledge)
          box([0.03, 0.96, 0.44], [-0.405, 1.44, -0.225], BODY, 'satin', radius=0.006),         # upper sides
          box([0.03, 0.96, 0.44], [0.405, 1.44, -0.225], BODY, 'satin', radius=0.006),
          box([0.86, 0.05, 0.46], [0, 1.965, -0.22], TRIM, 'wood', radius=0.01),              # crown
@@ -216,7 +216,7 @@ def pizza_oven():
     cx = 0.56
     p += [box([0.74, 0.84, 0.64], [cx, 0.42, -0.13], STONE, 'satin', radius=0.012),
           box([0.78, 0.05, 0.66], [cx, 0.865, -0.12], '#E9E3D8', 'gloss', radius=0.01),
-          box([0.6, 0.6, 0.02], [cx, 0.42, 0.18], OAK, 'wood', radius=0.008),                  # door
+          box([0.6, 0.6, 0.02], [cx, 0.42, 0.19], OAK, 'wood', radius=0.008),                  # door
           box([0.1, 0.014, 0.02], [cx, 0.62, 0.2], '#3E4146', 'metal', radius=0.005)]
     # pizza on a peel + toppings jars + basil
     p += [box([0.3, 0.015, 0.3], [cx - 0.08, 0.9, -0.08], OAKD, 'wood', radius=0.06),
@@ -246,7 +246,7 @@ def chefs_island():
               box([0.08, 0.012, 0.016], [x, 0.44, -0.004], BRASS, 'metal', radius=0.005)]
     p += [box([1.32, 0.7, 0.03], [0, 0.42, 0.42], CAB, 'satin', radius=0.008),                 # front panel (room side)
           box([1.32, 0.06, 0.32], [0, 0.73, 0.27], CAB, 'satin', radius=0.006),                # apron
-          box([1.34, 0.03, 0.03], [0, 0.12, 0.42], BRASS, 'metal', radius=0.008),              # foot rail
+          box([1.34, 0.03, 0.03], [0, 0.12, 0.44], BRASS, 'metal', radius=0.008),              # foot rail
           box([0.5, 0.008, 0.3], [0, 0.833, 0.24], '#22262B', 'gloss', radius=0.006)]          # induction hob
     for dx in (-0.12, 0.12):
         p.append(torus([0.16, 0.004, 0.16], [dx, 0.838, 0.24], '#C9483B', 'gloss', segments=20))  # hob rings

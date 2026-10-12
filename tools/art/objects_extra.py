@@ -534,8 +534,8 @@ SAGE_C = '#A7B59A'
 v = [
     box([0.84, 0.1, 0.5], [0, 0.05, -0.18], '#8E9C82', 'satin', radius=0.005),     # plinth
     box([0.88, 0.76, 0.56], [0, 0.48, -0.165], SAGE_C, 'satin', radius=0.008),     # cabinet
-    box([0.62, 0.24, 0.52], [0, 0.74, -0.12], '#F6F4EE', 'gloss', radius=0.03),    # apron-front sink
-    box([0.54, 0.004, 0.42], [0, 0.862, -0.13], '#DAD6CD', 'gloss', radius=0.04),  # basin inside
+    box([0.62, 0.24, 0.52], [0, 0.745, -0.12], '#F6F4EE', 'gloss', radius=0.03),   # apron-front sink, its rim just above the cabinet
+    box([0.54, 0.004, 0.42], [0, 0.867, -0.13], '#DAD6CD', 'gloss', radius=0.04),  # basin inside
     box([0.13, 0.04, 0.6], [-0.385, 0.88, -0.145], '#B5824F', 'wood', radius=0.006),  # butcher block
     box([0.13, 0.04, 0.6], [0.385, 0.88, -0.145], '#B5824F', 'wood', radius=0.006),
     box([0.62, 0.04, 0.08], [0, 0.88, -0.405], '#B5824F', 'wood', radius=0.006),
@@ -1021,7 +1021,7 @@ M['model.plant@cozy'] = v
 rnd = random.Random(29)
 v = [
     cyl([0.3, 0.32, 0.3], [0, 0.34, 0], '#F4F3EF', 'satin', segments=24),          # white pot
-    cyl([0.27, 0.01, 0.27], [0, 0.495, 0], '#3B2B20', 'matte'),                    # soil
+    cyl([0.27, 0.01, 0.27], [0, 0.5, 0], '#3B2B20', 'matte'),                      # soil, a little above the rim
     cyl([0.31, 0.02, 0.31], [0, 0.24, 0], LOAK, 'wood'),                           # stand collar
     cyl([0.035, 0.85, 0.035], [0, 0.92, 0], '#6B5440', 'wood', taper=0.6),         # trunk
 ]

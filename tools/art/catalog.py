@@ -355,14 +355,14 @@ add('dishwasher@minimal', dishwasher('#F2F2F0', BIRCH, 'satin', '#F2F2F0', '#F2F
 def farmhouse_sink(cab, top=OAK, top_fin='wood', tap=CHROME):
     return placeholder([
         box([0.98, 0.84, 0.58], [0, 0.48, -0.13], cab, 'satin', radius=0.012),
-        box([0.98, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),
+        box([0.96, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),
         box([0.4, 0.62, 0.02], [-0.22, 0.42, 0.165], cab, 'satin', radius=0.01),                    # doors
         box([0.4, 0.62, 0.02], [0.22, 0.42, 0.165], cab, 'satin', radius=0.01),
         box([0.012, 0.12, 0.02], [-0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
         box([0.012, 0.12, 0.02], [0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
         box([1.0, 0.04, 0.66], [-0.0, 0.94, -0.15], top, top_fin, radius=0.006),
-        box([0.66, 0.26, 0.5], [0, 0.83, -0.08], '#F6F5F2', 'gloss', radius=0.03),                 # apron basin
-        box([0.58, 0.02, 0.4], [0, 0.955, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
+        box([0.66, 0.26, 0.5], [0, 0.835, -0.08], '#F6F5F2', 'gloss', radius=0.03),                # apron basin
+        box([0.58, 0.02, 0.4], [0, 0.962, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
         cyl([0.04, 0.3, 0.04], [0, 1.1, -0.38], tap, 'chrome'),                                      # gooseneck tap
         rod([0, 1.25, -0.38], [0, 1.22, -0.2], 0.03, tap, 'chrome'),
         cyl([0.05, 0.03, 0.05], [0.12, 0.975, -0.4], tap, 'chrome'),
@@ -404,7 +404,7 @@ addp('rangeHood@cozy', range_hood('#E8DFCF', 'satin', HONEY, 'wood', stepped=Tru
 
 def island(body, top, top_fin, stool, legs):
     p = [box([1.84, 0.86, 0.56], [0, 0.47, -0.16], body, 'satin', radius=0.014),
-         box([1.84, 0.08, 0.54], [0, 0.04, -0.16], '#2F3236', 'satin', radius=0.006),
+         box([1.82, 0.08, 0.54], [0, 0.04, -0.16], '#2F3236', 'satin', radius=0.006),
          box([1.94, 0.05, 0.82], [0, 0.925, -0.04], top, top_fin, radius=0.01)]            # worktop with overhang at the front
     for x in (-0.68, -0.23, 0.23, 0.68):
         p.append(box([0.42, 0.6, 0.02], [x, 0.5, -0.45], body, 'satin', radius=0.01))     # (back doors, seen from the room behind)
@@ -958,7 +958,7 @@ for sfx, (wood, fin, back, knob) in {'': (OAK, 'wood', None, OAKD), '@modern': (
 z = -0.18
 p = []
 for x in (-0.91, 0.0, 0.91):
-    p += [box([0.035, 1.83, 0.035], [x, 0.915, z + s * 0.26], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
+    p += [box([0.035, 1.82, 0.035], [x, 0.91, z + s * 0.26], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
 for y in (0.12, 0.56, 1.0, 1.44, 1.815):
     p += [box([1.86, 0.03, 0.56], [0, y, z], OAK, 'wood', radius=0.006),
           box([1.86, 0.03, 0.025], [0, y - 0.03, z + 0.27], BLACKMETAL, 'metal', radius=0.006)]
@@ -980,7 +980,7 @@ def fireplace(stone, mantel, fin='satin', mantel_fin='wood'):
          box([1.84, 1.55, 0.3], [0, 2.025, -0.33], stone, fin, radius=0.015),           # flue up to the ceiling
          box([1.96, 0.07, 0.52], [0, 1.27, -0.22], mantel, mantel_fin, radius=0.01),    # mantel shelf
          box([1.96, 0.1, 0.62], [0, 0.05, -0.17], '#8E8A84', 'matte', radius=0.01),     # hearth
-         box([0.92, 0.7, 0.2], [0, 0.46, -0.16], '#2A2624', 'matte', radius=0.02),      # firebox
+         box([0.92, 0.7, 0.2], [0, 0.46, -0.155], '#2A2624', 'matte', radius=0.02),     # firebox
          box([0.8, 0.6, 0.02], [0, 0.44, -0.05], '#1B1716', 'matte', radius=0.01)]
     for x, r in ((-0.18, 12), (0.12, -18), (0.0, 80)):                                   # logs
         p.append(cyl([0.1, 0.5, 0.1], [x, 0.2, -0.12], '#6B4A33', 'bark', rotate=[0, r, 90]))
@@ -1559,7 +1559,7 @@ def doll_house(wall, roof, trim):
           box([0.12, 0.08, 0.1], [0.18, 0.08, -0.1], RUST, 'fabric', radius=0.02),             # tiny sofa
           box([0.14, 0.04, 0.1], [-0.18, 0.42, -0.1], '#9DC6CF', 'fabric', radius=0.01),       # tiny bed
           box([0.06, 0.12, 0.06], [0.2, 0.44, -0.1], MUSTARD, 'satin', radius=0.01),
-          box([0.12, 0.16, 0.02], [0.0, 0.62, 0.02], '#BFE0E6', 'glass', radius=0.01)]
+          box([0.12, 0.16, 0.02], [0.0, 0.62, 0.025], '#BFE0E6', 'glass', radius=0.01)]
     return p
 
 
@@ -1666,7 +1666,8 @@ add('deskLaptop@minimal', placeholder(desk(BIRCH, '#F2F2F0', '#E6E2DA', leg_fin=
 
 def gaming_pc(accent):
     p = desk('#2F3236', '#2F3236', '#2F3236', 'satin', w=1.7)
-    p = [q for q in p if q['at'][1] < 0.74 or q['at'][2] < 0.0]           # bare desk and chair
+    p = p[:-len(office_chair(-0.17, '#2F3236', '#2F3236'))]               # the desk's own chair: a gaming chair goes there
+    p = [q for q in p if q['at'][1] < 0.72]                                # its legs (a new top below)
     p += [box([1.7, 0.035, 0.44], [0, 0.735, 0.24], '#2F3236', 'satin', radius=0.008),
           box([1.6, 0.004, 0.36], [0, 0.755, 0.22], '#3A3D41', 'matte', radius=0.004),          # desk mat
           box([1.62, 0.01, 0.01], [0, 0.74, 0.465], accent, 'gloss', radius=0.003)]             # LED strip
