@@ -8,6 +8,7 @@ import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
 import { SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
+import { lowestStorey } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
@@ -180,7 +181,7 @@ export async function startSession(
   let storeyCheckAt = 0;
   /** The storey in view follows the resident looked at as they go up or down the stairs. */
   const followStorey = (now: number) => {
-    if (now < storeyCheckAt || game.storeys < 2 || game.mode !== 'live' || now - storeyChosenAt < STOREY_STAY_MS) return;
+    if (now < storeyCheckAt || game.storeys - game.lowestStorey < 2 || game.mode !== 'live' || now - storeyChosenAt < STOREY_STAY_MS) return;
     storeyCheckAt = now + 250;
     const id = game.inspected ?? game.selected;
     const snap = bridge.latest();
@@ -192,7 +193,7 @@ export async function startSession(
     if (storey !== game.storey) setStorey(storey);
   };
   function setStorey(storey: number): void {
-    const k = Math.max(0, Math.min(game.storeys - 1, storey));
+    const k = Math.max(game.lowestStorey, Math.min(game.storeys - 1, storey));
     if (k === game.storey) return;
     game.storey = k;
     renderer.setStorey(k);
@@ -802,7 +803,8 @@ export async function startSession(
     world = w;
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
-    if (game.storey >= game.storeys) setStorey(game.storeys - 1);
+    game.lowestStorey = lowestStorey(w);
+    if (game.storey >= game.storeys || game.storey < game.lowestStorey) setStorey(Math.max(game.lowestStorey, Math.min(game.storeys - 1, game.storey)));
     buildBuy.setStructure(w);
     refreshRoomOverlay();
     const mine = w.households.find((h) => h.player);
@@ -1322,8 +1324,7 @@ export async function startSession(
         const head = { x: 0, y: 0, z: 0 };
         if (renderer.simHead(id, head)) renderer.focus(head.x, head.z);
       },
-      stats: () => renderer.stats(),
-      view: () => viewPlot,
+      stats: () => renderer.stats(),      view: () => viewPlot,
       project(x: number, y: number, z: number) {
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;

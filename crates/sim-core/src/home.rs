@@ -431,6 +431,10 @@ impl World {
     ) -> Result<u32, Error> {
         let obj = self.check_fit(def, x, z, rot, layout).map_err(|e| {
             let e = e.to_string();
+            // The storeys' rules say what's wrong in words already (`check_storey_fit`).
+            if !e.starts_with('\'') {
+                return Error::new(e);
+            }
             Error::new(if e.contains("diagonal") {
                 "furniture can't stand on a tile with a diagonal wall"
             } else if e.contains("no wall to hang on") {
@@ -465,7 +469,7 @@ impl World {
         let cut_off = || {
             let room = self.lot.room_at(fx, fz);
             let p = &self.plots[plot as usize];
-            let k = self.storey_of(fz) * self.storey_depth();
+            let k = self.storey_row(self.storey_of(fz));
             room != OUTDOORS
                 && !(p.z + k..p.z + p.d + k).any(|z| (p.x..p.x + p.w).any(|x| self.lot.room_at(x, z) == room && seen[self.lot.tile_index(x, z)]))
         };
@@ -473,7 +477,7 @@ impl World {
         // with chairs all round); a chair pulled up to a table needs one free side.
         let unused = self.content.objects[def].interactions.is_empty();
         let reached = approach.iter().any(|&(ax, az)| self.lot.in_bounds(ax, az) && seen[self.lot.tile_index(ax, az)]);
-        let front_ok = unused || reached || (!approach.is_empty() && self.storey_of(fz) > 0 && cut_off());
+        let front_ok = unused || reached || (!approach.is_empty() && self.storey_of(fz) != 0 && cut_off());
         if !front_ok || !self.keeps_reach(plot, &before, Some(id)) {
             self.remove_object(id);
             return Err(Error::new("that would block the way"));
@@ -872,6 +876,9 @@ impl World {
                 return Err(Error::new("fences and gates run along the grid"));
             }
             let (a, b) = sides(e);
+            if matches!(target, Edge::Window | Edge::Fence | Edge::Gate) && (self.storey_of(a.1) < 0 || self.storey_of(b.1) < 0) {
+                return Err(Error::new("a basement is underground: no windows, fences or gates down there"));
+            }
             if e.kind != EdgeKind::Open && diagonal.is_some() && object_at(a.0, a.1).is_some() {
                 return Err(Error::new("a wall can't go through furniture"));
             }
@@ -1128,27 +1135,37 @@ impl World {
 
     /// Upstairs stands on downstairs: every room above the ground has a room under each of its
     /// tiles, and every wall above the ground stands on a room's ceiling (a room on one side of
-    /// it below). Nothing stands on the stairwell either.
+    /// it below). Nothing stands on the stairwell either. Stairs up from the basement keep
+    /// coming up inside a room.
     pub(crate) fn storeys_stand(&self, plot: u32) -> Result<(), Error> {
+        let indoor = |x: i32, z: i32| self.lot.in_bounds(x, z) && self.lot.room_at(x, z) != OUTDOORS;
+        for (o, _) in self.objects.iter().zip(&self.object_plot).filter(|(_, on)| **on == Some(plot)) {
+            if self.content.objects[o.def].stairs && self.storey_of(o.z) < 0 {
+                let rise = self.stairs.rise(-1);
+                if o.tiles(&self.content).any(|(x, z)| !indoor(x, z + rise)) {
+                    return Err(Error::new("the stairs down to the basement need a room over them"));
+                }
+            }
+        }
         if self.storeys < 2 {
             return Ok(());
         }
         let p = &self.plots[plot as usize];
-        let d = self.storey_depth();
-        let indoor = |x: i32, z: i32| self.lot.in_bounds(x, z) && self.lot.room_at(x, z) != OUTDOORS;
         for k in 1..self.storeys as i32 {
-            for z in p.z + k * d..p.z + p.d + k * d {
+            // This storey's first row, and the rows down to the storey below.
+            let (up, d) = (self.storey_row(k), self.stairs.rise(k - 1));
+            for z in p.z + up..p.z + p.d + up {
                 for x in p.x..p.x + p.w {
                     if indoor(x, z) && !indoor(x, z - d) {
                         return Err(Error::new("a room upstairs needs a room under it"));
                     }
                 }
             }
-            for z in p.z + k * d..=p.z + p.d + k * d {
+            for z in p.z + up..=p.z + p.d + up {
                 for x in p.x..=p.x + p.w {
                     let h = x < p.x + p.w && self.lot.h_edge(x as usize, z as usize) != Edge::Open;
-                    let v = z < p.z + p.d + k * d && self.lot.v_edge(x as usize, z as usize) != Edge::Open;
-                    let diag = x < p.x + p.w && z < p.z + p.d + k * d && self.lot.diag(x, z).is_some();
+                    let v = z < p.z + p.d + up && self.lot.v_edge(x as usize, z as usize) != Edge::Open;
+                    let diag = x < p.x + p.w && z < p.z + p.d + up && self.lot.diag(x, z).is_some();
                     if h && !(indoor(x, z - 1 - d) || indoor(x, z - d)) || v && !(indoor(x - 1, z - d) || indoor(x, z - d)) || diag && !indoor(x, z - d) {
                         return Err(Error::new("walls upstairs have to stand on a room below"));
                     }

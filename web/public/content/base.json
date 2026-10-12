@@ -3468,7 +3468,8 @@
     "fence": 25,
     "gate": 80,
     "remove": 0,
-    "storeys": 3
+    "storeys": 3,
+    "basement": true
   },
   "styles": [
     {

@@ -75,7 +75,7 @@ export class Director {
 
   /** A lot row on the ground's rows (residents upstairs are framed where they stand). */
   private groundRow(z: number): number {
-    const d = this.world && (this.world.storeys ?? 1) > 1 ? groundDepth(this.world) : 0;
+    const d = this.world ? groundDepth(this.world) : 0;
     return d > 0 ? z - Math.floor(z / d) * d : z;
   }
 

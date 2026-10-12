@@ -227,6 +227,60 @@ uniform vec4 wallCutParams;
 }
 
 /**
+ * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in
+ * metres) of the ground's materials isn't drawn above `below` metres while `on`.
+ */
+export class DigState {
+  readonly rect = new Vector4(0, 0, 0, 0);
+  on = false;
+  below = -0.5;
+}
+
+/** Drops the fragments of the landscape (terrain, lawn) inside the dug-out rectangle (`DigState`). */
+class DigPlugin extends MaterialPluginBase {
+  constructor(
+    material: Material,
+    private readonly state: DigState,
+  ) {
+    super(material, 'Dig', 211, undefined, true, false);
+    this.registerForExtraEvents = true;
+    this._enable(true);
+  }
+
+  override getClassName(): string {
+    return 'DigPlugin';
+  }
+
+  override isCompatible(): boolean {
+    return true;
+  }
+
+  override getUniforms(): { externalUniforms: string[] } {
+    return { externalUniforms: ['digRect', 'digSpan'] };
+  }
+
+  override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
+    const effect = subMesh.effect;
+    if (!effect) return;
+    const { rect, on, below } = this.state;
+    effect.setFloat4('digRect', rect.x, rect.y, rect.z, rect.w);
+    effect.setFloat4('digSpan', on ? 1 : 0, below, 0, 0);
+  }
+
+  override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
+    if (shaderType !== 'fragment') return null;
+    const wgsl = shaderLanguage === ShaderLanguage.WGSL;
+    const [u, p, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec4f'] : ['', 'vPositionW', 'vec4'];
+    return {
+      CUSTOM_FRAGMENT_DEFINITIONS: wgsl ? `uniform digRect: ${v4};\nuniform digSpan: ${v4};` : `uniform ${v4} digRect;\nuniform ${v4} digSpan;`,
+      CUSTOM_FRAGMENT_MAIN_BEGIN: `
+if (${u}digSpan.x > 0.5 && ${p}.y > ${u}digSpan.y && ${p}.x > ${u}digRect.x && ${p}.x < ${u}digRect.z && ${p}.z > ${u}digRect.y && ${p}.z < ${u}digRect.w) { discard; }
+`,
+    };
+  }
+}
+
+/**
  * One material for every untextured opaque finish (matte, satin, gloss, metal, chrome, skin,
  * hair): metalness and roughness come from the vertex colour's alpha (see `encodeFinish`), so a
  * placeholder model with five finishes is one draw call instead of five.
@@ -305,6 +359,21 @@ export class MaterialLibrary {
   private shadowMaterial: StandardMaterial | null = null;
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
+  /** The ground dug away over a basement in view (see `digInto`). */
+  readonly dig = new DigState();
+  private readonly dug = new WeakSet<Material>();
+
+  /** Makes `material` (the landscape's ground and lawn) follow `dig`. */
+  digInto(material: Material | null): void {
+    if (!material || this.dug.has(material)) return;
+    this.dug.add(material);
+    const parts = (material as Material & { subMaterials?: (Material | null)[] }).subMaterials;
+    if (parts) return parts.forEach((m) => this.digInto(m));
+    if (!(material instanceof PBRMaterial || material instanceof StandardMaterial)) return;
+    new DigPlugin(material, this.dig);
+    // (It may have been compiled without it.)
+    material.markDirty(true);
+  }
 
   /** Called after thawed materials were frozen again (a WebGPU snapshot must re-record then). */
   onRefrozen: (() => void) | null = null;

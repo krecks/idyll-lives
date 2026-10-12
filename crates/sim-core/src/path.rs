@@ -7,10 +7,10 @@
 //! diagonal wall or clip its end), but allowed past a diagonal that keeps clear of the corner,
 //! so a corridor between two parallel diagonal walls can be walked.
 //!
-//! Storeys: storey `k` is rows `k * depth .. (k + 1) * depth` of the lot (see
-//! `World::storeys`). Above the ground only rooms have a floor to stand on. Stairs are walked
-//! up from their foot, step by step, and the top step leads straight to the landing on the
-//! storey above.
+//! Storeys: each storey is a block of `depth` rows of the lot (see `World::storeys`; the
+//! ground is rows `0 .. depth`, the basement has a block of its own). Off the ground only rooms
+//! have a floor to stand on. Stairs are walked up from their foot, step by step, and the top
+//! step leads straight to the landing on the storey above.
 //!
 //! Gardens: the town is one grid, so nothing in it stops a resident cutting across the
 //! neighbours' lawns. Given `Grounds`, a step onto another household's plot costs a long
@@ -50,16 +50,45 @@ impl Stair {
 pub struct StairMap {
     /// Rows per storey; 0 when the lot has one storey.
     pub depth: i32,
+    /// The block of rows holding the basement (storey -1); 0: no basement. Blocks before it are
+    /// storeys 0, 1, …; blocks after it (storeys added later) are one storey lower than their
+    /// place.
+    pub basement: i32,
     pub stairs: Vec<Stair>,
 }
 
 /// No storeys, no stairs.
-pub static NO_STAIRS: StairMap = StairMap { depth: 0, stairs: Vec::new() };
+pub static NO_STAIRS: StairMap = StairMap { depth: 0, basement: 0, stairs: Vec::new() };
 
 impl StairMap {
-    /// The storey a row is on.
+    /// The storey a row is on (0: the ground, -1: the basement).
     pub fn storey(&self, z: i32) -> i32 {
-        if self.depth > 0 { z.div_euclid(self.depth) } else { 0 }
+        if self.depth == 0 {
+            return 0;
+        }
+        let block = z.div_euclid(self.depth);
+        match self.basement {
+            0 => block,
+            b if block == b => -1,
+            b if block > b => block - 1,
+            _ => block,
+        }
+    }
+
+    /// The first row of a storey.
+    pub fn storey_row(&self, storey: i32) -> i32 {
+        let block = match self.basement {
+            _ if self.depth == 0 => 0,
+            b if storey < 0 => b,
+            b if b > 0 && storey >= b => storey + 1,
+            _ => storey,
+        };
+        block * self.depth
+    }
+
+    /// Rows from a storey's to the same place on the one above.
+    pub fn rise(&self, storey: i32) -> i32 {
+        self.storey_row(storey + 1) - self.storey_row(storey)
     }
 
     /// The same place on the ground storey's rows.
@@ -91,9 +120,9 @@ impl StairMap {
             return (a[0] - b[0]).hypot(a[1] - b[1]);
         }
         let d = self.depth as f32;
-        let (ka, kb) = ((a[1] / d).floor(), (b[1] / d).floor());
-        let flat = (a[0] - b[0]).hypot((a[1] - ka * d) - (b[1] - kb * d));
-        flat + (ka - kb).abs() * STOREY_WALK
+        let (ka, kb) = (self.storey(a[1].floor() as i32), self.storey(b[1].floor() as i32));
+        let flat = (a[0] - b[0]).hypot(a[1].rem_euclid(d) - b[1].rem_euclid(d));
+        flat + (ka - kb).abs() as f32 * STOREY_WALK
     }
 }
 
@@ -139,7 +168,7 @@ pub struct NavGrid<'a> {
 
 impl NavGrid<'_> {
     /// Whether a resident can stand on the tile: on the lot, no furniture, no diagonal wall;
-    /// above the ground, only in a room (where there's a floor).
+    /// off the ground (upstairs or in the basement), only in a room (where there's a floor).
     pub fn tile_free(&self, x: i32, z: i32) -> bool {
         self.lot.in_bounds(x, z)
             && !self.blocked[self.lot.tile_index(x, z)]

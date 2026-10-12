@@ -7,7 +7,7 @@
  */
 
 import type { Content } from '../content/content';
-import { groundDepth, storeyOfRow, type RoomView, type WorldStructure } from '../core/protocol';
+import { groundDepth, storeyOfRow, storeyRow, type RoomView, type WorldStructure } from '../core/protocol';
 import { STOREY_HEIGHT, type Renderer, type RoomOverlayTile } from '../render/types';
 
 /** Factor names in `RoomView.scores` order. */
@@ -76,7 +76,7 @@ export class RoomOverlay {
     if (key === this.key) return;
     this.key = key;
     this.renderer.setRoomOverlay(world ? this.tiles(world, shown, storey) : []);
-    const lift = world ? storey * groundDepth(world) : 0;
+    const lift = world ? storeyRow(world, storey) : 0;
     this.root.replaceChildren();
     this.tags = shown.map((r) => {
       const el = document.createElement('div');
@@ -117,8 +117,8 @@ export class RoomOverlay {
     const colors = new Map(rooms.map((r) => [r.id, scoreColor(r.scores[5])]));
     const split = new Map((world.diagonals ?? []).map((d) => [d.z * world.width + d.x, d.rooms]));
     const out: RoomOverlayTile[] = [];
-    const rows = groundDepth(world);
-    for (let z = storey * rows; z < Math.min(world.depth, (storey + 1) * rows); z++) {
+    const first = storeyRow(world, storey);
+    for (let z = first; z < Math.min(world.depth, first + groundDepth(world)); z++) {
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
         const halves = split.get(i);

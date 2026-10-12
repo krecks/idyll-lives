@@ -22,7 +22,7 @@
       { id: 'room', label: 'Room', icon: 'icon.ui.room', unit: '/m', hint: 'Drag out a rectangle, then add a door', note: "An empty room can be closed off; residents and furniture can't be shut in." },
       { id: 'fence', label: 'Fence', icon: 'icon.ui.fence', unit: '/m', hint: 'Drag along the grid, then add a gate', note: 'Fences keep a garden outdoors (no floor, no roof); leave a gate so nobody is shut in.' },
       { id: 'gate', label: 'Gate', icon: 'icon.ui.gate', unit: '', hint: 'Click a fence (or open ground) to fit a gate', note: 'Leave a gate so nobody is shut in.' },
-      { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Click where the stairs start · R turns them · click your stairs to move them', note: 'Build the storey above first. Stairs are climbed from the front; nothing can stand on the steps or where they come up.' },
+      { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Click where the stairs start · R turns them · click your stairs to move them', note: 'Build the storey above first. Stairs placed in the basement lead up into a room on the ground floor. Stairs are climbed from the front; nothing can stand on the steps or where they come up.' },
       { id: 'roof', label: 'Roof', icon: 'icon.ui.roof', unit: '', hint: 'Pick a shape and a colour: the whole roof changes at once', note: 'The roof covers every room of the house. Changing it is free.' },
     ],
     [
@@ -42,6 +42,9 @@
     ],
   ];
   const tools = groups.flat();
+  /** Tools with nothing to do in the basement (no windows, gardens or roof underground). */
+  const aboveGround = new Set<BuildTool>(['window', 'fence', 'gate', 'roof']);
+  const underground = (id: BuildTool) => game.storey < 0 && aboveGround.has(id);
   /** What the tool costs with the look picked (per metre for walls, per face for paint, per tile for floors). */
   const price = (id: BuildTool): string => {
     if (!prices) return '';
@@ -113,7 +116,8 @@
                 role="radio"
                 aria-checked={game.buildTool === t.id}
                 class:active={game.buildTool === t.id}
-                title="{t.label}{costLabel(t)} — {t.note}{t.id === 'wall' ? diagonal : ''}"
+                disabled={underground(t.id)}
+                title="{t.label}{costLabel(t)} — {underground(t.id) ? 'Not in the basement.' : t.note}{t.id === 'wall' ? diagonal : ''}"
                 onclick={() => pick(t.id)}
               >
                 <span class="badge"><Icon name={t.icon} size={18} /></span>
@@ -211,6 +215,10 @@
     background: var(--build);
     color: #fff;
     animation: bounce 420ms var(--ease);
+  }
+  .tools button:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
   .label {
     white-space: nowrap;

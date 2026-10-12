@@ -15,11 +15,15 @@ import type { Content } from '../../content/content';
 import type { ItemPlacement } from '../../core/protocol';
 import { buildAhead, buildModel, type ModelTemplate } from './models';
 
-/** Where items show: the storey in view, rows per storey and how high each stands. */
+/** Where items show: the storey in view, the storey of a lot row and how high each stands. */
 export interface ItemView {
   storey: number;
-  /** Rows per storey (0: one storey). */
-  depth: number;
+  /** The storey a lot row is on (-1: the basement). */
+  storeyOf(z: number): number;
+  /** Whether storey `k` shows with `storey` in view. */
+  shown(k: number): boolean;
+  /** The same row on the ground's rows. */
+  groundZ(z: number): number;
   storeyHeight: number;
   /** Whether a ground point (tiles) is in the lot being viewed. */
   inView(x: number, z: number): boolean;
@@ -107,11 +111,7 @@ export class ItemLayer {
     const generation = ++this.generation;
     const view = this.view;
     if (!view) return;
-    const storeyOf = (z: number) => (view.depth > 0 ? Math.max(0, Math.floor(z / view.depth)) : 0);
-    const shown = this.items.filter((it) => {
-      const k = storeyOf(it.z);
-      return it.state !== 'stored' && k <= view.storey && view.inView(it.x, it.z - k * view.depth);
-    });
+    const shown = this.items.filter((it) => it.state !== 'stored' && view.shown(view.storeyOf(it.z)) && view.inView(it.x, view.groundZ(it.z)));
     const byModel = Map.groupBy(shown, (it) => this.modelOf(it.def));
     this.buildElsewhere(generation);
     const keys = [...byModel.keys()];
@@ -132,8 +132,7 @@ export class ItemLayer {
         this.buffers.set(key, matrices);
       }
       list.forEach((it, i) => {
-        const k = storeyOf(it.z);
-        const [x, y, z] = [it.x, k * view.storeyHeight + it.y, it.z - k * view.depth];
+        const [x, y, z] = [it.x, view.storeyOf(it.z) * view.storeyHeight + it.y, view.groundZ(it.z)];
         Quaternion.RotationYawPitchRollToRef(it.yaw, 0, 0, q);
         Matrix.ComposeToRef(one, q, at.set(x, y, z), m);
         m.copyToArray(matrices, i * 16);

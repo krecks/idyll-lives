@@ -111,12 +111,12 @@
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
     </span>
-    {#if game.storeys > 1}
+    {#if game.storeys - game.lowestStorey > 1}
       <div class="storeys" role="group" aria-label="Storey">
-        <button class="tool" title="Storey down (Page Down)" aria-label="Storey down" disabled={game.storey === 0} onclick={() => services.controls.setStorey(game.storey - 1)}>
+        <button class="tool" title="Storey down (Page Down)" aria-label="Storey down" disabled={game.storey <= game.lowestStorey} onclick={() => services.controls.setStorey(game.storey - 1)}>
           <span class="arrow down"><Icon name="icon.ui.back" size={16} /></span>
         </button>
-        <span class="storey" title="Storey in view: higher ones are hidden">{game.storey === 0 ? 'Ground' : `Floor ${game.storey}`}</span>
+        <span class="storey" title="Storey in view: higher ones are hidden">{game.storey < 0 ? 'Basement' : game.storey === 0 ? 'Ground' : `Floor ${game.storey}`}</span>
         <button class="tool" title="Storey up (Page Up)" aria-label="Storey up" disabled={game.storey >= game.storeys - 1} onclick={() => services.controls.setStorey(game.storey + 1)}>
           <span class="arrow up"><Icon name="icon.ui.back" size={16} /></span>
         </button>
