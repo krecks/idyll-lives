@@ -40,7 +40,8 @@ const towns: unknown[] = [];
 const stats = { tried: 0, made: 0, two: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0 };
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
-for (const [size, lot] of Object.entries(houses.lotSizes)) {
+// A farm lot's house is a large lot's (town.ts `houseLot`).
+for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
     const h = generateHouse(cfg, info, lot, houses.plot, size, seed * 7919);

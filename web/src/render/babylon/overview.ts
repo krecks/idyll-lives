@@ -23,7 +23,7 @@ import type { HouseBuilder } from './house';
 import { LAYER_TOWN } from './layers';
 import type { MaterialLibrary } from './materials';
 import { buildModel, placementVariation, type ModelTemplate } from './models';
-import { Street } from './street';
+import { fieldLayers, Street } from './street';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
 const TOWN_HEIGHT = 7;
@@ -198,6 +198,7 @@ export class TownOverview {
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['townStreets', world.meta?.streets, 'material.road', 0.012],
       ['townPaths', world.meta?.paths, 'material.path', 0.014],
+      ...fieldLayers(world.meta?.world?.fields, 'town'),
     ];
     for (const [name, rects, material, y] of layers) {
       if (!rects?.length) continue;
@@ -350,6 +351,7 @@ function townKey(world: WorldStructure): string {
     world.objects.length,
     world.objects.reduce((a, o) => a + o.x * 31 + o.z * 7 + o.rot, 0),
     (world.meta?.paths ?? []).map((r) => `${r.x},${r.z},${r.w}`).join(';'),
+    JSON.stringify(world.meta?.world ?? null),
   ].join('|');
 }
 
@@ -427,6 +429,9 @@ export class OverviewCamera {
   private viewW = 1920;
   private viewH = 1080;
   private onArrive: (() => void) | null = null;
+
+  /** Height of the land round the town (null: flat), so the camera stays above it with the town in sight. */
+  ground: ((x: number, z: number) => number) | null = null;
 
   constructor(private readonly camera: ArcRotateCamera) {}
 
@@ -535,10 +540,25 @@ export class OverviewCamera {
     const cam = this.camera;
     const c = this.cur;
     cam.alpha = c.alpha;
-    cam.beta = c.beta;
+    // Looking from higher up while the land (a mountain) would stand in the way.
+    let beta = c.beta;
+    for (let k = 0; k < 20 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, c.tz); k++) beta -= 0.04;
+    cam.beta = beta;
     cam.radius = c.radius;
     cam.target.copyFromFloats(c.tx, 0, c.tz);
     cam.targetScreenOffset.copyFromFloats(c.ox, c.oy);
+  }
+
+  /** Whether the camera at this pose is in the ground or has the land between it and the target. */
+  private hidden(alpha: number, beta: number, radius: number, tx: number, tz: number): boolean {
+    if (!this.ground) return false;
+    const [dx, dy, dz] = [Math.cos(alpha) * Math.sin(beta) * radius, Math.cos(beta) * radius, Math.sin(alpha) * Math.sin(beta) * radius];
+    for (const t of [0, 0.12, 0.25, 0.4, 0.55, 0.7]) {
+      const [x, y, z] = [tx + dx * (1 - t), dy * (1 - t), tz + dz * (1 - t)];
+      // Clear of the treetops too.
+      if (y < this.ground(x, z) + (t === 0 ? 12 : 14)) return true;
+    }
+    return false;
   }
 
   private startGlide(seconds: number): void {

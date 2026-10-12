@@ -80,7 +80,7 @@ import { createLighting, lightingAt } from './environment';
 import { buildFences } from './fences';
 import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
-import { Street } from './street';
+import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
 import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures } from './loaders';
@@ -562,7 +562,7 @@ export class BabylonRenderer implements Renderer {
     this.retireTemplates(new Set(this.templatesInUse));
     const templates = await this.templateMeshes();
 
-    const notCasting = new Set(['floors', 'floorsTiled', 'floorsCarpet', 'floorsStone', 'streets', 'paths', 'contactShadows', 'objectShadows', 'windows', 'windowsInner', 'plinth', 'wallsTiled']);
+    const notCasting = new Set(['floors', 'floorsTiled', 'floorsCarpet', 'floorsStone', 'streets', 'paths', 'fields', 'furrows', 'contactShadows', 'objectShadows', 'windows', 'windowsInner', 'plinth', 'wallsTiled']);
     this.baseCasters = [
       ...new Set([
         ...[...this.lotMeshes, ...this.worldMeshes].filter((m) => !notCasting.has(m.name) && !m.name.startsWith('silhouette') && !houseCasters.includes(m)),
@@ -601,6 +601,7 @@ export class BabylonRenderer implements Renderer {
       this.resetSnapshot();
     }
     this.steerCamera(this.engine.getDeltaTime() / 1000);
+    this.keepCameraClear();
     this.updateCutaway();
     this.followCamera();
     this.skyDome.drift(this.engine.getDeltaTime());
@@ -1416,6 +1417,23 @@ export class BabylonRenderer implements Renderer {
     this.followIndex = index;
   }
 
+  /**
+   * Keeps the game camera above the land round the town (mountains rise close to it in some
+   * worlds): looking from higher up instead of from inside a hill.
+   */
+  private keepCameraClear(): void {
+    const land = this.natureIn.world?.landscape;
+    if (this.townMode || !land) return;
+    const cam = this.camera;
+    for (let k = 0; k < 20 && cam.beta > 0.3; k++) {
+      const p = cam.position;
+      if (p.y >= land.heightAt(p.x, p.z) + 4) break;
+      cam.beta = Math.max(0.3, cam.beta - 0.03);
+      cam.inertialBetaOffset = 0;
+      cam.getViewMatrix(true);
+    }
+  }
+
   /** The director's shot, or keeping a followed resident centred (game world only). */
   private steerCamera(dt: number): void {
     if (this.gameRig.active) return this.gameRig.frame(dt);
@@ -1491,7 +1509,10 @@ export class BabylonRenderer implements Renderer {
       this.beginBuild();
       try {
         // Same seed and size can still be a new layout ("New neighbours"): re-fit the lawn to its houses.
-        (await this.useNature('town', world)).landscape.refreshLawn(world);
+        const nature = await this.useNature('town', world);
+        nature.landscape.refreshLawn(world);
+        // The camera keeps a clear view over the hills (and out of the mountains).
+        overview.rig.ground = (x, z) => nature.landscape.heightAt(x, z);
         await overview.build(world);
         if (this.townHighlight) overview.setHighlight(this.townHighlight);
         // Interior lamps of the game's house never reach the overview.
@@ -1622,8 +1643,10 @@ export class BabylonRenderer implements Renderer {
       this.lastLightMinute = this.townMinute;
       this.resetSnapshot();
     }
-    // Haze is tuned for the game's close camera; from high above it would wash the town out.
-    const fog = LOOK.fog * Math.min(1, Math.max(0.3, 55 / this.camera.radius));
+    // Haze is tuned for the game's close camera; from high above it would wash the town out
+    // (and the mountains round a mountain town, which are meant to be seen).
+    const clear = this.natureIn.town?.landscape.mountainous ? 0.35 : 1;
+    const fog = LOOK.fog * Math.min(1, Math.max(0.3, 55 / this.camera.radius)) * clear;
     if (Math.abs(fog - this.scene.fogDensity) > LOOK.fog * 0.02) this.scene.fogDensity = fog;
     this.followCamera();
     this.skyDome.drift(dt);
@@ -1672,7 +1695,7 @@ export class BabylonRenderer implements Renderer {
    */
   private async useNature(layer: 'world' | 'town', world: WorldStructure): Promise<NatureSet> {
     // The town's own size (the game's lot also holds the storeys above it).
-    const key = `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}`;
+    const key = Landscape.key(world);
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
@@ -2115,6 +2138,7 @@ export class BabylonRenderer implements Renderer {
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['streets', world.meta?.streets, 'material.road', 0.012],
       ['paths', world.meta?.paths, 'material.path', 0.014],
+      ...fieldLayers(world.meta?.world?.fields, ''),
     ];
     for (const [name, all, material, y] of layers) {
       // Only the stretch of road in front of the viewed lot.

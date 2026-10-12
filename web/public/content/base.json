@@ -614,7 +614,113 @@
       "Birch Avenue",
       "Linden Way",
       "Juniper Close"
-    ]
+    ],
+    "worlds": {
+      "small": {
+        "start": ["Willow", "Hazel", "Bramble", "Linden", "Clover", "Wren", "Robin", "Primrose", "Thistle", "Elder"],
+        "end": ["brook", "ford", "ley", "wick", " Green", "stead", "by", " End"],
+        "streets": ["Church", "Mill", "Orchard", "School", "Chapel", "Rose", "Meadow", "Well"],
+        "ways": ["Lane", "Street", "Row", "Close", "Walk"],
+        "taglines": [
+          "A village where everyone waves.",
+          "One street, one park, and a lot of gossip.",
+          "Small enough that the postie knows your name.",
+          "Quiet lanes, long evenings and a bench with a view.",
+          "Where the church bell is the only alarm clock."
+        ]
+      },
+      "medium": {
+        "start": ["Maple", "Cedar", "Bright", "Oak", "Ash", "Elm", "Sunny", "Fair", "Larch", "Silver"],
+        "end": ["field", "ton", "wood", " Park", "dale", "view", " Heights", "bury"],
+        "streets": ["Maple", "Elm", "Willow", "Birch", "Linden", "Juniper", "Poplar", "Sycamore"],
+        "ways": ["Street", "Road", "Avenue", "Way", "Drive"],
+        "taglines": [
+          "Trimmed hedges, friendly faces, a café that knows your order.",
+          "Big enough for a secret or two, small enough to keep none.",
+          "A town that turns out for every street party.",
+          "Lawns, letterboxes and the smell of someone's barbecue.",
+          "Everyone has an opinion about the park fountain."
+        ]
+      },
+      "dense": {
+        "start": ["King's", "Queen's", "Market", "Union", "Station", "High", "Bridge", "Canal", "Foundry", "Crown"],
+        "end": [" Cross", "gate", " Square", "side", " Quarter", "ton", " Row"],
+        "streets": ["High", "Market", "Station", "Union", "Canal", "Foundry", "Albion", "Victoria"],
+        "ways": ["Street", "Road", "Parade", "Terrace"],
+        "taglines": [
+          "Busy pavements, corner shops and neighbours on every side.",
+          "Never more than a minute from a fresh loaf.",
+          "Thin walls, close friends, loud Saturdays.",
+          "The bus is always just leaving.",
+          "Window boxes on every sill, gossip on every step."
+        ]
+      },
+      "farm": {
+        "start": ["Hay", "Barley", "Oat", "Wheat", "Clover", "Apple", "Mill", "Honey", "Butter", "Fallow"],
+        "end": ["field", "croft", " Farm", "ham", "stead", " Acres", " Bottom", "wold"],
+        "streets": ["Barn", "Mill", "Orchard", "Meadow", "Hayloft", "Plough", "Furrow", "Dairy"],
+        "ways": ["Lane", "Road", "Track", "Drove"],
+        "taglines": [
+          "Early mornings, muddy boots and pumpkins the size of a car.",
+          "The tractor is the rush hour.",
+          "Fields to the horizon and a farm shop that never locks.",
+          "Where the scarecrows have names.",
+          "Honest work, fresh eggs and a big sky."
+        ]
+      },
+      "seaside": {
+        "start": ["Gull", "Salt", "Shell", "Anchor", "Driftwood", "Pebble", "Harbour", "Sand", "Coral", "Tide"],
+        "end": ["cove", "mouth", "port", "haven", " Bay", " Quay", "sea", " Sands"],
+        "streets": ["Harbour", "Quay", "Beach", "Lighthouse", "Esplanade", "Net", "Lobster", "Smugglers'"],
+        "ways": ["Road", "Row", "Steps", "Lane", "Hill"],
+        "taglines": [
+          "A sleepy harbour where the gulls wake you.",
+          "Salt on the windows, sand in your shoes.",
+          "Every house has a view of the sea, if you lean out far enough.",
+          "Ice cream for breakfast is allowed here.",
+          "The tide sets the clock."
+        ]
+      },
+      "mountain": {
+        "start": ["Pine", "Stone", "Eagle", "Frost", "High", "Granite", "Cloud", "Raven", "Larch", "Snow"],
+        "end": ["crag", "fell", " Pass", "peak", "ridge", "scar", "dale", "holm"],
+        "streets": ["Summit", "Ridge", "Cable", "Chalet", "Glacier", "Edelweiss", "Lodge", "Scree"],
+        "ways": ["Path", "Road", "Way", "Lane"],
+        "taglines": [
+          "Thin air, thick jumpers, views worth the climb.",
+          "The peaks keep watch over a handful of homes.",
+          "Where the nearest neighbour is a mountain goat.",
+          "Pine smoke from every chimney.",
+          "A hamlet that hears its own echo."
+        ]
+      },
+      "lakeside": {
+        "start": ["Mirror", "Reed", "Heron", "Swan", "Willow", "Mere", "Lily", "Kingfisher", "Still", "Otter"],
+        "end": ["mere", "water", " Lake", "tarn", "shore", "pool", "side", " Reach"],
+        "streets": ["Boathouse", "Jetty", "Shore", "Reed", "Heron", "Lily", "Ferry", "Pier"],
+        "ways": ["Lane", "Road", "Walk", "Drive"],
+        "taglines": [
+          "Still water, slow mornings and swans with attitude.",
+          "Everyone swims at dawn; nobody admits how cold it is.",
+          "The lake reflects the sky, the town reflects the lake.",
+          "Herons on the shore, gossip on the jetty.",
+          "Sunsets here are a group activity."
+        ]
+      },
+      "forest": {
+        "start": ["Fern", "Moss", "Bracken", "Oak", "Holly", "Rowan", "Acorn", "Hollow", "Bluebell", "Badger"],
+        "end": ["wood", "glade", "hurst", " Hollow", "shaw", " Clearing", "dell", "holt"],
+        "streets": ["Woodland", "Acorn", "Fox", "Owl", "Fernbank", "Hollyhock", "Deer", "Mossy"],
+        "ways": ["Lane", "Way", "Ride", "Track"],
+        "taglines": [
+          "A clearing in deep woods where the owls have the last word.",
+          "Birdsong for an alarm, deer for neighbours.",
+          "Where the paths outnumber the people.",
+          "Moss on the roofs and mushrooms in every garden.",
+          "The forest keeps the secrets; the neighbours keep the rest."
+        ]
+      }
+    }
   },
   "emotions": [
     {
@@ -3497,7 +3603,8 @@
         {"id": "play", "label": "Playground", "outside": true},
         {"id": "street", "label": "Street & square", "outside": true},
         {"id": "food", "label": "Carts & machines", "outside": true},
-        {"id": "shops", "label": "Shop & café", "outside": false}
+        {"id": "shops", "label": "Shop & café", "outside": false},
+        {"id": "farm", "label": "Farm", "outside": true}
       ]
     }
   ],

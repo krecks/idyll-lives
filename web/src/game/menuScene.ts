@@ -217,7 +217,11 @@ class MenuScene {
       case 'create':
         return { focus: plots, frame: { left: W * 0.12, top: H * 0.1, right: W * 0.88, bottom: H * 0.98 }, beta: 1.3, alpha: 0.9, zoom: 1.8, sway: 0.25, duration, minute: CREATE_MINUTE };
       case 'overview':
-        return { focus: plots, frame: shot.frame, beta: 0.8, alpha: -Math.PI / 2 + 0.32, zoom: 1.04, drift: 0, duration, minute: OVERVIEW_MINUTE };
+        // Among mountains, lower: the peaks round the valley in the picture too.
+        return world.meta?.world?.landscape.mountains
+          ? // The mountainside behind the town in the picture too (the camera looks from low z).
+            { focus: { ...plots, d: plots.d + 190 }, frame: shot.frame, beta: 1.42, alpha: -Math.PI / 2 + 0.32, zoom: 1, drift: 0, duration, minute: OVERVIEW_MINUTE }
+          : { focus: plots, frame: shot.frame, beta: 0.8, alpha: -Math.PI / 2 + 0.32, zoom: 1.04, drift: 0, duration, minute: OVERVIEW_MINUTE };
       case 'lot': {
         // The lot with a strip of its neighbours around it, from the side the game opens on.
         const p = world.plots[shot.plot];

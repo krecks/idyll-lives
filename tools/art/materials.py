@@ -10,6 +10,9 @@ E = {
   'material.ground': dict(surf('#FFFFFF', 'grass', 0.3, normalStrength=0.8, projection='xz'), sideColor='#C9B391'),
   'material.road': surf('#FFFFFF', 'road_asphalt', 0.2, projection='xz'),
   'material.path': surf('#FFFFFF', 'path_hexpaving', 0.7, projection='xz'),
+  # Farm fields (town.ts `farmstead`): tilled earth, the greyscale grain tinted; furrows darker.
+  'material.soil': surf('#8A6646', 'grass', 0.5, projection='xz', roughness=1),
+  'material.furrow': surf('#664A33', 'grass', 0.5, projection='xz', roughness=1),
   'material.finish.matte': {'type': 'material', 'color': '#FFFFFF', 'roughness': 0.75},
   'material.finish.satin': {'type': 'material', 'color': '#FFFFFF', 'roughness': 0.42},
   'material.finish.gloss': {'type': 'material', 'color': '#FFFFFF', 'roughness': 0.12},

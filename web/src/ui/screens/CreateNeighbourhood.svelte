@@ -2,19 +2,15 @@
   import { onMount } from 'svelte';
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { menuScene } from '../../game/menuScene';
-  import { generateNeighbourhood, loadTemplates, vacantSlots, type NeighbourhoodDraft, type Templates, type TownSize } from '../../game/town';
+  import { loadTemplates, populate, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
-  import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
-  import Segmented from '../kit/Segmented.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
 
   const { content, assets } = services;
   let templates = $state.raw<Templates | null>(null);
-  let size = $state<TownSize>(app.town?.size ?? 'medium');
-  let name = $state(app.town?.name ?? '');
   let town = $state.raw<NeighbourhoodDraft | null>(app.town);
   /** Lot under the pointer (3D or a household card) and the lot the camera is on. */
   let hover = $state<number | null>(null);
@@ -36,15 +32,18 @@
       : [],
   );
 
-  function generate(keepName = true) {
-    if (!templates) return;
-    town = generateNeighbourhood(content, assets, templates, size, keepName && name ? name : undefined, undefined, town?.seed);
-    name = town.name;
+  /** The world from step 1, nobody living there yet. */
+  const world = (): NeighbourhoodDraft | null => app.world ?? (town && { ...town, households: [] });
+
+  /** New neighbours in the same world (its streets and houses stay as they are). */
+  function generate(count?: number) {
+    const empty = world();
+    if (!templates || !empty) return;
+    town = populate(content, assets, templates, empty, count);
   }
 
   function setNeighbours(count: number) {
-    if (!templates || !town) return;
-    town = generateNeighbourhood(content, assets, templates, size, name, count, town.seed);
+    generate(count);
   }
 
   function rerollHousehold(i: number) {
@@ -59,10 +58,10 @@
     town = { ...town, households: town.households.filter((_, j) => j !== i) };
   }
 
-  /** The town as the next step should see it (with the name typed here). */
+  /** The town as the next steps should see it. */
   function keep() {
     if (!town) return;
-    app.town = { ...town, name: name.trim() || town.name };
+    app.town = town;
   }
 
   function next() {
@@ -92,17 +91,14 @@
 
   onMount(async () => {
     templates = await loadTemplates();
-    if (!town) {
-      // Start from the neighbourhood the main menu showed.
-      town = await menuScene.showcaseDraft();
-      size = town.size;
-      name = town.name;
+    if (town) return;
+    if (!app.world) {
+      // No world made yet: that is the first step.
+      app.screen = 'world';
+      return;
     }
-  });
-
-  // Regenerate when the size changes.
-  $effect(() => {
-    if (templates && town && town.size !== size) generate();
+    generate();
+    keep();
   });
 
   // The 3D town follows the draft; a new layout drops the focus.
@@ -112,7 +108,7 @@
   });
   let layout = '';
   $effect(() => {
-    const key = town ? `${town.size}:${town.slots.map((s) => s.template).join(',')}` : '';
+    const key = town ? `${town.seed}:${town.slots.map((s) => s.template).join(',')}` : '';
     if (key !== layout) {
       layout = key;
       focus = null;
@@ -132,10 +128,10 @@
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
   <header>
-    <button class="btn ghost back" onclick={() => app.toMenu()}><Icon name="icon.ui.back" size={18} /> Menu</button>
+    <button class="btn ghost back" onclick={() => (app.screen = 'world')}><Icon name="icon.ui.back" size={18} /> World</button>
     <div class="title">
-      <span class="eyebrow">Step 1 of 3 · Your neighbourhood</span>
-      <input class="input town-name" aria-label="Town name" bind:value={name} maxlength="24" />
+      <span class="eyebrow">Step 2 of 4 · Choose a household</span>
+      <h1 class="town-name">{town?.name ?? app.world?.name ?? ''}</h1>
       <p class="lede">Play one of the households who live here, or make your own in Creation.</p>
     </div>
     <div class="actions">
@@ -153,44 +149,6 @@
       {/if}
       {#if town && templates}
         <div class="controls menu-glass" use:avoid>
-          <div class="control">
-            <span class="eyebrow">Game</span>
-            <Segmented
-              label="Game"
-              bind:value={app.mode}
-              options={[
-                { value: 'living', label: 'Living' },
-                { value: 'creative', label: 'Creative' },
-              ]}
-            />
-            <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
-          </div>
-          <div class="control">
-            <span class="eyebrow">Lifespan</span>
-            <Segmented
-              label="Lifespan"
-              bind:value={app.lifespan}
-              options={[
-                { value: 'off', label: 'Off' },
-                { value: 'short', label: 'Short' },
-                { value: 'normal', label: 'Normal' },
-                { value: 'long', label: 'Long' },
-              ]}
-            />
-            <span class="hint">{lifespanHint(app.lifespan)}</span>
-          </div>
-          <div class="control">
-            <span class="eyebrow">Town size</span>
-            <Segmented
-              label="Town size"
-              bind:value={size}
-              options={[
-                { value: 'small', label: 'Small' },
-                { value: 'medium', label: 'Medium' },
-                { value: 'large', label: 'Large' },
-              ]}
-            />
-          </div>
           <label class="control">
             <span class="eyebrow">Neighbours · {town.households.length}</span>
             <input
@@ -308,20 +266,12 @@
     color: #4a5163;
   }
   .town-name {
-    max-width: 380px;
+    margin: 0;
     font-size: 26px;
     font-weight: 750;
     letter-spacing: -0.025em;
-    height: 46px;
+    line-height: 46px;
     color: var(--text-strong);
-    background: transparent;
-    border-color: transparent;
-    padding-left: 0;
-  }
-  .town-name:hover,
-  .town-name:focus {
-    background: var(--surface);
-    padding-left: 12px;
   }
   .actions {
     display: flex;
@@ -355,11 +305,6 @@
     flex-direction: column;
     gap: 8px;
     min-width: 200px;
-  }
-  .hint {
-    font-size: 12px;
-    color: var(--text-muted);
-    max-width: 210px;
   }
   .controls .eyebrow,
   .list-head .eyebrow {

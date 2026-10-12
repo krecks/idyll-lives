@@ -9415,6 +9415,26 @@
       "uvScale": 0.7,
       "projection": "xz"
     },
+    "material.soil": {
+      "type": "material",
+      "color": "#8A6646",
+      "texture": "textures/grass/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.5,
+      "projection": "xz",
+      "roughness": 1
+    },
+    "material.furrow": {
+      "type": "material",
+      "color": "#664A33",
+      "texture": "textures/grass/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.5,
+      "projection": "xz",
+      "roughness": 1
+    },
     "model.rock": {
       "type": "model",
       "placeholder": [

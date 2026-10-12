@@ -1004,6 +1004,134 @@
           "needsTable": true
         }
       ]
+    },
+    {
+      "id": "farm.barn",
+      "name": "Red barn",
+      "model": "model.farm.barn",
+      "footprint": [
+        6,
+        6
+      ],
+      "price": 6400,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.9,
+      "description": "A big red barn with a gambrel roof, double doors and a hayloft. Every farm needs one.",
+      "interactions": []
+    },
+    {
+      "id": "farm.silo",
+      "name": "Grain silo",
+      "model": "model.farm.silo",
+      "footprint": [
+        3,
+        3
+      ],
+      "price": 3200,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.5,
+      "description": "A tall corrugated silo with a red cap: the landmark you can see from the next village.",
+      "interactions": []
+    },
+    {
+      "id": "farm.tractor",
+      "name": "Little tractor",
+      "model": "model.farm.tractor",
+      "footprint": [
+        2,
+        4
+      ],
+      "price": 2800,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A small green tractor with big yellow wheels, parked where it was last needed.",
+      "interactions": []
+    },
+    {
+      "id": "farm.hayBale",
+      "name": "Round hay bale",
+      "model": "model.farm.hayBale",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.2,
+      "description": "A round bale of summer hay, wrapped in twine.",
+      "interactions": []
+    },
+    {
+      "id": "farm.hayStack",
+      "name": "Stack of hay bales",
+      "model": "model.farm.hayStack",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 140,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.25,
+      "description": "Three square bales stacked up: a step, a seat, a fort.",
+      "interactions": []
+    },
+    {
+      "id": "farm.scarecrow",
+      "name": "Scarecrow",
+      "model": "model.farm.scarecrow",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 90,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.35,
+      "description": "A cheerful scarecrow in a plaid shirt. The crows are not impressed.",
+      "interactions": []
+    },
+    {
+      "id": "farm.trough",
+      "name": "Water trough",
+      "model": "model.farm.trough",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 220,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.15,
+      "description": "A galvanised trough, always full.",
+      "interactions": []
+    },
+    {
+      "id": "farm.coop",
+      "name": "Chicken coop",
+      "model": "model.farm.coop",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 480,
+      "category": "community",
+      "group": "farm",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A little wooden coop on legs with a ramp for the hens.",
+      "interactions": []
     }
   ]
 }
