@@ -473,7 +473,7 @@ export class Street {
    * Builds (or keeps) the street for this world and view; returns the shadow casters. Only a
    * change of the town layout outside the viewed lot rebuilds it.
    */
-  async build(world: WorldStructure, view: ViewRect | null): Promise<Mesh[]> {
+  async build(world: WorldStructure, view: ViewRect | null, pace?: () => Promise<void>): Promise<Mesh[]> {
     const outside = world.objects.filter((o) => !view || o.x < view.x || o.z < view.z || o.x >= view.x + view.w || o.z >= view.z + view.d);
     const key = [
       world.meta?.seed ?? 0,
@@ -824,6 +824,7 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => t.meshes.forEach((m) => m.setEnabled(false)));
     for (const [key, items, cast] of batches) {
+      await pace?.();
       const meshes = await this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key));
       this.lib.excludeFromLights(interior, new Set(meshes));
       foliage.push(...meshes);

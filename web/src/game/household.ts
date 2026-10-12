@@ -438,7 +438,16 @@ export function householdBonds(h: HouseholdDraft, firstIndex: number): { a: numb
 
 /** A draft's look at `age`: the body and head size and stoop of that life stage. */
 export function lookAtAge(content: Content, assets: AssetRegistry, appearance: Appearance, age: number): Appearance {
-  return lookOfStage(appearance, content.stageOf(age), palette(assets, 'palette.hair'));
+  return lookAtStage(appearance, content.stageOf(age), palette(assets, 'palette.hair'));
+}
+
+/** A look as the game shows it at a life stage: `lookOfStage`, and age greys the hair (from the colour they started with). */
+export function lookAtStage(appearance: Appearance, stage: LifeStageDef | undefined, hairPalette: readonly string[] = []): Appearance {
+  const look = lookOfStage(appearance, stage, hairPalette);
+  if (!look.hair) return look;
+  const base = look.hairBase ?? look.hair;
+  const hair = greyed(base, stage?.greyHair ?? 0);
+  return hair !== look.hair || look.hairBase ? { ...look, hair, hairBase: base } : look;
 }
 
 /** Whether a hair colour is silver or grey (light and without colour). */

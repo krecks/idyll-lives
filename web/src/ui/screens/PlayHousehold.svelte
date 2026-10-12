@@ -66,9 +66,10 @@
   }
 
   function play() {
-    if (!chosen) return;
+    const request = chosen ? app.playRequest(chosen.slot) : null;
+    if (!request) return;
     menuScene.highlight({});
-    app.start({ kind: 'new', town, household: chosen.household, slot: chosen.slot, existing: true, mode: app.mode });
+    app.start(request);
   }
 
   onMount(async () => {
@@ -144,7 +145,7 @@
               <dt>Home</dt>
               <dd>{house ? `${house.name}, ${house.bedrooms} bedroom${house.bedrooms === 1 ? '' : 's'}` : address.name}</dd>
               <dt>Household funds</dt>
-              <dd>{money(content.economy.startingFunds)}</dd>
+              <dd>{app.mode === 'creative' ? 'Free: this is a Creative game' : money(content.economy.startingFunds)}</dd>
             </dl>
             <p class="note">Settled residents: most already have a job and know a few of the neighbours.</p>
             {#if neighbours.length}

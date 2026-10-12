@@ -32,7 +32,7 @@ import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
 import { styledModel } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
-import { greyed, householdBonds, householdSpawns, lookFromSeed, lookOfStage, palette, type Appearance, type HouseholdDraft } from './household';
+import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
 import { UiMirror } from './uiUpdates';
@@ -771,15 +771,9 @@ export async function startSession(
       }
     }
     for (const s of w.sims) {
-      // Life stage: body and head size, and age greys the hair (from the colour they started with).
+      // Life stage: body and head size, and age greys the hair (as the menus show them).
       const stage = content.lifeStages.find((st) => st.id === s.stage);
-      if (s.appearance) s.appearance = lookOfStage(s.appearance, stage, palette(assets, 'palette.hair'));
-      const grey = stage?.greyHair ?? 0;
-      if (s.appearance?.hair) {
-        const base = s.appearance.hairBase ?? s.appearance.hair;
-        const hair = greyed(base, grey);
-        if (hair !== s.appearance.hair || s.appearance.hairBase) s.appearance = { ...s.appearance, hair, hairBase: base };
-      }
+      if (s.appearance) s.appearance = lookAtStage(s.appearance, stage, palette(assets, 'palette.hair'));
     }
     // Build mode: show what the simulation just accepted (furniture popping in, dust, money).
     const feedback = game.mode === 'build' && world && worldView === viewPlot ? editFeedback(world, w) : null;

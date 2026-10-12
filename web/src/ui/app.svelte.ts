@@ -72,6 +72,14 @@ class AppState {
     return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan };
   }
 
+  /** The new game that takes over the household already living on `slot` (also prepared in the background). */
+  playRequest(slot: number): StartRequest | null {
+    const town = this.town;
+    const household = town?.households.find((h) => h.slot === slot)?.household;
+    if (!town || !household) return null;
+    return { kind: 'new', town, household, slot, existing: true, mode: this.mode, lifespan: this.lifespan };
+  }
+
   start(request: StartRequest): void {
     this.request = request;
     this.overlay = null;

@@ -153,23 +153,24 @@
   $effect(() => {
     if (!app.dataReady || app.booting) return;
     const screen = app.screen;
-    const town = app.town;
     const slot = app.homeSlot;
     const home = slot === null ? null : app.homeRequest(slot);
-    const playSlot = app.playSlot;
+    const play = app.playSlot === null ? null : app.playRequest(app.playSlot);
     const snapshot = $state.snapshot(settings);
     let cancelled = false;
-    // Let the screen's own entrance animation finish first.
+    // Let the screen's own entrance animation and the camera's glide finish first: building a
+    // session holds up the main thread for a moment, which shows as a hitch in a moving camera.
     const timer = setTimeout(async () => {
+      await menuScene.settled();
+      if (cancelled) return;
       if (screen === 'menu') {
         const latest = await latestSave().catch(() => undefined);
         if (cancelled || !latest || app.screen !== 'menu') return;
         await host.prepare({ kind: 'load', saveId: latest.id }, snapshot).catch(() => {});
       } else if (screen === 'home' && home) {
         await host.prepare(home, snapshot).catch(() => {});
-      } else if (screen === 'play' && town && playSlot !== null) {
-        const existing = town.households.find((h) => h.slot === playSlot)?.household;
-        if (existing) await host.prepare({ kind: 'new', town, household: existing, slot: playSlot, existing: true, mode: app.mode }, snapshot).catch(() => {});
+      } else if (screen === 'play' && play) {
+        await host.prepare(play, snapshot).catch(() => {});
       }
     }, 500);
     return () => {

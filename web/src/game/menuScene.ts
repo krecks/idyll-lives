@@ -48,6 +48,8 @@ class MenuScene {
   private worldOf: NeighbourhoodDraft | null = null;
   private shotKey = '';
   private wanted: { shot: Shot; duration: number } | null = null;
+  /** When the camera's glide to the current shot ends (performance.now() ms). */
+  private glideEnd = 0;
   /** Tags of lots outside this screen area stay at its edge (pointing the way). */
   private bounds: Frame | null = null;
   private renderer: Renderer | null = null;
@@ -117,7 +119,16 @@ class MenuScene {
     if (key === this.shotKey) return;
     const first = this.shotKey === '';
     this.shotKey = key;
-    renderer.setTownShot(this.townShot(shot, world, duration), first);
+    const townShot = this.townShot(shot, world, duration);
+    renderer.setTownShot(townShot, first);
+    this.glideEnd = performance.now() + (first ? 0 : (townShot.duration ?? 0) * 1000);
+  }
+
+  /** Resolves once the camera has finished gliding (also to shots set while waiting). */
+  async settled(): Promise<void> {
+    for (let wait = this.glideEnd - performance.now(); wait > 0; wait = this.glideEnd - performance.now()) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
   }
 
   highlight(h: Partial<LotHighlight>): void {

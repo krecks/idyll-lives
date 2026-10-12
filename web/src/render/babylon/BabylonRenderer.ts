@@ -161,6 +161,8 @@ const RADIUS_LIMITS = [6, 95] as const;
 const WARM_WORLD_FRAMES = 4;
 /** Longest wait for a hidden world's textures before it is warmed up anyway (ms). */
 const TEXTURE_WAIT_MS = 5000;
+/** Main-thread time (ms) a world build behind the overview runs before the menus' town draws a frame. */
+const BUILD_SLICE_MS = 8;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -250,6 +252,8 @@ export class BabylonRenderer implements Renderer {
   private parked!: ArcRotateCamera;
   private warmFrames = 0;
   private worldBuilding = false;
+  /** When the running slice of a world build began (see `pace`). */
+  private sliceStart = 0;
   /** World/overview builds in progress; snapshot recording waits until there are none. */
   private builds = 0;
   private snapshotGeneration = 0;
@@ -456,8 +460,11 @@ export class BabylonRenderer implements Renderer {
     if (this.storey >= this.storeys.count) this.setStorey(this.storeys.count - 1);
     this.beginBuild();
     this.worldBuilding = true;
+    this.sliceStart = performance.now();
+    const until = this.sliceStart + TEXTURE_WAIT_MS;
     try {
       await this.buildWorld(world, view);
+      await this.warmShaders(until);
     } finally {
       this.worldBuilding = false;
       this.endBuild();
@@ -465,7 +472,7 @@ export class BabylonRenderer implements Renderer {
     // Built behind the overview (prepared in a menu): draw it hidden a few times so it shows without a hitch,
     // once its textures are in (KTX2 ones transcode in the background; a shader waits for its textures).
     if (this.townMode) {
-      await Promise.race([this.scene.whenReadyAsync(), new Promise((resolve) => setTimeout(resolve, TEXTURE_WAIT_MS))]);
+      await Promise.race([this.scene.whenReadyAsync(), new Promise((resolve) => setTimeout(resolve, Math.max(0, until - performance.now())))]);
       this.warmFrames = WARM_WORLD_FRAMES;
     }
   }
@@ -531,7 +538,9 @@ export class BabylonRenderer implements Renderer {
       this.walls = this.wallsLow = null;
       const before = new Set(this.templatesInUse);
       this.buildStreets(world);
-      this.lotCasters = this.buildLot(world);
+      await this.pace();
+      this.lotCasters = await this.buildLot(world);
+      await this.pace();
       const fences = buildFences(this.scene, world.fences ?? [], this.deps.content.fenceStyles);
       if (fences) this.worldMeshes.push(fences);
       // What was just built belongs to the lot layer; objects follow in `worldMeshes`.
@@ -544,9 +553,11 @@ export class BabylonRenderer implements Renderer {
     }
     const houseCasters = this.lotCasters;
     this.placeRoomLights(world, view);
-    const streetCasters = await this.street.build(world, this.view);
+    await this.pace();
+    const streetCasters = await this.street.build(world, this.view, () => this.pace());
     await this.buildObjects(world);
     this.hideHeld();
+    await this.pace();
     await this.buildSims(world);
     this.retireTemplates(new Set(this.templatesInUse));
     const templates = await this.templateMeshes();
@@ -2141,7 +2152,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** The viewed house (walls, trims, windows, floors, roof, room lights); returns shadow casters. */
-  private buildLot(world: WorldStructure): Mesh[] {
+  private async buildLot(world: WorldStructure): Promise<Mesh[]> {
     const { count, depth } = this.storeys;
     const W = world.width;
     const rooms = world.rooms;
@@ -2167,6 +2178,7 @@ export class BabylonRenderer implements Renderer {
       // Nothing up there yet: no storey to build.
       if (k > 0 && view && !(world.walls ?? []).some((e) => e.z >= view.z && e.z <= view.z + view.d && e.x >= view.x && e.x <= view.x + view.w)) break;
       const covered = (x: number, z: number) => k + 1 < count && (rooms[(z + depth) * W + x] ?? 0) !== 0;
+      if (k > 0) await this.pace();
       const built = this.house.build(world, view, k === 0 ? { covered } : { upper: true, covered, holes, landings });
       if (!built) {
         if (k === 0) break;
@@ -2204,9 +2216,15 @@ export class BabylonRenderer implements Renderer {
     this.worldMeshes.push(...built.meshes);
     this.roofs = built.roofs;
     // Roofs start hidden (walls down / cutaway); compile them now so walls-up doesn't hitch.
-    for (const roof of built.roofs) void roof.material?.forceCompilationAsync(roof).catch(() => {});
+    for (const roof of built.roofs) {
+      await this.pace();
+      void roof.material?.forceCompilationAsync(roof).catch(() => {});
+    }
     // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees).
-    for (const [key, items] of [...natureDecor('model.bush', built.shrubs), ...natureDecor('model.tree', built.trees, world, this.view)]) void this.placeDecor(key, items);
+    for (const [key, items] of [...natureDecor('model.bush', built.shrubs), ...natureDecor('model.tree', built.trees, world, this.view)]) {
+      await this.pace();
+      void this.placeDecor(key, items);
+    }
     this.lotRooms = built.rooms;
     this.lotSurfaces = built.surfaces;
     this.refreshLaid();
@@ -2365,7 +2383,13 @@ export class BabylonRenderer implements Renderer {
     const shown = world.objects.filter((o) => this.storeyOf(o.z) <= this.storey && this.inView(o.x + o.w / 2, o.z - this.storeyOf(o.z) * D + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
-    const templates = await Promise.all([...byModel.values()].map((list) => this.template(...this.objectTemplate(list[0]))));
+    // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
+    const pending: Promise<ModelTemplate>[] = [];
+    for (const list of byModel.values()) {
+      await this.pace();
+      pending.push(this.template(...this.objectTemplate(list[0])));
+    }
+    const templates = await Promise.all(pending);
     // What each tile's top belongs to, for the things standing on tops.
     const tops = new Map<string, number>();
     for (const o of shown) {
@@ -2742,6 +2766,61 @@ export class BabylonRenderer implements Renderer {
     this.lib.setEmissive(inner, this.emissiveTmp.scaleInPlace((1 - l.lamps) * 0.9 + 0.05));
     this.street?.setNight(l.lamps, this.glowColor);
     this.overview?.setNight(l.lamps, this.glowColor);
+  }
+
+  /**
+   * Behind the overview, lets the menus' town draw a frame once the world build has run for a
+   * slice: built in one go, it held the main thread for most of a second. In play (and when
+   * nothing is waiting to draw) the build runs straight through.
+   */
+  private async pace(): Promise<void> {
+    if (!this.townMode || !this.worldBuilding || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    this.sliceStart = performance.now();
+  }
+
+  /**
+   * Behind the overview, prepares the scene's shaders a few at a time, as the readiness check
+   * before the world is shown would (it did them all at once). Materials whose textures are
+   * still arriving wait for them, so this goes round again until all are ready (or `until`).
+   */
+  private async warmShaders(until: number): Promise<void> {
+    while (this.townMode && !(await this.warmShadersOnce()) && performance.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  /** One round of `warmShaders`: whether every shader is ready. */
+  private async warmShadersOnce(): Promise<boolean> {
+    const engine = this.engine;
+    const instancing = !!engine.getCaps().instancedArrays;
+    let ready = true;
+    // Every mesh, hidden ones too (templates built ahead), as `Scene.isReady` checks them.
+    for (const mesh of [...this.scene.meshes]) {
+      if (!(mesh instanceof Mesh) || mesh.isDisposed() || !mesh.subMeshes?.length) continue;
+      const instanced = mesh.hasThinInstances || (instancing && mesh.instances.length > 0);
+      const shadows = mesh.lightSources
+        .flatMap((l) => [...(l.getShadowGenerators()?.values() ?? [])])
+        .filter((g) => g.getShadowMap()?.renderList?.includes(mesh) ?? true);
+      for (const sub of mesh.subMeshes) {
+        const mat = sub.getMaterial();
+        if (!mat) continue;
+        // (Not `mesh.isReady`: it stops at the first material still compiling, which is nearly always the first.)
+        // Effects are kept per render pass: the camera's, as the check is made for it.
+        const pass = engine.currentRenderPassId;
+        engine.currentRenderPassId = this.scene.activeCamera?.renderPassId ?? pass;
+        ready = (mat._storeEffectOnSubMeshes ? mat.isReadyForSubMesh(mesh, sub, instanced) : mat.isReady(mesh, instanced)) && ready;
+        for (const g of shadows) {
+          for (const id of g.getShadowMap()?.renderPassIds ?? [pass]) {
+            engine.currentRenderPassId = id;
+            ready = g.isReady(sub, instanced, mat.needAlphaBlendingForMesh(mesh)) && ready;
+          }
+        }
+        engine.currentRenderPassId = pass;
+        await this.pace();
+      }
+    }
+    return ready;
   }
 
   private resetSnapshot(): void {
