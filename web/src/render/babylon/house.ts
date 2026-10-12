@@ -172,6 +172,8 @@ export interface RoomLight {
   x: number;
   y: number;
   z: number;
+  /** The room it lights (`WorldStructure.rooms`, 0 outdoors). */
+  room: number;
   /** Indoor area in tiles of the room it lights (0 outdoors). */
   area: number;
   /** A lamp the household bought, or the dim fill of a room without one. */
@@ -202,11 +204,11 @@ export function placeLights(world: WorldStructure, view: ViewRect | null, rooms:
   return [
     ...lamps
       .sort((a, b) => areaOf(b.room) - areaOf(a.room))
-      .map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
+      .map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
     ...[...rooms.entries()]
       .filter(([r]) => !lamps.some((l) => l.room === r))
       .sort((a, b) => b[1].n - a[1].n)
-      .map(([, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, area: t.n, kind: 'fill' })),
+      .map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
 }
 

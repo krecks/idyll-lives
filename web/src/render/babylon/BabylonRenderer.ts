@@ -51,6 +51,7 @@ import {
   type AbstractEngine,
 } from './core';
 import type { FrameState } from '../../core/bridge';
+import { Pose } from '../../core/snapshot';
 import { groundDepth, objectCentre, type ItemPlacement, type DiagonalWall, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { QualitySettings } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
@@ -122,6 +123,8 @@ const CLUSTERED_LIGHTS = 32;
 const LAMP_POWER = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
+/** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
+const LIGHTS_OUT_FADE = 1.2;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
@@ -309,6 +312,15 @@ export class BabylonRenderer implements Renderer {
   private lampCluster: ClusteredLightContainer | null = null;
   /** What each interior light is lighting (null: unused). */
   private roomLightUse: (RoomLight | null)[] = [];
+  /** Per interior light: 1 on, 0 out (its room is dark), eased between. */
+  private roomLightOn: number[] = [];
+  /** Rooms where everyone is asleep (lights out), and rooms with someone awake (scratch). */
+  private readonly darkRooms = new Set<number>();
+  private readonly awakeRooms = new Set<number>();
+  /** Indices of the snapshot layout's sleeping action tags. */
+  private sleepActions: { tags: readonly string[]; ids: Set<number> } | null = null;
+  /** Night level of the lamps at the last lighting update (`Lighting.lamps`). */
+  private lampsLevel = 0;
   private readonly lampColor = new Color3();
   private readonly glowColor = new Color3();
   private readonly emissiveTmp = new Color3();
@@ -598,6 +610,12 @@ export class BabylonRenderer implements Renderer {
     if (Math.abs(minute - this.lastLightMinute) >= (snapshot ? LIGHT_STEP_SNAPSHOT : LIGHT_STEP)) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
+      this.resetSnapshot();
+    }
+    // Lights go out in rooms where everyone is asleep.
+    this.findDarkRooms(frame);
+    if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
+      this.applyRoomLights();
       this.resetSnapshot();
     }
     this.steerCamera(this.engine.getDeltaTime() / 1000);
@@ -2270,6 +2288,53 @@ export class BabylonRenderer implements Renderer {
       else light.position.y = HIDDEN_Y;
       return l ?? null;
     });
+    this.roomLightOn = this.roomLightUse.map((use) => (use && this.darkRooms.has(use.room) ? 0 : 1));
+  }
+
+  /** The rooms whose occupants are all asleep (at least one, nobody awake, away residents not counted). */
+  private findDarkRooms(frame: FrameState): void {
+    const { curr, layout } = frame;
+    const dark = this.darkRooms;
+    const awake = this.awakeRooms;
+    dark.clear();
+    awake.clear();
+    const world = this.lastWorld;
+    if (!world) return;
+    if (this.sleepActions?.tags !== layout.actions) {
+      const ids = new Set<number>();
+      layout.actions.forEach((tag, i) => (tag === 'sleep' || tag === 'nap') && ids.add(i));
+      this.sleepActions = { tags: layout.actions, ids };
+    }
+    const sleeping = this.sleepActions.ids;
+    const k = layout.sim;
+    const W = world.width;
+    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if (curr[o + k.away] !== 0) continue;
+      // `z` is in lot rows: upper storeys have rooms of their own there.
+      const x = Math.floor(curr[o + k.x]);
+      const z = Math.floor(curr[o + k.z]);
+      const room = x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0;
+      if (!room) continue;
+      const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
+      (asleep ? dark : awake).add(room);
+    }
+    for (const room of awake) dark.delete(room);
+  }
+
+  /** Eases each interior light towards out (its room dark) or on; true if any changed. */
+  private fadeRoomLights(dt: number): boolean {
+    let changed = false;
+    const step = Math.min(1, dt / LIGHTS_OUT_FADE);
+    this.roomLightUse.forEach((use, i) => {
+      const on = this.roomLightOn[i] ?? 1;
+      const target = use && this.darkRooms.has(use.room) ? 0 : 1;
+      if (on === target) return;
+      this.roomLightOn[i] = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
+      changed = true;
+    });
+    return changed;
   }
 
   private decorModel(key: string): Promise<ModelTemplate> {
@@ -2764,22 +2829,8 @@ export class BabylonRenderer implements Renderer {
     }
 
     // Warm lamps inside, glowing windows outside at night; cool daylight in the panes by day.
-    this.roomLights.forEach((light, i) => {
-      // The overview has no interiors: the game house's lamps stay off behind it.
-      const use = this.townMode ? null : (this.roomLightUse[i] ?? null);
-      if (!use) {
-        light.intensity = 0;
-      } else if (use.kind === 'lamp') {
-        // A lamp the household bought: a warm pool around it.
-        light.intensity = l.lamps * LAMP_POWER * (use.power ?? 1);
-        light.range = use.range ?? 4.5;
-      } else {
-        // A room without a lamp: only a dim glow from the ceiling.
-        light.intensity = l.lamps * FILL_POWER * (4 + Math.min(use.area, 30) * 0.35);
-        light.range = 4 + Math.sqrt(use.area) * 1.4;
-      }
-      light.diffuse.copyFrom(this.lampColor);
-    });
+    this.lampsLevel = l.lamps;
+    this.applyRoomLights();
     const glass = this.lib.surface('material.window', { vertexColors: true, cutaway: true }) as PBRMaterial;
     // Windows light up only once it is getting dark outside.
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
@@ -2790,6 +2841,27 @@ export class BabylonRenderer implements Renderer {
     this.lib.setEmissive(inner, this.emissiveTmp.scaleInPlace((1 - l.lamps) * 0.9 + 0.05));
     this.street?.setNight(l.lamps, this.glowColor);
     this.overview?.setNight(l.lamps, this.glowColor);
+  }
+
+  /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */
+  private applyRoomLights(): void {
+    this.roomLights.forEach((light, i) => {
+      // The overview has no interiors: the game house's lamps stay off behind it.
+      const use = this.townMode ? null : (this.roomLightUse[i] ?? null);
+      const lit = this.lampsLevel * (this.roomLightOn[i] ?? 1);
+      if (!use) {
+        light.intensity = 0;
+      } else if (use.kind === 'lamp') {
+        // A lamp the household bought: a warm pool around it.
+        light.intensity = lit * LAMP_POWER * (use.power ?? 1);
+        light.range = use.range ?? 4.5;
+      } else {
+        // A room without a lamp: only a dim glow from the ceiling.
+        light.intensity = lit * FILL_POWER * (4 + Math.min(use.area, 30) * 0.35);
+        light.range = 4 + Math.sqrt(use.area) * 1.4;
+      }
+      light.diffuse.copyFrom(this.lampColor);
+    });
   }
 
   /**
