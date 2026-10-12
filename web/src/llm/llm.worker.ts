@@ -60,7 +60,9 @@ async function write(id: number, messages: ChatMessage[], reply: string, lead: s
       return;
     }
     const result = await generate(engine!, formatChat(spec!.chat, messages, reply, lead), params, () => aborted.has(id) || Date.now() > deadline);
-    if (result.stop === 'aborted') scope.postMessage({ type: 'skipped', id });
+    // Out of time with something written: what's there (the caller keeps finished sentences).
+    if (result.stop === 'aborted' && !aborted.has(id) && result.ids.length) scope.postMessage({ type: 'done', id, result: { ...result, stop: 'deadline' } });
+    else if (result.stop === 'aborted') scope.postMessage({ type: 'skipped', id });
     else scope.postMessage({ type: 'done', id, result });
   } catch (err) {
     scope.postMessage({ type: 'error', id, message: String(err) });

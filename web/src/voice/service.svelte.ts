@@ -5,7 +5,6 @@
  * worker as clips (`useRecording`).
  */
 
-import type { Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker } from './protocol';
 import { parseVisemes, type VisemeTrack } from './visemes';
@@ -35,8 +34,7 @@ export type ModelState = 'off' | 'loading' | 'ready' | 'error';
 /** How the voice worker is doing (for the debug overlay). */
 export interface VoiceThreadStats {
   state: ModelState;
-  /** Where the model runs and on how many threads. */
-  device: Device;
+  /** The runtime's threads (on the CPU). */
   threads: number;
   /** Time to load the engine, ms (0 until ready). */
   loadMs: number;
@@ -84,8 +82,6 @@ let worker: Worker | null = null;
 /** Counts workers started: what one knew (prepared voices), the next doesn't. */
 let generation = 0;
 export const voiceGeneration = () => generation;
-/** Where the model runs: the CPU, unless the device test found the GPU better (`useVoiceDevice`). */
-let device: Device = 'cpu';
 /**
  * The runtime's threads: two where the page is cross-origin isolated and the computer has six
  * cores or more (about 1.6 times as fast as one; the game, the simulation and a language model
@@ -151,23 +147,11 @@ export function ensureVoice(): Promise<void> {
     voiceStatus.progress = 0;
     voiceStatus.error = '';
     voiceStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device, threads: voiceThreads() });
+    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, threads: voiceThreads() });
     // A new worker knows no recordings yet.
     for (const [sha, r] of recordings) void r.then((pcm) => post({ type: 'clip', sha, samples: pcm.samples.slice(), rate: pcm.rate })).catch(() => {});
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
-}
-
-/** Runs the model on another device from the next load on (unloading it if loaded on another). */
-export function useVoiceDevice(next: Device): void {
-  if (next === device) return;
-  device = next;
-  if (worker) unloadVoice();
-}
-
-/** The device the model runs on (or will, when loaded). */
-export function voiceDevice(): Device {
-  return device;
 }
 
 /** Whether the engine can speak now. */
@@ -187,8 +171,7 @@ const cache = { bytes: 0, hits: 0 };
 
 function clipKey(text: string, voice: VoiceParams): string {
   const v = [voice.clipPitch, voice.clipDepth, voice.pitch, voice.depth, voice.speed, voice.temperature].map((x) => x.toFixed(3)).join('|');
-  // The GPU's arithmetic differs a little from the CPU's: clips are kept per device.
-  return `${settings.voiceLanguage}|${MODEL_ID}|${device}|${voice.clip}|${v}|${text}`;
+  return `${settings.voiceLanguage}|${MODEL_ID}|${voice.clip}|${v}|${text}`;
 }
 
 /** The clip for this line and voice if it was made before (and keeps it fresh), else null. */
@@ -200,6 +183,11 @@ export function cachedClip(text: string, voice: VoiceParams): Clip | null {
   clips.set(key, clip);
   cache.hits++;
   return clip;
+}
+
+/** Whether the clip for this line and voice was made before (without counting a hit). */
+export function hasClip(text: string, voice: VoiceParams): boolean {
+  return clips.has(clipKey(text, voice));
 }
 
 /** Audio for one line, from the cache or made (once, however often it's asked for meanwhile). */
@@ -301,7 +289,6 @@ export function voiceThreadStats(): VoiceThreadStats {
   const recentMs = counters.recent.filter((r) => r.at >= now - BUSY_WINDOW_MS).reduce((n, r) => n + r.ms, 0);
   return {
     state: voiceStatus.state,
-    device,
     threads: voiceThreads(),
     loadMs: counters.loadMs,
     lines: counters.lines,
@@ -342,8 +329,7 @@ export function benchVerdict(b: BenchResult): BenchVerdict {
 
 /**
  * "Test this computer": makes three typical lines while the scene keeps drawing, and measures
- * how fast speech is made and whether frames stay smooth (on the CPU unless the device test
- * found the GPU better).
+ * how fast speech is made and whether frames stay smooth.
  */
 export async function runBenchmark(): Promise<BenchResult> {
   voiceStatus.benchmarking = true;

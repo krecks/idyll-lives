@@ -1,6 +1,6 @@
 {
   "$comment": "How residents' lines are asked of the language model (web/src/talk/prompt.ts), per language. Content packs can add or replace any key under \"talk\": {\"en\": {...}}. {name}: the other resident's first name; {me}: the speaker's; {subject}, {emotion}, {action}: what the event is about.",
-  "rules": "You write what residents of a small town say out loud. Reply with only the resident's words: one short sentence, at most 12 words, in first person. Casual, friendly and fit for all ages.",
+  "rules": "You write what residents of a small town say out loud. Reply with only the resident's words, in first person: one to five short sentences, as many as the moment is worth (a quick reaction is one, something on their mind a few). Casual, friendly and fit for all ages.",
   "ask": "Write what {me} says now.",
   "askTo": "Write what {me} says to {name} now.",
   "examples": "{me} might say something like:",
@@ -14,12 +14,12 @@
     {
       "me": "Ada", "person": "an old woman", "personality": ["warm and gentle"],
       "moment": "Friday evening, in the park.\n{me} feels happy.\nTom is {me}'s friend.\nTom just told {me} a joke, and {me} likes it.\nWrite what {me} says to Tom now.",
-      "line": "Ha! Tom, that one was really good."
+      "line": "Ha! Tom, that one was really good. You always know how to cheer me up. Tell me another one tomorrow?"
     },
     {
       "me": "Kit", "person": "a teenage boy", "personality": ["sleepy and unhurried"],
       "moment": "Wednesday night, at home, in the bedroom.\n{me} feels tired.\nOn {me}'s mind: wants to read more.\n{me} decides to skip the plan to read.\nWrite what {me} says now.",
-      "line": "Too sleepy for books tonight. Tomorrow, maybe."
+      "line": "Too sleepy for books tonight. I read the same page three times already. My bed looks so soft right now. Tomorrow, maybe."
     }
   ],
   "intro": "{me} is {person} in a small town.",

@@ -135,7 +135,8 @@ export function llmReady(): boolean {
 
 /**
  * A reply to `messages` (the model's defaults for any parameter not given), or null if it was
- * skipped: still waiting when `deadline` (a `Date.now()` time) passed, or `signal` aborted it.
+ * skipped: still waiting when `deadline` (a `Date.now()` time) passed, or `signal` aborted it (one
+ * the deadline cut short keeps what it wrote: `stop: 'deadline'`).
  * `reply`: its first words, written for the model (not part of the text returned); `lead`: the
  * start of the last message, whose state is kept too (`chat.ts`). Waits for the model to load.
  */

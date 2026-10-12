@@ -27,11 +27,11 @@ import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { deviceTest, ensureTalk, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
-import { fill, loadLines, Lines, type Line } from './lines';
+import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
 import { voiceKey } from './pocket';
-import { brokenRecordings, cachedClip, ensureVoice, prepareVoice, speak, unloadVoice, useRecording, voiceGeneration, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { brokenRecordings, ensureVoice, hasClip, prepareVoice, speak, unloadVoice, useRecording, voiceGeneration, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { chosenRecording, voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
@@ -54,6 +54,8 @@ const SLOW_SHARE = 0.1;
 const FRAME_WINDOW = 120;
 /** The engine is unloaded after this long without a line (it reloads from the cache). */
 const IDLE_UNLOAD_MS = 5 * 60_000;
+/** An answer waits this long at most for the other side to finish their line. */
+const ANSWER_WAIT_MS = 15000;
 /** A subtitle stays this long after its line ends. */
 const SUBTITLE_LINGER_MS = 1200;
 /** Quiet time after a resident's own thought before the next one. */
@@ -106,6 +108,8 @@ interface Speaking {
   /** The renderer row (snapshot index) its mouth shapes went to. */
   row: number;
   track: VisemeTrack;
+  /** The whole line was said (or stopped). */
+  done: Promise<void>;
 }
 
 export class VoiceDirector {
@@ -458,15 +462,20 @@ export class VoiceDirector {
       });
   }
 
-  /** Says a line: its speech from the cache or made, then played. `requested`: when the moment was; `budget`: how late it may be. */
+  /**
+   * Says a line: its speech from the cache or made, then played, a piece at a time
+   * (`speechPieces`): a long line starts once its first piece is made, the next one being made
+   * while one plays. `requested`: when the moment was; `budget`: how late its first piece may be.
+   */
   private say(id: number, index: number, line: Line, partnerId: number, thought: boolean, now: number, requested: number, budget: number): void {
     const own = this.voiceOf(id);
     if (!own) return;
     const text = fill(line.text, this.firstName(id), partnerId >= 0 ? this.firstName(partnerId) : '');
     if (this.debug && this.heard.push(`${id} ${line.key}: ${text}`) > 50) this.heard.shift();
     const voice = withTone(own, line.tone);
+    const pieces = speechPieces(text);
     // A line said before plays at once, even while the engine is unloaded.
-    const cached = cachedClip(text, voice);
+    const cached = pieces.every((p) => hasClip(p, voice));
     if (!cached) {
       // Nothing new is said while the engine loads (or reloads after being idle): the moment passes.
       if (!voiceReady()) {
@@ -480,42 +489,65 @@ export class VoiceDirector {
     }
     const state = this.sims.get(id);
     if (thought && state) state.quietUntil = now + THOUGHT_GAP_MS;
-    let clip: Promise<Clip>;
-    if (cached) {
-      clip = Promise.resolve(cached);
-    } else {
+    // Each piece is asked for once the one before is made, so another line's can go between.
+    let given = false;
+    const clips: Promise<Clip>[] = [];
+    for (const piece of pieces) {
+      const before = clips[clips.length - 1] ?? Promise.resolve();
+      clips.push(before.then(() => (given ? Promise.reject(new Error('not said')) : speak(piece, voice))));
+    }
+    for (const c of clips) c.catch(() => {});
+    if (!cached) {
       this.inFlight++;
       this.lastLine = performance.now();
-      clip = speak(text, voice).finally(() => this.inFlight--);
-      void clip.then(() => this.timed(performance.now() - requested, budget)).catch(() => {});
+      void Promise.allSettled(clips).then(() => this.inFlight--);
+      void clips[0].then(() => this.timed(performance.now() - requested, budget)).catch(() => {});
     }
-    void clip
-      .then(async ({ samples, visemes }) => {
-        // An answer waits for the other side to finish (within reason).
-        const before = this.speaking.filter((s) => s.id !== id);
-        if (before.length && !thought) await Promise.race([Promise.all(before.map((s) => s.playing.ended)), wait(3000)]);
-        if (this.disposed || !settings.voices) return;
-        if (performance.now() - requested > budget + 3000 || this.speaking.length >= MAX_VOICES) {
-          this.dropped++;
-          return;
-        }
+    let entry: Speaking | null = null;
+    let ended = () => {};
+    const play = async () => {
+      const first = await clips[0];
+      const late = performance.now() - requested;
+      // An answer waits for the other side to finish (within reason).
+      const before = this.speaking.filter((s) => s.id !== id);
+      if (before.length && !thought) await Promise.race([Promise.all(before.map((s) => s.done)), wait(ANSWER_WAIT_MS)]);
+      if (this.disposed || !settings.voices) return;
+      if (late > budget + 3000 || this.speaking.length >= MAX_VOICES) {
+        this.dropped++;
+        return;
+      }
+      for (const [i, piece] of pieces.entries()) {
+        const { samples, visemes } = i ? await clips[i] : first;
+        // Stopped meanwhile (`stopAll`), or voices switched off.
+        if (this.disposed || !settings.voices || (entry && !this.speaking.includes(entry))) return;
         // Where the resident is now (rows move as residents come and go).
-        const row = this.rows.get(id) ?? index;
+        const row = entry?.row ?? this.rows.get(id) ?? index;
         const playing = playClip(samples, this.panFor(row));
         if (!playing) return;
-        this.spoken++;
-        const entry: Speaking = { id, playing, row, track: visemes };
-        this.speaking.push(entry);
+        if (entry) {
+          entry.playing = playing;
+          entry.track = visemes;
+        } else {
+          this.spoken++;
+          entry = { id, playing, row, track: visemes, done: new Promise((resolve) => (ended = resolve)) };
+          this.speaking.push(entry);
+        }
         this.renderer.setSpeech(row, visemes, playing.startTime);
-        if (settings.subtitles) this.sources.subtitles?.say(id, text, (samples.length / SAMPLE_RATE) * 1000 + SUBTITLE_LINGER_MS);
-        void playing.ended.then(() => {
-          const at = this.speaking.indexOf(entry);
-          if (at >= 0) this.speaking.splice(at, 1);
-          this.quiet(entry.row);
-          if (thought && state) state.quietUntil = Math.max(state.quietUntil, performance.now() + THOUGHT_GAP_MS);
-        });
-      })
-      .catch(() => {});
+        if (settings.subtitles) this.sources.subtitles?.say(id, piece, (samples.length / SAMPLE_RATE) * 1000 + SUBTITLE_LINGER_MS);
+        await playing.ended;
+      }
+    };
+    void play()
+      .catch(() => {})
+      .finally(() => {
+        given = true;
+        ended();
+        if (!entry) return;
+        const at = this.speaking.indexOf(entry);
+        if (at >= 0) this.speaking.splice(at, 1);
+        this.quiet(entry.row);
+        if (thought && state) state.quietUntil = Math.max(state.quietUntil, performance.now() + THOUGHT_GAP_MS);
+      });
   }
 
   /** How long a line took to make (waiting included); too many late ones in a row pause voices. */

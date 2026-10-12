@@ -78,7 +78,8 @@ export interface GenResult {
   /** Time to read the prompt (to the first token's choice), and to write the rest, ms. */
   prefillMs: number;
   decodeMs: number;
-  stop: 'eos' | 'newline' | 'text' | 'length' | 'aborted';
+  /** `deadline`: time ran out with some text written (`aborted` until the worker tells them apart). */
+  stop: 'eos' | 'newline' | 'text' | 'length' | 'aborted' | 'deadline';
   /** Some logits weren't finite numbers (a broken model or runtime: the text is garbage). */
   nonFinite: boolean;
 }

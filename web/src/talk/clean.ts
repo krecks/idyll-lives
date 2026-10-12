@@ -16,7 +16,12 @@ export interface CleanOptions {
   blocklist: readonly string[];
   /** Longest line kept, in characters. */
   maxLength?: number;
+  /** The reply was cut short (its token limit or deadline): an unfinished last sentence goes (nothing finished, no line). */
+  cut?: boolean;
 }
+
+/** Sentences a line keeps at most. */
+export const MAX_SENTENCES = 5;
 
 /** Characters a line may keep: Latin letters (with accents), digits, spaces and plain punctuation. */
 const ALLOWED = /[^A-Za-zÀ-ÖØ-öø-ÿ0-9 .,!?'’\-—…:;]/g;
@@ -24,7 +29,7 @@ const ALLOWED = /[^A-Za-zÀ-ÖØ-öø-ÿ0-9 .,!?'’\-—…:;]/g;
 const NARRATION_VERBS = 'says|said|smiles|smiled|laughs|laughed|nods|nodded|sighs|sighed|replies|replied|asks|asked|grins|grinned|looks|looked|whispers|whispered|shouts|shouted|thinks|thought|feels|felt|giggles|giggled|is|was|walks|turns|voice';
 
 export function cleanLine(raw: string, o: CleanOptions): string | null {
-  const max = o.maxLength ?? 90;
+  const max = o.maxLength ?? 360;
   let s = raw.replace(/<\|[^|]*\|>/g, ' ').trim();
   // The first line only (a reply should be one).
   s = s.split(/\n/)[0].trim();
@@ -46,10 +51,11 @@ export function cleanLine(raw: string, o: CleanOptions): string | null {
   s = s.replace(/["“”«»]/g, '');
   if (narration.test(s.trim())) return null;
   s = s.replace(ALLOWED, ' ').replace(/\s+/g, ' ').trim();
-  // At most two sentences, within the length.
-  const sentences = s.match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) ?? [];
+  // At most five sentences, within the length; cut short, only the finished ones.
+  let sentences: string[] = s.match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) ?? [];
+  if (o.cut && sentences.length && !/[.!?…]$/.test(sentences[sentences.length - 1].trim())) sentences = sentences.slice(0, -1);
   let out = '';
-  for (const sentence of sentences.slice(0, 2)) {
+  for (const sentence of sentences.slice(0, MAX_SENTENCES)) {
     const next = (out + ' ' + sentence.trim()).trim();
     if (next.length > max) break;
     out = next;

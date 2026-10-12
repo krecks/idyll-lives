@@ -1,51 +1,54 @@
 /**
  * The device test: whether the chosen language model and the voices run fast enough and right
- * on this computer, and where. The model is used as its 4-bit build as it is: fast on the GPU
- * (WebGPU), slow on the CPU (WASM). Setups:
+ * on this computer, and where the model runs. The model is used as its 4-bit build as it is:
+ * fast on the GPU (WebGPU), slow on the CPU (WASM). The voices (Pocket TTS) always run on the
+ * CPU: on WebGPU they were about four times slower. Setups:
  *
  * | | model | voices |
  * |---|---|---|
  * | A | GPU | CPU |
- * | B | GPU | GPU |
- * | C | CPU | CPU: only without a GPU, or if neither GPU setup worked |
+ * | C | CPU | CPU: only without a GPU, or if the GPU setup didn't work |
  *
- * Splitting between the two workers is the split worth having: the model and the voices work
- * side by side without taking each other's threads. The GPU also draws the game, so the test
+ * (B, voices on the GPU too, was dropped.) The model and the voices work side by side in their
+ * own workers without taking each other's threads. The GPU also draws the game, so the test
  * watches the frames too.
  *
- * Each setup writes five lines (greedy, so setups can be compared) and speaks them, measuring
- * load time, prompt and writing speed, speech time, the time from asking to having audio, and
- * frame times. Right means: no logits that aren't numbers, lines that pass `cleanLine`, and
- * voices as loud as on the CPU. The fastest setup that's right, smooth and in time is used.
+ * Each setup writes five lines (greedy, so setups can be compared, within the writer's limits
+ * and time) and speaks them a piece at a time as a game does, measuring load time, prompt and
+ * writing speed, the time from asking to having the first piece's audio, how fast a line's
+ * speech is made against its length (it must keep up with playback), and frame times. Right
+ * means: no logits that aren't numbers, lines that pass `cleanLine`, and speech whose samples
+ * are numbers. The fastest setup that's right, smooth and in time is used.
  * If none is, the model's lines are switched off (hand-written ones are said); if even speech
  * alone is too slow, voices are switched off too (`applyReport`).
  *
- * Results are kept per model and GPU (measured on an Apple M-series Mac, 2026-10-11, LFM2.5:
- * B 0.18 s a line, A 0.9 s).
+ * Results are kept per model and GPU (measured on an M3 Pro, 2026-10-12, LFM2.5, lines of 1–5
+ * sentences: A 2.1 s to the first sound and speech made in 0.76 of its length).
  */
 
 import { ensureLlm, generateText, llmStatus, unloadLlm, type ModelSpec } from '../llm';
 import { hasWebGpu, type Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
 import { toast } from '../ui/state.svelte';
-import { synthesize, useVoiceDevice, voiceDevice } from '../voice/service.svelte';
+import { speechPieces } from '../voice/lines';
+import { SAMPLE_RATE } from '../voice/protocol';
+import { synthesize } from '../voice/service.svelte';
 import type { VoiceParams } from '../voice/voices';
 import { cleanLine } from './clean';
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from './prompt';
-import { WRITE_MS } from './writer';
+import { cutShort, LINE_TOKENS, WRITE_MS } from './writer';
 
-export type SetupId = 'A' | 'B' | 'C';
+export type SetupId = 'A' | 'C';
 
 export interface Setup {
   id: SetupId;
+  /** Where the model runs (the voices run on the CPU). */
   llm: Device;
-  voice: Device;
 }
 
 export const SETUPS: readonly Setup[] = [
-  { id: 'A', llm: 'gpu', voice: 'cpu' },
-  { id: 'B', llm: 'gpu', voice: 'gpu' },
-  { id: 'C', llm: 'cpu', voice: 'cpu' },
+  { id: 'A', llm: 'gpu' },
+  { id: 'C', llm: 'cpu' },
 ];
 
 export interface SetupResult extends Setup {
@@ -59,9 +62,15 @@ export interface SetupResult extends Setup {
   prefillCachedMs: number;
   /** Writing speed, tokens per second (median). */
   tokPerS: number;
-  /** Making a line's speech, and from asking for a line to having its audio, ms (median). */
+  /** Writing a line, making its first piece's speech (`speechPieces`), and from asking for a line to having that, ms (median). */
+  writeMs: number;
   speechMs: number;
   lineMs: number;
+  /** Time to make a whole line's speech over its length (median; above 1 the next piece comes late). */
+  speechRtf: number;
+  /** Sentences a line had (mean), and lines cut short by `WRITE_MS`. */
+  sentences: number;
+  cut: number;
   /** Frame times while working, ms: median and 95th percentile. */
   frameP50: number;
   frameP95: number;
@@ -70,7 +79,7 @@ export interface SetupResult extends Setup {
   /** Lines that passed `cleanLine`, of those written. */
   clean: number;
   written: number;
-  /** Voices as loud as on the CPU (within 30 %) and no samples that aren't numbers. */
+  /** No samples that aren't numbers. */
   voiceOk: boolean;
   /** Right: ran, numbers fine, most lines clean, voices fine. */
   ok: boolean;
@@ -87,8 +96,8 @@ export interface DeviceReport {
   idleP50: number;
   idleP95: number;
   results: SetupResult[];
-  /** Where the model and voices run; null: nowhere fast enough (the model's lines are off). */
-  pick: { llm: Device; voice: Device; setup: SetupId } | null;
+  /** Where the model runs; null: nowhere fast enough (the model's lines are off). */
+  pick: { llm: Device; setup: SetupId } | null;
   /** Speech alone is fast enough somewhere (else voices are off). */
   voicesOk: boolean;
 }
@@ -98,6 +107,8 @@ const KEY = 'littlelives.deviceTests';
 const LINE_MS = WRITE_MS;
 /** Speech alone must be made within this (the voice speed test's "ok"). */
 const SPEECH_MS = 3000;
+/** A line's speech must be made faster than it plays, so its next piece is ready in time. */
+const MAX_RTF = 1;
 const VOICE: VoiceParams = { clip: 'preset:Charles', clipPitch: 1, clipDepth: 1, pitch: 1, depth: 1, speed: 1, temperature: 0.7 };
 
 export const deviceTest = $state({
@@ -126,14 +137,16 @@ export function reportFor(model: ModelSpec): DeviceReport | null {
 }
 
 /** Where a model and the voices run, if the test found it usable here. */
-export function devicePick(model: ModelSpec): { llm: Device; voice: Device } | null {
+export function devicePick(model: ModelSpec): { llm: Device } | null {
   return reportFor(model)?.pick ?? null;
 }
 
 function readReports(): Record<string, DeviceReport> {
   try {
     const r = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, DeviceReport>;
-    return r && typeof r === 'object' ? r : {};
+    if (!r || typeof r !== 'object') return {};
+    // Reports from before setup B (voices on the GPU) was dropped are tested again.
+    return Object.fromEntries(Object.entries(r).filter(([, x]) => x.results?.every((y) => SETUPS.some((s) => s.id === y.id))));
   } catch {
     return {};
   }
@@ -202,12 +215,6 @@ async function watchFrames<T>(work: () => Promise<T>): Promise<{ value: T; frame
   }
 }
 
-function rms(x: Float32Array): number {
-  let s = 0;
-  for (const v of x) s += v * v;
-  return Math.sqrt(s / Math.max(1, x.length));
-}
-
 /**
  * Runs the test for a model (`only`: some setups). The GPU setups run where there's WebGPU;
  * the CPU one only if neither of them is usable. Null if it was stopped (`stopDeviceTest`).
@@ -217,7 +224,7 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
   deviceTest.running = true;
   deviceTest.stopping = false;
   deviceTest.progress = 0;
-  const before = { llm: llmStatus.state === 'off' ? null : llmStatus.device, voice: voiceDevice() };
+  const before = llmStatus.state === 'off' ? null : llmStatus.device;
   const check = () => {
     if (deviceTest.stopping) throw new Stopped('stopped');
   };
@@ -239,14 +246,13 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
       deviceTest.progress = Math.min(1, stepsDone / Math.max(1, planned.length * perSetup));
     };
     const results: SetupResult[] = [];
-    let cpuRms = 0;
     for (const setup of SETUPS) {
       if (only && !only.includes(setup.id)) continue;
       // The CPU only when no GPU setup will do (unless asked for).
       if (setup.llm === 'cpu' && !only && results.some((x) => x.usable)) continue;
-      const r: SetupResult = { ...setup, ran: false, loadMs: 0, prefillMs: 0, prefillCachedMs: 0, tokPerS: 0, speechMs: 0, lineMs: 0, frameP50: 0, frameP95: 0, nonFinite: false, clean: 0, written: 0, voiceOk: false, ok: false, usable: false, lines: [] };
+      const r: SetupResult = { ...setup, ran: false, loadMs: 0, prefillMs: 0, prefillCachedMs: 0, tokPerS: 0, writeMs: 0, speechMs: 0, lineMs: 0, speechRtf: 0, sentences: 0, cut: 0, frameP50: 0, frameP95: 0, nonFinite: false, clean: 0, written: 0, voiceOk: false, ok: false, usable: false, lines: [] };
       results.push(r);
-      if ((setup.llm === 'gpu' || setup.voice === 'gpu') && !gpu) {
+      if (setup.llm === 'gpu' && !gpu) {
         r.error = 'no WebGPU here';
         continue;
       }
@@ -255,7 +261,6 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
         check();
         deviceTest.step = `Starting on the ${setup.llm.toUpperCase()}`;
         unloadLlm();
-        useVoiceDevice(setup.voice);
         const t0 = performance.now();
         await ensureLlm({ device: setup.llm, model: model.id });
         r.loadMs = performance.now() - t0;
@@ -264,33 +269,46 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
         await synthesize('Ready.', VOICE);
         check();
         advance(2);
-        deviceTest.step = setup.voice === setup.llm ? `Testing on the ${setup.llm.toUpperCase()}` : `Testing: ${setup.llm.toUpperCase()}, voices on the ${setup.voice.toUpperCase()}`;
+        deviceTest.step = setup.llm === 'cpu' ? 'Testing on the CPU' : 'Testing: GPU, voices on the CPU';
         const prefill: number[] = [];
         const speed: number[] = [];
+        const write: number[] = [];
         const speech: number[] = [];
+        const rtf: number[] = [];
         const lineMs: number[] = [];
-        let loud = 0;
+        let sentences = 0;
         let nanAudio = false;
         const { frames } = await watchFrames(async () => {
           for (const [i, ask] of asks.entries()) {
             const start = performance.now();
-            const g = await generateText(ask.messages, { temperature: 0, maxTokens: 24, stopAt: ['"'] }, { reply: ask.reply, lead: ask.lead });
+            // As in a game: the writer's limits, and its time (cut short, the finished sentences are said).
+            const g = await generateText(ask.messages, { temperature: 0, maxTokens: LINE_TOKENS, stopAt: ['"'] }, { reply: ask.reply, lead: ask.lead, deadline: Date.now() + WRITE_MS });
             check();
             advance();
             if (!g) continue;
+            write.push(performance.now() - start);
             r.written++;
+            if (g.stop === 'deadline') r.cut++;
             r.nonFinite ||= g.nonFinite;
             prefill.push(g.prefillMs);
             if (g.decodeMs > 0) speed.push(g.ids.length / (g.decodeMs / 1000));
-            const line = cleanLine(g.text, { me: 'Mia', names: ['Tom'], blocklist: text.blocklist });
+            const line = cleanLine(g.text, { me: 'Mia', names: ['Tom'], blocklist: text.blocklist, cut: cutShort(g) });
             if (line) r.clean++;
             r.lines.push(line ?? `✗ ${g.text}`);
+            sentences += line?.match(/[.!?…]+/g)?.length ?? 0;
+            // Spoken a piece at a time, as the voice director does: the first piece is heard once it's made.
             const s0 = performance.now();
-            const clip = await synthesize(line ?? 'Hello there.', VOICE);
-            speech.push(performance.now() - s0);
-            lineMs.push(performance.now() - start);
-            loud += rms(clip.samples);
-            nanAudio ||= clip.samples.some((v) => !Number.isFinite(v));
+            let samples = 0;
+            for (const [k, piece] of speechPieces(line ?? 'Hello there.').entries()) {
+              const clip = await synthesize(piece, VOICE);
+              if (k === 0) {
+                speech.push(performance.now() - s0);
+                lineMs.push(performance.now() - start);
+              }
+              samples += clip.samples.length;
+              nanAudio ||= clip.samples.some((v) => !Number.isFinite(v));
+            }
+            rtf.push((performance.now() - s0) / 1000 / Math.max(0.1, samples / SAMPLE_RATE));
             // Hopelessly slow (the CPU, often): two lines tell; don't wait for five.
             if (i === 1 && median(lineMs) > LINE_MS * 3) break;
           }
@@ -299,15 +317,16 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
         r.prefillMs = prefill[0] ?? 0;
         r.prefillCachedMs = median(prefill.slice(1));
         r.tokPerS = median(speed);
+        r.writeMs = median(write);
         r.speechMs = median(speech);
         r.lineMs = median(lineMs);
+        r.speechRtf = median(rtf);
+        r.sentences = sentences / Math.max(1, r.written);
         r.frameP50 = median(frames);
         r.frameP95 = percentile(frames, 0.95);
-        const meanRms = loud / Math.max(1, r.written);
-        if (setup.voice === 'cpu' && !cpuRms) cpuRms = meanRms;
-        r.voiceOk = !nanAudio && (setup.voice === 'cpu' || !cpuRms || Math.abs(meanRms - cpuRms) / cpuRms < 0.3);
+        r.voiceOk = !nanAudio;
         r.ok = !r.nonFinite && r.written > 0 && r.clean >= Math.ceil(r.written / 2) && r.voiceOk;
-        r.usable = r.ok && r.frameP95 <= smoothLimit && r.lineMs <= LINE_MS;
+        r.usable = r.ok && r.frameP95 <= smoothLimit && r.lineMs <= LINE_MS && r.speechRtf <= MAX_RTF;
       } catch (err) {
         if (deviceTest.stopping) throw new Stopped('stopped');
         r.error = String(err instanceof Error ? err.message : err);
@@ -323,8 +342,8 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
       idleP50: median(idle),
       idleP95: percentile(idle, 0.95),
       results,
-      pick: best ? { llm: best.llm, voice: best.voice, setup: best.id } : null,
-      voicesOk: results.some((x) => x.ran && x.voiceOk && x.speechMs <= SPEECH_MS),
+      pick: best ? { llm: best.llm, setup: best.id } : null,
+      voicesOk: results.some((x) => x.ran && x.voiceOk && x.speechMs <= SPEECH_MS && x.speechRtf <= MAX_RTF),
     };
     deviceTest.reports = { ...deviceTest.reports, [reportKey(model)]: report };
     try {
@@ -344,8 +363,7 @@ export async function runDeviceTest(text: TalkText, model: ModelSpec, only?: Set
     deviceTest.progress = 0;
     // Back to how it was (the pick applies from the next line on).
     unloadLlm();
-    useVoiceDevice(before.voice);
-    if (before.llm) void ensureLlm({ device: before.llm, model: model.id }).catch(() => {});
+    if (before) void ensureLlm({ device: before, model: model.id }).catch(() => {});
   }
 }
 

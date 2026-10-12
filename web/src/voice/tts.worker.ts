@@ -1,7 +1,7 @@
 /**
  * Voice worker: turns lines of text into 24 kHz audio, one at a time, off the main thread.
- * Kyutai's Pocket TTS runs on ONNX Runtime Web (its WASM build with SIMD; WebGPU only when the
- * device test tries it), and our Rust/WASM (`crates/voice-wasm`) shapes the voices, finds the
+ * Kyutai's Pocket TTS runs on ONNX Runtime Web, always on the CPU (its WASM build with SIMD:
+ * WebGPU was about four times slower, docs/design/voices.md), and our Rust/WASM (`crates/voice-wasm`) shapes the voices, finds the
  * mouth shapes and reads the text plain. `pocket.ts` makes each line.
  *
  * Everything is self-hosted, fetched once and kept in the Cache API, so the next session starts
@@ -10,7 +10,7 @@
 
 import { Tokenizer } from '@huggingface/tokenizers';
 import { fetchOnce, openCache, prune, gunzipText } from '../ml/assets';
-import { configureOrt, importOrt, ORT_WASM, sessionOptions, type Device } from '../ml/ort';
+import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { clip, reference, Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
 import { prepareVoice, synthesizeLine, type Bundle, type EmbeddingStore, type Engine, type Phonemizer, type Session } from './pocket';
@@ -59,7 +59,7 @@ scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
     if (!loading) {
-      loading = load(msg.base, msg.device ?? 'cpu', msg.threads ?? 1).catch((err) => {
+      loading = load(msg.base, msg.threads ?? 1).catch((err) => {
         loading = null;
         scope.postMessage({ type: 'error', message: String(err) });
         throw err;
@@ -136,13 +136,13 @@ function npy(bytes: ArrayBuffer): Float32Array {
 }
 
 /** Downloads (or takes from the cache) the runtime, our WASM, the model and the voices, and starts its sessions. */
-async function load(base: string, device: Device, threads: number): Promise<void> {
+async function load(base: string, threads: number): Promise<void> {
   const start = performance.now();
   const names = Object.keys(MODELS) as (keyof typeof MODELS)[];
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt wasm would
   // otherwise come back stale from the cache; those are fetched fresh there.
   const files: { url: string; size: number; built?: boolean }[] = [
-    { url: ORT_WASM[device].url, size: ORT_WASM[device].bytes, built: true },
+    { url: ORT_WASM.cpu.url, size: ORT_WASM.cpu.bytes, built: true },
     { url: wasmUrl, size: VOICE_WASM_BYTES, built: true },
     ...names.map((k) => ({ url: `${base}voice/${MODEL_DIR}${MODELS[k][0]}`, size: MODELS[k][1] })),
     ...SMALL.map(([name, size]) => ({ url: `${base}voice/${name}`, size })),
@@ -159,19 +159,18 @@ async function load(base: string, device: Device, threads: number): Promise<void
       }),
     ),
   );
-  // Keeps the other device's runtime: the device test switches back and forth.
-  void prune(cache, [...files.map((f) => f.url), ORT_WASM[device === 'gpu' ? 'cpu' : 'gpu'].url]);
+  void prune(cache, files.map((f) => f.url));
   const [ortWasm, wasm, ...rest] = bytes;
   const models = rest.slice(0, names.length);
   const [bundleJson, bos, tokenizerJson, presetIndex, presetPcm, lexicon] = rest.slice(names.length);
   await init({ module_or_path: wasm });
   const text = (b: ArrayBuffer) => new TextDecoder().decode(b);
   // No proxy worker (this is the worker); the runtime comes from our own download.
-  const ort = await importOrt(device);
-  configureOrt(ort, device, threads, ortWasm);
+  const ort = await importOrt('cpu');
+  configureOrt(ort, 'cpu', threads, ortWasm);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
   for (const [i, k] of names.entries()) {
-    sessions[k] = (await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device))) as unknown as Session;
+    sessions[k] = (await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions('cpu'))) as unknown as Session;
   }
   engine = {
     ort: ort as unknown as Engine['ort'],

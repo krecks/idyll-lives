@@ -118,7 +118,7 @@
     if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
     return `About ${mb(model)} MB, downloaded once.`;
   });
-  const NAMES = { A: 'the GPU, voices on the CPU', B: 'the GPU, voices too', C: 'the CPU' };
+  const NAMES = { A: 'the GPU, voices on the CPU', C: 'the CPU' };
   const deviceText = $derived.by(() => {
     if (deviceTest.running) return deviceTest.step || 'Testing…';
     const r = reportFor(model);

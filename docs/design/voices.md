@@ -51,26 +51,30 @@ Auto mode; Auto mode is next. Measurements and research behind the choices are a
   Chrome for Testing (cross-origin isolated, two threads), the Settings speed test: 1.6 s per
   line, 2.1× real time, worst frame 16.7 ms with the menu's town drawing; in a game, lines took
   0.6–2.2 s (1.5× real time), none dropped. The device test (LFM2.5 on the GPU) uses setup A:
-  speech 1.2 s a line on the CPU, against 3.6 s on WebGPU (setup B, too slow). Getting a new voice
-  ready: about 2.4 s (encoding a 10 s clip 2.1–2.3 s, feeding it to the model 0.4 s); 0.4 s once
-  its encoding is kept. Whisper understood every test line in every voice; about one line in 140
+  speech 1.2 s a line on the CPU, against 3.6 s on WebGPU (setup B, too slow). Lines of 1–5
+  sentences (the model's, since 2026-10-12) are spoken a piece at a time (`speechPieces`): on the
+  CPU the first sound comes after 1.1–1.7 s whatever the length and speech is made in 0.6–0.9 of
+  its length, so the next piece is always ready; on WebGPU 5–7 s and 3–3.7, with gaps of up to
+  15 s in a five-sentence line. So Pocket TTS only runs on the CPU (setup B is gone). Getting a
+  new voice ready: about 2.4 s (encoding a 10 s clip 2.1–2.3 s, feeding it to the model 0.4 s);
+  0.4 s once its encoding is kept. Whisper understood every test line in every voice; about one line in 140
   starts a word late (the model's own; see "Pocket TTS").
 - **Download:** 173.5 MB once (runtime 14.2, model 146.5, voices 11.3, dictionary 1.3, our WASM
   0.16), kept in the browser's cache.
 - **Guards (`voice/index.ts`):** as before: nothing new is said while the engine loads; it
   unloads after 5 minutes without a line; voices pause for the session (with a toast) after three
   lines in a row later than 4 s, or when making speech slows the frames.
-- **Not yet:** Auto mode; streaming playback (lines are played whole; if computers slower than
-  the M3 Pro need it, starting a line after its first frames is the next step).
+- **Not yet:** Auto mode; streaming within a piece (lines are played a sentence or so at a time;
+  if computers slower than the M3 Pro need it, starting a piece after its first frames is next).
 
 Residents speak with a text-to-speech model that runs **entirely in the browser**: no server, no
 API key, nothing leaves the player's computer.
 
 ## Goals and rules
 
-- **Performance first.** Speech must never cost frames. It runs in its own worker, on the CPU or
-  the GPU depending on the model and on what this computer handles better, and a benchmark in
-  Settings decides.
+- **Performance first.** Speech must never cost frames. It runs in its own worker, on the CPU
+  (the GPU draws the game, and Pocket TTS was slower there), and a benchmark in Settings checks
+  that this computer keeps up.
 - **Quiet by default.** Residents only speak when:
   1. **a resident is selected** (their Inspect panel is open, `game.inspected`): they speak their
      thoughts, and they and whoever they are talking to speak their conversation; or
@@ -135,8 +139,8 @@ that pause (`dsp::clip`). Lines are short and residents say many, so the rest is
 
 **Threads and the GPU:** one thread gives about 1.6× real time for whole lines; the worker uses
 two where the page is cross-origin isolated and the computer has at least six cores (the game, the
-simulation and the language model keep the others). Kyutai saw no GPU speed-up for batch size 1;
-the device test still tries WebGPU (setup B) and keeps it only if it is faster and smooth.
+simulation and the language model keep the others). Kyutai saw no GPU speed-up for batch size 1,
+and on WebGPU it was about four times slower here (2026-10-12): it only runs on the CPU.
 
 ## Shaping a voice (`crates/voice/src/dsp.rs`)
 

@@ -47,7 +47,8 @@ const CLEAN = [
   ['I love this 😀 so much!!', 'I love this so much!!'],
   ['What the hell is this crap?', null],
   ['Mia', null],
-  ['One. Two. Three. Four.', 'One. Two.'],
+  ['One. Two. Three. Four.', 'One. Two. Three. Four.'],
+  ['One. Two. Three. Four. Five. Six.', 'One. Two. Three. Four. Five.'],
   ['Look at [read](/ɹˈɛd/) this', 'Look at this.'],
   ['<|im_end|>', null],
   ['Sure, as an AI I can help.', null],
@@ -55,6 +56,16 @@ const CLEAN = [
 for (const [raw, want] of CLEAN) {
   const got = clean(raw);
   if (got !== want) fail(`cleanLine(${JSON.stringify(raw)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+}
+// Cut short (out of tokens or time): the unfinished sentence goes (with nothing finished, the line).
+const CUT = [
+  ['What a day. I think I will', 'What a day.'],
+  ['What a day. I think I will!', 'What a day. I think I will!'],
+  ['What a day and', null],
+];
+for (const [raw, want] of CUT) {
+  const got = cleanLine(raw, { me: 'Mia', names: ['Tom'], blocklist: text.blocklist, cut: true });
+  if (got !== want) fail(`cleanLine(${JSON.stringify(raw)}, cut) = ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
 }
 
 // ---- prompts ------------------------------------------------------------------------------------
@@ -88,7 +99,7 @@ if (asks[0].prompt.parts[1] !== asks[1].prompt.parts[1]) fail('two lines of the 
 
 // ---- replies ------------------------------------------------------------------------------------
 
-const GREEDY = { maxTokens: 24, temperature: 0, topK: 1, topP: 1, repetitionPenalty: 1.15, seed: 1, stopAtNewline: true, stopAt: ['"'] };
+const GREEDY = { maxTokens: 96, temperature: 0, topK: 1, topP: 1, repetitionPenalty: 1.15, seed: 1, stopAtNewline: true, stopAt: ['"'] };
 /**
  * Greedy replies to `MOMENTS`, cleaned. WASM arithmetic is the same on every machine (with the
  * same threads), so these hold everywhere; update them only on purpose (a new model, prompt
@@ -96,12 +107,12 @@ const GREEDY = { maxTokens: 24, temperature: 0, topK: 1, topP: 1, repetitionPena
  */
 const THREADS = 4;
 const GOLDEN = [
-  'Cooking level 5, a kitchen full of food!',
-  'Hey Tom, you look like a picture of me.',
-  'You were really funny.',
-  'The shower broke. Let me clean it up.',
-  "Roses need water, and I can't wait to see them grow!",
-  "I can't wait to learn more about plants and nature!",
+  "Cookin' level 5, a kitchen full of food. The fridge is just out here.",
+  "Hey Tom, you’re not the first to mention your lunch spot. The garden bench is perfect for a quick bite.",
+  "You were really funny last night. I didn't even notice.",
+  "Looks like the shower broke. I had to scramble for a change of clothes and maybe a quick bath.",
+  "Roses are red, and I love them. The swing set is perfect for a sunny afternoon. Water the garden before it gets too hot.",
+  "I can't believe I did it again! The plants are so happy, and the fridge is full of fresh herbs. It's amazing how much they make me feel.",
 ];
 
 const e1 = await engine(THREADS);

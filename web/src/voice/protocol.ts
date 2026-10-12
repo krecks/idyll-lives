@@ -1,11 +1,10 @@
 /** Messages between the main thread and the voice worker (`tts.worker.ts`). */
 
-import type { Device } from '../ml/ort';
 import type { VoiceParams } from './voices';
 
 export type ToVoiceWorker =
-  /** `base`: the app's base URL, where `voice/` lives; `device`: the CPU unless the device test asks for the GPU; `threads`: the runtime's. */
-  | { type: 'load'; base: string; language: string; device?: Device; threads?: number }
+  /** `base`: the app's base URL, where `voice/` lives; `threads`: the runtime's (always on the CPU). */
+  | { type: 'load'; base: string; language: string; threads?: number }
   /** A player's recording (any rate, decoded on the main thread), as clip `rec:<sha>`. */
   | { type: 'clip'; sha: string; samples: Float32Array; rate: number }
   /** Get a voice ready ahead of its first line (shape, encode, condition); no reply. */

@@ -49,6 +49,8 @@ const THOUGHTS = ['skipped', 'noPlace', 'kept', 'goal', 'roomLoved', 'roomDislik
 export function thoughtId(kind: number): string | undefined {
   return THOUGHTS[kind - 1];
 }
+/** Lines are spoken in pieces of at least this many characters (a lone "Ha!" goes with the next sentence). */
+const MIN_PIECE = 20;
 /** Lines a resident said lately per key, not picked again while others are left. */
 const RECENT = 3;
 /** Forget everyone's recent lines past this many keys (a long session with many residents). */
@@ -171,4 +173,23 @@ export class Lines {
 /** Fills `{name}` (the other resident) and `{me}`. */
 export function fill(text: string, me: string, other: string): string {
   return text.replaceAll('{me}', me || 'me').replaceAll('{name}', other || 'friend');
+}
+
+/** A line in the pieces it's spoken in: its sentences, short ones joined to the next (or the last). */
+export function speechPieces(text: string): string[] {
+  const pieces: string[] = [];
+  let piece = '';
+  for (const sentence of text.match(/[^.!?…]+[.!?…]+["'”’)]*|[^.!?…]+$/g) ?? [text]) {
+    if (!sentence.trim()) continue;
+    piece = piece ? `${piece} ${sentence.trim()}` : sentence.trim();
+    if (piece.length >= MIN_PIECE) {
+      pieces.push(piece);
+      piece = '';
+    }
+  }
+  if (piece) {
+    if (pieces.length) pieces[pieces.length - 1] += ` ${piece}`;
+    else pieces.push(piece);
+  }
+  return pieces;
 }

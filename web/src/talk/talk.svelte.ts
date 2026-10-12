@@ -8,7 +8,6 @@ import { untrack } from 'svelte';
 import { ensureLlm, llmStatus, modelById, unloadLlm, type ModelSpec } from '../llm';
 import type { Device } from '../ml/ort';
 import { settings } from '../settings/settings.svelte';
-import { useVoiceDevice } from '../voice/service.svelte';
 import { applyReport, devicePick, deviceTest, reportFor, reportKey, runDeviceTest, type DeviceReport } from './devices.svelte';
 import { loadTalk } from './text';
 
@@ -27,15 +26,14 @@ export function llmWrites(): boolean {
   return llmChosen() && devicePick(currentModel()) !== null;
 }
 
-/** Where the model and the voices run (the device test's pick; the voices on the CPU without one). */
-export function talkDevices(): { llm: Device; voice: Device } {
-  return devicePick(currentModel()) ?? { llm: 'gpu', voice: 'cpu' };
+/** Where the model runs (the device test's pick; the GPU without one). The voices always run on the CPU. */
+export function talkDevices(): { llm: Device } {
+  return devicePick(currentModel()) ?? { llm: 'gpu' };
 }
 
 /** Loads the chosen model where it runs best (switching if that changed). */
 export function ensureTalk(): Promise<void> {
   const devices = talkDevices();
-  useVoiceDevice(devices.voice);
   return ensureLlm({ device: devices.llm, model: currentModel().id });
 }
 
@@ -63,14 +61,12 @@ $effect.root(() => {
     const tested = reportFor(model) !== null;
     const stopped = deviceTest.stopped.includes(reportKey(model));
     const devices = talkDevices();
-    const voices = settings.voices;
     untrack(() => {
       if (deviceTest.running) return;
       if (chosen && !tested && !stopped) {
         void testDevices().catch(() => {});
         return;
       }
-      useVoiceDevice(voices && tested ? devices.voice : 'cpu');
       if (!llmWrites()) {
         if (llmStatus.state !== 'off') unloadLlm();
         return;

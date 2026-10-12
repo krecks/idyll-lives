@@ -14,8 +14,10 @@ import { cleanLine } from './clean';
 import { gatherMoment, type TalkSources } from './context';
 import { buildMessages, type TalkText } from './prompt';
 
-/** Time the model has to write a line, ms (speech is made after). */
+/** Time the model has to write a line, ms (speech is made after); cut short, it keeps the sentences finished. */
 export const WRITE_MS = 3500;
+/** Tokens a line may take: five short sentences. */
+export const LINE_TOKENS = 96;
 /** A persona read ahead may wait this long for the model. */
 const PRIME_MS = 30_000;
 /** Hand-written lines shown as examples. */
@@ -67,10 +69,10 @@ export class LlmWriter implements LineWriter {
     const start = performance.now();
     const result = await generateText(
       built.messages,
-      { seed: (req.seed * 2654435761) >>> 0, stopAt: [quote, '"', '“', '”'], avoidStart: examples },
+      { seed: (req.seed * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, '"', '“', '”'], avoidStart: examples },
       { reply: built.reply, lead: built.lead, deadline: Date.now() + WRITE_MS, signal },
     ).catch(() => null);
-    const line = result && !result.nonFinite ? cleanLine(result.text, { me: moment.me, names: moment.names, blocklist: this.text.blocklist }) : null;
+    const line = result && !result.nonFinite ? cleanLine(result.text, { me: moment.me, names: moment.names, blocklist: this.text.blocklist, cut: cutShort(result) }) : null;
     if (this.debug) {
       const prompt = built.lead + built.messages[built.messages.length - 1].content;
       const stats = result ? { promptTokens: result.promptTokens, cachedTokens: result.cachedTokens, prefillMs: result.prefillMs, decodeMs: result.decodeMs, stop: result.stop, tokens: result.ids.length } : undefined;
@@ -78,6 +80,11 @@ export class LlmWriter implements LineWriter {
     }
     return line ? { text: line, tone: scripted?.tone ?? toneOf(req), key: `llm:${scripted?.key ?? req.kind}` } : null;
   }
+}
+
+/** The reply stopped mid-way (out of tokens or time), not at its end. */
+export function cutShort(result: GenResult): boolean {
+  return result.stop === 'length' || result.stop === 'deadline';
 }
 
 /** Up to `n` different lines by hash. */
