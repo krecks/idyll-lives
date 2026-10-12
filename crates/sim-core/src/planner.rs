@@ -842,6 +842,8 @@ fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &Block
         }
         (TaskKind::Eat { .. }, _) => run.skill.is_none() && a.tags & content.cooking.eat_tags != 0,
         (TaskKind::Dishes { .. }, _) => run.skill.is_none() && a.tags & content.cooking.dishes_tags != 0,
+        // On the phone with someone is socialising.
+        (TaskKind::Phone { contact: Some(_), .. }, Phase::Using { .. }) => a.social,
         _ => false,
     }
 }

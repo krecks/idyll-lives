@@ -20,7 +20,7 @@ const REPATH_DISTANCE: f32 = 2.4;
 /// Extra distance at which a conversation can start.
 const ENGAGE_SLACK: f32 = 0.8;
 /// Rejected interactions end early.
-const FAILURE_LENGTH: f32 = 0.4;
+pub(crate) const FAILURE_LENGTH: f32 = 0.4;
 
 pub fn duration(s: &SocialDef, success: bool) -> f32 {
     if success {
@@ -54,22 +54,35 @@ pub fn acceptance_chance(
     target: &Sim,
     s: &SocialDef,
 ) -> f32 {
-    let (a, t) = (actor.id as usize, target.id as usize);
     let romantic = s.tags & content.social_rules.romantic_tags != 0;
     if romantic && !target.attracted_to(actor) {
         return 0.0; // not interested in the actor's gender
     }
+    accepts(content, rels, actor, target, &s.acceptance, s.tags)
+}
+
+/// Probability that `target` says yes to `actor` (terms `acc`, for something with `tags`): how
+/// the target feels about the actor, their chemistry, the target's mood, traits and emotion.
+/// Socials use it, and so do phone calls (`phone.rs`).
+pub(crate) fn accepts(
+    content: &Content,
+    rels: &Relationships,
+    actor: &Sim,
+    target: &Sim,
+    acc: &social::Acceptance,
+    tags: crate::content::TagMask,
+) -> f32 {
+    let (a, t) = (actor.id as usize, target.id as usize);
     let view = rels.get(t, a);
-    let acc = &s.acceptance;
     let mut p = acc.base
         + acc.friendship * view.friendship
         + acc.romance * view.romance
         + acc.chemistry * rels.chemistry(a, t)
         + acc.mood * (target.mood(content) - 0.5)
-        + target.mods.acceptance(s.tags)
-        + actor.mods.success(s.tags);
+        + target.mods.acceptance(tags)
+        + actor.mods.success(tags);
     if let Some(e) = target.emotion(content) {
-        p += content.emotions[e].mods.acceptance(s.tags);
+        p += content.emotions[e].mods.acceptance(tags);
     }
     if acc.taken_penalty > 0.0 && rels.partner_of(t).is_some_and(|p| p != a) {
         p -= acc.taken_penalty;
@@ -328,6 +341,25 @@ fn apply_outcome(
 ) {
     let s = &content.socials[social];
     let o = if success { &s.success } else { &s.failure };
+    outcome(content, rels, events, rng, sims, a, t, o, s.tags, success, tick);
+}
+
+/// What came of something `a` did with `t` (a social, a phone call): relationship changes both
+/// ways, needs, feelings, the outcome's effect, milestones and jealousy.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn outcome(
+    content: &Content,
+    rels: &mut Relationships,
+    events: &mut EventLog,
+    rng: &mut Rng,
+    sims: &mut [Sim],
+    a: usize,
+    t: usize,
+    o: &social::Outcome,
+    tags: crate::content::TagMask,
+    success: bool,
+    tick: u64,
+) {
     let defs = &content.feelings;
     let rules = &content.social_rules;
     let before = (*rels.get(a, t), *rels.get(t, a));
@@ -423,7 +455,7 @@ fn apply_outcome(
     }
 
     // Romance in front of a partner causes jealousy.
-    if success && s.tags & rules.romantic_tags != 0 {
+    if success && tags & rules.romantic_tags != 0 {
         for b in 0..sims.len() {
             if b == a || b == t || sims[b].pose == Pose::Lie {
                 continue;

@@ -250,7 +250,7 @@
       "group": "street",
       "outdoors": true,
       "decor": 0.4,
-      "description": "A red telephone box with a working phone. A call costs a dollar.",
+      "description": "A red telephone box, a bit of the old town. Everyone has a phone of their own these days, but this one still works (a call costs a dollar).",
       "interactions": [
         {
           "id": "call",
@@ -264,7 +264,8 @@
           "tags": [
             "lounge"
           ],
-          "cost": 1
+          "cost": 1,
+          "autonomous": false
         }
       ]
     },

@@ -384,6 +384,17 @@ export interface SocialDef {
   icon: string;
 }
 
+/** Something to do on the phone (`phone.actions`; sim-core `phone.rs`). */
+export interface PhoneActionDef {
+  id: string;
+  label: string;
+  icon?: string;
+  /** With someone (texting, calling, inviting); without: on their own (scrolling). */
+  contact?: boolean;
+  /** After a yes: they come over (`here`) or the caller goes over (`there`). */
+  meet?: 'here' | 'there';
+}
+
 /** What a routine block can be for (`activities`). */
 export interface ActivityDef {
   id: string;
@@ -481,6 +492,7 @@ interface ContentFile {
   cooking?: CookingRules;
   items?: ItemDef[];
   recipes?: RecipeDef[];
+  phone?: { actions?: PhoneActionDef[] };
   /** Further content files (relative to this one), merged key by key. */
   include?: string[];
 }
@@ -537,6 +549,8 @@ export class Content {
   readonly cooking: CookingRules;
   readonly items: readonly ItemDef[];
   readonly recipes: readonly RecipeDef[];
+  /** What residents do on their phones, in the order phone commands index them. */
+  readonly phoneActions: readonly PhoneActionDef[];
   private readonly itemById: Map<string, ItemDef>;
 
   private constructor(
@@ -583,6 +597,7 @@ export class Content {
     this.cooking = file.cooking ?? {};
     this.items = file.items ?? [];
     this.recipes = file.recipes ?? [];
+    this.phoneActions = file.phone?.actions ?? [];
     this.itemById = new Map(this.items.map((i) => [i.id, i]));
     this.freeRotation = new Set(file.objectRules?.freeRotation ?? []);
   }

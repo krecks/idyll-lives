@@ -49,6 +49,8 @@ export interface GameControls {
   goHome(): void;
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
+  /** The selected Sim uses their phone: `action` (content `phone.actions` index), with `contact` or on their own. */
+  phone(action: number, contact: number | null): void;
   useObject(objectId: number, interaction: number): void;
   /** The selected Sim eats a serving of food (an item) or clears it away to the sink. */
   useItem(itemId: number, action: 'eat' | 'clear'): void;

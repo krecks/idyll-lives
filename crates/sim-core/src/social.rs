@@ -283,7 +283,7 @@ pub(crate) struct SocialRaw {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct OutcomeRaw {
+pub(crate) struct OutcomeRaw {
     friendship: f32,
     romance: f32,
     target_friendship: f32,
@@ -345,7 +345,7 @@ fn find(index: &HashMap<String, usize>, key: &str, ctx: &str, kind: &str) -> Res
         .ok_or_else(|| Error::new(format!("{ctx}: unknown {kind} '{key}'")))
 }
 
-fn need_array(
+pub(crate) fn need_array(
     map: &HashMap<String, f32>,
     ix: &Indices,
     ctx: &str,
@@ -361,7 +361,7 @@ fn need_array(
     Ok(out)
 }
 
-fn tag_mask(tags: &[String], ix: &Indices, ctx: &str) -> Result<TagMask, Error> {
+pub(crate) fn tag_mask(tags: &[String], ix: &Indices, ctx: &str) -> Result<TagMask, Error> {
     let mut mask: TagMask = 0;
     for t in tags {
         let i = ix
@@ -412,7 +412,7 @@ pub(crate) fn feeling_id(raw: &FeelingRaw) -> &str {
     &raw.id
 }
 
-fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result<Outcome, Error> {
+pub(crate) fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result<Outcome, Error> {
     Ok(Outcome {
         friendship: raw.friendship,
         romance: raw.romance,
@@ -812,6 +812,10 @@ pub enum EventKind {
     TurnedAway,
     /// `a` knocked at the door of `b`'s home, but nobody answered.
     NobodyHome,
+    /// `a` invited `b` over on the phone, and `b` is coming.
+    Invited,
+    /// `b` said no on the phone to meeting up with `a` (an invitation, or `a` coming over).
+    Declined,
 }
 
 impl EventKind {
@@ -824,7 +828,8 @@ impl EventKind {
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway => 1,
-            Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome => 0,
+            Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
+            | Declined => 0,
         }
     }
 }

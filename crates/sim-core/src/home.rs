@@ -62,12 +62,12 @@ fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
 }
 
 /// Whether a task is at object `id` (using it, repairing it, cooking at it, sitting at it to
-/// eat, washing up at it): it stops when the object goes.
+/// eat or to be on the phone, washing up at it): it stops when the object goes.
 fn uses_object(t: &Task, id: u32) -> bool {
     match t.kind {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == id,
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
-        TaskKind::Eat { seat, .. } => seat == Some(id),
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(id),
         _ => false,
     }
 }
@@ -89,7 +89,7 @@ fn shift_objects(t: &mut Task, id: u32) {
             station.iter_mut().chain(origin.iter_mut()).for_each(shift);
         }
         TaskKind::Dishes { station, .. } => station.iter_mut().for_each(shift),
-        TaskKind::Eat { seat, .. } => seat.iter_mut().for_each(shift),
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat.iter_mut().for_each(shift),
         _ => {}
     }
 }

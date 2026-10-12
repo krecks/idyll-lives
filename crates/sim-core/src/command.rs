@@ -120,6 +120,14 @@ pub enum Command {
     GoHome {
         sim: u32,
     },
+    /// Use the phone: action `action` (index into content `phone.actions`), with `contact` if
+    /// it's with someone (text, call, invite them over, ask to come over).
+    Phone {
+        sim: u32,
+        action: usize,
+        #[serde(default)]
+        contact: Option<u32>,
+    },
     /// Cancel an action: index 0 is the current action, 1.. are queued ones.
     Cancel {
         sim: u32,

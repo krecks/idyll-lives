@@ -1847,6 +1847,86 @@
     "latestHour": 20,
     "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"}
   },
+  "phone": {
+    "fromStage": "teen",
+    "anim": "phone",
+    "seatTags": ["lounge"],
+    "seatRange": 5,
+    "noAnswerMinutes": 3,
+    "actions": [
+      {
+        "id": "text",
+        "label": "Text",
+        "icon": "icon.phone.text",
+        "minutes": 10,
+        "contact": true,
+        "message": true,
+        "tags": ["social", "friendly", "phone"],
+        "prefer": "liked",
+        "autonomyWeight": 0.6,
+        "acceptance": {"base": 0.85, "friendship": 0.004, "mood": 0.3},
+        "needs": {"social": 0.12, "fun": 0.03},
+        "contactNeeds": {"social": 0.06},
+        "success": {"friendship": 1, "targetFriendship": 1},
+        "failure": {"friendship": -0.5}
+      },
+      {
+        "id": "call",
+        "label": "Call",
+        "icon": "icon.phone.call",
+        "minutes": 25,
+        "contact": true,
+        "tags": ["social", "friendly", "phone"],
+        "prefer": "liked",
+        "autonomyWeight": 0.5,
+        "acceptance": {"base": 0.75, "friendship": 0.004, "mood": 0.4},
+        "needs": {"social": 0.28, "fun": 0.04},
+        "contactNeeds": {"social": 0.2},
+        "success": {"friendship": 2, "targetFriendship": 2},
+        "failure": {"friendship": -1, "targetFriendship": -0.5, "feeling": "awkward"}
+      },
+      {
+        "id": "invite",
+        "label": "Invite over",
+        "icon": "icon.phone.invite",
+        "minutes": 5,
+        "contact": true,
+        "meet": "here",
+        "tags": ["social", "friendly", "phone"],
+        "prefer": "liked",
+        "autonomyWeight": 0.25,
+        "acceptance": {"base": 0.45, "friendship": 0.006, "mood": 0.4},
+        "needs": {"social": 0.05},
+        "contactNeeds": {"social": 0.03},
+        "success": {"friendship": 1, "targetFriendship": 2},
+        "failure": {"friendship": -1}
+      },
+      {
+        "id": "askOver",
+        "label": "Ask to come over",
+        "icon": "icon.phone.visit",
+        "minutes": 5,
+        "contact": true,
+        "meet": "there",
+        "autonomous": false,
+        "tags": ["social", "friendly", "phone"],
+        "acceptance": {"base": 0.45, "friendship": 0.006, "mood": 0.4},
+        "needs": {"social": 0.05},
+        "contactNeeds": {"social": 0.03},
+        "success": {"friendship": 1, "targetFriendship": 1},
+        "failure": {"friendship": -1}
+      },
+      {
+        "id": "browse",
+        "label": "Scroll the phone",
+        "icon": "icon.phone.browse",
+        "minutes": 20,
+        "tags": ["fun", "phone"],
+        "autonomyWeight": 0.8,
+        "needs": {"fun": 0.15}
+      }
+    ]
+  },
   "economy": {
     "startingFunds": 2500,
     "emptyLotFunds": 10000,
@@ -1902,7 +1982,9 @@
     "adopted": "{b} adopted {a}",
     "graduated": "{a} finished school with {grade}",
     "turnedAway": "{b} didn't let {a} in",
-    "nobodyHome": "{a} knocked at {b}'s door, but nobody answered"
+    "nobodyHome": "{a} knocked at {b}'s door, but nobody answered",
+    "invited": "{a} invited {b} over",
+    "declined": "{b} couldn't meet up with {a} just now"
   },
   "activities": [
     {

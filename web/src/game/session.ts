@@ -417,6 +417,10 @@ export async function startSession(
       voices.playerConversation(game.selected, target);
       game.socialMenu = null;
     },
+    phone(action, contact) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'phone', sim: game.selected, action, contact: contact ?? undefined });
+    },
     useObject(objectId, interaction) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });

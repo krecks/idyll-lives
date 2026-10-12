@@ -912,7 +912,6 @@
     {"def": "litterBin", "x": 16, "z": 16, "rot": 2, "turn": 20},
     {"def": "drinkingFountain", "x": 14, "z": 16, "rot": 2},
     {"def": "postBox", "x": 16, "z": 1, "rot": 2},
-    {"def": "phoneBooth", "x": 18, "z": 1, "rot": 2},
     {"def": "noticeBoard", "x": 8, "z": 1, "rot": 2},
     {"def": "busStop", "x": 2, "z": 1, "rot": 2},
     {"def": "vendingSnack", "x": 23, "z": 18, "rot": 2},

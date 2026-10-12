@@ -16505,6 +16505,30 @@
       "type": "icon",
       "url": "icons/door.svg"
     },
+    "icon.ui.phone": {
+      "type": "icon",
+      "url": "icons/phone.svg"
+    },
+    "icon.phone.text": {
+      "type": "icon",
+      "url": "icons/chat.svg"
+    },
+    "icon.phone.call": {
+      "type": "icon",
+      "url": "icons/call.svg"
+    },
+    "icon.phone.invite": {
+      "type": "icon",
+      "url": "icons/home.svg"
+    },
+    "icon.phone.visit": {
+      "type": "icon",
+      "url": "icons/door.svg"
+    },
+    "icon.phone.browse": {
+      "type": "icon",
+      "url": "icons/phone.svg"
+    },
     "icon.ui.stairs": {
       "type": "icon",
       "url": "icons/stairs.svg"

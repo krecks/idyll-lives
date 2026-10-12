@@ -87,11 +87,13 @@ function patched(old: SimView | undefined, patch: SimPatch): SimView {
   const sim = { ...(old ?? NEW_SIM), ...fields } as SimView;
   if (fields.pension === null) delete sim.pension;
   if (fields.grade === null) delete sim.grade;
+  if (fields.phone === null) delete sim.phone;
   if (plan === null) delete sim.plan;
   else if (plan) sim.plan = { ...sim.plan, ...plan } as PlanView;
   if (patch.detail === false) {
     Object.assign(sim, NO_DETAILS);
     delete sim.grade;
+    delete sim.phone;
     delete sim.plan;
   }
   return sim;
