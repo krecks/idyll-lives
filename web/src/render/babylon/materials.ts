@@ -337,6 +337,8 @@ export interface SurfaceOptions {
   planarUV?: boolean;
   /** Follow the wall cutaway state (meshes need the `wallCut` attribute). */
   cutaway?: boolean;
+  /** A separate copy of the surface under this name (e.g. one per room, for its own emissive glow). */
+  variant?: string;
 }
 
 export class MaterialLibrary {
@@ -394,7 +396,7 @@ export class MaterialLibrary {
 
   /** A textured surface from a manifest `material` entry (walls, floors, roads, terrain). */
   surface(key: string, options: SurfaceOptions = {}): PBRMaterial {
-    const id = `${key}|${options.vertexColors ? 'vc' : ''}|${options.doubleSided ? '2s' : ''}|${options.planarUV ? 'xz' : ''}|${options.cutaway ? 'cut' : ''}`;
+    const id = `${key}|${options.vertexColors ? 'vc' : ''}|${options.doubleSided ? '2s' : ''}|${options.planarUV ? 'xz' : ''}|${options.cutaway ? 'cut' : ''}|${options.variant ?? ''}`;
     let mat = this.cache.get(id);
     if (!mat) {
       const entry = this.assets?.get(key, 'material') ?? { type: 'material', color: '#DDDDDD' };

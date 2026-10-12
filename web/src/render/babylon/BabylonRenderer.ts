@@ -325,6 +325,8 @@ export class BabylonRenderer implements Renderer {
   private roomLightUse: (RoomLight | null)[] = [];
   /** Per interior light: 1 on, 0 out (its room is dark), eased between. */
   private roomLightOn: number[] = [];
+  /** Per room whose windows are dimmed: 1 glowing, 0 out (its room is dark), eased between; unlisted rooms glow. */
+  private readonly windowGlowOn = new Map<number, number>();
   /** Rooms where everyone is asleep (lights out), and rooms with someone awake (scratch). */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
@@ -627,6 +629,11 @@ export class BabylonRenderer implements Renderer {
     this.findDarkRooms(frame);
     if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
       this.applyRoomLights();
+      this.resetSnapshot();
+    }
+    // And their windows stop glowing with them.
+    if (this.fadeWindowGlow(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
+      this.house.setWindowGlow(this.windowGlowOn);
       this.resetSnapshot();
     }
     this.steerCamera(this.engine.getDeltaTime() / 1000);
@@ -2416,6 +2423,23 @@ export class BabylonRenderer implements Renderer {
       this.roomLightOn[i] = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
       changed = true;
     });
+    return changed;
+  }
+
+  /** Eases each room's window glow towards out (the room dark) or on, as its lights; true if any changed. */
+  private fadeWindowGlow(dt: number): boolean {
+    let changed = false;
+    const step = Math.min(1, dt / LIGHTS_OUT_FADE);
+    const glow = this.windowGlowOn;
+    for (const room of this.darkRooms) if (!glow.has(room)) glow.set(room, 1);
+    for (const [room, on] of glow) {
+      const target = this.darkRooms.has(room) ? 0 : 1;
+      if (on === target && target === 0) continue;
+      const next = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
+      if (next === 1) glow.delete(room);
+      else glow.set(room, next);
+      changed = true;
+    }
     return changed;
   }
 
