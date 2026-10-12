@@ -488,6 +488,36 @@ impl World {
             .all(|(x, z)| self.lot.room_at(x, z) == OUTDOORS)
     }
 
+    /// Whether a tile has a door on one of its sides.
+    fn by_door(&self, x: i32, z: i32) -> bool {
+        if !self.lot.in_bounds(x, z) {
+            return false;
+        }
+        let (ux, uz, lot) = (x as usize, z as usize, &self.lot);
+        lot.h_edge(ux, uz) == Edge::Door
+            || lot.h_edge(ux, uz + 1) == Edge::Door
+            || lot.v_edge(ux, uz) == Edge::Door
+            || lot.v_edge(ux + 1, uz) == Edge::Door
+    }
+
+    /// Furniture on the floor (not pictures, ceiling lamps, rugs, things on tops or stairs)
+    /// doesn't go just inside a door, where it would make the way through a squeeze: a lamp
+    /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
+    fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
+        let d = &self.content.objects[def];
+        if d.layer.mounted() || d.stairs {
+            return Ok(());
+        }
+        // Where it doesn't fit at all, `place_at_home` says why.
+        let Ok(obj) = self.check_fit(def, x, z, rot, layout) else {
+            return Ok(());
+        };
+        if obj.tiles(&self.content).any(|(tx, tz)| self.by_door(tx, tz)) {
+            return Err(Error::new("that would stand in a doorway"));
+        }
+        Ok(())
+    }
+
     /// Good free spots for `def` on the plot, best first: indoors (outdoors for garden things),
     /// back to a wall, away from doors. Things on a surface go on the first top with room for
     /// them, in the middle if it's free.
@@ -507,13 +537,6 @@ impl World {
         }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
-        let near_door = |x: i32, z: i32| {
-            let (ux, uz) = (x as usize, z as usize);
-            lot.h_edge(ux, uz) == Edge::Door
-                || lot.h_edge(ux, uz + 1) == Edge::Door
-                || lot.v_edge(ux, uz) == Edge::Door
-                || lot.v_edge(ux + 1, uz) == Edge::Door
-        };
         let mut spots = Vec::new();
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
@@ -522,7 +545,7 @@ impl World {
                         continue;
                     };
                     if !self.fits_on_plot(&obj, plot)
-                        || obj.tiles(&self.content).any(|(tx, tz)| near_door(tx, tz))
+                        || obj.tiles(&self.content).any(|(tx, tz)| self.by_door(tx, tz))
                     {
                         continue;
                     }
@@ -581,7 +604,10 @@ impl World {
         let style = self.check_style(style.unwrap_or(self.households[h].style))?;
         let on_top = d.layer == Layer::Surface;
         let id = match at {
-            Some([x, z, rot]) => self.place_at_home(plot, def, x, z, rot as u8, layout, style, 0, price)?,
+            Some([x, z, rot]) => {
+                self.keep_doorway_clear(def, x, z, rot as u8, layout)?;
+                self.place_at_home(plot, def, x, z, rot as u8, layout, style, 0, price)?
+            }
             None => self
                 .find_spot(plot, def)
                 .into_iter()
@@ -677,6 +703,7 @@ impl World {
         let old = lifted.iter().find(|o| o.id == object).expect("lifted it").clone();
         let result = (|| {
             let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
+            self.keep_doorway_clear(old.def, x, z, rot, layout)?;
             let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.style, old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
             placed.turn = turn.unwrap_or(old.turn);

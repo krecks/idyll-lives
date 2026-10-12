@@ -234,6 +234,114 @@
      "x": 18,
      "z": 15,
      "rot": 3
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 11,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 7,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 11,
+     "z": 7,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 10,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 11,
+     "z": 10,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 12,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 11,
+     "z": 12,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 14,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 11,
+     "z": 14,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 11,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 11,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 14,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 14,
+     "rot": 0
     }
    ],
    "spawns": [
@@ -444,6 +552,72 @@
      "x": 21,
      "z": 17,
      "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 8,
+     "z": 6,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 12,
+     "z": 6,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 16,
+     "z": 6,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 8,
+     "z": 9,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 12,
+     "z": 9,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 16,
+     "z": 9,
+     "rot": 2
+    },
+    {
+     "def": "ceilingLight",
+     "x": 8,
+     "z": 12,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 12,
+     "z": 12,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 13,
+     "z": 12,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 16,
+     "z": 11,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 15,
+     "z": 13,
+     "rot": 2
     }
    ],
    "spawns": [
@@ -744,6 +918,168 @@
      "def": "bush",
      "x": 24,
      "z": 2,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 4,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 6,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 9,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 10,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 11,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 12,
+     "rot": 2
+    },
+    {
+     "def": "ceilingLight",
+     "x": 9,
+     "z": 14,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 9,
+     "z": 15,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 9,
+     "z": 16,
+     "rot": 2
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 21,
+     "z": 5,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 14,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 21,
+     "z": 8,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 13,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 15,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 16,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 17,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 19,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 20,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 22,
+     "z": 13,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 3,
+     "z": 14,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 5,
+     "z": 15,
+     "rot": 0
+    },
+    {
+     "def": "ceilingLight",
+     "x": 7,
+     "z": 14,
      "rot": 0
     }
    ],

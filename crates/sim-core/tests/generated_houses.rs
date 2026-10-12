@@ -3,7 +3,8 @@
 //! front door, upstairs too. Chairs face tables and things on tops stand on one; most houses have
 //! somewhere to sit down at a table and small things on their tops. No room is bigger than its
 //! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
-//! good share of houses on large lots have a kitchen island with stools pulled up to it.
+//! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
+//! room has lights enough for all of it at night, and nothing stands just inside a door.
 //!
 //! Make the houses first: `node --experimental-strip-types tools/housegen/sample.ts houses.json`,
 //! then `HOUSES=houses.json cargo test -p sim-core --test generated_houses -- --ignored --nocapture`.
@@ -12,7 +13,7 @@ mod common;
 
 use sim_core::World;
 use sim_core::content::{Layer, SurfaceKind};
-use sim_core::lot::OUTDOORS;
+use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 
@@ -30,6 +31,7 @@ fn generated_houses_are_livable() {
     let mut failures = Vec::new();
     let (mut dining, mut tops) = (0, 0);
     let (mut large, mut islands) = (0, 0);
+    let (mut rooms, mut bright) = (0, 0);
     for h in &houses {
         let label = format!("{} {} ({})", h["size"], h["seed"], h["description"]);
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
@@ -102,6 +104,43 @@ fn generated_houses_are_livable() {
                 failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
             }
         }
+        // Every room has a light, enough for all of it at night (an open kitchen and living room
+        // share theirs).
+        let lamp_tiles = w.content.room_rules.lamp_tiles;
+        for r in h["rooms"].as_array().into_iter().flatten() {
+            let kind = r["kind"].as_str().unwrap();
+            let [x, z] = ["x", "z"].map(|k| r[k].as_i64().unwrap() as i32);
+            let Some(room) = w.room_at_tile(x, z) else { continue };
+            rooms += 1;
+            bright += usize::from(room.scores.light >= 0.6);
+            if room.lamps == 0 {
+                failures.push(format!("{label}: the {kind} at {x},{z} has no light"));
+            } else if f32::from(room.lamps) * lamp_tiles < room.tiles {
+                failures.push(format!("{label}: the {kind} at {x},{z} has {} lights for {} tiles", room.lamps, room.tiles));
+            }
+        }
+        // Nothing stands just inside a door (a lamp beside a doorway makes the way in a squeeze).
+        let blocked = w.blocked();
+        let (lw, ld) = (w.lot.width as i32, w.lot.depth as i32);
+        let clear = |x: i32, z: i32| !w.lot.in_bounds(x, z) || !blocked[w.lot.tile_index(x, z)];
+        for z in 0..=ld {
+            for x in 0..=lw {
+                let h_door = x < lw && w.lot.h_edge(x as usize, z as usize) == Edge::Door;
+                let v_door = z < ld && w.lot.v_edge(x as usize, z as usize) == Edge::Door;
+                for (door, a, b) in [(h_door, (x, z - 1), (x, z)), (v_door, (x - 1, z), (x, z))] {
+                    for (tx, tz) in [a, b] {
+                        if door && !clear(tx, tz) {
+                            let what = w.objects.iter().find(|o| {
+                                let (ow, od) = o.size(&w.content);
+                                !w.content.objects[o.def].layer.mounted() && (o.x..o.x + ow).contains(&tx) && (o.z..o.z + od).contains(&tz)
+                            });
+                            let id = what.map_or("something", |o| w.content.objects[o.def].id.as_str());
+                            failures.push(format!("{label}: the {id} at {tx},{tz} stands in a doorway"));
+                        }
+                    }
+                }
+            }
+        }
         dining += usize::from(seated >= 2);
         // An island: a counter or bar with two stools or more facing it.
         if h["size"] == "large" {
@@ -121,6 +160,7 @@ fn generated_houses_are_livable() {
     }
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
+    eprintln!("  {bright} of {rooms} rooms lit well (the rest have too few windows for daylight)");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
     }
