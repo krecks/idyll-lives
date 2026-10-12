@@ -109,8 +109,9 @@
         {
           "id": "blend",
           "label": "Blend a power smoothie",
-          "anim": "drink",
-          "minutes": 15,
+          "anim": "cook",
+          "minutes": 4,
+          "eat": { "item": "smoothie", "minutes": 6 },
           "pose": "stand",
           "autonomous": true,
           "effects": { "hunger": 0.35, "energy": 0.06, "fun": 0.05 },

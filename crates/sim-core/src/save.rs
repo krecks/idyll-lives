@@ -446,6 +446,9 @@ pub enum TaskSave {
         object: u32,
         interaction: String,
         directed: bool,
+        /// A routine's step (washing hands after the toilet): it takes its full time.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        routine: bool,
     },
     MoveTo {
         x: f32,
@@ -1005,6 +1008,7 @@ impl World {
                         object,
                         interaction,
                         directed,
+                        routine,
                     } => {
                         let Some(&object) = object_ids.get(object) else {
                             continue;
@@ -1021,11 +1025,13 @@ impl World {
                                 interaction,
                             },
                             directed: *directed,
+                            routine: *routine,
                         }
                     }
                     TaskSave::MoveTo { x, z, directed } => Task {
                         kind: TaskKind::MoveTo { x: *x, z: *z },
                         directed: *directed,
+                        routine: false,
                     },
                     TaskSave::Social {
                         target,
@@ -1044,11 +1050,13 @@ impl World {
                                 social,
                             },
                             directed: *directed,
+                            routine: false,
                         }
                     }
                     TaskSave::Work => Task {
                         kind: TaskKind::Work,
                         directed: true,
+                        routine: false,
                     },
                     TaskSave::Visit { plot, directed } => {
                         if *plot as usize >= plot_count {
@@ -1057,15 +1065,18 @@ impl World {
                         Task {
                             kind: TaskKind::Visit { plot: *plot },
                             directed: *directed,
+                            routine: false,
                         }
                     }
                     TaskSave::GoHome { directed } => Task {
                         kind: TaskKind::GoHome,
                         directed: *directed,
+                        routine: false,
                     },
                     TaskSave::Clean { x, z, directed } => Task {
                         kind: TaskKind::Clean { x: *x, z: *z },
                         directed: *directed,
+                        routine: false,
                     },
                     // (An accident's while on the spot doesn't outlast a reload.)
                     TaskSave::Spot { .. } => continue,
@@ -1076,6 +1087,7 @@ impl World {
                         Task {
                             kind: TaskKind::Repair { object },
                             directed: *directed,
+                            routine: false,
                         }
                     }
                     // Upgrades used to be a Sim task; they are instant purchases now.
@@ -1098,6 +1110,7 @@ impl World {
                                 minutes: 0,
                             },
                             directed: *directed,
+                            routine: false,
                         }
                     }
                 };
@@ -1195,6 +1208,7 @@ impl World {
                     .id
                     .clone(),
                 directed: t.directed,
+                routine: t.routine,
             },
             TaskKind::MoveTo { x, z } => TaskSave::MoveTo {
                 x,

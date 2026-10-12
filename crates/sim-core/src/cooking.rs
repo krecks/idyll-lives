@@ -143,6 +143,8 @@ pub struct RecipeDef {
     pub steps: Vec<RecipeStep>,
     /// All steps' minutes.
     pub minutes: f32,
+    /// Made for an interaction's `eat` (`eat_recipe`), not cooked: no steps, never offered.
+    pub hidden: bool,
 }
 
 impl RecipeDef {
@@ -400,9 +402,45 @@ pub(crate) fn parse(
             outdoor: r.outdoor,
             minutes: steps.iter().map(|s| s.minutes).sum(),
             steps,
+            hidden: false,
         });
     }
     Ok((rules, item_defs, recipe_defs))
+}
+
+/// The hidden recipe of interaction `ctx`'s `eat`: `item` (one serving, nothing to buy: the
+/// interaction's own cost is paid), eaten in `minutes` for `effects`. Its id is the
+/// interaction's (`object.interaction`), so a plate in someone's hands survives a reload.
+pub(crate) fn eat_recipe(
+    ctx: &str,
+    label: &str,
+    items: &[ItemDef],
+    item: &str,
+    minutes: f32,
+    effects: [f32; MAX_NEEDS],
+) -> Result<RecipeDef, Error> {
+    let item = items
+        .iter()
+        .position(|i| i.id == item)
+        .ok_or_else(|| Error::new(format!("{ctx}: eat: unknown item '{item}'")))?;
+    if minutes <= 0.0 {
+        return Err(Error::new(format!("{ctx}: eat: minutes must be > 0")));
+    }
+    Ok(RecipeDef {
+        id: ctx.to_owned(),
+        label: label.to_owned(),
+        item,
+        servings: [1, 1],
+        cost_per_serving: 0,
+        effects,
+        eat_feeling: None,
+        eat_now: true,
+        eat_minutes: minutes,
+        outdoor: false,
+        steps: Vec::new(),
+        minutes: 0.0,
+        hidden: true,
+    })
 }
 
 fn capitalised(s: &str) -> String {
@@ -808,13 +846,10 @@ fn serve(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], i
             sim.mess = Some((fx, fz, i.dirt));
         }
     }
-    let made = Held { def: r.item, servings, quality, made_at: ctx.tick, recipe: Some(recipe) };
     if r.eat_now {
-        let plate = content.items[r.item].serving.unwrap_or(r.item);
-        sim.held = Some(Held { def: plate, servings: 1, ..made });
-        let eat = Task { kind: TaskKind::Eat { item: None, seat: None, plate: None, stage: 1 }, ..task };
-        return eat_next(sim, eat, ctx, objects, items);
+        return eat_now(sim, task, recipe, quality, ctx, objects, items);
     }
+    let made = Held { def: r.item, servings, quality, made_at: ctx.tick, recipe: Some(recipe) };
     let at = place(ctx, objects, sim.household);
     let Some(id) = at.put_down(items, made, sim.household, sim.pos, content.cooking.serve_range, r.outdoor, None, ctx.tick) else {
         return;
@@ -827,12 +862,46 @@ fn serve(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], i
     }
 }
 
+/// Made to be eaten at once (a sandwich, a snack from the fridge; `quality` as a cooked
+/// dish's): they hold a plate of `recipe` and sit down with it, at a table if there is one.
+pub(crate) fn eat_now(
+    sim: &mut Sim,
+    task: Task,
+    recipe: usize,
+    quality: f32,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+) {
+    let content = ctx.content;
+    let r = &content.recipes[recipe];
+    let plate = content.items[r.item].serving.unwrap_or(r.item);
+    sim.held = Some(Held { def: plate, servings: 1, quality, made_at: ctx.tick, recipe: Some(recipe) });
+    let eat = Task { kind: TaskKind::Eat { item: None, seat: None, plate: None, stage: 1 }, ..task };
+    eat_next(sim, eat, ctx, objects, items);
+}
+
+/// Where someone eats: on the plot they're on (at home, at a host's, in a park). Its objects,
+/// and whose plates are left there: the household living there (a guest's dirty plate is the
+/// host's to wash up), else nobody's (`None`: nothing is left behind).
+fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
+    let home = ctx.households[sim.household as usize].plot;
+    let Some(here) = ctx.briefs.get(sim.id as usize).and_then(|b| b.plot) else {
+        return (home_objects(ctx, sim.household), Some(sim.household));
+    };
+    if home == Some(here) {
+        return (ctx.index.on(here), Some(sim.household));
+    }
+    (ctx.index.on(here), ctx.households.iter().position(|h| h.plot == Some(here)).map(|h| h as u32))
+}
+
 /// The best free place to sit and eat: a chair at a table (`surface::dining_seat`), else a
 /// table with seats of its own, else any seat.
 fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
     let content = ctx.content;
     let rules = &content.cooking;
-    let candidates: Vec<u32> = home_objects(ctx, sim.household)
+    let candidates: Vec<u32> = dining(sim, ctx)
+        .0
         .iter()
         .copied()
         .filter(|&o| {
@@ -1047,7 +1116,9 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             if let Some(held) = sim.held
                 && let Some(spot) = plate_spot(sim, ctx, objects, items, seat, content.items[held.def].radius)
             {
-                plate = place(ctx, objects, sim.household).put_down(items, held, sim.household, sim.pos, 1.0, false, Some(spot), ctx.tick);
+                let (candidates, household) = dining(sim, ctx);
+                let at = Place { content, objects, lot: ctx.nav.lot, candidates };
+                plate = at.put_down(items, held, household.unwrap_or(sim.household), sim.pos, 1.0, false, Some(spot), ctx.tick);
                 sim.held = None;
             }
             let act = sim.current.as_mut().expect("checked above");
@@ -1195,10 +1266,14 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
                 .and_then(|e| seat.and_then(|s| plate_spot(sim, ctx, objects, items, s, content.items[e].radius)));
             // (Standing up first: a plate left on the floor goes where they stand.)
             end_activity(sim, content, objects);
-            if let Some(e) = held.and_then(|h| content.items[h.def].empty_as) {
+            let (candidates, household) = dining(sim, ctx);
+            if let Some(e) = held.and_then(|h| content.items[h.def].empty_as)
+                && let Some(household) = household
+            {
                 let dirty = Held { servings: 1, ..Held::of(e) };
                 let range = content.cooking.serve_range;
-                place(ctx, objects, sim.household).put_down(items, dirty, sim.household, sim.pos, range, false, spot, ctx.tick);
+                let at = Place { content, objects, lot: ctx.nav.lot, candidates };
+                at.put_down(items, dirty, household, sim.pos, range, false, spot, ctx.tick);
             }
         }
         TaskKind::Dishes { station, .. } => {

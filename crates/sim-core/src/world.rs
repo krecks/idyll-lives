@@ -343,6 +343,9 @@ pub struct Task {
     pub kind: TaskKind,
     /// Issued by the player (as opposed to chosen autonomously).
     pub directed: bool,
+    /// Done as part of a routine (washing hands after the toilet; see `Interaction::after`):
+    /// it takes its full time even with the needs it fills full.
+    pub routine: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -418,6 +421,9 @@ pub struct Sim {
     pub(crate) queue: VecDeque<Task>,
     pub(crate) current: Option<Activity>,
     pub(crate) idle_ticks: u32,
+    /// What they do next, before choosing anything else (an `after` routine, like washing
+    /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
+    pub(crate) follow_up: Option<Task>,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -505,6 +511,7 @@ impl Sim {
     pub(crate) fn clear_activity(&mut self) {
         self.current = None;
         self.queue.clear();
+        self.follow_up = None;
         self.engaged_with = None;
         self.transition = None;
         self.visiting = None;
@@ -1356,6 +1363,7 @@ impl World {
             queue: VecDeque::new(),
             current: None,
             idle_ticks: 0,
+            follow_up: None,
             household: spawn.household,
             job,
             away_until: None,
@@ -2267,6 +2275,7 @@ impl World {
         s.queue.push_back(Task {
             kind,
             directed: true,
+            routine: false,
         });
         Ok(())
     }
@@ -2477,7 +2486,12 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     // Ticks what they're doing moves on by (fewer than `steps` if it starts partway through).
     let mut ticks = sim.steps;
     if sim.current.is_none() {
-        if let Some(task) = sim.queue.pop_front() {
+        // A routine's next step (washing hands after the toilet) before anything else they'd
+        // do, unless the player asks for something.
+        let follow_up = sim.follow_up.take().filter(|_| !sim.queue.front().is_some_and(|t| t.directed));
+        if let Some(task) = follow_up {
+            start_task(sim, task, ctx, objects, items);
+        } else if let Some(task) = sim.queue.pop_front() {
             start_task(sim, task, ctx, objects, items);
         } else {
             sim.idle_ticks += sim.steps;
@@ -2570,6 +2584,8 @@ fn pick_autonomous(
     // Cooking: the stations they have (recipes need theirs), and whether food is ready.
     let stations = crate::cooking::station_mask(sim, ctx, objects);
     let fresh = items.list.iter().any(|it| it.household == sim.household && it.edible());
+    // Needs about to run out (see `use_object`'s `drained`).
+    let urgent: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < 0.08).fold(0, |m, n| m | 1 << n);
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -2618,6 +2634,14 @@ fn pick_autonomous(
             let mut care = 0.0;
             // Dining at a table only with a table to dine at.
             if inter.baby || (inter.needs_table && !at_table) {
+                continue;
+            }
+            // Planned, with an urgent need it doesn't fill: it would stop at once (`use_object`),
+            // and be chosen again, over and over.
+            if urgent != 0
+                && (0..content.needs.len()).any(|n| urgent & (1 << n) != 0 && inter.total_gain[n] <= 0.0)
+                && crate::planner::planned_now(content, sim, inter)
+            {
                 continue;
             }
             if inter.homework > 0.0 {
@@ -2857,6 +2881,7 @@ fn pick_autonomous(
             Choice::Dishes(item) => TaskKind::Dishes { item, station: None, stage: 0 },
         },
         directed: false,
+        routine: false,
     })
 }
 
@@ -3153,7 +3178,24 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 return;
             }
         } else {
+            let used = sim.current.as_ref().map(|a| a.task);
             end_activity(sim, content, objects);
+            if let Some(task) = used
+                && let TaskKind::Use { object, interaction } = task.kind
+                && let Some(o) = objects.get(object as usize)
+                && let Some(inter) = content.objects[o.def].interactions.get(interaction)
+            {
+                // Food fetched: they sit down with it (at a table if there is one) and eat.
+                if let Some(recipe) = inter.eats {
+                    let quality = content.object_rules.quality_factor(o.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
+                    crate::cooking::eat_now(sim, Task { routine: false, ..task }, recipe, quality, ctx, objects, items);
+                    if sim.current.is_some() {
+                        return;
+                    }
+                } else if inter.after != 0 {
+                    sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                }
+            }
         }
         // Catching up on a turn: it ended partway through, on average half a turn ago.
         sim.idle_ticks = (ticks - 1) / 2;
@@ -3212,7 +3254,8 @@ fn use_object(
         // activities go on for their time even once the needs they fill are full.
         let planned = crate::planner::planned_now(content, sim, inter);
         let drained = urgent && (inter.total_gain.iter().any(|&g| g < 0.0) || planned);
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned) || drained
+        let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine) || drained
     };
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {
@@ -3344,6 +3387,39 @@ fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &cra
     }
 }
 
+/// What follows using `object` when its interaction has an `after` (`tags`): the nearest
+/// working object on the same plot with an interaction of those tags, one they may use and can
+/// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
+fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags: TagMask) -> Option<Task> {
+    let content = ctx.content;
+    let plot = ctx.object_plot.get(object as usize).copied().flatten();
+    if access(ctx, sim, plot) == Access::None {
+        return None;
+    }
+    let usable = match sim.visiting {
+        Some(visit) => ctx.index.on(visit.plot),
+        None => ctx.index.usable_from(ctx.households[sim.household as usize].plot),
+    };
+    let approach = |o: &ObjectInstance| ctx.index.links.approach_of(o.id).unwrap_or_else(|| o.front_tile(content));
+    let mut near: Vec<(f32, u32, usize)> = usable
+        .iter()
+        .map(|&o| &objects[o as usize])
+        .filter(|o| o.id != object && ctx.object_plot[o.id as usize] == plot)
+        .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
+        .filter_map(|o| {
+            let i = content.objects[o.def].interactions.iter().position(|i| i.tags & tags != 0 && !i.baby && i.recipe.is_none())?;
+            let (fx, fz) = approach(o);
+            Some((ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos), o.id, i))
+        })
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let (_, object, interaction) = near.into_iter().take(3).find(|&(_, o, _)| {
+        let (fx, fz) = approach(&objects[o as usize]);
+        route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]).is_some()
+    })?;
+    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
+}
+
 /// Accident `a` happens to `sim` where they are (see `Content::accidents`).
 fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) {
     let content = ctx.content;
@@ -3372,6 +3448,7 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
             task: Task {
                 kind: TaskKind::Spot { accident: a },
                 directed: false,
+                routine: false,
             },
             phase: Phase::Using { elapsed: 0.0 },
             tags: rest.tags,
@@ -3573,7 +3650,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
     })?;
     let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
     sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
-    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false })
+    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false })
 }
 
 /// Whether partners `a` and `b` could have a baby now: at home together, grown-ups young enough,

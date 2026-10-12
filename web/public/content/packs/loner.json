@@ -171,8 +171,9 @@
         {
           "id": "order",
           "label": "Order a meal for one",
-          "anim": "eat",
-          "minutes": 30,
+          "anim": "fetch",
+          "minutes": 5,
+          "eat": { "item": "takeout", "minutes": 20 },
           "pose": "stand",
           "effects": { "hunger": 0.75, "fun": 0.05 },
           "tags": ["food"],
@@ -181,8 +182,9 @@
         {
           "id": "treat",
           "label": "Order a treat box",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": { "item": "treatPlate", "minutes": 8 },
           "pose": "stand",
           "effects": { "hunger": 0.25, "fun": 0.08 },
           "tags": ["food"],

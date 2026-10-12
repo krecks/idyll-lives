@@ -163,8 +163,12 @@
         {
           "id": "snack",
           "label": "Grab a snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.3
           },
@@ -210,8 +214,12 @@
         {
           "id": "snack",
           "label": "Grab a snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.35
           },
@@ -420,7 +428,11 @@
           "id": "reheat",
           "label": "Heat up leftovers",
           "anim": "cook",
-          "minutes": 15,
+          "minutes": 4,
+          "eat": {
+            "item": "leftovers",
+            "minutes": 12
+          },
           "effects": {
             "hunger": 0.45
           },
@@ -492,7 +504,11 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
-          "minutes": 10,
+          "minutes": 4,
+          "eat": {
+            "item": "toast",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.3
           },
@@ -503,8 +519,12 @@
         {
           "id": "smoothie",
           "label": "Blend a smoothie",
-          "anim": "drink",
-          "minutes": 10,
+          "anim": "cook",
+          "minutes": 3,
+          "eat": {
+            "item": "smoothie",
+            "minutes": 5
+          },
           "effects": {
             "hunger": 0.2,
             "energy": 0.06
@@ -638,12 +658,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.15
+            "hygiene": 0.04
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         },
         {
@@ -681,8 +702,12 @@
         {
           "id": "snack",
           "label": "Grab a snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.3
           },
@@ -2181,7 +2206,8 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
-          "minutes": 8,
+          "minutes": 5,
+          "after": "handwash",
           "pose": "sit",
           "effects": {
             "bladder": 1.0
@@ -2210,7 +2236,8 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
-          "minutes": 8,
+          "minutes": 5,
+          "after": "handwash",
           "pose": "sit",
           "effects": {
             "bladder": 1.0,
@@ -2360,12 +2387,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.15
+            "hygiene": 0.04
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         }
       ]
@@ -2389,12 +2417,13 @@
           "id": "wash",
           "label": "Wash hands",
           "anim": "wash",
-          "minutes": 4,
+          "minutes": 2,
           "effects": {
-            "hygiene": 0.18
+            "hygiene": 0.05
           },
           "tags": [
-            "hygiene"
+            "hygiene",
+            "handwash"
           ]
         }
       ]

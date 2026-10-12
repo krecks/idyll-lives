@@ -45,6 +45,13 @@ export interface InteractionDef {
    * cooking does for the cook; `minutes` aren't needed (the steps take their own).
    */
   recipe?: string;
+  /**
+   * Food to sit down with: `minutes` is then the fetching, and the resident eats `item` (an
+   * `items` id) at a table if there is one, for `eat.minutes`.
+   */
+  eat?: { item: string; minutes: number };
+  /** A tag: what follows when it finishes (toilets: `handwash`, washing hands at a sink). */
+  after?: string;
 }
 
 /** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */

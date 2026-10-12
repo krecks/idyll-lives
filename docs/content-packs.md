@@ -139,6 +139,8 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `autonomous` | `false` = only when the player asks. Default `true`. |
 | `needsTable` | Only offered while the seat faces a table it tucks under (its `seatAt`): dining at a table. A chair alone offers only its other interactions; the player's order fails with "needs a table". Needs a `seatAt`. Default `false`. |
 | `recipe` | Starts a recipe (`recipes` id; see [Cooking](#cooking)) instead of being used here alone: the resident goes round the recipe's stations (fridge, counter, stove), from whichever one they clicked, and serves a dish. `minutes` isn't needed (the steps take theirs); `effects` are then only what cooking does for the cook (`{"fun": 0.05}`), the meal's own are the recipe's. Keep the `tags` (`food`, `cooking`): kitchens, plans and traits go by them. `cost` comes from the recipe. |
+| `eat` | Food to sit down with: `{"item": "snack", "minutes": 8}`. `minutes` is then the fetching or making (a snack from the fridge: 2, toast: 4); once that's done the resident holds the `item` (an `items` id, a plate or a bowl), sits down with it like with a served dish (a chair at a table, then a table with seats, then any seat, else standing; see [Cooking](#cooking)) and eats it for the `eat` minutes. The positive `effects` come from eating (times the object's quality), so autonomy weighs the interaction just as before; a negative one is still spread over the fetching. Give it a fetching `anim` (`fetch`, `cook`). Not with `recipe`. Drinks stay plain interactions. |
+| `after` | A tag: what the resident does straight afterwards. When the interaction finishes (not when it's cancelled), they go on to the nearest working object on the same plot with an interaction of that tag, before anything else they'd choose (an order from the player still comes first), and it runs its full `minutes` even with the needs it fills full. With nothing like it there, nothing follows. Toilets have `"after": "handwash"` and sinks' *Wash hands* the `handwash` tag. |
 | `cost` | Dollars charged from the resident's household each time a resident **starts** using it (on arrival). Default 0. Only for real consumables bought from outside (takeout, deliveries, a rented movie, donations); owning and running an item costs money through the weekly bills instead. Residents never choose something their household can't afford, and the player's order fails with "not enough money". Guests pay from their own household. |
 | `skill` | Skill id that makes this interaction better: need gains and skill gains are multiplied by `1 + skillRules.effectPerLevel × level` (0.05 per whole level: level 4 = ×1.2, level 8 = ×1.4). Autonomy knows this, so good cooks prefer cooking. |
 | `feeling` | Feeling id granted when the interaction finishes after at least half its `minutes` (not when cancelled early). |
@@ -202,6 +204,7 @@ Tags in use (64 maximum for the whole game, base plus all packs):
 | `spa` | whirlpool tub (example pack), baths and hot tubs; declared in base.json `tags` |
 | `toys` | kids' things (toy box, play mat, doll house…); grown-up life stages like them far less (`tagPreference` 0.15, teens 0.4); declared in furniture.json `tags` |
 | `hygiene` | sink, shower |
+| `handwash` | sink *Wash hands* (what toilets' `after` goes on to) |
 | `bathroom` | toilet |
 | `chores` | water plant, tend flowers |
 | `nature` | plant, flowerbed |
@@ -602,7 +605,10 @@ optional; a long recipe tempts them less, a hungry family more, and food already
 at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
 keep the prep and cooking steps of everyday recipes optional. A station that's busy is waited
 for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
-(a snack, toast, a coffee, reheating) stays a plain interaction.
+(a snack, toast, reheating) isn't a recipe but an interaction with `eat`: fetched or made at the
+object, then eaten sitting down like a dish (it has a hidden recipe of its own, which the
+game makes, so a plate in someone's hands survives a reload). Drinks (a coffee, a soda) stay
+plain interactions.
 
 **`items`**: `{ "id": "mealPot", "label": "Home-cooked meal", "model": "item.mealPot", "hold": "both", "serving": "mealPlate", "emptyAs": "potDirty", "radius": 0.16 }`.
 `label` names it ("Eat Home-cooked meal"); `model` is its asset key; `hold` is `hand` or
@@ -677,9 +683,9 @@ consumables bought from outside, such as takeout or deliveries; never for using 
 
 | Object | Per hour |
 |---|---|
-| fridge snack / meal / gourmet | hunger 1.8 / 1.28 / 0.76 |
-| toilet | bladder 7.5 |
-| shower / sink | hygiene 3.0 / 2.25 |
+| fridge snack / meal / gourmet | hunger 1.8 (0.3 over 2 min fetching + 8 eating) / 1.28 / 0.76 |
+| toilet | bladder 12 |
+| shower / sink (hand washing) | hygiene 3.0 / 1.2 |
 | bed sleep / nap | energy 0.125 (+ comfort 0.05) / energy 0.25 |
 | sofa / armchair / bench | comfort 1.2 / 1.5 / 0.7 |
 | TV / browse / read | fun 0.7 / 0.6 / 0.6 |
