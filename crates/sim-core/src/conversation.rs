@@ -306,7 +306,7 @@ pub(crate) fn update(w: &mut World) {
                 if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
                     set_phase(&mut sims[j], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[l].pos) > REPATH_DISTANCE {
-                    chase(&nav, sims, j, l, content, objects);
+                    chase(&nav, &walk, sims, j, l, content, objects);
                 }
             }
             (Joining::Routing { .. }, None) => {
@@ -316,7 +316,7 @@ pub(crate) fn update(w: &mut World) {
             }
             (Joining::Waiting(_), Some((t, _))) => {
                 if dist(sims[j].pos, middle(sims, l, t)) > JOIN_RANGE + 0.6 {
-                    chase(&nav, sims, j, l, content, objects);
+                    chase(&nav, &walk, sims, j, l, content, objects);
                 } else if group(sims, content, l).len() >= MAX_GROUP {
                     end_activity(&mut sims[j], content, objects);
                 } else {

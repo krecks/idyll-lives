@@ -2941,6 +2941,12 @@ fn pick_autonomous(
         if !same_place {
             continue;
         }
+        if let Some(b) = leader.plot
+            && here != Some(b)
+            && access(ctx, sim, Some(b)) == Access::None
+        {
+            continue;
+        }
         let members: Vec<usize> = (0..ctx.briefs.len()).filter(|&m| ctx.briefs[m].conversing.is_some_and(|c| c.0 as usize == l)).collect();
         if members.len() >= conversation::MAX_GROUP || members.contains(&me) {
             continue;
