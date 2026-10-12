@@ -1076,6 +1076,8 @@ pub struct BuildRules {
     pub roof_colors: Vec<BuildStyle>,
     /// How many storeys a house may have (`build.storeys`, 1..=4; 1: no stairs).
     pub storeys: u8,
+    /// Whether a house may have a basement, a storey below the ground (`build.basement`).
+    pub basement: bool,
 }
 
 /// A look for walls, doors or windows. The simulation only needs its id (saves) and price; the
@@ -1699,6 +1701,8 @@ struct BuildRaw {
     fence: Option<i64>,
     gate: Option<i64>,
     storeys: Option<u8>,
+    #[serde(default)]
+    basement: bool,
 }
 
 #[derive(Deserialize)]
@@ -3032,6 +3036,7 @@ impl Content {
             windows: build_styles(&raw.window_styles, "window style")?,
             floors: build_styles(&raw.floor_coverings, "floor covering")?,
             storeys: raw.build.storeys.unwrap_or(1).clamp(1, 4),
+            basement: raw.build.basement,
         };
         let styles = raw
             .styles

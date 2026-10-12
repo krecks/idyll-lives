@@ -7,8 +7,8 @@
 //! when it is built on the other. On a lot of another width it is centred across it. Building it
 //! is one edit (one undo step), paid like building and buying it piece by piece.
 //!
-//! Every storey is in it (`storey` on each part, 0 the ground), and it's built on the same
-//! storeys again.
+//! Every storey is in it (`storey` on each part, 0 the ground, -1 the basement), and it's built
+//! on the same storeys again.
 //!
 //! **Moving a room** takes its walls, doors, windows, floors and everything standing in it a
 //! number of tiles across the lot; walls it shares with another room stay for that room.
@@ -43,9 +43,9 @@ pub struct Blueprint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlueprintEdge {
-    /// The storey it's on (0: the ground).
+    /// The storey it's on (0: the ground, -1: the basement).
     #[serde(default, skip_serializing_if = "ground")]
-    pub storey: u8,
+    pub storey: i8,
     pub axis: EdgeAxis,
     pub x: i32,
     pub z: i32,
@@ -68,9 +68,9 @@ pub struct BlueprintEdge {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlueprintFloor {
-    /// The storey it's on (0: the ground).
+    /// The storey it's on (0: the ground, -1: the basement).
     #[serde(default, skip_serializing_if = "ground")]
-    pub storey: u8,
+    pub storey: i8,
     pub x: i32,
     pub z: i32,
     pub covering: String,
@@ -85,9 +85,9 @@ pub struct BlueprintRoof {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlueprintObject {
-    /// The storey it's on (0: the ground).
+    /// The storey it's on (0: the ground, -1: the basement).
     #[serde(default, skip_serializing_if = "ground")]
-    pub storey: u8,
+    pub storey: i8,
     pub def: String,
     pub x: i32,
     pub z: i32,
@@ -182,7 +182,7 @@ fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
     }
 }
 
-fn ground(storey: &u8) -> bool {
+fn ground(storey: &i8) -> bool {
     *storey == 0
 }
 
@@ -202,8 +202,8 @@ impl World {
     /// or inside the plot's outline, and diagonals across its tiles.
     fn plot_edges(&self, p: &Plot) -> Vec<(EdgeRef, EdgeAxis, i32, i32, Edge)> {
         let mut out = Vec::new();
-        for k in 0..self.storeys as i32 {
-            let z0 = p.z + k * self.storey_depth();
+        for k in self.storey_range() {
+            let z0 = p.z + self.storey_row(k);
             for z in z0..=z0 + p.d {
                 for x in p.x..p.x + p.w {
                     if let Some((a, x, z, e)) = axis_of(EdgeRef::H(x as u16, z as u16), &self.lot).filter(|t| t.3 != Edge::Open) {
@@ -230,8 +230,8 @@ impl World {
     }
 
     /// Where on its storey a row is: the storey, and the row as if on the ground.
-    fn on_storey(&self, z: i32) -> (u8, i32) {
-        (self.storey_of(z) as u8, self.ground_z(z))
+    fn on_storey(&self, z: i32) -> (i8, i32) {
+        (self.storey_of(z) as i8, self.ground_z(z))
     }
 
     /// The household's home as a blueprint. Things that can't be bought aren't in it.
@@ -349,12 +349,12 @@ impl World {
         let index = |list: &[crate::content::BuildStyle], id: &Option<String>| id.as_ref().and_then(|id| list.iter().position(|s| &s.id == id));
         let mut edits = Vec::new();
         let mut faces = Vec::new();
-        let (storeys, depth) = (self.storeys, self.storey_depth());
-        let lift = move |storey: u8| -> Result<i32, Error> {
-            if storey >= storeys {
-                return Err(Error::new("this game's houses can't be that tall"));
+        let (storeys, rows) = (self.storey_range(), self.stairs.clone());
+        let lift = move |storey: i8| -> Result<i32, Error> {
+            if !storeys.contains(&i32::from(storey)) {
+                return Err(Error::new(if storey < 0 { "this game's houses have no basements" } else { "this game's houses can't be that tall" }));
             }
-            Ok(storey as i32 * depth)
+            Ok(rows.storey_row(i32::from(storey)))
         };
         for e in &bp.edges {
             let (x, z) = f.edge(e.axis, e.x + ox, e.z, true);
@@ -464,7 +464,7 @@ impl World {
         let (_, plot) = self.home_of(household)?;
         let p = self.plots[plot as usize].clone();
         // On the room's own storey.
-        let up = self.storey_of(z) * self.storey_depth();
+        let up = self.storey_row(self.storey_of(z));
         let on_plot = |tx: i32, tz: i32| tz >= p.z + up && tz < p.z + p.d + up && p.contains(tx, tz - up);
         if !on_plot(x, z) {
             return Err(Error::new("that isn't on your lot"));

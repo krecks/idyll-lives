@@ -1170,10 +1170,14 @@ struct StructureView<'a> {
     mode: crate::world::GameMode,
     width: usize,
     depth: usize,
-    /// Storeys the lot holds, and rows per storey: storey `k` is rows `k * storeyDepth ..` of
-    /// `depth` (see `storeys.rs`).
+    /// Storeys the lot holds at and above the ground, and rows per storey: storey `k` is rows
+    /// `k * storeyDepth ..` of `depth` (see `storeys.rs`).
     storeys: u8,
     storey_depth: i32,
+    /// The block of rows holding the basement (storey -1: rows `basement * storeyDepth ..`;
+    /// storeys above it after that block are one lower than their place); absent: none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    basement: Option<i32>,
     objects: Vec<ObjectView<'a>>,
     sims: Vec<SimInfo<'a>>,
     /// Names of former residents (story events name them with `social::FORMER`).
@@ -1666,7 +1670,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             roof: p.roof.map(|r| [r.style, r.color]),
             storeys: 1 + (1..world.storeys as i32)
                 .filter(|k| {
-                    let up = k * world.storey_depth();
+                    let up = world.storey_row(*k);
                     house_bounds(world, p.x, p.z + up, p.x + p.w, p.z + p.d + up).is_some()
                 })
                 .count() as u8,
@@ -1687,6 +1691,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         depth: world.lot.depth,
         storeys: world.storeys,
         storey_depth: world.storey_depth(),
+        basement: (world.stair_map().basement > 0).then_some(world.stair_map().basement),
         objects,
         sims,
         former: &world.former,

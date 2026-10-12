@@ -33,7 +33,9 @@
 //! kind's; `tall`, centimetres taller, absent: 0), and anything may stand off its tile's middle;
 //! doors and windows too (`looks[].sill`, `looks[].head`, centimetres; absent: their style's);
 //! 21 = story events from the phone (`invited`, `declined`); a phone action under way isn't
-//! saved. Older files load. Saves written before feelings
+//! saved; 22 = basements (`basement`: the block of the lot's rows holding storey -1, after the
+//! storeys above; absent: none, and the lot grows one on the end if the content allows it, so
+//! nothing already built moves). Older files load. Saves written before feelings
 //! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
 
 use std::collections::{BTreeMap, HashMap};
@@ -50,7 +52,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 21;
+pub const SAVE_VERSION: u32 = 22;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +73,10 @@ pub struct SaveFile {
     /// Storeys the lot holds (its depth is that many times the town's; absent before v17: 1).
     #[serde(default)]
     pub storeys: Option<u8>,
+    /// The block of rows holding the basement (its depth is then one more storey's; absent
+    /// before v22, or without a basement: none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basement: Option<u8>,
     /// Whether the player's residents move on their own (absent: yes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_moves: Option<bool>,
@@ -703,6 +709,7 @@ impl World {
             autonomy: self.autonomy,
             lifespan: Some(self.lifespan),
             storeys: Some(self.storeys),
+            basement: (self.stairs.basement > 0).then_some(self.stairs.basement as u8),
             player_moves: (!self.player_moves).then_some(false),
             rng: self.rng.state(),
             lot: LotSave {
@@ -827,9 +834,13 @@ impl World {
         let mut world = World::empty(content, lot, Rng::new(save.rng));
         // Storeys before the furniture: what may stand upstairs depends on them.
         let storeys = save.storeys.unwrap_or(1).max(1);
-        if storeys > 1 && world.lot.depth.is_multiple_of(storeys as usize) {
+        // The basement's block comes after the ground's, at most one past the storeys above.
+        let basement = save.basement.filter(|&b| b > 0 && b <= storeys);
+        let blocks = storeys as usize + usize::from(basement.is_some());
+        if blocks > 1 && world.lot.depth.is_multiple_of(blocks) {
             world.storeys = storeys;
-            world.stairs.depth = (world.lot.depth / storeys as usize) as i32;
+            world.stairs.depth = (world.lot.depth / blocks) as i32;
+            world.stairs.basement = basement.map_or(0, i32::from);
         }
         world.mode = save.mode;
         world.tick = save.tick;
