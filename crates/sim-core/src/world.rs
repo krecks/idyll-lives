@@ -330,11 +330,14 @@ pub enum TaskKind {
         plate: Option<u32>,
         stage: u8,
     },
-    /// Washing up: picking up `item` (and dirty things next to it), then at `station`.
+    /// Clearing away: picking up `item` and dirty things next to it (stage 0), scraping the
+    /// food off `scraps` of them into a bin (1), washing up (2) and putting them away (3), each
+    /// at `station`.
     Dishes {
         item: u32,
         station: Option<u32>,
         stage: u8,
+        scraps: u8,
     },
 }
 
@@ -2072,7 +2075,7 @@ impl World {
                         if !sink {
                             return Err(Error::new("there's nowhere to wash up: buy a sink or a dishwasher"));
                         }
-                        TaskKind::Dishes { item, station: None, stage: 0 }
+                        TaskKind::Dishes { item, station: None, stage: 0, scraps: 0 }
                     }
                 };
                 self.enqueue(sim, kind)?;
@@ -2854,7 +2857,7 @@ fn pick_autonomous(
             Choice::Clean(x, z) => TaskKind::Clean { x, z },
             Choice::Repair(object) => TaskKind::Repair { object },
             Choice::Eat(item) => TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 },
-            Choice::Dishes(item) => TaskKind::Dishes { item, station: None, stage: 0 },
+            Choice::Dishes(item) => TaskKind::Dishes { item, station: None, stage: 0, scraps: 0 },
         },
         directed: false,
     })

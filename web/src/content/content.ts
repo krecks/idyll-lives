@@ -76,6 +76,13 @@ export interface CookingRules {
   dishesTags?: string[];
   dishesAnim?: string;
   dishesInterest?: number;
+  /** Clearing away: scraping food off one thing (into a `bin`, else at the sink). */
+  scrapeMinutes?: number;
+  scrapeAnim?: string;
+  /** Putting an armful of clean things away, at one of `putAwayAt` (stations; default `prep`). */
+  putAwayMinutes?: number;
+  putAwayAnim?: string;
+  putAwayAt?: string[];
 }
 
 /** Something residents carry or put down (content `items`): ingredients, a pot of stew, a plate. */

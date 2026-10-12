@@ -568,10 +568,13 @@ the recipe's `servings`. The ingredients are paid at the first step (`costPerSer
 Housemates are told dinner's ready (a thought bubble); whoever's hungry takes a serving, sits
 down with it (a chair at a table, then a table with seats of its own, then any seat in
 `cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table. Someone
-washes up later at a sink or dishwasher (a chore, like tidying up), carrying up to
-`carryDishes` at a time. Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
+clears away later (a chore, like tidying up): they pick up the dish and the dirty things next to
+it, up to `carryDishes` at a time, scrape any food off into a `bin` station (the pedal bin; with
+none, at the sink), wash up at a sink or dishwasher and put the clean things away at a counter (`putAwayAt`;
+with none, from the sink). Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
 dirty or spoilt things slowly make their room dirty. The player can order any of it: clicking a
-dish offers **Eat** and **Clear away**.
+dish offers **Eat** and **Clear away** (full, half-eaten or gone-off food and dirty dishes alike;
+the home needs a sink or dishwasher).
 
 ```json
 "recipes": [{
@@ -620,7 +623,9 @@ them away) and are saved with the game.
 `dirtyDirtPerHour` 0.02, `skipPenalty` 0.05, `seatTags` (`lounge`, `food`) and `seatAvoid`
 (`spa`, `hygiene`, `bathroom`), `defaultSurfaceHeight` 0.9 (where tools are drawn on a station
 without a `surface`), `serveRange` 6 (m), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
-`dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6.
+`dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6,
+`scrapeMinutes` 1 (per thing with food on it) and `scrapeAnim` (`clean`), `putAwayMinutes` 2 (per
+armful), `putAwayAnim` (`fetch`) and `putAwayAt` (stations; `prep`).
 Packs merge `cooking` key by key and append to `items` and `recipes`.
 
 ## Balance guidance
