@@ -424,8 +424,36 @@ back to bed nearly rested outside the night). A bed's stars add
 better bed shortens a night a little. Naps (`napTags`) can't follow each other within
 `napCooldownHours` (default 4), aren't taken when woken by an urgent need, and below
 `exhaustedBelow` energy (default 0.2) residents go to bed whatever the hour (the schedule's
-daytime damping on sleep is lifted, naps count a quarter). **Jobs:**
-`careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+daytime damping on sleep is lifted, naps count a quarter; and a nap is allowed again, on the
+sofa when no bed is free). On a work or school day the alarm goes off: a sleep ends
+`wakeBeforeWorkMinutes` before they leave, rested or not, and nobody goes back to bed then.
+**Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+
+**Needs and autonomy:** a need's `comfortable` (0..1, default 0) is the level residents like to
+keep it at: below it the need weighs `autonomy.comfortBoost` times more (eased in over the tenth
+below it), so they see to it when it's convenient rather than once it's empty (the base game:
+bladder 0.6, hunger and social 0.4, hygiene 0.35, fun and comfort 0.3; the toilet comes at about
+half). The `autonomy` object:
+
+| Key | Meaning |
+|---|---|
+| `urgent` | Needs that get urgent (the essentials; default none, base game hunger, energy, bladder and hygiene). |
+| `urgentBelow` | Below this such a need is urgent, if home has something for it (default 0.08, base 0.1): whatever doesn't fill one is damped by `lookAhead`; what they chose themselves (not a routine, not a player's order, not something for one of them) stops if the need would otherwise drop under half of this before the end; and a need a chat doesn't fill keeps them out of conversations (and breaks one off). It's also when `wakeFor` needs wake a sleeper and when draining and planned activities stop. |
+| `comfortBoost` | See `comfortable` above (default 0, base 2: three times the weight). |
+| `lookAhead` | Multiplier (default 1, off; base 0.25) on something another need home has a thing for would run down to `urgentBelow` during, counting the walk there and from there to the nearest thing for that need (for a night's sleep only the `wakeFor` needs count, at `asleepDecay`), and on anything that wouldn't be over before they leave for work or school. A recipe isn't started at all then (hunger counts too: it's filled only at the end). |
+| `quickMinutes` | The longest a habit's top-up may take (default 30). |
+| `retryMinutes` | Something they chose but couldn't get to (a plate on a counter nobody can reach, a bed boxed in) isn't chosen again for this long (default 30). |
+
+`dayRhythm.habits` are what residents see to at the turning points of their day, each
+`{"at", "need", "below"}`: `wake` (after a night's sleep), `bed` (on the way to bed; they choose
+bed again after), `leave` (in the `dayRhythm.readyMinutes`, default 30, before leaving for work or
+school, dropping what they chose themselves), `home` (on getting home from work or school) and
+`meal` (after eating a serving). Unless `need` is at `below` or better (default 1), they first go
+to the nearest quick thing that fills it (no longer than `quickMinutes`, no recipe, nothing that
+needs a table, on the plot they're on); with several due, the one lowest for its `below` first.
+The base game: the toilet on getting up (below 0.95), before bed (0.9), before leaving (0.85), on
+getting home (0.9) and after a meal (0.85); a shower before bed below 0.3 hygiene; a snack before
+leaving below 0.7 hunger; `readyMinutes` 45.
 
 ## Life: ages, family, moving
 
@@ -565,7 +593,8 @@ home has nothing working for it.
 in the journal. `anotherRoom` (a room kind id): residents who badly need it and find what fills
 it taken, on two different days within a week, wish for another room of that kind (the base
 game's `wetSelf`: a second bathroom). `crowdedGraceMinutes` also lets it happen when the home has the essential but it's
-taken. At most 8.
+taken (the base game's `fellAsleep`: after 120 minutes, when nobody can get to a free bed). At
+most 8.
 
 ## Cooking
 
@@ -687,6 +716,17 @@ bought one by one) fills in below and between those:
 Something clearly better than the basic version (bigger gains, a buff, two slots) costs
 2–3× the basic item; luxury items $1,500–3,000. Per-use `cost` ($4–15) only for
 consumables bought from outside, such as takeout or deliveries; never for using something the household owns.
+
+**Need decay per hour** (base game; a whole need is 1): hunger 0.07, energy 0.058, bladder
+0.12, hygiene 0.045, fun 0.06, comfort 0.06, social 0.06. Asleep (`dayRhythm.asleepDecay`):
+energy 0, hunger ×0.3, bladder ×0.15, hygiene ×0.5, comfort ×0.3, fun and social ×0.1. At work or
+school (`workDecay`, a career's `workEffects` on top): hunger ×0.2, energy ×0.35, bladder ×0.1,
+hygiene ×0.3, fun and comfort ×0.2, social ×0.1. Awake at night energy goes ×1.8 (`nightDecay`).
+Walking takes time too (1.5 tiles a game minute): `crates/sim-core/tests/routines.rs` prints
+residents' days (toilet visits, how low needs go and what they were doing then, hours a day
+walking, eating, asleep...). With these numbers residents go to the toilet about 4 times a day
+at home and needs rarely run out; mostly for loners (social), long early shifts and homes where
+a bed can't be reached.
 
 **Need gains per hour** (at 0 stars; compare yours with these):
 

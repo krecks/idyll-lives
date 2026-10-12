@@ -8,6 +8,8 @@ export interface NeedDef {
   id: string;
   label: string;
   decayPerHour: number;
+  /** The level residents like to keep it at: below it they see to it when convenient. */
+  comfortable?: number;
   /** Asset key. */
   icon: string;
 }

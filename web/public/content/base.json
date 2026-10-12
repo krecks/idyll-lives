@@ -4,6 +4,7 @@
       "id": "hunger",
       "label": "Hunger",
       "decayPerHour": 0.07,
+      "comfortable": 0.4,
       "icon": "icon.need.hunger"
     },
     {
@@ -16,30 +17,35 @@
       "id": "bladder",
       "label": "Bladder",
       "decayPerHour": 0.12,
+      "comfortable": 0.6,
       "icon": "icon.need.bladder"
     },
     {
       "id": "hygiene",
       "label": "Hygiene",
       "decayPerHour": 0.045,
+      "comfortable": 0.35,
       "icon": "icon.need.hygiene"
     },
     {
       "id": "fun",
       "label": "Fun",
-      "decayPerHour": 0.08,
+      "decayPerHour": 0.06,
+      "comfortable": 0.3,
       "icon": "icon.need.fun"
     },
     {
       "id": "comfort",
       "label": "Comfort",
-      "decayPerHour": 0.07,
+      "decayPerHour": 0.06,
+      "comfortable": 0.3,
       "icon": "icon.need.comfort"
     },
     {
       "id": "social",
       "label": "Social",
-      "decayPerHour": 0.08,
+      "decayPerHour": 0.06,
+      "comfortable": 0.4,
       "icon": "icon.need.social"
     },
     {
@@ -1806,7 +1812,7 @@
       "effects": {
         "tagPreference": {
           "sleep": 0.1,
-          "nap": 0.5
+          "nap": 0.4
         }
       }
     },
@@ -3292,22 +3298,22 @@
       "hunger": 0.3,
       "bladder": 0.15,
       "hygiene": 0.5,
-      "fun": 0.2,
+      "fun": 0.1,
       "comfort": 0.3,
-      "social": 0.2
+      "social": 0.1
     },
     "wakeFor": [
       "bladder",
       "hunger"
     ],
     "workDecay": {
-      "hunger": 0.3,
+      "hunger": 0.2,
       "energy": 0.35,
       "bladder": 0.1,
-      "hygiene": 0.6,
-      "fun": 0.6,
-      "comfort": 0.5,
-      "social": 0.3
+      "hygiene": 0.3,
+      "fun": 0.2,
+      "comfort": 0.2,
+      "social": 0.1
     },
     "wakeBeforeWorkMinutes": 75,
     "lieInHours": 0.5,
@@ -3316,8 +3322,19 @@
       "nap"
     ],
     "napCooldownHours": 4,
-    "exhaustedBelow": 0.2
+    "exhaustedBelow": 0.2,
+    "habits": [
+      {"at": "wake", "need": "bladder", "below": 0.95},
+      {"at": "bed", "need": "bladder", "below": 0.9},
+      {"at": "bed", "need": "hygiene", "below": 0.3},
+      {"at": "leave", "need": "bladder", "below": 0.85},
+      {"at": "leave", "need": "hunger", "below": 0.7},
+      {"at": "home", "need": "bladder", "below": 0.9},
+      {"at": "meal", "need": "bladder", "below": 0.85}
+    ],
+    "readyMinutes": 45
   },
+  "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
@@ -3431,7 +3448,7 @@
   },
   "accidents": [
     {"id": "wetSelf", "need": "bladder", "anotherRoom": "bathroom", "story": "had an accident", "effects": {"bladder": 1.0, "hygiene": -0.6}, "dirt": 1.0, "feeling": "hadAccident", "cooldownHours": 2, "graceMinutes": 45},
-    {"id": "fellAsleep", "need": "energy", "story": "fell asleep on the floor", "feeling": "soreBack", "cooldownHours": 4, "graceMinutes": 60,
+    {"id": "fellAsleep", "need": "energy", "story": "fell asleep on the floor", "feeling": "soreBack", "cooldownHours": 4, "graceMinutes": 60, "crowdedGraceMinutes": 120,
      "rest": {"label": "Asleep on the floor", "minutes": 120, "pose": "lie", "anim": "sleep", "gains": {"energy": 0.45}, "tags": ["sleep", "rest"]}},
     {"id": "takeout", "need": "hunger", "story": "ordered takeout", "cost": 25, "cooldownHours": 2, "graceMinutes": 60,
      "rest": {"label": "Eat takeout", "minutes": 20, "pose": "stand", "anim": "eat", "gains": {"hunger": 0.7}, "tags": ["food"]}},

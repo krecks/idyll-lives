@@ -2,10 +2,12 @@
 //! `soak.rs`) and, watching only what's public each tick (current activity, task, tags, pose),
 //! this prints for every resident and day: sleep blocks, naps, toilet visits and whether hands
 //! were washed after, food eaten sitting or standing, how long each cooking step took and how
-//! low and how high needs went; then a summary across the town.
+//! low and how high needs went; then a summary across the town, with what residents were doing
+//! when a need ran low (under `LOW`) or out, and the accidents that came of it.
 //!
 //! `cargo test --release -p sim-core --test routines -- --ignored --nocapture`
-//! (with `LOD=1` the rest of the town runs at lower detail, as in the game). The test town's
+//! (with `LOD=1` the rest of the town runs at lower detail, as in the game; `SEED=n` for another
+//! town and other choices than seed 7's; `BY_DAY=1` for needs day by day). The test town's
 //! houses have only a fridge to cook at; for generated houses with whole kitchens, make worlds
 //! (`node --experimental-transform-types tools/worlds/sample.ts worlds.json`) and set
 //! `WORLDS=worlds.json` (the first world, or the one of kind `WORLD`, e.g. `WORLD=medium`).
@@ -15,6 +17,7 @@ mod common;
 use std::collections::BTreeMap;
 
 use sim_core::content::{Pose, TagMask};
+use sim_core::social::EventKind;
 use sim_core::world::{Phase, Sim, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
@@ -22,6 +25,10 @@ const DAYS: u32 = 7;
 const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
 /// Hands washed within this long after the toilet count as washed after it.
 const WASH_WITHIN_MINUTES: u64 = 10;
+/// A need this low is about to run out: residents should have done something before.
+const LOW: f32 = 0.05;
+/// Time spent under this counts as running low.
+const LOWISH: f32 = 0.1;
 
 /// What a resident is doing this tick, as far as the diagnostic cares.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -128,7 +135,13 @@ struct Day {
     cook: BTreeMap<String, (f32, f32, u32)>,
     need_min: Vec<f32>,
     need_sum: Vec<f64>,
+    /// Minutes each need spent under `LOWISH`.
+    need_lowish: Vec<u32>,
     samples: u32,
+    /// Minutes spent at work or school, asleep, walking, doing nothing...
+    time: BTreeMap<&'static str, u32>,
+    /// The bladder when each toilet visit started, and whether it was out of habit (a routine).
+    toilet_at: Vec<(f32, bool)>,
 }
 
 /// One resident's record.
@@ -139,7 +152,15 @@ struct Record {
     last: Option<(Doing, u64)>,
     /// When their last toilet visit ended (and whether hands were washed after it yet).
     toilet_end: Option<(u64, u32, bool)>,
+    /// What they're doing (as `what`), since when and with which needs then.
+    what: Option<(String, u64, Vec<f32>)>,
+    /// Needs as last sampled (to see one go under `LOW` or run out).
+    needs: Vec<f32>,
 }
+
+/// What residents were doing when a need went under `LOW` or ran out: (need, "low"/"out",
+/// what) → how often, the minutes it had gone on and that need when it started (summed).
+type Lows = BTreeMap<(usize, &'static str, String), (u32, f32, f32)>;
 
 /// The routine day of `tick`: days run 06:00 to 06:00, so a night's sleep counts for the
 /// evening it started.
@@ -158,7 +179,12 @@ fn object_name(w: &World, object: Option<u32>) -> String {
 
 impl Record {
     fn day(&mut self, d: u32, needs: usize) -> &mut Day {
-        self.days.entry(d).or_insert_with(|| Day { need_min: vec![1.0; needs], need_sum: vec![0.0; needs], ..Default::default() })
+        self.days.entry(d).or_insert_with(|| Day {
+            need_min: vec![1.0; needs],
+            need_sum: vec![0.0; needs],
+            need_lowish: vec![0; needs],
+            ..Default::default()
+        })
     }
 
     /// `doing` ended at `tick` after starting at `start`.
@@ -209,7 +235,48 @@ impl Record {
     }
 }
 
-fn run(seed: u64, player_size: usize) -> (World, Vec<Record>) {
+/// What a resident is up to, in a few words (for the lows): at work, asleep, walking to the
+/// toilet, sitting at the computer...
+fn what(w: &World, s: &Sim) -> String {
+    if s.away_until.is_some() {
+        return if s.job.is_some() { "at work".into() } else { "at school".into() };
+    }
+    let Some(a) = s.current() else {
+        return if s.engaged_with.is_some() { "talked to".into() } else { "nothing".into() };
+    };
+    let task = match a.task.kind {
+        TaskKind::Use { object, interaction } => {
+            let o = &w.content.objects[w.objects[object as usize].def];
+            format!("{} ({})", o.interactions[interaction].label, o.id)
+        }
+        TaskKind::Social { social, .. } => format!("social {}", w.content.socials[social].id),
+        TaskKind::Work => "off to work/school".into(),
+        TaskKind::GoHome => "home".into(),
+        TaskKind::Spot { accident } => format!("accident {}", w.content.accidents[accident].id),
+        // (Cook, eat, dishes, clean, repair, visit...)
+        other => format!("{other:?}").split([' ', '{']).next().unwrap_or("?").to_lowercase(),
+    };
+    let task = if a.task.directed { format!("{task} [directed]") } else { task };
+    match a.phase {
+        Phase::Routing { .. } => format!("walking: {task}"),
+        Phase::Queued { .. } => format!("queued: {task}"),
+        Phase::Knocking { .. } => "knocking".into(),
+        _ => task,
+    }
+}
+
+/// Whether their home has nothing that fills need `n`.
+fn home_lacks(w: &World, s: &Sim, n: usize) -> bool {
+    let Some(home) = w.households[s.household as usize].plot else { return true };
+    !w.objects.iter().any(|o| {
+        let (x, z) = o.front_tile(&w.content);
+        w.plot_at(x, z) == Some(home)
+            && !o.broken()
+            && w.content.objects[o.def].interactions.iter().any(|i| i.autonomous && i.total_gain[n] > 0.0)
+    })
+}
+
+fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<String, u32>) {
     let content = common::content();
     let town = match std::env::var("WORLDS") {
         Ok(path) => {
@@ -226,6 +293,9 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>) {
     let look = Lookup::new(&w);
     let needs = w.content.needs.len();
     let mut records: Vec<Record> = vec![Record::default(); w.sims.len()];
+    let mut lows = Lows::new();
+    let mut accidents: BTreeMap<String, u32> = BTreeMap::new();
+    let mut seen = w.events.last_id();
     // A little past the last morning, so the last night's sleep is over.
     let end = clock::tick_at(DAYS + 1, 10.0 * 60.0).unwrap();
     let started = std::time::Instant::now();
@@ -248,6 +318,10 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>) {
                         r.ended(&w, prev, since, tick);
                     }
                     r.started(&w, doing, tick);
+                    if let (Doing::Toilet, Some(b)) = (doing, look.bladder) {
+                        let habit = s.current().is_some_and(|a| a.task.routine);
+                        r.day(routine_day(tick), needs).toilet_at.push((s.needs[b], habit));
+                    }
                     r.last = Some((doing, tick));
                 }
             }
@@ -256,10 +330,52 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>) {
                 for n in 0..needs {
                     day.need_min[n] = day.need_min[n].min(s.needs[n]);
                     day.need_sum[n] += f64::from(s.needs[n]);
+                    day.need_lowish[n] += u32::from(s.needs[n] < LOWISH);
                 }
                 day.samples += 1;
+                // What they're doing, and whether a need just went low or ran out meanwhile.
+                let now = what(&w, s);
+                let class = match now.as_str() {
+                    "at work" | "at school" => "away",
+                    "nothing" => "nothing",
+                    _ if now.starts_with("walking") => "walking",
+                    _ if matches!(look.doing(&w, s), Doing::Sleep { .. } | Doing::Nap { .. }) => "asleep",
+                    _ if now.starts_with("social") || now == "talked to" => "talking",
+                    "cook" | "eat" => "meals",
+                    "dishes" | "clean" | "repair" => "chores",
+                    _ if matches!(look.doing(&w, s), Doing::Toilet | Doing::Wash) => "toilet",
+                    _ if matches!(look.doing(&w, s), Doing::Food { .. }) => "meals",
+                    _ => "doing",
+                };
+                *day.time.entry(class).or_default() += 1;
+                if r.what.as_ref().is_none_or(|(was, ..)| *was != now) {
+                    r.what = Some((now, tick, s.needs[..needs].to_vec()));
+                }
+                if r.needs.len() == needs {
+                    for n in (0..needs).filter(|&n| !w.content.needs[n].room) {
+                        let (before, after) = (r.needs[n], s.needs[n]);
+                        for (edge, label) in [(LOW, "low"), (1e-4, "out")] {
+                            if before >= edge && after < edge {
+                                let (doing, since, at) = r.what.as_ref().expect("set above");
+                                let doing = if home_lacks(&w, s, n) { format!("{doing} (none at home)") } else { doing.clone() };
+                                let e = lows.entry((n, label, doing)).or_default();
+                                e.0 += 1;
+                                e.1 += (tick - since) as f32 * MINUTES_PER_TICK;
+                                e.2 += at[n];
+                            }
+                        }
+                    }
+                }
+                r.needs = s.needs[..needs].to_vec();
             }
         }
+        for e in w.events.iter().filter(|e| e.id > seen && e.kind == EventKind::Accident) {
+            let id = e.n.and_then(|a| w.content.accidents.get(a as usize)).map_or("?".into(), |a| a.id.clone());
+            let s = &w.sims[e.a as usize];
+            eprintln!("accident: {} {} (h{}) at {}, day {}", id, s.name, s.household, clock_time(e.tick), clock::day(e.tick));
+            *accidents.entry(id).or_default() += 1;
+        }
+        seen = w.events.last_id();
     }
     // Whatever is still going on ends now.
     for r in &mut records {
@@ -268,7 +384,7 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>) {
         }
     }
     eprintln!("{} residents, {DAYS} days in {:.1} s", w.sims.len(), started.elapsed().as_secs_f64());
-    (w, records)
+    (w, records, lows, accidents)
 }
 
 fn rests(list: &[Rest]) -> String {
@@ -279,7 +395,7 @@ fn rests(list: &[Rest]) -> String {
     if all.is_empty() { "-".into() } else { all.join(", ") }
 }
 
-fn report(w: &World, records: &[Record]) {
+fn report(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<String, u32>) {
     let needs = w.content.needs.len();
     let short: Vec<String> = w.content.needs.iter().map(|n| n.id.chars().take(4).collect()).collect();
     eprintln!("Routine days run 06:00 to 06:00; needs are min/avg.");
@@ -313,10 +429,10 @@ fn report(w: &World, records: &[Record]) {
             eprintln!("      {}", need.join("  "));
         }
     }
-    summary(w, records);
+    summary(w, records, lows, accidents);
 }
 
-fn summary(w: &World, records: &[Record]) {
+fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<String, u32>) {
     let needs = w.content.needs.len();
     let days: Vec<&Day> = records.iter().flat_map(|r| r.days.iter().filter(|(d, _)| (1..=DAYS).contains(*d)).map(|(_, day)| day)).collect();
     let n = days.len().max(1) as f32;
@@ -383,6 +499,23 @@ fn summary(w: &World, records: &[Record]) {
         pct(washed as usize, toilets as usize),
         washes as f32 / n
     );
+    let at: Vec<(f32, bool)> = days.iter().flat_map(|d| d.toilet_at.iter().copied()).collect();
+    let habits = at.iter().filter(|a| a.1).count();
+    let chosen: Vec<f32> = at.iter().filter(|a| !a.1).map(|a| a.0).collect();
+    let mut bands = [0usize; 4];
+    for &b in &chosen {
+        bands[if b < 0.2 { 0 } else if b < 0.4 { 1 } else if b < 0.6 { 2 } else { 3 }] += 1;
+    }
+    eprintln!(
+        "toilet visits: {:.1} a day out of habit (getting up, bed, leaving, home, meals), {:.1} chosen, at bladder avg {:.2} (<0.2: {}, 0.2-0.4: {}, 0.4-0.6: {}, >=0.6: {})",
+        habits as f32 / n,
+        chosen.len() as f32 / n,
+        chosen.iter().sum::<f32>() / chosen.len().max(1) as f32,
+        bands[0],
+        bands[1],
+        bands[2],
+        bands[3]
+    );
     // Eating.
     let sum = |f: fn(&Day) -> u32| days.iter().map(|d| f(d)).sum::<u32>();
     let (es, et) = (sum(|d| d.eat_seated), sum(|d| d.eat_standing));
@@ -415,11 +548,70 @@ fn summary(w: &World, records: &[Record]) {
         })
         .collect();
     eprintln!("needs lowest/avg daily min/avg: {}", line.join("  "));
+    // Running low: how often, how long, doing what.
+    let real: Vec<usize> = (0..needs).filter(|&k| !w.content.needs[k].room).collect();
+    let any = days.iter().filter(|d| real.iter().any(|&k| d.need_min[k] < LOW)).count();
+    let line: Vec<String> = real
+        .iter()
+        .map(|&k| {
+            let under = days.iter().filter(|d| d.need_min[k] < LOW).count();
+            let minutes = days.iter().map(|d| d.need_lowish[k]).sum::<u32>() as f32 / n;
+            format!("{} {:.0}%/{:.0}", w.content.needs[k].id, pct(under, days.len()), minutes)
+        })
+        .collect();
+    eprintln!(
+        "resident-days with a need under {LOW}: {any} ({:.1}%); per need, % of days under {LOW} / minutes a day under {LOWISH}: {}",
+        pct(any, days.len()),
+        line.join("  ")
+    );
+    let mut time: BTreeMap<&str, u32> = BTreeMap::new();
+    for day in &days {
+        for (k, m) in &day.time {
+            *time.entry(k).or_default() += m;
+        }
+    }
+    let line: Vec<String> = time.iter().map(|(k, m)| format!("{k} {:.1}", *m as f32 / 60.0 / n)).collect();
+    eprintln!("hours a day: {}", line.join("  "));
+    let by_day: Vec<String> = (1..=DAYS)
+        .map(|d| {
+            let list: Vec<&Day> = records.iter().filter_map(|r| r.days.get(&d)).collect();
+            let low = list.iter().filter(|day| real.iter().any(|&k| day.need_min[k] < LOW)).count();
+            format!("d{d} {:.0}%", pct(low, list.len()))
+        })
+        .collect();
+    eprintln!("by day: {}", by_day.join("  "));
+    if std::env::var("BY_DAY").is_ok() {
+        for d in 1..=DAYS {
+            let list: Vec<&Day> = records.iter().filter_map(|r| r.days.get(&d)).collect();
+            let avg: Vec<String> = real
+                .iter()
+                .map(|&k| {
+                    let a = list.iter().map(|day| day.need_sum[k] / f64::from(day.samples.max(1))).sum::<f64>() / list.len().max(1) as f64;
+                    let low = list.iter().filter(|day| day.need_min[k] < LOW).count();
+                    format!("{} {a:.2}/{:.0}%", w.content.needs[k].id.chars().take(4).collect::<String>(), pct(low, list.len()))
+                })
+                .collect();
+            eprintln!("  d{d} avg/low: {}", avg.join("  "));
+        }
+    }
+    let line: Vec<String> = accidents.iter().map(|(id, c)| format!("{id} {c}")).collect();
+    eprintln!("accidents: {}", if line.is_empty() { "none".into() } else { line.join(", ") });
+    for (label, edge) in [("low", LOW), ("out", 0.0)] {
+        let mut list: Vec<_> = lows.iter().filter(|(k, _)| k.1 == label).collect();
+        list.sort_by_key(|e| std::cmp::Reverse(e.1.0));
+        let total: u32 = list.iter().map(|(_, v)| v.0).sum();
+        eprintln!("needs under {edge}: {total} times, doing (count, avg minutes at it, avg need when it started):");
+        for ((k, _, doing), (c, minutes, at)) in list.iter().take(25) {
+            let c = *c as f32;
+            eprintln!("  {:<8} x{:<4} {doing}: {:.0} min, from {:.2}", w.content.needs[*k].id, c, minutes / c, at / c);
+        }
+    }
 }
 
 #[test]
 #[ignore]
 fn a_week_of_routines() {
-    let (w, records) = run(7, 2);
-    report(&w, &records);
+    let seed = std::env::var("SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(7);
+    let (w, records, lows, accidents) = run(seed, 2);
+    report(&w, &records, &lows, &accidents);
 }

@@ -1,11 +1,90 @@
 //! Utility AI: objects advertise need gains; Sims score them against their current needs.
 
-use crate::content::{Interaction, MAX_NEEDS};
+use serde::Deserialize;
+
+use crate::content::{Interaction, MAX_NEEDS, NeedDef};
+
+/// How residents weigh their needs when they choose for themselves (`"autonomy"` in content).
+#[derive(Debug, Clone)]
+pub struct AutonomyRules {
+    /// Needs that get urgent (content `urgent`; bit per need, default none): the essentials.
+    pub urgent: u32,
+    /// One of those this low is urgent when home has something for it (a toilet, food):
+    /// residents see to it before anything else, stop what they chose themselves for it, and
+    /// don't stop to chat.
+    pub urgent_below: f32,
+    /// How much more a need below its `comfortable` level weighs: `need_weight` times
+    /// (1 + this), eased in over the tenth below it.
+    pub comfort_boost: f32,
+    /// Multiplier on a choice that would let another need run down to `urgent_below` before
+    /// it's over (a film started with the bladder at a quarter, a recipe started starving).
+    pub look_ahead: f32,
+    /// The longest a habit's top-up may take (the toilet, a snack; see `DayRhythm::habits`).
+    pub quick_minutes: f32,
+    /// Something they chose but couldn't get to isn't chosen again for this long.
+    pub retry_minutes: f32,
+    /// Needs a chat fills (any social's gains): running low on these is no reason to stop
+    /// talking.
+    pub social_fills: u32,
+}
+
+impl Default for AutonomyRules {
+    fn default() -> Self {
+        Self {
+            urgent: 0,
+            urgent_below: 0.08,
+            comfort_boost: 0.0,
+            look_ahead: 1.0,
+            quick_minutes: 30.0,
+            retry_minutes: 30.0,
+            social_fills: 0,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct AutonomyRaw {
+    pub(crate) urgent: Option<Vec<String>>,
+    urgent_below: Option<f32>,
+    comfort_boost: Option<f32>,
+    look_ahead: Option<f32>,
+    quick_minutes: Option<f32>,
+    retry_minutes: Option<f32>,
+}
+
+impl AutonomyRaw {
+    /// The rules, with the `urgent` needs and those a chat fills (bit per need) worked out.
+    pub(crate) fn rules(&self, urgent: Option<u32>, social_fills: u32) -> AutonomyRules {
+        let d = AutonomyRules::default();
+        AutonomyRules {
+            urgent: urgent.unwrap_or(d.urgent),
+            urgent_below: self.urgent_below.unwrap_or(d.urgent_below).clamp(0.0, 1.0),
+            comfort_boost: self.comfort_boost.unwrap_or(d.comfort_boost).max(0.0),
+            look_ahead: self.look_ahead.unwrap_or(d.look_ahead).clamp(0.0, 1.0),
+            quick_minutes: self.quick_minutes.unwrap_or(d.quick_minutes).max(0.0),
+            retry_minutes: self.retry_minutes.unwrap_or(d.retry_minutes).max(0.0),
+            social_fills,
+        }
+    }
+}
 
 /// How strongly a need at `value` (0 = empty, 1 = full) pulls a Sim. Low needs dominate.
 pub fn need_weight(value: f32) -> f32 {
     let deficit = (1.0 - value).clamp(0.0, 1.0);
     deficit * deficit * 3.0 + deficit * 0.5
+}
+
+/// How strongly each of `needs` pulls a resident: `need_weight`, more below the need's
+/// `comfortable` level (the bladder around half: seen to when it's convenient, not once it's
+/// bursting).
+pub fn felt(needs: &[f32], defs: &[NeedDef], rules: &AutonomyRules) -> [f32; MAX_NEEDS] {
+    let mut weights = [0.0; MAX_NEEDS];
+    for (n, (&value, def)) in needs.iter().zip(defs).enumerate() {
+        let below = ((def.comfortable - value) / 0.1).clamp(0.0, 1.0);
+        weights[n] = need_weight(value) * (1.0 + rules.comfort_boost * below);
+    }
+    weights
 }
 
 /// Attractiveness of an interaction for a Sim with `needs`, `distance` metres away.
@@ -15,10 +94,20 @@ pub fn score(needs: &[f32], interaction: &Interaction, distance: f32) -> f32 {
 
 /// Attractiveness of total need gains `gains`, `distance` metres away.
 pub fn score_gains(needs: &[f32], gains: &[f32; MAX_NEEDS], distance: f32) -> f32 {
+    let mut weights = [0.0; MAX_NEEDS];
+    for (w, &value) in weights.iter_mut().zip(needs) {
+        *w = need_weight(value);
+    }
+    score_felt(needs, &weights, gains, distance)
+}
+
+/// Attractiveness of total need gains `gains`, `distance` metres away, for needs that pull
+/// as hard as `weights` (see `felt`).
+pub fn score_felt(needs: &[f32], weights: &[f32], gains: &[f32; MAX_NEEDS], distance: f32) -> f32 {
     let mut s = 0.0;
     for (i, &value) in needs.iter().enumerate() {
         let gain = gains[i].min(1.0 - value).max(0.0);
-        s += gain * need_weight(value);
+        s += gain * weights[i];
     }
     s / (1.0 + distance * 0.08)
 }
@@ -90,6 +179,18 @@ mod tests {
         assert!(
             score(&needs, &interaction(0, 0.5), 1.0) > score(&needs, &interaction(0, 0.5), 20.0)
         );
+    }
+
+    #[test]
+    fn below_comfortable_weighs_more() {
+        let need = |comfortable| NeedDef { id: "n".into(), label: "n".into(), decay_per_minute: 0.0, room: false, comfortable };
+        let defs = [need(0.6), need(0.0)];
+        let rules = AutonomyRules { comfort_boost: 2.0, ..Default::default() };
+        let w = felt(&[0.45, 0.45], &defs, &rules);
+        assert!((w[0] - need_weight(0.45) * 3.0).abs() < 1e-5, "well below comfortable: three times the weight");
+        assert!((w[1] - need_weight(0.45)).abs() < 1e-5, "no comfortable level: as before");
+        let eased = felt(&[0.55, 0.55], &defs, &rules);
+        assert!(eased[0] > eased[1] && eased[0] < need_weight(0.55) * 3.0, "eased in just below it");
     }
 
     #[test]

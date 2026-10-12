@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::f32::consts::FRAC_PI_2;
 
 use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
-use crate::content::{Content, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask};
+use crate::content::{Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask};
 use crate::index::ObjectIndex;
 use crate::lot::{BondRaw, Lot, LotFile, SimSpawn};
 use crate::path::NavGrid;
@@ -425,6 +425,9 @@ pub struct Sim {
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
     pub(crate) follow_up: Option<Task>,
+    /// What they last chose for themselves but couldn't get to (a plate on a counter nobody
+    /// can reach), and until when they don't choose it again. Not saved either.
+    pub(crate) stuck: Option<(TaskKind, u64)>,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -587,9 +590,16 @@ impl Sim {
         }
     }
 
+    /// Whether a need a chat won't help with is about to run out (the bladder): no time to talk.
+    pub fn pressed(&self, content: &Content) -> bool {
+        let rules = &content.autonomy;
+        let essentials = rules.urgent & !rules.social_fills;
+        (0..content.needs.len()).any(|n| !content.needs[n].room && essentials & (1 << n) != 0 && self.needs[n] < rules.urgent_below)
+    }
+
     /// Whether another Sim can pull this one into a conversation right now.
     pub fn available_for_social(&self, content: &Content) -> bool {
-        if self.engaged_with.is_some() || self.pose == Pose::Lie || self.away_until.is_some() {
+        if self.engaged_with.is_some() || self.pose == Pose::Lie || self.away_until.is_some() || self.pressed(content) {
             return false;
         }
         // Busy with a planned block (unless it's for socialising).
@@ -1367,6 +1377,7 @@ impl World {
             current: None,
             idle_ticks: 0,
             follow_up: None,
+            stuck: None,
             household: spawn.household,
             job,
             away_until: None,
@@ -2293,16 +2304,9 @@ pub fn affordable(cost: i64, funds: i64) -> bool {
 /// Hour a Sim gets up today: the usual time, or earlier for an early shift.
 fn wake_hour(sim: &Sim, ctx: &Ctx) -> f32 {
     let rhythm = &ctx.content.day_rhythm;
-    let leave = sim
-        .job
-        .as_ref()
-        .and_then(|job| crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick))
-        .or_else(|| crate::life::school_today(ctx.content, sim, ctx.tick));
-    match leave {
-        Some((leave, ..)) if leave > ctx.tick => (crate::clock::hour(leave)
-            - rhythm.wake_before_work_minutes / 60.0)
-            .clamp(0.0, rhythm.wake_hour),
-        _ => rhythm.wake_hour,
+    match leave_today(sim, ctx) {
+        Some(leave) => (crate::clock::hour(leave) - rhythm.wake_before_work_minutes / 60.0).clamp(0.0, rhythm.wake_hour),
+        None => rhythm.wake_hour,
     }
 }
 
@@ -2338,6 +2342,12 @@ fn quality_boost(content: &Content, inter: &crate::content::Interaction, quality
 fn exhausted(sim: &Sim, content: &Content) -> bool {
     let rhythm = &content.day_rhythm;
     rhythm.rest_need.is_some_and(|n| sim.needs[n] < rhythm.exhausted_below)
+}
+
+/// Time to get up for work or school (`DayRhythm::wake_before_work_minutes` before leaving).
+fn getting_up(sim: &Sim, ctx: &Ctx) -> bool {
+    let early = social::minutes_to_ticks(ctx.content.day_rhythm.wake_before_work_minutes);
+    leave_today(sim, ctx).is_some_and(|leave| leave <= ctx.tick + early)
 }
 
 /// The middle of the night: a rested sleeper stays in bed until a little before they'd get up.
@@ -2512,6 +2522,12 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         end_activity(sim, content, objects);
     }
 
+    // Off to work or school soon: the toilet first, out of habit.
+    if let Some(task) = ready_to_leave(sim, ctx, objects) {
+        end_activity(sim, content, objects);
+        sim.follow_up = Some(task);
+    }
+
     // Ticks what they're doing moves on by (fewer than `steps` if it starts partway through).
     let mut ticks = sim.steps;
     if sim.current.is_none() {
@@ -2537,6 +2553,10 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 sim.idle_ticks = 0;
                 if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng) {
                     start_task(sim, task, ctx, objects, items);
+                    if sim.current.is_none() && sim.follow_up.is_none() {
+                        let retry = social::minutes_to_ticks(content.autonomy.retry_minutes);
+                        sim.stuck = Some((task.kind, ctx.tick + retry));
+                    }
                     // Catching up on a turn (`lod.rs`): they were idle until it was time to
                     // choose, so what they chose has only had the ticks since.
                     ticks = ticks.min(since + 1);
@@ -2584,6 +2604,8 @@ fn pick_autonomous(
 ) -> Option<Task> {
     let content = ctx.content;
     let needs = &sim.needs[..content.needs.len()];
+    // How hard each need pulls (more below the level they like to keep it at).
+    let felt = ai::felt(needs, &content.needs, &content.autonomy);
     let emotion = sim.emotion(content).map(|e| &content.emotions[e].mods);
     let schedule = content.schedule_at(ctx.hour);
     // Traits, the current emotion and the time of day all bias what feels right.
@@ -2604,14 +2626,15 @@ fn pick_autonomous(
     // A need that wakes sleepers (bladder, hunger) is urgent: deal with it first, as a sleep
     // started now would end at once (see `use_object`), over and over.
     let rhythm = &content.day_rhythm;
-    let woken = (0..content.needs.len()).any(|n| needs[n] < 0.08 && rhythm.wake_for & (1 << n) != 0);
+    let woken = (0..content.needs.len()).any(|n| needs[n] < content.autonomy.urgent_below && rhythm.wake_for & (1 << n) != 0);
     // (Not a nap either: the sofa won't help.) Worn out, it's bed whatever the hour, not a nap;
     // and no nap again too soon after the last.
     let rest = rhythm.sleep_tags | rhythm.nap_tags;
     let exhausted = exhausted(sim, content);
     let napped = ctx.tick < sim.nap_until;
-    // Nor back to bed rested, unless it's the middle of the night (it would end at once).
-    let rested = !before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95);
+    // Nor back to bed rested, unless it's the middle of the night (it would end at once), nor
+    // once the alarm's gone off for work or school.
+    let rested = (!before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95)) || getting_up(sim, ctx);
     // Only what they may use: at home and in public places, or where they're a guest.
     let usable = match sim.visiting {
         Some(visit) => ctx.index.on(visit.plot),
@@ -2620,8 +2643,17 @@ fn pick_autonomous(
     // Cooking: the stations they have (recipes need theirs), and whether food is ready.
     let stations = crate::cooking::station_mask(sim, ctx, objects);
     let fresh = items.list.iter().any(|it| it.household == sim.household && it.edible());
-    // Needs about to run out (see `use_object`'s `drained`).
-    let urgent: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < 0.08).fold(0, |m, n| m | 1 << n);
+    // Needs about to run out (see `use_object`'s `drained`); the essentials among them that
+    // home has something for; and all needs home has something for (what they look ahead to).
+    let low = content.autonomy.urgent_below;
+    let short: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < low).fold(0, |m, n| m | 1 << n);
+    let walk_per_minute = WALK_SPEED * sim.mods.walk_speed / MINUTES_PER_TICK;
+    let urgent = urgent_needs(sim, ctx, objects);
+    let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n));
+    // How far away the nearest thing for each need is, and how long until they leave for work
+    // or school (minutes).
+    let reach = reach(sim, ctx, objects, usable, walk_per_minute);
+    let until_leave = leave_today(sim, ctx).map(|t| (t - ctx.tick) as f32 * MINUTES_PER_TICK);
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -2672,12 +2704,11 @@ fn pick_autonomous(
             if inter.baby || (inter.needs_table && !at_table) {
                 continue;
             }
-            // Planned, with an urgent need it doesn't fill: it would stop at once (`use_object`),
-            // and be chosen again, over and over.
-            if urgent != 0
-                && (0..content.needs.len()).any(|n| urgent & (1 << n) != 0 && inter.total_gain[n] <= 0.0)
-                && crate::planner::planned_now(content, sim, inter)
-            {
+            // Costing a need about to run out, or planned with one it doesn't fill: it would stop
+            // at once (`use_object`), and be chosen again, over and over.
+            let costs = (0..content.needs.len()).any(|n| short & (1 << n) != 0 && inter.total_gain[n] < 0.0);
+            let leaves = (0..content.needs.len()).any(|n| short & (1 << n) != 0 && inter.total_gain[n] <= 0.0);
+            if costs || (leaves && crate::planner::planned_now(content, sim, inter)) {
                 continue;
             }
             if inter.homework > 0.0 {
@@ -2699,7 +2730,7 @@ fn pick_autonomous(
             if !inter.autonomous
                 || (woken && inter.tags & rest != 0)
                 || (rested && inter.tags & rhythm.sleep_tags != 0)
-                || (napped && inter.tags & rhythm.nap_tags != 0)
+                || (napped && !exhausted && inter.tags & rhythm.nap_tags != 0)
                 || (allowed == Access::Guest && inter.tags & content.social_rules.busy_tags != 0)
                 || !affordable(inter.cost, funds)
             {
@@ -2707,15 +2738,19 @@ fn pick_autonomous(
             }
             // Better objects and more skilled Sims get more out of it, and know it.
             let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
-            let gains = ai::score_gains(needs, &inter.total_gain.map(|g| g * boost), distance);
+            let gains = ai::score_felt(needs, &felt, &inter.total_gain.map(|g| g * boost), distance);
             let mut s = match inter.recipe {
                 // A recipe: only at home with every station it needs. Long ones tempt less, a
                 // hungry family more, and with food ready hardly at all.
                 Some(r) => {
                     let r = &content.recipes[r];
                     let at_home = ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == ctx.households[sim.household as usize].plot);
-                    // (Nobody starts on a long recipe with something else urgent.)
-                    let urgent = (0..content.needs.len()).any(|n| !content.needs[n].room && needs[n] < 0.1 && r.effects[n] <= 0.0);
+                    // (Nobody starts on a long recipe that something would run out before it's
+                    // done for, hunger too, as it's eaten only at the end; nor shortly before
+                    // leaving for work.)
+                    let minutes = r.minutes_with(stations);
+                    let urgent = runs_out(sim, content, fillable & content.autonomy.urgent, minutes, false, &[0.0; MAX_NEEDS], &reach, low)
+                        || until_leave.is_some_and(|m| minutes > m);
                     if urgent || !at_home || allowed != Access::Full || !r.possible(stations) {
                         continue;
                     }
@@ -2736,6 +2771,19 @@ fn pick_autonomous(
                 s /= schedule.preference(inter.tags & rhythm.sleep_tags).clamp(1e-3, 1.0);
             } else if exhausted && inter.tags & rhythm.nap_tags != 0 {
                 s *= 0.25;
+            }
+            // Not something long another need would run out before the end of, counting the way
+            // there and from there to what fills it (only what would wake them counts for a
+            // night's sleep): that first. Nor what they couldn't finish before leaving for work.
+            let sleep = inter.tags & rhythm.sleep_tags != 0;
+            let fills = (0..content.needs.len()).filter(|&n| inter.total_gain[n] > 0.0).fold(0u32, |m, n| m | 1 << n);
+            let watch = fillable & !fills & !urgent & if sleep { rhythm.wake_for } else { u32::MAX };
+            let there = distance / walk_per_minute;
+            let minutes = inter.minutes + there;
+            if runs_out(sim, content, watch, minutes, sleep, &inter.gain_per_minute, &reach.map(|r| r + there), low)
+                || (!sleep && until_leave.is_some_and(|m| minutes > m))
+            {
+                s *= content.autonomy.look_ahead;
             }
             if s > MIN_AUTONOMY_SCORE {
                 candidates.push((s, Choice::Object(obj.id, i)));
@@ -2784,7 +2832,7 @@ fn pick_autonomous(
             }
             let romantic = s.tags & content.social_rules.romantic_tags != 0;
             let friendly = matches!(s.prefer, Prefer::Any | Prefer::Liked);
-            let score = ai::score_gains(needs, &s.actor_gain, distance)
+            let score = ai::score_felt(needs, &felt, &s.actor_gain, distance)
                 * s.autonomy_weight
                 * prefer_factor(s.prefer, rel, chemistry, spark)
                 * feel(s.tags)
@@ -2837,7 +2885,7 @@ fn pick_autonomous(
             let Some(r) = it.recipe else { continue };
             let distance = ctx.nav.stairs.distance(it.at.centre(), sim.pos);
             let gains = content.recipes[r].effects.map(|g| g * it.quality);
-            let s = ai::score_gains(needs, &gains, distance) * rules.leftover_preference * invited;
+            let s = ai::score_felt(needs, &felt, &gains, distance) * rules.leftover_preference * invited;
             if best.is_none_or(|b| s > b.0) {
                 best = Some((s, it.id));
             }
@@ -2900,12 +2948,35 @@ fn pick_autonomous(
             let door = ctx.plots[plot as usize].arrival_point();
             let distance = (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]);
             // Travel is less of a deterrent than for a chat in the same room.
-            let score = ai::score_gains(needs, &visits.gains, distance * 0.25)
+            let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
                 * (0.4 + friendship / 100.0)
                 * feel(visits.tags)
                 * crate::planner::visit_factor(content, sim, soon);
             if score > MIN_AUTONOMY_SCORE {
                 candidates.push((score, Choice::Visit(plot)));
+            }
+        }
+    }
+
+    // Not what they couldn't get to a moment ago (and would try again and again).
+    if let Some((stuck, _)) = sim.stuck.filter(|s| ctx.tick < s.1) {
+        candidates.retain(|&(_, choice)| match (choice, stuck) {
+            (Choice::Object(o, i), TaskKind::Use { object, interaction }) => (o, i) != (object, interaction),
+            (Choice::Eat(it), TaskKind::Eat { item, .. }) => Some(it) != item,
+            _ => true,
+        });
+    }
+
+    // Needs about to run out come first: whatever doesn't fill one is put off.
+    if urgent != 0 {
+        for (s, choice) in &mut candidates {
+            let gains = match *choice {
+                Choice::Object(o, i) => content.objects[objects[o as usize].def].interactions[i].total_gain,
+                Choice::Eat(item) => items.get(item).and_then(|it| it.recipe).map_or([0.0; MAX_NEEDS], |r| content.recipes[r].effects),
+                _ => [0.0; MAX_NEEDS],
+            };
+            if !(0..content.needs.len()).any(|n| urgent & (1 << n) != 0 && gains[n] > 0.0) {
+                *s *= content.autonomy.look_ahead;
             }
         }
     }
@@ -3053,10 +3124,20 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     let Some(waypoints) = route(nav, sim.pos, sim.tile(), goal, target) else {
         return;
     };
-    if let TaskKind::Use { object, .. } = task.kind {
+    if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
         if !obj.reserve(sim.id, content.objects[obj.def].slots) {
             return;
+        }
+        // Off to bed (they can get there): the toilet first, out of habit, and then they
+        // choose bed again.
+        let sleep = content.objects[obj.def].interactions[interaction].tags & content.day_rhythm.sleep_tags != 0;
+        if sleep
+            && !task.directed
+            && let Some(first) = habit(sim, ctx, objects, HabitTime::Bed, ctx.object_plot[object as usize])
+        {
+            objects[object as usize].release(sim.id);
+            return start_task(sim, first, ctx, objects, items);
         }
     }
     sim.pose = Pose::Stand;
@@ -3154,7 +3235,8 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     object,
                     interaction,
                 } => {
-                    let done = use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes);
+                    let urgent = urgent_needs(sim, ctx, objects);
+                    let done = use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
                     if done {
@@ -3216,9 +3298,14 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     if finished {
         // A recipe's step, eating, washing up: on to what comes next.
         if sim.current.as_ref().is_some_and(|a| crate::cooking::chain(&a.task.kind)) {
+            let ate = sim.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { stage: 1, .. }));
             crate::cooking::step_done(sim, ctx, objects, items);
             if sim.current.is_some() {
                 return;
+            }
+            // After a meal: the toilet, out of habit.
+            if ate && sim.follow_up.is_none() {
+                sim.follow_up = habit(sim, ctx, objects, HabitTime::Meal, ctx.briefs[sim.id as usize].plot);
             }
         } else {
             let used = sim.current.as_ref().map(|a| a.task);
@@ -3237,6 +3324,9 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     }
                 } else if inter.after != 0 {
                     sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
+                    // Up: the toilet first, out of habit.
+                    sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
                 }
             }
         }
@@ -3246,7 +3336,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
 }
 
 /// One tick of using an object (`minutes` long: more when catching up on a turn, see
-/// `lod.rs`). Returns whether the Sim is done.
+/// `lod.rs`), with needs `pressing` (`urgent_needs`). Returns whether the Sim is done.
 fn use_object(
     sim: &mut Sim,
     ctx: &Ctx,
@@ -3254,6 +3344,7 @@ fn use_object(
     interaction: usize,
     elapsed: f32,
     minutes: f32,
+    pressing: u32,
 ) -> bool {
     let content = ctx.content;
     let inter = &content.objects[obj.def].interactions[interaction];
@@ -3271,10 +3362,13 @@ fn use_object(
         sim.care_out = Some((baby, per_tick));
     }
     let (mut any_gain, mut satisfied, mut urgent, mut wakes) = (false, true, false, false);
+    let (mut fills, mut emptying) = (0u32, false);
+    let low = content.autonomy.urgent_below;
     for n in 0..content.needs.len() {
         let g = inter.gain_per_minute[n];
         if g > 0.0 {
             any_gain = true;
+            fills |= 1 << n;
             let g = g * sim.mods.need_gain[n] * boost;
             sim.needs[n] = (sim.needs[n] + g * minutes).min(1.0);
             satisfied &= sim.needs[n] >= 0.999;
@@ -3282,11 +3376,12 @@ fn use_object(
             if g < 0.0 {
                 // Costs (a workout makes you hungry and sweaty).
                 sim.needs[n] = (sim.needs[n] + g * minutes).max(0.0);
+                emptying |= sim.needs[n] < low && !content.needs[n].room;
             }
             // (Surroundings are never urgent: they follow the room, nothing fills them. Nor is
             // what it's for: a snack fetched to eat sitting down fills hunger only then.)
-            urgent |= sim.needs[n] < 0.08 && !content.needs[n].room && inter.total_gain[n] <= 0.0;
-            wakes |= sim.needs[n] < 0.08 && content.day_rhythm.wake_for & (1 << n) != 0;
+            urgent |= sim.needs[n] < low && !content.needs[n].room && inter.total_gain[n] <= 0.0;
+            wakes |= sim.needs[n] < low && content.day_rhythm.wake_for & (1 << n) != 0;
         }
     }
     for s in 0..content.skills.len() {
@@ -3301,15 +3396,23 @@ fn use_object(
     } else if sleep {
         // One sleep until rested (only the need it's for counts: about 8 hours from tired,
         // less in a better bed), but nobody gets up in the middle of the night: once rested,
-        // they lie in until a little before they'd get up anyway.
+        // they lie in until a little before they'd get up anyway. On a work or school day the
+        // alarm goes off in time to get ready, rested or not.
         let rested = rhythm.rest_need.is_none_or(|n| sim.needs[n] >= 0.999);
         let longest = f32::from(content.planner.max_sleep_minutes);
-        wakes || elapsed >= longest || (rested && !before_dawn(sim, ctx))
+        wakes || elapsed >= longest || (rested && !before_dawn(sim, ctx)) || getting_up(sim, ctx)
     } else {
-        // Workouts and other draining activities stop before they empty a need. Planned
-        // activities go on for their time even once the needs they fill are full.
+        // Workouts and other draining activities stop before they empty the needs they cost.
+        // Planned activities go on for their time even once the needs they fill are full.
+        // Whatever they chose themselves (not a routine, nor for one of them) stops for a need
+        // about to run out that home has something for, if it would before the end (off to the
+        // toilet halfway through a film, not off the toilet for a bite to eat).
         let planned = crate::planner::planned_now(content, sim, inter);
-        let drained = urgent && (inter.total_gain.iter().any(|&g| g < 0.0) || planned);
+        let chosen = sim.current.as_ref().is_some_and(|a| !a.task.directed && !a.task.routine);
+        let left = inter.minutes - elapsed;
+        let drained = emptying
+            || (urgent && planned)
+            || (chosen && pressing & fills == 0 && runs_out(sim, content, pressing, left, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
         elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine) || drained
     };
@@ -3387,6 +3490,8 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         TaskKind::GoHome => {
             sim.current = None;
             sim.transition = Some(crate::life::Transition::Home);
+            // Home again: the toilet first, out of habit.
+            sim.follow_up = habit(sim, ctx, objects, HabitTime::Home, ctx.households[sim.household as usize].plot);
         }
         TaskKind::Social { .. } => act.phase = Phase::Waiting { ticks: 0 },
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => crate::cooking::arrive(sim, ctx, objects, items),
@@ -3411,13 +3516,146 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
     }
 }
 
+/// Just before they leave for work or school (`DayRhythm::ready_minutes`): what they do out of
+/// habit first (`HabitTime::Leave`), dropping what they chose themselves for it (not what
+/// they were told to do, a routine, cooking or eating, or something for that habit anyway).
+fn ready_to_leave(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task> {
+    let content = ctx.content;
+    let rhythm = &content.day_rhythm;
+    let low = rhythm.habits.iter().filter(|h| h.at == HabitTime::Leave && sim.needs[h.need] < h.below).fold(0u32, |m, h| m | 1 << h.need);
+    let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
+    if low == 0 || !free_will || sim.follow_up.is_some() || sim.queue.front().is_some_and(|t| t.directed) || sim.asleep(content) {
+        return None;
+    }
+    let leave = leave_today(sim, ctx)?;
+    if leave > ctx.tick + social::minutes_to_ticks(rhythm.ready_minutes) {
+        return None;
+    }
+    match sim.current.as_ref().map(|a| a.task) {
+        None => {}
+        Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false }) => {
+            let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+            if (0..content.needs.len()).any(|n| low & (1 << n) != 0 && inter.total_gain[n] > 0.0) {
+                return None;
+            }
+        }
+        Some(_) => return None,
+    }
+    habit(sim, ctx, objects, HabitTime::Leave, ctx.briefs[sim.id as usize].plot)
+}
+
 /// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge).
 fn home_fills(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], n: usize) -> bool {
+    home_needs(sim, ctx, objects, 1 << n) != 0
+}
+
+/// Which of the needs in `mask` (bit per need) their home has something working for (not
+/// counting what's only done with a baby there).
+fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32) -> u32 {
     let Some(home) = ctx.households[sim.household as usize].plot else {
-        return false;
+        return 0;
     };
-    ctx.index.on(home).iter().map(|&o| &objects[o as usize]).any(|o| {
-        !o.broken() && ctx.content.objects[o.def].interactions.iter().any(|i| i.autonomous && i.total_gain[n] > 0.0)
+    let mut found = 0;
+    for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken()) {
+        for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares()) {
+            found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
+        }
+        if found == mask {
+            break;
+        }
+    }
+    found
+}
+
+/// Essentials about to run out (`AutonomyRules::urgent`) that something at home fills (bit
+/// per need): residents see to them before anything else.
+fn urgent_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> u32 {
+    let content = ctx.content;
+    let rules = &content.autonomy;
+    let low = (0..content.needs.len())
+        .filter(|&n| !content.needs[n].room && rules.urgent & (1 << n) != 0 && sim.needs[n] < rules.urgent_below)
+        .fold(0, |m, n| m | 1 << n);
+    if low == 0 { 0 } else { home_needs(sim, ctx, objects, low) }
+}
+
+/// Whether one of the needs in `mask` would run down below `floor` in `minutes` of something
+/// (asleep or not) that costs `costs` a minute (negative gains), and the walk `after` it to
+/// what fills each.
+#[allow(clippy::too_many_arguments)]
+fn runs_out(
+    sim: &Sim,
+    content: &Content,
+    mask: u32,
+    minutes: f32,
+    asleep: bool,
+    costs: &[f32; MAX_NEEDS],
+    after: &[f32; MAX_NEEDS],
+    floor: f32,
+) -> bool {
+    let rhythm = &content.day_rhythm;
+    (0..content.needs.len()).filter(|&n| mask & (1 << n) != 0).any(|n| {
+        let factor = if asleep { rhythm.asleep_decay[n] } else { 1.0 };
+        let per_minute = content.needs[n].decay_per_minute * sim.mods.need_decay[n];
+        let used = (per_minute * factor - costs[n].min(0.0)) * minutes + per_minute * after[n];
+        sim.needs[n] - used < floor
+    })
+}
+
+/// How many minutes' walk the nearest thing for each need is (one they may use, not just for
+/// babies): where they'd go for it after whatever they're about to do.
+fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_minute: f32) -> [f32; MAX_NEEDS] {
+    let content = ctx.content;
+    let mut nearest = [f32::INFINITY; MAX_NEEDS];
+    for o in usable.iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken()) {
+        if access(ctx, sim, ctx.object_plot[o.id as usize]) == Access::None {
+            continue;
+        }
+        let fills = content.objects[o.def]
+            .interactions
+            .iter()
+            .filter(|i| i.autonomous && !i.baby && !i.cares())
+            .fold(0u32, |m, i| (0..content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(m, |m, n| m | 1 << n));
+        if fills == 0 {
+            continue;
+        }
+        let (fx, fz) = ctx.index.links.approach_of(o.id).unwrap_or_else(|| o.front_tile(content));
+        let minutes = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos) / per_minute;
+        for n in (0..content.needs.len()).filter(|&n| fills & (1 << n) != 0) {
+            nearest[n] = nearest[n].min(minutes);
+        }
+    }
+    nearest.map(|m| if m.is_finite() { m } else { 0.0 })
+}
+
+/// When they leave for work or school today (if they haven't yet).
+fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
+    sim.job
+        .as_ref()
+        .and_then(|job| crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick))
+        .or_else(|| crate::life::school_today(ctx.content, sim, ctx.tick))
+        .map(|(leave, ..)| leave)
+        .filter(|&leave| leave > ctx.tick)
+}
+
+/// What they do out of habit at a turning point of their day (`DayRhythm::habits`): for the
+/// habit for `at` whose need is lowest (for it), the nearest quick thing on `plot` that fills
+/// it. None: nothing to see to, or nothing there for it.
+fn habit(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], at: HabitTime, plot: Option<u32>) -> Option<Task> {
+    let content = ctx.content;
+    let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
+    // (The lowest first, for its habit.)
+    let mut due: Vec<&crate::content::Habit> = content.day_rhythm.habits.iter().filter(|h| h.at == at && sim.needs[h.need] < h.below).collect();
+    due.sort_by(|a, b| (sim.needs[a.need] / a.below).total_cmp(&(sim.needs[b.need] / b.below)));
+    due.into_iter().find_map(|h| {
+        nearest(sim, ctx, objects, plot, None, |i| {
+            i.autonomous
+                && i.total_gain[h.need] > 0.0
+                && i.minutes <= content.autonomy.quick_minutes
+                && !i.baby
+                && !i.needs_table
+                && i.recipe.is_none()
+                && affordable(i.cost, funds)
+        })
     })
 }
 
@@ -3447,8 +3685,21 @@ fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &cra
 /// working object on the same plot with an interaction of those tags, one they may use and can
 /// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
 fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags: TagMask) -> Option<Task> {
-    let content = ctx.content;
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
+    nearest(sim, ctx, objects, plot, Some(object), |i| i.tags & tags != 0 && !i.baby && i.recipe.is_none())
+}
+
+/// The nearest working object on `plot` (but `except`) with an interaction that `fits`, one
+/// they may use and can get to, as a routine task.
+fn nearest(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    plot: Option<u32>,
+    except: Option<u32>,
+    fits: impl Fn(&crate::content::Interaction) -> bool,
+) -> Option<Task> {
+    let content = ctx.content;
     if access(ctx, sim, plot) == Access::None {
         return None;
     }
@@ -3460,10 +3711,10 @@ fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags
     let mut near: Vec<(f32, u32, usize)> = usable
         .iter()
         .map(|&o| &objects[o as usize])
-        .filter(|o| o.id != object && ctx.object_plot[o.id as usize] == plot)
+        .filter(|o| Some(o.id) != except && ctx.object_plot[o.id as usize] == plot)
         .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
         .filter_map(|o| {
-            let i = content.objects[o.def].interactions.iter().position(|i| i.tags & tags != 0 && !i.baby && i.recipe.is_none())?;
+            let i = content.objects[o.def].interactions.iter().position(&fits)?;
             let (fx, fz) = approach(o);
             Some((ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos), o.id, i))
         })
