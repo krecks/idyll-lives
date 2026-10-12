@@ -118,3 +118,52 @@ fn a_visitor_knocking_at_save_time_knocks_again_after_loading() {
     minutes(&mut loaded, 90.0);
     assert!(loaded.events.iter().any(|e| e.kind == EventKind::Visited), "let in after loading");
 }
+
+/// Three houses in a row with no fences between the gardens: the host's on the west, a
+/// neighbour's in the middle and the guest's on the east, all facing the street (rows 10..14).
+fn row_of_three(bo: [f32; 2]) -> World {
+    let town = format!(
+        r#"{{"width":42,"depth":14,
+        "plots":[{{"name":"West","x":0,"z":0,"w":14,"d":10,"entry":[7.5,9.5]}},{{"name":"Middle","x":14,"z":0,"w":14,"d":10,"entry":[21.5,9.5]}},{{"name":"East","x":28,"z":0,"w":14,"d":10,"entry":[35.5,9.5]}}],
+        "households":[{{"name":"Host","plot":0,"player":true}},{{"name":"Guest","plot":2}},{{"name":"Neighbour","plot":1}}],
+        "sims":[{{"name":"Ada","household":0,"x":4.5,"z":4.5}},{{"name":"Bo","household":1,"x":{},"z":{}}},{{"name":"Cy","household":2,"x":21.5,"z":1.5}}],
+        "relationships":[{{"a":0,"b":1,"preset":"friends"}}]}}"#,
+        bo[0], bo[1]
+    );
+    let mut w = World::from_json(CONTENT, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w
+}
+
+#[test]
+fn a_visitor_goes_round_by_the_street_not_through_the_neighbours_garden() {
+    // From the back of the east garden to the west door: the straight line is across the middle one.
+    let mut w = row_of_three([33.5, 1.5]);
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    let mut on_street = false;
+    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let (x, z) = w.sims[1].tile();
+        assert_ne!(w.plot_at(x, z), Some(1), "Bo cut across the neighbours' garden at {x},{z}");
+        on_street |= z >= 10;
+        if w.events.iter().any(|e| e.kind == EventKind::Visited) {
+            break;
+        }
+    }
+    assert!(on_street, "by the street");
+    assert!(w.events.iter().any(|e| e.kind == EventKind::Visited), "and let in at the host's door");
+    assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0));
+}
+
+#[test]
+fn someone_in_a_garden_that_isnt_theirs_still_walks_out_of_it() {
+    // Bo finds himself at the back of the neighbours' garden and heads home.
+    let mut w = row_of_three([21.5, 4.5]);
+    w.apply(Command::GoHome { sim: 1 }).unwrap();
+    minutes(&mut w, 60.0);
+    let (x, z) = w.sims[1].tile();
+    assert_eq!(w.plot_at(x, z), Some(2), "home at {x},{z}");
+}

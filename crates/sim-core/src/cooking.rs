@@ -482,7 +482,7 @@ fn capitalised(s: &str) -> String {
 use crate::content::{Content, Interaction, Pose};
 use crate::items::Items;
 use crate::surface::{self, SurfaceSpot};
-use crate::world::{Access, Activity, Ctx, Sim, Task, access, affordable, end_activity, route};
+use crate::world::{Access, Activity, Ctx, Sim, Task, access, affordable, end_activity, walk_route};
 
 /// The tile a resident uses `obj` from (`surface::Links`, cached for the tick).
 fn approach(ctx: &Ctx, obj: &ObjectInstance) -> (i32, i32) {
@@ -621,7 +621,7 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
     let content = ctx.content;
     let o = &objects[obj as usize];
     let (fx, fz) = approach(ctx, o);
-    let Some(waypoints) = route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) else {
+    let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) else {
         return false;
     };
     let o = &mut objects[obj as usize];
@@ -636,7 +636,7 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
 /// Walks to tile `goal` for `task`.
 fn walk_to(sim: &mut Sim, task: Task, ctx: &Ctx, goal: (i32, i32), tags: TagMask) -> bool {
     let target = [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5];
-    let Some(waypoints) = route(&ctx.nav, sim.pos, sim.tile(), goal, target) else {
+    let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
         return false;
     };
     sim.pose = Pose::Stand;

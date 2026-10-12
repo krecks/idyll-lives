@@ -7,7 +7,7 @@ use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
 use crate::content::{Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask};
 use crate::index::ObjectIndex;
 use crate::lot::{BondRaw, Lot, LotFile, SimSpawn};
-use crate::path::NavGrid;
+use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 use crate::social::{self, ActiveFeeling, EventLog, Prefer, Relationships};
@@ -802,7 +802,7 @@ pub struct World {
     pub households: Vec<Household>,
     pub plots: Vec<Plot>,
     /// Plot per tile (see `map_plots`).
-    tile_plot: Vec<Option<u32>>,
+    pub(crate) tile_plot: Vec<Option<u32>>,
     pub relationships: Relationships,
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
@@ -872,6 +872,8 @@ pub(crate) struct Ctx<'a> {
     pub briefs: &'a [SimBrief],
     pub households: &'a [Household],
     pub plots: &'a [Plot],
+    /// Plot per ground tile (`World::tile_plot`).
+    pub tile_plot: &'a [Option<u32>],
     pub object_plot: &'a [Option<u32>],
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
@@ -1853,6 +1855,7 @@ impl World {
                 autonomy,
                 households,
                 plots,
+                tile_plot,
                 object_plot,
                 object_index,
                 exits,
@@ -1870,6 +1873,7 @@ impl World {
                 briefs,
                 households,
                 plots,
+                tile_plot,
                 object_plot,
                 index: object_index,
                 exits,
@@ -2840,6 +2844,13 @@ fn pick_autonomous(
         if !same_place {
             continue;
         }
+        // Not over the fence into someone else's garden to chat (a guest is welcome at the host's).
+        if let Some(b) = other.plot
+            && here != Some(b)
+            && access(ctx, sim, Some(b)) == Access::None
+        {
+            continue;
+        }
         let rel = ctx.rels.get(me, j);
         let chemistry = ctx.rels.chemistry(me, j);
         let attracted = other
@@ -3166,7 +3177,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             )
         }
     };
-    let Some(waypoints) = route(nav, sim.pos, sim.tile(), goal, target) else {
+    let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
         return;
     };
     if let TaskKind::Use { object, interaction } = task.kind {
@@ -3193,18 +3204,49 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     });
 }
 
-/// Smoothed waypoints from `pos` to `target`, or None if unreachable.
+/// Where `sim` may walk on the way to tile `goal` (see `path::Grounds`): home, the place
+/// they're a guest at, public places, the plot they're on now (nobody is stuck in a garden)
+/// and the one they're heading for. Everyone else's garden only when there's no other way.
+pub(crate) fn grounds<'a>(
+    tile_plot: &'a [Option<u32>],
+    plots: &[Plot],
+    households: &[Household],
+    nav: &NavGrid,
+    sim: &Sim,
+    goal: (i32, i32),
+) -> Grounds<'a> {
+    let mut grounds = Grounds { tile_plot, open: plots.iter().map(|p| p.public).collect() };
+    let here = sim.tile();
+    let ends = [here, goal].map(|(x, z)| grounds.plot(nav, x, z));
+    let home = households.get(sim.household as usize).and_then(|h| h.plot);
+    for p in ends.into_iter().chain([home, sim.visiting.map(|v| v.plot)]).flatten() {
+        if let Some(open) = grounds.open.get_mut(p as usize) {
+            *open = true;
+        }
+    }
+    grounds
+}
+
+/// `route` for `sim`, keeping out of other people's gardens (see `grounds`).
+pub(crate) fn walk_route(ctx: &Ctx, sim: &Sim, goal: (i32, i32), target: [f32; 2]) -> Option<Vec<[f32; 2]>> {
+    let grounds = grounds(ctx.tile_plot, ctx.plots, ctx.households, &ctx.nav, sim, goal);
+    route(&ctx.nav, sim.pos, sim.tile(), goal, target, Some(&grounds))
+}
+
+/// Smoothed waypoints from `pos` to `target`, or None if unreachable; round the gardens
+/// `grounds` keeps them out of, if any.
 pub(crate) fn route(
     nav: &NavGrid,
     pos: [f32; 2],
     start: (i32, i32),
     goal: (i32, i32),
     target: [f32; 2],
+    grounds: Option<&Grounds>,
 ) -> Option<Vec<[f32; 2]>> {
-    let path = nav.find_path(start, goal)?;
-    let mut waypoints = nav.smooth(&path);
+    let path = nav.find_path_with(start, goal, grounds)?;
+    let mut waypoints = nav.smooth_with(&path, grounds);
     // The first waypoint is the centre of the current tile; skip it when we can head on directly.
-    if waypoints.len() > 1 && nav.line_walkable(pos, waypoints[1]) {
+    if waypoints.len() > 1 && nav.line_walkable_with(pos, waypoints[1], grounds) {
         waypoints.remove(0);
     }
     match waypoints.last_mut() {
@@ -3773,7 +3815,7 @@ fn nearest(
     near.sort_by(|a, b| a.0.total_cmp(&b.0));
     let (_, object, interaction) = near.into_iter().take(3).find(|&(_, o, _)| {
         let (fx, fz) = approach(&objects[o as usize]);
-        route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]).is_some()
+        route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5], None).is_some()
     })?;
     Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
 }
