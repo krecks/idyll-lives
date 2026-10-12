@@ -951,6 +951,12 @@ pub struct VisitRules {
     pub tags: TagMask,
     /// Visitors knock and wait to be let in (`visits.door`); without it they walk straight in.
     pub door: Option<DoorRules>,
+    /// The least a friendly chat with one of the hosts scores for a guest (keeping them
+    /// company is what a visit is for, even with nothing to talk about); 0: no more than usual.
+    pub company: f32,
+    /// A guest with free will left with nothing to do for this long heads home (`boredMinutes`);
+    /// None: they stay until the visit is over.
+    pub bored_minutes: Option<f32>,
 }
 
 /// A visitor at the door: someone at home answers and lets them in or turns them away.
@@ -1804,6 +1810,8 @@ struct VisitRaw {
     earliest_hour: Option<f32>,
     latest_hour: Option<f32>,
     door: Option<DoorRaw>,
+    company: Option<f32>,
+    bored_minutes: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]
@@ -3075,6 +3083,8 @@ impl Content {
             earliest_hour: v.earliest_hour.unwrap_or(9.0),
             latest_hour: v.latest_hour.unwrap_or(21.0),
             tags: 1 << tag_index[VISIT_TAG],
+            company: v.company.unwrap_or(0.0).max(0.0),
+            bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),
             door: match &v.door {
                 None => None,
                 Some(d) => Some(DoorRules {
