@@ -52,6 +52,10 @@ pub struct RoomInfo {
     pub windows: u16,
     pub doors: u16,
     pub lamps: u16,
+    /// A wall of it (plain or with a window) is an outside wall, above ground: somewhere a
+    /// window could be. A room without (an inside bathroom, a hall, anything in the basement)
+    /// gets its daylight score from its lamps too.
+    pub outside: bool,
     /// Decor points of what stands in it.
     pub decor: f32,
     /// Share of its floor and wall faces with a chosen covering.
@@ -76,6 +80,7 @@ struct Acc {
     windows: u16,
     doors: u16,
     lamps: u16,
+    outside: bool,
     decor: f32,
     tags: TagMask,
     floors: f32,
@@ -218,12 +223,16 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         }
     }
 
-    // Walls, doors and windows on each room's boundary (a window between two rooms lights both).
-    let mut boundary = |r: u16, edge: Edge, covered: bool| {
+    // Walls, doors and windows on each room's boundary (a window between two rooms lights both),
+    // and which rooms have an outside wall (with outdoors across it, not underground).
+    let mut boundary = |r: u16, across: u16, z: i32, edge: Edge, covered: bool| {
         if r == OUTDOORS {
             return;
         }
         let Some(acc) = rooms.get_mut(r as usize) else { return };
+        if across == OUTDOORS && matches!(edge, Edge::Wall | Edge::Window) && w.storey_of(z) >= 0 {
+            acc.outside = true;
+        }
         match edge {
             Edge::Window => acc.windows += 1,
             Edge::Door => acc.doors += 1,
@@ -245,8 +254,9 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
                 continue;
             }
             let look = lot.look(EdgeRef::H(x as u16, z as u16));
-            boundary(room(x, z - 1), e, look.sides[0] != 0);
-            boundary(room(x, z), e, look.sides[1] != 0);
+            let (a, b) = (room(x, z - 1), room(x, z));
+            boundary(a, b, z - 1, e, look.sides[0] != 0);
+            boundary(b, a, z, e, look.sides[1] != 0);
         }
     }
     for z in 0..d_ {
@@ -256,8 +266,9 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
                 continue;
             }
             let look = lot.look(EdgeRef::V(x as u16, z as u16));
-            boundary(room(x - 1, z), e, look.sides[0] != 0);
-            boundary(room(x, z), e, look.sides[1] != 0);
+            let (a, b) = (room(x - 1, z), room(x, z));
+            boundary(a, b, z, e, look.sides[0] != 0);
+            boundary(b, a, z, e, look.sides[1] != 0);
         }
     }
     for z in 0..d_ {
@@ -265,8 +276,8 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             let Some(d) = lot.diag(x, z) else { continue };
             let look = lot.look(EdgeRef::Diag(x as u16, z as u16));
             let [h0, h1] = halves[lot.tile_index(x, z)];
-            boundary(h0, d.edge, look.sides[0] != 0);
-            boundary(h1, d.edge, look.sides[1] != 0);
+            boundary(h0, h1, z, d.edge, look.sides[0] != 0);
+            boundary(h1, h0, z, d.edge, look.sides[1] != 0);
         }
     }
 
@@ -306,6 +317,8 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         };
         let day = (f32::from(a.windows) * rules.window_tiles / a.tiles).min(1.0);
         let night = (f32::from(a.lamps) * rules.lamp_tiles / a.tiles).min(1.0);
+        // No window could light a room with no outside wall: its lamps are all its light, by day too.
+        let day = if a.outside { day } else { night };
         let coverings = 0.5 * (a.floors / a.tiles) + 0.5 * (a.covered_faces / a.faces.max(1.0));
         let decor = (a.decor / (a.tiles * rules.decor_per_tile) * 0.8 + coverings * 0.4).min(1.0);
         let function = match (kind, exclusive > 1, missing) {
@@ -326,6 +339,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             windows: a.windows,
             doors: a.doors,
             lamps: a.lamps,
+            outside: a.outside,
             decor: a.decor,
             coverings,
             dirt: 0.0,
@@ -351,6 +365,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             windows: 0,
             doors: 0,
             lamps: a.lamps,
+            outside: true,
             decor: a.decor,
             coverings: 0.0,
             dirt: 0.0,

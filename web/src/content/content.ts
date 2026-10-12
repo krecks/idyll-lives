@@ -478,7 +478,7 @@ interface ContentFile {
   roofColors?: RoofColorDef[];
   roomKinds?: RoomKindDef[];
   accidents?: AccidentDef[];
-  roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number };
+  roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number; windowTiles?: number };
   life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number } };
   economy?: Partial<Economy>;
   objectRules?: { freeRotation?: string[] };
@@ -529,6 +529,8 @@ export class Content {
   private readonly decorByCategory: Readonly<Record<string, number>>;
   /** Tiles one lamp lights fully at night (`roomRules.lampTiles`, as the simulation scores rooms). */
   readonly lampTiles: number;
+  /** Tiles one window lights fully by day (`roomRules.windowTiles`). */
+  readonly windowTiles: number;
   readonly windowStyles: readonly WindowStyleDef[];
   readonly economy: Economy;
   /** Animation tags, in the order the snapshot's `sim.action` indexes them. */
@@ -587,6 +589,7 @@ export class Content {
     this.adoptionCost = file.life?.adoption?.cost ?? null;
     this.decorByCategory = file.roomRules?.decorByCategory ?? {};
     this.lampTiles = file.roomRules?.lampTiles ?? 10;
+    this.windowTiles = file.roomRules?.windowTiles ?? 6;
     this.economy = { startingFunds: 0, currency: '$', ...file.economy };
     this.animations = [...new Set(file.animations ?? [])];
     this.shop = file.objects.filter((o) => o.price !== undefined);

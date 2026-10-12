@@ -128,6 +128,9 @@ fn a_basement_room_is_a_room_even_under_the_garden() {
     assert_eq!(w.lot.room_at(6, 4), OUTDOORS, "the garden above stays outdoors");
     let info = w.rooms().iter().find(|r| r.id == id && !r.garden).expect("scored like any room");
     assert_eq!((info.tiles, info.windows), (36.0, 0));
+    // No window could go in: no daylight to miss, its lamps (none yet) are all its light.
+    assert!(!info.outside);
+    assert_eq!(info.scores.light, 0.0);
     // Like upstairs: nothing stands outside rooms, and outside rooms isn't floor to stand on.
     assert!(buy(&mut w, "chair", 12, 4 + DOWN, 0).is_err());
     assert!(buy(&mut w, "chair", 5, 3 + DOWN, 0).is_ok());

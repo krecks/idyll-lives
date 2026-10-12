@@ -106,6 +106,42 @@ fn scores_follow_the_house_as_it_changes() {
     assert!((room(&w, 1, 1).scores.clean - 0.75).abs() < 1e-4);
 }
 
+/// A 7×5 house: a 2×2 closet in the middle (a door into it), and the rest one room wrapped round
+/// it with the front door. Neither has a window.
+const CLOSET: &str = r#"{"width":12,"depth":10,
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[4.5,8.5]}],
+    "households":[{"name":"Player","plot":0,"player":true}],
+    "walls":[[1,1,8,1],[1,6,8,6],[1,1,1,6],[8,1,8,6],
+             [3,2,5,2],[3,4,5,4],[3,2,3,4],[5,2,5,4]],
+    "doors":[{"x":4,"z":6,"axis":"x"},{"x":3,"z":4,"axis":"x"}],
+    "objects":[{"def":"lamp","x":3,"z":2},{"def":"lamp","x":7,"z":2}]}"#;
+
+/// A room with no outside wall can't have a window: its lamps light it by day too. A room with
+/// outside walls and no windows still misses its daylight (a window could go in).
+#[test]
+fn a_room_with_no_outside_wall_is_lit_by_its_lamps() {
+    let mut w = World::from_json(CONTENT, CLOSET, 1).unwrap();
+    let closet = room(&w, 3, 2);
+    assert_eq!((closet.tiles, closet.windows, closet.lamps, closet.outside), (4.0, 0, 1, false));
+    assert!((closet.scores.light - 1.0).abs() < 1e-4, "one lamp for 4 tiles, by day too: {}", closet.scores.light);
+    let ring = room(&w, 1, 1);
+    assert_eq!((ring.tiles, ring.windows, ring.lamps, ring.outside), (31.0, 0, 1, true));
+    assert!((ring.scores.light - 0.5 * 10.0 / 31.0).abs() < 1e-4, "no daylight: {}", ring.scores.light);
+
+    // Without its lamp the closet is dark.
+    w.apply(Command::Sell { household: 0, object: 0 }).unwrap();
+    assert_eq!(room(&w, 3, 2).scores.light, 0.0);
+    // With a window the ring gets daylight.
+    w.apply(Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::H, 6, 1, EdgeKind::Window)] }).unwrap();
+    let ring = room(&w, 1, 1);
+    assert!((ring.scores.light - 0.5 * (6.0 + 10.0) / 31.0).abs() < 1e-4, "{}", ring.scores.light);
+    // Moving a closet wall onto the outside wall makes it an outside room (dark by day).
+    let edits = vec![EdgeEdit::new(EdgeAxis::H, 3, 2, EdgeKind::Open), EdgeEdit::new(EdgeAxis::H, 4, 2, EdgeKind::Open), EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall), EdgeEdit::new(EdgeAxis::V, 5, 1, EdgeKind::Wall)];
+    w.apply(Command::Build { household: 0, edits }).unwrap();
+    let closet = room(&w, 3, 1);
+    assert_eq!((closet.tiles, closet.outside), (6.0, true));
+}
+
 /// A lamp nobody uses could stand anywhere that leaves the rest reachable; it keeps out of
 /// doorways (the tiles either side of a door), bought or moved there.
 #[test]

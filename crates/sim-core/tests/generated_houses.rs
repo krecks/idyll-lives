@@ -4,7 +4,8 @@
 //! somewhere to sit down at a table and small things on their tops. No room is bigger than its
 //! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
 //! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
-//! room has lights enough for all of it at night, and nothing stands just inside a door.
+//! room has lights enough for all of it at night and is lit well (windows enough by day where
+//! it has an outside wall), and nothing stands just inside a door.
 //!
 //! Make the houses first: `node --experimental-strip-types tools/housegen/sample.ts houses.json`,
 //! then `HOUSES=houses.json cargo test -p sim-core --test generated_houses -- --ignored --nocapture`.
@@ -105,7 +106,7 @@ fn generated_houses_are_livable() {
             }
         }
         // Every room has a light, enough for all of it at night (an open kitchen and living room
-        // share theirs).
+        // share theirs), and windows enough by day that the room overlay doesn't call it dim.
         let lamp_tiles = w.content.room_rules.lamp_tiles;
         for r in h["rooms"].as_array().into_iter().flatten() {
             let kind = r["kind"].as_str().unwrap();
@@ -117,6 +118,8 @@ fn generated_houses_are_livable() {
                 failures.push(format!("{label}: the {kind} at {x},{z} has no light"));
             } else if f32::from(room.lamps) * lamp_tiles < room.tiles {
                 failures.push(format!("{label}: the {kind} at {x},{z} has {} lights for {} tiles", room.lamps, room.tiles));
+            } else if room.scores.light < 0.6 {
+                failures.push(format!("{label}: the {kind} at {x},{z} is dim ({} windows for {} tiles)", room.windows, room.tiles));
             }
         }
         // Nothing stands just inside a door (a lamp beside a doorway makes the way in a squeeze).
@@ -160,7 +163,7 @@ fn generated_houses_are_livable() {
     }
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
-    eprintln!("  {bright} of {rooms} rooms lit well (the rest have too few windows for daylight)");
+    eprintln!("  {bright} of {rooms} rooms lit well");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
     }
