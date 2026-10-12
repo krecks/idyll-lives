@@ -12,7 +12,7 @@ import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type To
 
 const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
 
-/** World structure of a draft (`playerSlot` gets no driveway, as in the game). */
+/** World structure of a draft (`playerSlot` gets no driveway and is drawn as the player's house, as in the game). */
 export function previewWorld(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null = null): WorldStructure {
   const layout = layoutTown(content, t, town, playerSlot);
   const W = town.width;
@@ -93,7 +93,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn, offset: o.offset, w, d, quality: 0, style: 0, sellValue: null };
   });
 
-  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, seed: town.seed ?? 1, world: worldLook(town, layout.fields) };
+  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
   return {
     version: 0,
     lotVersion: 0,

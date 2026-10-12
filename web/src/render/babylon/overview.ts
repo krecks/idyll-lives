@@ -2,8 +2,9 @@
  * The town overview behind the menus (main menu, new-game steps): the whole neighbourhood at
  * once, drawn with the game's own builders so it looks like the game. Every house is a dressed
  * shell (`HouseBuilder.silhouettes` through `Street`: porches, chimneys, garages, cars, fences,
- * flower beds), plus the road, garden paths and every outdoor object (garden and park trees,
- * benches, flower beds). No interiors, no Sims.
+ * flower beds; the player's house, `WorldMeta.home`, dressed as the game builds it), plus the
+ * road, garden paths and every outdoor object (garden and park trees, benches, flower beds). No
+ * interiors, no Sims.
  *
  * Also owns the overview's lot highlights (glowing outlines, a soft fill and a light wall around
  * the selected lot; thin instances whose colours are rewritten, never re-recorded) and its
@@ -352,6 +353,7 @@ function townKey(world: WorldStructure): string {
     world.objects.reduce((a, o) => a + o.x * 31 + o.z * 7 + o.rot, 0),
     (world.meta?.paths ?? []).map((r) => `${r.x},${r.z},${r.w}`).join(';'),
     JSON.stringify(world.meta?.world ?? null),
+    world.meta?.home ?? '-',
   ].join('|');
 }
 

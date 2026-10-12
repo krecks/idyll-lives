@@ -365,6 +365,8 @@ export interface WorldMeta {
   seed?: number;
   /** What kind of world the town is in and how its land looks (missing: the classic valley). */
   world?: WorldLook;
+  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (no garage, car or garden dressing). */
+  home?: number | null;
 }
 
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */

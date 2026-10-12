@@ -44,8 +44,11 @@ class MenuScene {
   private templates: Templates | null = null;
   private showcase: NeighbourhoodDraft | null = null;
   private draft: NeighbourhoodDraft | null = null;
+  /** The lot shown as the player's house (null: none). */
+  private home: number | null = null;
   private world: WorldStructure | null = null;
   private worldOf: NeighbourhoodDraft | null = null;
+  private worldHome: number | null = null;
   private shotKey = '';
   private wanted: { shot: Shot; duration: number } | null = null;
   /** When the camera's glide to the current shot ends (performance.now() ms). */
@@ -81,17 +84,20 @@ class MenuScene {
 
   /**
    * Shows a neighbourhood behind the menus (the renderer rebuilds it only when its layout
-   * changed). Again after a game, too: starting one hides the overview.
+   * changed). Again after a game, too: starting one hides the overview. `home`: the lot the
+   * player will live on (the chosen home, the household's), drawn as the game will show it.
    */
-  async show(draft: NeighbourhoodDraft): Promise<void> {
-    if (draft === this.draft && this.renderer?.townShown) return;
+  async show(draft: NeighbourhoodDraft, home: number | null = null): Promise<void> {
+    if (draft === this.draft && home === this.home && this.renderer?.townShown) return;
     this.draft = draft;
+    this.home = home;
     const templates = (this.templates ??= await loadTemplates());
-    const world = this.world && this.worldOf === draft ? this.world : previewWorld(services.content, templates, draft);
+    const world = this.world && this.worldOf === draft && this.worldHome === home ? this.world : previewWorld(services.content, templates, draft, home);
     const renderer = await host.rendererNow({ ...settings });
-    if (this.draft !== draft) return;
+    if (this.draft !== draft || this.home !== home) return;
     this.world = world;
     this.worldOf = draft;
+    this.worldHome = home;
     this.attach(renderer);
     for (const [plot, label] of this.labels) this.anchor(plot, label);
     this.applyShot();
