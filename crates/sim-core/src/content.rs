@@ -860,7 +860,8 @@ pub struct DayRhythm {
 /// A baby crying for one of `needs` (bit per need; default: all but surroundings) below
 /// `below` while every grown-up at home is asleep wakes one of them, who does the crib's care
 /// interactions for each of those needs below `tend_below` and goes back to bed, with the
-/// `feeling` (optional). The same baby wakes nobody again for `cooldown_ticks`.
+/// `feeling` (optional); at night, a grown-up at home who's up and free comes instead. The
+/// same baby calls nobody again for `cooldown_ticks`.
 #[derive(Debug, Clone, Copy)]
 pub struct BabyWakes {
     pub needs: u32,

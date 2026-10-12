@@ -453,9 +453,13 @@ sofa when no bed is free). On a work or school day the alarm goes off: a sleep e
 crying for one of its `needs` (default: all but surroundings) under `below` (default 0.3) while
 every grown-up of the household at home is asleep, wake one of them: family first, then someone
 not worn out, then whoever was woken longest ago (partners take turns), then the most rested.
-They do the crib's care interactions for each of those needs under `tendBelow` (default 0.6)
-and go back to bed, with the `feeling` (optional); the same baby wakes nobody again for
-`cooldownMinutes` (default 90). The base game wakes for hunger, bladder and hygiene.
+At night, a grown-up at home who's up comes at once instead, dropping what they picked
+themselves (not the toilet or shower, cooking or eating, what the player told them to do, or
+when they leave for work or school within `readyMinutes`); with nobody up who can, one asleep
+is woken. They do the crib's care interactions for each of those needs under `tendBelow`
+(default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
+calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
+and hygiene.
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 
 **Needs and autonomy:** a need's `comfortable` (0..1, default 0) is the level residents like to

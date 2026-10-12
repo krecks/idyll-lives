@@ -429,6 +429,105 @@ fn nobody_wakes_when_the_baby_needs_nothing() {
     });
 }
 
+/// `NIGHT` with a television for a night owl (and a 4 am shift for an early riser).
+fn night_owl_content() -> String {
+    NIGHT
+        .replace(
+            r#"{"id":"energy","label":"Energy","decayPerHour":0.02}]"#,
+            r#"{"id":"energy","label":"Energy","decayPerHour":0.02},{"id":"fun","label":"Fun","decayPerHour":0.0}]"#,
+        )
+        .replace(
+            r#""animations":["sleep"],"#,
+            r#"{"id":"tv","name":"Television","price":200,"interactions":[
+                {"id":"watch","label":"Watch TV","minutes":240,"effects":{"fun":0.2},"tags":["lounge"]}]}],
+            "skills":[{"id":"writing","label":"Writing"}],
+            "grades":[{"id":"A","label":"Entry","payPerHour":10,"skillLevel":0}],
+            "careerCategories":[{"id":"press","label":"Press","shift":{"start":4,"hours":8,"days":[0,1,2,3,4,5,6]},
+              "tracks":[{"id":"press.print","label":"Print","skills":{"writing":1},"titles":["Runner"]}]}],
+            "animations":["sleep"],"#,
+        )
+        .replacen(r#""effects":{"hunger":0.6}}]}],"#, r#""effects":{"hunger":0.6}}]},"#, 1)
+}
+
+/// Ben in bed at one in the morning, Ada up watching television (on her own: nobody told her
+/// to; with `job`, she leaves for work at half past three), Bea fed until `hour`.
+fn night_owl(job: &str, hour: f32) -> World {
+    let town = NIGHT_TOWN
+        .replace(r#"{"def":"fridge","x":9,"z":9}"#, r#"{"def":"fridge","x":9,"z":9},{"def":"tv","x":6,"z":9}"#)
+        .replace(r#""age":30}"#, &format!(r#""age":30{job}}}"#));
+    let mut w = World::from_json(&night_owl_content(), &town, 1).unwrap();
+    let bedtime = sim_core::clock::tick_at(1, 22.0 * 60.0).unwrap();
+    while w.tick < bedtime {
+        w.tick_once();
+    }
+    w.sims[0].needs[1] = 1.0;
+    w.sims[0].needs[2] = 0.0;
+    w.sims[1].needs[1] = 0.35;
+    night_until(&mut w, hour, Some(1.0), |_| {});
+    let doing = |i: usize| w.sims[i].current().map(|a| a.task);
+    assert!(w.sims[1].asleep(&w.content), "Ben asleep: {:?}", doing(1));
+    assert!(
+        matches!(doing(0), Some(sim_core::world::Task { kind: sim_core::world::TaskKind::Use { object: 4, .. }, directed: false, .. })),
+        "Ada watching TV: {:?}",
+        doing(0)
+    );
+    w
+}
+
+#[test]
+fn a_parent_up_at_night_sees_to_the_crying_baby_and_the_other_sleeps_on() {
+    let mut w = night_owl("", 1.0);
+    // Crying with hunger: Ada leaves the television for her within minutes.
+    w.sims[2].needs[0] = 0.25;
+    let start = w.tick;
+    let mut fed_at = None;
+    let lowest = night_until(&mut w, 4.0, None, |w| {
+        assert!(w.sims[1].asleep(&w.content), "Ben woken at tick {}", w.tick);
+        if fed_at.is_none() && feeding(w, 0) {
+            fed_at = Some(w.tick);
+        }
+    });
+    let fed_at = fed_at.expect("Ada fed Bea");
+    let waited = (fed_at - start) as f32 * sim_core::MINUTES_PER_TICK;
+    assert!(waited < 5.0, "Ada saw to Bea promptly: {waited} minutes");
+    assert!(lowest > 0.2, "Bea's hunger never fell far: {lowest}");
+    assert!(!w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "brokenSleep"), "Ada wasn't woken");
+}
+
+#[test]
+fn a_parent_about_to_leave_for_work_leaves_the_crying_baby_to_the_one_asleep() {
+    let mut w = night_owl(r#","job":{"career":"press.print","level":0}"#, 3.1);
+    // Crying with hunger as Ada is about to set off (at half past three): Ben is woken at once.
+    w.sims[2].needs[0] = 0.25;
+    let (ben, ada) = first_to_feed(&mut w, 4.0);
+    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+    assert!(w.sims[2].needs[0] > 0.8, "Bea is fed: {}", w.sims[2].needs[0]);
+    assert!(w.sims[0].away_until.is_some() || w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Work)), "Ada went to work");
+}
+
+#[test]
+fn a_parent_told_to_watch_tv_leaves_the_crying_baby_to_the_one_asleep() {
+    let mut w = night_owl("", 1.0);
+    w.apply(Command::Use { sim: 0, object: 4, interaction: 0 }).unwrap();
+    w.sims[2].needs[0] = 0.25;
+    let (ben, ada) = first_to_feed(&mut w, 2.0);
+    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+}
+
+/// On until `hour` (`night_until`): how many minutes from now Ben, and Ada, first fed Bea.
+fn first_to_feed(w: &mut World, hour: f32) -> (Option<f32>, Option<f32>) {
+    let start = w.tick;
+    let mut first = [None; 2];
+    night_until(w, hour, None, |w| {
+        for i in 0..2 {
+            if first[i].is_none() && feeding(w, i) {
+                first[i] = Some((w.tick - start) as f32 * sim_core::MINUTES_PER_TICK);
+            }
+        }
+    });
+    (first[1], first[0])
+}
+
 /// The shipped content: a home with a crib, and what a grown-up needs for themselves.
 const HOME: &str = r#"{"width":16,"depth":12,
     "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":10,"entry":[8.5,9.5]}],
