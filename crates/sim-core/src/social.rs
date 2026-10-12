@@ -839,7 +839,7 @@ pub enum EventKind {
     Bought,
     /// `a` was told no again about the `object` (`n`: how many times).
     DeniedAgain,
-    /// `a`'s household paid `n` for a babysitter for `b` while they're at work.
+    /// `a`'s household paid `n` for a babysitter for `b` while they're out (at work, visiting...).
     Babysitter,
     /// `a` stayed home from work to look after `b` (no money for a babysitter).
     StayedHome,

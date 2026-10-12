@@ -805,6 +805,9 @@ pub(crate) struct SimBrief {
     /// Plot the Sim is standing on.
     pub plot: Option<u32>,
     pub away: bool,
+    /// On their way out: to work, on a visit or to something in a public place (so the last
+    /// grown-up at home with a baby knows they will be; see `life::minding_baby`).
+    pub leaving: bool,
     /// A baby (cared for in a crib), and their needs (so carers know what's wanted).
     pub baby: bool,
     pub needs: [f32; MAX_NEEDS],
@@ -1871,6 +1874,11 @@ impl World {
                 household: s.household,
                 plot: plot.filter(|_| s.here()),
                 away: s.away_until.is_some() || !s.here(),
+                leaving: s.current.as_ref().map(|a| &a.task).into_iter().chain(s.queue.front()).any(|t| match t.kind {
+                    TaskKind::Work | TaskKind::Visit { .. } => true,
+                    TaskKind::Use { object, .. } => self.object_plot.get(object as usize).copied().flatten().is_some_and(|p| self.plots[p as usize].public),
+                    _ => false,
+                }),
                 baby: s.here() && self.content.life.baby(s.age),
                 needs: s.needs,
                 here: s.here(),
@@ -2247,6 +2255,11 @@ impl World {
             Command::Visit { sim, plot } => {
                 if plot as usize >= self.plots.len() {
                     return Err(Error::new(format!("unknown plot {plot}")));
+                }
+                // Not leaving a baby home alone with no money for a babysitter.
+                if let Some(baby) = crate::life::no_cover_for(self, sim as usize) {
+                    let cost = self.content.life.childcare.map_or(0, |c| c.cost);
+                    return Err(Error::new(format!("nobody to look after {}: not enough money for a babysitter (${cost})", self.sims[baby].name)));
                 }
                 self.enqueue(sim, TaskKind::Visit { plot })?;
             }
@@ -2762,13 +2775,19 @@ fn pick_autonomous(
     // or school (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
     let until_leave = leave_today(sim, ctx).map(|t| (t - ctx.tick) as f32 * MINUTES_PER_TICK);
+    // The last grown-up at home with a baby doesn't go out (`life::minding_baby`), unless for
+    // an essential need about to run out that home has nothing for.
+    let minding = crate::life::minding_baby(sim, ctx);
+    let stranded = short & !fillable & content.autonomy.urgent;
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
         .filter(|o| o.has_free_slot(content.objects[o.def].slots))
     {
-        let allowed = access(ctx, sim, ctx.object_plot[obj.id as usize]);
-        if allowed == Access::None {
+        let plot = ctx.object_plot[obj.id as usize];
+        let allowed = access(ctx, sim, plot);
+        let outing = || plot.is_some_and(|p| ctx.plots[p as usize].public) && !content.objects[obj.def].interactions.iter().any(|i| (0..content.needs.len()).any(|n| stranded & (1 << n) != 0 && i.total_gain[n] > 0.0));
+        if allowed == Access::None || (minding && outing()) {
             continue;
         }
         if obj.broken() {
@@ -3105,6 +3124,7 @@ fn pick_autonomous(
     if sim.visiting.is_none()
         && here.is_some()
         && here == household.plot
+        && !minding
         && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
     {
         let soon = plans_soon();
