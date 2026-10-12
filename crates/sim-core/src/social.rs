@@ -13,7 +13,7 @@ use crate::content::{MAX_NEEDS, Modifiers, ModifiersRaw, TagMask};
 use crate::{Error, MINUTES_PER_TICK};
 
 /// Animation names the renderer understands, in snapshot code order (code = index + 1).
-pub const ANIMATIONS: [&str; 7] = ["talk", "laugh", "flirt", "argue", "fight", "hug", "kiss"];
+pub const ANIMATIONS: [&str; 8] = ["talk", "laugh", "flirt", "argue", "fight", "hug", "kiss", "wave"];
 
 /// Friendship levels used for statuses and milestone events.
 pub const LEVEL_ENEMY: i8 = -2;

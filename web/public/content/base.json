@@ -1643,7 +1643,16 @@
      "requires": {"partners": true, "minRomance": 50}, "acceptance": {"base": 0.4, "romance": 0.006, "mood": 0.2},
      "needs": {"social": 0.2, "fun": 0.1}, "targetNeeds": {"social": 0.2, "fun": 0.1},
      "success": {"romance": 6, "targetRomance": 6, "feeling": "inLove", "targetFeeling": "inLove", "effect": "conceive"},
-     "failure": {"romance": -2, "targetRomance": -2}}
+     "failure": {"romance": -2, "targetRomance": -2}},
+    {"id": "goodbyeHug", "label": "Hug goodbye", "category": "friendly", "icon": "icon.social.hug", "minutes": 3, "animation": "hug",
+     "tags": ["social", "friendly", "touch"], "distance": 0.55, "autonomous": false,
+     "requires": {"minFriendship": 50}, "acceptance": {"base": 0.85, "friendship": 0.003},
+     "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
+     "success": {"friendship": 2, "targetFriendship": 2, "feeling": "hugged", "targetFeeling": "hugged"}},
+    {"id": "goodbye", "label": "Say goodbye", "category": "friendly", "icon": "icon.social.goodbye", "minutes": 3, "animation": "wave",
+     "tags": ["social", "friendly"], "autonomous": false, "acceptance": {"base": 1.0},
+     "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
+     "success": {"friendship": 1, "targetFriendship": 1}}
   ],
   "bondPresets": {
     "roommates": {
@@ -1857,6 +1866,8 @@
     "latestHour": 20,
     "company": 0.05,
     "boredMinutes": 30,
+    "farewell": ["goodbyeHug", "goodbye"],
+    "farewellMinutes": 8,
     "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"}
   },
   "phone": {

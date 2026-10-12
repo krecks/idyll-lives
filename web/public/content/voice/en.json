@@ -412,6 +412,50 @@
         "Words won't fix this."
       ],
       "tone": "sad"
+    },
+    "goodbyeHug": {
+      "start": [
+        "Come here, you. Bye!",
+        "One last hug before I go.",
+        "Thanks for having me, {name}.",
+        "I'll miss you. Bye!",
+        "Bye, {name}! Big hug."
+      ],
+      "good": [
+        "Aww. Come back soon!",
+        "Take care of yourself.",
+        "See you soon, {name}.",
+        "Get home safe!",
+        "Thanks for coming over."
+      ],
+      "bad": [
+        "Okay, okay. Bye now.",
+        "A wave is fine, thanks.",
+        "See you around."
+      ],
+      "tone": "happy"
+    },
+    "goodbye": {
+      "start": [
+        "Well, I'd better get going.",
+        "Bye, {name}! See you soon.",
+        "Thanks for having me!",
+        "I should head home now.",
+        "Time for me to go. Bye!"
+      ],
+      "good": [
+        "Bye! Come again soon.",
+        "See you, {name}!",
+        "Thanks for coming!",
+        "Take care. Bye!",
+        "Get home safe!"
+      ],
+      "bad": [
+        "Oh. Bye, then.",
+        "Okay. See you.",
+        "Already? Fine, bye."
+      ],
+      "tone": "happy"
     }
   },
   "object": {

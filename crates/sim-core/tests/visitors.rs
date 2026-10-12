@@ -1,5 +1,8 @@
 //! Visitors at the door (`visits.door`): they knock, someone at home answers and lets them in or
-//! turns them away, and with nobody to answer they go home again.
+//! turns them away, and with nobody to answer they go home again. As they leave, they say
+//! goodbye to a host who's free (`visits.farewell`).
+
+mod common;
 
 use sim_core::social::EventKind;
 use sim_core::world::TaskKind;
@@ -258,6 +261,226 @@ fn without_free_will_a_guest_waits_for_the_player() {
     w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
     minutes(&mut w, 60.0);
     assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
+}
+
+/// The test content with a goodbye at the end of a visit (`visits.farewell`) and a bed (sleep
+/// can't be interrupted by a social).
+fn farewell_content() -> String {
+    CONTENT
+        .replace(
+            r#""tags":["lounge"]}]}]"#,
+            r#""tags":["lounge"]}]},
+            {"id":"bed","name":"Bed","footprint":[2,2],"interactions":[{"id":"sleep","label":"Sleep","minutes":480,"pose":"lie","effects":{},"tags":["sleep"]}]}]"#,
+        )
+        .replace(
+            r#""socials":["#,
+            r#""socials":[{"id":"goodbye","label":"Say goodbye","minutes":3,"animation":"wave","tags":["social"],"autonomous":false,"acceptance":{"base":1.0},"success":{"friendship":1,"targetFriendship":1}},"#,
+        )
+        .replace(r#""latestHour":21,"#, r#""latestHour":21,"farewell":["goodbye"],"farewellMinutes":4,"#)
+        .replace(r#""economy":"#, r#""socialRules":{"busyTags":["sleep"]},"economy":"#)
+}
+
+/// Ada's bed in `visiting`.
+const BED: u32 = 1;
+
+/// Bo let in at Ada's (who has a bed), the greeting over, and nobody needing anything.
+fn visiting() -> World {
+    let town = town("friends").replace(
+        r#"{"def":"chair","x":3,"z":2,"rot":0}"#,
+        r#"{"def":"chair","x":3,"z":2,"rot":0},{"def":"bed","x":12,"z":2,"rot":0}"#,
+    );
+    let mut w = World::from_json(&farewell_content(), &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+    }
+    // (Ada greets Bo with a chat.)
+    while w.sims[0].current().is_some() || w.sims[1].engaged_with.is_some() || w.sims[1].current().is_some() {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 14.0 * 60.0).unwrap(), "the greeting never ended");
+    }
+    for s in &mut w.sims {
+        s.needs = [1.0; sim_core::content::MAX_NEEDS];
+    }
+    w
+}
+
+fn goodbye(w: &World) -> usize {
+    w.content.social_index("goodbye").unwrap()
+}
+
+/// Whether Bo is saying (or on his way to say) goodbye to Ada.
+fn saying_goodbye(w: &World) -> bool {
+    let g = goodbye(w);
+    w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target: 0, social } if social == g))
+}
+
+/// Whether Ada is lying asleep in her bed.
+fn in_bed(w: &World) -> bool {
+    w.sims[0].pose == sim_core::content::Pose::Lie && w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: BED, .. }))
+}
+
+/// Ends Bo's visit now.
+fn time_up(w: &mut World) {
+    let tick = w.tick;
+    w.sims[1].visiting.as_mut().unwrap().until = tick;
+}
+
+#[test]
+fn a_guest_says_goodbye_to_the_host_then_walks_home() {
+    let mut w = visiting();
+    let before = w.relationships.get(1, 0).friendship;
+    time_up(&mut w);
+    let start = w.tick;
+    let (mut said, mut walked_after) = (false, false);
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        assert!(w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        said |= saying_goodbye(&w) && w.sims[0].engaged_with == Some(1);
+        let going = w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        assert!(!going || said, "Bo set off without saying goodbye");
+        walked_after |= going;
+    }
+    assert!(said, "Bo said goodbye to Ada");
+    assert!(walked_after, "and then walked home");
+    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
+    assert!(w.relationships.get(1, 0).friendship > before, "a little closer for it");
+}
+
+#[test]
+fn a_guest_leaves_a_sleeping_host_be() {
+    let mut w = visiting();
+    // Ada goes to bed.
+    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    while !in_bed(&w) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Ada never got into bed");
+    }
+    time_up(&mut w);
+    let start = w.tick;
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        assert!(w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        assert!(!saying_goodbye(&w), "Bo went to say goodbye to a sleeping host");
+    }
+    assert!(in_bed(&w), "Ada is still asleep");
+    assert_eq!(w.sims[0].engaged_with, None);
+}
+
+#[test]
+fn a_goodbye_that_cannot_happen_soon_is_skipped() {
+    let mut w = visiting();
+    // Bo across the room from Ada.
+    w.sims[0].pos = [4.5, 4.5];
+    w.sims[1].pos = [9.5, 4.5];
+    time_up(&mut w);
+    while !saying_goodbye(&w) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Bo never went to say goodbye");
+    }
+    // Ada heads off to bed just as Bo comes over.
+    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    let mut waited = sim_core::MINUTES_PER_TICK;
+    while w.sims[1].visiting.is_some() {
+        w.tick_once();
+        if saying_goodbye(&w) {
+            waited += sim_core::MINUTES_PER_TICK;
+        }
+        assert!(waited <= 4.1, "Bo hung around for a goodbye");
+        assert!(w.tick < clock::tick_at(1, 17.0 * 60.0).unwrap(), "Bo never got home");
+    }
+    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
+    assert!(waited > 3.5, "Bo gave Ada a few minutes ({waited:.1})");
+    assert!(in_bed(&w), "Ada went to bed");
+}
+
+#[test]
+fn a_guest_saying_goodbye_at_save_time_still_goes_home_after_loading() {
+    let mut w = visiting();
+    time_up(&mut w);
+    while !saying_goodbye(&w) {
+        w.tick_once();
+        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Bo never went to say goodbye");
+    }
+    let mut loaded = World::from_save_json(&farewell_content(), &w.save_json()).unwrap();
+    loaded.autonomy = false;
+    minutes(&mut loaded, 60.0);
+    assert!(loaded.sims[1].visiting.is_none(), "went home");
+    assert_eq!(loaded.plot_at(loaded.sims[1].tile().0, loaded.sims[1].tile().1), Some(1), "home");
+}
+
+#[test]
+fn goodbyes_are_not_on_the_social_menu() {
+    let w = visiting();
+    let g = goodbye(&w);
+    let options = sim_core::conversation::options(&w, 1, 0);
+    assert!(!options.is_empty());
+    assert!(!options.iter().any(|&(i, _)| i == g));
+}
+
+/// With the shipped content: a guest at the player's home says goodbye as the visit ends, with a
+/// hug for a close friend and a wave otherwise. (`DUMP_STATES=1` saves the moment for the game's
+/// `?state=` debug view.)
+#[test]
+fn guests_hug_close_friends_goodbye_and_wave_to_others() {
+    let content = common::content();
+    for (friendship, social, name) in [(70.0, "goodbyeHug", "goodbye-hug"), (30.0, "goodbye", "goodbye-wave")] {
+        let mut w = World::from_json(&content, &common::town(&content, 7, 2), 7).unwrap();
+        let h = w.households.iter().position(|h| h.player).unwrap();
+        let plot = w.households[h].plot.unwrap();
+        let guest = w.sims.iter().position(|s| s.household as usize != h && s.adult(&w.content)).unwrap();
+        w.autonomy = false;
+        // (A day off for everyone.)
+        for s in &mut w.sims {
+            s.job = None;
+        }
+        while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+            w.tick_once();
+        }
+        for i in 0..w.sims.len() {
+            let n = w.content.needs.len();
+            w.sims[i].needs[..n].fill(1.0);
+            if w.sims[i].household as usize == h {
+                w.relationships.get_mut(guest, i).friendship = friendship;
+                w.relationships.get_mut(i, guest).friendship = friendship;
+            }
+        }
+        common::look_at(&mut w, plot);
+        w.apply(Command::Visit { sim: guest as u32, plot }).unwrap();
+        while !w.events.iter().any(|e| e.kind == EventKind::Visited && e.a as usize == guest) {
+            w.tick_once();
+            assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+        }
+        minutes(&mut w, 30.0);
+        let tick = w.tick;
+        w.sims[guest].visiting.as_mut().unwrap().until = tick;
+        let farewell = w.content.social_index(social).unwrap();
+        let mut said = None;
+        for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+            w.tick_once();
+            if let Some(TaskKind::Social { target, social }) = w.sims[guest].current().map(|a| a.task.kind)
+                && w.sims[target as usize].engaged_with == Some(guest as u32)
+                && w.content.visits.farewell.contains(&social)
+            {
+                said = Some((target, social));
+                break;
+            }
+        }
+        let (host, s) = said.unwrap_or_else(|| panic!("{name}: no goodbye"));
+        assert_eq!(w.sims[host as usize].household as usize, h, "{name}: to one of the hosts");
+        assert_eq!(s, farewell, "{name}: {social}");
+        for _ in 0..sim_core::TICKS_PER_SECOND / 4 {
+            w.tick_once();
+        }
+        common::dump_state(&w, name);
+        minutes(&mut w, 60.0);
+        assert!(w.sims[guest].visiting.is_none(), "{name}: went home");
+    }
 }
 
 /// A bladder and a toilet at Ada's (`bathroom` makes a resident busy); guests may use it when
