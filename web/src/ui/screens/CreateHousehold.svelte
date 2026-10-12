@@ -80,11 +80,11 @@
     .map((value) => ({ value, label: bondLabels[value] }));
 
   /**
-   * Step 2 of a new game by default (the draft in `app`, back to the neighbourhood, on to the
+   * Step 3 of a new game by default (the draft in `app`, back to the neighbourhood, on to the
    * home). In a game, a family moving into the home: the caller says where back and next lead.
    */
   let {
-    eyebrow = 'Step 2 of 3 · Creation',
+    eyebrow = 'Step 3 of 4 · Creation',
     backLabel = 'Neighbourhood',
     nextLabel = 'Choose a home →',
     avoidNames = (app.town?.households ?? []).map((h) => h.household.name),

@@ -109,7 +109,7 @@
   <header>
     <button class="btn ghost back" onclick={back}><Icon name="icon.ui.back" size={18} /> Household</button>
     <div class="title">
-      <span class="eyebrow">Step 3 of 3 · Choose a home</span>
+      <span class="eyebrow">Step 4 of 4 · Choose a home</span>
       <h1>Where will the {household.name}s live?</h1>
     </div>
     <button class="btn primary large move" disabled={!selected} onclick={moveIn}>Move in →</button>
@@ -148,7 +148,8 @@
             ]}
           />
         {/if}
-        {#if templates?.lotSizes}
+        <!-- A farm keeps its size (its fields and farmyard come with it). -->
+        {#if templates?.lotSizes && lotSize !== 'farm'}
           <div class="lot-size">
             <span class="eyebrow">Lot size</span>
             <Segmented label="Lot size" bind:value={() => lotSize, setLotSize} options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }]} />

@@ -706,6 +706,169 @@ def path_light():
 add('street.pathLight', path_light())
 
 # =============================================================================================
+# Farm (farm lots in farm worlds, game/town.ts `farmstead`)
+# =============================================================================================
+BARN_RED, BARN_DARK, TRIM = '#A8322D', '#842621', '#F1EEE6'
+ROOF_GREY = '#4B4F55'
+HAY, HAY_DARK = '#D9B95E', '#B8964A'
+GALV = '#A9AFB3'
+
+
+def slope(a, b, depth, colour, finish, t=0.14):
+    """A flat roof plane from (x, y) `a` to `b`, running `depth` along z."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    return box([math.hypot(dx, dy) + 0.06, t, depth], [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0], colour, finish, rotate=[0, 0, math.degrees(math.atan2(dy, dx))])
+
+
+def barn():
+    """A red gambrel-roofed barn, big doors and a hayloft door at the front, white trim."""
+    w, d, h = 5.6, 5.5, 3.2
+    p = [box([w, h, d], [0, h / 2, 0], BARN_RED, 'matte'),
+         box([w + 0.06, 0.25, d + 0.06], [0, 0.125, 0], '#8E8C88', 'matte')]                          # plinth
+    # The gable: stepped to follow the roof.
+    for width, y0, y1 in ((4.8, h, 3.7), (4.0, 3.7, 4.2), (3.4, 4.2, 4.6), (1.7, 4.6, 4.95)):
+        p.append(box([width, y1 - y0, d], [0, (y0 + y1) / 2, 0], BARN_RED, 'matte'))
+    for sx in (-1, 1):                                                                                 # gambrel roof
+        p += [slope((sx * (w / 2 + 0.08), h - 0.1), (sx * 1.7, 4.6), d + 0.3, ROOF_GREY, 'satin'),
+              slope((sx * 1.7, 4.6), (0, 5.3), d + 0.3, ROOF_GREY, 'satin')]
+    z = d / 2 + 0.03
+    p += [box([2.6, 2.7, 0.06], [0, 1.35, z], BARN_DARK, 'matte'),                                     # doors
+          box([1.0, 0.95, 0.06], [0, 4.0, z], BARN_DARK, 'matte')]                                    # hayloft
+    for x0, y0, x1, y1 in ((-1.3, 0.1, 1.3, 2.7), (-0.5, 3.52, 0.5, 4.47)):                            # frames, crossed
+        p += [box([x1 - x0 + 0.16, 0.12, 0.08], [0, y1, z + 0.01], TRIM, 'wood'),
+              box([x1 - x0 + 0.16, 0.12, 0.08], [0, y0, z + 0.01], TRIM, 'wood'),
+              box([0.12, y1 - y0, 0.08], [x0, (y0 + y1) / 2, z + 0.01], TRIM, 'wood'),
+              box([0.12, y1 - y0, 0.08], [x1, (y0 + y1) / 2, z + 0.01], TRIM, 'wood'),
+              rod([x0, y0, z + 0.02], [x1, y1, z + 0.02], 0.09, TRIM, 'wood', shape='box', t2=0.06),
+              rod([x1, y0, z + 0.02], [x0, y1, z + 0.02], 0.09, TRIM, 'wood', shape='box', t2=0.06)]
+    for x in (-w / 2, w / 2):                                                                          # corner boards
+        for zz in (-d / 2, d / 2):
+            p.append(box([0.14, h, 0.14], [x * 0.99, h / 2, zz * 0.99], TRIM, 'wood'))
+    p += [cyl([0.04, 0.7, 0.04], [0, 5.65, 0], '#2B302E', 'satin', segments=6),                        # weathervane
+          box([0.6, 0.03, 0.12], [0, 5.9, 0], '#2B302E', 'satin'),
+          cone([0.14, 0.2, 0.14], [0.32, 5.9, 0], '#2B302E', 'satin', rotate=[0, 0, -90], segments=6)]
+    return p
+
+
+add('farm.barn', barn(), (6, 6))
+
+
+def silo():
+    """A tall corrugated grain silo with a domed cap and a ladder."""
+    p = [cyl([2.7, 0.24, 2.7], [0, 0.12, 0], '#9A958C', 'matte', segments=24),
+         cyl([2.4, 6.0, 2.4], [0, 3.1, 0], '#C3C8CB', 'metal', segments=24),
+         sph([2.44, 1.3, 2.44], [0, 6.1, 0], '#A8322D', 'satin', segments=24),
+         cyl([0.3, 0.2, 0.3], [0, 6.8, 0], '#C3C8CB', 'metal', segments=10)]
+    for y in (1.1, 2.1, 3.1, 4.1, 5.1):
+        p.append(cyl([2.46, 0.06, 2.46], [0, y, 0], GALV, 'metal', segments=24))
+    for x in (-0.18, 0.18):                                                                            # ladder
+        p.append(box([0.04, 5.8, 0.04], [x, 3.1, 1.27], '#5C6168', 'metal'))
+    for i in range(12):
+        p.append(box([0.4, 0.03, 0.03], [0, 0.6 + i * 0.45, 1.27], '#5C6168', 'metal'))
+    return p
+
+
+add('farm.silo', silo(), (3, 3))
+
+
+def tractor():
+    """A small green farm tractor: big wheels behind, a cab, a hood with an exhaust stack, facing +Z."""
+    green, yellow, tyre = '#3E7D3A', '#F2C14E', '#26282B'
+    p = [box([0.9, 0.55, 1.7], [0, 0.95, 0.75], green, 'gloss', radius=0.06),                          # hood
+         box([0.92, 0.12, 0.08], [0, 0.8, 1.62], '#2B302E', 'metal'),                                  # grille
+         box([1.1, 0.3, 1.2], [0, 0.85, -0.5], green, 'gloss', radius=0.04),                           # body under the cab
+         box([0.5, 0.12, 0.45], [0, 1.15, -0.6], '#2B302E', 'matte'),                                  # seat
+         box([0.5, 0.4, 0.08], [0, 1.4, -0.85], '#2B302E', 'matte'),
+         box([1.3, 0.08, 1.2], [0, 2.4, -0.5], green, 'gloss', radius=0.03),                           # cab roof
+         cyl([0.08, 0.7, 0.08], [0.3, 1.55, 1.25], '#2B302E', 'metal', segments=8),                    # exhaust
+         cyl([0.3, 0.06, 0.3], [0, 1.3, -0.1], '#2B302E', 'metal', rotate=[-40, 0, 0], segments=12)]   # wheel
+    for x in (-0.6, 0.6):
+        for zz in (-1.05, 0.05):
+            p.append(box([0.06, 1.25, 0.06], [x, 1.78, zz], '#2B302E', 'metal'))
+    for sx in (-1, 1):
+        p += [cyl([1.45, 0.42, 1.45], [sx * 0.76, 0.73, -0.75], tyre, 'matte', rotate=[0, 0, 90], segments=20),
+              cyl([0.85, 0.44, 0.85], [sx * 0.76, 0.73, -0.75], yellow, 'gloss', rotate=[0, 0, 90], segments=16),
+              cyl([0.78, 0.3, 0.78], [sx * 0.58, 0.39, 1.3], tyre, 'matte', rotate=[0, 0, 90], segments=16),
+              cyl([0.44, 0.32, 0.44], [sx * 0.58, 0.39, 1.3], yellow, 'gloss', rotate=[0, 0, 90], segments=12)]
+    return p
+
+
+add('farm.tractor', tractor(), (2, 4))
+
+
+def hay_bale():
+    """A round bale lying on its side, wrapped with twine."""
+    p = [cyl([0.98, 0.86, 0.98], [0, 0.49, 0], HAY, 'fabric', rotate=[0, 0, 90], segments=20),
+         cyl([0.7, 0.87, 0.7], [0, 0.49, 0], HAY_DARK, 'fabric', rotate=[0, 0, 90], segments=16)]
+    for x in (-0.25, 0.0, 0.25):
+        p.append(cyl([1.0, 0.03, 1.0], [x, 0.49, 0], '#8C6A3A', 'matte', rotate=[0, 0, 90], segments=20))
+    return p
+
+
+add('farm.hayBale', hay_bale())
+
+
+def hay_stack():
+    """Square bales: two side by side and one on top."""
+    p = []
+    for x, y in ((-0.48, 0.23), (0.48, 0.23), (0.0, 0.69)):
+        p.append(box([0.92, 0.44, 0.86], [x, y, 0], HAY, 'fabric', radius=0.04))
+        for dz in (-0.22, 0.22):
+            p.append(box([0.94, 0.45, 0.03], [x, y, dz], '#8C6A3A', 'matte'))
+    return p
+
+
+add('farm.hayStack', hay_stack(), (2, 1))
+
+
+def scarecrow():
+    """A scarecrow on a post: a plaid shirt, straw hands, a sack head and a floppy hat."""
+    p = [cyl([0.07, 1.9, 0.07], [0, 0.95, -0.05], '#7A5A3A', 'wood', segments=8),
+         box([0.96, 0.06, 0.06], [0, 1.45, -0.05], '#7A5A3A', 'wood'),
+         box([0.44, 0.62, 0.24], [0, 1.25, 0], '#B8322B', 'fabric', radius=0.05),                      # shirt
+         box([0.46, 0.06, 0.26], [0, 1.05, 0], '#2E4E7A', 'fabric'),                                   # belt of twine
+         box([0.8, 0.16, 0.16], [0, 1.45, 0], '#B8322B', 'fabric', radius=0.04),                       # sleeves
+         sph([0.32, 0.36, 0.3], [0, 1.78, 0], '#C9A86A', 'matte', segments=12),                        # sack head
+         cyl([0.56, 0.04, 0.56], [0, 1.93, 0], '#6E5A3A', 'fabric', segments=16),                      # hat
+         cyl([0.28, 0.2, 0.28], [0, 2.03, 0], '#6E5A3A', 'fabric', taper=0.8, segments=12)]
+    for sx in (-1, 1):
+        p.append(cone([0.14, 0.16, 0.14], [sx * 0.4, 1.45, 0], HAY, 'matte', rotate=[0, 0, sx * 90], segments=8))
+    return p
+
+
+add('farm.scarecrow', scarecrow())
+
+
+def trough():
+    """A galvanised water trough on short legs."""
+    p = [box([1.8, 0.5, 0.7], [0, 0.4, 0], GALV, 'metal', radius=0.08),
+         box([1.66, 0.02, 0.56], [0, 0.6, 0], '#5B93A8', 'gloss')]
+    for x in (-0.7, 0.7):
+        p.append(box([0.08, 0.16, 0.6], [x, 0.08, 0], '#5C6168', 'metal'))
+    return p
+
+
+add('farm.trough', trough(), (2, 1))
+
+
+def coop():
+    """A little chicken coop on legs: a wooden house with a red roof, a ramp down the front."""
+    wood, roof = '#C8A46E', '#A8322D'
+    p = [box([1.5, 0.9, 1.1], [0, 1.0, -0.25], wood, 'wood'),
+         box([0.3, 0.36, 0.04], [0, 0.78, 0.31], '#3A2A1E', 'matte'),                                  # hatch
+         box([0.26, 0.04, 0.9], [0, 0.32, 0.6], wood, 'wood', rotate=[-30, 0, 0])]                     # ramp
+    for x in (-0.65, 0.65):
+        for z in (-0.7, 0.2):
+            p.append(box([0.08, 0.55, 0.08], [x, 0.28, z], '#7A5A3A', 'wood'))
+    for sz in (-1, 1):
+        p.append(box([1.7, 0.06, 0.8], [0, 1.66, -0.25 + sz * 0.33], roof, 'satin', rotate=[sz * 32, 0, 0]))
+    return p
+
+
+add('farm.coop', coop(), (2, 2))
+
+
+# =============================================================================================
 # Validation (footprint bounds, finishes) and output
 # =============================================================================================
 FINISHES = {'material.finish.' + f for f in 'matte satin gloss metal chrome fabric wood bark foliage skin glass'.split()}

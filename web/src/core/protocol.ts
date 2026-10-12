@@ -335,7 +335,60 @@ export interface WorldMeta {
   streets?: { x: number; z: number; w: number; d: number }[];
   paths?: { x: number; z: number; w: number; d: number }[];
   seed?: number;
+  /** What kind of world the town is in and how its land looks (missing: the classic valley). */
+  world?: WorldLook;
 }
+
+/** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
+export interface WorldLook {
+  kind: string;
+  landscape: LandscapeParams;
+  /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
+  fields?: { x: number; z: number; w: number; d: number }[];
+}
+
+/**
+ * How the land round a town looks (see `render/babylon/nature.ts`). `DEFAULT_LANDSCAPE` is the
+ * classic valley every town had before worlds had kinds.
+ */
+export interface LandscapeParams {
+  /** Height of the hills (m) and how far they take to rise from the town's edge (m). */
+  hills: number;
+  rise: number;
+  /** The valley's rim: how high it climbs (m) and how far from the town it starts (m). */
+  rim: number;
+  rimFrom: number;
+  /** More (above 0) or fewer (below) trees in the woods, and how close they come (m past the flat apron). */
+  forest: number;
+  treeline: number;
+  /** Conifers and birches among the trees, 0..1 (0.5: the classic mix). */
+  conifers: number;
+  birches: number;
+  /** Grass: lush, lawn, meadow and hillside green (hex). */
+  grass: [string, string, string, string];
+  /** The sea past one side of the town (z side, its shore this far out), or a lake beside it (town metres). */
+  water?: { kind: 'sea'; side: 'zmin' | 'zmax'; shore: number } | { kind: 'lake'; x: number; z: number; rx: number; rz: number };
+  /** Farmland round the town: a patchwork of fields (cell size m, grid turned by `angle` rad). */
+  fields?: { size: number; angle: number };
+  /**
+   * A range of mountains round the valley, its peaks this high (m): ridges and pinnacles with
+   * bare rock above the trees and snow on the tops. Lower on the low-z side (the menus look at
+   * the town from there) and parted by a pass where the road leaves town.
+   */
+  mountains?: number;
+}
+
+export const DEFAULT_LANDSCAPE: LandscapeParams = {
+  hills: 14,
+  rise: 45,
+  rim: 30,
+  rimFrom: 60,
+  forest: 0,
+  treeline: 2,
+  conifers: 0.5,
+  birches: 0.5,
+  grass: ['#6F9A3E', '#86A84A', '#A2AE5A', '#638A3E'],
+};
 
 export interface HouseholdInfo {
   id: number;

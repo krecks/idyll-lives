@@ -55,6 +55,8 @@ const CAR_PAINT = ['#C9CDD2', '#F0F0EC', '#1E2328', '#2B4A7A', '#9E2A2B', '#5668
 const MAILBOX = ['#22262A', '#2F4A3A', '#E8E6E0', '#8C2A26', '#2E4568'];
 const BIN = ['#3C6B3A', '#55595E', '#2E5C8A'];
 const FENCE_WHITE = '#F2F0EA';
+/** Weathered wood of the rail fences round farms and their fields. */
+const RAIL_WOOD = '#8A6F52';
 
 /** Model keys of the thin-instanced foliage (street pack, see `assets/street/manifest.json`). */
 const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
@@ -381,6 +383,37 @@ function pickets(p: Painter, x0: number, z0: number, x1: number, z1: number): vo
   }
 }
 
+/** A rustic rail fence along an axis-aligned line (round-ish posts every ~2.4 m, two split rails). */
+function rails(p: Painter, x0: number, z0: number, x1: number, z1: number): void {
+  const alongX = Math.abs(x1 - x0) >= Math.abs(z1 - z0);
+  const len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+  if (len < 0.5) return;
+  p.at(x0, z0, alongX ? (x1 > x0 ? 0 : Math.PI) : z1 > z0 ? -Math.PI / 2 : Math.PI / 2);
+  p.paint(RAIL_WOOD, 0.9, 0);
+  const posts = Math.max(1, Math.round(len / 2.4));
+  for (let i = 0; i <= posts; i++) {
+    const x = (len * i) / posts;
+    p.box(x - 0.06, 0, -0.06, x + 0.06, 1.08, 0.06, 'ny');
+  }
+  for (const y of [0.42, 0.84]) p.box(0, y, -0.035, len, y + 0.1, 0.035, 'ny');
+}
+
+/**
+ * Farm fields as ground layers (`WorldLook.fields`): tilled earth, with darker heaped rows under
+ * the crops (every other tile across, from the field's second tile; `town.ts` keeps fields an odd
+ * number of tiles wide so this holds on lots turned round too). `prefix` names the meshes.
+ */
+export function fieldLayers(fields: Rect[] | undefined, prefix: string): [string, Rect[], string, number][] {
+  if (!fields?.length) return [];
+  const rows: Rect[] = [];
+  for (const f of fields) for (let x = f.x + 1; x < f.x + f.w - 1; x += 2) rows.push({ x: x + 0.1, z: f.z + 0.5, w: 0.8, d: f.d - 1 });
+  const name = (n: string) => (prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n);
+  return [
+    [name('fields'), fields, 'material.soil', 0.013],
+    [name('furrows'), rows, 'material.furrow', 0.0135],
+  ];
+}
+
 /** Soft elliptical contact shadow (alpha falls off to the rim). */
 function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: number, alpha: number, y = 0.02): void {
   const c = Math.cos(yaw);
@@ -482,6 +515,7 @@ export class Street {
       view ? `${view.x},${view.z},${view.w},${view.d}` : '-',
       world.plots.map((p) => `${p.house?.join(',') ?? ''}${p.roof ? `/${p.roof.join(',')}` : ''}`).join(';'),
       (world.meta?.paths ?? []).length,
+      (world.meta?.world?.fields ?? []).length,
       outside.length,
       outside.reduce((a, o) => a + o.x * 31 + o.z, 0),
     ].join('|');
@@ -493,6 +527,7 @@ export class Street {
 
     const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
     const paths = world.meta?.paths ?? [];
+    const fields = world.meta?.world?.fields ?? [];
     const plots = this.layout(world, view, streets, paths);
 
     const props = new Painter(new Geo());
@@ -686,7 +721,9 @@ export class Street {
 
       // Fences or hedges: sides from the house front line back, and the back edge. A side
       // shared with another neighbour is drawn once, on the boundary, by the plot on its left.
-      const style = hash(plot.x, plot.z, 30) < 0.5 ? 'picket' : hash(plot.x, plot.z, 31) < 0.75 ? 'hedge' : 'none';
+      // Farms have rail fences.
+      const farm = fields.some((f) => overlaps(f, plot, -0.01));
+      const style = farm ? 'rail' : hash(plot.x, plot.z, 30) < 0.5 ? 'picket' : hash(plot.x, plot.z, 31) < 0.75 ? 'hedge' : 'none';
       if (style !== 'none') {
         const row = plots.filter((o) => o.edge === L.edge).sort((a, b) => a.plot.x - b.plot.x);
         const i = row.indexOf(L);
@@ -746,6 +783,25 @@ export class Street {
           const px = i % 2 ? path.x - 0.22 : path.x + path.w + 0.22;
           if (free({ x: px - 0.1, z: z - 0.1, w: 0.2, d: 0.2 })) put(PROP.pathLight, px, z, 0);
         }
+      }
+    }
+
+    // ---- farm fields: rail fences round them, a gate on the side towards the farmhouse ----
+    for (const f of fields) {
+      if (view && overlaps(f, view, -0.01)) continue;
+      const owner = plots.find((L) => L.house && overlaps(f, L.plot, -0.01));
+      const gateWest = !owner?.house || (owner.house.x0 + owner.house.x1) / 2 < f.x + f.w / 2;
+      const [x0, z0, x1, z1] = [f.x + 0.3, f.z + 0.3, f.x + f.w - 0.3, f.z + f.d - 0.3];
+      const [gx, ox] = gateWest ? [x0, x1] : [x1, x0];
+      const gate = (z0 + z1) / 2;
+      for (const [a, b, c, d] of [
+        [x0, z0, x1, z0],
+        [x0, z1, x1, z1],
+        [ox, z0, ox, z1],
+        [gx, z0, gx, gate - 1.3],
+        [gx, gate + 1.3, gx, z1],
+      ] as const) {
+        this.edgeRun('rail', props, plants.hedge, a, b, c, d, blocked);
       }
     }
 
@@ -931,7 +987,7 @@ export class Street {
   }
 
   /** A fence or hedge along a line, skipping stretches that would run through objects. */
-  private edgeRun(style: 'picket' | 'hedge', props: Painter, hedges: [number, number, number, number, number][], x0: number, z0: number, x1: number, z1: number, blocked: Rect[]): void {
+  private edgeRun(style: 'picket' | 'hedge' | 'rail', props: Painter, hedges: [number, number, number, number, number][], x0: number, z0: number, x1: number, z1: number, blocked: Rect[]): void {
     const len = Math.hypot(x1 - x0, z1 - z0);
     if (len < 1) return;
     const step = 2;
@@ -942,6 +998,7 @@ export class Street {
       const [a, b] = [runStart / n, end / n];
       const [ax, az, bx, bz] = [x0 + (x1 - x0) * a, z0 + (z1 - z0) * a, x0 + (x1 - x0) * b, z0 + (z1 - z0) * b];
       if (style === 'picket') pickets(props, ax, az, bx, bz);
+      else if (style === 'rail') rails(props, ax, az, bx, bz);
       else {
         const l = Math.hypot(bx - ax, bz - az);
         const k = Math.max(1, Math.round(l / 1.05));

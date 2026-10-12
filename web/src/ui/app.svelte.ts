@@ -6,10 +6,10 @@ import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
 
 /**
- * New game: neighbourhood → household (Creation) → home → game; or neighbourhood → play (take
- * over a household that already lives there) → game.
+ * New game: world → neighbourhood (choose a household) → household (Creation) → home → game; or
+ * world → neighbourhood → play (take over a household that already lives there) → game.
  */
-export type Screen = 'menu' | 'neighbourhood' | 'create' | 'home' | 'play' | 'game';
+export type Screen = 'menu' | 'world' | 'neighbourhood' | 'create' | 'home' | 'play' | 'game';
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */
 export interface Progress {
@@ -25,7 +25,8 @@ class AppState {
   sessionKey = $state(0);
   dataReady = $state(false);
   fatal = $state('');
-  /** Drafts kept while moving back and forth through the new-game steps. */
+  /** Drafts kept while moving back and forth through the new-game steps: the world (nobody living there yet), then the town with its neighbours. */
+  world = $state.raw<NeighbourhoodDraft | null>(null);
   town = $state.raw<NeighbourhoodDraft | null>(null);
   household = $state.raw<HouseholdDraft | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
@@ -50,11 +51,12 @@ class AppState {
   loading = $state.raw<Progress | null>(null);
 
   newGame(): void {
+    this.world = null;
     this.town = null;
     this.household = null;
     this.playSlot = null;
     this.emptyLot = false;
-    this.screen = 'neighbourhood';
+    this.screen = 'world';
   }
 
   /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */

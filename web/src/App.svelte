@@ -13,6 +13,7 @@
   import ChooseHome from './ui/screens/ChooseHome.svelte';
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
   import CreateNeighbourhood from './ui/screens/CreateNeighbourhood.svelte';
+  import CreateWorld from './ui/screens/CreateWorld.svelte';
   import Credits from './ui/screens/Credits.svelte';
   import LoadGame from './ui/screens/LoadGame.svelte';
   import LoadingScreen from './ui/screens/LoadingScreen.svelte';
@@ -196,7 +197,9 @@
   {/if}
 {:else}
   {#if !app.liveBackdrop}<MenuBackdrop />{/if}
-  {#if app.screen === 'neighbourhood'}
+  {#if app.screen === 'world'}
+    <CreateWorld />
+  {:else if app.screen === 'neighbourhood'}
     <CreateNeighbourhood />
   {:else if app.screen === 'create'}
     <CreateHousehold />

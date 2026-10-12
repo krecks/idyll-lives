@@ -403,6 +403,18 @@ export interface Names {
   last: string[];
   towns?: string[];
   streets?: string[];
+  /** Names for each kind of world (`game/world.ts`), by its id. */
+  worlds?: Record<string, WorldNames>;
+}
+
+/** A kind of world's names: a town is a `start` and an `end`, a street a `streets` word and a `ways` word. */
+export interface WorldNames {
+  start: string[];
+  end: string[];
+  streets: string[];
+  ways: string[];
+  /** One line about the place, shown when the world is made. */
+  taglines: string[];
 }
 
 export interface CharacterRules {
