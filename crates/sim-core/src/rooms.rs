@@ -52,6 +52,8 @@ pub struct RoomInfo {
     pub windows: u16,
     pub doors: u16,
     pub lamps: u16,
+    /// Floor its lamps light at night, in all (tiles; `ObjectDef::lamp`).
+    pub lit: f32,
     /// A wall of it (plain or with a window) is an outside wall, above ground: somewhere a
     /// window could be. A room without (an inside bathroom, a hall, anything in the basement)
     /// gets its daylight score from its lamps too.
@@ -80,6 +82,7 @@ struct Acc {
     windows: u16,
     doors: u16,
     lamps: u16,
+    lit: f32,
     outside: bool,
     decor: f32,
     tags: TagMask,
@@ -293,7 +296,8 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             acc
         };
         acc.decor += def.decor * content.object_rules.quality_factor(o.quality);
-        acc.lamps += u16::from(def.lamp);
+        acc.lamps += u16::from(def.lamp > 0.0);
+        acc.lit += def.lamp;
         // Broken things don't do what they're for (a broken shower is no shower).
         if !o.broken() {
             acc.tags |= def.tags;
@@ -316,7 +320,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             1.0
         };
         let day = (f32::from(a.windows) * rules.window_tiles / a.tiles).min(1.0);
-        let night = (f32::from(a.lamps) * rules.lamp_tiles / a.tiles).min(1.0);
+        let night = (a.lit / a.tiles).min(1.0);
         // No window could light a room with no outside wall: its lamps are all its light, by day too.
         let day = if a.outside { day } else { night };
         let coverings = 0.5 * (a.floors / a.tiles) + 0.5 * (a.covered_faces / a.faces.max(1.0));
@@ -339,6 +343,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             windows: a.windows,
             doors: a.doors,
             lamps: a.lamps,
+            lit: a.lit,
             outside: a.outside,
             decor: a.decor,
             coverings,
@@ -365,6 +370,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             windows: 0,
             doors: 0,
             lamps: a.lamps,
+            lit: a.lit,
             outside: true,
             decor: a.decor,
             coverings: 0.0,

@@ -17,7 +17,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.8,
-        "height": 0.42
+        "height": 0.42,
+        "tiles": 6
       },
       "radius": 0.23,
       "description": "A blue ceramic lamp with a linen drum shade. It stands on a table, desk or nightstand and lights the room at night.",
@@ -39,7 +40,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.75,
-        "height": 0.4
+        "height": 0.4,
+        "tiles": 6
       },
       "radius": 0.29,
       "description": "A white block lamp with a square shade. It stands on a table, desk or nightstand and lights the room at night.",
@@ -61,7 +63,8 @@
       "light": {
         "range": 2.5,
         "intensity": 0.6,
-        "height": 0.3
+        "height": 0.3,
+        "tiles": 4
       },
       "radius": 0.17,
       "description": "A brass desk lamp with a green glass shade. It stands on a table, desk or nightstand and lights the room at night.",
@@ -83,7 +86,8 @@
       "light": {
         "range": 3.0,
         "intensity": 0.7,
-        "height": 0.22
+        "height": 0.22,
+        "tiles": 4
       },
       "radius": 0.21,
       "description": "A little dome lamp in coral. It stands on a table, desk or nightstand and lights the room at night.",
@@ -105,7 +109,8 @@
       "light": {
         "range": 2.5,
         "intensity": 0.5,
-        "height": 0.15
+        "height": 0.15,
+        "tiles": 3
       },
       "radius": 0.18,
       "description": "A black metal lantern with a candle inside. It stands on a table, desk or nightstand and lights the room at night.",
@@ -126,7 +131,8 @@
       "light": {
         "range": 4.5,
         "intensity": 1.0,
-        "height": 1.5
+        "height": 1.5,
+        "tiles": 10
       },
       "description": "A brass arc reaching over the sofa from a marble base.",
       "interactions": []
@@ -146,7 +152,8 @@
       "light": {
         "range": 4.0,
         "intensity": 0.9,
-        "height": 1.38
+        "height": 1.38,
+        "tiles": 8
       },
       "description": "A drum shade on three walnut legs.",
       "interactions": []
@@ -166,7 +173,8 @@
       "light": {
         "range": 4.5,
         "intensity": 0.9,
-        "height": 1.78
+        "height": 1.78,
+        "tiles": 10
       },
       "description": "A tall uplighter washing the ceiling with light.",
       "interactions": []
@@ -187,7 +195,8 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 2.5
+        "height": 2.5,
+        "tiles": 20
       },
       "description": "Three black spotlights on a white ceiling track.",
       "interactions": []
@@ -208,7 +217,8 @@
       "light": {
         "range": 4.5,
         "intensity": 0.9,
-        "height": 2.05
+        "height": 2.05,
+        "tiles": 14
       },
       "description": "A big round paper lantern on a cord.",
       "interactions": []

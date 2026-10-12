@@ -2049,7 +2049,8 @@
       "light": {
         "range": 3.2,
         "intensity": 0.7,
-        "height": 0.95
+        "height": 0.95,
+        "tiles": 5
       },
       "description": "A bedside table with a reading lamp: light for the bedroom at night.",
       "interactions": []
@@ -3942,7 +3943,8 @@
       "light": {
         "range": 4.0,
         "intensity": 0.8,
-        "height": 0.5
+        "height": 0.5,
+        "tiles": 6
       },
       "description": "A real fire under a mantel. It lights the room at night, and warming up by it leaves residents cosy.",
       "interactions": [
@@ -3980,7 +3982,8 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 2.1
+        "height": 2.1,
+        "tiles": 16
       },
       "description": "A frosted globe on a long cord.",
       "interactions": []
@@ -4001,7 +4004,8 @@
       "light": {
         "range": 5.0,
         "intensity": 0.9,
-        "height": 2.3
+        "height": 2.3,
+        "tiles": 20
       },
       "description": "A simple square ceiling light.",
       "interactions": []
@@ -4022,7 +4026,8 @@
       "light": {
         "range": 6.5,
         "intensity": 1.3,
-        "height": 2.1
+        "height": 2.1,
+        "tiles": 25
       },
       "description": "Two rings of bulbs: bright, and a centrepiece.",
       "interactions": []
@@ -4043,7 +4048,8 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 1.9
+        "height": 1.9,
+        "tiles": 14
       },
       "description": "An enamel factory shade on a chain.",
       "interactions": []
@@ -4064,7 +4070,8 @@
       "light": {
         "range": 4.5,
         "intensity": 0.8,
-        "height": 2.4
+        "height": 2.4,
+        "tiles": 14
       },
       "description": "Wooden blades and a light.",
       "interactions": []
@@ -4085,7 +4092,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.7,
-        "height": 1.8
+        "height": 1.8,
+        "tiles": 5
       },
       "description": "A small shaded lamp for the wall.",
       "interactions": []
@@ -4106,7 +4114,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.8,
-        "height": 1.7
+        "height": 1.7,
+        "tiles": 5
       },
       "description": "A black gooseneck lamp for reading corners.",
       "interactions": []
@@ -4127,7 +4136,8 @@
       "light": {
         "range": 5.0,
         "intensity": 0.9,
-        "height": 2.0
+        "height": 2.0,
+        "tiles": 8
       },
       "description": "A caged wall light: indoors or on the outside of the house.",
       "interactions": []
@@ -4147,7 +4157,8 @@
       "light": {
         "range": 4.0,
         "intensity": 0.9,
-        "height": 1.5
+        "height": 1.5,
+        "tiles": 8
       },
       "description": "A plain floor lamp.",
       "interactions": []
@@ -4167,7 +4178,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.8,
-        "height": 0.95
+        "height": 0.95,
+        "tiles": 6
       },
       "description": "A lamp on its own little table.",
       "interactions": []
@@ -4296,7 +4308,8 @@
       "light": {
         "range": 4.0,
         "intensity": 0.8,
-        "height": 0.5
+        "height": 0.5,
+        "tiles": 8
       },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [
@@ -4705,7 +4718,8 @@
       "light": {
         "range": 6.0,
         "intensity": 1.0,
-        "height": 2.3
+        "height": 2.3,
+        "tiles": 20
       },
       "description": "A lantern on a post to light the garden at night.",
       "interactions": []
@@ -4726,7 +4740,8 @@
       "light": {
         "range": 5.0,
         "intensity": 0.7,
-        "height": 2.1
+        "height": 2.1,
+        "tiles": 12
       },
       "description": "Festoon bulbs between two posts.",
       "interactions": []

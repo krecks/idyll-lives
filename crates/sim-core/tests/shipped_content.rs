@@ -395,8 +395,8 @@ fn house_templates_have_closed_bathrooms() {
     }
 }
 
-/// Every room of every house template has lights enough for all of it at night, and nothing
-/// stands just inside a door.
+/// Every room of every house template has lights enough for all of it at night (a few, not a
+/// ceiling full), and nothing stands just inside a door.
 #[test]
 fn house_templates_light_every_room_and_keep_doorways_clear() {
     use sim_core::lot::Edge;
@@ -412,16 +412,14 @@ fn house_templates_light_every_room_and_keep_doorways_clear() {
             "walls": h["walls"], "doors": h["doors"], "windows": h["windows"], "objects": h["objects"],
         });
         let world = World::from_json(&content, &lot.to_string(), 1).unwrap();
-        let lamp_tiles = world.content.room_rules.lamp_tiles;
         for room in world.rooms().iter().filter(|r| !r.garden) {
-            assert!(
-                f32::from(room.lamps) * lamp_tiles >= room.tiles,
-                "{}: the room at {:?} has {} lights for {} tiles",
-                h["id"],
-                room.centre,
-                room.lamps,
-                room.tiles
-            );
+            assert!(room.lit >= room.tiles, "{}: the room at {:?} has lights for {} of its {} tiles", h["id"], room.centre, room.lit, room.tiles);
+            let hanging = world.objects.iter().filter(|o| {
+                let d = &world.content.objects[o.def];
+                d.lamp > 0.0 && d.layer == sim_core::content::Layer::Ceiling && world.lot.room_at(o.x, o.z) == room.id
+            });
+            let hanging = hanging.count();
+            assert!(hanging <= 4, "{}: the room at {:?} has {hanging} ceiling lights, not a few bigger ones", h["id"], room.centre);
         }
         let blocked = world.blocked();
         let lot = &world.lot;

@@ -900,7 +900,8 @@
       "light": {
         "range": 3.5,
         "intensity": 0.6,
-        "height": 0.45
+        "height": 0.45,
+        "tiles": 4
       },
       "description": "A slim white surround with a flickering electric fire: no chimney needed. It lights the room at night.",
       "interactions": [

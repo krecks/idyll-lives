@@ -12,6 +12,8 @@ const CONTENT: &str = r#"{
       {"id":"sofa","name":"Sofa","price":100,"footprint":[2,1],"interactions":[{"id":"sit","label":"Sit","minutes":30,"tags":["lounge"]}]},
       {"id":"bed","name":"Bed","price":100,"footprint":[2,2],"interactions":[{"id":"sleep","label":"Sleep","minutes":480,"tags":["sleep"]}]},
       {"id":"lamp","name":"Lamp","price":30,"category":"decor","light":{"range":4}},
+      {"id":"chandelier","name":"Chandelier","price":300,"layer":"ceiling","light":{"range":6.5,"tiles":24}},
+      {"id":"candle","name":"Candle","price":5,"light":{"range":2,"tiles":4}},
       {"id":"plant","name":"Plant","price":20,"category":"garden"}],
     "roomKinds":[
       {"id":"bathroom","tags":["bathroom"],"essentials":[["bathroom"],["hygiene"]],"size":[3,6],"exclusive":true},
@@ -140,6 +142,20 @@ fn a_room_with_no_outside_wall_is_lit_by_its_lamps() {
     w.apply(Command::Build { household: 0, edits }).unwrap();
     let closet = room(&w, 3, 1);
     assert_eq!((closet.tiles, closet.outside), (6.0, true));
+}
+
+/// A lamp lights as much floor as its `light.tiles` says, else `roomRules.lampTiles` (10): a
+/// chandelier lights all of the 5×4 living room at night, a candle a fifth of it.
+#[test]
+fn lamps_light_as_much_floor_as_they_say() {
+    for (def, lit) in [("lamp", 10.0), ("chandelier", 24.0), ("candle", 4.0)] {
+        let town = TOWN.replace(r#""def":"lamp""#, &format!(r#""def":"{def}""#));
+        let w = World::from_json(CONTENT, &town, 1).unwrap();
+        let living = room(&w, 7, 2);
+        assert_eq!((living.lamps, living.lit), (1, lit), "{def}");
+        let night = (lit / 20.0).min(1.0);
+        assert!((living.scores.light - (0.9 + night) / 2.0).abs() < 1e-4, "{def}: three windows by day, the {def} at night");
+    }
 }
 
 /// A lamp nobody uses could stand anywhere that leaves the rest reachable; it keeps out of

@@ -22,7 +22,7 @@ Per room, on the plot it belongs to:
 |---|---|
 | `tiles` | indoor tiles (a split tile counts half) |
 | `windows`, `doors` | openings on its boundary |
-| `lamps` | objects with `light` inside |
+| `lamps`, `lit` | objects with `light` inside, and the floor they light in all (each its `light.tiles`, else `roomRules.lampTiles`) |
 | `outside` | a wall of it (plain or with a window) has outdoors across it, above ground: a window could go there |
 | `kind` | content `roomKinds`: the first kind whose required tags are offered by an object in the room (bathroom: `bathroom`; kitchen: `cooking`; bedroom: `sleep`; living: `lounge` / `entertainment` / `screen`; study: `reading` / `training`), else `empty` |
 | `mixed` | objects of two incompatible kinds (a bed in the kitchen, a toilet in the living room) |
@@ -37,7 +37,7 @@ and garden decor, and its size.
 | Factor | Score | Weight |
 |---|---|---|
 | Size | tiles against the kind's `size: [cramped, comfortable]`: below `cramped` it falls to 0, between the two it rises from 0.5 to 1 | 0.20 |
-| Light | daylight from windows (one window per 6 tiles is full) and lamplight (one lamp per 10 tiles is full), averaged; a room with no outside wall (an inside bathroom, a hall, the basement) can't have windows, so its lamplight counts for both | 0.20 |
+| Light | daylight from windows (one window per 6 tiles is full) and lamplight (full when its lamps' `tiles` add up to its floor: a ceiling light ~16, a floor lamp 10, a table lamp ~5), averaged; a room with no outside wall (an inside bathroom, a hall, the basement) can't have windows, so its lamplight counts for both | 0.20 |
 | Decor | decor points per tile against `decorPerTile` | 0.20 |
 | Cleanliness | 1 − dirt | 0.25 |
 | Function | 1 with the kind's essentials and nothing out of place; `mixed` 0.6; `empty` 0.4 | 0.15 |

@@ -4,7 +4,7 @@
 //! somewhere to sit down at a table and small things on their tops. No room is bigger than its
 //! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
 //! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
-//! room has lights enough for all of it at night and is lit well (windows enough by day where
+//! room has lights enough for all of it at night (no more than four from its ceiling) and is lit well (windows enough by day where
 //! it has an outside wall), every room can be walked into, and nothing stands just inside a
 //! door. A good share of houses on medium and large lots have a basement: under the house, no
 //! windows, its rooms lit and reached by stairs down that come up inside a living room, an
@@ -40,6 +40,7 @@ fn generated_houses_are_livable() {
     let (mut dining, mut tops) = (0, 0);
     let (mut large, mut islands) = (0, 0);
     let (mut rooms, mut bright) = (0, 0);
+    let (mut lights, mut most_lights) = (0, 0);
     let (mut bigger, mut basements, mut below) = (0, 0, 0);
     let mut dumped = false;
     for h in &houses {
@@ -181,18 +182,24 @@ fn generated_houses_are_livable() {
             }
         }
         // Every room has a light, enough for all of it at night (an open kitchen and living room
-        // share theirs), and windows enough by day that the room overlay doesn't call it dim.
-        let lamp_tiles = w.content.room_rules.lamp_tiles;
+        // share theirs), and windows enough by day that the room overlay doesn't call it dim. A
+        // few bigger lights do it, not a ceiling full of small ones.
         for r in h["rooms"].as_array().into_iter().flatten() {
             let kind = r["kind"].as_str().unwrap();
-            let [x, z] = ["x", "z"].map(|k| r[k].as_i64().unwrap() as i32);
+            let [x, z, rw, rd] = ["x", "z", "w", "d"].map(|k| r[k].as_i64().unwrap() as i32);
             let Some(room) = w.room_at_tile(x, z) else { continue };
             rooms += 1;
             bright += usize::from(room.scores.light >= 0.6);
+            let lamps = w.objects.iter().filter(|o| w.content.objects[o.def].lamp > 0.0 && (x..x + rw).contains(&o.x) && (z..z + rd).contains(&o.z));
+            let hanging = lamps.clone().filter(|o| w.content.objects[o.def].layer == Layer::Ceiling).count();
+            lights += lamps.count();
+            most_lights = most_lights.max(hanging);
             if room.lamps == 0 {
                 failures.push(format!("{label}: the {kind} at {x},{z} has no light"));
-            } else if f32::from(room.lamps) * lamp_tiles < room.tiles {
-                failures.push(format!("{label}: the {kind} at {x},{z} has {} lights for {} tiles", room.lamps, room.tiles));
+            } else if room.lit < room.tiles {
+                failures.push(format!("{label}: the {kind} at {x},{z} has lights for {} of its {} tiles", room.lit, room.tiles));
+            } else if hanging > 4 {
+                failures.push(format!("{label}: the {kind} at {x},{z} has {hanging} ceiling lights"));
             } else if room.scores.light < 0.6 {
                 failures.push(format!("{label}: the {kind} at {x},{z} is dim ({} windows for {} tiles)", room.windows, room.tiles));
             }
@@ -238,7 +245,7 @@ fn generated_houses_are_livable() {
     }
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
-    eprintln!("  {bright} of {rooms} rooms lit well");
+    eprintln!("  {bright} of {rooms} rooms lit well, {:.1} lamps a room, at most {most_lights} from one room's ceiling", lights as f32 / rooms.max(1) as f32);
     eprintln!("  {basements} of {bigger} houses on medium and large lots with a basement, {below} rooms down there (lit by lamps alone)");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");

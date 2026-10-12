@@ -98,7 +98,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `seat` | Seats (looks only): `{"height": 0.46, "forward": 0}`: the height of the seat (m) and how far forward of the object's middle the resident's hips are (m). Default: a few known objects' own values, else 0.45 and 0. |
 | `bunk` | Bunk beds (2 `slots`): both sleepers lie in the middle of the bed's width, the second on the upper bunk (heights per object in `render/babylon/characters.ts`, `BUNKS`). |
 | `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width. Default 1. |
-| `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55}` makes it a light at night (reach in metres, relative brightness, bulb height). |
+| `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55, "tiles": 10}` makes it a light at night (reach in metres, relative brightness, bulb height; `tiles`: floor it lights fully as its room's light is scored, default `roomRules.lampTiles`: a chandelier ~25, a ceiling light ~16, a floor lamp ~10, a sconce ~5, a table lamp ~4–6). |
 | `stations` | Cooking stations it is (see [Cooking](#cooking)): `["ingredients"]` for a fridge or pantry, `["prep"]` for a counter or island, `["stove", "oven"]` for a cooker, `["grill"]`, `["microwave"]`, `["dishes"]` for a sink or dishwasher. Recipe steps happen at stations. |
 | `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
 | `freeRotation` | `true` lets the player turn it to any angle in 15° steps and stand it anywhere on its tile (quarter tiles, or to the centimetre with Shift); both only for looks. Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
@@ -590,7 +590,7 @@ How the house shows up in residents' lives (see `docs/design/house-matters.md`).
 
 **Scoring** (`roomRules`, an object, so a pack can change single keys): `weights` of size, light,
 decor, cleanliness and function; `windowTiles` and `lampTiles` (tiles one window or lamp lights
-fully); `decorPerTile` and `gardenDecorPerTile` (decor points for full decor); `decorByCategory`;
+fully; a lamp's own `light.tiles` comes first); `decorPerTile` and `gardenDecorPerTile` (decor points for full decor); `decorByCategory`;
 `love` and `dislike` (overall scores that make residents love or dislike a room) with
 `loveFeeling` and `dislikeFeeling`; `drift` (how fast the `environment` need follows the room,
 per hour) and `away` (its target at work); `preference` (how much the AI prefers nicer rooms);

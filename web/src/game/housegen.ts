@@ -41,7 +41,7 @@ export interface HouseGenConfig {
   windows: { spacing: [number, number]; daylight?: number };
   stairs: string;
   garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
-  /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall). */
+  /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall, the basement's). */
   lights?: string[];
   basement?: BasementSpec;
   names: { first: string[]; second: Record<string, string[]> };
@@ -165,6 +165,8 @@ export interface ObjectInfo extends Shape {
   used: boolean;
   /** Whether it gives light (content `light`): it counts for its room's light at night. */
   lamp: boolean;
+  /** Tiles it lights at night (content `light.tiles`; undefined: `roomRules.lampTiles`). */
+  lightTiles?: number;
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -176,7 +178,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0, lamp: !!o.light });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
     }
     return known.get(def);
   };
@@ -229,8 +231,8 @@ export function random(seed: number): () => number {
 }
 
 /**
- * `lampTiles`: tiles one lamp lights at night (content `roomRules.lampTiles`); every room gets
- * lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
+ * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content
+ * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
  */
 export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
@@ -960,44 +962,64 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
 }
 
 /**
- * Lights from the ceiling until room `r` is lit right through at night: one lamp lights
- * `lampTiles` tiles (as the simulation scores rooms), and lamps already in it (on the floor,
- * on tops, on walls, from the ceiling) count. They spread over the room, each in the middle of
- * its share of it, all alike: the light already hanging there, else one of the room's own
- * ceiling lights (else of `lights`). Draws nothing from the house's random numbers.
+ * Lights from the ceiling until room `r` is lit right through at night, as the simulation scores
+ * rooms: each lamp lights its `light.tiles` (else `lampTiles`), and lamps already in it (on the
+ * floor, on tops, on walls) count. As few as do it, all alike and spread evenly, each in the
+ * middle of its share of the room: one big light sized to the room rather than a ceiling full of
+ * small ones. They're the kind that takes fewest of the room's own ceiling lights (else of
+ * `lights`; the one hanging there already if it's as good, else whichever the room's place
+ * picks), and what hung there already comes down to hang with them. Draws nothing from the
+ * house's random numbers.
  */
 function lights(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, lampTiles: number): void {
-  const want = Math.ceil((r.w * r.d) / Math.max(lampTiles, 0.1));
-  const lamps = () => f.objects.filter((o) => inside(r, o.x, o.z) && info(o.def)?.lamp);
-  if (lamps().length >= want) return;
-  const hanging = (d: string) => !!info(d)?.lamp && info(d)?.layer === 'ceiling';
+  const tiles = r.w * r.d;
+  const cover = (d: string) => (info(d)?.lamp ? Math.max(info(d)!.lightTiles ?? lampTiles, 0.1) : 0);
+  const lit = () => f.objects.reduce((n, o) => n + (inside(r, o.x, o.z) ? cover(o.def) : 0), 0);
+  if (lit() >= tiles) return;
+  const hanging = (d: string) => cover(d) > 0 && info(d)?.layer === 'ceiling';
   const own = (cfg.rooms[r.kind]?.ceiling ?? []).flatMap((s) => s.one).filter(hanging);
   const options = own.length ? own : (cfg.lights ?? []).filter(hanging);
-  const def = lamps().find((o) => hanging(o.def))?.def ?? options[(r.x + r.z) % options.length];
-  if (!def) return;
+  // What hangs there already comes down: it hangs again with the rest, all spread evenly.
+  const hung = f.objects.filter((o) => inside(r, o.x, o.z) && hanging(o.def));
+  for (const o of hung) unhang(f, info, o);
+  const short = tiles - lit();
+  const kinds = [...new Set([...hung.map((o) => o.def), ...options])];
+  if (!kinds.length) return;
+  const need = (d: string) => Math.ceil(short / cover(d) - 1e-6);
+  const want = Math.min(...kinds.map(need));
+  const best = kinds.filter((d) => need(d) === want);
+  const def = best.find((d) => hung.some((o) => o.def === d)) ?? best[(r.x + r.z) % best.length];
   // Hanging from the ceiling draws no random numbers.
   const rng = () => 0.5;
-  // The room in `want` shares (or a few more), as near square as can be.
+  // The room in `want` shares, as near square as can be.
   let grid: [number, number] = [want, 1];
-  let best = Infinity;
+  let most = Infinity;
   for (let cols = 1; cols <= want; cols++) {
     const rows = Math.ceil(want / cols);
     const score = cols * rows * 100 + Math.abs(r.w / cols - r.d / rows);
-    if (score < best) [best, grid] = [score, [cols, rows]];
+    if (score < most) [most, grid] = [score, [cols, rows]];
   }
   const [cols, rows] = grid;
-  const spots: [number, number][] = [];
-  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) spots.push([r.x + ((i + 0.5) * r.w) / cols - 0.5, r.z + ((j + 0.5) * r.d) / rows - 0.5]);
-  for (const [sx, sz] of spots) {
-    if (lamps().length >= want) return;
-    // A share with a ceiling light over it already (one hung above) is lit.
-    if (lamps().some((o) => info(o.def)?.layer === 'ceiling' && Math.hypot(o.x - sx, o.z - sz) < 1.5)) continue;
-    mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng, undefined, [sx, sz]);
+  for (let j = 0; j < rows; j++) {
+    // A last row with fewer shares spreads them over the room's width.
+    const across = Math.min(cols, want - j * cols);
+    for (let i = 0; i < across; i++) {
+      if (lit() >= tiles) return;
+      mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng, undefined, [r.x + ((i + 0.5) * r.w) / across - 0.5, r.z + ((j + 0.5) * r.d) / rows - 0.5]);
+    }
   }
-  // Shares that were lit already, or had no free ceiling: wherever there's room.
-  for (let n = lamps().length; n < want; n++) {
-    if (!mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng)) return;
-  }
+  // Shares with no free ceiling: wherever there's room.
+  while (lit() < tiles) if (!mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng)) return;
+}
+
+/** Takes a ceiling light down again (and frees its ceiling tiles). */
+function unhang(f: Floor, info: ObjectInfos, o: Placement): void {
+  const at = f.objects.indexOf(o);
+  f.objects.splice(at, 1);
+  f.fronts.splice(at, 1);
+  const [fw, fd] = info(o.def)?.footprint ?? [1, 1];
+  const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+  for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) f.layers?.delete(`ceiling:${key(o.x + dx, o.z + dz)}`);
 }
 
 /** Tiles of a footprint (min corner, rotated size). */
