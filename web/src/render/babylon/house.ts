@@ -451,8 +451,34 @@ export class HouseBuilder {
     const g = Math.min(1, Math.max(0, (lamps - 0.35) / 0.5));
     glow.scaleToRef(g * g * 0.35, this.glassGlow);
     this.lib.setEmissive(mat, this.glassGlow);
+    this.setWindowGlow(this.windowGlow);
   }
   private readonly glassGlow = new Color3();
+
+  /**
+   * How much each room's windows glow (0 out, 1 full; rooms not listed glow): the windows of a
+   * room where everyone is asleep go dark with its lights. Kept for the glass of later builds.
+   */
+  setWindowGlow(levels: ReadonlyMap<number, number>): void {
+    this.windowGlow = levels;
+    for (const [room, mat] of this.roomGlass) this.lib.setEmissive(mat, this.glassGlow.scaleToRef(levels.get(room) ?? 1, this.roomGlow));
+  }
+  private windowGlow: ReadonlyMap<number, number> = new Map();
+  /** The viewed house's clear glass for each room it lets light out of (its own glow). */
+  private readonly roomGlass = new Map<number, PBRMaterial>();
+  private readonly roomGlow = new Color3();
+
+  /** Clear glass for windows and glazed doors of `room` (0: outdoors, shared; previews share one too). */
+  private glassMaterial(room: number, cut: boolean): Material {
+    if (!room || !cut) return this.material(HOUSE_MATERIALS.clearGlass, cut);
+    let mat = this.roomGlass.get(room);
+    if (!mat) {
+      mat = this.lib.surface(HOUSE_MATERIALS.clearGlass, { vertexColors: true, cutaway: true, variant: `room${room}` });
+      this.roomGlass.set(room, mat);
+      this.lib.setEmissive(mat, this.glassGlow.scaleToRef(this.windowGlow.get(room) ?? 1, this.roomGlow));
+    }
+    return mat;
+  }
 
   build(world: WorldStructure, view: ViewRect | null, storey: StoreyBuild = {}): HouseBuild | null {
     if (!world.walls || !world.openings) return null;
@@ -645,7 +671,13 @@ export class HouseBuilder {
     const wainscot = new Geo();
     const stone = new Geo();
     const trim = new Geo().color(TRIM);
-    const glass = new Geo();
+    // Window and door glass: a bucket per room it lets light out of (its glow goes out with the room's lights).
+    const glassByRoom = new Map<number, Geo>();
+    const glass = (room: number): Geo => {
+      let g = glassByRoom.get(room);
+      if (!g) glassByRoom.set(room, (g = new Geo()));
+      return g;
+    };
     const ao = new Geo().color('#000000');
     // Covered faces: one bucket per finish (tinted per covering), and natural-wood door leaves.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
@@ -976,8 +1008,9 @@ export class HouseBuilder {
           const plane = sign * T;
           const outside = d.rooms[sign > 0 ? 1 : 0] === 0;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
-          glass.cutting(Cut.Hide, mask);
-          f.face(glass, g0, g1, sill, head, plane - sign * recess, sign);
+          // (Lit by the room behind it, else the one it faces.)
+          const pane = glass(d.rooms[sign > 0 ? 0 : 1] || d.rooms[sign > 0 ? 1 : 0]).cutting(Cut.Hide, mask);
+          f.face(pane, g0, g1, sill, head, plane - sign * recess, sign);
           trim.cutting(Cut.Hide, mask).color(TRIM);
           const fr = 0.07;
           f.box(trim, g0 - fr, g0, sill, head, ...out(0.035));
@@ -1017,13 +1050,14 @@ export class HouseBuilder {
         const into = out0 ? 1 : -1;
         const at = (l: number) => into * (T + 0.01 + l);
         const hinge = o0 + 0.02;
-        this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, { trim, wood: doorWood, glass }, {
+        const leafGlass = glass(d.rooms[into > 0 ? 1 : 0]);
+        this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, { trim, wood: doorWood, glass: leafGlass }, {
           box: (g, s0, s1, y0, y1, l0, l1) => f.box(g, hinge + s0, hinge + s1, y0, y1, Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))),
           pane: (y0, y1, l0, l1) => {
             const a = hinge + LEAF_T / 2;
             const pts: V3[] = [f.at(a, y0, at(l0)), f.at(a, y0, at(l1)), f.at(a, y1, at(l1)), f.at(a, y1, at(l0))];
-            glass.poly(pts, [f.ux, 0, f.uz]);
-            glass.poly([...pts].reverse(), [-f.ux, 0, -f.uz]);
+            leafGlass.poly(pts, [f.ux, 0, f.uz]);
+            leafGlass.poly([...pts].reverse(), [-f.ux, 0, -f.uz]);
           },
         });
       }
@@ -1322,11 +1356,10 @@ export class HouseBuilder {
     add(trim, 'trim', M.trim, { cast: true });
     for (const [finish, geo] of covered) add(geo, `walls-${finish}`, FINISH_MATERIALS[finish], { cast: true });
     add(doorWood, 'doorLeaves', M.door, { cast: true });
-    add(glass, 'windows', M.clearGlass);
+    for (const [room, geo] of glassByRoom) add(geo, 'windows', this.glassMaterial(room, !storey.preview));
     // Glass is see-through: draw it after the other blended surfaces (contact shadows) so
     // what lies behind it is complete when it is blended over.
-    const panes = meshes.find((m) => m.name === 'windows');
-    if (panes) panes.alphaIndex = 10;
+    for (const panes of meshes) if (panes.name === 'windows') panes.alphaIndex = 10;
     // (A preview's walls stand on the shadows of the walls they stand in for.)
     if (!storey.preview) add(ao, 'contactShadows', this.lib.contactShadow(), { cut: true });
     add(wood, 'floors', M.floorWood, { cut: false });
@@ -1540,7 +1573,7 @@ export class HouseBuilder {
     trim: Geo,
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
-    geos: { wood: Geo; glass: Geo },
+    geos: { wood: Geo; glass: (room: number) => Geo },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
@@ -1569,8 +1602,9 @@ export class HouseBuilder {
     // second leaf of a double door hangs on the far jamb.
     const hinge = run.len > 1 && run.index === run.len - 1 ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
     const at = (l: number) => (axis === 'h' ? z : x) + into * (T + 0.01 + l);
-    const { glass } = geos;
-    this.leaf(style, front, scheme, mask, head, { trim, ...geos }, {
+    // The leaf's glass belongs to the room it stands in.
+    const glass = geos.glass(axis === 'h' ? roomP(x + 0.5, z + into * 0.25) : roomP(x + into * 0.25, z + 0.5));
+    this.leaf(style, front, scheme, mask, head, { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
         if (axis === 'h') g.box(hinge + s0, y0, p0, hinge + s1, y1, p1);
@@ -1636,7 +1670,7 @@ export class HouseBuilder {
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
     trim: Geo,
-    glass: Geo,
+    glass: (room: number) => Geo,
     shutters: [boolean, boolean],
     win: WindowSpec,
     len = 1,
@@ -1662,10 +1696,11 @@ export class HouseBuilder {
       const plane = axis === 'h' ? z + sign * T : x + sign * T;
       const tileRoom = axis === 'h' ? roomP(x + 0.5, z + sign * 0.25) : roomP(x + sign * 0.25, z + 0.5);
       const outside = tileRoom === 0;
+      const behind = axis === 'h' ? roomP(x + 0.5, z - sign * 0.25) : roomP(x - sign * 0.25, z + 0.5);
       const P = (a: number, y: number, d: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * d] : [plane + n[0] * d, y, a]);
       // One clear pane per face, facing out of it (back faces are culled, so each side sees
-      // through exactly one pane).
-      glass.cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
+      // through exactly one pane), lit by the room behind it (else the one it faces).
+      glass(behind || tileRoom).cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
       trim.cutting(Cut.Hide, mask).color(TRIM);
       const f = 0.07;
       const out = 0.035;
