@@ -163,8 +163,10 @@ pub struct ObjectDef {
     pub turns: bool,
     /// Decor points it gives the room it stands in (plants, lamps, decor; see `RoomRules`).
     pub decor: f32,
-    /// Gives light at night (content `light`): counts for its room's light.
-    pub lamp: bool,
+    /// Floor tiles it lights at night, as its room's light is scored (content `light.tiles`, else
+    /// `roomRules.lampTiles`): a chandelier lights more of a room than a table lamp. 0: it gives
+    /// no light (no `light`).
+    pub lamp: f32,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -524,7 +526,8 @@ pub struct RoomKind {
 pub struct RoomRules {
     /// Weights of size, light, decor, cleanliness and function in the overall score.
     pub weights: [f32; 5],
-    /// Tiles one window lights fully by day, and one lamp by night.
+    /// Tiles one window lights fully by day, and one lamp by night (unless its `light` says how
+    /// many: `ObjectDef::lamp`).
     pub window_tiles: f32,
     pub lamp_tiles: f32,
     /// Decor points per tile for full decor, indoors and in the garden.
@@ -1874,7 +1877,8 @@ struct ObjectRaw {
     /// Wear per finished use (default: `objectRules.wear`).
     #[serde(default, rename = "wearPerUse")]
     wear_per_use: Option<f32>,
-    /// Lamps: the renderer reads the light's look; the simulation only that it gives light.
+    /// Lamps: the renderer reads the light's look; the simulation only its `tiles`, the floor it
+    /// lights (default `roomRules.lampTiles`).
     #[serde(default)]
     light: Option<serde_json::Value>,
     /// `wall`, `ceiling` or `rug` (default `floor`: furniture).
@@ -2274,6 +2278,7 @@ impl Content {
             &crate::cooking::Lookups { needs: &need_index, tags: &tag_index, feelings: &feeling_index, animations: &animations },
         )?;
 
+        let lamp_tiles = raw.room_rules.lamp_tiles.unwrap_or(10.0).max(0.1);
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
         for obj in &raw.objects {
@@ -2520,7 +2525,9 @@ impl Content {
                     })
                     .unwrap_or(0.0)
                     .max(0.0),
-                lamp: obj.light.is_some(),
+                lamp: obj.light.as_ref().map_or(0.0, |l| {
+                    l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
+                }),
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0
@@ -2981,7 +2988,7 @@ impl Content {
         let room_rules = RoomRules {
             weights: rr.weights.unwrap_or([0.2, 0.2, 0.2, 0.25, 0.15]),
             window_tiles: rr.window_tiles.unwrap_or(6.0).max(0.1),
-            lamp_tiles: rr.lamp_tiles.unwrap_or(10.0).max(0.1),
+            lamp_tiles,
             decor_per_tile: rr.decor_per_tile.unwrap_or(0.125).max(0.001),
             garden_decor_per_tile: rr.garden_decor_per_tile.unwrap_or(0.05).max(0.001),
             love: rr.love.unwrap_or(0.75),

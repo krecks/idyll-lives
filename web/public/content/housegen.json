@@ -340,7 +340,7 @@
     ]
   },
 
-  "$lights": "Every room gets lights enough for all of it at night (one lamp lights `roomRules.lampTiles` tiles in base.json; lamps already in it count): more from the ceiling, spread over the room, picked from the room's own `ceiling` lights, else from these (the upstairs hall).",
+  "$lights": "Every room gets lights enough for all of it at night (a lamp lights its `light.tiles`, else `roomRules.lampTiles` in base.json; lamps already in it count): more from the ceiling, as few as do it and spread evenly over the room, all of the kind among the room's own `ceiling` lights (else these: the upstairs hall, the basement's) that takes fewest, so a big room gets a chandelier rather than a ceiling full of small lights.",
   "lights": ["ceilingLight", "ceilingPendant"],
 
   "$garden": "Things outside the house: tables with chairs round them (`sets`, as a room's `dining`), then a few things.",

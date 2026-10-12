@@ -171,8 +171,11 @@ export interface ObjectDef {
   outdoors?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
   stairs?: boolean;
-  /** Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb. */
-  light?: { range?: number; intensity?: number; height?: number };
+  /**
+   * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
+   * and the floor it lights fully as its room is scored (tiles; default `roomRules.lampTiles`).
+   */
+  light?: { range?: number; intensity?: number; height?: number; tiles?: number };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**

@@ -26,7 +26,8 @@
       "light": {
         "range": 8.0,
         "intensity": 1.3,
-        "height": 3.5
+        "height": 3.5,
+        "tiles": 30
       },
       "description": "A tall cast-iron lantern that lights the pavement at night.",
       "interactions": []
