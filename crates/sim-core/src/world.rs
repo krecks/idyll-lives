@@ -1802,30 +1802,36 @@ impl World {
     /// A baby crying (content `dayRhythm.babyWakes`) in the crib at home with every grown-up of
     /// the household there asleep wakes one of them: family first, then someone not worn out,
     /// then whoever's turn it is (woken longest ago: partners take turns), then the most rested.
-    /// They do the crib's care for each need that's low and go back to bed (night still picks
-    /// it); and the same baby wakes nobody again for a while. With someone at home awake, they
-    /// see to the baby themselves (autonomy, `pick_autonomous`).
+    /// At night, a grown-up there who's up and free to drop what they're doing
+    /// (`free_for_baby`) comes at once instead: family first, then the nearest; with nobody up
+    /// who can (in the shower, told to do something, about to leave for work), one asleep is
+    /// woken. They do the crib's care for each need that's low (the woken go back to bed after:
+    /// night still picks it); and the same baby calls nobody again for a while. In the daytime,
+    /// with someone at home awake, they see to the baby themselves (autonomy, `pick_autonomous`).
     fn wake_for_crying_babies(&mut self) {
         let Some(rules) = self.content.day_rhythm.baby_wakes else { return };
         for b in 0..self.sims.len() {
             let Some((carer, tasks)) = self.woken_for(b, &rules) else { continue };
             let content = &self.content;
             let sim = &mut self.sims[carer];
+            let woken = sim.asleep(content);
             end_activity(sim, content, &mut self.objects);
             sim.follow_up = None;
             for task in tasks.into_iter().rev() {
                 sim.queue.push_front(task);
             }
             sim.queue.truncate(MAX_QUEUE);
-            sim.night_woken = self.tick;
-            if let Some(f) = rules.feeling {
-                social::add_feeling(&mut sim.feelings, f, &content.feelings, self.tick);
+            if woken {
+                sim.night_woken = self.tick;
+                if let Some(f) = rules.feeling {
+                    social::add_feeling(&mut sim.feelings, f, &content.feelings, self.tick);
+                }
             }
             self.sims[b].night_woken = self.tick;
         }
     }
 
-    /// Who baby `b`'s crying wakes (`wake_for_crying_babies`), and the care they do.
+    /// Who sees to baby `b`'s crying (`wake_for_crying_babies`), and the care they do.
     fn woken_for(&self, b: usize, rules: &crate::content::BabyWakes) -> Option<(usize, Vec<Task>)> {
         let content = &self.content;
         let baby = &self.sims[b];
@@ -1848,7 +1854,7 @@ impl World {
         if !def.interactions.iter().any(|i| care(i, rules.below)) || !crib.has_free_slot(def.slots) {
             return None;
         }
-        // The grown-ups at home; any of them up sees to the baby themselves.
+        // The grown-ups at home.
         let home: Vec<usize> = (0..self.sims.len())
             .filter(|&j| {
                 let s = &self.sims[j];
@@ -1857,16 +1863,32 @@ impl World {
                     && s.adult(content) && self.plot_at(x, z) == Some(plot)
             })
             .collect();
-        if home.iter().any(|&j| !self.sims[j].asleep(content)) {
+        // Nothing to do if someone's already doing the crib's care (or on their way to).
+        let tending = |t: &Task| matches!(t.kind, TaskKind::Use { object, interaction } if object == crib.id && def.interactions[interaction].cares());
+        if home.iter().any(|&j| self.sims[j].current().is_some_and(|a| tending(&a.task)) || self.sims[j].queue.iter().any(tending)) {
             return None;
         }
-        let rhythm = &content.day_rhythm;
-        let rest = |j: usize| rhythm.rest_need.map_or(1.0, |n| self.sims[j].needs[n]);
-        let key = |j: usize| {
-            let family = self.relationships.kin(j, b) != crate::social::Kin::None;
-            (family, rest(j) >= rhythm.exhausted_below, std::cmp::Reverse(self.sims[j].night_woken))
+        let carer = if home.iter().all(|&j| self.sims[j].asleep(content)) {
+            self.to_wake(b, &home)?
+        } else {
+            // Up at night: whoever's free drops what they're doing; by day, autonomy.
+            let rhythm = &content.day_rhythm;
+            if !rhythm.is_night(crate::clock::hour(self.tick), rhythm.wake_hour) {
+                return None;
+            }
+            let family = |j: usize| self.relationships.kin(j, b) != crate::social::Kin::None;
+            let (cx, cz) = crib.front_tile(content);
+            let far = |j: usize| {
+                let p = self.sims[j].pos;
+                (p[0] - cx as f32 - 0.5).powi(2) + (p[1] - cz as f32 - 0.5).powi(2)
+            };
+            let up = home
+                .iter()
+                .copied()
+                .filter(|&j| self.free_for_baby(j))
+                .max_by(|&x, &y| family(x).cmp(&family(y)).then(far(y).total_cmp(&far(x))));
+            up.or_else(|| self.to_wake(b, &home))?
         };
-        let carer = home.into_iter().max_by(|&x, &y| key(x).cmp(&key(y)).then(rest(x).total_cmp(&rest(y))))?;
         let tasks = def
             .interactions
             .iter()
@@ -1875,6 +1897,43 @@ impl World {
             .map(|(i, _)| Task { kind: TaskKind::Use { object: crib.id, interaction: i }, directed: false, routine: false })
             .collect();
         Some((carer, tasks))
+    }
+
+    /// Which of the grown-ups at `home` who are asleep baby `b`'s crying wakes
+    /// (`wake_for_crying_babies`).
+    fn to_wake(&self, b: usize, home: &[usize]) -> Option<usize> {
+        let content = &self.content;
+        let rhythm = &content.day_rhythm;
+        let rest = |j: usize| rhythm.rest_need.map_or(1.0, |n| self.sims[j].needs[n]);
+        let key = |j: usize| {
+            let family = self.relationships.kin(j, b) != crate::social::Kin::None;
+            (family, rest(j) >= rhythm.exhausted_below, std::cmp::Reverse(self.sims[j].night_woken))
+        };
+        home.iter()
+            .copied()
+            .filter(|&j| self.sims[j].asleep(content))
+            .max_by(|&x, &y| key(x).cmp(&key(y)).then(rest(x).total_cmp(&rest(y))))
+    }
+
+    /// Whether grown-up `j`, up at home, can see to a crying baby now: doing nothing, or
+    /// something they picked themselves (on their way to bed too; not the toilet or shower,
+    /// cooking or eating, or a conversation), with nothing the player asked for next, not
+    /// pressed themselves, and not leaving for work or school within `DayRhythm::ready_minutes`.
+    fn free_for_baby(&self, j: usize) -> bool {
+        let content = &self.content;
+        let sim = &self.sims[j];
+        if sim.asleep(content) || sim.engaged_with.is_some() || sim.pressed(content) {
+            return false;
+        }
+        let picked = sim.current().is_none_or(|a| {
+            !a.task.directed
+                && matches!(a.task.kind, TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. })
+                && a.tags & content.social_rules.busy_tags == 0
+        });
+        let next = sim.queue.front().is_some_and(|t| t.directed || matches!(t.kind, TaskKind::Work));
+        let ready = social::minutes_to_ticks(content.day_rhythm.ready_minutes);
+        let leaving = leave_at(sim, content, self.tick).is_some_and(|leave| leave <= self.tick + ready);
+        picked && !next && !leaving
     }
 
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
@@ -3965,12 +4024,17 @@ fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_m
 
 /// When they leave for work or school today (if they haven't yet).
 fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
+    leave_at(sim, ctx.content, ctx.tick)
+}
+
+/// When they leave for work or school later today (`leave_today`).
+fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
     sim.job
         .as_ref()
-        .and_then(|job| crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick))
-        .or_else(|| crate::life::school_today(ctx.content, sim, ctx.tick))
+        .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))
+        .or_else(|| crate::life::school_today(content, sim, tick))
         .map(|(leave, ..)| leave)
-        .filter(|&leave| leave > ctx.tick)
+        .filter(|&leave| leave > tick)
 }
 
 /// What they do out of habit at a turning point of their day (`DayRhythm::habits`): for the
