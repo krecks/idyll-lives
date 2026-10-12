@@ -160,12 +160,50 @@ struct GoalView<'a> {
     trend: f32,
     skill: Option<&'a str>,
     category: Option<&'a str>,
+    /// Object id, for things they want.
+    object: Option<&'a str>,
     target: f32,
     since_day: u32,
+    /// What it still takes: the skill levels a career goal needs (reached ones drop off), the
+    /// performance bar, the money for something they want.
+    steps: Vec<GoalStepView<'a>>,
 }
 
-fn goal_view<'a>(content: &'a Content, g: &Goal) -> GoalView<'a> {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GoalStepView<'a> {
+    /// `skill`, `performance` or `funds`.
+    kind: &'static str,
+    skill: Option<&'a str>,
+    have: f32,
+    need: f32,
+}
+
+fn goal_view<'a>(world: &'a World, s: &Sim, g: &Goal) -> GoalView<'a> {
+    let content = &world.content;
     let def = &content.goals[g.def];
+    let mut steps: Vec<GoalStepView> = crate::planner::goal_skills(content, s, g)
+        .into_iter()
+        .filter(|&(k, l)| s.skills[k] < l)
+        .map(|(k, l)| GoalStepView {
+            kind: "skill",
+            skill: Some(content.skills[k].id.as_str()),
+            have: round_to(s.skills[k], PERCENT),
+            need: l,
+        })
+        .collect();
+    match def.kind {
+        GoalKind::Promoted => {
+            if let Some(j) = &s.job {
+                steps.push(GoalStepView { kind: "performance", skill: None, have: j.performance.round(), need: 100.0 });
+            }
+        }
+        GoalKind::Own => {
+            let funds = world.households[s.household as usize].funds;
+            steps.push(GoalStepView { kind: "funds", skill: None, have: funds as f32, need: g.target });
+        }
+        _ => {}
+    }
     GoalView {
         def: &def.id,
         kind: def.kind,
@@ -176,8 +214,10 @@ fn goal_view<'a>(content: &'a Content, g: &Goal) -> GoalView<'a> {
         trend: away_from_zero(g.progress - g.history[2], PERCENT),
         skill: g.skill.map(|s| content.skills[s].id.as_str()),
         category: g.category.map(|c| content.career_categories[c].id.as_str()),
+        object: g.object.map(|o| content.objects[o].id.as_str()),
         target: g.target,
         since_day: g.since_day,
+        steps,
     }
 }
 
@@ -198,6 +238,17 @@ struct PlanView<'a> {
     home_wishes: Vec<crate::save::HomeWishSave>,
     /// How well they stick to plans now (1 = average).
     adherence: f32,
+    /// What they're asking to buy (waiting for a yes or no).
+    purchase: Option<PurchaseView<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PurchaseView<'a> {
+    object: &'a str,
+    price: i64,
+    /// Times they were told no for it before.
+    declines: u8,
 }
 
 fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
@@ -245,8 +296,13 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
                 block(b.routine, b.household, b.activity, b.skill, b.day, b.start, b.minutes, status, b.reason, b.done)
             })
             .collect(),
-        goals: p.goals.iter().map(|g| goal_view(content, g)).collect(),
-        suggestions: p.suggestions.iter().map(|g| goal_view(content, g)).collect(),
+        goals: p.goals.iter().map(|g| goal_view(world, s, g)).collect(),
+        suggestions: p.suggestions.iter().map(|g| goal_view(world, s, g)).collect(),
+        purchase: p.purchase.filter(|r| r.open).map(|r| PurchaseView {
+            object: &content.objects[r.object].id,
+            price: content.objects[r.object].price.unwrap_or(0),
+            declines: r.declines,
+        }),
         wishes: p
             .wishes
             .iter()
@@ -585,6 +641,7 @@ struct PlanSent {
     wishes: u64,
     home_wishes: u64,
     adherence: u64,
+    purchase: u64,
 }
 
 impl Default for UiSync {
@@ -875,6 +932,7 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
     parts.changed("wishes", &plan.wishes, &mut p.wishes);
     parts.changed("homeWishes", &plan.home_wishes, &mut p.home_wishes);
     parts.changed("adherence", &plan.adherence, &mut p.adherence);
+    parts.changed("purchase", &plan.purchase, &mut p.purchase);
     if parts.close() == 0 {
         o.out.truncate(mark);
         o.fields = fields;

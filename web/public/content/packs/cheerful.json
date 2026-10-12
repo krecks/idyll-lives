@@ -116,6 +116,7 @@
       "id": "cheerful.rainbowHammock",
       "name": "Rainbow hammock",
       "model": "model.cheerful.rainbowHammock",
+      "outdoors": true,
       "footprint": [2, 1],
       "price": 360,
       "category": "outdoor",

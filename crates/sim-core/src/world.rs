@@ -1935,6 +1935,7 @@ impl World {
                 | Command::MoveGoal { .. }
                 | Command::AcceptSuggestion { .. }
                 | Command::DismissSuggestion { .. }
+                | Command::DeclinePurchase { .. }
         );
         self.apply_command(cmd)?;
         if self.rooms_version != self.structure_version {
@@ -1985,6 +1986,9 @@ impl World {
             Command::AddGoal { sim, goal } => {
                 let day = crate::clock::day(self.tick);
                 let goal = crate::planner::goal_from(&self.content, &goal, self.sim(sim)?, day)?;
+                if crate::planner::progress(self, sim as usize, &goal) >= 1.0 {
+                    return Err(Error::new(format!("{} is there already", self.sims[sim as usize].name)));
+                }
                 let max = self.content.planner.max_goals;
                 let s = self.sim_mut(sim)?;
                 if s.planner.goals.len() >= max {
@@ -2029,6 +2033,14 @@ impl World {
                 if index < suggestions.len() {
                     suggestions.remove(index);
                 }
+            }
+            Command::AcceptPurchase { sim } => {
+                self.sim(sim)?;
+                crate::planner::accept_purchase(self, sim as usize)?;
+            }
+            Command::DeclinePurchase { sim } => {
+                self.sim(sim)?;
+                crate::planner::decline_purchase(self, sim as usize)?;
             }
             Command::SetLifespan { lifespan } => self.lifespan = lifespan,
             Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
@@ -2383,7 +2395,7 @@ fn before_dawn(sim: &Sim, ctx: &Ctx) -> bool {
 
 /// Target skill levels (what probation and the next promotion need, and skill goals) and how
 /// keen they are on each (the job's fully, a goal's by its place on the list).
-fn job_goals(sim: &Sim, content: &Content) -> ([f32; MAX_SKILLS], [f32; MAX_SKILLS]) {
+pub(crate) fn job_goals(sim: &Sim, content: &Content) -> ([f32; MAX_SKILLS], [f32; MAX_SKILLS]) {
     let mut goals = [0.0f32; MAX_SKILLS];
     let mut keen = [0.0f32; MAX_SKILLS];
     if let Some(job) = &sim.job {
@@ -2438,6 +2450,7 @@ pub(crate) fn practise(sim: &mut Sim, content: &Content, skill: usize, per_hour:
     sim.skills[skill] = after;
     if after.floor() > before.floor() {
         sim.skill_ups |= 1 << skill;
+        sim.planner.recheck = true;
     }
 }
 

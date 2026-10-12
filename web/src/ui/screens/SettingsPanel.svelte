@@ -8,7 +8,8 @@
   import { GRAPHICS_PRESETS, graphicsPreset, resetSettings, RESTART_KEYS, settings, type GraphicsPreset, type Settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { services } from '../services';
-  import { game } from '../state.svelte';
+  import { game, toast } from '../state.svelte';
+  import { loadState } from '../../debug/report';
   import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
@@ -32,6 +33,27 @@
   $effect(() => {
     if (app.screen === 'game' && playerMoves !== game.playerMoves) services.controls.setPlayerMoves(playerMoves);
   });
+
+  // Diagnostics: a game state to paste in (the simulation's save, or a debug report) and play.
+  let pasted = $state('');
+  let stateError = $state('');
+  async function loadPasted() {
+    stateError = '';
+    try {
+      app.start({ kind: 'load', saveId: await loadState(pasted.trim()) });
+      pasted = '';
+    } catch (err) {
+      stateError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  async function copyState() {
+    try {
+      await navigator.clipboard.writeText(await services.controls.currentState());
+      toast('Game state copied');
+    } catch (err) {
+      toast(`Couldn't copy the game state: ${err instanceof Error ? err.message : String(err)}`, 6000);
+    }
+  }
 
   /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
@@ -460,6 +482,20 @@
         <SettingRow title="Performance overlay" hint="Frame rate, draw calls and graphics backend (F3).">
           <Toggle label="Performance overlay" bind:checked={settings.showFps} />
         </SettingRow>
+        <SettingRow
+          title="Game state"
+          hint="Paste a game state to play it: the simulation's save, or a debug report."
+          details="Loading replaces the current game. The tests write states with DUMP_STATES=1 into debug-states/ (open one with ?state=<name> on the dev server)."
+        >
+          <div class="state">
+            <textarea bind:value={pasted} rows="3" spellcheck="false" placeholder="Paste a game state…" aria-label="Game state"></textarea>
+            {#if stateError}<p class="state-error">{stateError}</p>{/if}
+            <div class="state-actions">
+              <button class="btn small primary" disabled={!pasted.trim()} onclick={loadPasted}>Load state</button>
+              {#if app.screen === 'game'}<button class="btn small" onclick={copyState}>Copy current state</button>{/if}
+            </div>
+          </div>
+        </SettingRow>
       </section>
     {:else if page === 'audio'}
       <section>
@@ -596,6 +632,30 @@
 </div>
 
 <style>
+  .state {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(320px, 100%);
+  }
+  .state textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 11px/1.4 ui-monospace, monospace;
+    resize: vertical;
+  }
+  .state-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .state-error {
+    margin: 0;
+    font-size: 11.5px;
+    color: var(--bad);
+  }
   .settings {
     display: grid;
     grid-template-columns: 180px 1fr;

@@ -17,11 +17,14 @@ const crossOriginIsolation = {
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 const REPORTS = fileURLToPath(new URL('../debug-reports', import.meta.url));
+/** Game states written by the simulation's tests (`DUMP_STATES=1 cargo test`): `<repo>/debug-states/<name>.json`. */
+const STATES = fileURLToPath(new URL('../debug-states', import.meta.url));
 
 /**
  * Dev server endpoints for debug reports (see src/debug/report.ts):
  * POST /__debug/report writes report.json, save.txt and screenshot.jpg into a new folder;
- * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one).
+ * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one);
+ * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one).
  */
 function debugReports(): Plugin {
   return {
@@ -51,6 +54,17 @@ function debugReports(): Plugin {
         } catch (err) {
           res.statusCode = 500;
           res.end(String(err));
+        }
+      });
+      server.middlewares.use('/__debug/states/', async (req, res) => {
+        const name = decodeURIComponent((req.url ?? '').split('?')[0]).replace(/^\//, '');
+        if (!/^[\w.-]+$/.test(name) || name.includes('..')) return void ((res.statusCode = 404), res.end());
+        try {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(await readFile(join(STATES, `${name.replace(/\.json$/, '')}.json`)));
+        } catch {
+          res.statusCode = 404;
+          res.end();
         }
       });
       server.middlewares.use('/__debug/reports/', async (req, res) => {

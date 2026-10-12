@@ -160,6 +160,7 @@
       "id": "romantic.roseArbourSwing",
       "name": "Rose-arbour swing",
       "model": "model.romantic.roseArbourSwing",
+      "outdoors": true,
       "footprint": [2, 1],
       "price": 750,
       "category": "outdoor",

@@ -11,7 +11,7 @@ use crate::MINUTES_PER_TICK;
 use crate::clock;
 use crate::content::{CareerLevel, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule};
 use crate::social::{self, EventKind};
-use crate::world::{Activity, GameMode, Phase, Task, TaskKind, World, end_activity, practise};
+use crate::world::{Activity, GameMode, Phase, Sim, Task, TaskKind, World, affordable, end_activity, practise};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -547,6 +547,25 @@ fn answer(w: &mut World, h: usize, guest: usize) {
     events.push(tick, EventKind::TurnedAway, guest, h, None);
 }
 
+/// Lunch, the toilet, a coffee: at work (paid from `funds`) or school (free), each need below
+/// its break gets topped up, more than once if a long catch-up step took it far down.
+fn take_breaks(sim: &mut Sim, content: &Content, mut funds: Option<&mut i64>) {
+    for b in &content.day_rhythm.work_breaks {
+        for _ in 0..4 {
+            if sim.needs[b.need] >= b.below {
+                break;
+            }
+            if let Some(funds) = funds.as_deref_mut() {
+                if !affordable(b.cost, *funds) {
+                    break;
+                }
+                *funds -= b.cost;
+            }
+            sim.needs[b.need] = (sim.needs[b.need] + b.gain).min(1.0);
+        }
+    }
+}
+
 /// Off the map at work: needs change and skills grow, then come home with pay and maybe a promotion.
 fn at_work(w: &mut World, i: usize) {
     let tick = w.tick;
@@ -560,6 +579,7 @@ fn at_work(w: &mut World, i: usize) {
     let sim = &mut sims[i];
     let minutes = sim.minutes();
     let Some(job) = sim.job.clone() else {
+        take_breaks(sim, content, None);
         // At school: a little of the school's skills, then home.
         if let Some(school) = &content.life.school {
             for &(skill, weight) in &school.skills {
@@ -584,6 +604,7 @@ fn at_work(w: &mut World, i: usize) {
     for n in 0..MAX_NEEDS.min(content.needs.len()) {
         sim.needs[n] = (sim.needs[n] + career.work_effects[n] * per_tick).clamp(0.0, 1.0);
     }
+    take_breaks(sim, content, Some(&mut households[sim.household as usize].funds));
     for &(skill, weight) in &career.skills {
         practise(
             sim,
@@ -616,6 +637,7 @@ fn at_work(w: &mut World, i: usize) {
     {
         job.level += 1;
         job.performance = 0.0;
+        sim.planner.recheck = true;
         if let Some(m) = rules.promotion_feeling {
             social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
         }

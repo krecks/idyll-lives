@@ -4321,6 +4321,7 @@
       "id": "patioSet",
       "name": "Folding bistro set",
       "model": "model.patioSet",
+      "outdoors": true,
       "footprint": [
         1,
         2
@@ -4378,6 +4379,7 @@
       "id": "picnicTable",
       "name": "Picnic table",
       "model": "model.picnicTable",
+      "outdoors": true,
       "footprint": [
         3,
         2
@@ -4433,6 +4435,7 @@
       "id": "gardenChair",
       "name": "Garden chair",
       "model": "model.gardenChair",
+      "outdoors": true,
       "footprint": [
         1,
         1
@@ -4510,6 +4513,7 @@
       "id": "hammock",
       "name": "Hammock",
       "model": "model.hammock",
+      "outdoors": true,
       "footprint": [
         1,
         2

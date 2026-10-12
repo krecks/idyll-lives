@@ -190,6 +190,9 @@ pub struct ObjectDef {
     /// Keeps leftovers (content `stores`: fridges); food served where there's no free
     /// surface goes in.
     pub stores: bool,
+    /// Buy catalog group (`""`: none): things of one group with a use in common are the same
+    /// kind of thing (see `planner::wanted_object`).
+    pub group: String,
 }
 
 /// Radius of a thing on the `Surface` layer when content gives none (m).
@@ -826,6 +829,19 @@ pub struct DayRhythm {
     pub habits: Vec<Habit>,
     /// Habits before leaving for work or school start this long before they leave.
     pub ready_minutes: f32,
+    /// What residents see to while away at work or school (content `dayRhythm.workBreaks`).
+    pub work_breaks: Vec<WorkBreak>,
+}
+
+/// A break at work or school: once `need` drops below `below`, it gains `gain` (lunch, the
+/// toilet, a coffee). `cost` is paid from the household at work (school lunch is free); a
+/// break they can't afford is skipped.
+#[derive(Debug, Clone, Copy)]
+pub struct WorkBreak {
+    pub need: usize,
+    pub below: f32,
+    pub gain: f32,
+    pub cost: i64,
 }
 
 /// When a habit is kept (`Habit`).
@@ -1387,6 +1403,16 @@ struct DayRhythmRaw {
     exhausted_below: Option<f32>,
     habits: Vec<HabitRaw>,
     ready_minutes: Option<f32>,
+    work_breaks: Vec<WorkBreakRaw>,
+}
+
+#[derive(Deserialize)]
+struct WorkBreakRaw {
+    need: String,
+    below: f32,
+    gain: f32,
+    #[serde(default)]
+    cost: i64,
 }
 
 #[derive(Deserialize)]
@@ -1822,6 +1848,8 @@ struct ObjectRaw {
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
     #[serde(default)]
     category: Option<String>,
+    #[serde(default)]
+    group: Option<String>,
     /// Overrides whether it turns freely.
     #[serde(default, rename = "freeRotation")]
     free_rotation: Option<bool>,
@@ -2493,6 +2521,7 @@ impl Content {
                 seat_at,
                 stations,
                 stores: obj.stores,
+                group: obj.group.clone().unwrap_or_default(),
             });
         }
 
@@ -2843,6 +2872,15 @@ impl Content {
                 })
                 .collect::<Result<_, _>>()?,
             ready_minutes: dr.ready_minutes.unwrap_or(30.0).max(0.0),
+            work_breaks: dr
+                .work_breaks
+                .iter()
+                .map(|b| {
+                    let need = lookup(&need_index, &b.need, "dayRhythm.workBreaks", "need")?;
+                    let below = b.below.clamp(0.0, 1.0);
+                    Ok::<_, Error>(WorkBreak { need, below, gain: b.gain.max(0.0), cost: b.cost.max(0) })
+                })
+                .collect::<Result<_, _>>()?,
         };
         let rent = raw
             .economy

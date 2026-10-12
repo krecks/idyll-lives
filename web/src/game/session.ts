@@ -378,6 +378,12 @@ export async function startSession(
     dismissSuggestion(sim, index) {
       bridge.send({ type: 'dismissSuggestion', sim, index });
     },
+    acceptPurchase(sim) {
+      bridge.send({ type: 'acceptPurchase', sim });
+    },
+    declinePurchase(sim) {
+      bridge.send({ type: 'declinePurchase', sim });
+    },
     openCatalog(filter) {
       game.plannerOpen = false;
       controls.setBuildTab('furnish');
@@ -660,6 +666,9 @@ export async function startSession(
       controls.setMode('live');
       play('open');
     },
+    currentState() {
+      return bridge.requestSave();
+    },
     async debugReport(note) {
       const scale = Math.min(window.devicePixelRatio || 1, 2);
       const [save, screenshot, gpu] = await Promise.all([
@@ -762,11 +771,13 @@ export async function startSession(
   bridge.onWorld((w) => {
     if (disposed) return;
     // Newcomers and babies the simulation made up carry an appearance seed: give them their
-    // look (babies from their parents', so parents first).
+    // look (babies from their parents', so parents first). Residents with none at all (a game
+    // state the simulation's tests wrote) get one from their id and name.
     type Seeded = { seed?: number; parents?: number[]; voice?: Appearance['voice'] } | null;
+    const nameSeed = (id: number, name: string) => [...name].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0, 0x811c9dc5 ^ id);
     for (const pass of [false, true]) {
       for (const s of w.sims) {
-        const { seed, parents, voice } = (s.appearance as Seeded) ?? {};
+        const { seed, parents, voice } = (s.appearance as Seeded) ?? { seed: nameSeed(s.id, s.name) };
         if (typeof seed !== 'number' || !!parents?.length !== pass) continue;
         const looks = (parents ?? []).map((p) => w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
         s.appearance = lookFromSeed(assets, s.gender, seed, looks);

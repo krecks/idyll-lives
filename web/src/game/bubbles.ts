@@ -14,7 +14,7 @@ import type { Renderer } from '../render/types';
 
 const MAX_SIMS = 64;
 /** Thought kinds (snapshot `thought`) to bubble tones. */
-const THOUGHT_TONES = ['', 'bad', 'wish', 'good', 'love', 'good', 'bad', 'bad', 'bad', 'bad'];
+const THOUGHT_TONES = ['', 'bad', 'wish', 'good', 'love', 'good', 'bad', 'bad', 'bad', 'bad', 'good', 'wish'];
 
 interface Bubble {
   /** Positioned element (transform written per frame). */
@@ -114,7 +114,7 @@ export class BubbleLayer {
 
   /**
    * A thought's icon: the activity (skipped, wanted, kept), the goal reached, the room (loved,
-   * disliked), the broken thing or the need behind the accident.
+   * disliked), the broken thing, the need behind the accident or the thing they'd like to buy.
    */
   private thoughtIcon(kind: number, subject: number): string {
     switch (kind) {
@@ -125,6 +125,9 @@ export class BubbleLayer {
         return roomIcon(this.content, subject);
       case 7:
         return this.content.objectList[subject]?.icon || 'icon.bubble.bad';
+      case 11:
+        // Something they'd like to buy.
+        return this.content.objectList[subject]?.icon || 'icon.ui.funds';
       case 8: {
         const need = this.content.accidents[subject]?.need;
         return this.content.needs.find((n) => n.id === need)?.icon || 'icon.bubble.bad';

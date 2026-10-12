@@ -80,7 +80,7 @@ export function gatherMoment(text: TalkText, src: TalkSources, req: LineRequest,
 
   const mind: string[] = [];
   const plan = view?.plan;
-  for (const g of plan?.goals.slice(0, 1) ?? []) mind.push(lowerFirst(goalText(g.def, g.target, g.skill, g.category)));
+  for (const g of plan?.goals.slice(0, 1) ?? []) mind.push(lowerFirst(goalText(g.def, g.target, g.skill, g.category, g.object)));
   for (const [activity] of plan?.wishes.slice(0, 1) ?? []) {
     const a = content.activity(activity);
     if (a) mind.push(`a place to ${a.label.toLowerCase()}`);

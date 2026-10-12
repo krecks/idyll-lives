@@ -1040,7 +1040,10 @@
       "emotion": "happy",
       "mood": 0.25,
       "hours": 48
-    }
+    },
+    {"id": "gotWish", "label": "Got what they wanted", "emotion": "happy", "mood": 0.15, "hours": 24},
+    {"id": "deniedAgain", "label": "Told no again", "emotion": "angry", "mood": -0.12, "hours": 12},
+    {"id": "fedUp", "label": "Fed up with being told no", "emotion": "angry", "mood": -0.25, "hours": 24}
   ],
   "socials": [
     {
@@ -1984,7 +1987,10 @@
     "turnedAway": "{b} didn't let {a} in",
     "nobodyHome": "{a} knocked at {b}'s door, but nobody answered",
     "invited": "{a} invited {b} over",
-    "declined": "{b} couldn't meet up with {a} just now"
+    "declined": "{b} couldn't meet up with {a} just now",
+    "wantsToBuy": "{a} would like to buy a {object}",
+    "bought": "{a} bought a {object}",
+    "deniedAgain": "{a} is cross about being told no again about the {object}"
   },
   "activities": [
     {
@@ -2135,7 +2141,10 @@
     },
     "keptFeeling": "keptPlan",
     "noPlaceFeeling": "nowhereToDoIt",
-    "goalFeeling": "goalReached"
+    "goalFeeling": "goalReached",
+    "askAgainDays": 3,
+    "wishFeeling": "gotWish",
+    "deniedFeelings": ["deniedAgain", "fedUp"]
   },
   "goals": [
     {
@@ -2222,6 +2231,19 @@
       "traits": {
         "neat": 0.5,
         "slob": -0.5
+      }
+    },
+    {
+      "id": "own",
+      "label": "Have a {object}",
+      "icon": "icon.ui.funds",
+      "kind": "own",
+      "weight": 1.2,
+      "traits": {
+        "couchPotato": 0.8,
+        "foodie": 0.5,
+        "bookworm": 0.3,
+        "neat": -0.3
       }
     }
   ],
@@ -2656,6 +2678,7 @@
       "id": "bench",
       "name": "Park bench",
       "model": "model.bench",
+      "outdoors": true,
       "footprint": [
         2,
         1
@@ -2686,6 +2709,7 @@
       "id": "flowerbed",
       "name": "Raised flower bed",
       "model": "model.flowerbed",
+      "outdoors": true,
       "footprint": [
         1,
         1
@@ -3414,7 +3438,13 @@
       {"at": "home", "need": "bladder", "below": 0.9},
       {"at": "meal", "need": "bladder", "below": 0.85}
     ],
-    "readyMinutes": 45
+    "readyMinutes": 45,
+    "workBreaks": [
+      {"need": "hunger", "below": 0.5, "gain": 0.6, "cost": 10},
+      {"need": "bladder", "below": 0.35, "gain": 1},
+      {"need": "energy", "below": 0.3, "gain": 0.15, "cost": 3},
+      {"need": "hygiene", "below": 0.3, "gain": 0.2}
+    ]
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "objectRules": {

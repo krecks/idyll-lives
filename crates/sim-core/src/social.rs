@@ -816,6 +816,12 @@ pub enum EventKind {
     Invited,
     /// `b` said no on the phone to meeting up with `a` (an invitation, or `a` coming over).
     Declined,
+    /// `a` would like to buy an `object` (`n`: its price).
+    WantsToBuy,
+    /// `a` bought the `object` they wanted.
+    Bought,
+    /// `a` was told no again about the `object` (`n`: how many times).
+    DeniedAgain,
 }
 
 impl EventKind {
@@ -827,7 +833,8 @@ impl EventKind {
             | Fired | GoalReached | MovedIn | GrewOlder | Retired | Died | MovedInWith | MovedOut
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
-            | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway => 1,
+            | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
+            | DeniedAgain => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
             | Declined => 0,
         }
@@ -856,6 +863,9 @@ pub struct SocialEvent {
     /// Goal definition, for goal events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal: Option<u32>,
+    /// Object type, for things residents want (`Broke` and the like name theirs in `n`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object: Option<u32>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -880,6 +890,7 @@ impl EventLog {
             skill: None,
             career: None,
             goal: None,
+            object: None,
         });
     }
 
@@ -903,6 +914,7 @@ impl EventLog {
             skill: None,
             career: Some(career as u32),
             goal: None,
+            object: None,
         });
     }
 
@@ -919,6 +931,7 @@ impl EventLog {
             skill: goal.skill.map(|s| s as u32),
             career: goal.category.map(|c| c as u32),
             goal: Some(goal.def as u32),
+            object: goal.object.map(|o| o as u32),
         });
     }
 
@@ -942,10 +955,28 @@ impl EventLog {
             skill: skill.map(|s| s as u32),
             career: None,
             goal: None,
+            object: None,
         });
     }
 
-    /// Changes the residents events name (`f` gets each `a`, `b` and `c`).
+    /// An event about one Sim and a kind of object (something they want), with a number.
+    pub fn push_object(&mut self, tick: u64, kind: EventKind, a: usize, object: usize, n: Option<i64>) {
+        self.add(SocialEvent {
+            id: 0,
+            tick,
+            kind,
+            a: a as u32,
+            b: a as u32,
+            c: None,
+            n,
+            skill: None,
+            career: None,
+            goal: None,
+            object: Some(object as u32),
+        });
+    }
+
+        /// Changes the residents events name (`f` gets each `a`, `b` and `c`).
     pub(crate) fn rewrite_refs(&mut self, mut f: impl FnMut(&mut u32)) {
         for e in &mut self.events {
             f(&mut e.a);

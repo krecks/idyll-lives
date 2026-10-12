@@ -39,6 +39,9 @@ export interface GameControls {
   moveGoal(sim: number, index: number, to: number): void;
   acceptSuggestion(sim: number, index: number): void;
   dismissSuggestion(sim: number, index: number): void;
+  /** Yes to what the resident asked to buy: it's bought and placed at home. */
+  acceptPurchase(sim: number): void;
+  declinePurchase(sim: number): void;
   /** Build mode's catalog with only items that fit (a wish, a goal). */
   openCatalog(filter: BuyFilter): void;
   /** Take level `level` (grade) of career `career` (catalog index). */
@@ -100,6 +103,8 @@ export interface GameControls {
   moveIn(household: HouseholdDraft): void;
   /** Saves a debug report (screenshot, game state, log) and returns where it went. */
   debugReport(note: string): Promise<string>;
+  /** The simulation's whole state now (its save data), to paste back in Settings → Diagnostics. */
+  currentState(): Promise<string>;
 }
 
 /**

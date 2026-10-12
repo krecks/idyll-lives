@@ -47,6 +47,17 @@ pub fn lod_from_env(w: &mut World) {
 
 /// Everything that must hold at any moment.
 pub fn check(w: &World) {
+    // Things for outside (content `outdoors`) stand outside.
+    for o in &w.objects {
+        let def = &w.content.objects[o.def];
+        assert!(
+            !def.outdoors || w.lot.room_at(o.x, o.z) == sim_core::lot::OUTDOORS,
+            "the {} at {},{} is indoors",
+            def.name,
+            o.x,
+            o.z
+        );
+    }
     let n = w.sims.len();
     let content_needs = w.content.needs.len();
     for (i, s) in w.sims.iter().enumerate() {
@@ -490,4 +501,16 @@ fn yard(house: &Value, number: usize, defs: &[String], (w, d): (i64, i64), footp
         .map(|(k, (x, z, rot))| json!({"def": defs[(number * 7 + k) % defs.len()], "x": x, "z": z, "rot": rot}))
         .collect();
     Value::Array(list)
+}
+
+/// With `DUMP_STATES` set, writes the world's state to `<repo>/debug-states/<name>.json`, to
+/// look at in the game: `?state=<name>` on the dev server, or paste it in Settings → Interface →
+/// Diagnostics.
+pub fn dump_state(w: &World, name: &str) {
+    if std::env::var_os("DUMP_STATES").is_none() {
+        return;
+    }
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../debug-states");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(format!("{name}.json")), w.save_json()).unwrap();
 }
