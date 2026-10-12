@@ -31,7 +31,8 @@
  * the moment: idle with variations, walk (playback matched to the ground speed, so feet don't
  * slide), sit (fitted to each seat's height and depth, `SEATS`), lie (`lie` turned flat, under a
  * blanket in beds), talk / listen / laugh / argue / fight / hug / kiss, object use (cooking steps
- * have clips of their own), carrying (an upper-body clip, the thing on the palms) and procedural
+ * have clips of their own), carrying (an upper-body clip, the thing on the palms), a baby picked up
+ * out of the crib for a cuddle (posed in the arms of the one holding them, `cuddles`) and procedural
  * touches per activity (`activityPose`). States crossfade over ~0.25 s; turns are smoothed.
  *
  * Face: face morphs (ARKit face units and visemes, mixed per Sim in `characters/face.ts` and added
@@ -68,7 +69,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
-import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, resetAdditive, sampleClip, skin, type Additive, type Placement } from './characters/pose';
+import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
@@ -198,6 +199,29 @@ const TRAMPOLINE_MAT = 0.5;
 const VIBE_PLATE = 0.12;
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
+/** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
+function lieCentre(rig: SimRig): number {
+  return (rig.body.stage === 'baby' ? rig.body.height * 0.5 : LIE_CENTRE) * rig.scale;
+}
+function lieBack(rig: SimRig): number {
+  return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK) * rig.scale;
+}
+/**
+ * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
+ * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,
+ * and near the end lays them back down; the sim keeps the baby in the crib throughout (render only).
+ * `pick` / `put`: seconds of animation for picking up and putting back (a cuddle too short for them,
+ * at speed, plays them faster); `rail`: the rail's distance from the baby lying in the crib; `reach`:
+ * the feet's distance from it while reaching in, `clear` while holding the baby; `lean`: the bend
+ * over the rail (rad, for a grown-up of `height` m; taller ones bend further), `arms` the arms'
+ * angle forward of it.
+ */
+const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean: 0.9, height: 1.7, arms: 0.4 };
+/**
+ * The held baby: its middle forward of the forearms' (body scale of the one holding them) and its
+ * back above them (its own); its head end raised (rad) and turned towards the one holding them.
+ */
+const CRADLE = { forward: 0.08, lift: -0.03, tilt: 0.22, roll: -0.55 };
 
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
@@ -301,6 +325,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold },
   tend: { stand: ['kneel'], hands: HANDS.relaxed },
+  // The baby picked up out of the crib and held (`CUDDLE`).
+  cuddle: { stand: ['idle'], hands: HANDS.relaxed },
   harvest: { stand: ['harvest', 'plant'], hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
@@ -493,6 +519,22 @@ interface SimRig {
   lookPitch: number;
   /** Extra forward step towards a partner (hugs, kisses). */
   approach: number;
+  /**
+   * A cuddle (`CUDDLE`): seconds since it began (-1: not cuddling) and since laying the baby back
+   * down began (-1: not yet), game minutes so far, the pace of picking up / putting back, and the
+   * baby's row (-1: none).
+   */
+  cuddleT: number;
+  cuddleOut: number;
+  cuddleMin: number;
+  cuddleRate: number;
+  cuddleBaby: number;
+  /** Its poses' weights (0..1): reaching into the crib, holding the baby; and how far the baby is out of the crib, in the arms. */
+  reachW: number;
+  holdW: number;
+  liftW: number;
+  /** Where the feet step in towards the crib (m, along the facing). */
+  cuddleStep: number;
   /** Day clothes and pyjamas (switched when the Sim lies down in bed). */
   day: OutfitParams | null;
   night: OutfitParams | null;
@@ -651,6 +693,16 @@ export class Characters {
   };
   private readonly headTmp = new Float32Array(3);
   private readonly palm = new Float32Array(3);
+  /** Per Sim row: the grown-up holding them (a baby picked up for a cuddle, `CUDDLE`), -1 none. */
+  private readonly heldBy = new Int16Array(MAX_CHARACTERS).fill(-1);
+  /** The rows in the order they're posed this frame: a baby in someone's arms after the one holding them. */
+  private readonly order = new Int16Array(MAX_CHARACTERS);
+  /** Per Sim row holding a baby: the middle of the cradling forearms (x, y, z) as last posed. */
+  private readonly cradle = new Float32Array(MAX_CHARACTERS * 3);
+  /** Scratch for placing a held baby: two orientations and a vector. */
+  private readonly cradleQ = new Float32Array(12);
+  /** How long a cuddle lasts (game minutes), per object def. */
+  private readonly cuddleMinutes = new Map<string, number>();
   private readonly faceTmp: Face = { ...NEUTRAL };
   /** Gaze yaw / pitch (head-relative) from `gazeAt`. */
   private readonly gaze = new Float32Array(2);
@@ -996,6 +1048,15 @@ export class Characters {
         lookYaw: 0,
         lookPitch: 0,
         approach: 0,
+        cuddleT: -1,
+        cuddleOut: -1,
+        cuddleMin: 0,
+        cuddleRate: 1,
+        cuddleBaby: -1,
+        reachW: 0,
+        holdW: 0,
+        liftW: 0,
+        cuddleStep: 0,
         day: null,
         night: null,
         asleep: false,
@@ -1288,6 +1349,208 @@ export class Characters {
   }
 
   /**
+   * Cuddles (`CUDDLE`): finds the baby each grown-up cuddling holds (lying in the crib they use),
+   * advances the cuddle (picking up, holding, putting back as it nears its end; a cuddle cut short
+   * lets the baby settle back into the crib) and orders the rows so a held baby is posed after the
+   * one holding them.
+   */
+  private cuddles(frame: FrameState, count: number, dt: number, gameRate: number, animRate: number): void {
+    const { curr, layout } = frame;
+    const H = layout.headerLen;
+    const S = layout.simStride;
+    const k = layout.sim;
+    const act = k.action !== undefined && k.object !== undefined ? this.actionTags.indexOf('cuddle') : -1;
+    const step = dt * animRate;
+    // Seconds of animation per game minute at this speed.
+    const perMinute = gameRate > 0 ? animRate / gameRate : Infinity;
+    this.heldBy.fill(-1);
+    for (let j = 0; j < count; j++) {
+      const rig = this.sims[j];
+      if (!rig) continue;
+      const o = H + j * S;
+      const obj = curr[o + k.object] | 0;
+      let baby = -1;
+      if (act >= 0 && (curr[o + k.action] | 0) === act && curr[o + k.pose] === Pose.Stand && !(curr[o + k.moving] > 0) && !curr[o + k.away] && !this.force) {
+        for (let b = 0; b < count && baby < 0; b++) {
+          const ob = H + b * S;
+          if (b !== j && this.sims[b]?.body.stage === 'baby' && curr[ob + k.pose] === Pose.Lie && (curr[ob + k.object] | 0) === obj && !curr[ob + k.away]) baby = b;
+        }
+      }
+      if (baby >= 0) {
+        // Game minutes it lasts.
+        const minutes = this.cuddleLength(this.objectById.get(obj)?.def ?? '');
+        if (rig.cuddleT < 0 || rig.cuddleBaby !== baby) {
+          // Picking up and putting back fit in (faster at speed).
+          rig.cuddleT = 0;
+          rig.cuddleOut = -1;
+          rig.cuddleMin = 0;
+          rig.cuddleRate = clamp((CUDDLE.pick + CUDDLE.put + 1.5) / (minutes * perMinute), 1, 6);
+        }
+        rig.cuddleBaby = baby;
+        rig.cuddleT += step * rig.cuddleRate;
+        rig.cuddleMin += dt * gameRate;
+        if (rig.cuddleOut >= 0) rig.cuddleOut += step * rig.cuddleRate;
+        else if (rig.cuddleT >= CUDDLE.pick && (minutes - rig.cuddleMin) * perMinute * rig.cuddleRate <= CUDDLE.put) rig.cuddleOut = 0;
+        const t = rig.cuddleT;
+        const u = rig.cuddleOut;
+        // The feet: at the rail to reach in, a step back from it holding the baby.
+        const ob = H + baby * S;
+        const d = Math.hypot(curr[ob + k.x] - curr[o + k.x], this.groundRow(curr[ob + k.z]) - this.groundRow(curr[o + k.z]));
+        const atRail = Math.max(0, d - CUDDLE.rail - CUDDLE.reach);
+        const clear = Math.max(0, d - CUDDLE.rail - CUDDLE.clear);
+        if (u < 0) {
+          // Picking up: leaning in over the rail, the hands under the baby, lifting them out into the arms.
+          rig.reachW = ramp(t, 0.15, 0.9) * (1 - ramp(t, 1.5, 0.9));
+          rig.holdW = ramp(t, 1.5, 0.9);
+          rig.liftW = clamp((t - 1.35) / 1.05, 0, 1);
+          rig.cuddleStep = lerp(atRail * ramp(t, 0, 0.7), clear, ramp(t, 1.9, 0.7));
+        } else {
+          // Putting back: the same the other way round.
+          rig.reachW = ramp(u, 0.1, 0.9) * (1 - ramp(u, 1.4, 0.8));
+          rig.holdW = 1 - ramp(u, 0.1, 0.9);
+          rig.liftW = 1 - clamp((u - 0.1) / 1.05, 0, 1);
+          rig.cuddleStep = lerp(lerp(clear, atRail, ramp(u, 0, 0.6)), 0, ramp(u, 1.5, 0.7));
+        }
+      } else {
+        // Not (or no longer) cuddling: cut short, the arms come down and the baby settles back into the crib.
+        rig.cuddleT = -1;
+        rig.cuddleOut = -1;
+        rig.cuddleStep = 0;
+        rig.reachW = Math.max(0, rig.reachW - step * 3);
+        rig.holdW = Math.max(0, rig.holdW - step * 1.6);
+        rig.liftW = Math.max(0, rig.liftW - step * 1.6);
+        if (rig.liftW <= 0) rig.cuddleBaby = -1;
+      }
+      if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.heldBy[rig.cuddleBaby] = j;
+    }
+    let n = 0;
+    for (let i = 0; i < count; i++) if (this.heldBy[i] < 0) this.order[n++] = i;
+    for (let i = 0; i < count; i++) if (this.heldBy[i] >= 0) this.order[n++] = i;
+  }
+
+  /** How long a cuddle at an object of def `def` lasts (game minutes; its interaction shown as `cuddle`). */
+  private cuddleLength(def: string): number {
+    let m = this.cuddleMinutes.get(def);
+    if (m === undefined) {
+      m = this.content?.object(def)?.interactions.find((it) => it.anim === 'cuddle')?.minutes ?? 15;
+      this.cuddleMinutes.set(def, m);
+    }
+    return m;
+  }
+
+  /** Where Sim row `i` (picking up or holding a baby) has the baby, as just posed: in their hands, or cradled on their forearms. */
+  private writeCradle(i: number): void {
+    const B = this.set!.bone;
+    const t = this.scratch.worldT;
+    const c = this.cradle;
+    const rig = this.sims[i]!;
+    // Reaching into the crib: between the hands; holding: half way along the forearms, a little forward.
+    const h = smooth(rig.holdW);
+    for (let a = 0; a < 3; a++) {
+      const hands = (t[B.hand_l * 3 + a] + t[B.hand_r * 3 + a]) / 2;
+      c[i * 3 + a] = lerp(hands, (hands + (t[B.lowerarm_l * 3 + a] + t[B.lowerarm_r * 3 + a]) / 2) / 2, h);
+    }
+    c[i * 3] += Math.sin(rig.yaw) * CRADLE.forward * rig.scale * h;
+    c[i * 3 + 2] += Math.cos(rig.yaw) * CRADLE.forward * rig.scale * h;
+  }
+
+  /**
+   * A baby in the arms of Sim row `h` (`CUDDLE`), `e` of the way (0..1) from lying in the crib (the
+   * placement as posed) to cradled across their forearms, on the back with the head in the crook of
+   * the left arm, raised a little and turned towards them. Moves the body's middle (half way up its
+   * back) with the hands and turns it about that.
+   */
+  private cradled(rig: SimRig, h: number, e: number): void {
+    const pl = this.place;
+    const q = this.cradleQ;
+    const holder = this.sims[h]!;
+    const s = rig.scale;
+    const my = rig.body.height * 0.5 * s;
+    const mz = -lieBack(rig);
+    // Lying in the crib: the middle.
+    rotate(pl.qx, pl.qy, pl.qz, pl.qw, 0, my, mz, q, 8);
+    const x0 = pl.x + q[8];
+    const y0 = pl.y + q[9];
+    const z0 = pl.z + q[10];
+    // In the arms: head towards the holder's left, along their front.
+    const yaw = Math.atan2(Math.cos(holder.yaw), -Math.sin(holder.yaw));
+    const pitch = -Math.PI / 2 + CRADLE.tilt;
+    qmul(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2), Math.sin(pitch / 2), 0, 0, Math.cos(pitch / 2), q, 0);
+    qmul(q[0], q[1], q[2], q[3], 0, Math.sin(CRADLE.roll / 2), 0, Math.cos(CRADLE.roll / 2), q, 4);
+    // Blended with the crib's (the shorter way round).
+    const dot = pl.qx * q[4] + pl.qy * q[5] + pl.qz * q[6] + pl.qw * q[7];
+    const sg = dot < 0 ? -1 : 1;
+    let qx = lerp(pl.qx, sg * q[4], e);
+    let qy = lerp(pl.qy, sg * q[5], e);
+    let qz = lerp(pl.qz, sg * q[6], e);
+    let qw = lerp(pl.qw, sg * q[7], e);
+    const len = Math.hypot(qx, qy, qz, qw) || 1;
+    qx /= len;
+    qy /= len;
+    qz /= len;
+    qw /= len;
+    const c = this.cradle;
+    // (In the hands soon after they start lifting, turned round over the whole lift; cut short, back
+    // over the rail into the crib.)
+    const at = smooth(clamp(e * 2.2, 0, 1));
+    const x = lerp(x0, c[h * 3], at);
+    const y = lerp(y0, c[h * 3 + 1] + CRADLE.lift * s, at) + Math.sin(at * Math.PI) * (holder.cuddleT < 0 ? 0.2 : 0.04);
+    const z = lerp(z0, c[h * 3 + 2], at);
+    rotate(qx, qy, qz, qw, 0, my, mz, q, 8);
+    pl.x = x - q[8];
+    pl.y = y - q[9];
+    pl.z = z - q[10];
+    pl.qx = qx;
+    pl.qy = qy;
+    pl.qz = qz;
+    pl.qw = qw;
+  }
+
+  /**
+   * The grown-up's side of a cuddle (`CUDDLE`), by its weights: bent over the crib's rail with the
+   * arms reaching down into it; and holding the baby cradled in the arms, looking down at them,
+   * rocking from side to side.
+   */
+  private cuddlePose(rig: SimRig, time: number): void {
+    const B = this.set!.bone;
+    const add = this.add;
+    const r = smooth(rig.reachW);
+    const h = smooth(rig.holdW);
+    if (r > 0.001) {
+      // Bent over the rail (the taller, the further), the arms down into the crib, a little in.
+      const lean = CUDDLE.lean * clamp(1 + (rig.body.height * rig.scale - CUDDLE.height) * 1.2, 0.75, 1.4);
+      addRotation(add, B.spine_01, 1, 0, 0, lean * 0.67 * r);
+      addRotation(add, B.spine_02, 1, 0, 0, lean * 0.33 * r);
+      addRotation(add, B.upperarm_l, 0, 0, 1, 0.1 * r);
+      addRotation(add, B.upperarm_r, 0, 0, 1, -0.1 * r);
+      addRotation(add, B.upperarm_l, 1, 0, 0, -(lean + CUDDLE.arms) * r);
+      addRotation(add, B.upperarm_r, 1, 0, 0, -(lean + CUDDLE.arms) * r);
+      addRotation(add, B.lowerarm_l, 1, 0, 0, -0.15 * r);
+      addRotation(add, B.lowerarm_r, 1, 0, 0, -0.15 * r);
+      addRotation(add, B.Head, 1, 0, 0, 0.2 * r);
+    }
+    if (h > 0.001) {
+      // Rocking: slowly from side to side, the shoulders turning with it.
+      const sway = Math.sin(time * 2.1 + rig.seed * 6) * h;
+      addRotation(add, B.spine_01, 0, 0, 1, 0.035 * sway);
+      addRotation(add, B.spine_02, 0, 1, 0, 0.14 * sway);
+      // Cradling: elbows bent, the forearms across the front.
+      addRotation(add, B.upperarm_l, 0, 0, 1, -0.15 * h);
+      addRotation(add, B.upperarm_r, 0, 0, 1, 0.15 * h);
+      addRotation(add, B.upperarm_l, 1, 0, 0, -0.15 * h);
+      addRotation(add, B.upperarm_r, 1, 0, 0, -0.15 * h);
+      addRotation(add, B.lowerarm_l, 1, 0, 0, -1.0 * h);
+      addRotation(add, B.lowerarm_r, 1, 0, 0, -1.0 * h);
+      addRotation(add, B.lowerarm_l, 0, 1, 0, 1.1 * h);
+      addRotation(add, B.lowerarm_r, 0, 1, 0, -1.1 * h);
+      // Looking down at the baby (the head on the left).
+      addRotation(add, B.neck_01, 1, 0, 0, 0.15 * h);
+      addRotation(add, B.Head, 1, 0, 0, 0.3 * h);
+      addRotation(add, B.Head, 0, 1, 0, -0.2 * h);
+    }
+  }
+
+  /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
    * action tag): on its top, a little towards the cook.
    */
@@ -1379,7 +1642,11 @@ export class Characters {
       middle[l * 2 + 1] = sz / members.length;
     }
 
-    for (let i = 0; i < count; i++) {
+    // Cuddles: who holds which baby (posed after them, in their arms).
+    this.cuddles(frame, count, dt, gameRate, animRate);
+
+    for (let oi = 0; oi < count; oi++) {
+      const i = this.order[oi];
       const rig = this.sims[i];
       const o = H + i * S;
       const cx = curr[o + k.x];
@@ -1459,6 +1726,9 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
+      // Cuddling: turned to the baby in the crib.
+      const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
+      if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
       let partnerRig = partner >= 0 && partner < count ? this.sims[partner] : null;
       // Listening in (role 3, a group conversation): `partner` started it; they look at whichever
       // of the two is speaking, and stand the way sim-core turned them (to the middle of the group).
@@ -1541,6 +1811,16 @@ export class Characters {
       // Procedural layers.
       resetAdditive(this.add);
       this.procedural(rig, i, social, role, partnerRig, pose, moving, time, dt);
+      // A baby in someone's arms: knees drawn up a little.
+      const holder = this.heldBy[i] >= 0 ? this.sims[this.heldBy[i]] : null;
+      const inArms = holder?.visible ? smooth(holder.liftW) : 0;
+      if (inArms > 0) {
+        const B = set.bone;
+        addRotation(this.add, B.thigh_l, 1, 0, 0, -0.55 * inArms);
+        addRotation(this.add, B.thigh_r, 1, 0, 0, -0.4 * inArms);
+        addRotation(this.add, B.calf_l, 1, 0, 0, 0.8 * inArms);
+        addRotation(this.add, B.calf_r, 1, 0, 0, 0.65 * inArms);
+      }
 
       // Placement (root offsets blend with the clips).
       const rootY = lerp(rig.prev.rootY, rig.cur.rootY, w);
@@ -1562,7 +1842,9 @@ export class Characters {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
       this.writeBlanket(rig, i, pose, dt);
       this.writeCarried(rig, i, item);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
@@ -1672,8 +1954,8 @@ export class Characters {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
         key = 'lie';
-        rootY = rig.bedH + LIE_BACK * rig.scale;
-        rootFwd = LIE_CENTRE * rig.scale;
+        rootY = rig.bedH + lieBack(rig);
+        rootFwd = lieCentre(rig);
         pitch = -Math.PI / 2;
         rate = 0.3;
         fade = rig.cur.key === 'sitDown' ? 0.9 : 0.45;
@@ -1791,6 +2073,11 @@ export class Characters {
         }
         key = seq[rig.seq % seq.length];
         repeat = true;
+        // Up to the crib's rail to pick the baby up, back from it holding them (`cuddles`).
+        if (tag === 'cuddle') {
+          reach = rig.cuddleStep;
+          reachRate = 6;
+        }
         if (tag === 'exercise' && obj && (rig.useDef.includes('trampoline') || rig.useDef.includes('vibe'))) {
           // Up on the equipment (Sims use it from the tile in front): forward to its centre.
           rootFwd = Math.hypot(obj.cx - rig.x, obj.cz - rig.z);
@@ -1873,7 +2160,7 @@ export class Characters {
       cur.rootPitch = pitch;
     }
 
-    if (rig.fromBed && rig.prev.key === 'lie') rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + LIE_CENTRE * rig.scale;
+    if (rig.fromBed && rig.prev.key === 'lie') rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig);
 
     // Upper-body layer.
     if (upper) {
@@ -1958,7 +2245,7 @@ export class Characters {
       const dy = this.heads[ph + 1] - this.heads[i * 3 + 1];
       wantYaw = clamp(wrapAngle(Math.atan2(dx, dz) - rig.yaw), -1.1, 1.1);
       wantPitch = clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4);
-    } else if (!moving && pose !== Pose.Lie && !this.force) {
+    } else if (!moving && pose !== Pose.Lie && !this.force && rig.cuddleT < 0) {
       // Idle glances.
       const g = Math.floor(time / 3.7 + rig.seed * 5);
       wantYaw = (hash(g * 13 + i) - 0.5) * 0.9 * (hash(g * 5 + i) < 0.5 ? 1 : 0);
@@ -2059,6 +2346,7 @@ export class Characters {
       }
     }
     if (!social && !this.force && !dir?.clip) this.activityPose(rig, pose, time);
+    if ((rig.reachW > 0 || rig.holdW > 0) && pose === Pose.Stand && !this.force) this.cuddlePose(rig, time);
     // Lying: a bench press, or resting (see the `lie` clip).
     if (pose === Pose.Lie && rig.cur.key === 'lie' && rig.tag === 'lift') {
       // Bench press: arms push the bar up and lower it to the chest.
@@ -2258,7 +2546,7 @@ export class Characters {
   private stance(rig: SimRig, pose: number, moving: boolean, dt: number): void {
     const B = this.set!.bone;
     const standing = pose === Pose.Stand && !moving && (!this.force || this.forceStance);
-    const arms = standing && rig.skirt && RELAX_ARMS.has(rig.cur.key) && !(rig.upperW > 0.05) ? 1 : 0;
+    const arms = standing && rig.skirt && RELAX_ARMS.has(rig.cur.key) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
     rig.relaxArms += (arms - rig.relaxArms) * (rig.dir?.still ? 1 : Math.min(1, dt * 5));
     const a = smooth(clamp(rig.relaxArms, 0, 1));
     if (a > 1e-3) {
@@ -2947,6 +3235,11 @@ function clamp(v: number, lo: number, hi: number): number {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/** 0 before `from`, easing to 1 over `length` after it. */
+function ramp(t: number, from: number, length: number): number {
+  return smooth(clamp((t - from) / length, 0, 1));
 }
 
 function smooth(t: number): number {

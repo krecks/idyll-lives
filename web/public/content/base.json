@@ -2317,7 +2317,8 @@
     "chop",
     "stir",
     "flip",
-    "serve"
+    "serve",
+    "cuddle"
   ],
   "objects": [
     {
@@ -3316,7 +3317,7 @@
         {"id": "feed", "label": "Feed the baby", "anim": "tend", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
         {"id": "change", "label": "Change the baby", "anim": "clean", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"]},
         {"id": "play", "label": "Play with the baby", "anim": "play", "minutes": 20, "effects": {"fun": 0.2, "social": 0.15}, "care": {"fun": 0.6, "social": 0.5}, "tags": ["care", "social"]},
-        {"id": "cuddle", "label": "Cuddle the baby", "anim": "tend", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
+        {"id": "cuddle", "label": "Cuddle the baby", "anim": "cuddle", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
       ]
     },
     {

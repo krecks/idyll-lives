@@ -417,7 +417,7 @@ export function skin(
 }
 
 /** out[o..o+2] = rotate(q, v). */
-function rotate(qx: number, qy: number, qz: number, qw: number, vx: number, vy: number, vz: number, out: Float32Array, o: number): void {
+export function rotate(qx: number, qy: number, qz: number, qw: number, vx: number, vy: number, vz: number, out: Float32Array, o: number): void {
   // t = 2 * cross(q.xyz, v); v' = v + w * t + cross(q.xyz, t)
   const tx = 2 * (qy * vz - qz * vy);
   const ty = 2 * (qz * vx - qx * vz);
