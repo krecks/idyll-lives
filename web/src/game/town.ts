@@ -102,6 +102,8 @@ export interface Templates {
   info?: ObjectInfos;
   /** Tiles one lamp lights at night (content `roomRules.lampTiles`): generated rooms get lights enough. */
   lampTiles?: number;
+  /** Tiles one window lights by day (content `roomRules.windowTiles`): generated rooms get daylight enough. */
+  windowTiles?: number;
 }
 
 /** Town sizes of drafts from older code (worlds have a `WorldKind` now). */
@@ -194,7 +196,7 @@ export function loadTemplates(): Promise<Templates> {
       .then((t) => JSON.parse(t) as HouseGenConfig)
       .catch(() => undefined),
     townContent,
-  ]).then(([t, gen, content]) => ({ ...t, gen, info: objectInfos(content), lampTiles: content.lampTiles }));
+  ]).then(([t, gen, content]) => ({ ...t, gen, info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles }));
   return templates;
 }
 
@@ -221,7 +223,7 @@ export function houseTemplate(t: Templates, id: string): HouseTemplate | undefin
   if (id.startsWith('gen:')) {
     if (!generated.has(id)) {
       const [, size, seed] = id.split(':');
-      const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed), t.lampTiles) : null;
+      const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed), t.lampTiles, t.windowTiles) : null;
       generated.set(id, house ?? undefined);
     }
     return generated.get(id);

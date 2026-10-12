@@ -9,11 +9,12 @@
  *    kitchen), the front door faces the street; kitchen and living room may share an open space;
  * 3. two-storey houses get stairs along an outside wall of the living room, an upstairs hall over
  *    them, and the bedrooms and a bathroom off that hall;
- * 4. windows go along the outside walls; kitchens get a counter run along one wall (sink, stove);
- *    furniture goes against the walls (doors and stairs kept clear, every piece reachable), tables
- *    stand free with chairs round them, small things go on tops (counters, tables, shelves),
- *    floor lamps and such keep to corners and out of doorways, every room gets ceiling lights
- *    enough for all of it at night, and a few things (a patio set) go into the garden.
+ * 4. windows go along the outside walls, daylight enough for every room that has one; kitchens
+ *    get a counter run along one wall (sink, stove); furniture goes against the walls (doors and
+ *    stairs kept clear, every piece reachable), tables stand free with chairs round them, small
+ *    things go on tops (counters, tables, shelves), floor lamps and such keep to corners and out
+ *    of doorways, every room gets ceiling lights enough for all of it at night, and a few things
+ *    (a patio set) go into the garden.
  *
  * Seeded: the same seed, lot size and config always give the same house, so a town keeps only
  * `gen:<lot size>:<seed>` per lot (see `town.ts`). Output is a `HouseTemplate` in the layouts'
@@ -33,7 +34,8 @@ export interface HouseGenConfig {
   /** Rooms besides bedrooms, kitchen, bathroom and living room, where the house has more floor than its rooms may take. */
   extras?: ExtraRoom[];
   openPlan: number;
-  windows: { spacing: [number, number] };
+  /** `daylight`: the share of each room's floor its windows should light by day (`windowTiles` each). */
+  windows: { spacing: [number, number]; daylight?: number };
   stairs: string;
   garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
   /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall). */
@@ -209,11 +211,14 @@ export function random(seed: number): () => number {
   };
 }
 
-/** `lampTiles`: tiles one lamp lights at night (content `roomRules.lampTiles`); every room gets lights enough for all of it. */
-export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10): HouseTemplate | null {
+/**
+ * `lampTiles`: tiles one lamp lights at night (content `roomRules.lampTiles`); every room gets
+ * lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
+ */
+export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
-    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt), lampTiles);
+    const house = attemptHouse(cfg, info, lot, lotSize, random(seed * 31 + attempt), lampTiles, windowTiles);
     if (!house) continue;
     // Into the layouts' frame (centred on lots of other widths by `onLot`).
     const dx = -Math.floor((lot.width - medium.width) / 2);
@@ -249,7 +254,7 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
   return entries[entries.length - 1]?.[0] ?? null;
 }
 
-function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, lampTiles: number): HouseTemplate | null {
+function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, lampTiles: number, windowTiles: number): HouseTemplate | null {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -333,8 +338,8 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     if (!up) return null;
   }
   const has = new Set([...ground, ...upstairs]);
-  windows(cfg, rng, g, house);
-  if (up) windows(cfg, rng, up, house);
+  windows(cfg, rng, g, house, windowTiles);
+  if (up) windows(cfg, rng, up, house, windowTiles);
   if (!furnish(cfg, info, rng, g, has, lampTiles)) return null;
   if (up && !furnish(cfg, info, rng, up, has, lampTiles)) return null;
   garden(cfg, info, rng, g, house, lot);
@@ -674,12 +679,28 @@ function row(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[], alo
 
 // ---- windows, furniture, garden ---------------------------------------------------------
 
-function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect): void {
+/**
+ * Windows along each room's outside walls: one every so many tiles (`windows.spacing`), a
+ * bathroom one. A room they leave short of daylight (`windows.daylight`: the share of its floor
+ * its windows light, `windowTiles` tiles each as the simulation scores rooms) gets more on its
+ * outside walls, away from the others first, at a corner of the house or beside a door if need
+ * be. Never in a door's place, nor where the stairs run along the wall.
+ */
+function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect, windowTiles: number): void {
   const outside = (e: string) => {
     const [axis, xs, zs] = e.split(':');
     const [x, z] = [Number(xs), Number(zs)];
     return axis === 'h' ? (z === house.z || z === house.z + house.d) && x >= house.x && x < house.x + house.w : (x === house.x || x === house.x + house.w) && z >= house.z && z < house.z + house.d;
   };
+  const along = (e: string) => {
+    const [axis, xs, zs] = e.split(':');
+    const [x, z] = [Number(xs), Number(zs)];
+    return axis === 'h' ? [`h:${x - 1}:${z}`, `h:${x + 1}:${z}`] : [`v:${x}:${z - 1}`, `v:${x}:${z + 1}`];
+  };
+  // A plain wall not along the stairs (or the stairwell), nor (`loose` 0) next to a door or at a
+  // corner of the house; `loose` 1 allows a corner, 2 a door beside it too.
+  const free = (e: string, loose: number) =>
+    f.edges.get(e) === 'wall' && !sides(e).some(([x, z]) => f.taken.has(key(x, z))) && !along(e).some((n) => (loose < 2 && f.edges.get(n) === 'door') || (loose < 1 && !f.edges.has(n)));
   for (const r of f.rooms) {
     const spacing = between(rng, cfg.windows.spacing);
     const edges = [...f.edges.keys()].filter((e) => f.edges.get(e) === 'wall' && outside(e) && sides(e).some(([x, z]) => inside(r, x, z)));
@@ -687,16 +708,21 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect):
     edges.forEach((e, i) => {
       if (r.kind === 'bathroom' && placed >= 1) return;
       if ((i + Math.floor(spacing / 2)) % spacing !== 0) return;
-      // Not where the stairs (or the stairwell) run along the wall.
-      if (sides(e).some(([x, z]) => f.taken.has(key(x, z)))) return;
-      // Not right next to a door or at a corner.
-      const [axis, xs, zs] = e.split(':');
-      const [x, z] = [Number(xs), Number(zs)];
-      const near = axis === 'h' ? [`h:${x - 1}:${z}`, `h:${x + 1}:${z}`] : [`v:${x}:${z - 1}`, `v:${x}:${z + 1}`];
-      if (near.some((n) => f.edges.get(n) === 'door' || !f.edges.has(n))) return;
+      if (!free(e, 0)) return;
       f.edges.set(e, 'window');
       placed++;
     });
+    // Daylight enough.
+    const want = Math.ceil(((cfg.windows.daylight ?? 0) * r.w * r.d) / Math.max(windowTiles, 0.1));
+    for (const loose of [0, 1, 2]) {
+      while (placed < want) {
+        const spare = edges.filter((e) => free(e, loose));
+        const e = spare.find((e) => !along(e).some((n) => f.edges.get(n) === 'window')) ?? spare[0];
+        if (!e) break;
+        f.edges.set(e, 'window');
+        placed++;
+      }
+    }
   }
 }
 

@@ -265,8 +265,8 @@
   "$openPlan": "Chance that the kitchen and living room share one open space (no wall between them).",
   "openPlan": 0.25,
 
-  "$windows": "One window every so many tiles of outside wall (a range); bathrooms get one.",
-  "windows": { "spacing": [2, 3] },
+  "$windows": "One window every so many tiles of outside wall (a range); bathrooms get one. A room left with less daylight than `daylight` (the share of its floor its windows light, `roomRules.windowTiles` tiles each in base.json) gets more windows on its outside walls where they can go.",
+  "windows": { "spacing": [2, 3], "daylight": 0.5 },
 
   "stairs": "stairs",
 
