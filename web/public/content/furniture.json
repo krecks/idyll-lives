@@ -1097,11 +1097,11 @@
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "sit",
           "effects": {
-            "energy": 0.15,
-            "comfort": 0.15
+            "energy": 0.1,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1142,11 +1142,11 @@
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "sit",
           "effects": {
-            "energy": 0.15,
-            "comfort": 0.15
+            "energy": 0.1,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1189,11 +1189,11 @@
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "sit",
           "effects": {
-            "energy": 0.15,
-            "comfort": 0.15
+            "energy": 0.1,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1310,11 +1310,11 @@
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "sit",
           "effects": {
-            "energy": 0.15,
-            "comfort": 0.15
+            "energy": 0.1,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1828,11 +1828,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.25,
-            "comfort": 0.2
+            "energy": 0.12,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1863,7 +1863,7 @@
           "minutes": 480,
           "pose": "lie",
           "effects": {
-            "energy": 1.0,
+            "energy": 0.95,
             "comfort": 0.3
           },
           "tags": [
@@ -1875,11 +1875,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.25,
-            "comfort": 0.2
+            "energy": 0.12,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -1909,7 +1909,7 @@
           "minutes": 480,
           "pose": "lie",
           "effects": {
-            "energy": 0.9,
+            "energy": 0.88,
             "comfort": 0.3
           },
           "tags": [
@@ -1921,11 +1921,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.22,
-            "comfort": 0.15
+            "energy": 0.11,
+            "comfort": 0.08
           },
           "tags": [
             "rest",
@@ -1956,7 +1956,7 @@
           "minutes": 480,
           "pose": "lie",
           "effects": {
-            "energy": 1.0,
+            "energy": 1.1,
             "comfort": 0.5
           },
           "tags": [
@@ -1969,11 +1969,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.28,
-            "comfort": 0.25
+            "energy": 0.13,
+            "comfort": 0.12
           },
           "tags": [
             "rest",
@@ -2508,7 +2508,7 @@
           "minutes": 480,
           "pose": "lie",
           "effects": {
-            "energy": 1.0,
+            "energy": 0.95,
             "comfort": 0.4
           },
           "tags": [
@@ -2520,11 +2520,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.25,
-            "comfort": 0.2
+            "energy": 0.12,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
@@ -4463,11 +4463,11 @@
           "id": "doze",
           "label": "Doze in the sun",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 45,
           "pose": "lie",
           "effects": {
-            "energy": 0.2,
-            "comfort": 0.2
+            "energy": 0.12,
+            "comfort": 0.15
           },
           "tags": [
             "rest",
@@ -4509,11 +4509,11 @@
           "id": "doze",
           "label": "Doze in the hammock",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 45,
           "pose": "lie",
           "effects": {
-            "energy": 0.2,
-            "comfort": 0.25
+            "energy": 0.12,
+            "comfort": 0.18
           },
           "tags": [
             "rest",

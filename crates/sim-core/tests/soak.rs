@@ -12,6 +12,9 @@ use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 
+/// What happened over a whole run, by event kind (the world's log only keeps the latest).
+type Story = std::collections::BTreeMap<String, usize>;
+
 /// Per-resident record of how the run went.
 #[derive(Default, Clone)]
 struct Stats {
@@ -24,7 +27,7 @@ struct Stats {
     worst_idle: f32,
 }
 
-fn run(days: u32, seed: u64, player_size: usize) -> (World, Vec<Stats>) {
+fn run(days: u32, seed: u64, player_size: usize) -> (World, Vec<Stats>, Story) {
     let content = common::content();
     let town = common::town(&content, seed, player_size);
     let mut w = World::from_json(&content, &town, seed as u32).expect("town loads");
@@ -38,7 +41,9 @@ fn run(days: u32, seed: u64, player_size: usize) -> (World, Vec<Stats>) {
     ];
     let end = clock::tick_at(days + 1, 8.0 * 60.0).unwrap();
     let started = std::time::Instant::now();
+    let mut story = Story::new();
     while w.tick < end {
+        let hour = w.tick;
         for _ in 0..TICKS_PER_HOUR {
             w.tick_once();
             let waking = (9.0..21.0).contains(&clock::hour(w.tick));
@@ -57,6 +62,9 @@ fn run(days: u32, seed: u64, player_size: usize) -> (World, Vec<Stats>) {
                 }
             }
         }
+        for e in w.events.iter().filter(|e| e.tick > hour) {
+            *story.entry(format!("{:?}", e.kind)).or_default() += 1;
+        }
         common::check(&w);
         let n = w.content.needs.len();
         for (i, s) in w.sims.iter().enumerate() {
@@ -73,7 +81,7 @@ fn run(days: u32, seed: u64, player_size: usize) -> (World, Vec<Stats>) {
         w.sims.len(),
         w.tick as f64 / secs
     );
-    (w, stats)
+    (w, stats, story)
 }
 
 fn report(w: &World, stats: &[Stats]) {
@@ -134,7 +142,7 @@ fn report(w: &World, stats: &[Stats]) {
 
 #[test]
 fn a_town_lives_on_its_own_for_two_weeks() {
-    let (w, stats) = run(14, 7, 2);
+    let (w, stats, _) = run(14, 7, 2);
     report(&w, &stats);
     for (i, s) in w.sims.iter().enumerate() {
         let st = &stats[i];
@@ -188,8 +196,8 @@ fn a_town_lives_on_its_own_for_two_weeks() {
 
 #[test]
 fn same_seed_same_town() {
-    let (a, _) = run(2, 3, 2);
-    let (b, _) = run(2, 3, 2);
+    let (a, ..) = run(2, 3, 2);
+    let (b, ..) = run(2, 3, 2);
     assert_eq!(a.save_json(), b.save_json());
 }
 
@@ -217,7 +225,7 @@ fn saving_and_loading_mid_run_keeps_the_town() {
 #[test]
 #[ignore = "long: run with --release -- --ignored"]
 fn a_town_lives_on_its_own_for_two_months() {
-    let (w, stats) = run(60, 11, 3);
+    let (w, stats, _) = run(60, 11, 3);
     report(&w, &stats);
     // Nobody's life collapses (crowded houses do wear people down).
     for (i, s) in w.sims.iter().enumerate() {
@@ -231,7 +239,7 @@ fn a_town_lives_on_its_own_for_two_months() {
 #[test]
 #[ignore = "long: run with --release -- --ignored"]
 fn a_town_over_a_lifetime() {
-    let (w, _) = run(150, 7, 3);
+    let (w, _, story) = run(150, 7, 3);
     let here: Vec<_> = w.sims.iter().filter(|s| s.here()).collect();
     let mut kinds: std::collections::BTreeMap<String, usize> = Default::default();
     for e in w.events.iter() {
@@ -246,5 +254,6 @@ fn a_town_over_a_lifetime() {
     eprintln!("broken now: {broken:?}");
     assert!(here.len() >= 8, "the town doesn't empty out");
     assert!(w.sims.len() <= sim_core::world::MAX_SIMS);
-    assert!(kinds.contains_key("Died") && kinds.contains_key("MovedIn"), "lives end and new ones begin");
+    eprintln!("whole run: {story:?}");
+    assert!(story.contains_key("Died") && story.contains_key("MovedIn"), "lives end and new ones begin");
 }

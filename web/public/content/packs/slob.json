@@ -62,10 +62,10 @@
           "id": "snooze",
           "label": "Snooze in the beanbag",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 40,
           "pose": "lie",
           "autonomous": true,
-          "effects": { "energy": 0.2, "comfort": 0.2 },
+          "effects": { "energy": 0.12, "comfort": 0.13 },
           "tags": ["rest", "nap"]
         }
       ]

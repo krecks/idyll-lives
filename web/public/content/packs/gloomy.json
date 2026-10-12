@@ -192,10 +192,10 @@
           "id": "doze",
           "label": "Doze under the throw",
           "anim": "nap",
-          "minutes": 45,
+          "minutes": 30,
           "pose": "lie",
           "autonomous": true,
-          "effects": { "energy": 0.17, "comfort": 0.2 },
+          "effects": { "energy": 0.11, "comfort": 0.13 },
           "tags": ["rest", "nap"]
         }
       ]

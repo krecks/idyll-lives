@@ -797,12 +797,32 @@ pub struct DayRhythm {
     pub wake_for: u32,
     /// Sims with an early shift get up this long before they leave.
     pub wake_before_work_minutes: f32,
+    /// A rested sleeper stays in bed at night until this many hours before they'd get up.
+    pub lie_in_hours: f32,
+    /// What each star of a bed adds to sleep (instead of `ObjectRules::quality_bonus`: a better
+    /// bed makes a night a little shorter, not half as long).
+    pub sleep_quality_bonus: f32,
+    /// The need a night's sleep is for (the one beds fill most: energy). Sleepers get up once
+    /// it's full.
+    pub rest_need: Option<usize>,
+    /// Interactions with any of these tags are naps (short, and not again too soon).
+    pub nap_tags: TagMask,
+    /// No nap for this long after the last one.
+    pub nap_cooldown_hours: f32,
+    /// Below this (in what a bed's sleep fills), daytime is no reason not to go to bed, and a
+    /// nap won't do.
+    pub exhausted_below: f32,
 }
 
 impl DayRhythm {
     /// Night for a Sim who gets up at `wake`.
     pub fn is_night(&self, hour: f32, wake: f32) -> bool {
         !(wake..self.bed_hour).contains(&hour)
+    }
+
+    /// Multiplier on a night's sleep in a bed of `quality` stars.
+    pub fn sleep_quality_factor(&self, quality: u8) -> f32 {
+        1.0 + self.sleep_quality_bonus * quality as f32
     }
 }
 
@@ -1310,6 +1330,11 @@ struct DayRhythmRaw {
     work_decay: HashMap<String, f32>,
     wake_for: Option<Vec<String>>,
     wake_before_work_minutes: Option<f32>,
+    lie_in_hours: Option<f32>,
+    sleep_quality_bonus: Option<f32>,
+    nap_tags: Vec<String>,
+    nap_cooldown_hours: Option<f32>,
+    exhausted_below: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -2662,10 +2687,17 @@ impl Content {
                 }
                 Ok(out)
             };
+        let sleep_tags = tag_mask(&dr.sleep_tags);
+        let mut slept = [0.0f32; MAX_NEEDS];
+        for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
+            for (n, g) in inter.total_gain.iter().enumerate() {
+                slept[n] += g.max(0.0);
+            }
+        }
         let day_rhythm = DayRhythm {
             wake_hour: dr.wake_hour.unwrap_or(7.0),
             bed_hour: dr.bed_hour.unwrap_or(22.5),
-            sleep_tags: tag_mask(&dr.sleep_tags),
+            sleep_tags,
             night_decay: multipliers(&dr.night_decay, "dayRhythm")?,
             asleep_decay: multipliers(&dr.asleep_decay, "dayRhythm")?,
             work_decay: multipliers(&dr.work_decay, "dayRhythm")?,
@@ -2676,6 +2708,12 @@ impl Content {
                 })?,
             },
             wake_before_work_minutes: dr.wake_before_work_minutes.unwrap_or(75.0),
+            rest_need: (0..MAX_NEEDS).filter(|&n| slept[n] > 0.0).max_by(|&a, &b| slept[a].total_cmp(&slept[b])),
+            lie_in_hours: dr.lie_in_hours.unwrap_or(1.5),
+            sleep_quality_bonus: dr.sleep_quality_bonus.unwrap_or(0.06),
+            nap_tags: tag_mask(&dr.nap_tags),
+            nap_cooldown_hours: dr.nap_cooldown_hours.unwrap_or(4.0),
+            exhausted_below: dr.exhausted_below.unwrap_or(0.2),
         };
         let rent = raw
             .economy

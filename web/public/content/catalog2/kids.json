@@ -334,7 +334,7 @@
           "minutes": 480,
           "pose": "lie",
           "effects": {
-            "energy": 1.0,
+            "energy": 0.95,
             "comfort": 0.4
           },
           "tags": [
@@ -346,11 +346,11 @@
           "id": "nap",
           "label": "Take a nap",
           "anim": "nap",
-          "minutes": 60,
+          "minutes": 30,
           "pose": "lie",
           "effects": {
-            "energy": 0.25,
-            "comfort": 0.2
+            "energy": 0.12,
+            "comfort": 0.1
           },
           "tags": [
             "rest",
