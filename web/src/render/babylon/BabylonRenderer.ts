@@ -2366,10 +2366,12 @@ export class BabylonRenderer implements Renderer {
   private placeRoomLights(world: WorldStructure, view: ViewRect | null): void {
     // Rooms and lamps on every storey shown (in lot rows: lifted to their height here).
     const shown = (z: number) => storeyShown(this.storeyOf(z), this.storey);
-    const views = Array.from({ length: this.storeys.count - this.storeys.lowest }, (_, i) => (view ? { ...view, z: view.z + this.rowOf(i + this.storeys.lowest) } : null));
-    const lights = this.lotRooms
-      ? views.flatMap((v) => placeLights(world, v, this.lotRooms!, (def) => this.deps.content.object(def)?.light)).filter((l) => shown(l.z))
-      : [];
+    // The viewed lot on every storey at once: each room's lamps (or fill) are placed once.
+    const inView = (x: number, z: number) => {
+      const row = z - this.rowOf(this.storeyOf(z));
+      return !view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d);
+    };
+    const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     lights.sort((a, b) => this.storeyOf(a.z) - this.storeyOf(b.z));
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];

@@ -187,12 +187,13 @@ export interface RoomLight {
 export type RoomTiles = ReadonlyMap<number, { n: number; sx: number; sz: number }>;
 
 /**
- * The lights of the viewed house: every lamp (the biggest rooms' first, the garden's last),
- * then a dim fill from the ceiling of each room without one. Cheap: run on every change.
+ * The lights of the viewed house: every lamp, and a dim fill from the ceiling of each room
+ * without one. Each room's first light comes before any room's second (the biggest rooms' first,
+ * the garden's last), so with few lights to go round every room still gets one. Cheap: run on every change.
+ * `inView`: whether a lot tile is the viewed house's (on any storey: `rooms` are all of them).
  */
-export function placeLights(world: WorldStructure, view: ViewRect | null, rooms: RoomTiles, lightOf: (def: string) => LampLight | undefined): RoomLight[] {
+export function placeLights(world: WorldStructure, inView: (x: number, z: number) => boolean, rooms: RoomTiles, lightOf: (def: string) => LampLight | undefined): RoomLight[] {
   const W = world.width;
-  const inView = (x: number, z: number) => !view || (x >= view.x && z >= view.z && x < view.x + view.w && z < view.z + view.d);
   const roomAt = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
   const lamps: { x: number; z: number; lift: number; room: number; light: LampLight }[] = [];
   for (const o of world.objects) {
@@ -201,15 +202,19 @@ export function placeLights(world: WorldStructure, view: ViewRect | null, rooms:
     if (light) lamps.push({ ...objectCentre(o), lift: o.lift ?? 0, room: roomAt(o.x, o.z), light });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
-  return [
-    ...lamps
-      .sort((a, b) => areaOf(b.room) - areaOf(a.room))
-      .map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
-    ...[...rooms.entries()]
-      .filter(([r]) => !lamps.some((l) => l.room === r))
-      .sort((a, b) => b[1].n - a[1].n)
-      .map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
+  const lights = [
+    ...lamps.map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
+    ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
+  // How many lights of its room come before each.
+  const nth = new Map<RoomLight, number>();
+  const counts = new Map<number, number>();
+  for (const l of lights) {
+    const k = counts.get(l.room) ?? 0;
+    nth.set(l, k);
+    counts.set(l.room, k + 1);
+  }
+  return lights.sort((a, b) => nth.get(a)! - nth.get(b)! || b.area - a.area);
 }
 
 /** What a lamp object gives (content `light`). */
