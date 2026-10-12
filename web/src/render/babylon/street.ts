@@ -59,6 +59,11 @@ const BIN = ['#3C6B3A', '#55595E', '#2E5C8A'];
 const FENCE_WHITE = '#F2F0EA';
 /** Weathered wood of the rail fences round farms and their fields. */
 const RAIL_WOOD = '#8A6F52';
+/**
+ * How far neighbours' fences (and hedges, their middle) keep from the viewed lot's edge: clear of
+ * the pit dug round it while its basement is in view (`PIT_MARGIN` in BabylonRenderer).
+ */
+const LOT_CLEARANCE = { picket: 0.4, rail: 0.4, hedge: 0.8 };
 
 /** Model keys of the thin-instanced foliage (street pack, see `assets/street/manifest.json`). */
 const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
@@ -737,9 +742,11 @@ export class Street {
         const vStart = Math.max(L.edge * front - frontWall * front, ...[left, right].filter(neighbour).map((o) => (o!.house ? o!.edge * front - (front > 0 ? o!.house.z1 + T : o!.house.z0 - T) * front : 0))) + 0.4;
         const vEnd = plot.d - inset;
         const lines: [number, number, number, number][] = [];
-        if (!neighbour(left)) lines.push([plot.x + inset, vz(vStart), plot.x + inset, vz(vEnd)]);
-        lines.push(neighbour(right) ? [plot.x + plot.w, vz(vStart), plot.x + plot.w, vz(vEnd)] : [plot.x + plot.w - inset, vz(vStart), plot.x + plot.w - inset, vz(vEnd)]);
-        lines.push([plot.x + inset, backEdge + front * inset, plot.x + plot.w - inset, backEdge + front * inset]);
+        // Further in beside the viewed lot (see `LOT_CLEARANCE`).
+        const [inL, inR] = [left?.kind === 'home' ? LOT_CLEARANCE[style] : inset, right?.kind === 'home' ? LOT_CLEARANCE[style] : inset];
+        if (!neighbour(left)) lines.push([plot.x + inL, vz(vStart), plot.x + inL, vz(vEnd)]);
+        lines.push(neighbour(right) ? [plot.x + plot.w, vz(vStart), plot.x + plot.w, vz(vEnd)] : [plot.x + plot.w - inR, vz(vStart), plot.x + plot.w - inR, vz(vEnd)]);
+        lines.push([plot.x + inL, backEdge + front * inset, plot.x + plot.w - inR, backEdge + front * inset]);
         for (const [x0, z0, x1, z1] of lines) this.edgeRun(style, props, plants.hedge, x0, z0, x1, z1, blocked);
       }
 

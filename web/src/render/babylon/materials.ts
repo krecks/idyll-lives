@@ -234,6 +234,76 @@ export class DigState {
   readonly rect = new Vector4(0, 0, 0, 0);
   on = false;
   below = -0.5;
+  /**
+   * The basement itself is in view: everything lit inside `rect` is underground then, out of the
+   * sun (see `UndergroundPlugin`), with `lit` the share of the sun, the sky fill and the
+   * environment (sky ambient and reflections) that still reaches it.
+   */
+  under = false;
+  readonly lit = new Vector4(0, 0.1, 0.1, 0);
+}
+
+/**
+ * Keeps daylight out of a basement in view (`DigState.under`): inside the dug-out rectangle the
+ * sun and the sky fill (the directional and hemispheric lights) and the environment are scaled
+ * down to `DigState.lit`, so only the lamps (point lights) light it, day and night.
+ */
+class UndergroundPlugin extends MaterialPluginBase {
+  constructor(
+    material: Material,
+    private readonly state: DigState,
+  ) {
+    super(material, 'Underground', 212, undefined, true, false);
+    this.registerForExtraEvents = true;
+    this._enable(true);
+  }
+
+  override getClassName(): string {
+    return 'UndergroundPlugin';
+  }
+
+  override isCompatible(): boolean {
+    return true;
+  }
+
+  override getUniforms(): { externalUniforms: string[] } {
+    return { externalUniforms: ['undergroundRect', 'undergroundLit'] };
+  }
+
+  override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
+    const effect = subMesh.effect;
+    if (!effect) return;
+    const { rect, under, lit } = this.state;
+    effect.setFloat4('undergroundRect', rect.x, rect.y, rect.z, rect.w);
+    effect.setFloat4('undergroundLit', lit.x, lit.y, lit.z, under ? 1 : 0);
+  }
+
+  override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
+    if (shaderType !== 'fragment') return null;
+    const wgsl = shaderLanguage === ShaderLanguage.WGSL;
+    const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
+    return {
+      CUSTOM_FRAGMENT_DEFINITIONS: wgsl ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};` : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;`,
+      CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
+${wgsl ? 'var underground' : 'vec3 underground'} = ${v3}(1.0);
+if (${u}undergroundLit.w > 0.5 && ${p}.x > ${u}undergroundRect.x && ${p}.x < ${u}undergroundRect.z && ${p}.z > ${u}undergroundRect.y && ${p}.z < ${u}undergroundRect.w) { underground = ${u}undergroundLit.xyz; }
+`,
+      // Each light's colour as it's read (lamps, the point lights, keep theirs).
+      '!#define CUSTOM_LIGHT(\\d+)_COLOR': `
+#if defined(DIRLIGHT$1)
+diffuse$1 = ${v4}(diffuse$1.rgb * underground.x, diffuse$1.a);
+#elif defined(HEMILIGHT$1)
+diffuse$1 = ${v4}(diffuse$1.rgb * underground.y, diffuse$1.a);
+#endif
+#define CUSTOM_LIGHT$1_COLOR`,
+      CUSTOM_FRAGMENT_BEFORE_FINALCOLORCOMPOSITION: `
+#if !defined(UNLIT) && defined(REFLECTION)
+finalIrradiance *= underground.z;
+finalRadianceScaled *= underground.z;
+#endif
+`,
+    };
+  }
 }
 
 /** Drops the fragments of the landscape (terrain, lawn) inside the dug-out rectangle (`DigState`). */
@@ -443,10 +513,13 @@ export class MaterialLibrary {
     return mat;
   }
 
-  /** Adopts a material created elsewhere (e.g. by the glTF loader) into env updates and freezing. */
+  /** Adopts a material created elsewhere (e.g. by the glTF loader) into env updates, basements and freezing. */
   adopt(material: Material | null): void {
     if (!(material instanceof PBRMaterial) || this.lit.has(material)) return;
     material.maxSimultaneousLights = MAX_LIGHTS;
+    new UndergroundPlugin(material, this.dig);
+    // (It may have been compiled without it.)
+    material.markDirty(true);
     this.lit.add(material);
     this.freezeWhenReady(material);
   }
@@ -582,6 +655,7 @@ export class MaterialLibrary {
     mat.maxSimultaneousLights = MAX_LIGHTS;
     if (options.vertexColors || options.planarUV) new VertexTweaksPlugin(mat, { srgbColors: options.vertexColors, planarUV: options.planarUV });
     if (options.cutaway) new WallCutPlugin(mat, this.wallCut);
+    new UndergroundPlugin(mat, this.dig);
     this.lit.add(mat);
     this.freezeWhenReady(mat);
     return mat;

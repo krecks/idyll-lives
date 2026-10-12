@@ -22,7 +22,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
@@ -206,6 +206,9 @@ export class BuildBuyInput {
   /** Build: the door or window picked with its tool (all of a wide one), and its resize in progress. */
   private openingSel: OpeningRun | null = null;
   private openingDrag: { handle: string; from: number | null; now: OpeningRun; valid: boolean } | null = null;
+
+  /** Puts another storey in view (set by the session). */
+  showStorey: ((storey: number) => void) | null = null;
 
   constructor(
     renderer: Renderer,
@@ -1094,14 +1097,25 @@ export class BuildBuyInput {
   }
 
   /**
-   * Stairs tool: places the staircase in hand (it stays there for another). With nothing in
-   * hand, a click on stairs at home picks them up to move them; anywhere else, takes a new one.
+   * Stairs tool: places the staircase in hand (it stays there for another). A click on stairs at
+   * home (with nothing in hand, or a new staircase) picks them up to move them; anywhere else,
+   * takes a new one.
    */
   private clickStairs(ground: Point | null, objectId: number | null): boolean {
-    if (game.placing) return this.clickBuy(ground, objectId);
-    const home = this.home();
+    const plot = game.households.find((h) => h.player)?.plot;
+    const home = plot == null ? null : (game.plots[plot] ?? null);
     const obj = objectId === null ? undefined : game.objects.find((o) => o.id === objectId);
-    if (obj && home && this.content.object(obj.def)?.stairs && obj.x >= home.x && obj.z >= home.z && obj.x < home.x + home.w && obj.z < home.z + home.d) {
+    // Stairs at home on any storey (stairs down show in their stairwell from the ground), in the plot's ground rows.
+    const k = obj ? storeyOfRow(this.layout, obj.z) : 0;
+    const z = obj ? obj.z - storeyRow(this.layout, k) : 0;
+    const ours = !!obj && !!home && !!this.content.object(obj.def)?.stairs && obj.x >= home.x && z >= home.z && obj.x < home.x + home.w && z < home.z + home.d;
+    if (game.placing && !(ours && game.placing.objectId === null)) return this.clickBuy(ground, objectId);
+    if (obj && ours) {
+      // They're moved on their own storey: stairs down picked from the ground take the view down to them.
+      if (k !== game.storey && this.showStorey) {
+        this.showStorey(k);
+        ground = null;
+      }
       game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id };
     } else {
       const def = this.stairsDef();
