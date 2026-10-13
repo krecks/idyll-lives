@@ -2420,13 +2420,14 @@ impl World {
                         TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 }
                     }
                     crate::command::ItemAction::Clear => {
-                        let dishes = self.content.cooking.dishes;
+                        // (With no sink, into the bin.)
+                        let dishes = self.content.cooking.dishes | self.content.cooking.bin;
                         let home = self.households[household as usize].plot;
                         let sink = self.objects.iter().any(|o| {
                             self.content.objects[o.def].stations & dishes != 0 && !o.broken() && self.object_plot[o.id as usize] == home
                         });
                         if !sink {
-                            return Err(Error::new("there's nowhere to wash up: buy a sink or a dishwasher"));
+                            return Err(Error::new("there's nowhere to wash up: buy a sink, a dishwasher or a bin"));
                         }
                         TaskKind::Dishes { item, station: None, stage: 0, scraps: 0 }
                     }
@@ -3343,7 +3344,8 @@ fn pick_autonomous(
                 candidates.push((s, Choice::Eat(item)));
             }
         }
-        if stations & rules.dishes != 0 {
+        // (With no sink, the dirty things go in the bin.)
+        if stations & (rules.dishes | rules.bin) != 0 {
             let mut best: Option<(f32, u32)> = None;
             let mut count = 0;
             for it in items.list.iter().filter(|it| it.household == sim.household && it.to_clear(content)) {

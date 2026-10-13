@@ -181,6 +181,38 @@ fn no_sink_no_clearing_away() {
 }
 
 #[test]
+fn with_no_sink_dirty_things_go_in_the_bin() {
+    let kitchen = r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},
+        {"def":"stoveElectric","x":3,"z":1,"rot":0},{"def":"trashCan","x":7,"z":1,"rot":0}"#;
+    let bin = 3;
+    // Told to.
+    let mut w = world_with(&common::content(), kitchen);
+    let at = table(&w);
+    let pot = put_on(&mut w, at, "mealPot", 2, 0);
+    put_on(&mut w, at, "plateDirty", 0, 0);
+    w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+    assert_eq!(clearing(&mut w, 0, 120.0), [(1, bin)]);
+    assert!(w.items.list.is_empty(), "nothing put down again: {:?}", w.items.list);
+    assert_eq!(w.sims[0].held, None);
+    // Of their own accord.
+    let mut w = world_with(&common::content(), kitchen);
+    w.autonomy = true;
+    let at = table(&w);
+    for _ in 0..3 {
+        put_on(&mut w, at, "plateDirty", 0, 0);
+    }
+    for _ in 0..(4.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        common::check(&w);
+        if !w.items.list.iter().any(|it| it.to_clear(&w.content)) && w.sims.iter().all(|s| s.held.is_none()) {
+            break;
+        }
+    }
+    let dirty: Vec<_> = w.items.list.iter().filter(|it| it.to_clear(&w.content)).collect();
+    assert!(dirty.is_empty(), "the plates were cleared: {dirty:?}");
+}
+
+#[test]
 fn residents_clear_away_of_their_own_accord_the_same_way() {
     let mut w = world();
     w.autonomy = true;
