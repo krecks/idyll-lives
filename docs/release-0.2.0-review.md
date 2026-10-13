@@ -2,6 +2,19 @@
 
 The pre-release review for 0.2.0 started on 2026-10-13 from `main` at 4cde174, which is 136 commits after v0.1.0. It covers animations, objects and items, bugs, performance and release readiness. Each finding has a location, a severity, a description and a proposed fix.
 
+**Status (2026-10-13):** the review is done and its fixes are merged into `main`.
+- §1 describes the game as it was at 4cde174, and §2 lists the 140 findings with the owner's decisions.
+- §3 lists what was fixed, with the commit, the merge and the numbers before and after.
+- §4 lists what was found but not fixed, with a recommendation and a target release.
+- §5 is the checklist for the owner's own tests: the hardware, browsers and long sessions no agent could cover.
+- §6 lists the questions left for the owner, with the default that shipped.
+
+Fixes came in two waves of agents, each on its own branch:
+- **Wave A:** F1a and F1b (simulation), F2a (crash safety), F2b (input, audio and small web fixes), F2c (saves and start-up), F4 (animation), F5 (build, CI and licences), T1 (long-run tests).
+- **Wave B:** G1 (presets, resolution, pacing), L1 (load time and stepping), G2 (GPU savings nobody can see) and M1 (main thread).
+
+*(G2 and M1 were still running when this was written; their parts are marked "pending".)*
+
 Severity:
 - **critical**: a crash, data loss, or a release blocker.
 - **high**: a clearly visible bug or a missed performance target on common hardware.
@@ -46,7 +59,7 @@ Line numbers refer to 4cde174 unless a later commit is named.
   - With auto-fast on, a step may run up to 30 ticks while everyone in the household is asleep or away ("quiet hours", `World::advance`).
 - **Pause is speed 0:** the loop keeps publishing, but no ticks run. Menus, Build mode and the planner pause the game by switching to speed 0. They restore the previous speed when they close.
 - **Falling behind:** if the worker falls more than 1 s behind, it drops the backlog instead of catching up. Ticks per step never exceed 60, so 1,200 ticks a second at most.
-- **The renderer runs its own loop on the main thread** (`engine.runRenderLoop`, `BabylonRenderer.ts`), capped by the FPS setting.
+- **The renderer runs its own loop on the main thread** (`engine.runRenderLoop`, `BabylonRenderer.ts`), capped by the FPS setting through Babylon's `engine.maxFPS`. (In 0.2.0 the FramePacer paces it instead; see R1-02 in §3.1.)
   - It interpolates residents between the two latest sim steps, using a smoothed frame clock that follows snapshot arrivals (`core/bridge.ts`). It draws one step behind and extrapolates at most 1.3 steps.
   - Animations use real time; the character animation rate follows the game speed up to a limit.
 
@@ -569,4 +582,27 @@ Defaults taken by the coordinator:
 - **R1-08:** keep the keyboard camera keys and make them frame-rate independent.
 - **Balance:** no other gameplay balance changes in 0.2.0 beyond the decisions above.
 
-Graphics: *(pending)*
+Graphics (the owner, 2026-10-13, revised after P1's HD 620 estimate):
+- **Three presets:** Low, Medium and High, each knob defined in one table (`web/src/render/quality.ts`). Ultra, Custom and the fine-tune toggles go.
+  - **Medium** is everyone's default and keeps today's Medium look: pixel-identical apart from savings nobody can see.
+  - **Low** has modest visible trims for older laptops: FXAA, 1024 shadows, fewer night lamps, fewer tufts. It has no 60 fps target.
+  - **High** is Medium with 4096 shadows and 2 live mirrors.
+- **Settings from 0.1:** an old Low stays Low, and everything else becomes Medium.
+- **Resolution:** Auto draws at native resolution up to a budget of about 1920×1080 pixels, and is applied again on zoom and when the window moves to another screen. Custom draws 50–100 % of native. Auto doesn't step down when the game runs slowly.
+- **Frame rate:** the FPS cap stays, paced in whole display refreshes so it doesn't judder (the FramePacer).
+- **WebGL2:** the switch stays, under Troubleshooting.
+- **In scope, the savings nobody can see:** these make Medium cheaper everywhere.
+  - No canvas MSAA, and the pixel budget on 4K and Retina screens.
+  - Daytime lamps out of the cluster.
+  - The shadow map not redrawn when nothing moved.
+  - Nature culled in chunks.
+  - Drawing held behind full-screen menus.
+  - A lighting throttle and a dt clamp.
+- **Not a priority for 0.2.0:** these are best effort, documented as future work and not promised.
+  - Detecting a weak GPU, and picking Low or WebGL2 on its own at first start.
+  - Auto resolution stepping down on slow machines.
+  - Low at a guaranteed 60 fps on an Intel HD 620.
+  - Generated LOD models.
+- **Targets for Intel HD 620/530 laptops** (i7-7500U, i7-8550U, i5-6500 at 1080p) are goals, not release gates: Medium ≥ 30 fps, Low ≥ 60 fps.
+  - They are estimates from scaled Mac measurements (§2.5.1).
+  - The owner confirms them on real hardware with the in-game benchmark (§5).
