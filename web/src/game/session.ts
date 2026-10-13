@@ -244,6 +244,8 @@ export async function startSession(
   game.catalog = bridge.catalog;
   /** Sims the player controls. */
   const playerSims = () => game.roster.filter((s) => game.households[s.household]?.player).map((s) => s.id);
+  /** Names of the player's household: a save's members (Load game lists them), not the whole town. */
+  const householdNames = () => game.sims.filter((s) => game.households[s.household]?.player).map((s) => s.name);
   const homePlot = (): number | null => game.households.find((h) => h.player)?.plot ?? null;
 
   // --- Watching: after a while without input the director takes the camera ----------------
@@ -747,7 +749,7 @@ export async function startSession(
         camera: renderer.cameraPose(),
         ui: { ...ui, viewPlot },
         log: recentLog(),
-        saveMeta: { id: 'debug', name: 'Debug report', household, members: game.sims.map((x) => x.name), day: game.day, minute: game.minute, savedAt: Date.now(), autosave: false },
+        saveMeta: { id: 'debug', name: 'Debug report', household, members: householdNames(), day: game.day, minute: game.minute, savedAt: Date.now(), autosave: false },
       };
       return deliverReport({ report, save, screenshot });
     },
@@ -839,7 +841,7 @@ export async function startSession(
       id,
       name,
       household,
-      members: game.sims.map((s) => s.name),
+      members: householdNames(),
       day: game.day,
       minute: game.minute,
       savedAt: Date.now(),
@@ -854,9 +856,12 @@ export async function startSession(
   /** When the game last autosaved (or started). */
   let autosavedAt = -Infinity;
   let autosaveFailed = false;
-  /** Autosaves the game being played into the older of its two autosaves; a failure is told once. */
+  /**
+   * Autosaves the game being played into the older of its two autosaves; a failure is told once.
+   * Not once the simulation stopped: there's nothing to save, and the crash screen says so.
+   */
   const autosave = async () => {
-    if (!revealed || disposed) return;
+    if (!revealed || disposed || stoppedWith !== null) return;
     autosavedAt = performance.now();
     try {
       await store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
