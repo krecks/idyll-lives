@@ -928,3 +928,68 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 - **An environment-intensity material plugin,** so lighting steps don't thaw the PBR materials (P1-11). Target v0.3.
 - **Merging the night grade into image processing:** one full-screen pass, about 0 ms on the M3 and about 1 ms on Intel by P1's estimate. Target never, unless Intel measurements show it matters.
 - **Per-phase timings of the simulation** (an F6 agent in the plan, not run): P3 found the sim isn't a bottleneck (a speed-5 step averages 0.86 ms in the big town on the M3). Target never, unless sim time starts to matter.
+
+## 5. Manual test checklist
+
+Every agent tested on Apple Silicon Macs in Chromium, with one display. This list is what only the owner can check: other hardware and browsers, real tabs and windows, and long sessions. The site is https://krecks.github.io/idyll-lives/ (below: `…/`). F3 opens the performance overlay: its Main thread section shows the backend, the preset in use, the render resolution and its share of the screen, the display's measured refresh rate and every how many refreshes a frame is drawn ("120 Hz ÷ 2"), the frame rate and the GPU time.
+
+**Intel HD 620/530 laptops** (i7-7500U, i7-8550U, i5-6500 at 1920×1080; nothing has been measured on Intel yet):
+- [ ] Open `…/?bench=village&quality=medium&hour=13&cam=orbit&res=1`. The benchmark warms up for 5 s, measures for 20 s, then shows a summary: press "Copy result" and keep the JSON.
+- [ ] The same with `quality=low`, then both again with `&renderer=webgl` (WebGL2), and the four again with `hour=21` (night).
+- [ ] Goals (§2.8): Medium at 30 fps or more, Low at 60 or more. The estimate was Medium about 6–10 fps and Low about 9–27 fps before the 0.2.0 savings (§2.5.1). The benchmark draws every refresh (`cap=0`), so the display's refresh rate caps its `fps`.
+- [ ] P1-16: compare WebGPU with WebGL2 for long tasks and the frame interval's p95 and p99. If WebGPU stalls where WebGL2 doesn't, weak GPUs may be better off on WebGL2 (§4).
+- [ ] Play 10 minutes on Medium (the default) and 10 on Low, with F3 open: frame rate, GPU time, Busy, and whether Auto resolution shows 1920×1080 · 100 %.
+- [ ] *(pending: anything G2 or M1 asks to check on Intel.)* <!-- G2 --> <!-- M1 -->
+
+**Safari and Firefox** (not tested by any agent):
+- [ ] Safari 26 with WebGPU: the first visit reloads once for the isolation service worker, and F3 shows Shared memory: on. A new game, Save, reload the page, Continue.
+- [ ] Safari: sound starts after the first click or key, and comes back after switching tabs and apps (`interrupted`). Voices and the language model run (WebGPU).
+- [ ] Safari: Export a save from Load game, then Import it. (Safari may delete the site's storage after 7 days without a visit.)
+- [ ] Firefox: where it has no WebGPU, the game draws with WebGL2 (F3 backend), and voices and the language model say they need WebGPU. On any browser `?renderer=webgl` forces WebGL2.
+
+**Displays at 120/144 Hz and odd rates** (frame rates the FramePacer should give; F3 shows the measured Hz and the divisor):
+
+| Display | Cap 30 | Cap 60 (default) | Cap 120 | No cap |
+|---|---|---|---|---|
+| 60 Hz | 30 | 60 | 60 | 60 |
+| 75 Hz | 37.5 | 75 | 75 | 75 |
+| 90 Hz | 30 | 45 | 90 | 90 |
+| 100 Hz | 33.3 | 50 | 100 | 100 |
+| 120 Hz | 30 | 60 | 120 | 120 |
+| 144 Hz | 36 | 72 | 144 | 144 |
+| 165 Hz | 33 | 55 | 82.5 | 165 |
+| 240 Hz | 34.3 | 60 | 120 | 240 |
+
+- [ ] On a 120 Hz and a 144 Hz display, each cap (Settings › Performance › Frame rate cap): F3's Display matches the table, and a walker crossing the lot moves evenly, without a hitch every second or two.
+- [ ] On a 90 Hz or 165 Hz display, cap 60 gives 45 or 55 fps (rounded down, §6). Say if that feels wrong.
+- [ ] The menus' town runs at 30 fps at most (36 on 144 Hz); the flight into a game is smooth.
+
+**4K and Retina screens, zoom, a second monitor:**
+- [ ] On a 4K or Retina screen with Resolution on Auto, F3's Resolution is about 2.07 million pixels (a 3840×2160 screen: 1920×1080 · 50 %) and the picture looks sharp.
+- [ ] Browser zoom in and out (Ctrl/Cmd + and −): F3's Resolution follows and returns to about 2.07 MP.
+- [ ] Drag the window from a Retina or 4K screen to a 1080p one and back (not tested: one display): F3's Resolution changes with the screen, with no blur.
+- [ ] Custom resolution at 50 % and 100 %.
+
+**Long sessions:**
+- [ ] Play a few hours at mixed speeds, with the journal opened now and then: F3's JS heap and long tasks stay level, the journal stays at 300 entries or fewer, and each game keeps two autosaves (Load game).
+- [ ] Speed 5 past game day 1167 (about 7.8 hours at speed 5): residents still age and have birthdays, babies are born, people move in. Before 0.2.0 these stopped on day 1167. (The sim test `the_town_still_ages_after_day_1167` checks the same natively.)
+
+**GitHub Pages, first visit and a redeploy:**
+- [ ] A fresh browser profile: the page loads once more for the service worker and plays; F3 shows Shared memory: on.
+- [ ] A return visit: DevTools › Application › Cache Storage has `littlelives-build-<id>`, and the Network panel shows `assets/*-<hash>.js` served by the service worker.
+- [ ] Leave a tab on the main menu across a redeploy, without having started a game in it, then start one: the game screen's script is gone from the site, so the tab shows "A new version is available." with Reload, over the menu. After the reload the new build runs, and the old build's cache is gone.
+
+**Voices and the language model** (WebGPU only):
+- [ ] Settings › Voices: Resident voices on (216.7 MB once), Try the voices, then What residents say › Lines › Language model (259 MB once), the device test ("On this computer") and Try the model.
+- [ ] Play with both on and subtitles shown: lines are spoken, and F3's frame rate holds while lines are made.
+
+**Saves:**
+- [ ] Load game › Export a save, delete it, then Import a save… with the file: it comes back and loads.
+- [ ] Import refusals: in an exported file, change `\"version\":23` inside `data` to 999 ("from a newer version"); cut the file short ("damaged"); pick any other JSON file ("isn't an Idyll Lives save"). Nothing is added.
+- [ ] A save from the live 0.1-era site (version 17 or 19) still loads after the update.
+- [ ] The crash screen: open a game with `?debug`, then in the console `__crash('panic')`, `__crash('throw')`, `__crash('hang')` (about 8 s) and `__crash('render')` (about 2 s at 30 fps). Each shows the crash screen. Only `render` offers Save and reload; the others refuse to save. Main menu, then Continue, starts again.
+
+**Windows, tabs and settings:**
+- [ ] Alt+Tab in Build mode (Windows; on macOS, Option-click another window), come back, and click with the Wall tool: it draws a wall, and the floor isn't picked up.
+- [ ] Sound stops in a hidden tab and comes back when the tab is shown, whatever the settings. With "Mute in background" on, sound fades while another window has focus. Master volume works.
+- [ ] Settings from 0.1: set Graphics to Low on the live site before the update (or, in DevTools on the new site, set `localStorage['open-sims-wasm.settings']` to `{"quality":"low"}` and reload). After the update Settings › Performance shows Low. With `{"quality":"high"}`, or the old defaults, it shows Medium. Resolution is Auto either way.
