@@ -37,6 +37,8 @@ class AppState {
   fatal = $state('');
   /** The game can't go on: the crash screen shows (the first reason is kept). */
   crash = $state.raw<Crash | null>(null);
+  /** A file of this version couldn't be fetched (most likely a new version was published meanwhile): a banner offers to reload. */
+  newVersion = $state(false);
   /** Drafts kept while moving back and forth through the new-game steps: the world (nobody living there yet), then the town with its neighbours. */
   world = $state.raw<NeighbourhoodDraft | null>(null);
   town = $state.raw<NeighbourhoodDraft | null>(null);

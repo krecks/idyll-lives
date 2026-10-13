@@ -2,6 +2,7 @@
   import { onMount, type Component } from 'svelte';
   import { host } from './game/host';
   import { menuScene } from './game/menuScene';
+  import { watchLog } from './debug/log';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave } from './persistence/saves';
@@ -29,10 +30,31 @@
   /** The in-game interface is a script chunk of its own: fetched once the menu is up, or when a game starts. */
   let GameView = $state.raw<Component | null>(null);
   let gameViewLoad: Promise<unknown> | null = null;
-  const loadGameView = () => (gameViewLoad ??= import('./ui/screens/GameView.svelte').then((m) => (GameView = m.default)));
+  const loadGameView = () =>
+    (gameViewLoad ??= import('./ui/screens/GameView.svelte').then(
+      (m) => (GameView = m.default),
+      (err: unknown) => {
+        // Fetched again on the next try; a game waiting for it goes back to the menu meanwhile.
+        gameViewLoad = null;
+        console.error('[app] the game screen failed to load', err);
+        app.newVersion = true;
+        if (app.screen === 'game') app.toMenu();
+      },
+    ));
+
+  /**
+   * A script file that didn't load: a new version replaced this one's files (they're hashed per
+   * version), or the network failed. Either way, reloading is the cure.
+   */
+  const MISSING_FILE = /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS/i;
 
   onMount(() => {
     host.mount(gameLayer);
+    window.addEventListener('vite:preloadError', () => (app.newVersion = true));
+    // Also what was caught and only logged (Babylon's shaders are fetched on first use).
+    watchLog((entry) => {
+      if (entry.level !== 'warn' && MISSING_FILE.test(entry.text)) app.newVersion = true;
+    });
     void boot();
   });
 
@@ -236,6 +258,15 @@
 
 {#if app.crash && !app.fatal}<CrashScreen crash={app.crash} />{/if}
 
+{#if app.newVersion}
+  <div class="scaled update">
+    <div class="glass bar" role="alert">
+      <span>A new version is available.</span>
+      <button class="btn primary" onclick={() => location.reload()}>Reload</button>
+    </div>
+  </div>
+{/if}
+
 <div class="scaled toast-layer"><Toasts /></div>
 
 <style>
@@ -273,6 +304,27 @@
   }
   .game-layer :global(.scene-veil.on) {
     opacity: 1;
+  }
+  /* "A new version is available": a bar at the top, over everything but the toasts. */
+  .update {
+    position: fixed;
+    inset: 16px 0 auto 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 55;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 8px 8px 20px;
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    pointer-events: auto;
+  }
+  .bar .btn {
+    border-radius: var(--radius-pill);
   }
   .toast-layer {
     position: fixed;
