@@ -993,3 +993,42 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 - [ ] Alt+Tab in Build mode (Windows; on macOS, Option-click another window), come back, and click with the Wall tool: it draws a wall, and the floor isn't picked up.
 - [ ] Sound stops in a hidden tab and comes back when the tab is shown, whatever the settings. With "Mute in background" on, sound fades while another window has focus. Master volume works.
 - [ ] Settings from 0.1: set Graphics to Low on the live site before the update (or, in DevTools on the new site, set `localStorage['open-sims-wasm.settings']` to `{"quality":"low"}` and reload). After the update Settings › Performance shows Low. With `{"quality":"high"}`, or the old defaults, it shows Medium. Resolution is Auto either way.
+
+## 6. Open questions for the owner
+
+Nothing waited on these: each has a default that shipped in 0.2.0, and a different answer would be a change for a later release. The §2.7 questions not listed here were answered by the decisions in §2.8, or by a fix in §3 (R1-17, P3-01).
+
+| Question | What shipped | From |
+|---|---|---|
+| **Gameplay** | | |
+| When ordered, may a guest nap or shower at the host's? | Orders follow the guest rules of free will: nothing private but the toilet, no sleep or nap, no cooking, no caring for the host's baby. | F1a |
+| A visiting resident ordered to use something at home or in a park stays "visiting" until the visit times out. Should the order end the visit? | Unchanged (as before 0.2.0). | F1a |
+| In the starter house, residents start a full night's sleep in the daytime at about 0.55 energy, about once a day each, for about 3 hours. Practice sessions that now run their full length make those sleeps about 7 % longer. | Unchanged. | F1b |
+| A couple who are expecting and move out (`move_to`) leave the pregnancy with the parents' household. | Unchanged. | F1b |
+| When someone leaves town, a pregnancy they're a parent of ends. The other choice was to keep it with one parent. | It ends. | F1b |
+| A household the player doesn't play that couldn't keep a week's rent after buying a child's bed doesn't buy one, and doesn't try again later. | As implemented (f1993e5). | coordinator |
+| In a full big town (64 residents), births only follow deaths and departures, because newcomers refill empty houses first. | Unchanged (balance). | soak runs |
+| R3-17: a stronger distance penalty at night, or a cap on autonomous trips? | No change (balance). | R3 |
+| **Animation** | | |
+| Is the new `jogAlong` clip (the jog's pose with a stride) the right look for fast walking? | Shipped. | F4 |
+| Should walkers also glide at the start and end of a walk at speeds 4–5 (walking in one snapshot, standing in the other)? | No: they glide only when walking in both snapshots, as the decision said; §4 suggests it for 0.2.1. | F4 |
+| R1-08: are the arrow keys meant to move the camera? | Kept, and now as fast at any frame rate. | R1 |
+| **Graphics** | | |
+| Should Auto's pixel budget be smaller on Low? P1 suggested about 1.17 MP. | 1920×1080 (2.07 MP) on every preset. | G1 |
+| A cap the refresh rate doesn't divide rounds down when the next rate up is more than 25 % above it: cap 60 gives 45 fps on 90 Hz, 50 on 100 Hz and 55 on 165 Hz. Acceptable? | Shipped. | G1 |
+| The menus' camera glides run at 30 fps with the menus' town; only the flight into a game runs at the full rate. Acceptable? | Shipped. | G1 |
+| On Low, the lighting steps every 10 game minutes at speed 3 and up and in the quiet-hours time-lapse, so the sun moves in visible steps about once a second. Acceptable? | Shipped. | G1 |
+| Should weak GPUs (Intel HD 620-class) get Low, or WebGL2, by default at first start? | No detection: everyone starts on Medium with WebGPU where it works (put off, §2.8). §5's bench run informs it. | P1 |
+| Should Low replace the interface's frosted blur with a plain tint (P2-03)? | No: Low keeps the blur. | P2 |
+| *(pending: G2's questions, e.g. Low without the neighbours' house interiors (P1-01, P1-12), and whether drawing stops behind full-screen menus.)* <!-- G2 --> | | G2 |
+| *(pending: M1's questions.)* <!-- M1 --> | | M1 |
+| **Saves and crashes** | | |
+| A save whose load traps is deleted as damaged, like a corrupt one. Should it be kept and marked instead (§4)? | Deleted, with a notice. | F2c |
+| "Save and reload" after a crash writes a new manual save each time. Should it go into the game's autosaves? | A new manual save. | F2a |
+| R4-05: after a GPU reset, rebuild the renderer silently, or offer Save and reload? | Save and reload. | R4 |
+| **Release** | | |
+| R5-15: keep the large model files on Pages, split them, or host them on Hugging Face or a CDN? | On Pages; split only if the dry run or the live check shows a problem. | R5 |
+| R5-02: dry run through `workflow_dispatch` on `main`, or a `v0.2.0-rc.1` tag? | `workflow_dispatch` on `main`, with `-f deploy=false`, before tagging. | R5 |
+| **Process** | | |
+| The agents' browser checks are Playwright scripts. The web app has no JS test runner: should they live in the repo, and where? | They stay out of the repo. | F4 |
+| Should sim-core offer a read-only accessor for a resident's follow-up, so tests needn't read it from the debug text? | Tests read the debug text, and a test fails if that stops working. | T1 |
