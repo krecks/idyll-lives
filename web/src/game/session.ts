@@ -1217,7 +1217,6 @@ export async function startSession(
     reveal() {
       if (revealed) return;
       revealed = true;
-      renderer.setIdleOrbit(false);
       // A loaded debug report shows the view it was captured from.
       const pose = takePendingPose();
       if (pose) renderer.setCameraPose(pose);

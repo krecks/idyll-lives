@@ -177,6 +177,8 @@ const WARM_WORLD_FRAMES = 4;
 const TEXTURE_WAIT_MS = 5000;
 /** Main-thread time (ms) a world build behind the overview runs before the menus' town draws a frame. */
 const BUILD_SLICE_MS = 8;
+/** Longest frame time (ms) things move by in one frame (the first frame back after a hidden tab spans all of it). */
+const MAX_FRAME_MS = 100;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -240,7 +242,8 @@ export class BabylonRenderer implements Renderer {
   /** The frame state last posed (the marker goes up once the camera has moved). */
   private lastFrame: FrameState | null = null;
   private active = false;
-  private idleOrbit = false;
+  /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
+  private frameDt = 0;
   /** The watching director's hold on the game camera (see `setGameShot`). */
   private gameRig!: GameCameraRig;
   /** Resident the camera keeps centred while the player turns and zooms (`followSim`). */
@@ -684,22 +687,22 @@ export class BabylonRenderer implements Renderer {
     }
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
-    if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
+    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
     // And their windows stop glowing with them.
-    if (this.fadeWindowGlow(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
+    if (this.fadeWindowGlow(this.frameDt / 1000) && this.lampsLevel > 0) {
       this.house.setWindowGlow(this.windowGlowOn);
       this.resetSnapshot();
     }
-    this.steerCamera(this.engine.getDeltaTime() / 1000);
+    this.steerCamera(this.frameDt / 1000);
     this.keepCameraClear();
     this.updateCutaway();
     this.followCamera();
-    this.skyDome.drift(this.engine.getDeltaTime());
-    this.fx.update(this.engine.getDeltaTime());
-    if (this.ghostShown) this.updateGhost(this.engine.getDeltaTime());
+    this.skyDome.drift(this.frameDt);
+    this.fx.update(this.frameDt);
+    if (this.ghostShown) this.updateGhost(this.frameDt);
     if (this.builtPending) this.swapBuilt();
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -1528,14 +1531,9 @@ export class BabylonRenderer implements Renderer {
     return new Promise((resolve) => this.frameWaiters.push({ left: frames, resolve }));
   }
 
-  setIdleOrbit(on: boolean): void {
-    this.idleOrbit = on;
-  }
-
   setGameShot(shot: GameShot | null, cut = false): void {
     if (!shot) return this.gameRig.release();
     this.followIndex = null;
-    this.idleOrbit = false;
     this.gameRig.setShot(shot, cut || this.townMode);
     this.cameraPlaced = true;
   }
@@ -1880,8 +1878,7 @@ export class BabylonRenderer implements Renderer {
 
   private readonly renderFrame = () => {
     const start = performance.now();
-    const dt = this.engine.getDeltaTime();
-    if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
+    const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
     this.onFrame?.(performance.now());
     if (this.townMode && this.overview) {
       this.townFrame(dt);

@@ -308,8 +308,6 @@ export interface Renderer {
   setActive(active: boolean): void;
   /** Resolves once `frames` more frames have been drawn (shaders compiled, textures uploaded). */
   framesRendered(frames: number): Promise<void>;
-  /** Slowly circles the camera (for the live menu backdrop). */
-  setIdleOrbit(on: boolean): void;
   /**
    * Watching: the director takes the game camera and glides to `shot` (or with `cut`, jumps);
    * null hands it straight back to the player where it is.
