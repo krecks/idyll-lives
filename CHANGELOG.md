@@ -33,7 +33,7 @@ In this release babies are cared for, meals are cooked from start to finish, eve
 - **After an update:** a tab left open across an update offers to reload instead of hanging, and a new release never mixes with files cached from the last one.
 
 ### Graphics
-- **Graphics is Low, Medium or High,** and Medium, the game's intended look, is everyone's default. Low is for older laptops (simpler shadows, edges and lamps); High adds sharper shadows and live mirrors. Ultra, Custom, the fine-tune switches and ambient occlusion are gone. *(pending: G2's trims on Low.)* <!-- G2 -->
+- **Graphics is Low, Medium or High,** and Medium, the game's intended look, is everyone's default. Low is for older laptops: simpler shadows, edges and lamps, half the lawn's tufts and flowers, and no shadows from the woods round the town. High adds sharper shadows and live mirrors. Ultra, Custom, the fine-tune switches and ambient occlusion are gone.
 - **Resolution: Auto** draws the screen's own pixels up to about 1920×1080 and scales up beyond, so 4K and Retina screens run about as fast as a 1080p one; it follows browser zoom and a move to another screen. Custom draws 50–100 %.
 - **The frame rate cap no longer judders:** frames are paced in whole display refreshes.
 - The WebGL2 switch is under Settings › Performance › Troubleshooting.
@@ -42,7 +42,8 @@ In this release babies are cared for, meals are cooked from start to finish, eve
 Measured on an M3 Pro in Chrome, 1920×1080:
 - **Faster start:** the menu appears about 1.4 s sooner for returning players (2.83 → 1.42 s with a save, warm cache). The game's data arrives in one download instead of about 60, the sky's lighting starts downloading with the page, and returning players load the game's scripts from their browser. A first visit at 10 Mbit/s reaches the menu in 3.14 s instead of 3.44.
 - **Smaller download:** the simulation and voice WebAssembly are optimised and stripped (620 KB smaller, 44 KB gzipped).
-- **Lighter drawing:** the canvas is no longer multisampled and the shadow map writes less, so Medium touches 141 MB of render targets a frame instead of 216; the menus' town is drawn at 30 fps. *(pending: G2's savings.)* <!-- G2 -->
+- **Lighter drawing, the same picture:** lamps that are off by day cost nothing, grass, flowers and woods out of view aren't drawn, and the sun's shadows are drawn only from what stands near your lot and only when something in them moves. Medium by day on an M3 Pro (WebGPU, 1920×1080) now takes 5.60 ms of graphics work a frame instead of 8.99: 146 fps instead of 84 without a cap. Medium also uses 141 MB of render targets a frame instead of 216.
+- **Nothing drawn behind menus:** behind the pause menu, Settings, Load game, Credits and the planner the game stops drawing until you close them, and the menus' town is drawn at 30 fps. High's mirrors take video memory only while they reflect.
 - **Lighter interface:** progress and need bars no longer make the browser lay out the page on every frame, speech bubbles are placed without forcing a layout, goal ideas are worked out only when a plan changes, bird songs are made off the main thread, and furniture for other lots is built in small steps, without a hitch. With the CPU slowed 3× to stand in for an older laptop, at speed 5: the main thread is busy 74 % of the time instead of 85 % (82 % instead of 96 % with a resident's panel open). F3's "Busy (frames)" now counts the browser's layout and paint too.
 - **Smoother motion:** residents glide instead of jumping at the fastest speeds, jog instead of sliding, face where they're going, and keep their animation when something in the house changes; the camera and clouds no longer jump after a hidden tab.
 
