@@ -298,10 +298,12 @@ export interface Renderer {
   cameraPose(): CameraPose;
   setCameraPose(pose: CameraPose): void;
   /**
-   * Sets the per-frame callback (runs before each frame is drawn) and starts drawing.
-   * The renderer outlives game sessions: its engine and compiled shaders are reused.
+   * Sets the per-frame callback (runs before each frame is drawn) and starts drawing. `onView`
+   * runs once per drawn frame of the game world after the camera took the frame's input and
+   * before anything is drawn: for what is placed on screen over the view (`project` then matches
+   * the picture). The renderer outlives game sessions: its engine and compiled shaders are reused.
    */
-  run(onFrame: (now: number) => void): void;
+  run(onFrame: (now: number) => void, onView?: () => void): void;
   /** Pauses or resumes drawing (e.g. nothing to show behind a menu). */
   setActive(active: boolean): void;
   /** Resolves once `frames` more frames have been drawn (shaders compiled, textures uploaded). */

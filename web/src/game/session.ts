@@ -6,7 +6,7 @@
 
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
-import { SimBridge } from '../core/bridge';
+import { SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
@@ -1177,18 +1177,18 @@ export async function startSession(
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
 
+  /** This frame's interpolation state (for what is placed over the view once the camera has moved). */
+  let shown: FrameState | null = null;
   renderer.run((now) => {
     bridge.sync(now);
-    const frame = bridge.frame(now);
+    const frame = (shown = bridge.frame(now));
     renderer.update(frame);
     renderer.setHeldObject(game.placing?.objectId ?? buildBuy.heldId());
     buildBuy.syncHandles();
     if (!revealed) return;
-    bubbles.update(frame);
     voices.update(frame);
     worldSound.update(frame);
     followStorey(now);
-    if (roomOverlayOn()) roomOverlay.update();
     if (game.watching) {
       // Menus and other modes end watching (opening them is input, but not all of it is ours).
       if (!canWatch() && !director.active) stopWatching();
@@ -1202,6 +1202,11 @@ export async function startSession(
       if (game.speed === 1 && game.mode === 'live') bridge.send({ type: 'setSpeed', speed: slowedFrom });
       slowedFrom = null;
     }
+  }, () => {
+    // Bubbles, subtitles and room tags: where the camera, moved for this frame, shows the heads and rooms.
+    if (!revealed || !shown) return;
+    bubbles.update(shown);
+    if (roomOverlayOn()) roomOverlay.update();
   });
 
   const session: GameSession = {

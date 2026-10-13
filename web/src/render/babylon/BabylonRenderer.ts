@@ -17,6 +17,7 @@
 import {
   ArcRotateCamera,
   type ArcRotateCameraPointersInput,
+  type Camera,
   Color3,
   Color4,
   ColorCurves,
@@ -233,6 +234,11 @@ export class BabylonRenderer implements Renderer {
   /** Meshes the room lights were last told to leave out (the landscape and sky). */
   private lightExcluded = new Set<Mesh>();
   private onFrame: ((now: number) => void) | null = null;
+  /** Per drawn frame once the camera has moved (see `run`), and the frame it last ran in. */
+  private onView: (() => void) | null = null;
+  private viewFrame = -1;
+  /** The frame state last posed (the marker goes up once the camera has moved). */
+  private lastFrame: FrameState | null = null;
   private active = false;
   private idleOrbit = false;
   /** The watching director's hold on the game camera (see `setGameShot`). */
@@ -442,6 +448,8 @@ export class BabylonRenderer implements Renderer {
     scene.skipPointerMovePicking = true;
     scene.constantlyUpdateMeshUnderPointer = false;
     this.instrumentation = new SceneInstrumentation(scene);
+    // Once the camera has taken this frame's input (it does inside `render`), before anything is drawn.
+    scene.onBeforeCameraRenderObservable.add((camera) => this.cameraMoved(camera));
     // `?debug`: expose the scene for inspection from the console / test harness.
     if (this.debug) Object.assign(window, { __scene: scene, __renderer: this });
     // PBR materials and image-based lighting; the environment must exist before materials compile.
@@ -661,7 +669,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   update(frame: FrameState): void {
-    const { curr, layout, now } = frame;
+    const { curr, layout } = frame;
     // Snapshot rendering bakes light uniforms and the clear colour into the recording, so
     // lighting changes force a re-record; throttle them to keep most frames replayed.
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : curr[layout.header.minute];
@@ -701,19 +709,37 @@ export class BabylonRenderer implements Renderer {
 
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     this.simCount = count;
-    this.markerMatrix.fill(0);
-    this.markerHaloMatrix.fill(0);
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
     this.mirrors.update(this.camera);
     this.handles.update(this.camera.globalPosition);
+    this.simShadow.thinInstanceBufferUpdated('matrix');
+    this.lastFrame = frame;
+  }
+
+  /**
+   * Once per drawn frame of the game world, after the camera took this frame's input (dragging,
+   * zooming): the selection marker (it faces the camera) and what the session places over the
+   * view (`onView`: bubbles, room tags), so they don't trail a frame behind the camera.
+   */
+  private cameraMoved(camera: Camera): void {
+    if (camera !== this.camera || this.townMode || this.viewFrame === this.scene.getFrameId()) return;
+    this.viewFrame = this.scene.getFrameId();
+    this.placeMarker();
+    this.onView?.();
+  }
+
+  private placeMarker(): void {
+    this.markerMatrix.fill(0);
+    this.markerHaloMatrix.fill(0);
+    const frame = this.lastFrame;
     const sel = this.selectedSim;
-    if (sel !== null && sel < count && this.characters.visible[sel]) {
+    if (frame && sel !== null && sel < this.simCount && this.characters.visible[sel]) {
+      const { curr, layout, now } = frame;
       const h = this.characters.heads;
       const emotion = curr[layout.headerLen + sel * layout.simStride + layout.sim.emotion];
       this.writeMarker(h[sel * 3], h[sel * 3 + 1], h[sel * 3 + 2], emotion, now);
     }
-    this.simShadow.thinInstanceBufferUpdated('matrix');
     for (const mesh of this.marker) {
       mesh.thinInstanceBufferUpdated('matrix');
       mesh.thinInstanceBufferUpdated('color');
@@ -1485,8 +1511,9 @@ export class BabylonRenderer implements Renderer {
     };
   }
 
-  run(onFrame: (now: number) => void): void {
+  run(onFrame: (now: number) => void, onView?: () => void): void {
     this.onFrame = onFrame;
+    this.onView = onView ?? null;
     this.setActive(true);
   }
 
@@ -1571,6 +1598,8 @@ export class BabylonRenderer implements Renderer {
     this.simCount = 0;
     this.selectedSim = null;
     this.onFrame = null;
+    this.onView = null;
+    this.lastFrame = null;
     this.cursor.position.y = HIDDEN_Y;
     this.markerMatrix.fill(0);
     this.markerHaloMatrix.fill(0);
