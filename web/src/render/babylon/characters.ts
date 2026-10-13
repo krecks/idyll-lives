@@ -1673,15 +1673,19 @@ export class Characters {
       const n = groups[l * 3];
       if (!n) continue;
       const t = curr[H + l * S + k.partner] | 0;
-      const members = [l, t, groups[l * 3 + 1], groups[l * 3 + 2]].slice(0, n + 2).filter((m) => m >= 0 && m < count);
+      // The one who started it, their partner and those listening in.
       let sx = 0;
       let sz = 0;
-      for (const m of members) {
+      let members = 0;
+      for (let j = 0; j < n + 2; j++) {
+        const m = j === 0 ? l : j === 1 ? t : groups[l * 3 + j - 1];
+        if (m < 0 || m >= count) continue;
         sx += curr[H + m * S + k.x];
         sz += this.groundRow(curr[H + m * S + k.z]);
+        members++;
       }
-      middle[l * 2] = sx / members.length;
-      middle[l * 2 + 1] = sz / members.length;
+      middle[l * 2] = sx / members;
+      middle[l * 2 + 1] = sz / members;
     }
 
     // Cuddles: who holds which baby (posed after them, in their arms).
