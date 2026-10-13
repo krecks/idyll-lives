@@ -454,9 +454,11 @@ crying for one of its `needs` (default: all but surroundings) under `below` (def
 every grown-up of the household at home is asleep, wake one of them: family first, then someone
 not worn out, then whoever was woken longest ago (partners take turns), then the most rested.
 At night, a grown-up at home who's up comes at once instead, dropping what they picked
-themselves (not the toilet or shower, cooking or eating, what the player told them to do, or
-when they leave for work or school within `readyMinutes`); with nobody up who can, one asleep
-is woken. They do the crib's care interactions for each of those needs under `tendBelow`
+themselves (a meal is left where it is, to finish later; a cook with no more than
+`finishMinutes` of a step left, default 15, finishes it first, and the recipe goes on after;
+not the toilet or shower, washing up, a longer step, what the player told them to do, or when
+they leave for work or school within `readyMinutes`); with nobody up who can, one asleep is
+woken. They do the crib's care interactions for each of those needs under `tendBelow`
 (default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.

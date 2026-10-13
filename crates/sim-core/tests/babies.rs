@@ -7,8 +7,10 @@
 
 mod common;
 
+use sim_core::items::ItemAt;
 use sim_core::lot::SimSpawn;
 use sim_core::planner::ThoughtKind;
+use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -452,10 +454,16 @@ fn night_owl_content() -> String {
 /// Ben in bed at one in the morning, Ada up watching television (on her own: nobody told her
 /// to; with `job`, she leaves for work at half past three), Bea fed until `hour`.
 fn night_owl(job: &str, hour: f32) -> World {
+    night_owl_in(&night_owl_content(), "", job, hour)
+}
+
+/// `night_owl` with `content`, and `objects` (JSON, each with a comma before) after the
+/// television.
+fn night_owl_in(content: &str, objects: &str, job: &str, hour: f32) -> World {
     let town = NIGHT_TOWN
-        .replace(r#"{"def":"fridge","x":9,"z":9}"#, r#"{"def":"fridge","x":9,"z":9},{"def":"tv","x":6,"z":9}"#)
+        .replace(r#"{"def":"fridge","x":9,"z":9}"#, &format!(r#"{{"def":"fridge","x":9,"z":9}},{{"def":"tv","x":6,"z":9}}{objects}"#))
         .replace(r#""age":30}"#, &format!(r#""age":30{job}}}"#));
-    let mut w = World::from_json(&night_owl_content(), &town, 1).unwrap();
+    let mut w = World::from_json(content, &town, 1).unwrap();
     let bedtime = sim_core::clock::tick_at(1, 22.0 * 60.0).unwrap();
     while w.tick < bedtime {
         w.tick_once();
@@ -463,6 +471,7 @@ fn night_owl(job: &str, hour: f32) -> World {
     w.sims[0].needs[1] = 1.0;
     w.sims[0].needs[2] = 0.0;
     w.sims[1].needs[1] = 0.35;
+    w.sims[1].needs[2] = 1.0;
     night_until(&mut w, hour, Some(1.0), |_| {});
     let doing = |i: usize| w.sims[i].current().map(|a| a.task);
     assert!(w.sims[1].asleep(&w.content), "Ben asleep: {:?}", doing(1));
@@ -512,6 +521,151 @@ fn a_parent_told_to_watch_tv_leaves_the_crying_baby_to_the_one_asleep() {
     w.sims[2].needs[0] = 0.25;
     let (ben, ada) = first_to_feed(&mut w, 2.0);
     assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+}
+
+/// `night_owl_content` with a kitchen: a fridge with `fridge` (its interactions) that keeps
+/// food and gives ingredients, a snack that's a plate to sit down with (half an hour's eating),
+/// a meal made at the fridge, a counter (ten minutes) and the stove (half an hour), and a
+/// table to eat at.
+fn night_kitchen_content(fridge: &str) -> String {
+    night_owl_content()
+        .replace(
+            r#"{"id":"fridge","name":"Fridge","price":100,"interactions":["#,
+            r#"{"id":"fridge","name":"Fridge","price":100,"stations":["ingredients"],"stores":true,"interactions":["#,
+        )
+        .replace(r#"{"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.6}}"#, fridge)
+        .replace(
+            r#""tags":["lounge"]}]}],"#,
+            r#""tags":["lounge"]}]},
+            {"id":"table","name":"Dining set","price":300,"footprint":[2,1],"slots":2,"surface":{"height":0.75,"kind":"table"},
+             "interactions":[{"id":"coffee","label":"Coffee","minutes":20,"pose":"sit","autonomous":false,"effects":{"energy":0.05},"tags":["food"]}]},
+            {"id":"counter","name":"Counter","price":100,"stations":["prep"],"surface":{"height":0.9,"kind":"counter"}},
+            {"id":"stove","name":"Stove","price":400,"stations":["stove"]}],
+            "items":[{"id":"snack","label":"Snack","emptyAs":"plateDirty"},{"id":"plateDirty","label":"Dirty plate","dirty":true},
+              {"id":"ingredients","label":"Ingredients"},{"id":"prepBowl","label":"Prepped bowl"},
+              {"id":"mealPot","label":"Home-cooked meal","serving":"mealPlate","emptyAs":"potDirty","radius":0.16},
+              {"id":"mealPlate","label":"Plate of food","emptyAs":"plateDirty"},{"id":"potDirty","label":"Dirty pot","dirty":true,"radius":0.16}],
+            "recipes":[{"id":"meal","label":"Make a meal","item":"mealPot","servings":[1,4],"costPerServing":3,"effects":{"hunger":0.9},
+              "steps":[{"at":["ingredients"],"minutes":5,"holds":"ingredients"},{"at":["prep"],"minutes":10,"holds":"prepBowl"},
+                       {"at":["stove"],"minutes":30}]}],"#,
+        )
+}
+
+const SNACK: &str = r#"{"id":"snack","label":"Snack","minutes":2,"eat":{"item":"snack","minutes":30},"effects":{"hunger":0.6},"tags":["food"]}"#;
+const MEAL: &str = r#"{"id":"meal","label":"Make a meal","recipe":"meal","tags":["food","cooking"]}"#;
+/// The table, counter and stove for `night_kitchen_content` (`night_owl_in`).
+const KITCHEN: &str = r#",{"def":"table","x":2,"z":6},{"def":"counter","x":10,"z":9},{"def":"stove","x":11,"z":9}"#;
+
+/// On (Bea fed) until `done`; panics after two hours.
+fn until(w: &mut World, what: &str, done: impl Fn(&World) -> bool) {
+    let limit = w.tick + 2 * 60 * 20;
+    while !done(w) {
+        w.sims[2].needs[0] = 1.0;
+        w.tick_once();
+        assert!(w.tick < limit, "{what}: Ada {:?}", w.sims[0].current().map(|a| a.task));
+    }
+}
+
+/// With Ada at step `step` of the meal (at its station), how many minutes of it are left.
+fn cooking(w: &World, step: u8) -> Option<f32> {
+    w.sims[0].current().and_then(|a| match (a.task.kind, &a.phase) {
+        (TaskKind::Cook { step: s, station: Some(_), minutes, .. }, Phase::Using { elapsed }) if s == step => {
+            Some(f32::from(minutes) - elapsed)
+        }
+        _ => None,
+    })
+}
+
+#[test]
+fn a_parent_eating_at_night_leaves_her_plate_for_the_crying_baby_and_finishes_it_after() {
+    let mut w = night_owl_in(&night_kitchen_content(SNACK), KITCHEN, "", 1.0);
+    // Hungry: Ada leaves the television for a snack and sits down to it at the table.
+    w.sims[0].needs[0] = 0.1;
+    w.sims[0].needs[2] = 1.0;
+    let at_table = |w: &World| {
+        w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { plate: Some(_), .. }) && matches!(a.phase, Phase::Using { .. }))
+    };
+    until(&mut w, "Ada sits down to a snack", at_table);
+    minutes(&mut w, 5);
+    assert!(at_table(&w), "still eating: {:?}", w.sims[0].current().map(|a| a.task));
+    let plate = w.items.list.iter().find(|it| it.edible()).expect("a plate on the table").id;
+    // Bea cries: Ada leaves her plate on the table and feeds her; Ben sleeps on.
+    w.sims[2].needs[0] = 0.25;
+    let start = w.tick;
+    let (mut fed_at, mut left) = (None, true);
+    night_until(&mut w, 4.0, None, |w| {
+        assert!(w.sims[1].asleep(&w.content), "Ben woken at tick {}", w.tick);
+        // (The first feed: she feeds Bea again before morning.)
+        if feeding(w, 0) && *fed_at.get_or_insert(w.tick) + 20 * 20 > w.tick {
+            left &= w.items.get(plate).is_some_and(|it| it.edible() && matches!(it.at, ItemAt::Surface { .. }));
+        }
+    });
+    let fed_at = fed_at.expect("Ada fed Bea");
+    let waited = (fed_at - start) as f32 * sim_core::MINUTES_PER_TICK;
+    assert!(waited < 5.0, "Ada saw to Bea promptly: {waited} minutes");
+    assert!(left, "the snack waited on the table while she fed Bea");
+    // And she came back to it after.
+    assert!(w.items.get(plate).is_none_or(|it| !it.edible()), "the snack was eaten: {:?}", w.items.get(plate));
+    assert!(w.sims[0].needs[0] > 0.5, "Ada isn't hungry now: {}", w.sims[0].needs[0]);
+}
+
+#[test]
+fn a_parent_cooking_at_night_finishes_the_step_sees_to_the_crying_baby_and_goes_on_after() {
+    let mut w = night_owl_in(&night_kitchen_content(MEAL), KITCHEN, "", 1.0);
+    w.items.list.retain(|it| !it.edible());
+    w.sims[0].needs[0] = 0.3;
+    w.sims[0].needs[2] = 1.0;
+    // Hungry: Ada makes a meal. Bea cries with a few minutes of chopping to go.
+    until(&mut w, "Ada at the counter", |w| cooking(w, 1).is_some_and(|m| m <= 6.0));
+    w.sims[2].needs[0] = 0.25;
+    let start = w.tick;
+    let (mut fed_at, mut stove_first) = (None, false);
+    night_until(&mut w, 4.0, None, |w| {
+        assert!(w.sims[1].asleep(&w.content), "Ben woken at tick {}", w.tick);
+        if feeding(w, 0) {
+            fed_at.get_or_insert(w.tick);
+        }
+        stove_first |= fed_at.is_none() && cooking(w, 2).is_some();
+    });
+    let fed_at = fed_at.expect("Ada fed Bea");
+    let waited = (fed_at - start) as f32 * sim_core::MINUTES_PER_TICK;
+    assert!(waited > 5.0 && waited < 10.0, "Ada finished chopping, then saw to Bea: {waited} minutes");
+    assert!(!stove_first, "Bea before the stove");
+    // Then back to the stove: the meal is made (and she has some).
+    let made = w.items.list.iter().any(|it| w.content.items[it.def].id == "mealPot" || w.content.items[it.def].id == "potDirty");
+    assert!(made && w.sims[0].needs[0] > 0.5, "the meal was made and eaten: hunger {}", w.sims[0].needs[0]);
+}
+
+#[test]
+fn a_parent_with_long_to_go_on_the_stove_leaves_the_crying_baby_to_the_one_asleep() {
+    let mut w = night_owl_in(&night_kitchen_content(MEAL), KITCHEN, "", 1.0);
+    w.items.list.retain(|it| !it.edible());
+    w.sims[0].needs[0] = 0.3;
+    w.sims[0].needs[2] = 1.0;
+    // Bea cries with most of the half hour on the stove to go: Ben is woken.
+    until(&mut w, "Ada at the stove", |w| cooking(w, 2).is_some_and(|m| m >= 25.0));
+    w.sims[2].needs[0] = 0.25;
+    let (ben, ada) = first_to_feed(&mut w, 2.5);
+    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+}
+
+#[test]
+fn whose_turn_it_is_at_night_survives_a_reload() {
+    let mut w = night();
+    w.sims[2].needs[0] = 0.25;
+    let mut first = None;
+    night_until(&mut w, 1.5, None, |w| first = first.or((0..2).find(|&i| feeding(w, i))));
+    let first = first.expect("someone fed Bea");
+    let mut w = World::from_save_json(NIGHT, &w.save_json()).unwrap();
+    // Crying again at once: she's quiet for her hour (from one o'clock) and then the other
+    // parent gets up.
+    w.sims[2].needs[0] = 0.25;
+    let mut next = None;
+    night_until(&mut w, 3.0, None, |w| next = next.or((0..2).find(|&i| feeding(w, i)).map(|i| (i, w.tick))));
+    let (next, at) = next.expect("someone fed Bea again");
+    let hour = sim_core::clock::minute_of_day(at) as f32 / 60.0;
+    assert!(hour > 1.9, "Bea's quiet spell carried over: fed again at {hour:.2}");
+    assert_ne!(next, first, "turn and turn about after the reload");
 }
 
 /// On until `hour` (`night_until`): how many minutes from now Ben, and Ada, first fed Bea.

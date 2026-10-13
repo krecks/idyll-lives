@@ -214,6 +214,10 @@ fn is_zero_u32(n: &u32) -> bool {
     *n == 0
 }
 
+fn is_zero_u64(n: &u64) -> bool {
+    *n == 0
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectSave {
     pub def: String,
@@ -309,6 +313,10 @@ pub struct SimSave {
     /// What they carry (absent before v19: nothing).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub held: Option<HeldSave>,
+    /// The tick a crying baby last woke them (a grown-up), or they last called someone (a
+    /// baby), so turns at night and the baby's quiet spell go on after a reload (absent: never).
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub night_woken: u64,
 }
 
 /// A resident's planner, by content id.
@@ -680,6 +688,7 @@ impl World {
                         made_at: h.made_at,
                         recipe: h.recipe.map(|r| content.recipes[r].id.clone()),
                     }),
+                    night_woken: s.night_woken,
                 }
             })
             .collect();
@@ -1036,6 +1045,7 @@ impl World {
                     recipe: h.recipe.as_deref().and_then(|r| content.recipe_index(r)),
                 })
             });
+            sim.night_woken = s.night_woken;
             // At work, or a pupil at school.
             let pupil = content.life.stage_at(s.age.unwrap_or(30.0)).is_some_and(|st| st.school);
             sim.away_until = s.away_minutes.filter(|_| sim.job.is_some() || pupil).map(after);

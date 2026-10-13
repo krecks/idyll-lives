@@ -1809,11 +1809,12 @@ impl World {
     /// the household there asleep wakes one of them: family first, then someone not worn out,
     /// then whoever's turn it is (woken longest ago: partners take turns), then the most rested.
     /// At night, a grown-up there who's up and free to drop what they're doing
-    /// (`free_for_baby`) comes at once instead: family first, then the nearest; with nobody up
-    /// who can (in the shower, told to do something, about to leave for work), one asleep is
-    /// woken. They do the crib's care for each need that's low (the woken go back to bed after:
-    /// night still picks it); and the same baby calls nobody again for a while. In the daytime,
-    /// with someone at home awake, they see to the baby themselves (autonomy, `pick_autonomous`).
+    /// (`free_for_baby`) comes at once instead (a cook nearly done with a step finishes it
+    /// first): family first, then the nearest; with nobody up who can (in the shower, told to
+    /// do something, about to leave for work), one asleep is woken. They do the crib's care for
+    /// each need that's low (the woken go back to bed after: night still picks it); and the same
+    /// baby calls nobody again for a while. In the daytime, with someone at home awake, they see
+    /// to the baby themselves (autonomy, `pick_autonomous`).
     fn wake_for_crying_babies(&mut self) {
         let Some(rules) = self.content.day_rhythm.baby_wakes else { return };
         for b in 0..self.sims.len() {
@@ -1821,7 +1822,10 @@ impl World {
             let content = &self.content;
             let sim = &mut self.sims[carer];
             let woken = sim.asleep(content);
-            end_activity(sim, content, &mut self.objects);
+            // A cook halfway through a step finishes it first (`cooking::called_away`).
+            if !crate::cooking::called_away(sim, content, &mut self.objects) {
+                end_activity(sim, content, &mut self.objects);
+            }
             sim.follow_up = None;
             for task in tasks.into_iter().rev() {
                 sim.queue.push_front(task);
@@ -1891,7 +1895,7 @@ impl World {
             let up = home
                 .iter()
                 .copied()
-                .filter(|&j| self.free_for_baby(j))
+                .filter(|&j| self.free_for_baby(j, rules))
                 .max_by(|&x, &y| family(x).cmp(&family(y)).then(far(y).total_cmp(&far(x))));
             up.or_else(|| self.to_wake(b, &home))?
         };
@@ -1922,19 +1926,24 @@ impl World {
     }
 
     /// Whether grown-up `j`, up at home, can see to a crying baby now: doing nothing, or
-    /// something they picked themselves (on their way to bed too; not the toilet or shower,
-    /// cooking or eating, or a conversation), with nothing the player asked for next, not
-    /// pressed themselves, and not leaving for work or school within `DayRhythm::ready_minutes`.
-    fn free_for_baby(&self, j: usize) -> bool {
+    /// something they picked themselves (on their way to bed too; eating, the plate left where
+    /// it is; cooking, with at most `BabyWakes::finish_minutes` of the step left, see
+    /// `cooking::called_away`; not the toilet or shower, washing up, or a conversation), with
+    /// nothing the player asked for next, not pressed themselves, and not leaving for work or
+    /// school within `DayRhythm::ready_minutes`.
+    fn free_for_baby(&self, j: usize, rules: &crate::content::BabyWakes) -> bool {
         let content = &self.content;
         let sim = &self.sims[j];
         if sim.asleep(content) || sim.engaged_with.is_some() || sim.pressed(content) {
             return false;
         }
         let picked = sim.current().is_none_or(|a| {
-            !a.task.directed
-                && matches!(a.task.kind, TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. })
-                && a.tags & content.social_rules.busy_tags == 0
+            let drop = match a.task.kind {
+                TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. } | TaskKind::Eat { .. } => true,
+                TaskKind::Cook { .. } => crate::cooking::step_left(sim).is_some_and(|m| m <= rules.finish_minutes),
+                _ => false,
+            };
+            !a.task.directed && drop && a.tags & content.social_rules.busy_tags == 0
         });
         let next = sim.queue.front().is_some_and(|t| t.directed || matches!(t.kind, TaskKind::Work));
         let ready = social::minutes_to_ticks(content.day_rhythm.ready_minutes);

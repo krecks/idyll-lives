@@ -877,14 +877,16 @@ pub struct DayRhythm {
 /// A baby crying for one of `needs` (bit per need; default: all but surroundings) below
 /// `below` while every grown-up at home is asleep wakes one of them, who does the crib's care
 /// interactions for each of those needs below `tend_below` and goes back to bed, with the
-/// `feeling` (optional); at night, a grown-up at home who's up and free comes instead. The
-/// same baby calls nobody again for `cooldown_ticks`.
+/// `feeling` (optional); at night, a grown-up at home who's up and free comes instead (a cook
+/// with at most `finish_minutes` of a step left finishes it first). The same baby calls nobody
+/// again for `cooldown_ticks`.
 #[derive(Debug, Clone, Copy)]
 pub struct BabyWakes {
     pub needs: u32,
     pub below: f32,
     pub tend_below: f32,
     pub cooldown_ticks: u64,
+    pub finish_minutes: f32,
     pub feeling: Option<usize>,
 }
 
@@ -1487,6 +1489,8 @@ struct BabyWakesRaw {
     tend_below: Option<f32>,
     #[serde(default)]
     cooldown_minutes: Option<f32>,
+    #[serde(default)]
+    finish_minutes: Option<f32>,
     #[serde(default)]
     feeling: Option<String>,
 }
@@ -3006,6 +3010,7 @@ impl Content {
                         below,
                         tend_below: b.tend_below.unwrap_or(0.6).clamp(below, 1.0),
                         cooldown_ticks: (b.cooldown_minutes.unwrap_or(90.0).max(0.0) / crate::MINUTES_PER_TICK) as u64,
+                        finish_minutes: b.finish_minutes.unwrap_or(15.0).max(0.0),
                         feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
                     })
                 })
