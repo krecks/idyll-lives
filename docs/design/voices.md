@@ -1,13 +1,16 @@
 # Resident voices
 
-*Plan for residents speaking their thoughts and conversations out loud. Status (2026-10-12):
+*Plan for residents speaking their thoughts and conversations out loud. Status (0.2.0):
 residents speak with **Supertone's Supertonic 3** on the graphics card (WebGPU): ten bundled
-voices, each resident with their own pitch, depth and speed. It replaced Kyutai's Pocket TTS the
-same day (0.1.0 to 2026-10-12; it spoke like a reference clip, so players could record their own
-voice, but on the CPU a line took 1–2 s and on WebGPU it was four times slower; see "History:
-Pocket TTS"). The sections "The model: Pocket TTS", "Voices" and "A resident's own voice"
-describe that model and are kept as history. Phases 1–4 are in, with the guards of phase 6 that
-don't need Auto mode. Measurements and research behind the choices are at the end.*
+voices, each resident with their own pitch, depth and speed (in since 2026-10-12). 0.1.0 shipped
+KittenTTS nano (see "History: KittenTTS nano and Paradee-8M"). In between, on 2026-10-12 and
+never in a release, Kyutai's Pocket TTS spoke like a reference clip, so players could record
+their own voice, but on the CPU a line took 1–2 s and on WebGPU it was four times slower (see
+"History: Pocket TTS"). The sections "The model: Pocket TTS", "Voices" and "A resident's own
+voice" describe that model and are kept as history. Phases 1–4 are in, with the guards of phase
+6 that don't need Auto mode. Since 0.2.0 a voice-engine trap restarts the voice worker (at most 3
+times a session), and sound stops in a hidden tab. Measurements and research behind the choices
+are at the end.*
 
 ## Built so far
 
@@ -557,7 +560,7 @@ Sources: [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0),
 [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) (MIT, [npm](https://www.npmjs.com/package/onnxruntime-web)),
 [browser TTS benchmarks](https://briantung.me/blog/tts-engines-in-the-browser/),
 [lessac dataset licence](https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html).
-## History: Pocket TTS (0.1.0 to 2026-10-12)
+## History: Pocket TTS (2026-10-12, after 0.1.0; never released)
 
 Kyutai's Pocket TTS spoke like a short reference clip, so a player could record their own voice.
 It made speech one 80 ms frame at a time: 1.6–2× real time on the CPU, and on WebGPU about four

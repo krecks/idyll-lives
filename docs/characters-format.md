@@ -238,7 +238,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | idle | yes | 2.5 | standing about, and object use that needs no hands |
 | talk | yes | 2.93 | talking, singing (with `phone` on top), the mirror |
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
-| jog | yes | 0.7 | running, treadmills |
+| jog | yes | 0.7 | running on the spot, treadmills, exercise |
+| jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
