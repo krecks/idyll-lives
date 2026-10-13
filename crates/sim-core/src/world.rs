@@ -139,9 +139,12 @@ impl ObjectInstance {
 
     /// Whether `sim` can use this object (it has a free slot, or `sim` already holds one).
     pub fn can_use(&self, sim: u32, slots: u8) -> bool {
-        self.users[..slots as usize]
-            .iter()
-            .any(|u| u.is_none_or(|u| u == sim))
+        self.can_use_in(sim, 0..slots as usize)
+    }
+
+    /// Whether one of the slots in `range` is free for `sim` (or already theirs).
+    pub fn can_use_in(&self, sim: u32, range: std::ops::Range<usize>) -> bool {
+        self.users[range].iter().any(|u| u.is_none_or(|u| u == sim))
     }
 
     pub fn has_free_slot(&self, slots: u8) -> bool {
@@ -154,15 +157,18 @@ impl ObjectInstance {
 
     /// Takes a slot for `sim` (keeps the one it already has).
     pub(crate) fn reserve(&mut self, sim: u32, slots: u8) -> bool {
+        self.reserve_in(sim, 0..slots as usize)
+    }
+
+    /// Takes one of the slots in `range` for `sim` (keeps the one it already has).
+    pub(crate) fn reserve_in(&mut self, sim: u32, range: std::ops::Range<usize>) -> bool {
         if self.slot_of(sim).is_some() {
             return true;
         }
-        match self.users[..slots as usize]
-            .iter()
-            .position(Option::is_none)
-        {
+        let start = range.start;
+        match self.users[range].iter().position(Option::is_none) {
             Some(i) => {
-                self.users[i] = Some(sim);
+                self.users[start + i] = Some(sim);
                 true
             }
             None => false,
@@ -3384,7 +3390,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(obj) = objects.get(object as usize) else {
                 return;
             };
-            if !obj.can_use(sim.id, content.objects[obj.def].slots) || obj.broken() {
+            if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
                 return;
             }
             let inter = &content.objects[obj.def].interactions[interaction];
@@ -3482,7 +3488,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     };
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
-        if !obj.reserve(sim.id, content.objects[obj.def].slots) {
+        if !obj.reserve_in(sim.id, content.objects[obj.def].slots_for(interaction)) {
             return;
         }
         // Off to bed (they can get there): the toilet first, out of habit, and then they
@@ -4401,7 +4407,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
         let def = &content.objects[o.def];
         let i = def.interactions.iter().position(|it| it.baby)?;
         let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
-        (!o.broken() && !taken && o.has_free_slot(def.slots)).then_some((o.id, i))
+        (!o.broken() && !taken && o.can_use_in(sim.id, def.slots_for(i))).then_some((o.id, i))
     })?;
     let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
     sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
