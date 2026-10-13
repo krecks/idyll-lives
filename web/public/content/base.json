@@ -3564,6 +3564,7 @@
     "startAge": [25, 50],
     "retireAt": 65,
     "pension": 0.4,
+    "basicPension": 500,
     "retireFeeling": "retired",
     "death": {"from": 75, "perYear": 0.04, "growth": 0.12},
     "grief": {"feeling": "grieving", "lightFeeling": "missesSomeone", "close": 60, "friend": 35},

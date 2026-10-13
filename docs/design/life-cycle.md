@@ -48,7 +48,7 @@ game's pace, so changing the lifespan never makes anyone jump in age. Content `l
     {"id": "elder", "label": "Elder", "from": 60,
      "effects": {"needDecay": {"energy": 1.2}, "walkSpeed": 0.85}}
   ],
-  "retireAt": 65, "pension": 0.4,
+  "retireAt": 65, "pension": 0.4, "basicPension": 500,
   "death": {"from": 75, "perYear": 0.04, "growth": 0.12},
   "grief": {"feeling": "grieving", "lightFeeling": "missesSomeone", "close": 60, "friend": 35},
   "newcomers": {"hour": 12, "days": 3},
@@ -78,7 +78,11 @@ sometimes families (a couple with a grown child, two siblings). Grief uses kin.
 ## Retirement and death
 
 - **Retirement:** at `retireAt` an employed resident retires (story event, a good feeling) and
-  the household gets a weekly pension of `pension` × their last weekly pay.
+  the household gets a weekly pension of `pension` × their last weekly pay, and at least
+  `basicPension` (500 a week: about the rent and bills of a home of one). Anyone at or past the
+  age without a job is retired with the basic pension: made or moving in at that age, at midnight
+  on reaching it, or at midnight after losing or quitting a job. The job market doesn't hire
+  them, but a job the player gives them sticks.
 - **Death:** from `death.from` a resident may pass away of old age, checked at midnight: a
   yearly chance of `perYear`, ×e^`growth` per year past `from`, spread over the year's days
   (median about 84). The journal tells it; family, partners and friends with friendship of at

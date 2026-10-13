@@ -193,8 +193,8 @@ pub(crate) fn update(w: &mut World) {
     job_market(w, day);
 }
 
-/// Once a day: unemployed residents with free will look for work, and residents who have been
-/// unhappy at work for a while may quit.
+/// Once a day: unemployed residents with free will below the retirement age look for work, and
+/// residents who have been unhappy at work for a while may quit.
 fn job_market(w: &mut World, day: u32) {
     let Some(market) = w.content.career_rules.market.clone() else {
         return;
@@ -229,7 +229,10 @@ fn job_market(w: &mut World, day: u32) {
             }
             continue;
         }
-        if day < w.sims[i].job_search_from {
+        // Nobody's hired from the retirement age on (they retire instead; a job the player gives
+        // them is theirs to keep).
+        let retirement_age = w.content.life.retire_at.is_some_and(|at| w.sims[i].age >= at);
+        if day < w.sims[i].job_search_from || retirement_age {
             continue;
         }
         // Short on money, or set on finding work (a goal): look harder.

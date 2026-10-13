@@ -346,9 +346,10 @@ pub struct LifeRules {
     /// Ages new residents get when nothing says otherwise.
     pub start_age: [f32; 2],
     /// Working residents retire at this age (None: never), with a weekly pension of
-    /// `pension` × their last weekly pay, and the `retire_feeling`.
+    /// `pension` × their last weekly pay (at least `basic_pension`), and the `retire_feeling`.
     pub retire_at: Option<f32>,
     pub pension: f32,
+    pub basic_pension: i64,
     pub retire_feeling: Option<usize>,
     /// Passing away of old age (None: nobody does).
     pub death: Option<DeathRules>,
@@ -1549,6 +1550,7 @@ struct LifeRaw {
     start_age: Option<[f32; 2]>,
     retire_at: Option<f32>,
     pension: Option<f32>,
+    basic_pension: Option<i64>,
     retire_feeling: Option<String>,
     death: Option<DeathRaw>,
     grief: GriefRaw,
@@ -2755,12 +2757,17 @@ impl Content {
             });
         }
         let start_age = raw.life.start_age.unwrap_or([25.0, 50.0]);
+        let basic_pension = raw.life.basic_pension.unwrap_or(0);
+        if basic_pension < 0 {
+            return Err(Error::new(format!("life.basicPension {basic_pension} must be ≥ 0")));
+        }
         let life = LifeRules {
             days_per_year: raw.life.days_per_year.unwrap_or(2.0).max(0.1),
             stages,
             start_age: [start_age[0].min(start_age[1]), start_age[0].max(start_age[1])],
             retire_at: raw.life.retire_at,
             pension: raw.life.pension.unwrap_or(0.0).max(0.0),
+            basic_pension,
             retire_feeling: feeling(&raw.life.retire_feeling, "life")?,
             death: raw.life.death.as_ref().map(|d| DeathRules {
                 from: d.from,
@@ -3712,8 +3719,9 @@ mod tests {
     }
 
     /// Content that would break the game is refused, saying what's wrong: walking speeds,
-    /// decays and multipliers, too many genders, recipe steps, resale and upgrade prices, a
-    /// footprint, repeated ids, bond presets, names nothing has, and times too big to be numbers.
+    /// decays and multipliers, too many genders, recipe steps, resale and upgrade prices, a basic
+    /// pension below 0, a footprint, repeated ids, bond presets, names nothing has, and times too
+    /// big to be numbers.
     #[test]
     fn refuses_content_that_would_break_the_game() {
         use serde_json::json;
@@ -3742,6 +3750,7 @@ mod tests {
         refused(&|c| c["objectRules"] = json!({"resale": 1.5}), "objectRules.resale 1.5 must be 0..1");
         refused(&|c| c["objectRules"] = json!({"resale": -0.5}), "objectRules.resale");
         refused(&|c| c["objectRules"] = json!({"upgradeCost": -0.3}), "objectRules.upgradeCost -0.3");
+        refused(&|c| c["life"] = json!({"basicPension": -5}), "life.basicPension -5 must be ≥ 0");
         refused(&|c| c["objects"][1]["footprint"] = json!([7, 1]), "object 'tv': a footprint is at most 6 × 6 tiles");
         refused(
             &|c| {

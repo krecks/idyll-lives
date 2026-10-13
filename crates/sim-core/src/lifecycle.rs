@@ -63,19 +63,26 @@ pub(crate) fn update(w: &mut World) {
         newcomers(w, &rules);
         neighbours_adopt(w);
     }
-    let Some(days_per_year) = w.lifespan.days_per_year(w.content.life.days_per_year) else { return };
     if !clock::at_minute(w.tick, 0.0) {
         return;
     }
+    // (None: nobody ages, so nobody reaches the retirement age or dies of old age.)
+    let days_per_year = w.lifespan.days_per_year(w.content.life.days_per_year);
     let mut out_of_cribs = Vec::new();
+    let mut reached_retirement = Vec::new();
     for i in 0..w.sims.len() {
+        let Some(days_per_year) = days_per_year else { break };
         if !w.sims[i].here() || born.contains(&i) {
             continue;
         }
         let rules = &w.content.life;
         let sim = &mut w.sims[i];
         let before = rules.stage(sim.age);
+        let was = sim.age;
         sim.age += 1.0 / days_per_year;
+        if rules.retire_at.is_some_and(|at| was < at && sim.age >= at) {
+            reached_retirement.push(i);
+        }
         let stage = rules.stage(sim.age);
         if stage == before || rules.stages.is_empty() {
             continue;
@@ -118,9 +125,10 @@ pub(crate) fn update(w: &mut World) {
     }
     for i in 0..w.sims.len() {
         if w.sims[i].here() {
-            retire_if_due(w, i);
+            retire_if_due(w, i, reached_retirement.contains(&i));
         }
     }
+    let Some(days_per_year) = days_per_year else { return };
     for i in 0..w.sims.len() {
         let Some(death) = w.content.life.death else { break };
         if !w.sims[i].here() || w.sims[i].age < death.from {
@@ -134,20 +142,19 @@ pub(crate) fn update(w: &mut World) {
     }
 }
 
-/// At the retirement age a working resident retires: a weekly pension for the household.
-fn retire_if_due(w: &mut World, i: usize) {
+/// Retiring, with a weekly pension for the household: a working resident on the day they reach
+/// the retirement age (`reached`; a job they take after that is theirs to keep), and anyone at or
+/// past it without a job (who never had one, or lost or quit one) on any day.
+fn retire_if_due(w: &mut World, i: usize, reached: bool) {
     let rules = &w.content.life;
     let Some(at) = rules.retire_at else { return };
     let sim = &w.sims[i];
-    if sim.retired || sim.age < at {
+    if sim.retired || sim.age < at || (sim.job.is_some() && !reached) {
         return;
     }
-    let Some(job) = sim.job.as_ref() else { return };
-    let level = &w.content.careers[job.career].levels[job.level];
-    let weekly = level.pay * i64::from(level.days.count_ones());
-    let (career, grade) = (job.career, job.level);
+    let job = sim.job.as_ref().map(|j| (j.career, j.level));
     let feeling = rules.retire_feeling;
-    let pension = (weekly as f32 * rules.pension).round() as i64;
+    let pension = pension(&w.content, sim.job.as_ref());
     let sim = &mut w.sims[i];
     sim.retired = true;
     sim.pension = pension;
@@ -155,7 +162,21 @@ fn retire_if_due(w: &mut World, i: usize) {
     if let Some(f) = feeling {
         social::add_feeling(&mut sim.feelings, f, &w.content.feelings, w.tick);
     }
-    w.events.push_career(w.tick, EventKind::Retired, i, career, Some(grade as i64));
+    // (The story tells of leaving a job; retiring without one passes quietly.)
+    if let Some((career, grade)) = job {
+        w.events.push_career(w.tick, EventKind::Retired, i, career, Some(grade as i64));
+    }
+}
+
+/// The weekly pension of someone retiring from `job` (None: they had none): content
+/// `life.pension` × its weekly pay, and at least `life.basicPension`.
+pub(crate) fn pension(content: &crate::content::Content, job: Option<&crate::life::Job>) -> i64 {
+    let share = job.map_or(0, |job| {
+        let level = &content.careers[job.career].levels[job.level];
+        let weekly = level.pay * i64::from(level.days.count_ones());
+        (weekly as f32 * content.life.pension).round() as i64
+    });
+    share.max(content.life.basic_pension)
 }
 
 /// Old age: the story tells it, family, partners and friends grieve, and they're gone.
