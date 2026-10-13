@@ -19,7 +19,7 @@ export interface BenchFlags {
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
   hour: number | null;
   cam: BenchCamera;
-  /** Render scale: 0.5..1, or `auto` (what the game picks: today the graphics preset's own). */
+  /** Render scale: 0.5..1, or `auto` (the player's resolution setting). */
   res: number | 'auto';
   /** Seconds measured, after `warmup` seconds of the same camera path. */
   secs: number;

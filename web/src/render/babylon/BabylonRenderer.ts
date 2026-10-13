@@ -105,6 +105,7 @@ import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
+import { renderScale, watchPixelRatio } from './resolution';
 
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
@@ -330,7 +331,9 @@ export class BabylonRenderer implements Renderer {
   /** Lot the camera was last turned towards (see `buildSims`). */
   private framedView = '';
 
-  private options: LiveRenderOptions = { resolutionScale: 1, cameraSensitivity: 1, fpsCap: 60 };
+  private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 60 };
+  /** Stops watching the device pixel ratio (see `applyResolution`). */
+  private unwatchPixelRatio: (() => void) | null = null;
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
@@ -470,7 +473,7 @@ export class BabylonRenderer implements Renderer {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
-      const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
+      const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), powerPreference: 'high-performance', ...compressedTextureFeatures() });
       try {
         await engine.initAsync();
         this.engine = this.webgpu = engine;
@@ -486,7 +489,11 @@ export class BabylonRenderer implements Renderer {
         }
       }
     }
-    this.engine ??= new Engine(canvas, !this.diag.has('nocanvasaa'), { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
+    this.engine ??= new Engine(canvas, !this.diag.has('nocanvasaa'), { powerPreference: 'high-performance' });
+    // The drawing size follows the resolution setting and the device pixel ratio (not Babylon's
+    // `adaptToDeviceRatio`, which would scale our own level again when the ratio changes).
+    this.applyResolution();
+    this.unwatchPixelRatio = watchPixelRatio(this.onResize);
     // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
     if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
@@ -1876,6 +1883,7 @@ export class BabylonRenderer implements Renderer {
     this.warmPass++;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
+    this.unwatchPixelRatio?.();
     this.overview?.dispose();
     this.engine.dispose();
   }
@@ -2546,8 +2554,7 @@ export class BabylonRenderer implements Renderer {
       curves.shadowsDensity = LOOK.shadowsDensity;
     }
     this.scene.fogDensity = LOOK.fog;
-    const scale = Math.min(1, Math.max(0.5, this.options.resolutionScale));
-    this.engine.setHardwareScalingLevel(1 / (window.devicePixelRatio * scale));
+    this.applyResolution();
     this.markerPalette = LOOK.marker.map((hex) => {
       const c = Color3.FromHexString(hex).toLinearSpace();
       return [c.r * 1.2, c.g * 1.2, c.b * 1.2, 1];
@@ -3482,7 +3489,22 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  private readonly onResize = () => this.engine.resize();
+  private readonly onResize = () => this.applyResolution();
+
+  /**
+   * Sizes the drawing to the canvas, the device pixel ratio and the resolution setting
+   * (`resolution.ts`): on start, on settings changes, when the window resizes and when the pixel
+   * ratio changes (zoom, another screen).
+   */
+  private applyResolution(): void {
+    const engine = this.engine;
+    const dpr = window.devicePixelRatio || 1;
+    const scale = renderScale(this.canvas.clientWidth * dpr, this.canvas.clientHeight * dpr, this.options.resolution);
+    const level = 1 / (dpr * scale);
+    // (Setting the level resizes; the same level still needs a resize for a new canvas size.)
+    if (level !== engine.getHardwareScalingLevel()) engine.setHardwareScalingLevel(level);
+    else engine.resize();
+  }
 
   /** Image-based lighting from a prefiltered environment (manifest key `environment.sky`). */
   private async setupEnvironment(): Promise<void> {

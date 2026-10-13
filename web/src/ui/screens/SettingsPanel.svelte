@@ -7,6 +7,7 @@
   import { untrack } from 'svelte';
   import { resetSettings, RESTART_KEYS, settings, type Settings } from '../../settings/settings.svelte';
   import type { GraphicsPreset } from '../../render/quality';
+  import { MIN_SCALE } from '../../render/babylon/resolution';
   import { app } from '../app.svelte';
   import { services } from '../services';
   import { game, toast } from '../state.svelte';
@@ -58,7 +59,7 @@
 
   /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
-    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'resolutionScale', 'fpsCap', 'renderer'] },
+    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'resolution', 'fpsCap', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
@@ -164,6 +165,9 @@
     }
   }
   const percent = (v: number) => `${Math.round(v * 100)}%`;
+
+  // Resolution: Auto, or a share of the screen's own of the player's choosing (the slider; kept while on Auto).
+  let customResolution = $state(settings.resolution === 'auto' ? 1 : settings.resolution);
 
   // Frame rate cap: a preset, or a number of the player's own (`custom`, -1 in the control).
   const FPS_PRESETS = [30, 60, 120, 0];
@@ -292,9 +296,33 @@
             ]}
           />
         </SettingRow>
-        <SettingRow title="Resolution" hint="Lower is softer, but much faster.">
-          <input class="slider" type="range" min="0.5" max="1" step="0.05" aria-label="Resolution scale" bind:value={settings.resolutionScale} />
-          <output>{percent(settings.resolutionScale)}</output>
+        <SettingRow
+          title="Resolution"
+          hint={settings.resolution === 'auto' ? 'Full detail up to 1920×1080; bigger screens are scaled up.' : 'Lower is softer, but much faster.'}
+          details="Auto keeps 4K and Retina screens about as fast as a 1080p one. Custom draws that share of the screen's own resolution."
+        >
+          <Segmented
+            label="Resolution"
+            value={settings.resolution === 'auto' ? 'auto' : 'custom'}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+            onchange={(v) => (settings.resolution = v === 'auto' ? 'auto' : customResolution)}
+          />
+          {#if settings.resolution !== 'auto'}
+            <input
+              class="slider"
+              type="range"
+              min={MIN_SCALE}
+              max="1"
+              step="0.05"
+              aria-label="Resolution scale"
+              value={settings.resolution}
+              oninput={(e) => (settings.resolution = customResolution = Number(e.currentTarget.value))}
+            />
+            <output>{percent(settings.resolution)}</output>
+          {/if}
         </SettingRow>
         <SettingRow title="Frame rate cap" hint="A cap saves power and keeps laptops cooler." details="No cap draws as often as the display refreshes.">
           <Segmented

@@ -111,8 +111,8 @@ export interface RendererDeps {
 
 /** Settings that can change while a game is running. */
 export interface LiveRenderOptions {
-  /** Fraction of native resolution, 0.5..1. */
-  resolutionScale: number;
+  /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`babylon/resolution.ts`). */
+  resolution: 'auto' | number;
   cameraSensitivity: number;
   /** Frames per second at most; 0: as many as the display shows. */
   fpsCap: number;

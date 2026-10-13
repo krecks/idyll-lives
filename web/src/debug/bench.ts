@@ -94,7 +94,7 @@ export function prepareBench(): void {
   unsavedSettings();
   // (The renderer takes `?quality=` itself; the setting too, for what shows it.)
   if (b.quality) settings.graphics = b.quality;
-  if (b.res !== 'auto') settings.resolutionScale = b.res;
+  if (b.res !== 'auto') settings.resolution = b.res;
   Object.assign(settings, { directorDelay: 0, autosaveMinutes: 0, fpsCap: b.cap, autoSlow: false, voices: false, showFps: false, reducedMotion: false });
   const css: string[] = [];
   if (!b.hud) css.push('.hud-root, .world-overlay, .toast-layer { display: none !important; }');

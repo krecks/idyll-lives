@@ -4,12 +4,13 @@
  */
 
 import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
+import { MIN_SCALE, type Resolution } from '../render/babylon/resolution';
 
 export interface Settings {
   /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
   graphics: GraphicsPreset;
-  /** Fraction of native resolution, 0.5..1. */
-  resolutionScale: number;
+  /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/babylon/resolution.ts`). */
+  resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
   fpsCap: number;
   /** `webgl` draws with WebGL2 even where WebGPU works (Troubleshooting). */
@@ -75,7 +76,7 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 
 export const DEFAULT_SETTINGS: Settings = {
   graphics: 'medium',
-  resolutionScale: 1,
+  resolution: 'auto',
   fpsCap: 60,
   renderer: 'auto',
   autonomy: true,
@@ -136,6 +137,7 @@ function load(): Settings {
     // Settings that are gone (bloom, tilt-shift, the quality preset and its parts, the visual style) aren't kept.
     for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete (merged as Record<string, unknown>)[k];
     if (!isGraphicsPreset(merged.graphics)) merged.graphics = DEFAULT_SETTINGS.graphics;
+    if (merged.resolution !== 'auto' && !(merged.resolution >= MIN_SCALE && merged.resolution <= 1)) merged.resolution = DEFAULT_SETTINGS.resolution;
     // Babble (0.14–0.19) is gone: anything but a language we have becomes the default.
     if (!['en'].includes(merged.voiceLanguage)) merged.voiceLanguage = DEFAULT_SETTINGS.voiceLanguage;
     return merged;
