@@ -866,6 +866,8 @@ pub struct World {
     /// Bumped per slot when someone new takes it (views rebuild that resident).
     pub(crate) generations: Vec<u32>,
     pub(crate) rng: Rng,
+    /// The seed the game started from (0: unknown, a save from before v23), for bug reports.
+    pub seed: u32,
     pub(crate) structure_version: u32,
     /// Bumped when the lot itself changes (walls, doors, windows, fences, coverings, floors),
     /// not when only objects, residents or households do: views can then leave the lot out.
@@ -972,6 +974,7 @@ impl World {
 
     pub fn new(content: Content, lot_file: &LotFile, seed: u32) -> Result<Self, Error> {
         let mut world = Self::empty(content, Lot::from_file(lot_file)?, Rng::new(seed));
+        world.seed = seed;
         // Storeys from the file before its objects (stairs, furniture upstairs).
         let storeys = lot_file.storeys.unwrap_or(1).clamp(1, 4);
         if storeys > 1 || lot_file.basement {
@@ -1099,6 +1102,7 @@ impl World {
             former: Vec::new(),
             generations: Vec::new(),
             rng,
+            seed: 0,
             structure_version: 1,
             lot_version: 1,
             briefs: Vec::new(),

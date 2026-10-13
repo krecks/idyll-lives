@@ -673,8 +673,8 @@ impl Relationships {
         for (x, y, kin) in [(a, b, preset.kin), (b, a, preset.kin.inverse())] {
             let r = self.get_mut(x, y);
             r.met = true;
-            r.friendship = preset.friendship;
-            r.romance = preset.romance;
+            r.friendship = preset.friendship.clamp(-100.0, 100.0);
+            r.romance = preset.romance.clamp(-100.0, 100.0);
             r.partners = preset.partners;
             if !kin.is_none() {
                 r.kin = kin;

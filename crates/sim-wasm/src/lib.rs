@@ -34,6 +34,12 @@ impl Game {
         Ok(Game::with_world(world))
     }
 
+    /// The seed the game started from, for bug reports (0: unknown, a save from before v23).
+    #[wasm_bindgen(getter)]
+    pub fn seed(&self) -> u32 {
+        self.world.seed
+    }
+
     /// Serializes the whole game state (see `sim_core::save`).
     pub fn save(&self) -> String {
         self.world.save_json()

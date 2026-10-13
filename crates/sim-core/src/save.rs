@@ -35,9 +35,10 @@
 //! 21 = story events from the phone (`invited`, `declined`); a phone action under way isn't
 //! saved, nor is joining in on a conversation (`Join` tasks); 22 = basements (`basement`: the
 //! block of the lot's rows holding storey -1, after the storeys above; absent: none, and the lot
-//! grows one on the end if the content allows it, so nothing already built moves). Older files
-//! load. Saves written before feelings
-//! were renamed from "moodlets" store them under `moodlets`; a serde alias still reads it.
+//! grows one on the end if the content allows it, so nothing already built moves); 23 = the seed
+//! the game started from (`seed`, for bug reports; absent: 0, unknown). Older files load. Saves
+//! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
+//! alias still reads it.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -53,7 +54,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 22;
+pub const SAVE_VERSION: u32 = 23;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,6 +83,9 @@ pub struct SaveFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_moves: Option<bool>,
     pub rng: u32,
+    /// The seed the game started from (absent before v23: 0, unknown).
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub seed: u32,
     pub lot: LotSave,
     pub objects: Vec<ObjectSave>,
     pub sims: Vec<SimSave>,
@@ -200,6 +204,17 @@ pub struct LookSave {
 
 fn is_zero(n: &u8) -> bool {
     *n == 0
+}
+
+/// A number as a save can hold it: JSON has no NaN or infinity, and one (written as `null`)
+/// would make the whole save unloadable, so a broken value is written as `or`.
+fn finite(x: f32, or: f32) -> f32 {
+    if x.is_finite() { x } else { or }
+}
+
+/// `Some(x)` if it can be saved (else left out, and loaded as the default).
+fn some_finite(x: f32) -> Option<f32> {
+    x.is_finite().then_some(x)
 }
 
 fn is_unworn(w: &f32) -> bool {
@@ -602,7 +617,7 @@ impl World {
                 value: Some(o.value),
                 turn: o.turn,
                 offset: o.offset,
-                wear: o.wear,
+                wear: finite(o.wear, 0.0),
                 size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
                 tall: o.tall,
             })
@@ -619,6 +634,11 @@ impl World {
                 {
                     let (fx, fz) = s.seated_from.unwrap_or_else(|| self.approach_tile(&self.objects[object as usize]));
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+                }
+                // (Lost somewhere: back at home's front door, or the middle of town.)
+                if !pos.iter().all(|p| p.is_finite()) {
+                    let home = self.households.get(s.household as usize).and_then(|h| h.plot);
+                    pos = home.map_or([self.lot.width as f32 / 2.0, self.lot.depth as f32 / 2.0], |p| self.plots[p as usize].arrival_point());
                 }
                 let tasks = s
                     .current()
@@ -643,35 +663,35 @@ impl World {
                     household: s.household,
                     traits: s.traits.clone(),
                     perks: s.perks.clone(),
-                    age: Some(s.age),
+                    age: some_finite(s.age),
                     gone: s.gone,
                     retired: s.retired,
                     pension: s.pension,
-                    grade: content.life.stage_at(s.age).is_some_and(|st| st.school).then_some(s.grade),
+                    grade: content.life.stage_at(s.age).is_some_and(|st| st.school).then_some(s.grade).and_then(some_finite),
                     pos,
-                    yaw: s.yaw,
+                    yaw: finite(s.yaw, 0.0),
                     needs: content
                         .needs
                         .iter()
                         .enumerate()
-                        .map(|(i, n)| (n.id.clone(), s.needs[i]))
+                        .map(|(i, n)| (n.id.clone(), finite(s.needs[i], 0.75)))
                         .collect(),
                     feelings,
                     skills: content
                         .skills
                         .iter()
                         .enumerate()
-                        .map(|(i, k)| (k.id.clone(), s.skills[i]))
+                        .map(|(i, k)| (k.id.clone(), finite(s.skills[i], 0.0)))
                         .collect(),
                     job: s.job.as_ref().map(|j| JobSave {
                         career: content.careers[j.career].id.clone(),
                         level: j.level,
-                        performance: j.performance,
+                        performance: finite(j.performance, 0.0),
                         last_shift_day: j.last_shift_day,
-                        satisfaction: Some(j.satisfaction),
+                        satisfaction: some_finite(j.satisfaction),
                         shifts: j.shifts,
                         missed: j.missed,
-                        shift_mood: Some(j.shift_mood),
+                        shift_mood: some_finite(j.shift_mood),
                     }),
                     job_search_from: s.job_search_from,
                     nap_minutes: minutes_left(s.nap_until),
@@ -684,7 +704,7 @@ impl World {
                     held: s.held.map(|h| HeldSave {
                         def: content.items[h.def].id.clone(),
                         servings: h.servings,
-                        quality: h.quality,
+                        quality: finite(h.quality, 1.0),
                         made_at: h.made_at,
                         recipe: h.recipe.map(|r| content.recipes[r].id.clone()),
                     }),
@@ -699,11 +719,12 @@ impl World {
                 let rel = *self.relationships.get(a, b);
                 let chemistry = self.relationships.chemistry(a, b);
                 if a != b && (rel != Relationship::default() || chemistry != 0.0) {
+                    let rel = Relationship { friendship: finite(rel.friendship, 0.0), romance: finite(rel.romance, 0.0), ..rel };
                     relationships.push(RelationshipSave {
                         a: a as u32,
                         b: b as u32,
                         rel,
-                        chemistry,
+                        chemistry: finite(chemistry, 0.0),
                     });
                 }
             }
@@ -726,6 +747,7 @@ impl World {
             basement: (self.stairs.basement > 0).then_some(self.stairs.basement as u8),
             player_moves: (!self.player_moves).then_some(false),
             rng: self.rng.state(),
+            seed: self.seed,
             lot: LotSave {
                 width: self.lot.width,
                 depth: self.lot.depth,
@@ -762,7 +784,7 @@ impl World {
                     w: p.w,
                     d: p.d,
                     public: p.public,
-                    entry: p.entry,
+                    entry: p.entry.filter(|e| e.iter().all(|v| v.is_finite())),
                     roof: p.roof.map(|r| {
                         let b = &content.build;
                         let id = |list: &[crate::content::BuildStyle], i: u8| {
@@ -774,7 +796,7 @@ impl World {
                 .collect(),
             relationships,
             meta: self.meta.clone(),
-            exits: self.exits.clone(),
+            exits: self.exits.iter().copied().filter(|e| e.iter().all(|v| v.is_finite())).collect(),
             events: self
                 .events
                 .iter()
@@ -808,7 +830,7 @@ impl World {
                         z,
                         offset,
                         servings: it.servings,
-                        quality: it.quality,
+                        quality: finite(it.quality, 1.0),
                         made_at: it.made_at,
                         household: it.household,
                         spoiled: it.spoiled,
@@ -858,6 +880,7 @@ impl World {
             world.stairs.basement = basement.map_or(0, i32::from);
         }
         world.mode = save.mode;
+        world.seed = save.seed;
         world.tick = save.tick;
         world.speed = save.speed.min(MAX_SPEED);
         // Before v8 the one free-will switch was the player's setting; now each household has one.
@@ -930,6 +953,9 @@ impl World {
                 })
                 .collect()
         };
+        if let Some(h) = world.households.iter().find(|h| h.plot.is_some_and(|p| p as usize >= world.plots.len())) {
+            return Err(Error::new(format!("corrupt save: household '{}' lives on an unknown plot", h.name)));
+        }
 
         // Keep object ids stable: a removed object type would shift ids, so tasks are remapped.
         // Things standing on tops go in once everything else stands.
@@ -978,7 +1004,7 @@ impl World {
                 appearance: s.appearance.clone(),
                 traits: s.traits.clone(),
                 perks: s.perks.clone(),
-                age: s.age,
+                age: s.age.filter(|a| a.is_finite()),
                 skills: Default::default(),
                 x: s.pos[0],
                 z: s.pos[1],
@@ -986,13 +1012,16 @@ impl World {
             world.spawn_sim(&spawn)?;
         }
         let n = world.sims.len();
+        if let Some(h) = world.households.iter().find(|h| h.expecting.is_some_and(|e| e.parents.iter().any(|&p| p as usize >= n))) {
+            return Err(Error::new(format!("corrupt save: household '{}' expects a baby by someone who isn't in town", h.name)));
+        }
         let plot_count = world.plots.len();
         let tick = world.tick;
-        let after = |minutes: f32| tick + social::minutes_to_ticks(minutes);
+        let after = |minutes: f32| tick.saturating_add(social::minutes_to_ticks(finite(minutes, 0.0)));
         for (id, s) in save.sims.iter().enumerate() {
             let content = &world.content;
             let sim = &mut world.sims[id];
-            sim.yaw = s.yaw;
+            sim.yaw = finite(s.yaw, 0.0);
             sim.gone = s.gone;
             sim.retired = s.retired;
             sim.pension = s.pension.max(0);
@@ -1182,7 +1211,8 @@ impl World {
             for r in &save.relationships {
                 let (a, b) = (r.a as usize, r.b as usize);
                 if a < n && b < n && a != b {
-                    world.relationships.set(a, b, r.rel);
+                    let rel = Relationship { friendship: r.rel.friendship.clamp(-100.0, 100.0), romance: r.rel.romance.clamp(-100.0, 100.0), ..r.rel };
+                    world.relationships.set(a, b, rel);
                     world.relationships.set_chemistry(a, b, r.chemistry);
                 }
             }
@@ -1243,7 +1273,11 @@ impl World {
             .collect();
         world.items.list.sort_by_key(|it| it.id);
         world.items.list.dedup_by_key(|it| it.id);
-        world.items.next_id = save.next_item.max(world.items.list.last().map_or(0, |it| it.id + 1));
+        let after_last = match world.items.list.last() {
+            Some(it) => it.id.checked_add(1).ok_or_else(|| Error::new("corrupt save: an item id is out of range"))?,
+            None => 0,
+        };
+        world.items.next_id = save.next_item.max(after_last);
         world.make_storeys();
         world.refresh_rooms();
         // What someone was eating or washing up is put down (those don't go on after loading).
@@ -1267,6 +1301,8 @@ impl World {
                 directed: t.directed,
                 routine: t.routine,
             },
+            // (A walk to nowhere isn't saved.)
+            TaskKind::MoveTo { x, z } if !(x.is_finite() && z.is_finite()) => return None,
             TaskKind::MoveTo { x, z } => TaskSave::MoveTo {
                 x,
                 z,
@@ -1541,11 +1577,11 @@ fn goal_save(content: &Content, g: &Goal) -> GoalSave {
         skill: skill_id(content, g.skill),
         category: g.category.map(|c| content.career_categories[c].id.clone()),
         object: g.object.map(|o| content.objects[o].id.clone()),
-        target: g.target,
+        target: finite(g.target, 0.0),
         since_day: g.since_day,
-        start: g.start,
-        progress: g.progress,
-        history: g.history,
+        start: finite(g.start, 0.0),
+        progress: finite(g.progress, 0.0),
+        history: g.history.map(|h| finite(h, 0.0)),
     }
 }
 
@@ -1619,7 +1655,7 @@ fn planner_save(content: &Content, p: &Planner) -> Option<PlannerSave> {
                 }
                 .into(),
                 reason: b.reason.map(|r| reason_save(content, r)),
-                done: b.done,
+                done: finite(b.done, 0.0),
             })
             .collect(),
         wishes: p
@@ -2009,5 +2045,89 @@ mod tests {
         assert_eq!(loaded.lot.v_edge(6, 8), crate::lot::Edge::Window);
         assert_eq!(loaded.lot.v_edge(6, 4), crate::lot::Edge::Door);
         assert_eq!(loaded.save_json(), json);
+    }
+
+    /// A saved game as JSON, edited by `f`.
+    fn edited(f: impl FnOnce(&mut serde_json::Value)) -> String {
+        let w = World::from_json(CONTENT, LOT, 3).unwrap();
+        let mut saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+        f(&mut saved);
+        saved.to_string()
+    }
+
+    /// Damaged saves are refused when they're read, not by a panic later: a household on a plot
+    /// the town doesn't have, a baby expected by someone who isn't there, an item id past the
+    /// last one there can be.
+    #[test]
+    fn damaged_saves_are_refused_on_loading() {
+        let refused = |json: String, why: &str| {
+            let err = World::from_save_json(CONTENT, &json).err().unwrap_or_else(|| panic!("{why}: loaded"));
+            assert!(err.to_string().starts_with("corrupt save"), "{why}: {err}");
+        };
+        refused(edited(|s| s["households"][0]["plot"] = 7.into()), "unknown plot");
+        refused(edited(|s| s["households"][0]["expecting"] = serde_json::json!({"parents": [0, 9], "due": 3})), "unknown parent");
+        let item = serde_json::json!([{"id": u32::MAX, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0}]);
+        // (An item the content doesn't know is dropped: give the content one.)
+        let content = CONTENT.replacen(r#""needs":"#, r#""items":[{"id":"x","label":"X","model":"x"}],"needs":"#, 1);
+        let json = edited(|s| s["items"] = item);
+        let err = World::from_save_json(&content, &json).err().map(|e| e.to_string());
+        assert_eq!(err.as_deref(), Some("corrupt save: an item id is out of range"));
+        // An expected baby by residents who are there loads.
+        let json = edited(|s| s["households"][0]["expecting"] = serde_json::json!({"parents": [0, 1], "due": 3}));
+        assert!(World::from_save_json(CONTENT, &json).is_ok());
+    }
+
+    /// Numbers out of range in a save (here written as 1e39, which reads as infinity) are brought
+    /// back in: a facing, friendship and romance (±100), a nap or a visit's end.
+    #[test]
+    fn numbers_out_of_range_load_in_range() {
+        let json = edited(|s| {
+            s["sims"][0]["yaw"] = serde_json::json!(1e39);
+            s["sims"][0]["napMinutes"] = serde_json::json!(1e39);
+            s["sims"][0]["visiting"] = serde_json::json!([0, 1e39]);
+            for r in s["relationships"].as_array_mut().unwrap() {
+                r["friendship"] = serde_json::json!(1e39);
+                r["romance"] = serde_json::json!(-1e39);
+            }
+        });
+        let w = World::from_save_json(CONTENT, &json).unwrap();
+        assert_eq!(w.sims[0].yaw, 0.0);
+        let r = w.relationships.get(0, 1);
+        assert_eq!((r.friendship, r.romance), (100.0, -100.0));
+        assert_eq!(w.sims[0].nap_until, w.tick + 1, "no nap for ever");
+    }
+
+    /// Whatever goes wrong while playing, the save can be loaded: a value that isn't a number
+    /// (NaN, infinity) is written as a usable one, never as `null`.
+    #[test]
+    fn broken_numbers_never_make_a_save_unloadable() {
+        let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
+        let s = &mut w.sims[0];
+        s.pos = [f32::NAN, 3.0];
+        s.yaw = f32::INFINITY;
+        s.age = f32::NAN;
+        s.needs[0] = f32::NAN;
+        s.skills[0] = f32::NEG_INFINITY;
+        w.objects[0].wear = f32::NAN;
+        w.relationships.adjust(0, 1, f32::NAN, 0.0);
+        w.exits.push([f32::NAN, 1.0]);
+        let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+        assert!(loaded.sims[0].pos.iter().all(|p| p.is_finite()));
+        assert_eq!(loaded.sims[0].needs[0], 0.75);
+        assert_eq!(loaded.relationships.get(0, 1).friendship, 0.0);
+        assert!(loaded.exits.is_empty());
+    }
+
+    /// v23: the seed the game started from is kept (absent in older saves: 0, unknown).
+    #[test]
+    fn the_starting_seed_is_saved() {
+        let w = World::from_json(CONTENT, LOT, 1234).unwrap();
+        assert_eq!(w.seed, 1234);
+        let json = w.save_json();
+        assert_eq!(World::from_save_json(CONTENT, &json).unwrap().seed, 1234);
+        let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
+        old["version"] = 22.into();
+        old.as_object_mut().unwrap().remove("seed");
+        assert_eq!(World::from_save_json(CONTENT, &old.to_string()).unwrap().seed, 0);
     }
 }
