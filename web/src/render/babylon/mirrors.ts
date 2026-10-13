@@ -5,7 +5,8 @@
  * The rest keep their glossy glass. A reflection is only drawn while its mirror is on screen.
  *
  * Mirrors follow their object's instance matrix each frame, so things popping in, hidden storeys
- * and objects being moved need nothing extra.
+ * and objects being moved need nothing extra. A reflection's render target exists only while a
+ * mirror uses it (and a little after, as mirrors come and go with the camera's turns).
  */
 
 import { Color3, Constants, Matrix, Mesh, MirrorTexture, Plane, StandardMaterial, Vector3, VertexData, type AbstractMesh, type Camera, type Scene } from './core';
@@ -23,6 +24,15 @@ export interface MirrorInstance {
 const RATIO = 0.75;
 /** Mirrors further from the camera than this (m) aren't worth a reflection. */
 const RANGE = 40;
+/** Milliseconds a reflection's render target is kept once no mirror uses it. */
+const KEEP_MS = 10_000;
+
+interface Reflection {
+  texture: MirrorTexture;
+  material: StandardMaterial;
+  /** When a mirror last used it (`performance.now()`). */
+  used: number;
+}
 
 interface Item {
   instance: MirrorInstance;
@@ -39,7 +49,8 @@ interface Item {
 }
 
 export class Mirrors {
-  private readonly pool: { texture: MirrorTexture; material: StandardMaterial }[] = [];
+  /** The reflections that may be live at once (null: not made, or let go). */
+  private readonly pool: (Reflection | null)[];
   private readonly square: Mesh;
   private readonly disc: Mesh;
   private readonly overlays = new Set<AbstractMesh>();
@@ -52,28 +63,47 @@ export class Mirrors {
    * `count`: how many mirrors reflect at once (0: none). `reflected`: whether a mesh shows in
    * reflections (the overlays never do).
    */
+  /** A reflection made (the benchmark watches what each draws). */
+  onCreated: ((texture: MirrorTexture) => void) | null = null;
+
   constructor(
-    scene: Scene,
+    private readonly scene: Scene,
     count: number,
-    reflected: (mesh: AbstractMesh) => boolean,
+    private readonly reflected: (mesh: AbstractMesh) => boolean,
   ) {
     this.square = unitMesh(scene, 'mirrorSquare', false);
     this.disc = unitMesh(scene, 'mirrorDisc', true);
-    for (let i = 0; i < count; i++) {
-      const texture = new MirrorTexture(`mirror${i}`, { ratio: RATIO }, scene, false, Constants.TEXTURETYPE_HALF_FLOAT);
-      texture.renderListPredicate = (mesh) => !this.overlays.has(mesh) && reflected(mesh);
-      // Multisampled: at this size, unsmoothed edges show as stairs.
-      texture.samples = 4;
-      // A hint of the glass's own tint and loss.
-      texture.level = 0.92;
-      const material = new StandardMaterial(`mirror${i}`, scene);
-      material.diffuseColor = Color3.Black();
-      material.specularColor = Color3.Black();
-      material.emissiveColor = new Color3(0.006, 0.008, 0.009);
-      material.disableLighting = true;
-      material.reflectionTexture = texture;
-      this.pool.push({ texture, material });
-    }
+    this.pool = Array.from({ length: count }, () => null);
+  }
+
+  private reflection(i: number): Reflection {
+    const known = this.pool[i];
+    if (known) return known;
+    const texture = new MirrorTexture(`mirror${i}`, { ratio: RATIO }, this.scene, false, Constants.TEXTURETYPE_HALF_FLOAT);
+    texture.renderListPredicate = (mesh) => !this.overlays.has(mesh) && this.reflected(mesh);
+    // Multisampled: at this size, unsmoothed edges show as stairs.
+    texture.samples = 4;
+    // A hint of the glass's own tint and loss.
+    texture.level = 0.92;
+    const material = new StandardMaterial(`mirror${i}`, this.scene);
+    material.diffuseColor = Color3.Black();
+    material.specularColor = Color3.Black();
+    material.emissiveColor = new Color3(0.006, 0.008, 0.009);
+    material.disableLighting = true;
+    material.reflectionTexture = texture;
+    this.onCreated?.(texture);
+    return (this.pool[i] = { texture, material, used: 0 });
+  }
+
+  /** Lets go of the reflections no mirror has used for `KEEP_MS` (all of them with `now` Infinity). */
+  private release(now: number): void {
+    this.pool.forEach((r, i) => {
+      if (!r || now - r.used < KEEP_MS || this.items.some((item) => item.slot === i)) return;
+      for (const item of this.items) for (const mesh of item.meshes) if (mesh.material === r.material) mesh.material = null;
+      r.material.dispose();
+      r.texture.dispose();
+      this.pool[i] = null;
+    });
   }
 
   /** The mirrors of the world being shown (replaces the last ones). */
@@ -81,6 +111,8 @@ export class Mirrors {
     for (const item of this.items) for (const mesh of item.meshes) mesh.dispose();
     this.overlays.clear();
     this.items = [];
+    // A world without mirrors needs none of the reflections.
+    if (!instances.some((i) => i.surfaces.length)) this.release(Infinity);
     if (!this.pool.length) return;
     for (const instance of instances) {
       const meshes = instance.surfaces.map((s, i) => {
@@ -97,6 +129,7 @@ export class Mirrors {
   /** Per frame: places the mirrors and gives the reflections to the nearest ones facing `camera`. */
   update(camera: Camera): void {
     if (!this.items.length) return;
+    const now = performance.now();
     const eye = camera.globalPosition;
     const ranked = this.ranked;
     ranked.length = 0;
@@ -131,7 +164,9 @@ export class Mirrors {
       item.meshes.forEach((mesh, i) => {
         if (mesh.isEnabled() !== on) mesh.setEnabled(on);
         if (!on) return;
-        const { material, texture } = this.pool[item.slot];
+        const reflection = this.reflection(item.slot);
+        reflection.used = now;
+        const { material, texture } = reflection;
         if (mesh.material !== material) mesh.material = material;
         item.instance.surfaces[i].matrix.multiplyToRef(item.matrix, item.worlds[i]);
         mesh.freezeWorldMatrix(item.worlds[i]);
@@ -139,11 +174,21 @@ export class Mirrors {
         if (i === 0) Plane.FromPositionAndNormalToRef(item.centre, item.normal.negateToRef(this.back), texture.mirrorPlane);
       });
     }
+    this.release(now);
   }
 
-  /** The reflections' render targets, mirrors in the world and those reflecting now (benchmark reports). */
+  /** How many reflections may be live at once, the render targets of those reflecting now, mirrors in the world and those reflecting now (benchmark reports). */
+  get capacity(): number {
+    return this.pool.length;
+  }
+
+  get reflecting(): MirrorTexture[] {
+    return this.items.filter((item) => item.slot >= 0).map((item) => this.pool[item.slot]?.texture).filter((t): t is MirrorTexture => !!t);
+  }
+
+  /** The reflections' render targets made now. */
   get textures(): MirrorTexture[] {
-    return this.pool.map((p) => p.texture);
+    return this.pool.filter((r): r is Reflection => !!r).map((r) => r.texture);
   }
 
   get count(): number {
@@ -156,10 +201,7 @@ export class Mirrors {
 
   dispose(): void {
     this.set([]);
-    for (const { texture, material } of this.pool) {
-      material.dispose();
-      texture.dispose();
-    }
+    this.release(Infinity);
     this.square.dispose();
     this.disc.dispose();
   }

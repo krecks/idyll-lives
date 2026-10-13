@@ -1616,6 +1616,9 @@ export class BabylonRenderer implements Renderer {
     const map = this.shadows.getShadowMap();
     if (map) watch(map, 'shadow');
     for (const texture of this.mirrors.textures) watch(texture, 'mirror');
+    // (Reflections are made when a mirror first reflects.)
+    this.mirrors.onCreated = (texture) => watch(texture, 'mirror');
+    this.probeOff.push(() => (this.mirrors.onCreated = null));
   }
 
   measureGpu(on: boolean, who: 'overlay' | 'bench' = 'overlay'): void {
@@ -1734,7 +1737,7 @@ export class BabylonRenderer implements Renderer {
     const push = (pass: RenderPassInfo | null) => pass && passes.push(pass);
     if (this.sun.shadowEnabled && map?.renderList?.length) push(target('shadow', map.renderTarget));
     const live = this.mirrors.live;
-    this.mirrors.textures.slice(0, live).forEach((t, i) => push(target(`mirror${i}`, t.renderTarget)));
+    this.mirrors.reflecting.forEach((t, i) => push(target(`mirror${i}`, t.renderTarget)));
     // The scene draws into the first post-process's input, each post-process into the next one's, the last onto the canvas.
     const chain = (this.camera._postProcesses ?? []).filter((pp) => !!pp);
     if (chain.length) push(target('scene', chain[0]!.inputTexture));
@@ -1753,7 +1756,7 @@ export class BabylonRenderer implements Renderer {
       gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : (engine as Engine).getGlInfo(),
       timerQuery: !!engine.getCaps().timerQuery,
       render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: !this.diag.has('nocanvasaa') },
-      quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
+      quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
       diag: [...this.diag],
       passes,
       targets: (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache.map((t) => target(t.label ?? '?', t)),
