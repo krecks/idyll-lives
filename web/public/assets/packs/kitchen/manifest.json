@@ -1,0 +1,248 @@
+{
+  "$comment": "Blender-built kitchen models (tools/art/blender/kitchen.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "version": 1,
+  "entries": {
+    "model.fridge": {
+      "type": "model",
+      "url": "../../models/kitchen/fridge.glb",
+      "materials": {
+        "*": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "seal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "produce2": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
+        "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "peas": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            0.68,
+            0.06,
+            0.57
+          ],
+          "at": [
+            0.0,
+            0.03,
+            -0.17
+          ],
+          "color": "#B9BCBF",
+          "material": "material.finish.satin",
+          "radius": 0.006
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.74,
+            1.74,
+            0.63
+          ],
+          "at": [
+            0.0,
+            0.93,
+            -0.14
+          ],
+          "color": "#F3F3F1",
+          "material": "material.finish.gloss",
+          "radius": 0.03
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.728,
+            0.556,
+            0.04
+          ],
+          "at": [
+            0.0,
+            1.51,
+            0.195
+          ],
+          "color": "#F3F3F1",
+          "material": "material.finish.gloss",
+          "radius": 0.022
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.728,
+            1.146,
+            0.04
+          ],
+          "at": [
+            0.0,
+            0.643,
+            0.195
+          ],
+          "color": "#F3F3F1",
+          "material": "material.finish.gloss",
+          "radius": 0.022
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.7,
+            0.014,
+            0.03
+          ],
+          "at": [
+            0.0,
+            1.224,
+            0.187
+          ],
+          "color": "#B9BCBF",
+          "material": "material.finish.satin",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.022,
+            0.25,
+            0.022
+          ],
+          "at": [
+            -0.3,
+            1.399,
+            0.256
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.009899999999999999
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.0176,
+            0.0176,
+            0.03
+          ],
+          "at": [
+            -0.3,
+            1.304,
+            0.23
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.0176,
+            0.0176,
+            0.03
+          ],
+          "at": [
+            -0.3,
+            1.494,
+            0.23
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.022,
+            0.36,
+            0.022
+          ],
+          "at": [
+            -0.3,
+            0.984,
+            0.256
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.009899999999999999
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.0176,
+            0.0176,
+            0.03
+          ],
+          "at": [
+            -0.3,
+            0.834,
+            0.23
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.0176,
+            0.0176,
+            0.03
+          ],
+          "at": [
+            -0.3,
+            1.134,
+            0.23
+          ],
+          "color": "#D0D3D6",
+          "material": "material.finish.chrome",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.1,
+            0.018,
+            0.004
+          ],
+          "at": [
+            0.25,
+            1.74,
+            0.216
+          ],
+          "color": "#B9BCBF",
+          "material": "material.finish.satin",
+          "radius": 0.002
+        }
+      ]
+    }
+  }
+}
