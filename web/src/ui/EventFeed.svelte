@@ -43,9 +43,11 @@
     -webkit-backdrop-filter: blur(var(--glass-blur));
     font-weight: 550;
     font-size: 13px;
+    /* Gone after 12 s (FEED_MS in game/session.ts). The fade waits rather than taking 12 s, so
+       reduced motion, which only shortens animations, still shows the entry for its time. */
     animation:
       slide var(--slow) var(--ease),
-      fade 12s linear forwards;
+      fade 1.8s linear 10.2s forwards;
   }
   li.milestone {
     border-color: var(--accent);
@@ -84,12 +86,11 @@
       transform: translateX(16px);
     }
   }
+  /* Hidden at the end, not just see-through: a faded entry can't be clicked. */
   @keyframes fade {
-    85% {
-      opacity: 1;
-    }
     to {
       opacity: 0;
+      visibility: hidden;
     }
   }
 </style>
