@@ -31,7 +31,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # No RUSTFLAGS here: it would replace .cargo/config.toml's and drop SIMD from the wasm.
+    # No RUSTFLAGS here: it would replace .cargo/config.toml's SIMD flag (the wasm crates then
+    # stop with a compile error), so a flag added here must repeat `-C target-feature=+simd128`.
     env:
       CARGO_TERM_COLOR: always
     steps:

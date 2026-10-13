@@ -1,3 +1,4 @@
-# WASM SIMD is supported by every desktop browser we target.
+# WASM SIMD is supported by every desktop browser we target. A RUSTFLAGS in the environment
+# replaces these flags instead of adding to them: the wasm crates then refuse to build without SIMD.
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "target-feature=+simd128"]
