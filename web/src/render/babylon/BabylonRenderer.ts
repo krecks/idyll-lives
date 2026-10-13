@@ -1631,9 +1631,11 @@ export class BabylonRenderer implements Renderer {
     const casters = (map?.renderList ?? []).filter((m) => m.isEnabled() && m.isVisible) as Mesh[];
     const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
     const nature = this.natureIn.world?.meshes ?? [];
+    // (GPUAdapterInfo's fields are getters: copied one by one.)
+    const adapter = (this.webgpu as unknown as { _adapterInfo?: Record<string, string> } | null)?._adapterInfo;
     return {
       backend: this.webgpu ? 'WebGPU' : 'WebGL2',
-      gpu: this.webgpu ? { ...((this.webgpu as unknown as { _adapterInfo?: Record<string, string> })._adapterInfo ?? {}) } : (engine as Engine).getGlInfo(),
+      gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : (engine as Engine).getGlInfo(),
       timerQuery: !!engine.getCaps().timerQuery,
       render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: !this.diag.has('nocanvasaa') },
       quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
