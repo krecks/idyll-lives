@@ -37,6 +37,7 @@ import {
   type SubMesh,
   type UniformBuffer,
 } from './core';
+import { withBuild } from '../../assets/build';
 import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
 
@@ -685,7 +686,9 @@ export class MaterialLibrary {
  * A texture from the build's compressed copy (KTX2, which carries its own colour space) when
  * there is one, else from the file; a copy that fails to load falls back to the file.
  */
-export function textureWithFallback(url: string, scene: Scene, srgb: boolean, anisotropy?: number): Texture {
+export function textureWithFallback(source: string, scene: Scene, srgb: boolean, anisotropy?: number): Texture {
+  // Normal and ARM maps sit next to the albedo (`new URL(entry.normal, base)`), without the build's query.
+  const url = withBuild(source);
   const copy = optimizedUrl(url);
   const tex: Texture = new Texture(copy, scene, {
     invertY: false,

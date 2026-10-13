@@ -29,6 +29,7 @@ import {
   Vector3,
   type Mesh,
 } from '../babylon/core';
+import { withoutBuild } from '../../assets/build';
 import type { AssetRegistry } from '../../assets/registry';
 import { MaterialLibrary } from '../babylon/materials';
 import { buildModel } from '../babylon/models';
@@ -216,9 +217,9 @@ class ItemThumbnails implements ItemPreviews {
     return this.store;
   }
 
-  /** Cache key: changes with the app version and the model's manifest entry (its file, fit, finishes). */
+  /** Cache key: changes with the app version and the model's manifest entry (its file, fit, finishes; not the build). */
   private storeKey(model: string): string {
-    const entry = this.assets.has(model, 'model') ? JSON.stringify(this.assets.get(model, 'model')) : '';
+    const entry = this.assets.has(model, 'model') ? withoutBuild(JSON.stringify(this.assets.get(model, 'model'))) : '';
     return `${location.origin}/__item-pictures/${__APP_VERSION__}/${THUMB_PX}/${hash(model + entry)}.webp`;
   }
 

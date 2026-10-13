@@ -5,3 +5,5 @@
 declare const __APP_VERSION__: string;
 /** The commit the game was built from (short hash; see vite.config.ts). */
 declare const __APP_COMMIT__: string;
+/** Tells this build's files apart in caches (`assets/build.ts`; see vite.config.ts). */
+declare const __BUILD_ID__: string;

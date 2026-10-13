@@ -26,6 +26,12 @@ function commit(): string {
   }
 }
 const COMMIT = commit();
+/**
+ * This build's id, a query on runtime fetches from public/ (src/assets/build.ts): the commit in CI;
+ * locally the commit and the build time, as the tree may hold changes. No dots: Babylon reads a
+ * texture's type from the URL's last dot.
+ */
+const BUILD_ID = process.env.GITHUB_SHA ? COMMIT : `${COMMIT}-${Date.now().toString(36)}`;
 
 /** Where debug reports from the game land (dev server only): `<repo>/debug-reports/<name>/`. */
 const REPORTS = fileURLToPath(new URL('../debug-reports', import.meta.url));
@@ -127,7 +133,7 @@ function optimizedAssets(): Plugin {
 export default defineConfig({
   plugins: [svelte(), debugReports(), optimizedAssets()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
-  define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT) },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
   preview: { headers: crossOriginIsolation },
   worker: { format: 'es' },

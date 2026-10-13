@@ -8,6 +8,7 @@
  * files without a copy (the dev server, a modder's pack) load as they are.
  */
 
+import { withBuild, withoutBuild } from './build';
 import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
 
 const URL_FIELDS = ['url', 'texture'] as const;
@@ -56,20 +57,20 @@ export class AssetRegistry {
 
 /** A manifest followed by the packs it lists (depth first, in order), fetched in parallel. */
 async function fetchManifests(url: URL): Promise<[URL, Manifest][]> {
-  const res = await fetch(url);
+  const res = await fetch(withBuild(url.href));
   if (!res.ok) throw new Error(`failed to load asset manifest ${url}: ${res.status}`);
   const manifest = (await res.json()) as Manifest;
   const packs = await Promise.all((manifest.packs ?? []).map((pack) => fetchManifests(new URL(pack, url))));
   return [[url, manifest], ...packs.flat()];
 }
 
-/** Absolute source URL -> absolute URL of its compressed copy. */
+/** Absolute source URL -> absolute URL of its compressed copy (both without the build query). */
 const optimized = new Map<string, string>();
 
 /** Reads the build's index of compressed copies (there is none on the dev server). */
 async function loadOptimized(base: URL): Promise<void> {
   try {
-    const res = await fetch(new URL('optimized.json', base));
+    const res = await fetch(withBuild(new URL('optimized.json', base).href));
     // (The dev server answers a missing file with its index page.)
     if (!res.ok || !res.headers.get('content-type')?.includes('json')) return;
     const index = (await res.json()) as { files?: Record<string, string> };
@@ -81,15 +82,16 @@ async function loadOptimized(base: URL): Promise<void> {
 
 /** The file to fetch for an asset URL: its compressed copy when the build made one. */
 export function optimizedUrl(url: string): string {
-  return optimized.get(new URL(url, location.href).href) ?? url;
+  const copy = optimized.get(withoutBuild(new URL(url, location.href).href));
+  return copy ? withBuild(copy) : url;
 }
 
-/** Makes file references absolute relative to the manifest that declared them. */
+/** Makes file references absolute relative to the manifest that declared them, with this build's query. */
 function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
   const out: Record<string, unknown> = { ...entry };
   for (const field of URL_FIELDS) {
     const value = out[field];
-    if (typeof value === 'string') out[field] = new URL(value, base).href;
+    if (typeof value === 'string') out[field] = withBuild(new URL(value, base).href);
   }
   return out as unknown as AssetEntry;
 }

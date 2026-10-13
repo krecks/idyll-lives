@@ -5,6 +5,8 @@
  * up what's on screen.
  */
 
+import { withBuild } from './build';
+
 /** Background downloads at once. */
 const BACKGROUND_PARALLEL = 2;
 
@@ -45,7 +47,7 @@ export function prefetch(urls: Iterable<string>): void {
       next();
     })
       .then(async () => {
-        const res = await fetch(url, { priority: 'low' });
+        const res = await fetch(withBuild(url), { priority: 'low' });
         await res.arrayBuffer();
       })
       .catch(() => requested.delete(url))
