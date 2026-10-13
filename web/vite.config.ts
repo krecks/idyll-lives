@@ -162,13 +162,60 @@ function releaseWasm(): Plugin {
   };
 }
 
+/** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
+const bundledPackages = new Set<string>();
+
+/** Notes which npm packages end up in a bundle (the page's, and each worker's: see `worker.plugins`). */
+function collectPackages(): Plugin {
+  return {
+    name: 'collect-packages',
+    apply: 'build',
+    async generateBundle(_, bundle) {
+      const { packageDir } = await import(new URL('../tools/release/licenses.mjs', import.meta.url).href);
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        for (const [id, mod] of Object.entries(chunk.modules)) {
+          const dir = mod.renderedLength > 0 ? packageDir(id) : undefined;
+          if (dir) bundledPackages.add(dir);
+        }
+      }
+    },
+  };
+}
+
+/**
+ * The licences of what the game ships that others made (tools/release/licenses.mjs):
+ * dist/THIRD-PARTY-LICENSES.txt, and Inter's licence next to its font files. Linked from Credits.
+ */
+function thirdPartyLicenses(): Plugin {
+  let outDir = '';
+  let log: (line: string) => void = () => {};
+  return {
+    name: 'third-party-licenses',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      log = (line) => config.logger.info(line, { timestamp: true });
+    },
+    async closeBundle() {
+      const tool = await import(new URL('../tools/release/licenses.mjs', import.meta.url).href);
+      const header = `Idyll Lives ${pkg.version} (build ${COMMIT}): software and models by others that the game includes, and their licences.
+The game itself is free software under the GNU General Public License v3.0 or later. The art is listed in assets/CREDITS.md.`;
+      const { text, counts } = tool.thirdPartyLicenses({ packageDirs: [...bundledPackages], header });
+      await writeFile(join(outDir, 'THIRD-PARTY-LICENSES.txt'), text);
+      await cp(fileURLToPath(new URL('./node_modules/@fontsource-variable/inter/LICENSE', import.meta.url)), join(outDir, 'assets/inter-LICENSE.txt'));
+      log(`THIRD-PARTY-LICENSES.txt: ${counts.npm} npm packages, ${counts.rust} Rust crates, ${counts.texts} licence texts`);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [svelte(), debugReports(), optimizedAssets(), releaseWasm()],
+  plugins: [svelte(), debugReports(), optimizedAssets(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
   preview: { headers: crossOriginIsolation },
-  worker: { format: 'es' },
+  worker: { format: 'es', plugins: () => [collectPackages()] },
   // The voice and language model workers' imports: Vite's start-up scan doesn't reach worker
   // imports, so it would find them only when the first line is spoken, re-bundle and reload the page.
   optimizeDeps: { include: ['onnxruntime-web/wasm', 'onnxruntime-web/webgpu', '@huggingface/tokenizers'] },
