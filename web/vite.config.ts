@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -211,6 +211,29 @@ function earlyEnvironment(): Plugin {
   };
 }
 
+/**
+ * The asset manifests ship without their spaces (public/ keeps them readable): the base one is
+ * 1.46 MB pretty-printed and 0.59 MB minified.
+ */
+function minifiedManifests(): Plugin {
+  let outDir = '';
+  return {
+    name: 'minified-manifests',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const dir = join(outDir, 'assets');
+      for (const file of await readdir(dir, { recursive: true })) {
+        if (basename(file) !== 'manifest.json') continue;
+        const path = join(dir, file);
+        await writeFile(path, JSON.stringify(JSON.parse(await readFile(path, 'utf8'))));
+      }
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -259,7 +282,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
