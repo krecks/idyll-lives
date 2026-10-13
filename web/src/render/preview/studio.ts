@@ -86,7 +86,7 @@ export class Studio {
     readonly canvas: HTMLCanvasElement,
     readonly webgpu: boolean,
   ) {
-    this.frame = { prev: this.snap, curr: this.snap, alpha: 0, layout: LAYOUT, now: 0 };
+    this.frame = { prev: this.snap, curr: this.snap, alpha: 0, steps: 1, layout: LAYOUT, now: 0 };
     const [blob, pool] = this.makeShadows();
     this.blob = blob;
     this.pool = pool;
@@ -214,7 +214,7 @@ export class Studio {
     this.building = true;
     const sims = this.rows.flatMap((r, i) => (r ? [simInfo(i, r.look)] : []));
     void this.characters
-      .build({ sims, objects: [] }, true)
+      .build({ sims, objects: [] }, 'rows')
       .catch((err: unknown) => console.warn('[preview] build failed', err))
       .finally(() => {
         this.builtKey = key;

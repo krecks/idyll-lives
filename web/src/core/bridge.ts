@@ -22,6 +22,8 @@ export interface FrameState {
   curr: Float32Array;
   /** Progress from `prev` to `curr`: 0..1, slightly above 1 when a snapshot is late (extrapolates). */
   alpha: number;
+  /** Sim steps from `prev` to `curr`: 1, more when frames missed snapshots (a long frame, under 20 fps). */
+  steps: number;
   layout: SnapshotLayout;
   now: number;
 }
@@ -51,16 +53,22 @@ export class SimBridge {
   private prev: Float32Array;
   private curr: Float32Array;
   private scratch: Float32Array;
+  /** The sim steps they show (the worker counts them; snapshots a frame missed are skipped). */
+  private step2 = 0;
+  private step1 = 0;
+  private step0 = 0;
   /**
-   * Frame clock: snapshot `n` is drawn as arriving at `clockBase + n * stepMs`. It follows the
-   * average arrival rhythm, not each arrival, so timer jitter (e.g. browsers coarsening timers
-   * for privacy) doesn't make motion stall and jump.
+   * Frame clock: the snapshot of sim step `n` is drawn as arriving at `clockBase + n * stepMs`.
+   * It follows the average arrival rhythm, not each arrival, so timer jitter (e.g. browsers
+   * coarsening timers for privacy) doesn't make motion stall and jump; and it counts the steps
+   * the worker ran, so snapshots a long frame missed don't put it behind.
    */
   private clockBase = 0;
-  private arrivals = 0;
   private clocked = false;
   private hasData = false;
   private pending = false;
+  /** Sim step of the snapshot posted last (without shared memory). */
+  private pendingStep = 0;
   private readonly frameState: FrameState;
 
   private world: WorldStructure | null = null;
@@ -99,7 +107,7 @@ export class SimBridge {
     this.prev = new Float32Array(layout.capacity);
     this.curr = new Float32Array(layout.capacity);
     this.scratch = new Float32Array(layout.capacity);
-    this.frameState = { prev: this.prev, curr: this.curr, alpha: 0, layout, now: 0 };
+    this.frameState = { prev: this.prev, curr: this.curr, alpha: 0, steps: 1, layout, now: 0 };
     worker.onmessage = (e: MessageEvent<FromWorker>) => {
       this.lastHeard = performance.now();
       this.handle(e.data);
@@ -289,20 +297,32 @@ export class SimBridge {
     const fresh = this.reader ? this.reader.read(this.scratch) : this.pending;
     if (!fresh) return;
     this.pending = false;
+    const step = this.reader ? this.reader.step : this.pendingStep;
+    if (this.hasData && step === this.step0) {
+      // Published again without a step (a command took effect): the same moment, changed.
+      const old = this.curr;
+      this.curr = this.scratch;
+      this.scratch = old;
+      return;
+    }
     const old = this.prev2;
     this.prev2 = this.prev;
     this.prev = this.curr;
     this.curr = this.scratch;
     this.scratch = old;
+    this.step2 = this.step1;
+    this.step1 = this.step0;
+    this.step0 = step;
     if (!this.hasData) {
       this.prev.set(this.curr);
       this.prev2.set(this.curr);
+      this.step1 = step - 1;
+      this.step2 = step - 2;
       this.hasData = true;
     }
-    this.arrivals++;
-    const late = now - (this.clockBase + this.arrivals * this.stepMs);
+    const late = now - (this.clockBase + step * this.stepMs);
     if (!this.clocked || Math.abs(late) > CLOCK_RESET_STEPS * this.stepMs) {
-      this.clockBase = now - this.arrivals * this.stepMs;
+      this.clockBase = now - step * this.stepMs;
       this.clocked = true;
     } else {
       this.clockBase += late * CLOCK_GAIN;
@@ -312,16 +332,19 @@ export class SimBridge {
   /** Interpolation state for rendering: draws one step behind the sim for smooth motion. */
   frame(now: number): FrameState {
     const f = this.frameState;
-    const t = (now - (this.clockBase + this.arrivals * this.stepMs)) / this.stepMs;
-    if (t < 0) {
-      // The newest snapshot came early: finish the step before it first.
+    // The (fractional) sim step shown now.
+    const at = (now - this.clockBase) / this.stepMs - 1;
+    if (at < this.step1) {
+      // The newest snapshot came early: finish the step(s) before it first.
       f.prev = this.prev2;
       f.curr = this.prev;
-      f.alpha = Math.max(0, t + 1);
+      f.steps = Math.max(1, this.step1 - this.step2);
+      f.alpha = Math.max(0, (at - this.step2) / f.steps);
     } else {
       f.prev = this.prev;
       f.curr = this.curr;
-      f.alpha = Math.min(t, MAX_EXTRAPOLATION);
+      f.steps = Math.max(1, this.step0 - this.step1);
+      f.alpha = Math.min((at - this.step1) / f.steps, MAX_EXTRAPOLATION);
     }
     f.now = now;
     return f;
@@ -340,6 +363,7 @@ export class SimBridge {
     switch (msg.type) {
       case 'snapshot':
         this.scratch.set(msg.data);
+        this.pendingStep = msg.step;
         this.pending = true;
         break;
       case 'world': {

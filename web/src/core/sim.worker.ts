@@ -37,6 +37,8 @@ let panicked: string | null = null;
 let stopped = false;
 /** `__crash('panic')`: the next step panics. */
 let panicNext = false;
+/** Sim steps run so far: published with each snapshot (the renderer's clock counts steps, not snapshots). */
+let simSteps = 0;
 
 (self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
   panicked = message;
@@ -157,6 +159,7 @@ function runLoop(stepMs: number): void {
     try {
       if (panicNext) game!.debugPanic('a panic on purpose (__crash)');
       game!.advance();
+      simSteps++;
       publish();
       now = performance.now();
       if (now - lastUi >= UI_INTERVAL_MS) {
@@ -199,10 +202,10 @@ function publish(): void {
   // Re-create the view each time: WASM memory growth detaches old views.
   const view = new Float32Array(memory.buffer, g.snapshot_ptr(), g.snapshot_len());
   if (writer) {
-    writer.write(view);
+    writer.write(view, simSteps);
   } else {
     const copy = view.slice();
-    scope.postMessage({ type: 'snapshot', data: copy }, [copy.buffer]);
+    scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
   const version = g.structure_version();
   if (version !== lastStructure) {

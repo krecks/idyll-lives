@@ -184,10 +184,15 @@ export const JOG: Gait = {
   kick: 0.22,
 };
 
-function jogPose(p: number): PoseSpec {
+/** Jogging along (`jogAlong`): the jog travelling at 2.5 m/s, a stride per cycle, leaning into it a little more. */
+const JOG_SECONDS = 0.7;
+const JOG_SPEED = 2.5;
+const JOG_ALONG: Gait = { ...JOG, stride: JOG_SPEED * JOG_SECONDS, back: 0.02, lean: 7 };
+
+function jogPose(p: number, g: Gait = JOG): PoseSpec {
   const swingL = -Math.cos(TAU * (p - 0.04));
   return {
-    ...gaitPose(p, JOG),
+    ...gaitPose(p, g),
     upperarm_l: hang('l', -2 + 24 * swingL, 9),
     upperarm_r: hang('r', -2 - 24 * swingL, 9),
     lowerarm_l: elbow('l', 84 + 12 * swingL, 15),
@@ -196,5 +201,10 @@ function jogPose(p: number): PoseSpec {
 }
 
 export function locomotionClips(): ClipDef[] {
-  return [cycle('walk', { seconds: WALK_SECONDS, loop: true, speed: WALK_SPEED }, (p) => gaitPose(p, WALK)), cycle('jog', { seconds: 0.7, loop: true }, jogPose)];
+  return [
+    cycle('walk', { seconds: WALK_SECONDS, loop: true, speed: WALK_SPEED }, (p) => gaitPose(p, WALK)),
+    cycle('jog', { seconds: JOG_SECONDS, loop: true }, (p) => jogPose(p)),
+    // Residents on their way faster than the walk can step (the game sped up; children's short legs).
+    cycle('jogAlong', { seconds: JOG_SECONDS, loop: true, speed: JOG_SPEED }, (p) => jogPose(p, JOG_ALONG)),
+  ];
 }

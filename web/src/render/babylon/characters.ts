@@ -111,6 +111,24 @@ const GAME_RATE = [0, 1, 3, 10, 30, 60];
 const QUIET_SPEED = 4;
 /** Larger jumps between frames snap instead of sliding. */
 const SNAP_DISTANCE = 1.6;
+/**
+ * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
+ * a step covers metres; cutting corners of their path is the price): metres walked per tick
+ * (`world::WALK_SPEED`), the fastest walkers' trait and perk factors (1.15 x 1.2 in the base game,
+ * with room for packs) and some slack. Further than that, or not walking in both, is a jump.
+ */
+const WALK_PER_TICK = 0.075;
+const WALK_FASTEST = 1.5;
+const WALK_SLACK = 1.2;
+/**
+ * The walk and jog cycles play matched to the ground speed, up to this many times their own pace
+ * (faster, they would only flicker; the feet slide instead). A walker who would need the walk
+ * faster jogs along (`jogAlong`), and walks again below `JOG_BACK` of it.
+ */
+const GAIT_MAX_RATE = 3;
+const JOG_BACK = 0.8;
+/** Locomotion cycles (they play in real time at the matched rate, and change into each other in step). */
+const GAITS = new Set(['walk', 'jogAlong']);
 const DEFAULT_FADE = 0.25;
 
 /** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
@@ -483,6 +501,8 @@ function copyPlayer(from: Player, to: Player): void {
 
 interface SimRig {
   id: number;
+  /** Who the row holds, in what body (see `build`: a rebuild keeps the rig only for the same). */
+  who: string;
   /** Height of the floor under them (upper storeys, part way up the stairs). */
   floorY: number;
   body: BodyData;
@@ -762,6 +782,8 @@ export class Characters {
   readonly directions: (StageDirection | null)[] = [];
   /** Selected Sim (selection ring), or null. */
   private selected: number | null = null;
+  /** Reduce motion: the selection ring keeps still (no spin, no pulse). */
+  reducedMotion = false;
   private ring: Mesh | null = null;
   private readonly ringMatrix = new Float32Array(16);
 
@@ -965,10 +987,14 @@ export class Characters {
 
   /**
    * Builds instances for the world's Sims (meshes and materials are cached). `keep` keeps the
-   * animation state of Sims whose row stays (previews restyling a Sim without restarting it).
-   * A Sim may carry `outfitId`, the id its outfit is derived from when it differs from its row.
+   * animation state (clips, blankets, pyjamas, a baby in someone's arms ...): `'rows'` of every
+   * row that stays (previews restyling a Sim without restarting it), `'residents'` of rows that
+   * still hold the same resident in the same body (the game: the world is rebuilt whenever
+   * something in it changes; a slot taken by someone new, or a body grown into the next life
+   * stage, starts afresh). A Sim may carry `outfitId`, the id its outfit is derived from when it
+   * differs from its row.
    */
-  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number; basement?: number }, keep = false): Promise<void> {
+  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number; basement?: number }, keep: 'rows' | 'residents' | false = false): Promise<void> {
     if (!(await this.init())) return;
     const set = this.set!;
     // Life stages other than the base bodies' (children, teens, elders …) load on demand, the
@@ -1021,13 +1047,19 @@ export class Characters {
       const stageScale = shaped ? 1 : (s.appearance?.stageScale ?? 1);
       const scale = ((BASE_HEIGHT[base.name] ?? 1.72) / base.height) * height * stageScale;
       const build = clampBuild(s.appearance?.build);
-      const rig: SimRig = {
+      const head = shaped ? 1 : (s.appearance?.stageHead ?? 1);
+      const stoop = s.appearance?.stageStoop ?? 0;
+      const who = `${s.name}|${s.generation ?? 0}|${s.gender}|${stage ?? ''}|${body.name}|${outfitId}`;
+      const old = kept[s.id];
+      // The same rig carries on (pyjamas: `asleep` is worked out again, and the outfit for it written, when next posed).
+      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, head, stoop, build, asleep: false }) : {
         id: s.id,
+        who,
         floorY: 0,
         body,
         scale,
-        head: shaped ? 1 : (s.appearance?.stageHead ?? 1),
-        stoop: s.appearance?.stageStoop ?? 0,
+        head,
+        stoop,
         build,
         seed: hash(s.id + 17),
         visible: false,
@@ -1095,8 +1127,6 @@ export class Characters {
         speechStart: 0,
         speechSeg: 0,
       };
-      const old = kept[s.id];
-      if (old) Object.assign(rig, old, { body, scale, build, asleep: false });
       this.sims[s.id] = rig;
       rig.day = outfitFor(outfitId, s.gender, s.appearance, body);
       rig.night = outfitFor(outfitId, s.gender, s.appearance, body, true);
@@ -1424,6 +1454,9 @@ export class Characters {
         rig.reachW = Math.max(0, rig.reachW - step * 3);
         rig.holdW = Math.max(0, rig.holdW - step * 1.6);
         rig.liftW = Math.max(0, rig.liftW - step * 1.6);
+        // Walking off (given an order), or the baby no longer lying there as a baby: back in the crib at once.
+        const held = rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
+        if (curr[o + k.moving] > 0 || held?.body.stage !== 'baby' || curr[H + rig.cuddleBaby * S + k.pose] !== Pose.Lie) rig.liftW = 0;
         if (rig.liftW <= 0) rig.cuddleBaby = -1;
       }
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.heldBy[rig.cuddleBaby] = j;
@@ -1607,6 +1640,10 @@ export class Characters {
     const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
     const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
     const gameRate = GAME_RATE[gameSpeed] ?? 1;
+    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them).
+    const prevSpeed = prev[layout.header.speed] | 0;
+    const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
+    const reach = Math.max(SNAP_DISTANCE, WALK_PER_TICK * WALK_FASTEST * WALK_SLACK * Math.max(gameRate, GAME_RATE[prevGameSpeed] ?? 1) * frame.steps);
     const animRate = this.debugRate ?? Math.min(gameRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
@@ -1636,15 +1673,19 @@ export class Characters {
       const n = groups[l * 3];
       if (!n) continue;
       const t = curr[H + l * S + k.partner] | 0;
-      const members = [l, t, groups[l * 3 + 1], groups[l * 3 + 2]].slice(0, n + 2).filter((m) => m >= 0 && m < count);
+      // The one who started it, their partner and those listening in.
       let sx = 0;
       let sz = 0;
-      for (const m of members) {
+      let members = 0;
+      for (let j = 0; j < n + 2; j++) {
+        const m = j === 0 ? l : j === 1 ? t : groups[l * 3 + j - 1];
+        if (m < 0 || m >= count) continue;
         sx += curr[H + m * S + k.x];
         sz += this.groundRow(curr[H + m * S + k.z]);
+        members++;
       }
-      middle[l * 2] = sx / members.length;
-      middle[l * 2 + 1] = sz / members.length;
+      middle[l * 2] = sx / members;
+      middle[l * 2 + 1] = sz / members;
     }
 
     // Cuddles: who holds which baby (posed after them, in their arms).
@@ -1662,7 +1703,8 @@ export class Characters {
       let tz = cz;
       let th = ch;
       let tyaw = curr[o + k.yaw];
-      if (Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
+      const walking = curr[o + k.moving] > 0 && prev[o + k.moving] > 0;
+      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
         tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
         tz = pz + (cz - pz) * alpha;
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
@@ -1707,7 +1749,8 @@ export class Characters {
       }
 
       // Position / speed / facing.
-      if (!rig.visible) {
+      const appeared = !rig.visible;
+      if (appeared) {
         rig.x = tx;
         rig.z = tz;
         rig.yaw = tyaw;
@@ -1758,8 +1801,10 @@ export class Characters {
         } else faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
-      const maxTurn = (moving ? 9 : 6) * dt;
-      rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12)), -maxTurn, maxTurn));
+      // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
+      const turn = moving ? clamp(gameRate, 1, 10) : 1;
+      const maxTurn = (moving ? 9 : 6) * dt * turn;
+      rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
 
@@ -1769,16 +1814,16 @@ export class Characters {
       const carry = item ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
 
       // Activity → clip.
-      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry);
+      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry, dt, appeared);
       rig.lastPose = pose;
 
       // Advance and blend.
       const step = dt * animRate;
-      advance(rig.cur, rig.cur.key === 'walk' || rig.cur.key === 'jog' ? dt : step);
-      advance(rig.prev, rig.prev.key === 'walk' || rig.prev.key === 'jog' ? dt : step);
+      advance(rig.cur, GAITS.has(rig.cur.key) || rig.cur.key === 'jog' ? dt : step);
+      advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
       // Carrying while walking: the arms bob in step with the feet.
-      if (rig.cur.key === 'walk' && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
+      if (GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
       rig.upperW += clamp(rig.upperTarget - rig.upperW, -dt * 4, dt * 4);
       if (dir?.still) {
@@ -1851,7 +1896,7 @@ export class Characters {
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
-      this.writeBlanket(rig, i, pose, dt);
+      this.writeBlanket(rig, i, pose, dt, appeared);
       this.writeCarried(rig, i, item);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
 
@@ -1875,7 +1920,7 @@ export class Characters {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
-    this.writeRing(now * 0.001);
+    this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
       this.visible[i] = 0;
@@ -1914,6 +1959,10 @@ export class Characters {
     tag: string,
     /** The upper-body clip for what the Sim carries ('' = nothing). */
     carry: string,
+    /** Seconds since the last frame (0 while paused). */
+    dt: number,
+    /** Drawn again (back in view, on the storey shown, home from away): no fading in from what they did when last seen. */
+    fresh: boolean,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
     const set = this.set!;
@@ -2005,10 +2054,15 @@ export class Characters {
         else if (up) upper = up;
       }
     } else if (moving) {
-      key = 'walk';
-      const clip = set.clips.get('walk')!;
-      rate = clamp(rig.speed / (clip.speed * rig.body.pelvisScale * rig.scale), 0.35, 3);
-      fade = 0.2;
+      // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
+      // game, short legs), jogging along.
+      const legs = rig.body.pelvisScale * rig.scale;
+      const walk = rig.speed / (set.clips.get('walk')!.speed * legs);
+      const jog = set.clips.get('jogAlong');
+      const jogging = !!jog && walk > GAIT_MAX_RATE * (rig.cur.key === 'jogAlong' ? JOG_BACK : 1);
+      key = jogging ? 'jogAlong' : 'walk';
+      rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
+      fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
     } else if (social) {
       const me = speaking(pair, role, time);
@@ -2151,7 +2205,8 @@ export class Characters {
       const t = rig.cur.key === 'standUp' ? rig.cur.time / rig.cur.clip!.duration : 0;
       rootFwd = edge * (1 - smooth(clamp((t - 0.3) / 0.6, 0, 1)));
     }
-    rig.hands += (hands - rig.hands) * Math.min(1, step * 5 + 0.02);
+    // (A little quicker at slow game speeds than the animation; still while paused.)
+    rig.hands += (hands - rig.hands) * (1 - Math.exp(-(step * 5 + dt * 1.2)));
 
     // Sequenced object use: the next clip when a one-shot ends, or after LOOP_STEP for loops.
     const cur = rig.cur;
@@ -2190,6 +2245,14 @@ export class Characters {
     } else {
       rig.upperTarget = 0;
     }
+
+    if (fresh) {
+      copyPlayer(rig.cur, rig.prev);
+      rig.w = 1;
+      rig.upperW = rig.upperTarget;
+      rig.approach = reach;
+      rig.hands = hands;
+    }
   }
 
   private clip(key: string): Clip {
@@ -2212,10 +2275,12 @@ export class Characters {
     }
     const c = rig.cur;
     const sameLoop = c.key === key && clip.loop;
+    // Walking into a jog and back: in step (both cycles start at the left heel's strike).
+    const inStep = GAITS.has(key) && GAITS.has(c.key) && c.clip ? ((c.time / c.clip.duration) % 1) * clip.duration : -1;
     c.clip = clip;
     c.key = key;
     // Walk cycles of the previous walk keep their phase.
-    c.time = sameLoop ? c.time : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
+    c.time = sameLoop ? c.time : inStep >= 0 ? inStep : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
     c.rate = rate;
     c.repeat = repeat;
     c.rootY = rootY;
@@ -2856,12 +2921,12 @@ export class Characters {
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
    * and to the bed's foot end, pulled up over ~0.5 s when the Sim lies down; zero-scaled otherwise.
    */
-  private writeBlanket(rig: SimRig, i: number, pose: number, dt: number): void {
+  private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
     const blanket = this.blankets.get(rig.body.family);
     if (!blanket) return;
     const bed = rig.bed;
     const under = pose === Pose.Lie && LYING.has(rig.cur.key) && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
-    rig.cover = clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
+    rig.cover = fresh ? (under ? 1 : 0) : clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
     const m = blanket.matrices;
     const o = i * 16;
     if (rig.cover <= 0 || !bed) {

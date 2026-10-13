@@ -16,7 +16,9 @@
 
 import {
   ArcRotateCamera,
+  type ArcRotateCameraKeyboardMoveInput,
   type ArcRotateCameraPointersInput,
+  type Camera,
   Color3,
   Color4,
   ColorCurves,
@@ -98,7 +100,7 @@ import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { DECOR_MODELS, installNature, Landscape, natureDecor, Sky } from './nature';
+import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
@@ -188,6 +190,8 @@ const BUILD_SLICE_MS = 8;
 const FAILED_FRAMES_LIMIT = 60;
 /** Longest wait for `framesRendered` (drawing stopped, a hidden tab): then it goes on without them. */
 const FRAME_WAIT_LIMIT_MS = 15_000;
+/** Longest frame time (ms) things move by in one frame (the first frame back after a hidden tab spans all of it). */
+const MAX_FRAME_MS = 100;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -245,8 +249,18 @@ export class BabylonRenderer implements Renderer {
   /** Meshes the room lights were last told to leave out (the landscape and sky). */
   private lightExcluded = new Set<Mesh>();
   private onFrame: ((now: number) => void) | null = null;
+  /** Per drawn frame once the camera has moved (see `run`), and the frame it last ran in. */
+  private onView: (() => void) | null = null;
+  private viewFrame = -1;
+  /** The frame state last posed (the marker goes up once the camera has moved). */
+  private lastFrame: FrameState | null = null;
   private active = false;
-  private idleOrbit = false;
+  /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
+  private frameDt = 0;
+  /** Reduce motion: plants, clouds, the selection marker, the Build ghost and build effects keep still. */
+  private reducedMotion = false;
+  /** The arrow keys' camera nudges per frame at 60 fps (see `paceKeys`). */
+  private keyNudge = { angularSpeed: 0, panningSensibility: 0, zoomingSensibility: 0 };
   /** The watching director's hold on the game camera (see `setGameShot`). */
   private gameRig!: GameCameraRig;
   /** Resident the camera keeps centred while the player turns and zooms (`followSim`). */
@@ -485,6 +499,8 @@ export class BabylonRenderer implements Renderer {
     scene.skipPointerMovePicking = true;
     scene.constantlyUpdateMeshUnderPointer = false;
     this.instrumentation = new SceneInstrumentation(scene);
+    // Once the camera has taken this frame's input (it does inside `render`), before anything is drawn.
+    scene.onBeforeCameraRenderObservable.add((camera) => this.cameraMoved(camera));
     // `?debug`: expose the scene for inspection from the console / test harness.
     if (this.debug) Object.assign(window, { __scene: scene, __renderer: this });
     // PBR materials and image-based lighting; the environment must exist before materials compile.
@@ -531,15 +547,48 @@ export class BabylonRenderer implements Renderer {
     window.addEventListener('resize', this.onResize);
   }
 
-  async setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+  /** The newest world waiting to be built, and the builds in progress (see `setWorld`). */
+  private nextWorld: { world: WorldStructure; view: ViewRect | null } | null = null;
+  private worldBuilds: Promise<void> | null = null;
+
+  /**
+   * Builds `world`. One build runs at a time: worlds arriving meanwhile (two edits in one frame,
+   * a multi-edit build) wait for it, and only the newest of them is built next. Resolves when
+   * the newest world is built.
+   */
+  setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.lastWorld = world;
-    this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
-    if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
+    this.nextWorld = { world, view };
+    return (this.worldBuilds ??= this.buildWorlds());
+  }
+
+  private async buildWorlds(): Promise<void> {
+    let error: unknown = null;
+    try {
+      for (let next = this.nextWorld; next; next = this.nextWorld) {
+        this.nextWorld = null;
+        try {
+          await this.buildOne(next.world, next.view);
+          error = null;
+        } catch (err) {
+          error = err;
+        }
+      }
+    } finally {
+      this.worldBuilds = null;
+    }
+    if (error) throw error;
+  }
+
+  private async buildOne(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.beginBuild();
+    // (First: a storey in view the world no longer has is changed below, for this build to show.)
     this.worldBuilding = true;
     this.sliceStart = performance.now();
     const until = this.sliceStart + TEXTURE_WAIT_MS;
     try {
+      this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
+      if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
       await this.buildWorld(world, view);
       await this.warmShaders(until);
     } finally {
@@ -671,7 +720,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   update(frame: FrameState): void {
-    const { curr, layout, now } = frame;
+    const { curr, layout } = frame;
     // Snapshot rendering bakes light uniforms and the clear colour into the recording, so
     // lighting changes force a re-record; throttle them to keep most frames replayed.
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : curr[layout.header.minute];
@@ -686,22 +735,22 @@ export class BabylonRenderer implements Renderer {
     }
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
-    if (this.fadeRoomLights(this.engine.getDeltaTime() / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
+    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
     // And their windows stop glowing with them.
-    if (this.fadeWindowGlow(this.engine.getDeltaTime() / 1000) && this.lampsLevel > 0) {
+    if (this.fadeWindowGlow(this.frameDt / 1000) && this.lampsLevel > 0) {
       this.house.setWindowGlow(this.windowGlowOn);
       this.resetSnapshot();
     }
-    this.steerCamera(this.engine.getDeltaTime() / 1000);
+    this.steerCamera(this.frameDt / 1000);
     this.keepCameraClear();
     this.updateCutaway();
     this.followCamera();
-    this.skyDome.drift(this.engine.getDeltaTime());
-    this.fx.update(this.engine.getDeltaTime());
-    if (this.ghostShown) this.updateGhost(this.engine.getDeltaTime());
+    if (!this.reducedMotion) this.skyDome.drift(this.frameDt);
+    this.fx.update(this.frameDt);
+    if (this.ghostShown) this.updateGhost(this.frameDt);
     if (this.builtPending) this.swapBuilt();
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -711,19 +760,37 @@ export class BabylonRenderer implements Renderer {
 
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     this.simCount = count;
-    this.markerMatrix.fill(0);
-    this.markerHaloMatrix.fill(0);
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
     this.mirrors.update(this.camera);
     this.handles.update(this.camera.globalPosition);
+    this.simShadow.thinInstanceBufferUpdated('matrix');
+    this.lastFrame = frame;
+  }
+
+  /**
+   * Once per drawn frame of the game world, after the camera took this frame's input (dragging,
+   * zooming): the selection marker (it faces the camera) and what the session places over the
+   * view (`onView`: bubbles, room tags), so they don't trail a frame behind the camera.
+   */
+  private cameraMoved(camera: Camera): void {
+    if (camera !== this.camera || this.townMode || this.viewFrame === this.scene.getFrameId()) return;
+    this.viewFrame = this.scene.getFrameId();
+    this.placeMarker();
+    this.onView?.();
+  }
+
+  private placeMarker(): void {
+    this.markerMatrix.fill(0);
+    this.markerHaloMatrix.fill(0);
+    const frame = this.lastFrame;
     const sel = this.selectedSim;
-    if (sel !== null && sel < count && this.characters.visible[sel]) {
+    if (frame && sel !== null && sel < this.simCount && this.characters.visible[sel]) {
+      const { curr, layout, now } = frame;
       const h = this.characters.heads;
       const emotion = curr[layout.headerLen + sel * layout.simStride + layout.sim.emotion];
       this.writeMarker(h[sel * 3], h[sel * 3 + 1], h[sel * 3 + 2], emotion, now);
     }
-    this.simShadow.thinInstanceBufferUpdated('matrix');
     for (const mesh of this.marker) {
       mesh.thinInstanceBufferUpdated('matrix');
       mesh.thinInstanceBufferUpdated('color');
@@ -889,6 +956,10 @@ export class BabylonRenderer implements Renderer {
     this.camera.wheelDeltaPercentage = 0.012 * s;
     // Babylon skips whole frames (nothing begun or presented) until the next one is due.
     this.engine.maxFPS = options.fpsCap > 0 ? options.fpsCap : undefined;
+    const still = (this.reducedMotion = !!options.reducedMotion);
+    setWind(this.scene, still ? 0 : 1);
+    this.characters.reducedMotion = still;
+    this.fx.reducedMotion = still;
     this.applyLook();
   }
 
@@ -997,12 +1068,14 @@ export class BabylonRenderer implements Renderer {
     root.position.z += (this.ghostGoal.z - root.position.z) * glide;
     root.rotation.y += (this.ghostYawGoal - root.rotation.y) * (1 - Math.exp(-dt * 16));
     // Held a hand's breadth above the floor (or the top it goes on), bobbing gently; picked up with a springy pop.
-    root.position.y = this.ghostLift + 0.07 + 0.035 * Math.sin(this.ghostAge * 3.4);
+    // (Reduce motion: held still, no pop, no pulse.)
+    const still = this.reducedMotion;
+    root.position.y = this.ghostLift + 0.07 + (still ? 0 : 0.035 * Math.sin(this.ghostAge * 3.4));
     const t = this.ghostSpawn;
-    const s = t > 0.6 ? 1 : 1 - Math.exp(-8 * t) * Math.cos(14 * t);
+    const s = still || t > 0.6 ? 1 : 1 - Math.exp(-8 * t) * Math.cos(14 * t);
     root.scaling.set(s, s, s);
     // Where it can't go, it pulses.
-    this.ghostMaterial.alpha = this.ghostValid ? 0.5 : 0.36 + 0.14 * Math.sin(this.ghostAge * 9);
+    this.ghostMaterial.alpha = this.ghostValid ? 0.5 : still ? 0.36 : 0.36 + 0.14 * Math.sin(this.ghostAge * 9);
     this.ghostArrowMaterial.alpha = this.ghostMaterial.alpha + 0.25;
   }
 
@@ -1687,8 +1760,9 @@ export class BabylonRenderer implements Renderer {
     };
   }
 
-  run(onFrame: (now: number) => void): void {
+  run(onFrame: (now: number) => void, onView?: () => void): void {
     this.onFrame = onFrame;
+    this.onView = onView ?? null;
     this.setActive(true);
   }
 
@@ -1712,14 +1786,9 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  setIdleOrbit(on: boolean): void {
-    this.idleOrbit = on;
-  }
-
   setGameShot(shot: GameShot | null, cut = false): void {
     if (!shot) return this.gameRig.release();
     this.followIndex = null;
-    this.idleOrbit = false;
     this.gameRig.setShot(shot, cut || this.townMode);
     this.cameraPlaced = true;
   }
@@ -1782,6 +1851,8 @@ export class BabylonRenderer implements Renderer {
     this.simCount = 0;
     this.selectedSim = null;
     this.onFrame = null;
+    this.onView = null;
+    this.lastFrame = null;
     this.cursor.position.y = HIDDEN_Y;
     this.markerMatrix.fill(0);
     this.markerHaloMatrix.fill(0);
@@ -1963,7 +2034,7 @@ export class BabylonRenderer implements Renderer {
     const fog = LOOK.fog * Math.min(1, Math.max(0.3, 55 / this.camera.radius)) * clear;
     if (Math.abs(fog - this.scene.fogDensity) > LOOK.fog * 0.02) this.scene.fogDensity = fog;
     this.followCamera();
-    this.skyDome.drift(dt);
+    if (!this.reducedMotion) this.skyDome.drift(dt);
     this.townListener?.();
   }
 
@@ -2075,8 +2146,8 @@ export class BabylonRenderer implements Renderer {
         c.shadowDrawCalls = c.shadowTriangles = c.mirrorDrawCalls = c.mirrorTriangles = 0;
         probe.before(start);
       }
-      const dt = this.engine.getDeltaTime();
-      if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
+      const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
+      this.paceKeys(dt);
       this.onFrame?.(performance.now());
       if (probe) updated = performance.now();
       if (this.townMode && this.overview) {
@@ -2113,6 +2184,21 @@ export class BabylonRenderer implements Renderer {
     }
   };
 
+  /**
+   * Babylon's keyboard camera input (arrows turn, Ctrl+arrows pan, +/- zoom) nudges the camera by
+   * a fixed amount per drawn frame: scaled by the frame's time, it moves as fast at any frame rate
+   * as at 60 fps.
+   */
+  private paceKeys(dtMs: number): void {
+    const keys = this.camera.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
+    if (!keys) return;
+    const k = Math.max(0.05, (dtMs * 60) / 1000);
+    const at60 = this.keyNudge;
+    keys.angularSpeed = at60.angularSpeed * k;
+    keys.panningSensibility = at60.panningSensibility / k;
+    keys.zoomingSensibility = at60.zoomingSensibility / k;
+  }
+
   // --- setup -------------------------------------------------------------------------
 
   private setupCamera(): void {
@@ -2131,6 +2217,8 @@ export class BabylonRenderer implements Renderer {
     // A slightly longer lens than the default flattens perspective a little: the dollhouse look.
     cam.fov = 0.7;
     cam.attachControl(true);
+    const keys = cam.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
+    if (keys) this.keyNudge = { angularSpeed: keys.angularSpeed, panningSensibility: keys.panningSensibility, zoomingSensibility: keys.zoomingSensibility };
     this.gameRig = new GameCameraRig(cam, { radius: RADIUS_LIMITS, beta: [0.3, 1.35] }, (i, out) => this.simHead(i, out));
     // Holds the game view while the town overview drives the camera (never drawn).
     this.parked = new ArcRotateCamera('parkedCamera', cam.alpha, cam.beta, cam.radius, Vector3.Zero(), this.scene);
@@ -3074,7 +3162,9 @@ export class BabylonRenderer implements Renderer {
   }
 
   private async buildSims(world: WorldStructure): Promise<void> {
-    await this.characters.build(world);
+    // Residents carry on as they were (a world message comes with every change in it: a thing
+    // bought, sold, broken or mended, someone arriving or leaving ...).
+    await this.characters.build(world, 'residents');
     // Sims arrive at the lot's entry, in front of the door. The first time a lot is shown, view it
     // from that side (three-quarter angle) so the cutaway opens the front wall instead of the
     // full-height back wall hiding the arriving household. (Not when following someone there:
@@ -3161,7 +3251,8 @@ export class BabylonRenderer implements Renderer {
    * so it stays readable when zoomed out. Its colour follows their mood. Allocation-free.
    */
   private writeMarker(x: number, headY: number, z: number, emotion: number, now: number): void {
-    const t = now * 0.001;
+    // (Reduce motion: no bob, no breathing.)
+    const t = this.reducedMotion ? 0 : now * 0.001;
     const breath = Math.sin(t * 2.4);
     const cam = this.camera.globalPosition;
     const dist = Math.hypot(cam.x - x, cam.y - headY, cam.z - z);

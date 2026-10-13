@@ -70,7 +70,10 @@ export interface SnapshotLayout {
 
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;
 
-/** Bytes reserved before the snapshot floats: one Int32 sequence counter (padded). */
+/**
+ * Bytes reserved before the snapshot floats: the Int32 sequence counter, then the Int32 number of
+ * the sim step the snapshot shows (padded).
+ */
 const SHARED_HEADER_BYTES = 16;
 
 export function createSharedSnapshot(layout: SnapshotLayout): SharedArrayBuffer {
@@ -82,17 +85,20 @@ export function createSharedSnapshot(layout: SnapshotLayout): SharedArrayBuffer 
  * Lock-free: the reader never blocks the writer.
  */
 export class SharedSnapshotWriter {
+  /** [sequence, step]. */
   private readonly seq: Int32Array;
   private readonly data: Float32Array;
 
   constructor(buffer: SharedArrayBuffer, capacity: number) {
-    this.seq = new Int32Array(buffer, 0, 1);
+    this.seq = new Int32Array(buffer, 0, 2);
     this.data = new Float32Array(buffer, SHARED_HEADER_BYTES, capacity);
   }
 
-  write(src: Float32Array): void {
+  /** `step`: the sim step it shows (snapshots published between steps, after a command, repeat it). */
+  write(src: Float32Array, step: number): void {
     Atomics.add(this.seq, 0, 1);
     this.data.set(src);
+    Atomics.store(this.seq, 1, step);
     Atomics.add(this.seq, 0, 1);
   }
 }
@@ -101,9 +107,11 @@ export class SharedSnapshotReader {
   private readonly seq: Int32Array;
   private readonly data: Float32Array;
   private lastSeq = 0;
+  /** The sim step of the snapshot last read. */
+  step = 0;
 
   constructor(buffer: SharedArrayBuffer, capacity: number) {
-    this.seq = new Int32Array(buffer, 0, 1);
+    this.seq = new Int32Array(buffer, 0, 2);
     this.data = new Float32Array(buffer, SHARED_HEADER_BYTES, capacity);
   }
 
@@ -112,8 +120,10 @@ export class SharedSnapshotReader {
     const before = Atomics.load(this.seq, 0);
     if (before === this.lastSeq || before & 1) return false;
     into.set(this.data);
+    const step = Atomics.load(this.seq, 1);
     if (Atomics.load(this.seq, 0) !== before) return false;
     this.lastSeq = before;
+    this.step = step;
     return true;
   }
 }

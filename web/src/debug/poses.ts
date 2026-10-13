@@ -405,7 +405,7 @@ const layout: SnapshotLayout = {
   items,
 };
 const snap = new Float32Array(layout.capacity);
-const frame: FrameState = { prev: snap, curr: snap, alpha: 0, layout, now: 0 };
+const frame: FrameState = { prev: snap, curr: snap, alpha: 0, steps: 1, layout, now: 0 };
 const shadowMatrices = new Float32Array(MAX_CHARACTERS * 16);
 
 let clock = 0;

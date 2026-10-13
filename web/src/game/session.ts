@@ -6,7 +6,7 @@
 
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
-import { SaveRefused, SimBridge } from '../core/bridge';
+import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey, seenAt } from '../core/protocol';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
@@ -1301,19 +1301,19 @@ export async function startSession(
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
 
+  /** This frame's interpolation state (for what is placed over the view once the camera has moved). */
+  let shown: FrameState | null = null;
   renderer.run((now) => {
     if (failFrames) throw new Error('a frame failed on purpose (__crash)');
     bridge.sync(now);
-    const frame = bridge.frame(now);
+    const frame = (shown = bridge.frame(now));
     renderer.update(frame);
     renderer.setHeldObject(game.placing?.objectId ?? buildBuy.heldId());
     buildBuy.syncHandles();
     if (!revealed) return;
-    bubbles.update(frame);
     voices.update(frame);
     worldSound.update(frame);
     followStorey(now);
-    if (roomOverlayOn()) roomOverlay.update();
     if (game.watching) {
       // Menus and other modes end watching (opening them is input, but not all of it is ours).
       if (!canWatch() && !director.active) stopWatching();
@@ -1327,6 +1327,11 @@ export async function startSession(
       if (game.speed === 1 && game.mode === 'live') bridge.send({ type: 'setSpeed', speed: slowedFrom });
       slowedFrom = null;
     }
+  }, () => {
+    // Bubbles, subtitles and room tags: where the camera, moved for this frame, shows the heads and rooms.
+    if (!revealed || !shown) return;
+    bubbles.update(shown);
+    if (roomOverlayOn()) roomOverlay.update();
   });
 
   const session: GameSession = {
@@ -1344,7 +1349,6 @@ export async function startSession(
       if (stoppedWith !== null) app.crashed({ kind: 'sim', detail: stoppedWith });
       // Nothing to lose yet: leaving the page in the first minute doesn't autosave.
       autosavedAt = performance.now();
-      renderer.setIdleOrbit(false);
       // A loaded debug report shows the view it was captured from.
       const pose = takePendingPose();
       if (pose) renderer.setCameraPose(pose);
@@ -1383,6 +1387,7 @@ export async function startSession(
         resolutionScale: s.resolutionScale,
         cameraSensitivity: s.cameraSensitivity,
         fpsCap: s.fpsCap,
+        reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
       bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });

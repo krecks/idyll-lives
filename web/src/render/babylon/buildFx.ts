@@ -68,6 +68,8 @@ export class BuildEffects {
   private readonly mScale = new Matrix();
   private readonly mOut = new Matrix();
   private disposed = false;
+  /** Reduce motion: rings fade where they are (no spreading), no sparkles or dust, no pop. */
+  reducedMotion = false;
 
   constructor(private readonly scene: Scene) {
     this.ringTexture = ringTexture(scene);
@@ -77,6 +79,10 @@ export class BuildEffects {
     const cx = fx.x + fx.w / 2;
     const cz = fx.z + fx.d / 2;
     const size = Math.max(fx.w, fx.d);
+    if (this.reducedMotion) {
+      if (fx.kind === 'place' || fx.kind === 'upgrade' || fx.kind === 'sell') this.ring(fx.kind, cx, cz, size, fx.y ?? 0);
+      return;
+    }
     switch (fx.kind) {
       case 'place':
       case 'upgrade':
@@ -97,6 +103,7 @@ export class BuildEffects {
 
   /** Springs a just-placed object into place: it grows from nothing, overshoots and settles. */
   pop(target: PopTarget): void {
+    if (this.reducedMotion) return;
     const o = target.index * 16;
     if (o + 16 > target.matrices.length) return;
     const base = Matrix.FromArray(target.matrices, o);
@@ -120,7 +127,7 @@ export class BuildEffects {
       if (r.age >= RING_TIME) continue;
       r.age += dt;
       const t = Math.min(1, r.age / RING_TIME);
-      const ease = 1 - (1 - t) ** 3;
+      const ease = this.reducedMotion ? 1 : 1 - (1 - t) ** 3;
       const s = r.size * (0.55 + 0.95 * ease) + 0.4;
       r.mesh.scaling.set(s, 1, s);
       r.mesh.visibility = (1 - t) ** 1.6;

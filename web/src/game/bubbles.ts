@@ -3,8 +3,9 @@
  * kept, wanting somewhere to do it, a goal reached, a room loved or disliked, something broken,
  * an accident), as DOM elements over the canvas. With subtitles, a spoken line shows as text in
  * the bubble while it plays (`say`; a bubble of its own if there's no icon).
- * Per frame only `transform` is written (compositor-only); icons and text change only when a
- * conversation starts, its outcome is revealed or a line starts or ends. No allocations per frame.
+ * Per frame only `transform` is written (compositor-only), and only when it moved; icons and text
+ * change only when a conversation starts, its outcome is revealed or a line starts or ends. No
+ * allocations per frame while nothing moves on screen.
  */
 
 import type { AssetRegistry } from '../assets/registry';
@@ -28,6 +29,9 @@ interface Bubble {
   key: string;
   shown: string;
   visible: boolean;
+  /** Screen position last written (unchanged: no new transform string). */
+  x: number;
+  y: number;
 }
 
 /** A line being said: its text, until when (ms, performance clock). */
@@ -103,7 +107,11 @@ export class BubbleLayer {
         bubble.visible = true;
         bubble.el.style.display = '';
       }
-      bubble.el.style.transform = `translate3d(${this.screen.x}px, ${this.screen.y}px, 0)`;
+      if (this.screen.x !== bubble.x || this.screen.y !== bubble.y) {
+        bubble.x = this.screen.x;
+        bubble.y = this.screen.y;
+        bubble.el.style.transform = `translate3d(${bubble.x}px, ${bubble.y}px, 0)`;
+      }
     }
     for (let i = count; i < this.bubbles.length; i++) if (this.bubbles[i]) this.hide(this.bubbles[i]);
   }
@@ -167,7 +175,7 @@ export class BubbleLayer {
       body.append(icon, text);
       el.appendChild(body);
       this.root.appendChild(el);
-      b = this.bubbles[i] = { el, body, icon, text, key: '', shown: '', visible: false };
+      b = this.bubbles[i] = { el, body, icon, text, key: '', shown: '', visible: false, x: NaN, y: NaN };
     }
     return b;
   }

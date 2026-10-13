@@ -22,6 +22,7 @@ export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 export { Camera } from '@babylonjs/core/Cameras/camera';
 export { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 export type { ArcRotateCameraPointersInput } from '@babylonjs/core/Cameras/Inputs/arcRotateCameraPointersInput';
+export type { ArcRotateCameraKeyboardMoveInput } from '@babylonjs/core/Cameras/Inputs/arcRotateCameraKeyboardMoveInput';
 export type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 export { Constants } from '@babylonjs/core/Engines/constants';
 export { Engine } from '@babylonjs/core/Engines/engine';

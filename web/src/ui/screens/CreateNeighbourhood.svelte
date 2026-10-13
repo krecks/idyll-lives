@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { lookAtAge, randomHousehold } from '../../game/household';
+  import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
   import { loadTemplates, populate, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
@@ -86,7 +87,7 @@
     focus = plot === focus ? null : plot;
     if (focus === null) return;
     const i = town?.households.findIndex((h) => h.slot === focus) ?? -1;
-    if (i >= 0) list?.querySelectorAll('.household')[i]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (i >= 0) list?.querySelectorAll('.household')[i]?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
   }
 
   onMount(async () => {
