@@ -472,8 +472,11 @@ export class BabylonRenderer implements Renderer {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
+    // No multisampling on the canvas: only the last full-screen pass draws to it, so it would only
+    // cost memory traffic (66 MB a frame at 1080p; screenshots without it are the same, P1-06).
+    // The scene itself is smoothed in the post-processing pipeline (`msaaSamples`, or FXAA).
     if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
-      const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), powerPreference: 'high-performance', ...compressedTextureFeatures() });
+      const engine = new WebGPUEngine(canvas, { antialias: false, powerPreference: 'high-performance', ...compressedTextureFeatures() });
       try {
         await engine.initAsync();
         this.engine = this.webgpu = engine;
@@ -489,7 +492,7 @@ export class BabylonRenderer implements Renderer {
         }
       }
     }
-    this.engine ??= new Engine(canvas, !this.diag.has('nocanvasaa'), { powerPreference: 'high-performance' });
+    this.engine ??= new Engine(canvas, false, { powerPreference: 'high-performance' });
     // The drawing size follows the resolution setting and the device pixel ratio (not Babylon's
     // `adaptToDeviceRatio`, which would scale our own level again when the ratio changes).
     this.applyResolution();
@@ -1732,7 +1735,7 @@ export class BabylonRenderer implements Renderer {
     chain.forEach((pp, i) => {
       const next = chain[i + 1];
       if (next) push(target(pp!.name, next.inputTexture));
-      else passes.push({ name: `${pp!.name} (canvas)`, width: engine.getRenderWidth(), height: engine.getRenderHeight(), samples: this.diag.has('nocanvasaa') ? 1 : 4, colorBytes: 4, depthBytes: 4 });
+      else passes.push({ name: `${pp!.name} (canvas)`, width: engine.getRenderWidth(), height: engine.getRenderHeight(), samples: 1, colorBytes: 4, depthBytes: 4 });
     });
     const casters = (map?.renderList ?? []).filter((m) => m.isEnabled() && m.isVisible) as Mesh[];
     const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
@@ -1743,7 +1746,7 @@ export class BabylonRenderer implements Renderer {
       backend: this.webgpu ? 'WebGPU' : 'WebGL2',
       gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : (engine as Engine).getGlInfo(),
       timerQuery: !!engine.getCaps().timerQuery,
-      render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: !this.diag.has('nocanvasaa') },
+      render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: false },
       quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
       diag: [...this.diag],
       passes,
