@@ -169,7 +169,7 @@ class ItemThumbnails implements ItemPreviews {
         // Nobody wants it any more (scrolled away, another category): don't draw it.
         const i = this.queue.indexOf(j);
         if (!j.waiters.length && j.priority === 'now' && i >= 0) this.queue.splice(i, 1);
-      });
+      }, { once: true });
       void this.pump();
     });
   }

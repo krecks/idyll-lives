@@ -289,6 +289,8 @@ export async function startSession(
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   let autosaveMinutes = -1;
+  /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
+  let showFps: boolean | null = null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -1281,11 +1283,10 @@ export async function startSession(
       });
       bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
-      game.perfOpen = s.showFps;
+      if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
       if (s.autosaveMinutes !== autosaveMinutes) {
         autosaveMinutes = s.autosaveMinutes;
         clearInterval(autosaveTimer);
-      clearTimeout(prefetchTimer);
         if (autosaveMinutes > 0) {
           autosaveTimer = setInterval(() => {
             if (game.pauseMenu) return;
@@ -1308,6 +1309,7 @@ export async function startSession(
       ideas.clear();
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
+      clearTimeout(prefetchTimer);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pointerdown', onInput, true);
