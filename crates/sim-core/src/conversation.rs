@@ -17,7 +17,8 @@ use crate::rng::Rng;
 use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef};
 use crate::world::{ObjectInstance, Phase, Sim, TaskKind, World, end_activity, grounds, route};
 
-/// How long an actor waits for a busy target before giving up.
+/// How long an actor waits for a busy target before giving up (in all: following them about
+/// counts too, see `follow`).
 const WAIT_LIMIT_TICKS: u32 = (10.0 / MINUTES_PER_TICK) as u32;
 /// Re-route when the target is this far from the route's end. Routes end on a tile
 /// *next to* the target (up to ~1.6 m from them), so this must exceed that.
@@ -207,21 +208,27 @@ pub(crate) fn update(w: &mut World) {
         };
         let s = &content.socials[social];
         let gap = dist(sims[i].pos, sims[t].pos);
+        let directed = act.task.directed;
 
         match state {
             State::Routing { goal } => {
+                // (Following the target after getting there counts as waiting for them.)
+                if sims[i].social_waited > 0 {
+                    sims[i].social_waited += 1;
+                }
                 if gap <= s.distance + ENGAGE_SLACK {
                     set_phase(&mut sims[i], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[t].pos) > REPATH_DISTANCE {
-                    chase(&nav, &walk, sims, i, t, content, objects);
+                    follow(&nav, &walk, sims, i, t, directed, content, objects);
                 }
             }
             State::Waiting(ticks) => {
+                sims[i].social_waited += 1;
                 // About to drop (or burst) themselves: the talk would break off at once.
                 if sims[i].pressed(content) {
                     end_activity(&mut sims[i], content, objects);
                 } else if gap > s.distance + ENGAGE_SLACK + 0.6 {
-                    chase(&nav, &walk, sims, i, t, content, objects);
+                    follow(&nav, &walk, sims, i, t, directed, content, objects);
                 } else if sims[t].available_for_social(content) {
                     engage(
                         content,
@@ -236,7 +243,7 @@ pub(crate) fn update(w: &mut World) {
                         social,
                         tick,
                     );
-                } else if ticks >= WAIT_LIMIT_TICKS {
+                } else if sims[i].social_waited >= WAIT_LIMIT_TICKS {
                     end_activity(&mut sims[i], content, objects);
                 } else {
                     sims[i].yaw = facing(sims[i].pos, sims[t].pos);
@@ -483,6 +490,31 @@ fn group_outcome(content: &Content, rels: &mut Relationships, events: &mut Event
 fn set_phase(sim: &mut Sim, phase: Phase) {
     if let Some(act) = sim.current.as_mut() {
         act.phase = phase;
+    }
+}
+
+/// The target of `i`'s social moved off: after them (`chase`) while they're someone to talk to
+/// and somewhere `i` would chat (not into someone else's house or garden, as when choosing; the
+/// player's orders go anywhere). Off home or to work, sitting down to eat, busy with what they
+/// were told to do: `i` gives up rather than follow them across town.
+#[allow(clippy::too_many_arguments)]
+fn follow<'a>(
+    nav: &NavGrid,
+    walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
+    sims: &mut [Sim],
+    i: usize,
+    t: usize,
+    directed: bool,
+    content: &Content,
+    objects: &mut [ObjectInstance],
+) {
+    let (x, z) = sims[t].tile();
+    let open = walk(&sims[i], sims[i].tile());
+    let allowed = directed || open.plot(nav, x, z).is_none_or(|p| open.open.get(p as usize).copied().unwrap_or(true));
+    if allowed && sims[t].available_for_social(content) {
+        chase(nav, walk, sims, i, t, content, objects);
+    } else {
+        end_activity(&mut sims[i], content, objects);
     }
 }
 

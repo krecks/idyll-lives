@@ -454,6 +454,9 @@ pub struct Sim {
     /// What they last chose for themselves but couldn't get to (a plate on a counter nobody
     /// can reach), and until when they don't choose it again. Not saved either.
     pub(crate) stuck: Option<(TaskKind, u64)>,
+    /// Ticks the social they're on has spent waiting for its target, and following them since
+    /// it first got there (see `conversation::update`). Not saved.
+    pub(crate) social_waited: u32,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -1449,6 +1452,7 @@ impl World {
             idle_ticks: 0,
             follow_up: None,
             stuck: None,
+            social_waited: 0,
             household: spawn.household,
             job,
             away_until: None,
@@ -3475,6 +3479,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(goal) = conversation::approach_tile(nav, other.pos, sim.pos) else {
                 return;
             };
+            sim.social_waited = 0;
             (
                 [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5],
                 goal,

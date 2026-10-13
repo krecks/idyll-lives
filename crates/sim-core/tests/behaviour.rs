@@ -78,7 +78,34 @@ fn told_to_chat_while_about_to_drop_they_leave_the_other_be() {
 }
 
 #[test]
-#[ignore = "R3 proof: fails until a chat gives up on someone who keeps walking off"]
+fn nobody_follows_someone_over_the_fence_for_a_chat() {
+    // Bob, from next door, is in Ann's garden; he heads home to watch TV as lonely Ann comes over.
+    let content = r#"{
+        "needs":[{"id":"social","label":"Social","decayPerHour":0.1},{"id":"fun","label":"Fun","decayPerHour":0.05}],
+        "objects":[{"id":"tv","name":"TV","interactions":[{"id":"watch","label":"Watch","minutes":60,"effects":{"fun":0.6}}]}],
+        "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.4}}],
+        "bondPresets":{"friends":{"friendship":40}}}"#;
+    let lot = r#"{"width":40,"depth":14,
+        "plots":[{"name":"West","x":0,"z":0,"w":20,"d":10,"entry":[10.5,9.5]},{"name":"East","x":20,"z":0,"w":20,"d":10,"entry":[30.5,9.5]}],
+        "households":[{"name":"Ann's","plot":0,"player":true},{"name":"Bob's","plot":1}],
+        "objects":[{"def":"tv","x":34,"z":2,"rot":0}],
+        "sims":[{"name":"Ann","household":0,"x":2.5,"z":5.5},{"name":"Bob","household":1,"x":17.5,"z":5.5}],
+        "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
+    let mut w = World::from_json(content, lot, 5).unwrap();
+    w.sims[0].needs[..2].copy_from_slice(&[0.1, 1.0]);
+    w.sims[1].needs[..2].copy_from_slice(&[1.0, 0.1]);
+    let mut went_after = false;
+    for _ in 0..20 * 40 {
+        w.tick_once();
+        went_after |= matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Social { target: 1, .. }));
+        let (x, z) = w.sims[0].tile();
+        assert_ne!(w.plot_at(x, z), Some(1), "Ann followed Bob into his garden for a chat");
+    }
+    assert!(went_after, "Ann never went to chat with Bob");
+    assert!(w.sims[1].engaged_with.is_none() && w.sims[0].current().is_none_or(|a| !matches!(a.task.kind, TaskKind::Social { .. })));
+}
+
+#[test]
 fn nobody_follows_someone_across_town_for_a_chat() {
     let mut w = talk_town(80, r#"{"name":"Ann","x":4.5,"z":5.5},{"name":"Bob","x":6.5,"z":5.5}"#);
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
