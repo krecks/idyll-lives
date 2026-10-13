@@ -505,6 +505,8 @@ export class BabylonRenderer implements Renderer {
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
     this.engine.onResizeObservable.add(() => this.drawOnce());
 
+    // Babylon's own clock (particles: the build effects' sparkles and dust) steps at most as far as the game's.
+    Scene.MaxDeltaTime = MAX_FRAME_MS;
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
     scene.skipPointerMovePicking = true;
