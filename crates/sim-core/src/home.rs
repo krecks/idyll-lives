@@ -1192,6 +1192,7 @@ impl World {
             for t in current.into_iter().chain(sim.queue.iter_mut()) {
                 shift_objects(t, id);
             }
+            sim.remap_unreachable(|o| if o == id { None } else { Some(if o > id { o - 1 } else { o }) });
         }
         let obj = self.objects.remove(id as usize);
         self.object_plot.remove(id as usize);

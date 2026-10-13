@@ -15,6 +15,8 @@ use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_SECOND, ai, conversation
 
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
+/// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
+pub(crate) const UNREACHABLE: usize = 4;
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
@@ -451,9 +453,11 @@ pub struct Sim {
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
     pub(crate) follow_up: Option<Task>,
-    /// What they last chose for themselves but couldn't get to (a plate on a counter nobody
-    /// can reach), and until when they don't choose it again. Not saved either.
-    pub(crate) stuck: Option<(TaskKind, u64)>,
+    /// The last few things they chose for themselves but couldn't get to (a plate on a counter
+    /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
+    /// don't choose it again: uses, eating, cleaning, repairs, washing up and visits (see
+    /// `remember_unreachable`; object ids follow `remap_unreachable`). Not saved either.
+    pub(crate) unreachable: [Option<(TaskKind, u64)>; UNREACHABLE],
     /// Ticks the social they're on has spent waiting for its target, and following them since
     /// it first got there (see `conversation::update`). Not saved.
     pub(crate) social_waited: u32,
@@ -701,9 +705,55 @@ impl Sim {
         }
     }
 
-    /// Whether they couldn't get to object `id` a moment ago (see `stuck`), and won't try again yet.
+    /// What they couldn't get to a moment ago and won't choose again yet (`unreachable`).
+    pub(crate) fn unreachable_now(&self, tick: u64) -> impl Iterator<Item = TaskKind> + '_ {
+        self.unreachable.iter().flatten().filter(move |u| tick < u.1).map(|u| u.0)
+    }
+
+    /// Whether they couldn't get to object `id` a moment ago (`unreachable`), and won't try again yet.
     pub(crate) fn couldnt_reach(&self, id: u32, tick: u64) -> bool {
-        self.stuck.is_some_and(|(kind, until)| tick < until && matches!(kind, TaskKind::Use { object, .. } if object == id))
+        self.unreachable_now(tick).any(|kind| matches!(kind, TaskKind::Use { object, .. } | TaskKind::Repair { object } if object == id))
+    }
+
+    /// They couldn't get to what they chose for themselves (`kind`): not again until `until`.
+    /// Only what can't be reached for long is remembered (things, places and visits; people
+    /// move); the oldest memory makes way.
+    pub(crate) fn remember_unreachable(&mut self, kind: TaskKind, until: u64) {
+        if !matches!(
+            kind,
+            TaskKind::Use { .. } | TaskKind::Eat { .. } | TaskKind::Clean { .. } | TaskKind::Repair { .. } | TaskKind::Dishes { .. } | TaskKind::Visit { .. }
+        ) {
+            return;
+        }
+        let same = self.unreachable.iter().position(|u| u.is_some_and(|u| same_target(u.0, kind)));
+        let slot = same.unwrap_or_else(|| (0..UNREACHABLE).min_by_key(|&k| self.unreachable[k].map_or(0, |u| u.1)).unwrap_or(0));
+        self.unreachable[slot] = Some((kind, until));
+    }
+
+    /// Objects moved (ids shifted, one gone): `remap` gives each object id in `unreachable` its
+    /// new id, or None for one that's gone (forgotten then).
+    pub(crate) fn remap_unreachable(&mut self, remap: impl Fn(u32) -> Option<u32>) {
+        for slot in &mut self.unreachable {
+            let Some((TaskKind::Use { object, .. } | TaskKind::Repair { object }, _)) = slot else { continue };
+            match remap(*object) {
+                Some(new) => *object = new,
+                None => *slot = None,
+            }
+        }
+    }
+}
+
+/// Whether two tasks are after the same thing (`Sim::unreachable`): the same use of an object,
+/// the same food, tile, broken object, dirty dish or house.
+fn same_target(a: TaskKind, b: TaskKind) -> bool {
+    match (a, b) {
+        (TaskKind::Use { object, interaction }, TaskKind::Use { object: o, interaction: i }) => (object, interaction) == (o, i),
+        (TaskKind::Eat { item, .. }, TaskKind::Eat { item: it, .. }) => item == it,
+        (TaskKind::Clean { x, z }, TaskKind::Clean { x: cx, z: cz }) => (x, z) == (cx, cz),
+        (TaskKind::Repair { object }, TaskKind::Repair { object: o }) => object == o,
+        (TaskKind::Dishes { item, .. }, TaskKind::Dishes { item: it, .. }) => item == it,
+        (TaskKind::Visit { plot }, TaskKind::Visit { plot: p }) => plot == p,
+        _ => false,
     }
 }
 
@@ -1456,7 +1506,7 @@ impl World {
             current: None,
             idle_ticks: 0,
             follow_up: None,
-            stuck: None,
+            unreachable: [None; UNREACHABLE],
             social_waited: 0,
             household: spawn.household,
             job,
@@ -2841,7 +2891,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     start_task(sim, task, ctx, objects, items);
                     if sim.current.is_none() && sim.follow_up.is_none() {
                         let retry = social::minutes_to_ticks(content.autonomy.retry_minutes);
-                        sim.stuck = Some((task.kind, ctx.tick + retry));
+                        sim.remember_unreachable(task.kind, ctx.tick + retry);
                     }
                     // Catching up on a turn (`lod.rs`): they were idle until it was time to
                     // choose, so what they chose has only had the ticks since.
@@ -3209,9 +3259,11 @@ fn pick_autonomous(
         let p = &ctx.plots[plot as usize];
         let lot = ctx.nav.lot;
         let mut best: Option<(f32, i32, i32)> = None;
+        // (Not where they couldn't get to a moment ago: the next dirtiest spot instead.)
+        let out_of_reach: Vec<(i32, i32)> = sim.unreachable_now(ctx.tick).filter_map(|k| if let TaskKind::Clean { x, z } = k { Some((x, z)) } else { None }).collect();
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
-                if !lot.in_bounds(x, z) {
+                if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
                     continue;
                 }
                 let i = lot.tile_index(x, z);
@@ -3325,11 +3377,16 @@ fn pick_autonomous(
         }
     }
 
-    // Not what they couldn't get to a moment ago (and would try again and again).
-    if let Some((stuck, _)) = sim.stuck.filter(|s| ctx.tick < s.1) {
-        candidates.retain(|&(_, choice)| match (choice, stuck) {
+    // Not what they couldn't get to a moment ago (and would try again and again, each time
+    // looking for a way there).
+    for kind in sim.unreachable_now(ctx.tick) {
+        candidates.retain(|&(_, choice)| match (choice, kind) {
             (Choice::Object(o, i), TaskKind::Use { object, interaction }) => (o, i) != (object, interaction),
             (Choice::Eat(it), TaskKind::Eat { item, .. }) => Some(it) != item,
+            (Choice::Clean(x, z), TaskKind::Clean { x: cx, z: cz }) => (x, z) != (cx, cz),
+            (Choice::Repair(o), TaskKind::Repair { object }) => o != object,
+            (Choice::Dishes(it), TaskKind::Dishes { item, .. }) => it != item,
+            (Choice::Visit(p), TaskKind::Visit { plot }) => p != plot,
             _ => true,
         });
     }
@@ -3445,11 +3502,8 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             };
             (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
         }
+        // (Their visit starts once there's a way there: see below.)
         TaskKind::Visit { plot } => {
-            sim.transition = Some(crate::life::Transition::Visit {
-                plot,
-                directed: task.directed,
-            });
             let door = ctx.plots[plot as usize].arrival_point();
             (
                 door,
@@ -3508,6 +3562,12 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
         return;
     };
+    if let TaskKind::Visit { plot } = task.kind {
+        sim.transition = Some(crate::life::Transition::Visit {
+            plot,
+            directed: task.directed,
+        });
+    }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
         if !obj.reserve_in(sim.id, content.objects[obj.def].slots_for(interaction)) {
@@ -4438,6 +4498,28 @@ mod tests {
         assert!(w.sims[0].needs[0] > 0.5);
         assert_eq!(w.sims[0].tile(), front);
         assert_eq!(w.sims[0].seated_from, None);
+    }
+
+    #[test]
+    fn what_they_couldnt_get_to_is_remembered_a_while() {
+        let mut w = world();
+        let s = &mut w.sims[0];
+        s.remember_unreachable(TaskKind::Use { object: 3, interaction: 1 }, 100);
+        s.remember_unreachable(TaskKind::Repair { object: 1 }, 100);
+        s.remember_unreachable(TaskKind::Visit { plot: 2 }, 50);
+        s.remember_unreachable(TaskKind::Clean { x: 4, z: 5 }, 200);
+        // People move: never remembered. Something remembered again just lasts longer.
+        s.remember_unreachable(TaskKind::Social { target: 1, social: 0 }, 300);
+        s.remember_unreachable(TaskKind::Visit { plot: 2 }, 80);
+        assert_eq!(s.unreachable_now(60).count(), 4);
+        assert!(s.couldnt_reach(3, 60) && s.couldnt_reach(1, 99) && !s.couldnt_reach(1, 100) && !s.couldnt_reach(2, 0));
+        // Full: the one that runs out first makes way.
+        s.remember_unreachable(TaskKind::Eat { item: Some(7), seat: None, plate: None, stage: 0 }, 300);
+        assert!(!s.unreachable_now(0).any(|k| matches!(k, TaskKind::Visit { .. })));
+        // Object 1 is gone and the ids after it shift down.
+        s.remap_unreachable(|o| if o == 1 { None } else { Some(if o > 1 { o - 1 } else { o }) });
+        assert!(s.couldnt_reach(2, 0) && !s.couldnt_reach(3, 0) && !s.couldnt_reach(1, 0));
+        assert_eq!(s.unreachable_now(0).count(), 3);
     }
 }
 
