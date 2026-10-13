@@ -17,6 +17,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { quiet } from '../bench/quiet.mjs';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const PORT = 5299;
@@ -47,6 +48,7 @@ const browser = await chromium.launch({
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.addInitScript(quiet);
   page.on('console', (m) => m.type() === 'error' && console.error(`page: ${m.text()}`));
   await page.goto(`http://localhost:${PORT}/?debug`);
   await page.waitForFunction(() => typeof window.__llmBench === 'function', null, { timeout: 60_000 });
