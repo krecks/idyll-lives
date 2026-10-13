@@ -34,7 +34,9 @@ registerBuiltInGLTFExtensions();
  * WebGPU engine options that let KTX2 textures stay block-compressed on the GPU. Babylon asks
  * for no optional device features by default, so the transcoder would expand every texture to
  * RGBA; it drops the ones the adapter doesn't have. (WebGL2 enables its extensions itself.)
+ * Also timestamp queries: GPU time in the F3 overlay and the benchmark, measured only while
+ * one of them is open (`BabylonRenderer.measureGpu`).
  */
 export function compressedTextureFeatures(): { deviceDescriptor: GPUDeviceDescriptor } {
-  return { deviceDescriptor: { requiredFeatures: ['texture-compression-bc', 'texture-compression-etc2', 'texture-compression-astc'] } };
+  return { deviceDescriptor: { requiredFeatures: ['texture-compression-bc', 'texture-compression-etc2', 'texture-compression-astc', 'timestamp-query'] } };
 }

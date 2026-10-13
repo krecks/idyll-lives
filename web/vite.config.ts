@@ -19,12 +19,15 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 const REPORTS = fileURLToPath(new URL('../debug-reports', import.meta.url));
 /** Game states written by the simulation's tests (`DUMP_STATES=1 cargo test`): `<repo>/debug-states/<name>.json`. */
 const STATES = fileURLToPath(new URL('../debug-states', import.meta.url));
+/** Rendering benchmark results (`?bench=<scene>`, src/debug/bench.ts): `<repo>/bench-results/<name>.json`. */
+const BENCH_RESULTS = fileURLToPath(new URL('../bench-results', import.meta.url));
 
 /**
  * Dev server endpoints for debug reports (see src/debug/report.ts):
  * POST /__debug/report writes report.json, save.txt and screenshot.jpg into a new folder;
  * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one);
- * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one).
+ * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one);
+ * POST /__debug/bench writes a benchmark's result to `bench-results/`.
  */
 function debugReports(): Plugin {
   return {
@@ -51,6 +54,24 @@ function debugReports(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ path: `debug-reports/${name}` }));
           server.config.logger.info(`[debug] report saved to debug-reports/${name}`, { timestamp: true });
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(String(err));
+        }
+      });
+      server.middlewares.use('/__debug/bench', async (req, res) => {
+        if (req.method !== 'POST') return void ((res.statusCode = 405), res.end());
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(chunk as Buffer);
+          const body = Buffer.concat(chunks).toString('utf8');
+          const result = JSON.parse(body) as { startedAt: string; scene: string; label?: string };
+          const slug = `${result.scene}-${result.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+          const name = `${result.startedAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-')}-${slug}.json`;
+          await mkdir(BENCH_RESULTS, { recursive: true });
+          await writeFile(join(BENCH_RESULTS, name), JSON.stringify(result, null, 2));
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ path: `bench-results/${name}` }));
         } catch (err) {
           res.statusCode = 500;
           res.end(String(err));

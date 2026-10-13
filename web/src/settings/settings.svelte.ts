@@ -137,9 +137,18 @@ function load(): Settings {
 
 export const settings: Settings = $state(load());
 
+/** Settings are kept unless a benchmark changed them for its page alone (`unsavedSettings`). */
+let persist = true;
+
+/** From now on settings changes apply to this page only (the benchmark's own, `debug/bench.ts`). */
+export function unsavedSettings(): void {
+  persist = false;
+}
+
 $effect.root(() => {
   $effect(() => {
     const json = JSON.stringify(settings);
+    if (!persist) return;
     try {
       localStorage.setItem(STORAGE_KEY, json);
     } catch {

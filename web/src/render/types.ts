@@ -41,6 +41,56 @@ export interface RenderStats {
   cpuMs: number;
   drawCalls: number;
   snapshotRendering: boolean;
+  /** Pixels drawn per frame (the render resolution), and its share of the screen's along each side (the resolution scale). */
+  renderWidth: number;
+  renderHeight: number;
+  renderScale: number;
+  /** GPU time per frame (ms) while it is measured (`measureGpu`); null: not measured, or the browser can't. */
+  gpuMs: number | null;
+  /** Main-thread time posing the residents per frame, smoothed (ms). */
+  residentsMs: number;
+}
+
+/** Benchmark hooks around every drawn frame (`debug/bench.ts`). */
+export interface FrameProbe {
+  /** First thing in a frame (the benchmark moves the camera here). */
+  before(now: number): void;
+  /**
+   * Last thing in a frame: when it began, when the game's per-frame update ended and when drawing
+   * was submitted (ms, performance clock), and what was drawn.
+   */
+  after(start: number, updated: number, end: number, counts: FrameCounts): void;
+}
+
+/** What one frame drew. Reused; read it in `FrameProbe.after`. */
+export interface FrameCounts {
+  /** In all passes. */
+  drawCalls: number;
+  triangles: number;
+  /** In the sun's shadow map. */
+  shadowDrawCalls: number;
+  shadowTriangles: number;
+  /** In the live mirrors' reflections. */
+  mirrorDrawCalls: number;
+  mirrorTriangles: number;
+  /** Lighting updates so far (`applyLighting`). */
+  lightingUpdates: number;
+  /** Whole frames the GPU timer has measured so far, and the newest (ms; 0 if the browser can't time whole frames). */
+  gpuFrames: number;
+  gpuMs: number;
+  /** Posing the residents (`RenderStats.residentsMs`). */
+  residentsMs: number;
+}
+
+/** A render pass of a frame (benchmark reports: pixels × samples × bytes is the memory traffic it causes). */
+export interface RenderPassInfo {
+  name: string;
+  width: number;
+  height: number;
+  samples: number;
+  /** Bytes per sample of its colour target and of its depth (0: none). */
+  colorBytes: number;
+  depthBytes: number;
 }
 
 export interface PickResult {
@@ -291,6 +341,14 @@ export interface Renderer {
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
+  /** Benchmark: hooks around every drawn frame (null: none). */
+  setFrameProbe(probe: FrameProbe | null): void;
+  /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
+  measureGpu(on: boolean, who?: 'overlay' | 'bench'): void;
+  /** Benchmark: per-pass GPU times (ms per frame, WebGPU only, while measured; empty otherwise); `reset` starts them over. */
+  gpuPasses(reset?: boolean): { name: string; ms: number; frames: number }[];
+  /** Benchmark: the passes a frame draws, the GPU and what the scene holds (counts that show two runs drew the same). */
+  benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;

@@ -10,6 +10,7 @@ import { SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { BENCH } from '../debug/benchFlags';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -1191,6 +1192,8 @@ export async function startSession(
   };
 
   const statsTimer = setInterval(() => {
+    // GPU timing costs a little, so it runs only while the overlay is open.
+    renderer.measureGpu(game.perfOpen);
     if (!game.perfOpen) return;
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
@@ -1245,7 +1248,8 @@ export async function startSession(
       lastInput = performance.now();
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
-      bridge.send({ type: 'setSpeed', speed: resumeSpeed ?? 1 });
+      // (A benchmark runs at its own speed.)
+      bridge.send({ type: 'setSpeed', speed: BENCH?.speed ?? resumeSpeed ?? 1 });
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
@@ -1256,7 +1260,8 @@ export async function startSession(
         else controls.setBuildTab('furnish');
       }
       prefetchTimer = setTimeout(() => {
-        if (disposed) return;
+        // (Not while benchmarking: drawing the pictures would show in the measurements.)
+        if (disposed || BENCH) return;
         services.items.prefetch(content.shop.map((def) => ({ model: styledModel(content, assets, def, game.householdStyle), footprint: def.footprint ?? [1, 1] })));
       }, PREFETCH_PICTURES_MS);
     },

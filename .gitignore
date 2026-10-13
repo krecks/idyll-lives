@@ -8,4 +8,5 @@ node_modules
 .DS_Store
 /debug-reports
 /debug-states
+/bench-results
 /web/.assets
