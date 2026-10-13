@@ -337,3 +337,91 @@ fn with_a_grandparent_at_home_the_last_parent_goes_to_the_park_without_a_babysit
     assert!(at_the_park_until(&mut w, 12.0), "Ada went to the park");
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
 }
+
+// ---- Two grown-ups sent out ---------------------------------------------------------------
+//
+// Ada and Dan at home with Cleo: once one of them is on their way out (a visit, the park, a
+// neighbour's fridge, a chat with Bo at his, a walk down the street, meeting up with Bo), the
+// other is the last one home.
+
+const DAN: &str = r#",{"name":"Dan","household":0,"x":6.5,"z":8.5,"age":33}"#;
+
+/// The street with Dan at home too, at 10:00 on day 1 with `funds` in the bank (both home:
+/// staying in until then).
+fn two_at_home(funds: i64) -> World {
+    let mut w = street_world(true, DAN);
+    w.households[0].free_will = false;
+    until(&mut w, 1, 10.0);
+    w.households[0].free_will = true;
+    w.households[0].funds = funds;
+    assert!(!out(&w, 0) && !out(&w, 3), "both home");
+    w
+}
+
+#[test]
+fn without_money_two_quick_orders_out_leave_someone_home() {
+    let mut w = two_at_home(10);
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+    // Ada is still walking off the lot: Dan is the last one home.
+    assert!(!out(&w, 0), "Ada hasn't left yet");
+    let err = w.apply(Command::Visit { sim: 3, plot: 2 }).unwrap_err();
+    assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
+    w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap_err();
+    let mut visited = false;
+    while clock::hour(w.tick) < 13.0 {
+        for _ in 0..5 * 20 {
+            w.tick_once();
+        }
+        visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
+        assert!(!(out(&w, 0) && out(&w, 3)), "Cleo left alone at {:.2}", clock::hour(w.tick));
+    }
+    assert!(visited, "Ada went to Bo's");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no money for one");
+}
+
+#[test]
+fn any_order_off_the_lot_counts_as_leaving() {
+    let refused = |err: sim_core::Error| assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
+    // Bo's fridge, a chat with Bo at his, a walk down the street, asking Bo on the phone to
+    // come over to his.
+    let orders = [
+        Command::Use { sim: 0, object: 4, interaction: 0 },
+        Command::Social { sim: 0, target: 2, social: 0 },
+        Command::MoveTo { sim: 0, x: 30.5, z: 11.0 },
+        Command::Phone { sim: 0, action: 0, contact: Some(2) },
+    ];
+    for order in orders {
+        let mut w = two_at_home(10);
+        let what = format!("{order:?}");
+        w.apply(order).unwrap_or_else(|e| panic!("{what}: {e}"));
+        // Ada on her way out: Dan can't be sent out after her.
+        refused(w.apply(Command::Visit { sim: 3, plot: 2 }).unwrap_err());
+        refused(w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap_err());
+        // Things at home are fine.
+        w.apply(Command::Use { sim: 3, object: 1, interaction: 0 }).unwrap_or_else(|e| panic!("after {what}: {e}"));
+    }
+}
+
+#[test]
+fn with_money_both_go_out_and_a_babysitter_is_booked_once() {
+    let mut w = two_at_home(500);
+    w.sims[1].needs[0] = 0.5;
+    w.sims[1].needs[1] = 0.5;
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+    w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap();
+    let (mut visited, mut park, mut both) = (false, false, false);
+    while clock::hour(w.tick) < 12.0 {
+        for _ in 0..5 * 20 {
+            w.tick_once();
+        }
+        visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
+        let (x, z) = w.sims[3].tile();
+        park |= w.plot_at(x, z) == Some(1);
+        both |= out(&w, 0) && out(&w, 3);
+    }
+    assert!(visited && park && both, "Ada went to Bo's and Dan to the park, both out at once");
+    let booked = told(&w, EventKind::Babysitter, 1);
+    assert_eq!(booked.len(), 1, "one babysitter for the day");
+    assert_eq!((booked[0].b, booked[0].n), (1, Some(40)), "for Cleo, for $40");
+    assert_eq!(w.households[0].funds, 460, "paid once");
+}
