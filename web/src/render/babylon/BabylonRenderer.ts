@@ -488,15 +488,48 @@ export class BabylonRenderer implements Renderer {
     window.addEventListener('resize', this.onResize);
   }
 
-  async setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+  /** The newest world waiting to be built, and the builds in progress (see `setWorld`). */
+  private nextWorld: { world: WorldStructure; view: ViewRect | null } | null = null;
+  private worldBuilds: Promise<void> | null = null;
+
+  /**
+   * Builds `world`. One build runs at a time: worlds arriving meanwhile (two edits in one frame,
+   * a multi-edit build) wait for it, and only the newest of them is built next. Resolves when
+   * the newest world is built.
+   */
+  setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.lastWorld = world;
-    this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
-    if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
+    this.nextWorld = { world, view };
+    return (this.worldBuilds ??= this.buildWorlds());
+  }
+
+  private async buildWorlds(): Promise<void> {
+    let error: unknown = null;
+    try {
+      for (let next = this.nextWorld; next; next = this.nextWorld) {
+        this.nextWorld = null;
+        try {
+          await this.buildOne(next.world, next.view);
+          error = null;
+        } catch (err) {
+          error = err;
+        }
+      }
+    } finally {
+      this.worldBuilds = null;
+    }
+    if (error) throw error;
+  }
+
+  private async buildOne(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.beginBuild();
+    // (First: a storey in view the world no longer has is changed below, for this build to show.)
     this.worldBuilding = true;
     this.sliceStart = performance.now();
     const until = this.sliceStart + TEXTURE_WAIT_MS;
     try {
+      this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
+      if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
       await this.buildWorld(world, view);
       await this.warmShaders(until);
     } finally {
