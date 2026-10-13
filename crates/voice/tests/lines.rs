@@ -74,6 +74,8 @@ fn lines(v: &Value, at: &str, out: &mut Vec<(String, String)>) {
 fn g2p() -> Option<G2p> {
     let path = content_dir().join("../voice/en-us.lexz");
     let Ok(file) = std::fs::File::open(&path) else {
+        // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
+        assert!(std::env::var_os("CI").is_none(), "{} missing in CI (run `node tools/voice/fetch.mjs` first)", path.display());
         eprintln!("skipped: {} missing (run `node tools/voice/fetch.mjs`)", path.display());
         return None;
     };
