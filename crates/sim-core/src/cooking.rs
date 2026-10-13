@@ -735,6 +735,10 @@ fn cook_next(
             _ => {}
         }
         if !s.optional {
+            // Given up after the ingredients were bought: they go back (the money too).
+            if servings > 0 {
+                sim.pending_spend -= r.cost(servings).max(0);
+            }
             return cannot_cook(sim, ctx, tags);
         }
         // Done without (no counter: chopped at the next station).

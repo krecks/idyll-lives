@@ -316,6 +316,29 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
 }
 
 #[test]
+fn a_recipe_given_up_after_paying_gives_the_money_back() {
+    // The only stove breaks while Ada preps a gourmet meal, which can't do without one.
+    let mut w = world_with(KITCHEN, 1, false);
+    let funds = w.households[0].funds;
+    order(&mut w, 0, FRIDGE, "gourmet");
+    let mut paid = false;
+    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if let Some(TaskKind::Cook { step: 1, servings, .. }) = w.sims[0].current().map(|a| a.task.kind) {
+            paid |= servings > 0 && w.households[0].funds < funds;
+            w.objects[STOVE as usize].wear = 1.0;
+        }
+        if paid && !cooking(&w, 0) {
+            break;
+        }
+    }
+    assert!(paid, "the ingredients were bought");
+    assert!(!cooking(&w, 0) && w.items.list.iter().all(|it| it.servings == 0), "given up: nothing was made");
+    ticks(&mut w, 1.0);
+    assert_eq!(w.households[0].funds, funds, "the money for the ingredients is back");
+}
+
+#[test]
 fn a_stove_that_broke_on_the_way_is_left_for_the_other_one() {
     let kitchen = format!(r#"{KITCHEN},{{"def":"stove","x":8,"z":1,"rot":0}}"#);
     let mut w = world_with(&kitchen, 1, false);
