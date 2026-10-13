@@ -31,7 +31,7 @@ The same on every preset:
 - **The FramePacer** for the frame rate cap (below).
 - **The menus' town** is drawn at about 30 fps (the cap's rounding rule for 30, below).
 - **Dark lamps leave the cluster:** a lamp that is off gets a range of 1 cm, so it covers next to no tiles (P1-02).
-- **Nature is culled in cells:** the landscape's plants are grouped by where they stand (lawn tufts in 32 m squares, flowers in 96 m squares, the woods in 8 sectors round the town), so the camera leaves out those out of view (P1-01).
+- **Nature is culled in groups, in the game:** the landscape's plants are grouped by where they stand (lawn tufts in about 64 m squares, the woods in 8 sectors round the town; a part with fewer than 36,000 triangles in all, such as bark or flowers, stays whole), so the camera leaves out those out of view (P1-01). Each group is a mesh of its own, culled by its box, and every mesh costs the main thread a little each frame, so the squares are wide. The menus' town, with the whole landscape in view, and the game's sun shadows (the near woods) draw the plants whole (`nature.ts`).
 - **The sun's shadow map** draws only the casters that can reach its square round the lot, and is drawn again only when something in it changed: the light, a thing placed or moved, walls, roofs or storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame (P1-04).
 - **Only the residents in view** have their pose rows uploaded each frame (P1-14).
 - **Nothing is drawn behind full-screen menus:** the pause menu, Settings, Load game, Credits, the planner and the crash screen get 2 more frames, then none until they close; the frosted glass keeps blurring the last frame.
@@ -188,14 +188,25 @@ The HD 620 estimate scales these: T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, wit
 | High, night | 80 → 91 | 8.62 → 8.24 | 116 → 108 | 8.02 → 8.11 | 253/242/48 → 277/163/54 | 6.73 → 4.31 | 225 → 225 |
 
 - High isn't like for like: the base had 2048 shadows. G2's own whole-branch table may include runs on battery; these numbers take precedence.
-- **The processor's side:** these are GPU savings. At 3× CPU slow-down P1's sign-off found no CPU gain in play (8 of 12 cells 0.6–3.9 ms a frame worse): the nature cells add main-pass draws (+10 % in the orbit, +21 % in the wide view) while the shadow pass drops by 79–96. G3 is working on it. *(G3's numbers to come.)* <!-- G3 -->
+- **The processor's side:** at 3× CPU slow-down P1's sign-off found no CPU gain in play on 5f72a7c (8 of 12 cells 0.6–3.9 ms a frame worse): G2's plant groups added about 300 meshes (cloned, which slowed Babylon's per-frame mesh loop) and main-pass draws, and every visible change of the sky's light at dusk walked every mesh once per material (41 of them). G3 (5ef8dbf) kept the groups to the game in wider squares, made them new meshes, and changes the light by flags. With P2's method at 3× CPU (speed 5, on AC power, median of 3), a frame's main-thread work now averages 7.21 ms (p95 9.39) against 7.94 (12.40) at 4cde174, 8.19 (12.61) before G2 and 10.18 (20.45) after it, with no long tasks.
+
+**After G3** (benchmark, village orbit by day, `--preview --throughput`, median of 3), dee213f (before G2) → G2 → G3, GPU ms and the share of G2's saving G3 keeps:
+
+| Preset, backend | GPU ms | Kept | Draws (shadow) | Triangles M |
+|---|---|---|---|---|
+| Medium, WebGPU | 8.60 → 5.18 → 5.39 | 94 % | 494 (242) → 429 (152) → 409 (156) | 6.03 → 3.71 → 4.14 |
+| Medium, WebGL2 | 10.52 → 6.52 → 6.92 | 90 % | as above | as above |
+| Low, WebGPU | 4.91 → 3.81 → 3.61 | all of it | 494 (242) → 423 (146) → 399 (146) | 6.03 → 3.44 → 3.58 |
+| Low, WebGL2 | 6.78 → 4.47 → 4.58 | 95 % | 494 (242) → 422 (146) → 399 (146) | 6.03 → 3.44 → 3.58 |
+
+The table above this one (P1's sign-off) is 5f72a7c, before G3; G3 gives back about 0.2–0.4 ms of Medium's GPU saving on the M3 for the CPU it saves. Shots against dee213f, headless on both sides: Medium at most 0.095 % of pixels off by more than 2 (the far road, P1-17); Low and High against `main` at most 0.136 %.
 
 **G2, step by step** (each change against the one before, production build, median of 3 interleaved runs; each change's own tables are in its commit body, and in the release review's §3.5.1):
 
 | Change | What it saved (Medium unless said; against the step before) |
 |---|---|
 | Dark lamps out of the cluster | WebGPU orbit by day: GPU 8.87 → 6.49 ms, 92 → 119 fps; at night unchanged |
-| Nature in cells | WebGPU orbit by day: GPU 6.08 → 5.17 ms, triangles 6.01 → 4.56 M (draws 493 → 538) |
+| Nature in cells (G2's first version; G3 widened them) | WebGPU orbit by day: GPU 6.08 → 5.17 ms, triangles 6.01 → 4.56 M (draws 493 → 538) |
 | Shadow casters culled to the map | Draws 540 → 429 (shadow 262 → 152), shadow triangles 1.70 → 0.81 M, 140 → 148 fps |
 | Shadow map drawn only when something moved | Build mode (paused): GPU 8.54 → 4.96 ms, shadow draws 152 → 0; live play with residents in view unchanged |
 | Lighting at most 10 times a second | Dusk at speed 5: lighting updates 20.1 → 9.7 a second |

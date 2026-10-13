@@ -218,6 +218,7 @@ interface NatureSet {
   landscape: Landscape;
   meshes: Mesh[];
   casters: Mesh[];
+  only: Map<Mesh, 'game' | 'town'>;
   ready: Promise<void>;
   users: Set<'world' | 'town'>;
   pending: number;
@@ -1805,7 +1806,7 @@ export class BabylonRenderer implements Renderer {
     });
     const casters = (map?.renderList ?? []).filter((m) => m.isEnabled() && m.isVisible) as Mesh[];
     const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
-    const nature = this.natureIn.world?.meshes ?? [];
+    const nature = (this.natureIn.world?.meshes ?? []).filter((m) => m.layerMask & LAYER_WORLD);
     // (GPUAdapterInfo's fields are getters: copied one by one.)
     const adapter = (this.webgpu as unknown as { _adapterInfo?: Record<string, string> } | null)?._adapterInfo;
     return {
@@ -2185,10 +2186,11 @@ export class BabylonRenderer implements Renderer {
     let set = this.natures.get(key);
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity);
-      const created: NatureSet = { landscape, meshes: [], casters: [], users: new Set(), pending: 0, ready: Promise.resolve() };
+      const created: NatureSet = { landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve() };
       created.ready = landscape.build(this.scene, this.deps.assets, world).then((nature) => {
         created.meshes = nature.meshes;
         created.casters = nature.casters;
+        created.only = nature.only;
         for (const mesh of nature.meshes) {
           mesh.freezeWorldMatrix();
           mesh.layerMask = 0;
@@ -2221,7 +2223,19 @@ export class BabylonRenderer implements Renderer {
         continue;
       }
       const mask = (n.users.has('world') ? LAYER_WORLD : 0) | (n.users.has('town') ? LAYER_TOWN : 0);
-      for (const mesh of n.meshes) mesh.layerMask = mask;
+      // Plants in groups only in the game, whole only in the overview (and in the game's shadow
+      // map: the casters); those neither draws are switched off (each mesh costs a little every
+      // frame, drawn or not).
+      const casters = new Set(this.quality.landscapeShadows ? n.casters : []);
+      for (const mesh of n.meshes) {
+        const only = n.only.get(mesh);
+        if (!only) {
+          mesh.layerMask = mask;
+          continue;
+        }
+        mesh.layerMask = mask & (only === 'game' ? LAYER_WORLD : LAYER_TOWN);
+        mesh.setEnabled((mesh.layerMask !== 0 || (casters.has(mesh) && n.users.has('world'))) && !this.diag.has('nonature'));
+      }
       all.push(...n.meshes);
     }
     // Interior lamps never light the landscape (keeps its shaders simple). Only when that
