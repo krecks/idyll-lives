@@ -1483,6 +1483,11 @@ impl World {
             .age
             .unwrap_or_else(|| crate::lifecycle::default_age(&content.life, name, id))
             .clamp(0.0, 150.0);
+        // At or past the retirement age: retired already, with the pension of a job they were
+        // given (at least the basic pension).
+        let retired = content.life.retire_at.is_some_and(|at| age >= at);
+        let pension = if retired { crate::lifecycle::pension(content, job.as_ref()) } else { 0 };
+        let job = job.filter(|_| !retired);
         let mut needs = [0.0; MAX_NEEDS];
         for n in needs.iter_mut().take(self.content.needs.len()) {
             *n = self.rng.range(0.55, 0.95);
@@ -1538,8 +1543,8 @@ impl World {
             invited_until: 0,
             served: None,
             hung_up: None,
-            retired: false,
-            pension: 0,
+            retired,
+            pension,
             school_day: 0,
             grade: content.life.school.as_ref().map_or(0.0, |s| s.start_grade),
             steps: 1,

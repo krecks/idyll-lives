@@ -79,7 +79,10 @@ sometimes families (a couple with a grown child, two siblings). Grief uses kin.
 
 - **Retirement:** at `retireAt` an employed resident retires (story event, a good feeling) and
   the household gets a weekly pension of `pension` × their last weekly pay, and at least
-  `basicPension` (500 a week: enough for a home of one).
+  `basicPension` (500 a week: about the rent and bills of a home of one). Anyone at or past the
+  age without a job is retired with the basic pension: made or moving in at that age, at midnight
+  on reaching it, or at midnight after losing or quitting a job. The job market doesn't hire
+  them, but a job the player gives them sticks.
 - **Death:** from `death.from` a resident may pass away of old age, checked at midnight: a
   yearly chance of `perYear`, ×e^`growth` per year past `from`, spread over the year's days
   (median about 84). The journal tells it; family, partners and friends with friendship of at
