@@ -1,8 +1,10 @@
-# Shared helpers for the Blender-built models (see README.md). Blender 4.2+ / 5.x.
+# Shared helpers for the Blender-built models (see README.md and docs/design/objects.md).
+# The committed models were exported with Blender 5.2 LTS (glTF I/O 5.2.40); other versions warn.
 #
 # Conventions, matching the game (docs: "Replacing art"):
 #   1 unit = 1 metre, origin at the footprint centre on the floor (z = 0), front facing -Y in
-#   Blender. The glTF exporter's default +Y up turns Blender -Y into the game's +Z front.
+#   Blender. The glTF exporter's default +Y up turns Blender -Y into the game's +Z front, and
+#   Blender +X into the game's -X: Blender (x, y, z) is the game's (-x, z, -y).
 #
 # A model script imports this module, calls `reset()`, builds meshes with the helpers below
 # (each returns a Blender object) and calls `export_glb(path, objects)`.
@@ -12,6 +14,10 @@ import os
 import bpy
 
 TAU = math.tau
+
+BLENDER = (5, 2)
+if tuple(bpy.app.version[:2]) != BLENDER:
+    print(f'[gamekit] warning: Blender {bpy.app.version_string}; the models were made with {BLENDER[0]}.{BLENDER[1]} LTS')
 
 
 def reset():
@@ -37,17 +43,27 @@ _MATERIALS = {}
 
 
 def mat(name, color, roughness=0.6, metallic=0.0, alpha=1.0, emission=0.0):
-    """A cached Principled material. `color` is an sRGB hex string or an (r, g, b) 0..1 tuple."""
+    """
+    A cached Principled material. `color` is sRGB, as the game's manifests write colours: a hex
+    string or an (r, g, b) 0..1 tuple. Blender's colour sockets and glTF's colour factors are
+    linear, so it is converted. One-sided: the meshes are closed (glTF `doubleSided` would draw
+    every back face too, and hide faces wound the wrong way).
+    """
     key = (name, color, roughness, metallic, alpha, emission)
     if key in _MATERIALS:
         return _MATERIALS[key]
     m = bpy.data.materials.new(name)
     m.use_nodes = True
+    m.use_backface_culling = True
     bsdf = m.node_tree.nodes.get('Principled BSDF')
-    rgb = _rgb(color)
+    rgb = _linear(_rgb(color))
     bsdf.inputs['Base Color'].default_value = (*rgb, 1.0)
     bsdf.inputs['Roughness'].default_value = roughness
     bsdf.inputs['Metallic'].default_value = metallic
+    # The viewport colour too, so `preview` (Workbench) shows it.
+    m.diffuse_color = (*rgb, alpha)
+    m.roughness = roughness
+    m.metallic = metallic
     if alpha < 1.0:
         bsdf.inputs['Alpha'].default_value = alpha
         m.blend_method = 'BLEND'
@@ -67,6 +83,11 @@ def _rgb(color):
         c = color.lstrip('#')
         return tuple(int(c[i:i + 2], 16) / 255 for i in (0, 2, 4))
     return tuple(color)
+
+
+def _linear(rgb):
+    """sRGB 0..1 -> linear 0..1 (the sRGB transfer function)."""
+    return tuple(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb)
 
 
 # ---- primitives --------------------------------------------------------------------------
@@ -237,8 +258,11 @@ def fit(obj, w, h, d):
     return obj
 
 
-def export_glb(path, objects=None):
-    """Writes a .glb (all mesh objects unless given), +Y up so Blender -Y is the game's +Z front."""
+def export_glb(path, objects=None, texcoords=False):
+    """
+    Writes a .glb (all mesh objects unless given), +Y up so Blender -Y is the game's +Z front.
+    Without textures the UVs stay out (`texcoords`): the game gives flat-coloured parts its own.
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     bpy.ops.object.select_all(action='DESELECT')
     objects = objects if objects is not None else [o for o in bpy.context.scene.objects if o.type == 'MESH']
@@ -246,7 +270,8 @@ def export_glb(path, objects=None):
         o.select_set(True)
     bpy.context.view_layer.objects.active = objects[0]
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
-                              export_apply=True, export_yup=True, export_materials='EXPORT')
+                              export_apply=True, export_yup=True, export_materials='EXPORT',
+                              export_texcoords=texcoords)
     return path
 
 
