@@ -120,6 +120,15 @@ const SNAP_DISTANCE = 1.6;
 const WALK_PER_TICK = 0.075;
 const WALK_FASTEST = 1.5;
 const WALK_SLACK = 1.2;
+/**
+ * The walk and jog cycles play matched to the ground speed, up to this many times their own pace
+ * (faster, they would only flicker; the feet slide instead). A walker who would need the walk
+ * faster jogs along (`jogAlong`), and walks again below `JOG_BACK` of it.
+ */
+const GAIT_MAX_RATE = 3;
+const JOG_BACK = 0.8;
+/** Locomotion cycles (they play in real time at the matched rate, and change into each other in step). */
+const GAITS = new Set(['walk', 'jogAlong']);
 const DEFAULT_FADE = 0.25;
 
 /** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
@@ -1798,11 +1807,11 @@ export class Characters {
 
       // Advance and blend.
       const step = dt * animRate;
-      advance(rig.cur, rig.cur.key === 'walk' || rig.cur.key === 'jog' ? dt : step);
-      advance(rig.prev, rig.prev.key === 'walk' || rig.prev.key === 'jog' ? dt : step);
+      advance(rig.cur, GAITS.has(rig.cur.key) || rig.cur.key === 'jog' ? dt : step);
+      advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
       // Carrying while walking: the arms bob in step with the feet.
-      if (rig.cur.key === 'walk' && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
+      if (GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
       rig.upperW += clamp(rig.upperTarget - rig.upperW, -dt * 4, dt * 4);
       if (dir?.still) {
@@ -2029,10 +2038,15 @@ export class Characters {
         else if (up) upper = up;
       }
     } else if (moving) {
-      key = 'walk';
-      const clip = set.clips.get('walk')!;
-      rate = clamp(rig.speed / (clip.speed * rig.body.pelvisScale * rig.scale), 0.35, 3);
-      fade = 0.2;
+      // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
+      // game, short legs), jogging along.
+      const legs = rig.body.pelvisScale * rig.scale;
+      const walk = rig.speed / (set.clips.get('walk')!.speed * legs);
+      const jog = set.clips.get('jogAlong');
+      const jogging = !!jog && walk > GAIT_MAX_RATE * (rig.cur.key === 'jogAlong' ? JOG_BACK : 1);
+      key = jogging ? 'jogAlong' : 'walk';
+      rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
+      fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
     } else if (social) {
       const me = speaking(pair, role, time);
@@ -2236,10 +2250,12 @@ export class Characters {
     }
     const c = rig.cur;
     const sameLoop = c.key === key && clip.loop;
+    // Walking into a jog and back: in step (both cycles start at the left heel's strike).
+    const inStep = GAITS.has(key) && GAITS.has(c.key) && c.clip ? ((c.time / c.clip.duration) % 1) * clip.duration : -1;
     c.clip = clip;
     c.key = key;
     // Walk cycles of the previous walk keep their phase.
-    c.time = sameLoop ? c.time : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
+    c.time = sameLoop ? c.time : inStep >= 0 ? inStep : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
     c.rate = rate;
     c.repeat = repeat;
     c.rootY = rootY;
