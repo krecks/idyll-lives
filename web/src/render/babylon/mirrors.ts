@@ -141,6 +141,19 @@ export class Mirrors {
     }
   }
 
+  /** The reflections' render targets, mirrors in the world and those reflecting now (benchmark reports). */
+  get textures(): MirrorTexture[] {
+    return this.pool.map((p) => p.texture);
+  }
+
+  get count(): number {
+    return this.items.length;
+  }
+
+  get live(): number {
+    return this.items.filter((item) => item.slot >= 0).length;
+  }
+
   dispose(): void {
     this.set([]);
     for (const { texture, material } of this.pool) {

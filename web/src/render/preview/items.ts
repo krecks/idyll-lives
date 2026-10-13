@@ -30,6 +30,7 @@ import {
   type Mesh,
 } from '../babylon/core';
 import type { AssetRegistry } from '../../assets/registry';
+import { openCache } from '../../ml/assets';
 import { MaterialLibrary } from '../babylon/materials';
 import { buildModel } from '../babylon/models';
 import { installNature } from '../babylon/nature';
@@ -64,8 +65,12 @@ interface Job {
 
 const thumbs = new Map<string, string>();
 const turntables = new Map<string, string[]>();
-/** Pictures kept between visits (Cache Storage); bump to drop old pictures after a look change. */
-const STORE = 'littlelives-item-pictures-v1';
+/**
+ * Pictures kept between visits (Cache Storage), in a cache per app version: older versions' caches
+ * are deleted when it opens. Bump `v1` to drop old pictures after a look change.
+ */
+const STORE_PREFIX = 'littlelives-item-pictures-';
+const STORE = `${STORE_PREFIX}v1-${__APP_VERSION__}`;
 
 export function createItemPreviews(assets: AssetRegistry): ItemPreviews {
   return new ItemThumbnails(assets);
@@ -164,7 +169,7 @@ class ItemThumbnails implements ItemPreviews {
         // Nobody wants it any more (scrolled away, another category): don't draw it.
         const i = this.queue.indexOf(j);
         if (!j.waiters.length && j.priority === 'now' && i >= 0) this.queue.splice(i, 1);
-      });
+      }, { once: true });
       void this.pump();
     });
   }
@@ -212,7 +217,7 @@ class ItemThumbnails implements ItemPreviews {
   // ---- pictures kept between visits ----------------------------------------------------
 
   private cache(): Promise<Cache | null> {
-    this.store ??= (typeof caches === 'undefined' ? Promise.resolve(null) : caches.open(STORE)).catch(() => null);
+    this.store ??= typeof caches === 'undefined' ? Promise.resolve(null) : openCache(STORE_PREFIX, STORE);
     return this.store;
   }
 

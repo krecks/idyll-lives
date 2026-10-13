@@ -167,20 +167,27 @@ export class BuildBuyInput {
   private shift = false;
   /** Alt (Option) held: a click picks up a look (the eyedropper). */
   private alt = false;
-  private readonly onKey = (e: KeyboardEvent) => {
-    if (this.alt !== e.altKey) {
-      this.alt = e.altKey;
+  private readonly onModifiers = (e: KeyboardEvent | PointerEvent) => this.modifiers(e.altKey, e.shiftKey);
+  /**
+   * Away from the game (Alt+Tab, another window clicked with Option held), the keys' release goes
+   * elsewhere: nothing counts as held any more. Pointer events carry the keys too, so the next move
+   * or click is right whatever key events were missed.
+   */
+  private readonly onBlur = () => this.modifiers(false, false);
+  private modifiers(alt: boolean, shift: boolean): void {
+    if (this.alt !== alt) {
+      this.alt = alt;
       if (!this.alt && !game.eyedropper) game.pickHint = null;
     }
-    if (this.shift === e.shiftKey) return;
-    this.shift = e.shiftKey;
+    if (this.shift === shift) return;
+    this.shift = shift;
     if (this.lastHover && this.building() && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
     // Shift lets go of the quarter-tile snap, and of whole tiles and 10 cm steps while resizing.
     const held = game.placing && this.content.object(game.placing.def);
     if (held && !held.stairs) this.rehover();
     if (this.resizing) this.hoverResize(this.lastHover);
     if (this.openingDrag) this.hoverOpening(this.lastHover);
-  };
+  }
   private lastHover: Point | null = null;
   /** A wall/remove press is held (the gesture belongs to drawing until release). */
   private pressed = false;
@@ -217,13 +224,19 @@ export class BuildBuyInput {
     private readonly send: (command: Command) => void,
   ) {
     this.preview = renderer as unknown as Partial<BuildPreview>;
-    window.addEventListener('keydown', this.onKey);
-    window.addEventListener('keyup', this.onKey);
+    window.addEventListener('keydown', this.onModifiers);
+    window.addEventListener('keyup', this.onModifiers);
+    for (const type of ['pointerdown', 'pointermove', 'pointerup'] as const) window.addEventListener(type, this.onModifiers, true);
+    window.addEventListener('blur', this.onBlur);
+    document.addEventListener('visibilitychange', this.onBlur);
   }
 
   dispose(): void {
-    window.removeEventListener('keydown', this.onKey);
-    window.removeEventListener('keyup', this.onKey);
+    window.removeEventListener('keydown', this.onModifiers);
+    window.removeEventListener('keyup', this.onModifiers);
+    for (const type of ['pointerdown', 'pointermove', 'pointerup'] as const) window.removeEventListener(type, this.onModifiers, true);
+    window.removeEventListener('blur', this.onBlur);
+    document.removeEventListener('visibilitychange', this.onBlur);
   }
 
   /** The lot arrays the maps below were made from (unchanged ones arrive as the same arrays). */
@@ -1703,6 +1716,24 @@ export class BuildBuyInput {
     game.buildStart = null;
     this.clearPreviews();
     return true;
+  }
+
+  /**
+   * A held press ended without its release (the pointer was cancelled, or the window lost focus):
+   * nothing it was doing happens. A wall run or paint stroke is dropped, a carried or resized
+   * object goes back, a door or window keeps its size.
+   */
+  abortPress(): void {
+    if (this.openingDrag) {
+      this.openingDrag = null;
+      this.preview.setLeftDragCamera?.(true);
+      this.clearPreviews();
+      this.handlesKey = '';
+      this.syncHandles();
+    }
+    if (this.resizing || this.dragging) this.cancel();
+    else this.cancelDrawing();
+    this.pressed = this.dropped = false;
   }
 
   /** Escape: drop what's in hand. Returns true if there was something to cancel. */

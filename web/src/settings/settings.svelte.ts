@@ -42,6 +42,8 @@ export interface Settings {
   autoSlow: boolean;
   /** Time-lapse while everyone at home sleeps or is at work. */
   skipQuietHours: boolean;
+  /** The game pauses while another window has focus (and plays on when it's back). */
+  pauseOnBlur: boolean;
   /**
    * Clicking residents and the floor: `inspect` looks at a resident first (commands from their
    * panel); `always` gives orders straight away, as before.
@@ -64,6 +66,10 @@ export interface Settings {
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
+  /** Every sound, 0..1. */
+  masterVolume: number;
+  /** Silent while another window has focus (sound always stops while the tab is hidden). */
+  muteInBackground: boolean;
   /** Build mode's dock: `compact` keeps one row of the catalog (more of the lot in view), `expanded` shows several. */
   catalogSize: 'compact' | 'expanded';
   /** First-use tips already dismissed (ids from `FirstTip`). */
@@ -97,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideHudWhileWatching: false,
   autoSlow: true,
   skipQuietHours: true,
+  pauseOnBlur: false,
   directControl: 'inspect',
   voices: false,
   voiceLanguage: 'en',
@@ -105,6 +112,8 @@ export const DEFAULT_SETTINGS: Settings = {
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
+  masterVolume: 1,
+  muteInBackground: true,
   catalogSize: 'compact',
   tipsSeen: [],
 };
@@ -128,9 +137,18 @@ function load(): Settings {
 
 export const settings: Settings = $state(load());
 
+/** Settings are kept unless a benchmark changed them for its page alone (`unsavedSettings`). */
+let persist = true;
+
+/** From now on settings changes apply to this page only (the benchmark's own, `debug/bench.ts`). */
+export function unsavedSettings(): void {
+  persist = false;
+}
+
 $effect.root(() => {
   $effect(() => {
     const json = JSON.stringify(settings);
+    if (!persist) return;
     try {
       localStorage.setItem(STORAGE_KEY, json);
     } catch {

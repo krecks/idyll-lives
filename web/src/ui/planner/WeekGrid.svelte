@@ -92,6 +92,8 @@
 
   function move(e: PointerEvent) {
     if (!drag) return;
+    // The button went up where we didn't see it (another window): the block stays where it is now.
+    if (e.buttons === 0) return void (drag = null);
     const dy = e.clientY - drag.y;
     const dx = e.clientX - drag.x;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -153,7 +155,8 @@
   const hours = Array.from({ length: 24 }, (_, h) => h);
 </script>
 
-<svelte:window onpointermove={move} onpointerup={up} />
+<!-- A drag ends with the button, a cancelled pointer or the window losing focus (not a lost capture: a block redrawn mid-drag loses it). -->
+<svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} onblur={up} />
 
 <div class="week" class:readonly>
   <div class="head">

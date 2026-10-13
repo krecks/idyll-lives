@@ -2,6 +2,7 @@
   import { onMount, type Component } from 'svelte';
   import { host } from './game/host';
   import { menuScene } from './game/menuScene';
+  import { BENCH } from './debug/benchFlags';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave } from './persistence/saves';
@@ -45,6 +46,9 @@
    */
   async function boot() {
     const step = (label: string, value: number) => (app.boot = { label, value });
+    // `?bench=<scene>`: the benchmark's settings (for this page only) before anything reads them.
+    const bench = BENCH ? await import('./debug/bench') : null;
+    bench?.prepareBench();
     try {
       step('Loading game data', 0.05);
       await loadGameData();
@@ -66,7 +70,7 @@
         }),
       );
       const latest = await latestSave().catch(() => undefined);
-      if (latest && !['debugReport', 'state'].some((k) => new URLSearchParams(location.search).has(k))) {
+      if (latest && !['debugReport', 'state', 'bench'].some((k) => new URLSearchParams(location.search).has(k))) {
         // The save's own steps fill the rest of the bar.
         const stop = $effect.root(() => {
           $effect(() => {
@@ -85,6 +89,7 @@
     app.booting = false;
     void loadGameView();
     await openDebugReport();
+    await bench?.runBench();
   }
 
   // Global interface preferences.
