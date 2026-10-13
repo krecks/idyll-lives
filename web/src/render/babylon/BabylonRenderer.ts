@@ -106,6 +106,7 @@ import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
+import { SunShadows } from './sunShadows';
 
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
@@ -214,6 +215,8 @@ export class BabylonRenderer implements Renderer {
   private sun!: DirectionalLight;
   private sky!: HemisphericLight;
   private shadows!: ShadowGenerator;
+  /** Which casters the shadow map draws (see sunShadows.ts). */
+  private sunShadows!: SunShadows;
   private post: DefaultRenderingPipeline | null = null;
   private nightGrade: NightGrade | null = null;
   private instrumentation!: SceneInstrumentation;
@@ -1979,6 +1982,7 @@ export class BabylonRenderer implements Renderer {
     cam.lowerBetaLimit = 0.05;
     cam.upperBetaLimit = 1.45;
     cam.layerMask = LAYER_TOWN;
+    this.sunShadows.drawAll(true);
     const rig = this.overview!.rig;
     rig.syncFromCamera();
     if (this.townShot) rig.setShot(this.townShot, true);
@@ -1994,6 +1998,7 @@ export class BabylonRenderer implements Renderer {
     this.applyDig();
     this.warmFrames = 0;
     cam.layerMask = LAYER_WORLD;
+    this.sunShadows.drawAll(false);
     copyPose(this.parked, cam);
     cam.targetScreenOffset.set(0, 0);
     [cam.lowerRadiusLimit, cam.upperRadiusLimit] = RADIUS_LIMITS;
@@ -2243,6 +2248,7 @@ export class BabylonRenderer implements Renderer {
     shadows.normalBias = 0.02;
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
+    this.sunShadows = new SunShadows(shadows);
     if (this.diag.has('noshadows')) this.sun.shadowEnabled = false;
     // Note: with WebGPU snapshot rendering Babylon renders every render target each frame (to
     // keep the recorded passes aligned), so a render-once shadow map would not save anything.

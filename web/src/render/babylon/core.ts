@@ -56,6 +56,7 @@ export { Texture } from '@babylonjs/core/Materials/Textures/texture';
 export type { UniformBuffer } from '@babylonjs/core/Materials/uniformBuffer';
 export { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 export { Matrix, Quaternion, Vector3, Vector4 } from '@babylonjs/core/Maths/math.vector';
+export { Frustum } from '@babylonjs/core/Maths/math.frustum';
 export { Plane } from '@babylonjs/core/Maths/math.plane';
 export { Viewport } from '@babylonjs/core/Maths/math.viewport';
 export type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
