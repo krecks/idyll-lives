@@ -522,8 +522,9 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
 
 /// Child `i` is out of the crib (or came to live here past it) and needs a bed: with fewer bed
 /// places at home than people past the crib, a household the player doesn't play buys one (the
-/// cheapest, at the first good free spot, like `cribs_for_babies`); the player's is told
-/// (`EventKind::NoBed`) and buys its own.
+/// cheapest, at the first good free spot, like `cribs_for_babies`) if that leaves a week's rent
+/// and bills, like the planner's purchases; the player's is told (`EventKind::NoBed`) and buys
+/// its own.
 pub(crate) fn bed_for_child(w: &mut World, i: usize) {
     let h = w.sims[i].household as usize;
     let sleep = w.content.day_rhythm.sleep_tags;
@@ -540,7 +541,9 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
         .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby))
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
+    let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
     if let Some((price, bed)) = bed
+        && w.households[h].funds - w.build_price(price) >= reserve
         && w.deliver(h as u32, bed).is_some()
     {
         w.pay(h, price);

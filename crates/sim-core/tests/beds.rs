@@ -84,3 +84,13 @@ fn a_child_adopted_into_a_home_without_a_bed_for_them() {
     w.apply(Command::Adopt { household: 0, child: true }).unwrap();
     assert_eq!(w.events.iter().filter(|e| e.kind == EventKind::NoBed).count(), 1, "the player is told");
 }
+
+#[test]
+fn neighbours_short_of_money_dont_buy_into_debt() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    w.households[1].funds = 300;
+    until(&mut w, 2);
+    assert!(!w.content.life.baby(w.sims[3].age), "Dot is a child now");
+    assert_eq!(beds(&w, 12), 1, "no bed they can't pay for");
+    assert_eq!(w.households[1].funds, 300);
+}
