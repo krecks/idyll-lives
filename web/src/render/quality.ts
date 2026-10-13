@@ -48,6 +48,17 @@ export interface QualitySettings {
    * speed 5, 20 updates a second, CPU p95 4.7–6 ms against 0.3–0.4 ms (P1-11).
    */
   lightingStep: number;
+  /**
+   * Share of the lawn's grass tufts and flowers drawn (always the same ones; the placement is
+   * otherwise unchanged): 0.5 leaves out 20,410 of the landscape's 44,655 plants.
+   */
+  lawnDensity: number;
+  /**
+   * The woods round the town cast shadows (the lot's own garden trees, the street and the house
+   * always do). Low's half lawn and no woods' shadows together: −0.29 M triangles, −6 shadow draws
+   * and −0.5 ms GPU in the orbit view by day (Low, WebGPU).
+   */
+  landscapeShadows: boolean;
   /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
   snapshotRendering: boolean;
 }
@@ -58,9 +69,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, snapshotRendering: true },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, snapshotRendering: true },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, snapshotRendering: true },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

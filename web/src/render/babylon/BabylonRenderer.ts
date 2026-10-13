@@ -108,6 +108,7 @@ import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
 import { renderScale, watchPixelRatio } from './resolution';
 import { FramePacer } from './pacing';
+import { SunShadows } from './sunShadows';
 
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
@@ -126,6 +127,12 @@ const MENU_FPS = 30;
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
 /**
+ * And real milliseconds at least: at the fastest speeds the minutes passed every snapshot (20 a
+ * second), and each update can thaw the materials for a few frames. At normal speed the steps are
+ * 500 ms apart anyway.
+ */
+const LIGHT_MIN_MS = 100;
+/**
  * Metres of the game's sun shadow map beyond the lot's corners (nearby trees and the street
  * still shade it), and the outer share of it over which shadows fade out.
  */
@@ -140,6 +147,8 @@ const SHADOW_EDGE_FADE = 0.15;
  */
 const ROOM_LIGHTS = 4;
 const CLUSTERED_LIGHTS = 32;
+/** Range (m) of an interior light while it is dark: it then covers next to no cluster tiles (see `applyRoomLights`). */
+const DARK_LAMP_RANGE = 0.01;
 /** Brightness of a lamp at night (times its content `intensity`). */
 const LAMP_POWER = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
@@ -200,6 +209,8 @@ const FAILED_FRAMES_LIMIT = 60;
 const FRAME_WAIT_LIMIT_MS = 15_000;
 /** Longest frame time (ms) things move by in one frame (the first frame back after a hidden tab spans all of it). */
 const MAX_FRAME_MS = 100;
+/** Frames still drawn once a full-screen menu covers the view (see `hold`): the paused scene, settled, under its glass. */
+const HOLD_FRAMES = 2;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -220,6 +231,8 @@ export class BabylonRenderer implements Renderer {
   private sun!: DirectionalLight;
   private sky!: HemisphericLight;
   private shadows!: ShadowGenerator;
+  /** Which casters the shadow map draws, and when (see sunShadows.ts). */
+  private sunShadows!: SunShadows;
   private post: DefaultRenderingPipeline | null = null;
   private nightGrade: NightGrade | null = null;
   private instrumentation!: SceneInstrumentation;
@@ -263,6 +276,9 @@ export class BabylonRenderer implements Renderer {
   /** The frame state last posed (the marker goes up once the camera has moved). */
   private lastFrame: FrameState | null = null;
   private active = false;
+  /** A full-screen menu covers the view (see `hold`), and the frames still drawn before it stops. */
+  private covered = false;
+  private coveredFrames = 0;
   /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
   private frameDt = 0;
   /** Reduce motion: plants, clouds, the selection marker, the Build ghost and build effects keep still. */
@@ -349,6 +365,8 @@ export class BabylonRenderer implements Renderer {
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
+  /** When the lighting was last updated in the game (`FrameState.now`; see `LIGHT_MIN_MS`). */
+  private lastLightAt = 0;
   /**
    * Storeys (sim-core `storeys.rs`): how many at and above the ground, the lowest (-1 with a
    * basement), where their rows are, and the one in view (see `storeyShown`: higher ones are
@@ -531,7 +549,10 @@ export class BabylonRenderer implements Renderer {
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
+    this.engine.onResizeObservable.add(() => this.drawOnce());
 
+    // Babylon's own clock (particles: the build effects' sparkles and dust) steps at most as far as the game's.
+    Scene.MaxDeltaTime = MAX_FRAME_MS;
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
     scene.skipPointerMovePicking = true;
@@ -692,7 +713,7 @@ export class BabylonRenderer implements Renderer {
     const nature = await this.useNature('world', world);
     // No grass through floors of rooms built (or furniture bought) since the lawn was scattered.
     nature.landscape.refreshLawn(world);
-    this.natureCasters = nature.casters;
+    this.natureCasters = this.quality.landscapeShadows ? nature.casters : [];
     this.templatesInUse.clear();
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
@@ -770,9 +791,11 @@ export class BabylonRenderer implements Renderer {
     const h = layout.header;
     const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
     const step = snapshot ? LIGHT_STEP_SNAPSHOT : fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
-    if (Math.abs(minute - this.lastLightMinute) >= step) {
+    const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
+    if (due && Math.abs(minute - this.lastLightMinute) >= step) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
+      this.lastLightAt = frame.now;
       this.resetSnapshot();
     }
     // Lights go out in rooms where everyone is asleep.
@@ -791,6 +814,8 @@ export class BabylonRenderer implements Renderer {
     this.updateCutaway();
     this.followCamera();
     if (!this.reducedMotion) this.skyDome.drift(this.frameDt);
+    // Things springing into place cast as they grow.
+    if (this.fx.busy) this.sunShadows.moved();
     this.fx.update(this.frameDt);
     if (this.ghostShown) this.updateGhost(this.frameDt);
     if (this.builtPending) this.swapBuilt();
@@ -804,6 +829,8 @@ export class BabylonRenderer implements Renderer {
     this.simCount = count;
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+    // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
+    if (this.characters.posed) this.sunShadows.moved();
     this.mirrors.update(this.camera);
     this.handles.update(this.camera.globalPosition);
     this.simShadow.thinInstanceBufferUpdated('matrix');
@@ -1097,6 +1124,7 @@ export class BabylonRenderer implements Renderer {
       mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
       mesh.thinInstanceBufferUpdated('matrix');
     }
+    this.sunShadows.moved();
     this.resetSnapshot();
   }
 
@@ -1543,6 +1571,7 @@ export class BabylonRenderer implements Renderer {
   /** Roofs show with walls up, over the storeys in view. */
   private showRoofs(): void {
     for (const roof of this.roofs) roof.setEnabled(this.roofShown && storeyShown((roof.metadata as { storey?: number } | null)?.storey ?? 0, this.storey));
+    this.sunShadows.moved();
   }
 
   /** Storeys above the one in view are hidden (walls, floors, roofs). */
@@ -1558,6 +1587,7 @@ export class BabylonRenderer implements Renderer {
       else mesh.isVisible = this.storey >= 0;
     }
     this.applyDig();
+    this.sunShadows.moved();
     this.resetSnapshot();
   }
 
@@ -1578,6 +1608,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   async captureThumbnail(width: number, height: number): Promise<string | null> {
+    this.drawOnce();
     try {
       return await CreateScreenshotAsync(this.engine, this.camera, { width, height }, 'image/jpeg', 0.8);
     } catch (err) {
@@ -1642,6 +1673,9 @@ export class BabylonRenderer implements Renderer {
     const map = this.shadows.getShadowMap();
     if (map) watch(map, 'shadow');
     for (const texture of this.mirrors.textures) watch(texture, 'mirror');
+    // (Reflections are made when a mirror first reflects.)
+    this.mirrors.onCreated = (texture) => watch(texture, 'mirror');
+    this.probeOff.push(() => (this.mirrors.onCreated = null));
   }
 
   measureGpu(on: boolean, who: 'overlay' | 'bench' = 'overlay'): void {
@@ -1760,7 +1794,7 @@ export class BabylonRenderer implements Renderer {
     const push = (pass: RenderPassInfo | null) => pass && passes.push(pass);
     if (this.sun.shadowEnabled && map?.renderList?.length) push(target('shadow', map.renderTarget));
     const live = this.mirrors.live;
-    this.mirrors.textures.slice(0, live).forEach((t, i) => push(target(`mirror${i}`, t.renderTarget)));
+    this.mirrors.reflecting.forEach((t, i) => push(target(`mirror${i}`, t.renderTarget)));
     // The scene draws into the first post-process's input, each post-process into the next one's, the last onto the canvas.
     const chain = (this.camera._postProcesses ?? []).filter((pp) => !!pp);
     if (chain.length) push(target('scene', chain[0]!.inputTexture));
@@ -1779,7 +1813,7 @@ export class BabylonRenderer implements Renderer {
       gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : (engine as Engine).getGlInfo(),
       timerQuery: !!engine.getCaps().timerQuery,
       render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: false },
-      quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
+      quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
       diag: [...this.diag],
       passes,
       targets: (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache.map((t) => target(t.label ?? '?', t)),
@@ -1816,6 +1850,17 @@ export class BabylonRenderer implements Renderer {
     this.active = active;
     if (active) this.engine.runRenderLoop(this.renderFrame);
     else this.engine.stopRenderLoop(this.renderFrame);
+  }
+
+  hold(on: boolean): void {
+    if (on === this.covered) return;
+    this.covered = on;
+    this.coveredFrames = HOLD_FRAMES;
+  }
+
+  /** Behind a full-screen menu, one more frame: a screenshot reads the canvas once drawn, and a resized canvas is blank. */
+  private drawOnce(): void {
+    if (this.covered) this.coveredFrames = Math.max(this.coveredFrames, 1);
   }
 
   framesRendered(frames: number): Promise<void> {
@@ -2029,6 +2074,7 @@ export class BabylonRenderer implements Renderer {
     cam.lowerBetaLimit = 0.05;
     cam.upperBetaLimit = 1.45;
     cam.layerMask = LAYER_TOWN;
+    this.sunShadows.setOverview(true);
     const rig = this.overview!.rig;
     rig.syncFromCamera();
     if (this.townShot) rig.setShot(this.townShot, true);
@@ -2044,6 +2090,7 @@ export class BabylonRenderer implements Renderer {
     this.applyDig();
     this.warmFrames = 0;
     cam.layerMask = LAYER_WORLD;
+    this.sunShadows.setOverview(false);
     copyPose(this.parked, cam);
     cam.targetScreenOffset.set(0, 0);
     [cam.lowerRadiusLimit, cam.upperRadiusLimit] = RADIUS_LIMITS;
@@ -2122,8 +2169,9 @@ export class BabylonRenderer implements Renderer {
   /** Shadow casters of what is on screen: the overview, or the game world (its walls only with walls up). */
   private updateShadowList(): void {
     const map = this.shadows.getShadowMap()!;
-    if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...(this.natureIn.town?.casters ?? [])];
+    if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...((this.quality.landscapeShadows && this.natureIn.town?.casters) || [])];
     else map.renderList = this.wallMode === 'up' ? [...this.baseCasters, ...this.wallCasters] : this.baseCasters;
+    this.sunShadows.moved();
   }
 
   /**
@@ -2136,7 +2184,7 @@ export class BabylonRenderer implements Renderer {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world);
+      const landscape = new Landscape(world, this.quality.lawnDensity);
       const created: NatureSet = { landscape, meshes: [], casters: [], users: new Set(), pending: 0, ready: Promise.resolve() };
       created.ready = landscape.build(this.scene, this.deps.assets, world).then((nature) => {
         created.meshes = nature.meshes;
@@ -2187,6 +2235,11 @@ export class BabylonRenderer implements Renderer {
   }
 
   private readonly renderFrame = () => {
+    // Behind a full-screen menu: its last frames, then only those something waits for.
+    if (this.covered) {
+      if (this.coveredFrames > 0) this.coveredFrames--;
+      else if (!this.frameWaiters.length) return;
+    }
     const start = performance.now();
     const probe = this.probe;
     // Babylon asks for the next frame only after this one returns: a frame that throws must not
@@ -2296,9 +2349,10 @@ export class BabylonRenderer implements Renderer {
     shadows.normalBias = 0.02;
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
+    this.sunShadows = new SunShadows(shadows);
     if (this.diag.has('noshadows')) this.sun.shadowEnabled = false;
-    // Note: with WebGPU snapshot rendering Babylon renders every render target each frame (to
-    // keep the recorded passes aligned), so a render-once shadow map would not save anything.
+    // The game's map is drawn again only when something in it moved (see sunShadows.ts); with WebGPU
+    // snapshot rendering (the menus' town) Babylon draws every render target each frame anyway.
 
     // Warm interior lamps; always enabled (so shaders never recompile) and dimmed to zero by
     // day. Clustered where the engine supports it: then dozens light at once.
@@ -2306,7 +2360,7 @@ export class BabylonRenderer implements Renderer {
     const make = (i: number) => {
       const light = new PointLight(`room${i}`, new Vector3(0, HIDDEN_Y, 0), this.scene);
       light.falloffType = Light.FALLOFF_GLTF;
-      light.range = 7;
+      light.range = DARK_LAMP_RANGE;
       light.intensity = 0;
       light.specular = new Color3(0.4, 0.35, 0.3);
       return light;
@@ -3344,6 +3398,7 @@ export class BabylonRenderer implements Renderer {
     this.counts.lightingUpdates++;
     const l = lightingAt(minute, LOOK, this.lighting);
     this.sun.direction.copyFrom(l.sunDirection);
+    this.sunShadows.moved();
     const town = this.townMode && this.overview;
     // The game's shadow map covers a fixed circle round the lot: its texels keep their size
     // and place while the sun turns and residents walk, so shadows don't change shape at each
@@ -3419,6 +3474,9 @@ export class BabylonRenderer implements Renderer {
         light.intensity = lit * FILL_POWER * (4 + Math.min(use.area, 30) * 0.35);
         light.range = 4 + Math.sqrt(use.area) * 1.4;
       }
+      // A dark one (all of them by day) adds nothing, but the cluster would still sort it into the
+      // screen's tiles by its range for every pixel to loop over: next to no range keeps it out.
+      if (light.intensity === 0) light.range = DARK_LAMP_RANGE;
       light.diffuse.copyFrom(this.lampColor);
     });
   }

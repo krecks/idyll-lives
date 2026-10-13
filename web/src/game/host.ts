@@ -63,6 +63,8 @@ class GameHost {
   private played: GameSession | null = null;
   /** The player heard that WebGPU failed and WebGL2 draws instead. */
   private toldFallback = false;
+  /** A full-screen menu covers the view (see `cover`). */
+  private covered = false;
 
   constructor() {
     this.root = document.createElement('div');
@@ -231,6 +233,16 @@ class GameHost {
     });
   }
 
+  /**
+   * A full-screen menu (the pause menu, Settings, Load game, Credits, the planner, the crash
+   * screen) covers the view, or no longer does: nothing is drawn behind it (`Renderer.hold`).
+   */
+  cover(on: boolean): void {
+    if (on === this.covered) return;
+    this.covered = on;
+    void this.renderer?.then((r) => r.hold(on)).catch(() => {});
+  }
+
   /** Draws only while something is on screen: the game, or the menus' town. */
   private syncActive(renderer: Renderer | undefined | null): void {
     if (!renderer) return;
@@ -257,6 +269,7 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = (why, err) => app.crashed(why === 'device' ? { kind: 'graphics', detail: 'The graphics device was lost.' } : { kind: 'render', detail: err instanceof Error ? err.message : String(err) });
       await renderer.init(this.canvas);
+      renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {
         this.toldFallback = true;
         toast("WebGPU didn't start on this computer, so the game draws with WebGL instead.", 6000);

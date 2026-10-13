@@ -1,7 +1,7 @@
 /**
  * Landscape around the town: terrain with rolling hills, forests, lawn details and a sky
- * dome. Everything is static and instanced (one draw call per model type), generated
- * deterministically from the town's seed so a loaded game looks the same.
+ * dome. Everything is static and instanced (a draw call per model type and area, see
+ * `FOREST_SECTORS`), generated deterministically from the town's seed so a loaded game looks the same.
  *
  * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
  * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
@@ -59,6 +59,18 @@ const TREELINE = 12;
 const WATER_Y = -0.35;
 /** Sand from the shoreline up the bank (m). */
 const BEACH = 8;
+/**
+ * Plants are drawn in groups the camera leaves out when they're out of view (a model drawn as one
+ * mesh over the whole landscape never is): the woods in this many sectors round the town, lawn
+ * tufts and flowers in squares of these sizes (m; flowers are sparser, so bigger squares for about
+ * as many triangles a draw). A model with fewer triangles in all than `SPLIT_TRIANGLES` stays one
+ * mesh: the draw calls more (seen from far out, most sectors are in view) would cost more than the
+ * triangles they save.
+ */
+const FOREST_SECTORS = 8;
+const TUFT_CELL = 32;
+const FLOWER_CELL = 96;
+const SPLIT_TRIANGLES = 36_000;
 
 export interface NatureResult {
   meshes: Mesh[];
@@ -149,10 +161,14 @@ export class Landscape {
   private readonly roads: CountryRoads;
   /** Farm fields in town (no lawn on them). */
   private readonly fields: { x: number; z: number; w: number; d: number }[];
-  /** Lawn tufts and flowers: each instance's original matrix and town tile (-1 outside the town). */
+  /** Lawn tufts and flowers, per model and cell (see `TUFT_CELL`): each instance's original matrix and town tile (-1 outside the town). */
   private lawn: { meshes: Mesh[]; base: Float32Array; shown: Float32Array; tiles: Int32Array; hidden: Uint8Array }[] = [];
 
-  constructor(world: WorldStructure) {
+  /** `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half). */
+  constructor(
+    world: WorldStructure,
+    private readonly lawnDensity = 1,
+  ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
     this.d = groundDepth(world);
@@ -451,12 +467,14 @@ export class Landscape {
       }
     }
     const out: { meshes: Mesh[]; casts: boolean }[] = [];
+    const [cx, cz] = [this.w / 2, this.d / 2];
+    const sector = (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     for (const [bucket, casts] of [
       [near, true],
       [far, false],
     ] as const) {
       for (const [key, list] of bucket) {
-        out.push({ meshes: await instanced(scene, assets, key, list, casts ? 0 : 1), casts });
+        out.push({ meshes: (await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector)).flatMap((cell) => cell.meshes), casts });
       }
     }
     return out;
@@ -507,16 +525,20 @@ export class Landscape {
         tuftTiles.push(-1);
       }
     }
+    // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
+    const d = this.lawnDensity;
+    const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     this.lawn = [];
-    for (const [key, matrices, tiles] of [
-      ['model.grassTuft', tufts, tuftTiles],
-      ['model.flowers', flowers, flowerTiles],
+    for (const [key, matrices, tiles, size] of [
+      ['model.grassTuft', thin(tufts), thin(tuftTiles), TUFT_CELL],
+      ['model.flowers', thin(flowers), thin(flowerTiles), FLOWER_CELL],
     ] as const) {
-      const meshes = await instanced(scene, assets, key, matrices, 0, false);
-      if (!meshes.length) continue;
-      const base = new Float32Array(matrices.length * 16);
-      matrices.forEach((m, i) => m.copyToArray(base, i * 16));
-      this.lawn.push({ meshes, base, shown: new Float32Array(base), tiles: Int32Array.from(tiles), hidden: new Uint8Array(tiles.length) });
+      const square = (x: number, z: number) => `${Math.floor(x / size)},${Math.floor(z / size)}`;
+      for (const { meshes, indices } of await instanced(scene, assets, key, matrices, 0, false, square)) {
+        const base = new Float32Array(indices.length * 16);
+        indices.forEach((k, i) => matrices[k].copyToArray(base, i * 16));
+        this.lawn.push({ meshes, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) });
+      }
     }
     this.refreshLawn(world);
     return this.lawn.flatMap((l) => l.meshes);
@@ -576,19 +598,51 @@ function scatter(x: number, z: number, rand: () => number, scale: number, y = 0)
   );
 }
 
-/** One template per model key, drawn with thin instances; static, so bounds are computed once. */
-async function instanced(scene: Scene, assets: AssetRegistry, key: string, matrices: Matrix[], lod: 0 | 1 = 0, fixed = true): Promise<Mesh[]> {
+/**
+ * One template per model key, drawn with thin instances; static, so bounds are computed once.
+ * `cell` groups the instances (by where they stand) into meshes of their own, sharing the
+ * template's geometry and materials, so those out of view aren't drawn; each group keeps its
+ * instances in their order (`indices` into `matrices`). Models with few triangles stay one group.
+ */
+async function instanced(
+  scene: Scene,
+  assets: AssetRegistry,
+  key: string,
+  matrices: Matrix[],
+  lod: 0 | 1 = 0,
+  fixed = true,
+  cell?: (x: number, z: number) => string,
+): Promise<{ meshes: Mesh[]; indices: number[] }[]> {
   if (matrices.length === 0) return [];
   const template = await buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod });
-  const buffer = new Float32Array(matrices.length * 16);
-  matrices.forEach((m, i) => m.copyToArray(buffer, i * 16));
-  for (const mesh of template.meshes) {
-    mesh.thinInstanceSetBuffer('matrix', buffer, 16, fixed);
-    mesh.thinInstanceRefreshBoundingInfo(false);
-    mesh.receiveShadows = true;
-    mesh.freezeWorldMatrix();
+  const triangles = template.meshes.reduce((n, mesh) => n + mesh.getTotalIndices() / 3, 0) * matrices.length;
+  const split = cell && triangles >= SPLIT_TRIANGLES ? cell : () => '';
+  const groups = new Map<string, number[]>();
+  matrices.forEach((m, i) => {
+    const k = split(m.m[12], m.m[14]);
+    const group = groups.get(k);
+    if (group) group.push(i);
+    else groups.set(k, [i]);
+  });
+  // Copies are made before any instances are set (a clone would copy them), each with its own
+  // geometry: Babylon keeps a mesh's instance buffer with its geometry's vertex buffers.
+  const copy = (mesh: Mesh, c: number) => {
+    const clone = mesh.clone(`${mesh.name}#${c}`);
+    clone.makeGeometryUnique();
+    return clone;
+  };
+  const cells = [...groups.values()].map((indices, c) => ({ meshes: c === 0 ? template.meshes : template.meshes.map((mesh) => copy(mesh, c)), indices }));
+  for (const { meshes, indices } of cells) {
+    const buffer = new Float32Array(indices.length * 16);
+    indices.forEach((k, i) => matrices[k].copyToArray(buffer, i * 16));
+    for (const mesh of meshes) {
+      mesh.thinInstanceSetBuffer('matrix', buffer, 16, fixed);
+      mesh.thinInstanceRefreshBoundingInfo(false);
+      mesh.receiveShadows = true;
+      mesh.freezeWorldMatrix();
+    }
   }
-  return template.meshes;
+  return cells;
 }
 
 // ---- Garden dressing ------------------------------------------------------------------

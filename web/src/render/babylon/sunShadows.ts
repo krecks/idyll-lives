@@ -1,0 +1,67 @@
+/**
+ * The sun's shadow map in the game. It covers a square round the viewed lot (see
+ * `BabylonRenderer.applyLighting`), but Babylon draws every caster of its list into it, wherever
+ * it stands: the street's far houses, the woods round the town. Only casters whose bounds reach
+ * into the square are drawn; the rest would add no texel.
+ *
+ * And the square stays put while the camera turns, so the map is drawn again only when something
+ * in it changed (`moved`): the sun's step, a Sim's pose, a thing placed or hidden, the walls. While
+ * the game is paused (Buy and Build mode too) it isn't drawn at all.
+ */
+
+import { Frustum, Plane, RenderTargetTexture, type AbstractMesh, type ShadowGenerator } from './core';
+
+/** Metres a caster's bounds may lie past the square's sides and still be drawn (bounds that lag behind a thing springing into place). */
+const MARGIN = 1;
+
+export class SunShadows {
+  private readonly planes = Array.from({ length: 6 }, () => new Plane(0, 0, 0, 0));
+  private readonly inside: AbstractMesh[] = [];
+  private readonly map: RenderTargetTexture;
+  /** The menus' town: its map is fitted round all its casters, and drawn every frame. */
+  private overview = false;
+
+  constructor(private readonly generator: ShadowGenerator) {
+    this.map = generator.getShadowMap()!;
+    this.map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    this.map.getCustomRenderList = (_pass, casters, count) => (this.overview || !casters ? null : this.cull(casters, count));
+  }
+
+  /** The menus' town (every caster, every frame) or the game. */
+  setOverview(on: boolean): void {
+    this.overview = on;
+    this.map.refreshRate = on ? 1 : RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    this.moved();
+  }
+
+  /** Something in the map changed: it is drawn again in the next frame. */
+  moved(): void {
+    this.map.resetRefreshCounter();
+  }
+
+  private cull(casters: readonly AbstractMesh[], count: number): AbstractMesh[] {
+    // (The light's transform for this frame is made just before the list is asked for.)
+    Frustum.GetPlanesToRef(this.generator.getTransformMatrix(), this.planes);
+    const inside = this.inside;
+    inside.length = 0;
+    for (let i = 0; i < count; i++) {
+      const mesh = casters[i];
+      // Meshes the camera never culls (Sims: posed on the GPU, their bounds say nothing) are always drawn.
+      if (mesh.alwaysSelectAsActiveMesh || this.reaches(mesh)) inside.push(mesh);
+    }
+    return inside;
+  }
+
+  /** Whether a caster's bounds reach in past the map's four sides (its depth range is left to the GPU). */
+  private reaches(mesh: AbstractMesh): boolean {
+    const box = mesh.getBoundingInfo().boundingBox;
+    const lo = box.minimumWorld;
+    const hi = box.maximumWorld;
+    for (let p = 2; p < 6; p++) {
+      const { normal: n, d } = this.planes[p];
+      const far = n.x * (n.x >= 0 ? hi.x : lo.x) + n.y * (n.y >= 0 ? hi.y : lo.y) + n.z * (n.z >= 0 ? hi.z : lo.z) + d;
+      if (far < -MARGIN) return false;
+    }
+    return true;
+  }
+}
