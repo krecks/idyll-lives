@@ -856,9 +856,12 @@ export async function startSession(
   /** When the game last autosaved (or started). */
   let autosavedAt = -Infinity;
   let autosaveFailed = false;
-  /** Autosaves the game being played into the older of its two autosaves; a failure is told once. */
+  /**
+   * Autosaves the game being played into the older of its two autosaves; a failure is told once.
+   * Not once the simulation stopped: there's nothing to save, and the crash screen says so.
+   */
   const autosave = async () => {
-    if (!revealed || disposed) return;
+    if (!revealed || disposed || stoppedWith !== null) return;
     autosavedAt = performance.now();
     try {
       await store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
