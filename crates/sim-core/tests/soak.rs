@@ -530,7 +530,7 @@ fn busy(days: u32, seed: u64) {
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R2-01 (a stale follow-up panics after furniture moves, day 6), then maybe R3-03 and R3-08"]
+#[ignore = "long (--release -- --ignored); fails on main until R2-01 (a stale follow-up panics after furniture moves, day 6), then on T1-01 (in a full town a couple tries for a baby back to back, 2 h)"]
 fn a_big_town_with_a_busy_player_for_two_months() {
     busy(60, 7);
 }
