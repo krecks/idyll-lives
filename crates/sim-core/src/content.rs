@@ -2091,6 +2091,7 @@ pub(crate) struct ModifiersRaw {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TraitRaw {
     id: String,
     label: String,

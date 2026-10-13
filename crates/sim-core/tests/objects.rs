@@ -170,7 +170,6 @@ fn moving_a_fruit_bowl_leaves_the_dinner_on_the_table() {
 /// R2-05 (content). `TraitRaw` has no `rename_all = "camelCase"`, so the shipped traits'
 /// `startingSkills` are dropped by serde and every resident starts with no skills from traits.
 #[test]
-#[ignore = "release review: fails until R2-05 is fixed"]
 fn traits_give_their_starting_skills() {
     let w = world();
     let cooking = w.content.skill_index("cooking").unwrap();
