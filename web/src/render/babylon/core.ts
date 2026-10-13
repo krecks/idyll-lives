@@ -61,6 +61,7 @@ export { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData';
 export { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 export type { SubMesh } from '@babylonjs/core/Meshes/subMesh';
 export { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+export type { PerformanceMonitor } from '@babylonjs/core/Misc/performanceMonitor';
 export { CreateScreenshotAsync } from '@babylonjs/core/Misc/screenshotTools';
 // Loaded on demand (`buildFx.ts`).
 export type { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';

@@ -51,6 +51,7 @@ import {
   WebGPUEngine,
   WebGPUPerfCounter,
   type AbstractEngine,
+  type PerformanceMonitor,
   type RenderTargetTexture,
   type RenderTargetWrapper,
 } from './core';
@@ -106,6 +107,7 @@ import { BuildEffects, type PopTarget } from './buildFx';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
 import { renderScale, watchPixelRatio } from './resolution';
+import { FramePacer } from './pacing';
 
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
@@ -332,6 +334,8 @@ export class BabylonRenderer implements Renderer {
   private framedView = '';
 
   private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 60 };
+  /** Draws frames in whole display refreshes, at most the frame rate cap (Babylon's frame requester). */
+  private readonly pacer = new FramePacer();
   /** Stops watching the device pixel ratio (see `applyResolution`). */
   private unwatchPixelRatio: (() => void) | null = null;
   private skyDome!: Sky;
@@ -499,6 +503,9 @@ export class BabylonRenderer implements Renderer {
     this.unwatchPixelRatio = watchPixelRatio(this.onResize);
     // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
     if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
+    this.pacer.setCap(this.options.fpsCap);
+    this.engine.customAnimationFrameRequester = this.pacer;
+    this.timeFramesByRefresh();
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
@@ -967,8 +974,8 @@ export class BabylonRenderer implements Renderer {
     this.camera.angularSensibilityX = this.camera.angularSensibilityY = 1000 / s;
     this.camera.panningSensibility = 90 / s;
     this.camera.wheelDeltaPercentage = 0.012 * s;
-    // Babylon skips whole frames (nothing begun or presented) until the next one is due.
-    this.engine.maxFPS = options.fpsCap > 0 ? options.fpsCap : undefined;
+    // Frames are paced in whole display refreshes (`pacing.ts`), not by Babylon's `maxFPS`.
+    this.pacer.setCap(this.options.fpsCap);
     const still = (this.reducedMotion = !!options.reducedMotion);
     setWind(this.scene, still ? 0 : 1);
     this.characters.reducedMotion = still;
@@ -2162,7 +2169,8 @@ export class BabylonRenderer implements Renderer {
       }
       const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
       this.paceKeys(dt);
-      this.onFrame?.(performance.now());
+      // The time of the refresh this frame is for: even steps, as the frames will show.
+      this.onFrame?.(this.pacer.frameTime || performance.now());
       if (probe) updated = performance.now();
       if (this.townMode && this.overview) {
         this.townFrame(dt);
@@ -3493,6 +3501,23 @@ export class BabylonRenderer implements Renderer {
   }
 
   private readonly onResize = () => this.applyResolution();
+
+  /**
+   * Babylon times each frame when it starts to run (`performance.now()`), which wanders by however
+   * long the browser took to get to it. It times them by the refresh they're drawn for instead (the
+   * pacer's `frameTime`): the frame time (`getDeltaTime`: camera glides and inertia, clouds, wind,
+   * fades) is then whole refreshes, as the frames show.
+   */
+  private timeFramesByRefresh(): void {
+    const engine = this.engine as unknown as { _measureFps?: () => void; _performanceMonitor?: PerformanceMonitor; _fps: number; _deltaTime: number };
+    const monitor = engine._performanceMonitor;
+    if (typeof engine._measureFps !== 'function' || !monitor) return;
+    engine._measureFps = () => {
+      monitor.sampleFrame(this.pacer.frameTime || undefined);
+      engine._fps = monitor.averageFPS;
+      engine._deltaTime = monitor.instantaneousFrameTime || 0;
+    };
+  }
 
   /**
    * Sizes the drawing to the canvas, the device pixel ratio and the resolution setting
