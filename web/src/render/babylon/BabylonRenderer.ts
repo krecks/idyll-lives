@@ -48,8 +48,12 @@ import {
   VertexData,
   Viewport,
   WebGPUEngine,
+  WebGPUPerfCounter,
   type AbstractEngine,
+  type RenderTargetTexture,
+  type RenderTargetWrapper,
 } from './core';
+import { benchDiag } from '../../debug/benchFlags';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
 import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
@@ -60,6 +64,8 @@ import type {
   BuildEffect,
   CameraPose,
   EdgePreview,
+  FrameCounts,
+  FrameProbe,
   GameShot,
   LiveRenderOptions,
   PaintPreviewFace,
@@ -67,6 +73,7 @@ import type {
   LotHighlight,
   PickResult,
   ObjectResize,
+  RenderPassInfo,
   PlacementGhost,
   ResizeHandle,
   Renderer,
@@ -325,6 +332,18 @@ export class BabylonRenderer implements Renderer {
   private readonly debug = new URLSearchParams(location.search).has('debug');
   /** `?hour=21` freezes the lighting at that hour (for screenshots and look development). */
   private readonly fixedHour: number | null;
+  /** `?diag=…` (benchmarks): features left out of the picture to measure what each costs, or time frozen (`debug/benchFlags.ts`). */
+  private readonly diag = benchDiag();
+  /** Benchmark hooks around each frame, and what the frame drew (see `setFrameProbe`). */
+  private probe: FrameProbe | null = null;
+  private probeOff: (() => void)[] = [];
+  private readonly counts: FrameCounts = { drawCalls: 0, triangles: 0, shadowDrawCalls: 0, shadowTriangles: 0, mirrorDrawCalls: 0, mirrorTriangles: 0, lightingUpdates: 0, gpuFrames: 0, gpuMs: 0, residentsMs: 0 };
+  /** Who wants GPU time measured (the F3 overlay, the benchmark); WebGL2's timer queries on. */
+  private readonly gpuWanted = new Set<string>();
+  private glTimer = false;
+  /** WebGPU: per frame, its first pass's start and last pass's end (ns; see `spanPasses`), and the latest whole frames (ms). */
+  private readonly gpuSpans = new Map<number, [bigint, bigint]>();
+  private readonly gpuRecent: number[] = [];
   private readonly roomLights: PointLight[] = [];
   /** Holds the room lights when lighting is clustered (null: forward lights). */
   private lampCluster: ClusteredLightContainer | null = null;
@@ -430,12 +449,14 @@ export class BabylonRenderer implements Renderer {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     if (!forceWebGL && (await WebGPUEngine.IsSupportedAsync)) {
-      const engine = new WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
+      const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
       await engine.initAsync();
       this.engine = this.webgpu = engine;
     } else {
-      this.engine = new Engine(canvas, true, { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
+      this.engine = new Engine(canvas, !this.diag.has('nocanvasaa'), { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
     }
+    // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
+    if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
 
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
@@ -482,7 +503,7 @@ export class BabylonRenderer implements Renderer {
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
-    this.mirrors = new Mirrors(scene, this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    this.mirrors = new Mirrors(scene, this.diag.has('nomirrors') ? 0 : this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
     window.addEventListener('resize', this.onResize);
@@ -1449,6 +1470,195 @@ export class BabylonRenderer implements Renderer {
       cpuMs: this.cpuMs,
       drawCalls: this.instrumentation.drawCallsCounter.current,
       snapshotRendering: this.webgpu?.snapshotRendering ?? false,
+      renderWidth: this.engine.getRenderWidth(),
+      renderHeight: this.engine.getRenderHeight(),
+      renderScale: 1 / (this.engine.getHardwareScalingLevel() * window.devicePixelRatio),
+      gpuMs: this.gpuMs(),
+      residentsMs: this.characters?.updateMs ?? 0,
+    };
+  }
+
+  setFrameProbe(probe: FrameProbe | null): void {
+    for (const off of this.probeOff) off();
+    this.probeOff = [];
+    this.probe = probe;
+    if (!probe) return;
+    // Draw calls and triangles of the shadow map and the reflections (both counted for the whole frame too).
+    const draws = this.instrumentation.drawCallsCounter;
+    const watch = (rtt: RenderTargetTexture, kind: 'shadow' | 'mirror') => {
+      let calls = 0;
+      let indices = 0;
+      const before = rtt.onBeforeRenderObservable.add(() => {
+        calls = draws.current;
+        indices = this.scene.getActiveIndices();
+      });
+      const after = rtt.onAfterRenderObservable.add(() => {
+        this.counts[`${kind}DrawCalls`] += draws.current - calls;
+        this.counts[`${kind}Triangles`] += (this.scene.getActiveIndices() - indices) / 3;
+      });
+      this.probeOff.push(() => (rtt.onBeforeRenderObservable.remove(before), rtt.onAfterRenderObservable.remove(after)));
+    };
+    const map = this.shadows.getShadowMap();
+    if (map) watch(map, 'shadow');
+    for (const texture of this.mirrors.textures) watch(texture, 'mirror');
+  }
+
+  measureGpu(on: boolean, who: 'overlay' | 'bench' = 'overlay'): void {
+    if (on) this.gpuWanted.add(who);
+    else this.gpuWanted.delete(who);
+    const want = this.gpuWanted.size > 0;
+    if (this.webgpu) {
+      // Needs the device's 'timestamp-query' feature (asked for in `loaders.ts`, where the adapter has it).
+      if (!this.engine.getCaps().timerQuery || this.webgpu.enableGPUTimingMeasurements === want) return;
+      this.webgpu.enableGPUTimingMeasurements = want;
+      this.gpuSpans.clear();
+      this.gpuRecent.length = 0;
+      if (want) {
+        this.timePasses();
+        this.spanPasses();
+      }
+    } else if (want !== this.glTimer) {
+      // WebGL2: EXT_disjoint_timer_query_webgl2 where the browser offers it (the query code loads on first use).
+      this.glTimer = want;
+      void Promise.all([import('@babylonjs/core/Engines/AbstractEngine/abstractEngine.timeQuery'), import('@babylonjs/core/Engines/Extensions/engine.query')]).then(() =>
+        (this.engine as unknown as { captureGPUFrameTime(on: boolean): void }).captureGPUFrameTime(this.glTimer),
+      );
+    }
+  }
+
+  /** GPU time of the whole frame, about the last second's average (ms), while measured. */
+  private gpuMs(): number | null {
+    if (this.webgpu) return this.gpuRecent.length ? this.gpuRecent.reduce((a, x) => a + x, 0) / this.gpuRecent.length : null;
+    const counter = this.glTimer ? (this.engine as unknown as { _gpuFrameTime?: { count: number; lastSecAverage: number } })._gpuFrameTime : undefined;
+    return counter && counter.count > 0 ? counter.lastSecAverage / 1e6 : null;
+  }
+
+  /**
+   * WebGPU: the GPU's whole frame is from its first pass's start to its last pass's end. (Babylon
+   * times the passes one by one, and its frame timer stamps the command encoders, which on Apple
+   * GPUs misses the drawing; their passes overlap, so their own times add up to more than the frame.)
+   * Reads each pass's start and end as Babylon's query set resolves them.
+   */
+  private spanPasses(): void {
+    type QuerySet = { readTwoValuesAndSubtract(first: number): Promise<number | null>; _getBuffer(first: number, count: number): GPUBuffer | null; _dstBuffers: GPUBuffer[]; spans?: true };
+    const engine = this.webgpu!;
+    const set = (engine as unknown as { _timestampQuery: { _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery._measureDuration?._querySet;
+    if (!set || set.spans || typeof set._getBuffer !== 'function') return;
+    set.spans = true;
+    set.readTwoValuesAndSubtract = async (first: number) => {
+      const frame = engine.frameId;
+      const buffer = set._getBuffer(first, 2);
+      if (!buffer) return null;
+      try {
+        await buffer.mapAsync(1 /* GPUMapMode.READ */);
+      } catch {
+        return 0;
+      }
+      const [begin, end] = new BigUint64Array(buffer.getMappedRange());
+      buffer.unmap();
+      set._dstBuffers.push(buffer);
+      // (Queries 0 and 1 are the encoder stamps of Babylon's frame timer.)
+      if (first >= 2 && end > begin) {
+        const span = this.gpuSpans.get(frame);
+        if (!span) this.gpuSpans.set(frame, [begin, end]);
+        else {
+          if (begin < span[0]) span[0] = begin;
+          if (end > span[1]) span[1] = end;
+        }
+      }
+      return Number(end - begin);
+    };
+  }
+
+  /** Frames whose pass times have all come back (a few frames late): their whole spans, ms. */
+  private settleSpans(): void {
+    const settled = this.engine.frameId - 6;
+    for (const [frame, [begin, end]] of this.gpuSpans) {
+      if (frame > settled) continue;
+      this.gpuSpans.delete(frame);
+      const ms = Number(end - begin) / 1e6;
+      this.counts.gpuFrames++;
+      this.counts.gpuMs = ms;
+      this.gpuRecent.push(ms);
+      if (this.gpuRecent.length > 60) this.gpuRecent.shift();
+    }
+  }
+
+  /** WebGPU: a GPU timer on every render target (Babylon gives one only to targets made while timing is on). */
+  private timePasses(reset = false): void {
+    for (const target of (this.engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache) {
+      const timed = target as RenderTargetWrapper & { gpuTimeInFrame?: WebGPUPerfCounter };
+      if (reset || !timed.gpuTimeInFrame) timed.gpuTimeInFrame = new WebGPUPerfCounter();
+    }
+    if (reset && this.webgpu) (this.webgpu as { gpuTimeInFrameForMainPass?: WebGPUPerfCounter }).gpuTimeInFrameForMainPass = new WebGPUPerfCounter();
+  }
+
+  gpuPasses(reset = false): { name: string; ms: number; frames: number }[] {
+    const engine = this.webgpu;
+    if (!engine?.enableGPUTimingMeasurements) return [];
+    const out: { name: string; ms: number; frames: number }[] = [];
+    const add = (name: string, timer: WebGPUPerfCounter | undefined) => {
+      const c = timer?.counter;
+      if (c && c.count > 0) out.push({ name, ms: c.average / 1e6, frames: c.count });
+    };
+    add('canvas', engine.gpuTimeInFrameForMainPass);
+    for (const target of (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache) {
+      add(target.label ?? '?', (target as RenderTargetWrapper & { gpuTimeInFrame?: WebGPUPerfCounter }).gpuTimeInFrame);
+    }
+    this.timePasses(reset);
+    return out;
+  }
+
+  benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] } {
+    const engine = this.engine;
+    const scene = this.scene;
+    const map = this.shadows.getShadowMap();
+    const passes: RenderPassInfo[] = [];
+    const target = (name: string, rtw: RenderTargetWrapper | null | undefined): RenderPassInfo | null =>
+      rtw ? { name, width: rtw.width, height: rtw.height, samples: rtw.samples ?? 1, colorBytes: textureBytes(rtw.texture?.type, rtw.texture?.format), depthBytes: depthBytes(rtw) } : null;
+    const push = (pass: RenderPassInfo | null) => pass && passes.push(pass);
+    if (this.sun.shadowEnabled && map?.renderList?.length) push(target('shadow', map.renderTarget));
+    const live = this.mirrors.live;
+    this.mirrors.textures.slice(0, live).forEach((t, i) => push(target(`mirror${i}`, t.renderTarget)));
+    // The scene draws into the first post-process's input, each post-process into the next one's, the last onto the canvas.
+    const chain = (this.camera._postProcesses ?? []).filter((pp) => !!pp);
+    if (chain.length) push(target('scene', chain[0]!.inputTexture));
+    chain.forEach((pp, i) => {
+      const next = chain[i + 1];
+      if (next) push(target(pp!.name, next.inputTexture));
+      else passes.push({ name: `${pp!.name} (canvas)`, width: engine.getRenderWidth(), height: engine.getRenderHeight(), samples: this.diag.has('nocanvasaa') ? 1 : 4, colorBytes: 4, depthBytes: 4 });
+    });
+    const casters = (map?.renderList ?? []).filter((m) => m.isEnabled() && m.isVisible) as Mesh[];
+    const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
+    const nature = this.natureIn.world?.meshes ?? [];
+    return {
+      backend: this.webgpu ? 'WebGPU' : 'WebGL2',
+      gpu: this.webgpu ? { ...((this.webgpu as unknown as { _adapterInfo?: Record<string, string> })._adapterInfo ?? {}) } : (engine as Engine).getGlInfo(),
+      timerQuery: !!engine.getCaps().timerQuery,
+      render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: !this.diag.has('nocanvasaa') },
+      quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
+      diag: [...this.diag],
+      passes,
+      targets: (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache.map((t) => target(t.label ?? '?', t)),
+      scene: {
+        meshes: scene.meshes.length,
+        enabledMeshes: scene.meshes.filter((m) => m.isEnabled()).length,
+        activeMeshes: scene.getActiveMeshes().length,
+        materials: scene.materials.length,
+        textures: scene.textures.length,
+        lights: scene.lights.filter((l) => l.isEnabled()).length,
+        lampsLit: this.roomLights.filter((l) => l.intensity > 0).length,
+        shadowCasters: casters.length,
+        shadowCasterTriangles: Math.round(casters.reduce((n, m) => n + triangles(m), 0)),
+        natureMeshes: nature.filter((m) => m.isEnabled()).length,
+        natureInstances: nature.reduce((n, m) => n + (m.isEnabled() && m.hasThinInstances ? m.thinInstanceCount : 0), 0),
+        residents: this.simCount,
+        residentsDrawn: this.characters ? this.characters.visible.subarray(0, this.simCount).reduce((n, v) => n + (v ? 1 : 0), 0) : 0,
+        mirrors: this.mirrors.count,
+        mirrorsLive: live,
+        nightGrade: this.nightGrade?.amount ?? 0,
+        lightingUpdates: this.counts.lightingUpdates,
+      },
     };
   }
 
@@ -1778,6 +1988,8 @@ export class BabylonRenderer implements Renderer {
           mesh.layerMask = 0;
           // Dug away over a basement in view.
           this.lib.digInto(mesh.material);
+          // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
+          if (this.diag.has('nonature') && mesh.hasThinInstances) mesh.setEnabled(false);
         }
       });
       this.natures.set(key, (set = created));
@@ -1818,15 +2030,35 @@ export class BabylonRenderer implements Renderer {
 
   private readonly renderFrame = () => {
     const start = performance.now();
+    const probe = this.probe;
+    if (probe) {
+      const c = this.counts;
+      c.shadowDrawCalls = c.shadowTriangles = c.mirrorDrawCalls = c.mirrorTriangles = 0;
+      probe.before(start);
+    }
     const dt = this.engine.getDeltaTime();
     if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
     this.onFrame?.(performance.now());
+    const updated = probe ? performance.now() : 0;
     if (this.townMode && this.overview) {
       this.townFrame(dt);
       if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
     }
     this.scene.render();
-    this.cpuMs += (performance.now() - start - this.cpuMs) * 0.1;
+    const end = performance.now();
+    this.cpuMs += (end - start - this.cpuMs) * 0.1;
+    if (this.gpuWanted.size && this.webgpu) this.settleSpans();
+    if (probe) {
+      this.counts.drawCalls = this.instrumentation.drawCallsCounter.current;
+      this.counts.triangles = this.scene.getActiveIndices() / 3;
+      if (!this.webgpu) {
+        const gpu = this.glTimer ? (this.engine as unknown as { _gpuFrameTime?: { count: number; current: number } })._gpuFrameTime : undefined;
+        this.counts.gpuFrames = gpu?.count ?? 0;
+        this.counts.gpuMs = gpu ? gpu.current / 1e6 : 0;
+      }
+      this.counts.residentsMs = this.characters?.updateMs ?? 0;
+      probe.after(start, updated, end, this.counts);
+    }
     for (let i = this.frameWaiters.length - 1; i >= 0; i--) {
       const w = this.frameWaiters[i];
       if (--w.left <= 0) {
@@ -1876,6 +2108,7 @@ export class BabylonRenderer implements Renderer {
     shadows.normalBias = 0.02;
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
+    if (this.diag.has('noshadows')) this.sun.shadowEnabled = false;
     // Note: with WebGPU snapshot rendering Babylon renders every render target each frame (to
     // keep the recorded passes aligned), so a render-once shadow map would not save anything.
 
@@ -1902,6 +2135,7 @@ export class BabylonRenderer implements Renderer {
       this.roomLights.push(light);
     }
     if (clustered) this.lampCluster = new ClusteredLightContainer('lamps', this.roomLights, this.scene);
+    if (this.diag.has('nolamps')) for (const light of this.lampCluster ? [this.lampCluster] : this.roomLights) light.setEnabled(false);
   }
 
   private setupPostProcessing(): void {
@@ -1920,8 +2154,9 @@ export class BabylonRenderer implements Renderer {
     }
 
     const post = (this.post = new DefaultRenderingPipeline('post', true, this.scene, [this.camera]));
-    post.samples = q.msaaSamples;
-    post.fxaaEnabled = q.msaaSamples <= 1;
+    const aa = !this.diag.has('noaa');
+    post.samples = aa ? q.msaaSamples : 1;
+    post.fxaaEnabled = aa && q.msaaSamples <= 1;
     post.imageProcessingEnabled = true;
     const ip = post.imageProcessing;
     ip.toneMappingEnabled = true;
@@ -1932,7 +2167,7 @@ export class BabylonRenderer implements Renderer {
     ip.colorCurves = new ColorCurves();
     post.bloomEnabled = false;
     post.depthOfFieldEnabled = false;
-    this.nightGrade = new NightGrade(this.camera, this.engine, this.webgpu !== null);
+    if (!this.diag.has('nonight')) this.nightGrade = new NightGrade(this.camera, this.engine, this.webgpu !== null);
   }
 
   private setupHelpers(): void {
@@ -2929,6 +3164,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   private applyLighting(minute: number): void {
+    this.counts.lightingUpdates++;
     const l = lightingAt(minute, LOOK, this.lighting);
     this.sun.direction.copyFrom(l.sunDirection);
     const town = this.townMode && this.overview;
@@ -3141,6 +3377,21 @@ function setExposure(config: ImageProcessingConfiguration, value: number): void 
   const fields = config as unknown as { _exposure?: number };
   if (typeof fields._exposure === 'number' && (fields._exposure === 1) === (value === 1)) fields._exposure = value;
   else config.exposure = value;
+}
+
+/** Bytes per pixel of a colour target of Babylon texture `type` and `format` (benchmark reports; 0: depth only). */
+function textureBytes(type: number = Constants.TEXTURETYPE_UNSIGNED_BYTE, format: number = Constants.TEXTUREFORMAT_RGBA): number {
+  if (format >= Constants.TEXTUREFORMAT_DEPTH24_STENCIL8 && format <= Constants.TEXTUREFORMAT_STENCIL8) return 0;
+  const channels: Record<number, number> = { [Constants.TEXTUREFORMAT_ALPHA]: 1, [Constants.TEXTUREFORMAT_R]: 1, [Constants.TEXTUREFORMAT_RG]: 2 };
+  const size: Record<number, number> = { [Constants.TEXTURETYPE_FLOAT]: 4, [Constants.TEXTURETYPE_HALF_FLOAT]: 2 };
+  return (channels[format] ?? 4) * (size[type] ?? 1);
+}
+
+/** Bytes per pixel of a render target's depth (and stencil); 0 without one. */
+function depthBytes(rtw: RenderTargetWrapper): number {
+  const texture = rtw._depthStencilTexture ?? (rtw.texture && textureBytes(rtw.texture.type, rtw.texture.format) === 0 ? rtw.texture : null);
+  if (!texture) return rtw._generateDepthBuffer || rtw._generateStencilBuffer ? 4 : 0;
+  return texture.format === Constants.TEXTUREFORMAT_DEPTH16 ? 2 : texture.format === Constants.TEXTUREFORMAT_DEPTH32FLOAT_STENCIL8 ? 8 : 4;
 }
 
 function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
