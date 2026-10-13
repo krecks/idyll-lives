@@ -142,6 +142,39 @@ fn the_checks_catch_a_town_gone_wrong() {
     }
 }
 
+/// The checks read a resident's follow-up from their debug text (it isn't public): after the
+/// toilet it's washing hands at the sink. If this fails, the field was renamed and
+/// `common::follow_up` needs to follow.
+#[test]
+fn the_checks_see_a_follow_up() {
+    let town = r#"{"width":16,"depth":16,
+        "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":14,"entry":[8.5,13.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "sims":[{"name":"Ada","household":0,"x":8.5,"z":8.5,"traits":["bookworm"]}]}"#;
+    let mut w = World::from_json(&common::content(), town, 1).unwrap();
+    w.autonomy = false;
+    for (def, x) in [("toilet", 3), ("sink", 6)] {
+        let cmd = sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, 3, 0]), style: None, turn: None, offset: None, size: None, tall: None };
+        w.apply(cmd).unwrap();
+    }
+    let (toilet, sink) = (0, 1);
+    let bladder = w.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    w.sims[0].needs[bladder] = 0.3;
+    let interaction = w.content.objects[w.objects[toilet].def].interactions.iter().position(|i| i.id == "use").unwrap();
+    w.apply(sim_core::Command::Use { sim: 0, object: toilet as u32, interaction }).unwrap();
+    let mut next = None;
+    for _ in 0..common::TICKS_PER_HOUR {
+        w.tick_once();
+        common::check(&w);
+        if let Some(kind) = common::follow_up(&w.sims[0]) {
+            next = Some(kind);
+            break;
+        }
+    }
+    let next = next.expect("a follow-up after the toilet");
+    assert_eq!(common::debug_field(&next, "object"), Some(sink), "{next}");
+}
+
 /// The watch sees residents stuck: with free will off everyone stands about, and someone sent
 /// away for good stays away.
 #[test]
