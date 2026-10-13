@@ -13,7 +13,7 @@ Fixes came in two waves of agents, each on its own branch:
 - **Wave A:** F1a and F1b (simulation), F2a (crash safety), F2b (input, audio and small web fixes), F2c (saves and start-up), F4 (animation), F5 (build, CI and licences), T1 (long-run tests).
 - **Wave B:** G1 (presets, resolution, pacing), L1 (load time and stepping), G2 (GPU savings nobody can see) and M1 (main thread).
 
-*(G2 and M1 were still running when this was written; their parts are marked "pending".)*
+*(G2 was still running when this was written; its parts are marked "pending".)*
 
 Severity:
 - **critical**: a crash, data loss, or a release blocker.
@@ -627,9 +627,9 @@ Every fix was made on an agent's branch and merged into `main` with `git merge -
 | L1 | 0c561b4 | Load time, service-worker caching, catch-up cap |
 | G1 | accaaad | Presets, Auto resolution, FramePacer, menu at 30 fps |
 | G2 | *(pending)* | *(pending)* <!-- G2 --> |
-| M1 | *(pending)* | *(pending)* <!-- M1 --> |
+| M1 | dee213f | Bars by transform, bubbles without forced layout, idea toasts only on change, models built ahead in small steps, bird songs off the main thread, F3's Busy |
 
-Three small fixes went straight onto `main`: f1993e5 (the bed purchase leaves a week's rent), b565f95 (T1-01, §3.7) and 954506d (the long runs and the day-1167 test un-ignored).
+Some small fixes went straight onto `main`: f1993e5 (the bed purchase leaves a week's rent), b565f95 (T1-01, §3.7), 954506d (the long runs and the day-1167 test un-ignored) and f5f08bf (the feed, §3.7).
 
 ### 3.1 Animations and frame pacing (R1)
 
@@ -784,14 +784,32 @@ G1's A/B (fps; GPU and CPU in ms a frame; render targets in MB a frame):
 
 #### 3.5.2 Main thread (P2)
 
-G1 (accaaad) and M1 *(pending)*.
+G1 (accaaad) for P2-08, and M1 (merge dee213f) for the rest. M1 measured on the M3 Pro in headed Chrome for Testing (Playwright's Chromium 1243) on WebGPU, 1920×1080, Medium, with the CPU slowed 3× (CDP), at speed 5, with P2's method (`measure.mjs`, the `p2-evening` save). Each figure is a median of 3, the baseline (a428263) and M1's build run alternately under the bench lock, after a 30 s warm-up so the catalog pictures drawn early in a game stay out of the window. The total busy share swings by ±5 points between runs on that shared machine; the figures that isolate the changes (work outside the frame callback, layouts, interface updates) are steady.
+
+M1's branch as a whole (production build, speed 5, 3× CPU):
+
+| Measure | Panel closed | SimPanel open |
+|---|---|---|
+| Main thread busy | 84.7 → 74.0 % | 96.4 → 82.1 % |
+| Work outside the frame callback | 204 → 143 ms/s | 273 → 205 ms/s |
+| Frame p95 | 16.1 → 15.0 ms | 17.2 → 15.5 ms |
+| Interface updates (handler and Svelte's flush) | 8.7 → 6.0 ms/s | 11.8 → 8.6 ms/s |
+| Layouts a second | 108 → 11 | 82 → 10.5 |
+| GPU process busy | 27 → 15 % | 35 → 15 % |
+| Longest idle callback | 19.5 → 4.5 ms | 19.4 → 4.7 ms |
+
+With the SimPanel open the frame rate went 57.8 → 60.8 fps. M1's runs saw no long task; the baseline had one of 55 ms in one of three panel-closed runs. At speed 1 with the panel closed: busy 68 → 60 %, layouts 99 → 8 a second, interface updates 5.9 → 3.7 ms/s.
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
 | P2-08 | The town behind the menus is paced at 30 fps at most (36 on a 144 Hz display), in whole refreshes like the cap; the flight into the game runs at the game's rate. | f10d9e5 | Main menu on the M3 Pro, 120 Hz, production build, 8 s, main-thread task time from CDP: 60 fps and 20 % busy → 30 fps and 14 %; at 3× CPU slow-down, 45 % → 24 %. Every menu frame now stays 4 refreshes on screen. |
-| *(pending)* <!-- M1 --> | *(pending: M1's rows. Planned: P2-01 the progress and need bars, P2-05 idea toasts, P2-06 build-ahead hitches, P2-13 bird songs, P2-14 F3 "Busy", the bubbles (P2-02), and the HUD's cost a frame (P1-10).)* | | |
-
-*(pending: M1's before/after numbers.)* <!-- M1 -->
+| P2-01 | The household cards' action bars and the SimPanel's need and action bars move by transform, which the compositor animates: `scaleX` for action bars, `translateX` for need bars (so a bar's rounded end stays round). They used to animate `width`, and each update (about 8 a second) restarted a 300 ms transition, so the page was laid out and repainted on every display refresh. | d9b58d1 | Measured alone, panel closed: busy 68.7 → 61.4 %, work outside the frame callback 169 → 113 ms/s, layouts 119 → 11 a second (16.5 → 3.5 ms/s), the GPU process 23 → 16 % busy. Same look: old and new bars side by side, at rest and held at 0, ¼, ½ and ¾ of a transition, differ only in the anti-aliasing of a bar's end pixel (and in the shape of the 1–3 px sliver of a need under 3 %). |
+| P2-02 | The renderer keeps the canvas's size, updated by a ResizeObserver, for placing bubbles, panning sounds and the menu town's camera, instead of reading it from the page after the interface has changed it. | b70beaf | Dev server, 25 s CPU profiles, two runs each: `project` 23.7 → 0.4 ms/s, the bubbles' update 19.2 → 3.1 ms/s, the world sounds' update 8.9–11.4 → 1.0–1.3 ms/s (with P2-13). Forced style and layout inside the frame (trace, full CPU speed): 68 → 2 a second, 11.3 → 0.7 ms/s; what's left is a new bubble's pop. |
+| P2-05 | Goal ideas, things to buy and wishes are worked out again only when the residents' names, the parts of their plans that hold ideas, or (for repairs) the things at home changed. A plain "a resident changed" check would have saved almost nothing: some resident changes in nearly every update. | 519dd59 | Dev server: the toasts' update 2.0–2.5 → 0.1–0.2 ms/s. |
+| P2-06 | A model built ahead for another lot goes part by part, then group by group, at most 4 ms at a time, and goes on in the next idle moment (waiting at most 200 ms for one). Its pieces stay hidden until it is whole, and the next model waits for it. Models wanted on screen are still built at once. | 61f86c1 | Longest idle callback 19.5 → 4.5 ms (production build), 28–29 → 4.5 ms (dev server); long tasks in play 0 or 1 a run (55 ms) → none. A tree or park table used to take 10–15 ms on the M3 and 35–55 ms with the CPU slowed 3×. A model still being built ahead when the camera arrives may now appear up to a few hundred ms later. |
+| P2-13 | The bird species and their synthesis move to `audio/birdsong.ts`, and the worker that makes the water sounds makes the songs too (made on the spot where there are no workers). A bird whose song isn't ready yet sings a quarter of a second later. | 9ebcec5 | Removes 20–26 ms bursts inside the frame with the CPU slowed 3×. Every bird's three versions at 44.1, 48 and 96 kHz are identical sample for sample, old and new (54 of 54). |
+| P2-14 | F3's "Busy" is now "Busy (frames)": the frame callback's share plus the browser's style, layout and paint after it, measured only while the overlay is open. "Frame work" shows the callback's own share. (A share from long-animation-frame entries isn't possible: they only cover frames over 50 ms.) | 4fd8694 | Against a trace of the same seconds (dev server, speed 5): 29 % shown for 32 % measured, and 93 % for 96 % with the CPU slowed 3×. Interface updates between frames aren't counted, as its tooltip says. |
+| P1-10 | No change of its own: P2-01 removed the per-frame layout and P2-02 the forced layouts, which were most of what the interface cost a frame. The frosted blur is unchanged (P2-03, §4). | d9b58d1, b70beaf | Benchmark without vsync, 2 runs each: the interface cost 5 fps (88 against 93 without it) → within noise (94 against 95). |
 
 #### 3.5.3 Simulation, build and load (P3)
 
@@ -852,6 +870,7 @@ F5 (merge cc88635), F1a (R5-05, R5-08), F2c (R5-07, R5-09, R5-10, R5-11), F2b (R
 | Newcomer babies | A newcomer family's "grown child" could arrive as a baby, with no crib and nothing to do: the youngest age came from the first life stage, which became the baby's when the young stages were added. In the century run of seed 19, Hugo stood where he arrived from day 122 to day 126. Newcomers now start at the first grown-up stage (18), and the random draws are unchanged. | de0a880 | `newcomers_are_grown_up` (seeds 1–40); the seed-19 century runs pass. |
 | Departures | Leaving town now also ends answering the door to the leaver, calls with them and waiting for them, and ends a pregnancy they're a parent of. | 1631442 | – |
 | Dishes in hand | See §3.2. | 335a8ab | – |
+| Feed news | Found by M1: a faded entry in the story feed was only see-through, and up to three stayed clickable until the next news arrived. With reduced motion on, the 12 s fade ran in 0 ms, so entries were invisible from the start. The fade now waits 10.2 s, lasts 1.8 s and ends hidden. | f5f08bf | In Chrome: hidden and unclickable at 12.5 s; with animation durations forced to 0, an entry shows until 10.2 s. |
 
 ### 3.8 Tests added
 
@@ -879,7 +898,8 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | P1-07, P2-07 | high | Submitting about 493 draws costs 5.1–6.7 ms of CPU a frame on WebGPU (M3 Pro), 21–31 ms at 3× CPU, so on WebGPU Low can't reach 60 fps on the target CPUs. | The owner put the low-end work off (§2.8). | Halve the draws: merge the static shadow casters per lot (P1-04) and trim Low. Retry snapshot rendering in play, with the pose texture updated outside the recorded bundles. Measure on an Intel laptop (§5) before choosing WebGL2 for weak GPUs. | v0.3 |
 | P1-12 | high | Low draws the same lot, street and furniture geometry as Medium: 2.2 M triangles in the main pass and 1.54 M in the shadow pass, a floor of about 2.5 ms on the M3 after any trim. | Generated LODs were put off (§2.8). | LODs for furniture and the street's houses, low-detail shadow copies of furniture, and the neighbours' houses as overview shells on Low. | v0.3 |
 | P1-04 (rest) | high | The 242 shadow-map draws aren't merged into a few shadow-only meshes per lot. *(pending: whether G2's "redrawn only when something moves" covers part of it.)* <!-- G2 --> | A larger change than the release allowed. | Merge static casters per lot (house and fences, the street's houses and props, garden trees): about 10–20 shadow draws instead of 242. | v0.3 |
-| P2-01, P2-02, P2-05, P2-06, P2-13, P2-14, P1-10 | high to low | *(pending: what M1 leaves of these.)* <!-- M1 --> | | | |
+| Running CSS animations (new) | low | Chrome recalculates style every frame for each running CSS animation, even a transform-only one, and on a 120 Hz display that's every refresh. The bar transitions and the low-need pulse are always running, and each feed entry runs its own for 12 s: about 0.13 ms a frame at full CPU speed (M1, M3 Pro). | Removing it means dropping the bar transitions or the pulse, which changes the look (§6). | The owner decides; if so, bars that jump to their value and a still low-need marker. | v0.3 |
+| P2-06 (side effect, new) | low | A model still being built ahead when the camera arrives may appear up to a few hundred ms later than before. | The cost of building in 4 ms steps. | Leave it unless players notice. | never |
 | Trapped loads (new) | medium | A save whose load traps is deleted as damaged. That would also delete a valid save that hits a loader bug or runs out of memory. | Follows the decision for damaged saves (F2c). | Treat a trap like a too-new save: keep it, mark it, skip it, and offer it in a debug report. | 0.2.1 |
 | P1-16 | medium | With vsync and the cap off, WebGPU frames stall under a saturated GPU (35–43 long tasks in 10 s, frame p95 60–137 ms on the M3) while WebGL2 stays smooth. A weak GPU is always saturated. | Needs Intel hardware. | The owner's bench run on an HD 620 with and without `&renderer=webgl` (§5) decides whether weak GPUs should draw with WebGL2. | 0.2.1, after §5 |
 | P1-08 | medium | The benchmark's Build scenario runs at about 60 fps in every preset, against 88–120 fps for the same orbit in Live. The cause wasn't found. | Not investigated. | Start with the catalog pictures' second engine (`render/preview/items.ts`) and the paused session's frame clock. | 0.2.1 |
@@ -902,7 +922,7 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | P3-17 | low | CI runs only on a release tag or by hand: no job on push or pull request. | Not in scope. | A push and pull-request job with `cargo test` and clippy that prints the big town's ticks per second without gating. | 0.2.1 |
 | R5-22 | low | Settings have no version: migrations guess from which keys exist, and only graphics and resolution are range-checked. | Not in scope. | A `settingsVersion` with ordered migrations, and numbers clamped after the merge. | v0.3 |
 | Menu stutter (new) | low | Preparing the latest save behind the menu shows as 2–3 frames of 100–175 ms in the first seconds on the menu (M3 Pro), roughly three times that on the target CPUs. | The cost of P3-01's faster menu. | Build that world in slices, as playing an existing household already does. | v0.3 |
-| P2-11 | low | No heap-snapshot diff over a 1-hour run at speed 5 was taken; P2 saw the heap after GC grow 153.5 → 160.2 MB in 10 minutes, likely portraits and lists for new residents. *(pending: unless M1 took one.)* <!-- M1 --> | "If time allows" in the review. | §5's long session watches F3's JS heap; take the diff if it keeps growing. | 0.2.1 |
+| P2-11 | low | No heap-snapshot diff over a 1-hour run at speed 5 was taken; P2 saw the heap after GC grow 153.5 → 160.2 MB in 10 minutes, likely portraits and lists for new residents. | "If time allows" in the review, and M1 didn't take one. | §5's long session watches F3's JS heap; take the diff if it keeps growing. | 0.2.1 |
 | P1-13 | low | Low's image processing still writes an RGBA16F target before FXAA (16.6 MB a frame). | Not done. | Do FXAA in the image-processing pass, or use an 8-bit intermediate, if cheap in Babylon. | v0.3 |
 | P1-17 | low | A far road's lane markings render brighter or darker between page loads (0.03–0.12 % of pixels). | Not done. | Thaw or refreeze the shared landscape materials on the switch from the overview to the game. | v0.3 |
 | Background tabs (new) | low | In a background tab Chrome delays the sim worker's timers to 100–150 ms, so the game runs at about 80–85 % of its speed there (L1, before and after). | Browser behaviour. | Leave it unless players notice; a catch-up rule for hidden tabs would be the fix. | never |
@@ -911,6 +931,7 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | R5-27 | low | `content/lots/starter.json` ships, though only tests and the pack checker read it. | Harmless. | Move it to `crates/sim-core/tests/data/`. | v0.3 |
 | Pause on blur (new) | low | With "Pause when the window loses focus" on, a player who switches away while a game loads may come back to it paused. | Rare, and the setting is off by default. | Leave it unless reported. | never |
 | `check:llm` (new) | low | The language model's checks aren't in CI: 7.3 minutes on 4 threads, against golden text made on arm64. | Too slow for every release. | Run `pnpm check:llm` by hand when the prompt, the cleaning rules or the model change. | never |
+| Small allocations (M1's item 8) | low | Not done: the allocations at 10 Hz in `audio/world.ts`, `buildmode.ts` and `menuScene.ts`, and the churn of `game.sims`. | P2 measured each site under 50 KB/s, 90 % of all allocation being Babylon's own per-draw work, with no major GC (P2-12, §2.5.2). | Leave them. | never |
 
 **Put off by the owner** (§2.8: best effort, not promised; target v0.3):
 - Detecting a weak GPU and picking Low or WebGL2 on its own at first start (P1's question, P1-07).
@@ -939,8 +960,9 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 - [ ] The same with `quality=low`, then both again with `&renderer=webgl` (WebGL2), and the four again with `hour=21` (night).
 - [ ] Goals (§2.8): Medium at 30 fps or more, Low at 60 or more. The estimate was Medium about 6–10 fps and Low about 9–27 fps before the 0.2.0 savings (§2.5.1). The benchmark draws every refresh (`cap=0`), so the display's refresh rate caps its `fps`.
 - [ ] P1-16: compare WebGPU with WebGL2 for long tasks and the frame interval's p95 and p99. If WebGPU stalls where WebGL2 doesn't, weak GPUs may be better off on WebGL2 (§4).
-- [ ] Play 10 minutes on Medium (the default) and 10 on Low, with F3 open: frame rate, GPU time, Busy, and whether Auto resolution shows 1920×1080 · 100 %.
-- [ ] *(pending: anything G2 or M1 asks to check on Intel.)* <!-- G2 --> <!-- M1 -->
+- [ ] Play 10 minutes on Medium (the default) and 10 on Low, with F3 open: frame rate, GPU time, Busy (frames), and whether Auto resolution shows 1920×1080 · 100 %.
+- [ ] Main thread on a real slow CPU: at speed 5 with a resident's panel open, F3's "Busy (frames)" and long tasks. M1 measured the main thread 82 % busy there with the M3's CPU slowed 3× (§3.5.2), standing in for these laptops; that was from a trace, and F3 reads a few points lower than a trace. Note any long task or hitch, for example when the camera follows someone onto another lot.
+- [ ] *(pending: anything G2 asks to check on Intel.)* <!-- G2 -->
 
 **Safari and Firefox** (not tested by any agent):
 - [ ] Safari 26 with WebGPU: the first visit reloads once for the isolation service worker, and F3 shows Shared memory: on. A new game, Save, reload the page, Continue.
@@ -1022,7 +1044,7 @@ Nothing waited on these: each has a default that shipped in 0.2.0, and a differe
 | Should weak GPUs (Intel HD 620-class) get Low, or WebGL2, by default at first start? | No detection: everyone starts on Medium with WebGPU where it works (put off, §2.8). §5's bench run informs it. | P1 |
 | Should Low replace the interface's frosted blur with a plain tint (P2-03)? | No: Low keeps the blur. | P2 |
 | *(pending: G2's questions, e.g. Low without the neighbours' house interiors (P1-01, P1-12), and whether drawing stops behind full-screen menus.)* <!-- G2 --> | | G2 |
-| *(pending: M1's questions.)* <!-- M1 --> | | M1 |
+| Chrome recalculates style every frame for each running CSS animation (the bar transitions, the low-need pulse, a feed entry's fade): about 0.13 ms a frame at full CPU speed on the M3 Pro, every refresh on a 120 Hz display. Removing it means dropping the bar transitions or the pulse, which changes the look. Worth it? | Kept: the bar transitions and the low-need pulse are unchanged (now animated by transform, P2-01). | M1 |
 | **Saves and crashes** | | |
 | A save whose load traps is deleted as damaged, like a corrupt one. Should it be kept and marked instead (§4)? | Deleted, with a notice. | F2c |
 | "Save and reload" after a crash writes a new manual save each time. Should it go into the game's autosaves? | A new manual save. | F2a |
