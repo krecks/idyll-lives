@@ -10,7 +10,7 @@
   import { settings } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
   import { services } from './ui/services';
-  import { toast } from './ui/state.svelte';
+  import { game, toast } from './ui/state.svelte';
   import Modal from './ui/kit/Modal.svelte';
   import ChooseHome from './ui/screens/ChooseHome.svelte';
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
@@ -169,6 +169,11 @@
   $effect(() => {
     const s = $state.snapshot(settings);
     if (app.screen !== 'game') host.applyMenuSettings(s);
+  });
+
+  // Full-screen menus cover the view: nothing is drawn behind them (their frosted glass keeps the last frame).
+  $effect(() => {
+    host.cover(app.overlay !== null || app.crash !== null || (app.screen === 'game' && (game.pauseMenu || (game.plannerOpen && game.mode === 'live'))));
   });
 
   /**

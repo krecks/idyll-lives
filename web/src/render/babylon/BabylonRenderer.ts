@@ -195,6 +195,8 @@ const FAILED_FRAMES_LIMIT = 60;
 const FRAME_WAIT_LIMIT_MS = 15_000;
 /** Longest frame time (ms) things move by in one frame (the first frame back after a hidden tab spans all of it). */
 const MAX_FRAME_MS = 100;
+/** Frames still drawn once a full-screen menu covers the view (see `hold`): the paused scene, settled, under its glass. */
+const HOLD_FRAMES = 2;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -260,6 +262,9 @@ export class BabylonRenderer implements Renderer {
   /** The frame state last posed (the marker goes up once the camera has moved). */
   private lastFrame: FrameState | null = null;
   private active = false;
+  /** A full-screen menu covers the view (see `hold`), and the frames still drawn before it stops. */
+  private covered = false;
+  private coveredFrames = 0;
   /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
   private frameDt = 0;
   /** Reduce motion: plants, clouds, the selection marker, the Build ghost and build effects keep still. */
@@ -498,6 +503,7 @@ export class BabylonRenderer implements Renderer {
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
+    this.engine.onResizeObservable.add(() => this.drawOnce());
 
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
@@ -1548,6 +1554,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   async captureThumbnail(width: number, height: number): Promise<string | null> {
+    this.drawOnce();
     try {
       return await CreateScreenshotAsync(this.engine, this.camera, { width, height }, 'image/jpeg', 0.8);
     } catch (err) {
@@ -1783,6 +1790,17 @@ export class BabylonRenderer implements Renderer {
     this.active = active;
     if (active) this.engine.runRenderLoop(this.renderFrame);
     else this.engine.stopRenderLoop(this.renderFrame);
+  }
+
+  hold(on: boolean): void {
+    if (on === this.covered) return;
+    this.covered = on;
+    this.coveredFrames = HOLD_FRAMES;
+  }
+
+  /** Behind a full-screen menu, one more frame: a screenshot reads the canvas once drawn, and a resized canvas is blank. */
+  private drawOnce(): void {
+    if (this.covered) this.coveredFrames = Math.max(this.coveredFrames, 1);
   }
 
   framesRendered(frames: number): Promise<void> {
@@ -2150,6 +2168,11 @@ export class BabylonRenderer implements Renderer {
   }
 
   private readonly renderFrame = () => {
+    // Behind a full-screen menu: its last frames, then only those something waits for.
+    if (this.covered) {
+      if (this.coveredFrames > 0) this.coveredFrames--;
+      else if (!this.frameWaiters.length) return;
+    }
     const start = performance.now();
     const probe = this.probe;
     // Babylon asks for the next frame only after this one returns: a frame that throws must not

@@ -370,6 +370,12 @@ export interface Renderer {
   /** Pauses or resumes drawing (e.g. nothing to show behind a menu). */
   setActive(active: boolean): void;
   /**
+   * A full-screen menu covers the view (`true`) or no longer does: a couple more frames are drawn
+   * (the menu's frosted glass keeps showing the last), then none until it's lifted. Screenshots and
+   * `framesRendered` still get theirs.
+   */
+  hold(on: boolean): void;
+  /**
    * Resolves once `frames` more frames have been drawn (shaders compiled, textures uploaded), or
    * after a while without them (drawing stopped, a hidden tab): nothing waits for frames forever.
    */
