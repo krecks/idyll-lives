@@ -779,6 +779,8 @@ export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt';
 
 export type ToWorker =
   | { type: 'init'; content: string; source: GameSource }
+  /** Only checks that a save opens (an imported file); answered with `checked`. */
+  | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }
   | { type: 'save'; requestId: number }
   | { type: 'socialOptions'; requestId: number; actor: number; target: number }
@@ -824,7 +826,9 @@ export type FromWorker =
   /** About once a second. */
   | { type: 'stats'; stats: SimThreadStats }
   /** `problem`: the game couldn't start because of its save. */
-  | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem };
+  | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
+  /** A save `check`ed: `problem` null if it opens. */
+  | { type: 'checked'; problem: SaveProblem | null; message: string };
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {

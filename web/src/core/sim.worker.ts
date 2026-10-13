@@ -37,6 +37,8 @@ scope.onmessage = (e) => {
   try {
     if (msg.type === 'init') {
       void start(msg.content, msg.source).catch((err) => fail(err, true));
+    } else if (msg.type === 'check') {
+      void check(msg.content, msg.save).catch((err) => fail(err, true));
     } else if (msg.type === 'save' && game) {
       scope.postMessage({ type: 'saved', requestId: msg.requestId, data: game.save() });
     } else if (msg.type === 'view') {
@@ -93,6 +95,19 @@ async function start(content: string, source: GameSource): Promise<void> {
   publish();
   postUi();
   runLoop(1000 / layout.ticksPerSecond);
+}
+
+/** Opens a save only to see whether it can be played (an imported file), then lets it go. */
+async function check(content: string, save: string): Promise<void> {
+  await init();
+  try {
+    Game.fromSave(content, save).free();
+    scope.postMessage({ type: 'checked', problem: null, message: '' });
+  } catch (err) {
+    const { message, problem } = refusal(err);
+    if (problem) scope.postMessage({ type: 'checked', problem, message });
+    else scope.postMessage({ type: 'error', message, fatal: true });
+  }
 }
 
 /**

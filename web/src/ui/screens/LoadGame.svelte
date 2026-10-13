@@ -1,14 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { deleteSave, listSaves, onSavesChanged, playable, type SaveMeta } from '../../persistence/saves';
+  import { SimBridge } from '../../core/bridge';
+  import { loadGameData } from '../../game/session';
+  import { deleteSave, exportSave, importProblemText, listSaves, onSavesChanged, parseSaveFile, playable, writeSave, type SaveMeta } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { clock, timeAgo } from '../format';
   import Icon from '../Icon.svelte';
+  import { toast } from '../state.svelte';
 
   let saves = $state<SaveMeta[] | null>(null);
   let confirmDelete = $state<string | null>(null);
   let error = $state('');
+  let importing = $state(false);
+  let fileInput = $state<HTMLInputElement>();
 
   async function refresh() {
     try {
@@ -22,6 +27,47 @@
   async function remove(id: string) {
     await deleteSave(id);
     confirmDelete = null;
+  }
+
+  /** Downloads the save as a file (to keep a copy, or to play it in another browser). */
+  async function download(id: string) {
+    try {
+      const { name, text } = await exportSave(id);
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (err) {
+      error = `Exporting failed: ${err instanceof Error ? err.message : err}`;
+    }
+  }
+
+  /** Adds a save file to the list, if this version of the game can open it. */
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    importing = true;
+    error = '';
+    try {
+      const record = parseSaveFile(await file.text());
+      if (!record) {
+        error = "That file isn't an Idyll Lives save.";
+        return;
+      }
+      const problem = await SimBridge.checkSave((await loadGameData()).content.json, record.data);
+      if (problem) {
+        error = importProblemText(problem);
+        return;
+      }
+      await writeSave(record);
+      toast(`Imported “${record.name}”`);
+    } catch (err) {
+      error = `Importing failed: ${err instanceof Error ? err.message : err}`;
+    } finally {
+      importing = false;
+      if (fileInput) fileInput.value = '';
+    }
   }
 
   onMount(() => {
@@ -60,6 +106,7 @@
             <button class="btn ghost" aria-label="Delete {s.name}" onclick={() => (confirmDelete = s.id)}>
               <Icon name="icon.ui.trash" size={16} />
             </button>
+            <button class="btn ghost" title="Download this save as a file" onclick={() => download(s.id)}>Export</button>
             <button class="btn primary" disabled={!playable(s)} onclick={() => app.start({ kind: 'load', saveId: s.id })}>Load</button>
           {/if}
         </div>
@@ -67,6 +114,12 @@
     {/each}
   </ul>
 {/if}
+
+<div class="files">
+  <span>Saves are kept in this browser. Export one to keep a copy, or to play it in another browser.</span>
+  <button class="btn ghost" disabled={importing} onclick={() => fileInput?.click()}>{importing ? 'Importing…' : 'Import a save…'}</button>
+  <input type="file" accept=".json,application/json" hidden bind:this={fileInput} onchange={() => upload(fileInput?.files?.[0])} />
+</div>
 
 <style>
   ul {
@@ -121,6 +174,17 @@
     font-size: 12px;
     color: #8a5e0c;
     font-weight: 550;
+  }
+  .files {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .files span {
+    flex: 1;
   }
   .actions {
     display: flex;

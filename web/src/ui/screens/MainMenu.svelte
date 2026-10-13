@@ -61,7 +61,7 @@
         </button>
       {/if}
       <MenuItem label="New game" icon="icon.ui.plus" variant={latest ? 'default' : 'primary'} arrow={!latest} onclick={() => app.newGame()} />
-      <MenuItem label="Load game" icon="icon.ui.load" disabled={saves.length === 0} badge={saves.length || undefined} onclick={() => (app.overlay = 'load')} />
+      <MenuItem label="Load game" icon="icon.ui.load" badge={saves.length || undefined} onclick={() => (app.overlay = 'load')} />
       <MenuItem label="Settings" icon="icon.ui.settings" onclick={() => (app.overlay = 'settings')} />
       <MenuItem label="Credits" variant="quiet" onclick={() => (app.overlay = 'credits')} />
     </nav>

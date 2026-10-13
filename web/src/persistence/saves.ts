@@ -146,6 +146,7 @@ export function readSave(id: string): Promise<SaveRecord | undefined> {
 }
 
 export async function writeSave(record: SaveRecord): Promise<void> {
+  keepStorage();
   await run('readwrite', [STORE, META], (tx) => {
     tx.objectStore(STORE).put(record);
     tx.objectStore(META).put(metaOf(record));
@@ -199,4 +200,61 @@ function problemNotice(problem: SaveProblem, name: string): string {
   if (problem === 'tooNew') return `“${name}” is from a newer version of Idyll Lives, so this version can't open it. It's been kept.`;
   if (problem === 'tooOld') return `“${name}” is from a version of Idyll Lives too old to open, so it was removed.`;
   return `“${name}” is damaged and can't be opened, so it was removed.`;
+}
+
+/** What's wrong with a save file someone tried to import. */
+export function importProblemText(problem: SaveProblem): string {
+  if (problem === 'tooNew') return "This save is from a newer version of Idyll Lives, so this version can't open it.";
+  if (problem === 'tooOld') return 'This save is from a version of Idyll Lives too old to open.';
+  return "This save is damaged and can't be opened.";
+}
+
+/** Marks an exported save file (and its format). */
+const FILE_KIND = 'idyll-lives-save';
+
+/** A save as a file to keep elsewhere: the whole record, as JSON. */
+export async function exportSave(id: string): Promise<{ name: string; text: string }> {
+  const record = await readSave(id);
+  if (!record) throw new Error('That save no longer exists.');
+  const name = `${record.name.replace(/[^\p{L}\p{N} ._-]+/gu, ' ').trim() || 'save'}.json`;
+  return { name, text: JSON.stringify({ kind: FILE_KIND, format: 1, ...record }) };
+}
+
+/**
+ * Reads an exported save file into a new record (a new slot, so nothing is overwritten); null if
+ * the file isn't one. Whether the game can open it is for the simulation to say.
+ */
+export function parseSaveFile(text: string): SaveRecord | null {
+  let file: Record<string, unknown>;
+  try {
+    file = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!file || typeof file !== 'object' || file.kind !== FILE_KIND || typeof file.data !== 'string') return null;
+  const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  return {
+    id: crypto.randomUUID(),
+    name: str(file.name, 'Imported save').slice(0, 80),
+    household: str(file.household, ''),
+    members: Array.isArray(file.members) ? file.members.filter((m): m is string => typeof m === 'string') : [],
+    day: num(file.day, 1),
+    minute: num(file.minute, 0),
+    savedAt: num(file.savedAt, Date.now()),
+    // Only a picture carried in the file itself.
+    thumbnail: typeof file.thumbnail === 'string' && file.thumbnail.startsWith('data:image/') ? file.thumbnail : null,
+    autosave: false,
+    game: typeof file.game === 'string' ? file.game : undefined,
+    data: file.data,
+  };
+}
+
+let storageKept = false;
+
+/** Asks the browser once to keep the saves when it runs short of space (granted silently, or not). */
+function keepStorage(): void {
+  if (storageKept) return;
+  storageKept = true;
+  navigator.storage?.persist?.().catch(() => false);
 }

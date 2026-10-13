@@ -107,6 +107,20 @@ export class SimBridge {
     });
   }
 
+  /** Whether `save` opens (without starting a game): null if it does, else what's wrong with it. */
+  static checkSave(content: string, save: string): Promise<SaveProblem | null> {
+    const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
+    return new Promise<SaveProblem | null>((resolve, reject) => {
+      worker.onerror = (e) => reject(new Error(e.message || 'sim worker failed to start'));
+      worker.onmessage = (e: MessageEvent<FromWorker>) => {
+        const msg = e.data;
+        if (msg.type === 'checked') resolve(msg.problem);
+        else if (msg.type === 'error') reject(new Error(msg.message));
+      };
+      worker.postMessage({ type: 'check', content, save } satisfies ToWorker);
+    }).finally(() => worker.terminate());
+  }
+
   get sharedMemory(): boolean {
     return this.reader !== null;
   }
