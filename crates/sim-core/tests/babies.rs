@@ -198,8 +198,7 @@ fn adopting_a_child() {
 fn neighbours_adopt_now_and_then() {
     let content = FAMILY.replace(r#""adoption":{"cost":500}"#, r#""adoption":{"cost":500,"neighbours":1.0},"newcomers":{"hour":12,"days":1000}"#);
     let town = COUPLE.replace(r#""player":true"#, r#""player":false"#)
-        .replace(r#""households":[{"name":"Moss","plot":0,"player":false}]"#, r#""households":[{"name":"Moss","plot":0,"player":false},{"name":"Player","player":true}]"#)
-        .replace(r#""economy""#, r#""economy""#);
+        .replace(r#""households":[{"name":"Moss","plot":0,"player":false}]"#, r#""households":[{"name":"Moss","plot":0,"player":false},{"name":"Player","player":true}]"#);
     let mut w = World::from_json(&content, &town, 1).unwrap();
     w.households[0].funds = 5000;
     minutes(&mut w, 24 * 60);
@@ -673,9 +672,9 @@ fn first_to_feed(w: &mut World, hour: f32) -> (Option<f32>, Option<f32>) {
     let start = w.tick;
     let mut first = [None; 2];
     night_until(w, hour, None, |w| {
-        for i in 0..2 {
-            if first[i].is_none() && feeding(w, i) {
-                first[i] = Some((w.tick - start) as f32 * sim_core::MINUTES_PER_TICK);
+        for (i, first) in first.iter_mut().enumerate() {
+            if first.is_none() && feeding(w, i) {
+                *first = Some((w.tick - start) as f32 * sim_core::MINUTES_PER_TICK);
             }
         }
     });

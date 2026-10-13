@@ -34,6 +34,9 @@ pub fn guess(word: &str) -> String {
             i += 1;
             continue;
         }
+        // One rule per spelling, tried in this order, even where two spellings sound alike
+        // ("ee"/"ea", "ie" and a final "ey" all give "i", ahead of the general "ey" rule).
+        #[allow(clippy::if_same_then_else)]
         let (sound, len): (&str, usize) = if rest(i, "tch") {
             ("ʧ", 3)
         } else if rest(i, "sch") {

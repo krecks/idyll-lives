@@ -3109,7 +3109,7 @@ impl Content {
             dirt: {
                 let mut d: Vec<(TagMask, f32)> =
                     rr.dirt.iter().map(|(t, &v)| (tag_mask(std::slice::from_ref(t)), v.max(0.0))).filter(|(m, _)| *m != 0).collect();
-                d.sort_by(|a, b| a.0.cmp(&b.0));
+                d.sort_by_key(|e| e.0);
                 d
             },
             clean: CleanRules {

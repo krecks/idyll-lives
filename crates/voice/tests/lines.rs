@@ -181,10 +181,10 @@ fn keys_name_content_that_exists() {
         v.get(section).and_then(Value::as_object).map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default()
     };
     let mut tone = |at: &str, v: &Value| {
-        if let Some(t) = v.get("tone") {
-            if !t.as_str().is_some_and(|t| TONES.contains(&t)) {
-                wrong.push(format!("{at}: unknown tone {t}"));
-            }
+        if let Some(t) = v.get("tone")
+            && !t.as_str().is_some_and(|t| TONES.contains(&t))
+        {
+            wrong.push(format!("{at}: unknown tone {t}"));
         }
     };
     let mut unknown = Vec::new();
