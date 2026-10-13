@@ -796,6 +796,12 @@ class NatureWindPlugin extends MaterialPluginBase {
   }
 }
 
+/** How strongly the wind moves a scene's plants (1 as made; 0 still, for reduce motion). */
+export function setWind(scene: Scene, strength: number): void {
+  const state = windState.get(scene);
+  if (state) state.strength = strength;
+}
+
 /**
  * Hooks the plant finishes as they are created (whoever builds the first plant): wind sway and the
  * per-instance tint. Also advances the wind clock. Call once per scene, before any model loads.

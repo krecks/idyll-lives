@@ -233,10 +233,11 @@ class GameHost {
 }
 
 function liveOptions(s: Settings) {
-  return { resolutionScale: s.resolutionScale, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap };
+  return { resolutionScale: s.resolutionScale, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap, reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches };
 }
 
-function reducedMotion(): boolean {
+/** Reduce motion: the setting (as applied to the page) or the system's. */
+export function reducedMotion(): boolean {
   return document.documentElement.classList.contains('reduce-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 

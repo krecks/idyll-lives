@@ -92,7 +92,7 @@ import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { DECOR_MODELS, installNature, Landscape, natureDecor, Sky } from './nature';
+import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
@@ -245,6 +245,8 @@ export class BabylonRenderer implements Renderer {
   private active = false;
   /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
   private frameDt = 0;
+  /** Reduce motion: plants, clouds, the selection marker, the Build ghost and build effects keep still. */
+  private reducedMotion = false;
   /** The arrow keys' camera nudges per frame at 60 fps (see `paceKeys`). */
   private keyNudge = { angularSpeed: 0, panningSensibility: 0, zoomingSensibility: 0 };
   /** The watching director's hold on the game camera (see `setGameShot`). */
@@ -703,7 +705,7 @@ export class BabylonRenderer implements Renderer {
     this.keepCameraClear();
     this.updateCutaway();
     this.followCamera();
-    this.skyDome.drift(this.frameDt);
+    if (!this.reducedMotion) this.skyDome.drift(this.frameDt);
     this.fx.update(this.frameDt);
     if (this.ghostShown) this.updateGhost(this.frameDt);
     if (this.builtPending) this.swapBuilt();
@@ -910,6 +912,10 @@ export class BabylonRenderer implements Renderer {
     this.camera.wheelDeltaPercentage = 0.012 * s;
     // Babylon skips whole frames (nothing begun or presented) until the next one is due.
     this.engine.maxFPS = options.fpsCap > 0 ? options.fpsCap : undefined;
+    const still = (this.reducedMotion = !!options.reducedMotion);
+    setWind(this.scene, still ? 0 : 1);
+    this.characters.reducedMotion = still;
+    this.fx.reducedMotion = still;
     this.applyLook();
   }
 
@@ -1018,12 +1024,14 @@ export class BabylonRenderer implements Renderer {
     root.position.z += (this.ghostGoal.z - root.position.z) * glide;
     root.rotation.y += (this.ghostYawGoal - root.rotation.y) * (1 - Math.exp(-dt * 16));
     // Held a hand's breadth above the floor (or the top it goes on), bobbing gently; picked up with a springy pop.
-    root.position.y = this.ghostLift + 0.07 + 0.035 * Math.sin(this.ghostAge * 3.4);
+    // (Reduce motion: held still, no pop, no pulse.)
+    const still = this.reducedMotion;
+    root.position.y = this.ghostLift + 0.07 + (still ? 0 : 0.035 * Math.sin(this.ghostAge * 3.4));
     const t = this.ghostSpawn;
-    const s = t > 0.6 ? 1 : 1 - Math.exp(-8 * t) * Math.cos(14 * t);
+    const s = still || t > 0.6 ? 1 : 1 - Math.exp(-8 * t) * Math.cos(14 * t);
     root.scaling.set(s, s, s);
     // Where it can't go, it pulses.
-    this.ghostMaterial.alpha = this.ghostValid ? 0.5 : 0.36 + 0.14 * Math.sin(this.ghostAge * 9);
+    this.ghostMaterial.alpha = this.ghostValid ? 0.5 : still ? 0.36 : 0.36 + 0.14 * Math.sin(this.ghostAge * 9);
     this.ghostArrowMaterial.alpha = this.ghostMaterial.alpha + 0.25;
   }
 
@@ -1781,7 +1789,7 @@ export class BabylonRenderer implements Renderer {
     const fog = LOOK.fog * Math.min(1, Math.max(0.3, 55 / this.camera.radius)) * clear;
     if (Math.abs(fog - this.scene.fogDensity) > LOOK.fog * 0.02) this.scene.fogDensity = fog;
     this.followCamera();
-    this.skyDome.drift(dt);
+    if (!this.reducedMotion) this.skyDome.drift(dt);
     this.townListener?.();
   }
 
@@ -2963,7 +2971,8 @@ export class BabylonRenderer implements Renderer {
    * so it stays readable when zoomed out. Its colour follows their mood. Allocation-free.
    */
   private writeMarker(x: number, headY: number, z: number, emotion: number, now: number): void {
-    const t = now * 0.001;
+    // (Reduce motion: no bob, no breathing.)
+    const t = this.reducedMotion ? 0 : now * 0.001;
     const breath = Math.sin(t * 2.4);
     const cam = this.camera.globalPosition;
     const dist = Math.hypot(cam.x - x, cam.y - headY, cam.z - z);

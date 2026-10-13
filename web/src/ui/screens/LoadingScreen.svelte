@@ -4,6 +4,7 @@
    * Covers the 3D scene, so nothing is seen half-built; fades out when it goes.
    */
   import { fade } from 'svelte/transition';
+  import { reducedMotion } from '../../game/host';
   import type { Progress } from '../app.svelte';
   import MenuBackdrop from './MenuBackdrop.svelte';
 
@@ -15,7 +16,7 @@
   });
 </script>
 
-<div class="loading" out:fade={{ duration: 420 }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(shown * 100)} aria-valuetext={progress.label}>
+<div class="loading" out:fade={{ duration: reducedMotion() ? 0 : 420 }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(shown * 100)} aria-valuetext={progress.label}>
   <MenuBackdrop always />
   <div class="center scaled">
     <div class="card glass">

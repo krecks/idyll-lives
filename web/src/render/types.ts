@@ -66,6 +66,8 @@ export interface LiveRenderOptions {
   cameraSensitivity: number;
   /** Frames per second at most; 0: as many as the display shows. */
   fpsCap: number;
+  /** Reduce motion (the setting or the system's): decorative movement in the scene stands still. */
+  reducedMotion?: boolean;
 }
 
 /** Translucent preview of an object being placed in buy mode. */

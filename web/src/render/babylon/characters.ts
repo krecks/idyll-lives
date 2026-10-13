@@ -782,6 +782,8 @@ export class Characters {
   readonly directions: (StageDirection | null)[] = [];
   /** Selected Sim (selection ring), or null. */
   private selected: number | null = null;
+  /** Reduce motion: the selection ring keeps still (no spin, no pulse). */
+  reducedMotion = false;
   private ring: Mesh | null = null;
   private readonly ringMatrix = new Float32Array(16);
 
@@ -1914,7 +1916,7 @@ export class Characters {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
-    this.writeRing(now * 0.001);
+    this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
       this.visible[i] = 0;

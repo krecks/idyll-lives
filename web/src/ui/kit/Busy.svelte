@@ -77,4 +77,23 @@
       transform: translateX(290%);
     }
   }
+  /* Reduce motion: no sweep (stopped, it would read as a bar part way along); the whole bar breathes. */
+  @media (prefers-reduced-motion: reduce) {
+    .sweep {
+      width: 100%;
+      animation: breathe 1.6s ease-in-out infinite alternate !important;
+    }
+  }
+  :global(.reduce-motion) .sweep {
+    width: 100%;
+    animation: breathe 1.6s ease-in-out infinite alternate !important;
+  }
+  @keyframes breathe {
+    from {
+      opacity: 0.25;
+    }
+    to {
+      opacity: 0.7;
+    }
+  }
 </style>
