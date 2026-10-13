@@ -53,13 +53,22 @@
   $effect(() => {
     session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen || app.crash !== null);
   });
+
+  function interfaceFailed(error: unknown) {
+    console.error('[ui] the game interface failed', error);
+    queueMicrotask(() => app.crashed({ kind: 'interface', detail: error instanceof Error ? error.message : String(error) }));
+  }
 </script>
 
 {#if session}
-  <div class="scaled hud-root"><Hud /></div>
-  {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
-  {#if game.mode === 'create'}<Creation />{/if}
-  {#if game.pauseMenu}<PauseMenu {session} />{/if}
+  <!-- An error in the interface: the crash screen, while the game (still running here) can be saved. -->
+  <svelte:boundary onerror={interfaceFailed}>
+    <div class="scaled hud-root"><Hud /></div>
+    {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
+    {#if game.mode === 'create'}<Creation />{/if}
+    {#if game.pauseMenu}<PauseMenu {session} />{/if}
+    {#snippet failed()}{/snippet}
+  </svelte:boundary>
 {:else if error}
   <div class="splash">
     <div class="glass box">

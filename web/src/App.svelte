@@ -36,6 +36,12 @@
     void boot();
   });
 
+  /** An error in the game's interface: the crash screen (outside the render that failed). */
+  function interfaceFailed(error: unknown) {
+    console.error('[ui] the game interface failed', error);
+    queueMicrotask(() => app.crashed({ kind: 'interface', detail: error instanceof Error ? error.message : String(error) }));
+  }
+
   /** Longest wait for one start-up step (a stuck step must not keep the menu away). */
   const STEP_LIMIT_MS = 45_000;
   const within = (p: Promise<unknown>) => Promise.race([p, new Promise((resolve) => setTimeout(resolve, STEP_LIMIT_MS))]);
@@ -196,7 +202,12 @@
   <LoadingScreen progress={app.boot} />
 {:else if app.screen === 'game'}
   {#if GameView}
-    {#key app.sessionKey}<GameView />{/key}
+    {#key app.sessionKey}
+      <svelte:boundary onerror={interfaceFailed}>
+        <GameView />
+        {#snippet failed()}{/snippet}
+      </svelte:boundary>
+    {/key}
   {:else}
     <LoadingScreen progress={app.loading ?? { label: 'Moving in', value: 0 }} />
   {/if}
