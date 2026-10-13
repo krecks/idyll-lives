@@ -303,3 +303,27 @@ fn using_things_makes_a_mess_and_residents_tidy_it_up() {
     w.refresh_rooms();
     assert!(room(&w, 2, 2).scores.clean > dirty);
 }
+
+#[test]
+fn two_tidy_residents_dont_both_go_for_the_same_mess() {
+    let town = KITCHEN.replace(r#""sims":[{"name":"Ada","x":3.5,"z":4.5,"traits":["neat"]}]"#, r#""sims":[{"name":"Ada","x":3.5,"z":4.5,"traits":["neat"]},{"name":"Bo","x":9.5,"z":8.5,"traits":["neat"]}]"#);
+    let mut w = World::from_json(MESS_CONTENT, &town, 3).unwrap();
+    let (worst, other) = (w.lot.tile_index(2, 2), w.lot.tile_index(5, 4));
+    w.dirt[worst] = 0.9;
+    w.dirt[other] = 0.6;
+    for s in &mut w.sims {
+        s.needs[0] = 1.0;
+    }
+    // Bo is a step away first; Ada sets off for the worst of it before he's free.
+    w.apply(Command::MoveTo { sim: 1, x: 10.5, z: 8.5 }).unwrap();
+    let cleaning = |w: &World, i: usize| match w.sims[i].current().map(|a| a.task.kind) {
+        Some(sim_core::world::TaskKind::Clean { x, z }) => Some((x, z)),
+        _ => None,
+    };
+    for _ in 0..60 * 20 {
+        w.tick_once();
+        let (a, b) = (cleaning(&w, 0), cleaning(&w, 1));
+        assert!(a.is_none() || a != b, "both went for the mess at {a:?}");
+    }
+    assert!(w.dirt[worst] < 0.5 && w.dirt[other] < 0.1, "both tidied: {:.2} {:.2}", w.dirt[worst], w.dirt[other]);
+}

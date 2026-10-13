@@ -887,6 +887,8 @@ pub(crate) struct SimBrief {
     /// In a conversation (leading it, being talked to or listening in): who started it and
     /// the social.
     pub conversing: Option<(u32, usize)>,
+    /// The tile they're tidying up (or on their way to), if any.
+    pub cleaning: Option<(i32, i32)>,
 }
 
 pub struct World {
@@ -2097,6 +2099,7 @@ impl World {
                 adult: s.adult(&self.content),
                 age: s.age,
                 conversing: None,
+                cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -3259,8 +3262,10 @@ fn pick_autonomous(
         let p = &ctx.plots[plot as usize];
         let lot = ctx.nav.lot;
         let mut best: Option<(f32, i32, i32)> = None;
-        // (Not where they couldn't get to a moment ago: the next dirtiest spot instead.)
-        let out_of_reach: Vec<(i32, i32)> = sim.unreachable_now(ctx.tick).filter_map(|k| if let TaskKind::Clean { x, z } = k { Some((x, z)) } else { None }).collect();
+        // (Not where they couldn't get to a moment ago, nor where someone else is tidying up:
+        // the next dirtiest spot instead.)
+        let mut out_of_reach: Vec<(i32, i32)> = sim.unreachable_now(ctx.tick).filter_map(|k| if let TaskKind::Clean { x, z } = k { Some((x, z)) } else { None }).collect();
+        out_of_reach.extend(ctx.briefs.iter().enumerate().filter(|&(j, _)| j != me).filter_map(|(_, b)| b.cleaning));
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
@@ -3567,6 +3572,13 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             plot,
             directed: task.directed,
         });
+    }
+    // A place at it for the repair (two housemates don't both set off for it).
+    if let TaskKind::Repair { object } = task.kind {
+        let obj = &mut objects[object as usize];
+        if !obj.reserve(sim.id, content.objects[obj.def].slots) {
+            return;
+        }
     }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
@@ -4285,7 +4297,7 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     let held = sim.current.take().and_then(|act| match act.task.kind {
-        TaskKind::Use { object, .. } => Some(object),
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,

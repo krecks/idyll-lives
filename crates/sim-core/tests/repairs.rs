@@ -2,6 +2,7 @@
 //! for their room) until a resident repairs them or the player pays for a quick fix.
 
 use sim_core::social::EventKind;
+use sim_core::world::TaskKind;
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -99,4 +100,28 @@ fn things_wear_out_break_and_get_repaired() {
     assert!(w.events.iter().any(|e| e.kind == EventKind::Repaired && e.a == 0));
     assert!(w.sims[0].skills[0] > 0.2, "handiness {}", w.sims[0].skills[0]);
     assert_eq!(w.households[0].funds, 1000, "a resident's repair is free");
+}
+
+#[test]
+fn one_resident_goes_to_repair_a_broken_chair_not_two() {
+    let town = TOWN.replace(r#""sims":[{"name":"Ada","x":4.5,"z":3.5}]"#, r#""sims":[{"name":"Ada","x":4.5,"z":3.5},{"name":"Bo","x":4.5,"z":2.5}]"#);
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    w.objects[0].wear = 1.0;
+    for s in &mut w.sims {
+        s.needs[0] = 1.0;
+    }
+    let repairing = |w: &World, i: usize| matches!(w.sims[i].current().map(|a| a.task.kind), Some(TaskKind::Repair { .. }));
+    let mut went = false;
+    for _ in 0..60 * 20 {
+        w.tick_once();
+        assert!(!(repairing(&w, 0) && repairing(&w, 1)), "both went to repair the one-seat chair");
+        went |= repairing(&w, 0) || repairing(&w, 1);
+        if !w.objects[0].broken() {
+            break;
+        }
+    }
+    assert!(went && !w.objects[0].broken(), "repaired");
+    w.tick_once();
+    let sitting = w.sims.iter().any(|s| s.current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: 0, .. })));
+    assert!(sitting || !w.objects[0].in_use(), "the place at it is free again");
 }
