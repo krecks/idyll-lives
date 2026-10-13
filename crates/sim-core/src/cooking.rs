@@ -521,7 +521,12 @@ pub(crate) fn station_mask(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> 
     if sim.visiting.is_some() {
         return 0;
     }
-    home_objects(ctx, sim.household)
+    home_stations(ctx, sim.household, objects)
+}
+
+/// The stations household `household`'s home has, wherever they are: working objects there.
+pub(crate) fn home_stations(ctx: &Ctx, household: u32, objects: &[ObjectInstance]) -> StationMask {
+    home_objects(ctx, household)
         .iter()
         .map(|&o| &objects[o as usize])
         .filter(|o| !o.broken())
