@@ -3398,15 +3398,18 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(obj) = objects.get(object as usize) else {
                 return;
             };
+            // (Not one it doesn't have: an id from before something was sold or moved.)
+            let Some(inter) = content.objects[obj.def].interactions.get(interaction) else {
+                return;
+            };
             if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
                 return;
             }
-            let inter = &content.objects[obj.def].interactions[interaction];
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {
                 return;
             }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
-            let tags = content.objects[obj.def].interactions[interaction].tags;
+            let tags = inter.tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
         }
         TaskKind::MoveTo { x, z } => ([x, z], (x.floor() as i32, z.floor() as i32), 0),

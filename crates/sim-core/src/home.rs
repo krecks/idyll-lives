@@ -16,7 +16,7 @@ use crate::content::Layer;
 use crate::lot::{Diagonal, Edge, EdgeLook, EdgeRef, FORM_HALF, OUTDOORS};
 use crate::path::NavGrid;
 use crate::social::EventKind;
-use crate::world::{GameMode, Layout, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_SIZE, ObjectInstance, Task, TaskKind, World, end_activity, kind_size};
+use crate::world::{GameMode, Layout, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_SIZE, ObjectInstance, TaskKind, World, end_activity, kind_size};
 
 /// Tiles around a plot that still count when checking who can reach what (the path from the street).
 const REACH_MARGIN: i32 = 2;
@@ -63,8 +63,8 @@ fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
 
 /// Whether a task is at object `id` (using it, repairing it, cooking at it, sitting at it to
 /// eat or to be on the phone, washing up at it): it stops when the object goes.
-fn uses_object(t: &Task, id: u32) -> bool {
-    match t.kind {
+fn uses_object(t: &TaskKind, id: u32) -> bool {
+    match *t {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == id,
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(id),
@@ -74,13 +74,13 @@ fn uses_object(t: &Task, id: u32) -> bool {
 
 /// Object `id` is gone: the task's object ids after it shift down by one (a recipe started
 /// from it goes on without).
-fn shift_objects(t: &mut Task, id: u32) {
+fn shift_objects(t: &mut TaskKind, id: u32) {
     let shift = |o: &mut u32| {
         if *o > id {
             *o -= 1;
         }
     };
-    match &mut t.kind {
+    match t {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => shift(object),
         TaskKind::Cook { station, origin, .. } => {
             if *origin == Some(id) {
@@ -1175,7 +1175,8 @@ impl World {
         Ok(())
     }
 
-    /// Removes an object. Sims using it stop, and later object ids shift down by one.
+    /// Removes an object. Sims using it stop, and later object ids shift down by one (in what
+    /// they do, have queued, do next out of habit, and couldn't get to).
     pub(crate) fn remove_object(&mut self, id: u32) -> ObjectInstance {
         let World {
             sims,
@@ -1184,12 +1185,18 @@ impl World {
             ..
         } = self;
         for sim in sims.iter_mut() {
-            if sim.current.as_ref().is_some_and(|a| uses_object(&a.task, id)) {
+            if sim.current.as_ref().is_some_and(|a| uses_object(&a.task.kind, id)) {
                 end_activity(sim, content, objects);
             }
-            sim.queue.retain(|t| !uses_object(t, id));
+            sim.queue.retain(|t| !uses_object(&t.kind, id));
+            // (A routine's next step, washing hands at this sink, goes with it.)
+            sim.follow_up = sim.follow_up.take().filter(|t| !uses_object(&t.kind, id));
+            sim.stuck = sim.stuck.take().filter(|(t, _)| !uses_object(t, id));
             let current = sim.current.as_mut().map(|a| &mut a.task);
-            for t in current.into_iter().chain(sim.queue.iter_mut()) {
+            for t in current.into_iter().chain(sim.queue.iter_mut()).chain(sim.follow_up.iter_mut()) {
+                shift_objects(&mut t.kind, id);
+            }
+            if let Some((t, _)) = &mut sim.stuck {
                 shift_objects(t, id);
             }
         }
@@ -1305,4 +1312,47 @@ fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLo
 pub(crate) fn repair_cost(content: &crate::content::Content, obj: &crate::world::ObjectInstance) -> i64 {
     let price = content.objects[obj.def].price.unwrap_or(0) as f32;
     (price * content.object_rules.repair.cost * obj.wear).round().max(1.0) as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::World;
+    use crate::world::{Task, TaskKind};
+
+    const CONTENT: &str = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1}],
+        "objects":[{"id":"fridge","name":"Fridge","interactions":[
+            {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.4}}]}]}"#;
+
+    const LOT: &str = r#"{"width":12,"depth":12,
+        "objects":[{"def":"fridge","x":1,"z":1,"rot":0},{"def":"fridge","x":4,"z":1,"rot":0},{"def":"fridge","x":7,"z":1,"rot":0}],
+        "sims":[{"name":"Ada","x":3.5,"z":5.5}]}"#;
+
+    fn snack(object: u32) -> TaskKind {
+        TaskKind::Use { object, interaction: 0 }
+    }
+
+    fn object(t: Option<TaskKind>) -> Option<u32> {
+        match t {
+            Some(TaskKind::Use { object, .. }) => Some(object),
+            _ => None,
+        }
+    }
+
+    /// What a resident does next out of habit, and what they couldn't get to, follow the
+    /// object they name when ids shift, and go with it.
+    #[test]
+    fn follow_ups_and_what_they_couldnt_reach_follow_the_object() {
+        let mut w = World::from_json(CONTENT, LOT, 7).unwrap();
+        w.sims[0].follow_up = Some(Task { kind: snack(2), directed: false, routine: true });
+        w.sims[0].stuck = Some((snack(1), 1000));
+        w.remove_object(0);
+        assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(1));
+        assert_eq!(object(w.sims[0].stuck.map(|s| s.0)), Some(0));
+        w.remove_object(0);
+        assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(0));
+        assert!(w.sims[0].stuck.is_none(), "the one they couldn't reach is gone");
+        w.remove_object(0);
+        assert!(w.sims[0].follow_up.is_none(), "the one they'd use next is gone");
+    }
 }

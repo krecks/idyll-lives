@@ -1,6 +1,7 @@
-//! Release review R2 (objects and items): tests that prove findings. Each one fails (or
-//! panics) on 4cde174 and should pass once the finding it names is fixed; they're ignored
-//! until then (`cargo test -p sim-core --test review_r2_objects -- --ignored`).
+//! Objects and the things on them, from the release review (R2): each test failed (or
+//! panicked) on 4cde174 and names the finding that fixed it. Selling and moving renumber
+//! objects (ids are places in `World::objects`), so everything that names one by id has to
+//! follow.
 
 mod common;
 
@@ -59,7 +60,6 @@ fn finish_on_the_toilet(w: &mut World, toilet: u32) {
 /// washing hands leaves the follow-up pointing at the next object: here a lamp with no
 /// interactions, so `start_task` indexes `interactions[0]` (`ObjectDef::slots_for`) and panics.
 #[test]
-#[ignore = "release review: fails until R2-01 is fixed"]
 fn selling_an_earlier_object_while_a_follow_up_is_pending_does_not_panic() {
     let mut w = world();
     let first = buy(&mut w, "lamp", 1, 11);
@@ -80,7 +80,6 @@ fn selling_an_earlier_object_while_a_follow_up_is_pending_does_not_panic() {
 /// sends the resident to wash at the far sink instead of the near one... and with a toilet
 /// after the sink, to "wash" (index 0) on the toilet, i.e. to use the toilet again.
 #[test]
-#[ignore = "release review: fails until R2-01 is fixed"]
 fn a_pending_follow_up_still_names_the_sink_after_an_earlier_sale() {
     let mut w = world();
     let first = buy(&mut w, "lamp", 1, 11);
