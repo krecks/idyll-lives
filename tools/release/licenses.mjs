@@ -6,9 +6,10 @@
  *   workers), with the licence files from each package.
  * - The Rust crates compiled into the simulation's and the voice's WebAssembly: `cargo metadata`
  *   for the dependencies of sim-wasm and voice-wasm, the licence files from Cargo's sources.
- * - Files shipped as they are (the meshopt decoder), and the licences that came with the voice
- *   model, the dictionary and the language model (fetched next to them, see tools/voice/fetch.mjs
- *   and tools/llm/fetch.mjs). The art is listed in assets/CREDITS.md.
+ * - Files shipped as they are (the meshopt and Zstandard decoders), work adapted into the game's
+ *   own code (TalkingHead's expressions), and the licences that came with the voice model, the
+ *   dictionary and the language model (fetched next to them, see tools/voice/fetch.mjs and
+ *   tools/llm/fetch.mjs). The art is listed in assets/CREDITS.md.
  *
  * Identical texts (the Apache-2.0 licence of many crates) are printed once and referred to.
  */
@@ -31,6 +32,21 @@ const KNOWN = {
   'onnxruntime-web': ['LICENSE (github.com/microsoft/onnxruntime)', mit('Copyright (c) Microsoft Corporation')],
   'onnxruntime-common': ['LICENSE (github.com/microsoft/onnxruntime)', mit('Copyright (c) Microsoft Corporation')],
 };
+
+/**
+ * Shipped or adapted work with no npm package to read the licence from: its texts, as published,
+ * are kept in tools/release/texts/.
+ */
+const KEPT = [
+  ['zstddec (decoders/zstddec.wasm, built by Babylon.js), with Zstandard', 'MIT; BSD-3-Clause', 'https://github.com/donmccurdy/zstddec', 'zstddec-LICENSE'],
+];
+const ADAPTED = [
+  ["TalkingHead's emoji expressions, adapted for the residents' faces (render/babylon/characters/face.ts)", 'MIT', 'https://github.com/met4citizen/TalkingHead', 'TalkingHead-LICENSE'],
+];
+
+function kept([name, license, url, file]) {
+  return { name, version: '', license, url, files: [[file, readFileSync(join(ROOT, 'tools/release/texts', file), 'utf8')]] };
+}
 
 function mit(copyright) {
   return `MIT License
@@ -125,7 +141,7 @@ export function thirdPartyLicenses({ packageDirs, header }) {
     const pkg = npmPackage(realpathSync(join(WEB, 'node_modules', name)));
     return { ...pkg, name: `${name} ${pkg.version} (${files})`, version: '' };
   };
-  const shipped = [asIs('@fontsource-variable/inter', 'the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt'), asIs('meshoptimizer', 'decoders/meshopt_decoder.js')];
+  const shipped = [asIs('@fontsource-variable/inter', 'the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt'), asIs('meshoptimizer', 'decoders/meshopt_decoder.js'), ...KEPT.map(kept)];
   const data = [
     ['Supertonic 3 voice model (voice/supertonic-3/)', 'BigScience OpenRAIL-M', 'https://huggingface.co/Supertone/supertonic-3', 'web/public/voice/supertonic-3/LICENSE'],
     ['Misaki US English dictionaries (voice/en-us.lexz)', 'Apache-2.0', 'https://github.com/hexgrad/misaki', 'web/public/voice/misaki-LICENSE'],
@@ -159,6 +175,7 @@ export function thirdPartyLicenses({ packageDirs, header }) {
   section('JavaScript bundled into assets/*.js (npm packages)', npm);
   section('Rust crates compiled into assets/sim_wasm_bg-*.wasm and voice_wasm_bg-*.wasm', rust);
   section('Files shipped as they are', shipped);
+  section("Adapted into the game's own code", ADAPTED.map(kept));
   section('Voice model, dictionary and language model (the copies next to them are the same texts)', data);
   out.push('== Licence texts ==', '');
   for (const t of texts.values()) out.push(`---- [${t.n}] for ${t.users.join(', ')} ----`, '', t.text.trim(), '', '');
