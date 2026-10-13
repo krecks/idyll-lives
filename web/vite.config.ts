@@ -184,6 +184,33 @@ function releaseWasm(): Plugin {
   };
 }
 
+/**
+ * The sky's lighting (the base manifest's `environment.sky`, a 1 MB `.env`) starts downloading
+ * with the page, next to the game's script and data, instead of once the renderer starts and asks
+ * for it: a script in `index.html` fetches it, and `MaterialLibrary.loadEnvironment` takes the
+ * bytes (`self.__skyEnv`). (Not a `<link rel=preload>`: under the isolation service worker Chrome
+ * doesn't hand a preload to `fetch()`, and the file would download twice.)
+ */
+function earlyEnvironment(): Plugin {
+  let base = '/';
+  return {
+    name: 'early-environment',
+    configResolved(config) {
+      base = config.base;
+    },
+    transformIndexHtml() {
+      const manifest = JSON.parse(readFileSync(new URL('./public/assets/manifest.json', import.meta.url), 'utf8')) as { entries: Record<string, { url?: string }> };
+      const file = manifest.entries['environment.sky']?.url;
+      if (!file) return [];
+      // As the asset registry resolves it (src/assets/registry.ts, build.ts), so the URLs match.
+      const url = new URL(file, `http://x${base}assets/manifest.json`);
+      const href = JSON.stringify(`${url.pathname}${url.search ? `${url.search}&` : '?'}v=${BUILD_ID}`);
+      const children = `self.__skyEnv = { url: ${href}, bytes: fetch(${href}).then((res) => (res.ok ? res.arrayBuffer() : null)).catch(() => null) };`;
+      return [{ tag: 'script', children, injectTo: 'head' }];
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -232,7 +259,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), optimizedAssets(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
