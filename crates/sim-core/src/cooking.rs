@@ -609,7 +609,14 @@ fn find_station(
 /// Starts (or carries on with) a cooking, eating or washing-up task.
 pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items) {
     match task.kind {
-        TaskKind::Cook { .. } => cook_next(sim, task, ctx, objects, items, None, None),
+        TaskKind::Cook { recipe, step, .. } => {
+            // Back to it after a crying baby (`called_away`): what the last step left is picked
+            // up again.
+            if sim.held.is_none() && step > 0 {
+                sim.held = ctx.content.recipes[recipe].steps.get(step as usize - 1).and_then(|s| s.holds).map(Held::of);
+            }
+            cook_next(sim, task, ctx, objects, items, None, None)
+        }
         TaskKind::Eat { .. } => eat_next(sim, task, ctx, objects, items),
         TaskKind::Dishes { .. } => dishes_next(sim, task, ctx, objects, items, None),
         _ => {}
@@ -737,6 +744,74 @@ fn cook_next(
     }
     task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: 0 };
     serve(sim, task, ctx, objects, items, last);
+}
+
+/// Minutes until a cook could leave off for a crying baby (`World::wake_for_crying_babies`):
+/// none on their way to a station or waiting for one, else what's left of the step they're at.
+/// None if they aren't cooking.
+pub(crate) fn step_left(sim: &Sim) -> Option<f32> {
+    let act = sim.current.as_ref()?;
+    let TaskKind::Cook { minutes, .. } = act.task.kind else {
+        return None;
+    };
+    Some(match act.phase {
+        Phase::Using { elapsed } => (f32::from(minutes) - elapsed).max(0.0),
+        _ => 0.0,
+    })
+}
+
+/// Called away to a crying baby (`World::wake_for_crying_babies`) while cooking: halfway
+/// through a step, they finish it first (true: `step_done` sees the baby waiting); on their way
+/// to a station or waiting for one, they leave off now (false), and the recipe waits at the
+/// front of the queue to go on from that step (the care goes in front of it).
+pub(crate) fn called_away(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) -> bool {
+    let Some(act) = sim.current.as_ref().filter(|a| matches!(a.task.kind, TaskKind::Cook { .. })) else {
+        return false;
+    };
+    if matches!(act.phase, Phase::Using { .. }) {
+        return true;
+    }
+    let rest = left_off(act.task);
+    end_activity(sim, content, objects);
+    sim.queue.push_front(rest);
+    false
+}
+
+/// A recipe left off before its step: to go on later from there, finding a station again.
+fn left_off(task: Task) -> Task {
+    let TaskKind::Cook { recipe, step, origin, servings, skipped, minutes, .. } = task.kind else {
+        return task;
+    };
+    Task { kind: TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes }, ..task }
+}
+
+/// Whether `task` is care for a crying baby they were called away to (not the player's).
+fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstance]) -> bool {
+    let TaskKind::Use { object, interaction } = task.kind else {
+        return false;
+    };
+    !task.directed
+        && objects
+            .get(object as usize)
+            .and_then(|o| content.objects[o.def].interactions.get(interaction))
+            .is_some_and(|i| i.cares())
+}
+
+/// A step done with a crying baby waiting (`called_away`): they go now. The rest of the recipe
+/// waits in the queue after the baby; a dish just served stays where it was put (they don't
+/// sit down to it now: a plate in hand is put down, `settle`).
+fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
+    if !sim.queue.front().is_some_and(|t| baby_care(t, content, objects)) {
+        return;
+    }
+    let Some(task) = sim.current.as_ref().map(|a| a.task) else {
+        return;
+    };
+    end_activity(sim, content, objects);
+    if matches!(task.kind, TaskKind::Cook { .. }) {
+        let at = sim.queue.iter().take_while(|t| baby_care(t, content, objects)).count();
+        sim.queue.insert(at, left_off(task));
+    }
 }
 
 /// Nowhere to make it: they think about wanting somewhere to cook.
@@ -1373,6 +1448,7 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
             sim.held = content.recipes[recipe].steps[step as usize].holds.map(Held::of);
             let next = TaskKind::Cook { recipe, step: step + 1, station: None, origin, servings, skipped, minutes: 0 };
             cook_next(sim, Task { kind: next, ..task }, ctx, objects, items, None, station);
+            leave_for_baby(sim, content, objects);
         }
         TaskKind::Eat { seat, plate, .. } => {
             let food = sim.held.map(|h| (h.recipe, h.quality)).or_else(|| plate.and_then(|p| items.get(p)).map(|it| (it.recipe, it.quality)));
