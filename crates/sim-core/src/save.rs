@@ -957,7 +957,7 @@ impl World {
             return Err(Error::new(format!("corrupt save: household '{}' lives on an unknown plot", h.name)));
         }
 
-        // Object ids may change from the save's (a removed object type, or tops placed last): tasks are remapped.
+        // Object ids may change from the save's (an object left out, or tops placed last): tasks are remapped.
         // Things standing on tops go in once everything else stands.
         let mut object_ids = HashMap::new();
         let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);
@@ -979,19 +979,17 @@ impl World {
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };
-            match placed {
-                Ok(id) => {
-                    let obj = &world.objects[id as usize];
-                    let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
-                    let offset = world.check_offset(obj.def, obj.rot, o.offset).unwrap_or([0, 0]);
-                    world.objects[id as usize].turn = turn;
-                    world.objects[id as usize].offset = offset;
-                    world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
-                    object_ids.insert(i as u32, id);
-                }
-                Err(_) if world.content.object_index(&o.def).is_none() => {} // content no longer has it
-                Err(_) if tops[i] => {} // what it stood on is gone
-                Err(e) => return Err(e),
+            // What can't be placed is left out, and the rest of the game loads: a kind the content
+            // no longer has, a thing whose top is gone, or one that doesn't fit where it was any
+            // more (building can leave a ceiling lamp outdoors, or something upstairs outside a room).
+            if let Ok(id) = placed {
+                let obj = &world.objects[id as usize];
+                let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
+                let offset = world.check_offset(obj.def, obj.rot, o.offset).unwrap_or([0, 0]);
+                world.objects[id as usize].turn = turn;
+                world.objects[id as usize].offset = offset;
+                world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
+                object_ids.insert(i as u32, id);
             }
         }
         for s in &save.sims {
