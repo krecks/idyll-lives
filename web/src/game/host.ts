@@ -250,6 +250,9 @@ class GameHost {
       const { content, assets } = await loadGameData();
       const params = new URLSearchParams(location.search);
       const renderer = new BabylonRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
+      // Drawing that broke for good can't be mended in place: the crash screen (or, after a GPU
+      // reset, "Graphics were reset") offers to save and reload.
+      renderer.onFailure = (why, err) => app.crashed(why === 'device' ? { kind: 'graphics', detail: 'The graphics device was lost.' } : { kind: 'render', detail: err instanceof Error ? err.message : String(err) });
       await renderer.init(this.canvas);
       return renderer;
     })();

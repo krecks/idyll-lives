@@ -71,6 +71,7 @@ import type {
   ResizeHandle,
   Renderer,
   RendererDeps,
+  RenderFailure,
   RenderStats,
   TownShot,
   ViewRect,
@@ -176,6 +177,10 @@ const WARM_WORLD_FRAMES = 4;
 const TEXTURE_WAIT_MS = 5000;
 /** Main-thread time (ms) a world build behind the overview runs before the menus' town draws a frame. */
 const BUILD_SLICE_MS = 8;
+/** Frames in a row that may fail to draw before drawing counts as broken (`onFailure`). */
+const FAILED_FRAMES_LIMIT = 60;
+/** Longest wait for `framesRendered` (drawing stopped, a hidden tab): then it goes on without them. */
+const FRAME_WAIT_LIMIT_MS = 15_000;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -241,6 +246,9 @@ export class BabylonRenderer implements Renderer {
   private followIndex: number | null = null;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private frameWaiters: { left: number; resolve: () => void }[] = [];
+  /** Frames in a row that failed to draw (each is caught, so the loop goes on). */
+  private failedFrames = 0;
+  onFailure: ((why: RenderFailure, error?: unknown) => void) | null = null;
   /**
    * Built model templates by key, kept across lot switches and sessions (building them
    * is expensive). Templates not used by the current world are disabled, not disposed.
@@ -1465,7 +1473,16 @@ export class BabylonRenderer implements Renderer {
   }
 
   framesRendered(frames: number): Promise<void> {
-    return new Promise((resolve) => this.frameWaiters.push({ left: frames, resolve }));
+    return new Promise((resolve) => {
+      const waiter = { left: frames, resolve };
+      this.frameWaiters.push(waiter);
+      setTimeout(() => {
+        const i = this.frameWaiters.indexOf(waiter);
+        if (i < 0) return;
+        this.frameWaiters.splice(i, 1);
+        resolve();
+      }, FRAME_WAIT_LIMIT_MS);
+    });
   }
 
   setIdleOrbit(on: boolean): void {
@@ -1556,6 +1573,7 @@ export class BabylonRenderer implements Renderer {
 
   dispose(): void {
     this.warmPass++;
+    this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
     this.overview?.dispose();
     this.engine.dispose();
@@ -1818,14 +1836,23 @@ export class BabylonRenderer implements Renderer {
 
   private readonly renderFrame = () => {
     const start = performance.now();
-    const dt = this.engine.getDeltaTime();
-    if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
-    this.onFrame?.(performance.now());
-    if (this.townMode && this.overview) {
-      this.townFrame(dt);
-      if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
+    // Babylon asks for the next frame only after this one returns: a frame that throws must not
+    // stop drawing for good. The first error is logged; many in a row count as broken.
+    try {
+      const dt = this.engine.getDeltaTime();
+      if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
+      this.onFrame?.(performance.now());
+      if (this.townMode && this.overview) {
+        this.townFrame(dt);
+        if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
+      }
+      this.scene.render();
+      this.failedFrames = 0;
+    } catch (err) {
+      if (this.failedFrames === 0) console.error('[render] a frame failed', err);
+      if (++this.failedFrames === FAILED_FRAMES_LIMIT) this.onFailure?.('frames', err);
+      return;
     }
-    this.scene.render();
     this.cpuMs += (performance.now() - start - this.cpuMs) * 0.1;
     for (let i = this.frameWaiters.length - 1; i >= 0; i--) {
       const w = this.frameWaiters[i];

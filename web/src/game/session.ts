@@ -171,6 +171,8 @@ export async function startSession(
     markReady = resolve;
     failReady = reject;
   });
+  /** `?debug`'s `__crash('render')`: every frame fails. */
+  let failFrames = false;
 
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
@@ -722,8 +724,8 @@ export async function startSession(
   if (params.has('debug')) {
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__crash(what)`: fails on purpose, to see how the game copes. 'panic': the simulation panics;
-    // 'throw': an error its worker doesn't catch; 'hang': its worker hangs.
-    Object.assign(window, { __crash: (what: 'panic' | 'throw' | 'hang') => bridge.debugCrash(what) });
+    // 'throw': an error its worker doesn't catch; 'hang': its worker hangs; 'render': every frame fails.
+    Object.assign(window, { __crash: (what: 'panic' | 'throw' | 'hang' | 'render') => (what === 'render' ? (failFrames = true) : bridge.debugCrash(what)) });
   }
   game.sharedMemory = bridge.sharedMemory;
   game.household = household;
@@ -1206,6 +1208,7 @@ export async function startSession(
   }, STATS_INTERVAL_MS);
 
   renderer.run((now) => {
+    if (failFrames) throw new Error('a frame failed on purpose (__crash)');
     bridge.sync(now);
     const frame = bridge.frame(now);
     renderer.update(frame);
