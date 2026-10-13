@@ -2272,7 +2272,9 @@ export class BabylonRenderer implements Renderer {
     this.sun = new DirectionalLight('sun', new Vector3(-0.5, -1, 0.4), this.scene);
     this.sun.autoCalcShadowZBounds = true;
 
-    const shadows = (this.shadows = new ShadowGenerator(this.quality.shadowMapSize, this.sun));
+    // A red-only colour target (R16F): filtered shadows read only the depth texture beside it, so the
+    // RGBA16F one Babylon makes by default was written every frame and never read (P1-05).
+    const shadows = (this.shadows = new ShadowGenerator(this.quality.shadowMapSize, this.sun, false, undefined, true));
     shadows.usePercentageCloserFiltering = true;
     shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     shadows.bias = 0.0015;
