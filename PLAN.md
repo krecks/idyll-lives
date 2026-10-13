@@ -236,7 +236,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - **Presets:** the three graphics presets and their costs are in [docs/design/graphics.md](docs/design/graphics.md).
 
 **Targets (the owner, 0.2.0):** laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1080p: Medium at 30 fps or more. Low there is best effort; 60 fps on Low is not a 0.2.0 target.
-- Medium's 30 fps is an estimate from scaled Mac measurements, not yet measured on Intel hardware, and not a release gate.
+- 30 fps is Medium's target, not a release gate, and it hasn't been measured on Intel hardware. Scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is estimated at about 14–41 fps by day.
 - Before 0.2.0, P1 estimated Medium at about 6–10 fps and Low at about 9–27 fps there, with the GPU as the limit.
 - The owner confirms them on real hardware with the in-game benchmark (`?bench=village`).
 

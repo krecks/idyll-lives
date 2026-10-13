@@ -1,6 +1,6 @@
 # Graphics settings and performance
 
-*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. The target for Intel laptops below, Medium at 30 fps, is estimated from Mac measurements and not yet measured on Intel hardware; Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
+*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. On the Intel laptops below, Medium's target is 30 fps. It hasn't been measured on Intel hardware: scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
 
 Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolution.ts` (Auto resolution), `web/src/render/babylon/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
@@ -45,15 +45,16 @@ Removed in 0.2.0: Ultra, Custom and the fine-tune toggles, and ambient occlusion
 
 The owner's target machines are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
 
-| Preset | 0.2.0 target | P1's estimate before 0.2.0 (§2.5.1) | Status |
-|---|---|---|---|
-| Medium | 30 fps or more | about 6–10 fps | An estimate, not yet measured on Intel hardware; not a release gate |
-| Low | none: best effort | about 9–27 fps at 75 % scale | The owner made Low at 60 fps not a 0.2.0 target |
+| Preset | 0.2.0 target | Estimate for 0.2.0, by day / at night | Estimate before 0.2.0 (P1, §2.5.1) | Status |
+|---|---|---|---|---|
+| Medium | 30 fps or more | about 10–21 / 8–13 fps | about 6–10 fps | Probably falls short; not measured on Intel hardware; not a release gate |
+| Low | none: best effort | about 14–41 / 13–39 fps | about 9–27 fps | The owner made Low at 60 fps not a 0.2.0 target |
+| High | none | about 9–17 / 7–11 fps | about 6 fps | – |
 
-- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by about 3×. The owner confirms them on real hardware with the benchmark (the release review's §5).
+- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by 2–3×; at sign-off it applied the same models to 0.2.0 (on AC power, `render.mjs --throughput`, median of 3). Only a run on a real Intel laptop settles it; the owner does that with the benchmark (the release review's §5).
+- **Medium misses 30 fps on both models.** At night it barely improved (8.84 → 7.39 ms of GPU on the M3), because lit lamps still cost: the night range cap for the lamp cluster (P1-02) wasn't done.
 - **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
-- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, WebGPU spends 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, and WebGL2 10–19 ms (54–98 fps). So on WebGPU the CPU alone also keeps Low from 60 fps there (P1-07).
-- **Since the savings nobody can see** (G2), Medium by day on the M3 Pro takes 5.60 ms of GPU a frame instead of 8.99, and Low 4.10 ms instead of 5.04 (WebGPU, orbit view; below). Nobody has run P1's Intel estimate again with these numbers: the benchmark on a real laptop will tell.
+- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, 0.2.0 allows 47–57 fps on WebGPU and 78–98 fps on WebGL2, above every GPU estimate (P1's sign-off). Before 0.2.0 WebGPU spent 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, so on WebGPU the CPU alone also kept Low from 60 fps there (P1-07).
 
 ## Resolution
 

@@ -604,8 +604,8 @@ Graphics (the owner, 2026-10-13, revised after P1's HD 620 estimate):
   - Low at 60 fps on an Intel HD 620: Low is best effort, and 60 fps on Low is not a 0.2.0 target.
   - Generated LOD models.
 - **The target for Intel HD 620/530 laptops** (i7-7500U, i7-8550U, i5-6500 at 1080p) is Medium at 30 fps or more. It is not a release gate.
-  - It is an estimate from scaled Mac measurements (§2.5.1), not yet measured on Intel hardware.
-  - The owner confirms it on real hardware with the in-game benchmark (§5).
+  - It hasn't been measured on Intel hardware. Scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day and 8–13 at night (P1's sign-off; before 0.2.0, 6–10 fps, §2.5.1), so it probably falls short until someone measures it on a real laptop.
+  - The owner checks it on real hardware with the in-game benchmark (§5).
 
 ## 3. Fixed
 
@@ -987,8 +987,8 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 
 **Intel HD 620/530 laptops** (i7-7500U, i7-8550U, i5-6500 at 1920×1080; nothing has been measured on Intel yet):
 - [ ] Open `…/?bench=village&quality=medium&hour=13&cam=orbit&res=1`. The benchmark warms up for 5 s, measures for 20 s, then shows a summary: press "Copy result" and keep the JSON.
-- [ ] The same with `quality=low`, then both again with `&renderer=webgl` (WebGL2), and the four again with `hour=21` (night).
-- [ ] The target (§2.8): Medium at 30 fps or more; Low is best effort, with no frame-rate target. The estimate was Medium about 6–10 fps and Low about 9–27 fps before the 0.2.0 savings (§2.5.1). The benchmark draws every refresh (`cap=0`), so the display's refresh rate caps its `fps`.
+- [ ] The same with `quality=low`, then both again with `&renderer=webgl` (WebGL2), and the four again with `hour=21` (night). Add one run with `cam=wide`, where the nature cells cost the most draws.
+- [ ] The target (§2.8): Medium at 30 fps or more; Low is best effort, with no frame-rate target. Scaled from Mac measurements, 0.2.0 is estimated at Medium about 10–21 fps by day and 8–13 at night, Low about 14–41 and 13–39 (before 0.2.0: Medium about 6–10, Low about 9–27, §2.5.1). The benchmark draws every refresh (`cap=0`), so the display's refresh rate caps its `fps`.
 - [ ] P1-16: compare WebGPU with WebGL2 for long tasks and the frame interval's p95 and p99. If WebGPU stalls where WebGL2 doesn't, weak GPUs may be better off on WebGL2 (§4).
 - [ ] Play 10 minutes on Medium (the default) and 10 on Low, with F3 open: frame rate, GPU time, Busy (frames), and whether Auto resolution shows 1920×1080 · 100 %.
 - [ ] Main thread on a real slow CPU: at speed 5 with a resident's panel open, F3's "Busy (frames)" and long tasks. M1 measured the main thread 82 % busy there with the M3's CPU slowed 3× (§3.5.2), standing in for these laptops; that was from a trace, and F3 reads a few points lower than a trace. Note any long task or hitch, for example when the camera follows someone onto another lot.
