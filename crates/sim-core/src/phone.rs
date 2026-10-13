@@ -260,6 +260,7 @@ pub mod why {
     pub const ON_THE_PHONE: &str = "On the phone";
     pub const BUSY: &str = "Busy";
     pub const NOT_MET: &str = "They haven't met";
+    pub const NOT_CLOSE: &str = "Not close enough";
     pub const HOUSEMATE: &str = "Lives with them";
     pub const NOT_NOW: &str = "Not at this hour";
     pub const OUT_VISITING: &str = "Out visiting";
@@ -330,8 +331,9 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
     if !has_phone(content, t.age) {
         return Some(why::TOO_YOUNG);
     }
-    if !act.requires.allows(w.relationships.get(me, contact)) {
-        return Some(why::NOT_MET);
+    let rel = w.relationships.get(me, contact);
+    if !act.requires.allows(rel) {
+        return Some(if rel.met { why::NOT_CLOSE } else { why::NOT_MET });
     }
     if let Some(busy) = status_for(w, me, contact)
         && (busy == why::ASLEEP || busy == why::RIGHT_HERE || !act.message)
@@ -376,9 +378,31 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
     None
 }
 
-/// Checks a player's phone order: `me` has a phone and isn't away, the action exists, and a
-/// contact (if it takes one) is someone they know with a phone. Whether the contact is free is
-/// decided when the phone is out.
+/// Why a player's phone order (`action`, with `contact` if it takes one) is refused right now,
+/// or None if it goes ahead (whether the contact says yes is another matter): the phone out of
+/// use (`unusable`), the contact out of reach or the visit out (`why_not`), or going over to
+/// theirs would leave a baby home alone (`life::homebound`). The command handler
+/// (`check_order`) and the UI (`view.rs`) both ask this, so a button is greyed out exactly when
+/// pressing it would be refused.
+pub fn refusal(w: &World, me: usize, action: usize, contact: Option<usize>) -> Option<&'static str> {
+    let act = w.content.phone.actions.get(action)?;
+    if let Some(off) = unusable(w, me) {
+        return Some(off);
+    }
+    if let Some(c) = contact.filter(|_| act.contact)
+        && let Some(why) = why_not(w, me, c, action)
+    {
+        return Some(why);
+    }
+    if act.meet == Some(Meet::There) {
+        return crate::life::homebound(w, me);
+    }
+    None
+}
+
+/// Checks a player's phone order: the action exists and takes a contact (a resident other
+/// than `me`) if and only if it needs one, and it isn't refused right now (`refusal`).
+/// Whether the contact is still free when the phone comes out is decided then (`update`).
 pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u32>) -> Result<(), Error> {
     let act = w
         .content
@@ -389,24 +413,23 @@ pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u
     if let Some(why) = unusable(w, me) {
         return Err(Error::new(format!("{}: {}", w.sims[me].name, why.to_lowercase())));
     }
-    // Going over to theirs: not leaving a baby home alone.
-    if act.meet == Some(Meet::There) {
-        crate::life::check_cover(w, me)?;
-    }
-    match (act.contact, contact) {
-        (false, None) => Ok(()),
-        (false, Some(_)) => Err(Error::new(format!("{} is just for {}", act.label, w.sims[me].name))),
-        (true, None) => Err(Error::new(format!("{} needs someone to contact", act.label))),
+    let contact = match (act.contact, contact) {
+        (false, None) => None,
+        (false, Some(_)) => return Err(Error::new(format!("{} is just for {}", act.label, w.sims[me].name))),
+        (true, None) => return Err(Error::new(format!("{} needs someone to contact", act.label))),
         (true, Some(c)) => {
             let c = c as usize;
-            let t = w.sims.get(c).filter(|t| t.here() && c != me).ok_or_else(|| Error::new(format!("unknown resident {c}")))?;
-            if !has_phone(&w.content, t.age) {
-                return Err(Error::new(format!("{} is too young for a phone", t.name)));
-            }
-            if !act.requires.allows(w.relationships.get(me, c)) {
-                return Err(Error::new(format!("{} doesn't know {} well enough", w.sims[me].name, t.name)));
-            }
-            Ok(())
+            w.sims.get(c).filter(|t| t.here() && c != me).ok_or_else(|| Error::new(format!("unknown resident {c}")))?;
+            Some(c)
+        }
+    };
+    match refusal(w, me, action, contact) {
+        None => Ok(()),
+        // (The longer story: whom, and what a babysitter costs.)
+        Some(crate::life::NO_SITTER) => crate::life::check_cover(w, me),
+        Some(why) => {
+            let who = contact.map_or_else(String::new, |c| format!(" · {}", w.sims[c].name));
+            Err(Error::new(format!("{}{who}: {}", act.label, why.to_lowercase())))
         }
     }
 }

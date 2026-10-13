@@ -133,22 +133,34 @@ fn a_call_cheers_both_up_and_brings_them_closer() {
 fn nobody_answers_in_their_sleep() {
     let mut w = world(CONTENT, "friends");
     let bed = w.objects.iter().position(|o| w.content.objects[o.def].id == "bed").unwrap() as u32;
+    let sofa = w.objects.iter().position(|o| w.content.objects[o.def].id == "sofa").unwrap() as u32;
+    let (call, text) = (action(&w, "call"), action(&w, "text"));
+    // Off to bed: too busy for a call, but a text still reaches him. Ada sits down for a
+    // while first, and texts once he's asleep.
     w.apply(Command::Use { sim: 1, object: bed, interaction: 0 }).unwrap();
-    minutes(&mut w, 30.0);
-    assert!(w.sims[1].asleep(&w.content), "Bo is asleep");
-    assert_eq!(phone::status(&w, 1), Some(phone::why::ASLEEP));
-    let call = action(&w, "call");
-    assert_eq!(phone::why_not(&w, 0, 1, call), Some(phone::why::ASLEEP));
+    minutes(&mut w, 1.0);
+    assert_eq!(phone::refusal(&w, 0, call, Some(1)), Some(phone::why::BUSY));
+    assert_eq!(phone::refusal(&w, 0, text, Some(1)), None);
+    w.apply(Command::Use { sim: 0, object: sofa, interaction: 0 }).unwrap();
+    w.apply(Command::Phone { sim: 0, action: text, contact: Some(1) }).unwrap();
     let before = *w.relationships.get(1, 0);
     let social = w.sims[1].needs[0];
-    w.apply(Command::Phone { sim: 0, action: call, contact: Some(1) }).unwrap();
-    minutes(&mut w, 1.0);
-    assert_eq!(on_the_phone(&w, 0).map(|p| p.2), Some(Answer::NoAnswer));
-    minutes(&mut w, 5.0);
+    let mut answer = None;
+    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        answer = answer.or(on_the_phone(&w, 0).map(|p| p.2).filter(|&a| a != Answer::Pending));
+    }
+    assert!(w.sims[1].asleep(&w.content), "Bo is asleep");
+    assert_eq!(answer, Some(Answer::NoAnswer));
     assert!(on_the_phone(&w, 0).is_none(), "gave up after a few rings");
     assert!(w.sims[1].asleep(&w.content), "still asleep");
     assert_eq!(w.relationships.get(1, 0).friendship, before.friendship);
     assert!(w.sims[1].needs[0] <= social);
+    // Asleep, he can't be called at all: the order is refused, saying why.
+    assert_eq!(phone::status(&w, 1), Some(phone::why::ASLEEP));
+    assert_eq!(phone::why_not(&w, 0, 1, call), Some(phone::why::ASLEEP));
+    let err = w.apply(Command::Phone { sim: 0, action: call, contact: Some(1) }).unwrap_err();
+    assert_eq!(err.to_string(), "Call · Bo: asleep");
 }
 
 #[test]
@@ -213,6 +225,88 @@ fn phone_orders_are_checked() {
     // The JSON the UI sends.
     let cmd = sim_core::Command::from_json(&format!(r#"{{"type":"phone","sim":0,"action":{call},"contact":1}}"#)).unwrap();
     assert!(matches!(cmd, Command::Phone { sim: 0, contact: Some(1), .. }));
+}
+
+/// Ada's phone as the UI is told: per contact, why each action is out (null: it isn't).
+fn phone_ui(w: &World) -> Value {
+    let ui: Value = serde_json::from_str(&sim_core::view::ui_state_json(w)).unwrap();
+    ui["sims"].as_array().unwrap().iter().find(|s| s["id"] == 0).expect("Ada")["phone"].clone()
+}
+
+/// Every phone order Ada could give right now (with Bo, or on her own): greyed out in the UI
+/// with a reason exactly when the command handler refuses it, giving the same reason. Each
+/// order is tried on a copy of the world. Returns the reasons, per action.
+fn agrees(content: &str, w: &World) -> Vec<Option<&'static str>> {
+    let ui = phone_ui(w);
+    let bo = ui["contacts"].as_array().unwrap().iter().find(|c| c["id"] == 1).cloned();
+    let mut out = Vec::new();
+    for (a, act) in w.content.phone.actions.iter().enumerate() {
+        let contact = act.contact.then_some(1);
+        let why = phone::refusal(w, 0, a, contact);
+        if act.contact {
+            let shown = bo.as_ref().map_or(Value::Null, |c| c["why"][a].clone());
+            assert_eq!(shown.as_str(), why, "{}: the UI says {shown}", act.id);
+        }
+        let mut copy = World::from_save_json(content, &w.save_json()).unwrap();
+        match (copy.apply(Command::Phone { sim: 0, action: a, contact: contact.map(|c| c as u32) }), why) {
+            (Ok(()), None) => {}
+            (Err(e), Some(why)) => assert!(e.to_string().ends_with(&why.to_lowercase()), "{}: refused with '{e}', not '{why}'", act.id),
+            (res, why) => panic!("{}: the handler says {res:?}, the UI {why:?}", act.id),
+        }
+        out.push(why);
+    }
+    out
+}
+
+#[test]
+fn the_phone_greys_out_exactly_what_would_be_refused() {
+    let content = CONTENT.replace(r#""meet":"there","autonomous":false,"#, r#""meet":"there","autonomous":false,"requires":{"minFriendship":20},"#);
+    let mut w = world(&content, "friends");
+    let (text, call, invite, ask) = (action(&w, "text"), action(&w, "call"), action(&w, "invite"), action(&w, "askOver"));
+    // 11:00, both at home and free: anything goes.
+    assert!(agrees(&content, &w).iter().all(Option::is_none));
+    // Bo out of the house: no going over to his.
+    let home = w.sims[1].pos;
+    w.sims[1].pos = [10.5, 12.5];
+    assert_eq!(agrees(&content, &w)[ask], Some(phone::why::NOT_HOME));
+    w.sims[1].pos = home;
+    // Not close enough to ask to come over (but a call is fine).
+    w.relationships.get_mut(0, 1).friendship = 10.0;
+    let why = agrees(&content, &w);
+    assert_eq!((why[ask], why[call]), (Some(phone::why::NOT_CLOSE), None));
+    w.relationships.get_mut(0, 1).friendship = 60.0;
+    // Late in the evening: no visits either way, though they can still talk.
+    while clock::hour(w.tick) < 21.5 {
+        w.tick_once();
+    }
+    let why = agrees(&content, &w);
+    assert_eq!((why[invite], why[ask]), (Some(phone::why::NOT_NOW), Some(phone::why::NOT_NOW)));
+    assert_eq!((why[text], why[call]), (None, None));
+}
+
+#[test]
+fn alone_with_the_baby_and_no_money_they_cannot_ask_to_come_over() {
+    let content = common::content();
+    let mut w = World::from_json(&content, &common::town(&content, 7, 1), 7).unwrap();
+    w.autonomy = false;
+    let h = w.households.iter().position(|h| h.player).unwrap();
+    let me = w.sims.iter().position(|s| s.household as usize == h).unwrap();
+    w.households[h].funds = 100_000;
+    w.apply(Command::Adopt { household: h as u32, child: false }).unwrap();
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    // Someone they know who is home and free.
+    let friend = (0..w.sims.len())
+        .find(|&j| w.sims[j].household as usize != h && phone::refusal(&w, me, action(&w, "askOver"), Some(j)).is_none())
+        .expect("a friend to visit");
+    w.relationships.get_mut(me, friend).friendship = 60.0;
+    let ask = action(&w, "askOver");
+    w.households[h].funds = 0;
+    assert_eq!(phone::refusal(&w, me, ask, Some(friend)), Some(sim_core::life::NO_SITTER));
+    assert_eq!(phone::refusal(&w, me, action(&w, "call"), Some(friend)), None, "a call is fine");
+    assert!(w.apply(Command::Phone { sim: me as u32, action: ask, contact: Some(friend as u32) }).is_err());
+    common::dump_state(&w, "phone-no-sitter");
 }
 
 #[test]

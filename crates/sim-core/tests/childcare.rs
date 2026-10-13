@@ -268,6 +268,43 @@ fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_out() {
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
 }
 
+/// Ada as the UI is told: why she can't be sent out, and why asking Bo to come over to his is
+/// out (null: it isn't).
+fn going_out_ui(w: &World) -> (serde_json::Value, serde_json::Value) {
+    let ui: serde_json::Value = serde_json::from_str(&sim_core::view::ui_state_json(w)).unwrap();
+    let ada = ui["sims"].as_array().unwrap().iter().find(|s| s["id"] == 0).expect("Ada").clone();
+    let bo = ada["phone"]["contacts"].as_array().unwrap().iter().find(|c| c["id"] == 2).expect("Bo in her phone").clone();
+    (ada["homebound"].clone(), bo["why"][0].clone())
+}
+
+#[test]
+fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
+    let mut w = street_world(true, "");
+    until(&mut w, 1, 10.0);
+    // With money for a babysitter: the visit and asking Bo are both on.
+    assert_eq!(sim_core::life::homebound(&w, 0), None);
+    assert_eq!(sim_core::phone::refusal(&w, 0, 0, Some(2)), None);
+    assert_eq!(going_out_ui(&w), (serde_json::Value::Null, serde_json::Value::Null));
+    // Without: greyed out, saying why, exactly as the orders are refused.
+    w.households[0].funds = 10;
+    let why = sim_core::life::NO_SITTER;
+    assert_eq!(sim_core::life::homebound(&w, 0), Some(why));
+    assert_eq!(sim_core::phone::refusal(&w, 0, 0, Some(2)), Some(why));
+    assert_eq!(going_out_ui(&w), (serde_json::json!(why), serde_json::json!(why)));
+    assert!(w.apply(Command::Visit { sim: 0, plot: 2 }).is_err());
+    assert!(w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).is_err());
+    // A grandparent home: on again, as the orders go ahead.
+    let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
+    let mut w = street_world(true, grandma);
+    // (Ada would go over to Bo's on her own.)
+    w.households[0].free_will = false;
+    until(&mut w, 1, 10.0);
+    w.households[0].funds = 10;
+    assert_eq!(going_out_ui(&w), (serde_json::Value::Null, serde_json::Value::Null));
+    w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).unwrap();
+    w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
+}
+
 #[test]
 fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
     let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;

@@ -625,6 +625,7 @@ struct DetailsSent {
     actions: u64,
     skills: u64,
     phone: u64,
+    homebound: u64,
     plan: u64,
     plan_parts: PlanSent,
 }
@@ -910,6 +911,8 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
     let skills: Vec<f32> = s.skills[..content.skills.len()].iter().map(|&v| floor_to(v, PERCENT)).collect();
     o.changed("skills", &skills, &mut d.skills);
     o.changed_opt("phone", phone_view(world, s).as_ref(), &mut d.phone);
+    // Why they can't be sent out (visiting) right now, as the command handler decides.
+    o.changed_opt("homebound", crate::life::homebound(world, s.id as usize).as_ref(), &mut d.homebound);
 
     // Routines, goals and wishes (the player's household only), part by part.
     if !world.households[s.household as usize].player {
@@ -957,7 +960,8 @@ fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
             ContactView {
                 id: t.id,
                 status: crate::phone::status_for(world, me, c),
-                why: (0..content.phone.actions.len()).map(|a| crate::phone::why_not(world, me, c, a)).collect(),
+                // (As the command handler decides: `phone::refusal`.)
+                why: (0..content.phone.actions.len()).map(|a| crate::phone::refusal(world, me, a, Some(c))).collect(),
             }
         })
         .collect();

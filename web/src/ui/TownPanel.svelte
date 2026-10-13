@@ -73,9 +73,11 @@
           {/each}
         </ul>
         {#if me && plot.id !== me.plot && plot.id !== homePlot}
-          <button class="btn primary" onclick={() => services.controls.visit(plot.id)}>
+          <!-- (Greyed out, saying why, when the sim would refuse it.) -->
+          <button class="btn primary" disabled={!!me.homebound} title={me.homebound} onclick={() => services.controls.visit(plot.id)}>
             Send {me.name} to visit
           </button>
+          {#if me.homebound}<span class="muted why">{me.homebound}</span>{/if}
         {:else if me && plot.id === homePlot && me.plot !== homePlot}
           <button class="btn primary" onclick={() => services.controls.goHome()}>Send {me.name} home</button>
         {/if}
@@ -180,6 +182,10 @@
   }
   .hint {
     margin: 0;
+  }
+  .why {
+    margin-top: -4px;
+    text-align: center;
   }
   ul {
     list-style: none;

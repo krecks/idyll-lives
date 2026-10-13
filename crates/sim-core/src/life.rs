@@ -464,6 +464,16 @@ pub(crate) fn no_cover_for(w: &World, i: usize) -> Option<usize> {
     home.then(|| stays_home_for(w, i)).flatten()
 }
 
+/// Why going out would leave a baby home alone (`homebound`), short for the UI.
+pub const NO_SITTER: &str = "Nobody to mind the baby";
+
+/// Why `i` can't be sent out (off the home lot: visiting, the park, over to a friend's) now:
+/// `NO_SITTER` when that would leave a baby alone at home (`no_cover_for`, as `check_cover`
+/// refuses), else None. For the UI, next to what would take them out.
+pub fn homebound(w: &World, i: usize) -> Option<&'static str> {
+    no_cover_for(w, i).map(|_| NO_SITTER)
+}
+
 /// Refuses a player's order that takes `i` off the home lot (a visit, the park, the shops,
 /// over to a friend's) when it would leave a baby alone at home: `no_cover_for`.
 pub(crate) fn check_cover(w: &World, i: usize) -> Result<(), crate::Error> {

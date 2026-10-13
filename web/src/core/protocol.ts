@@ -546,6 +546,8 @@ export interface SimView {
   skills: number[];
   /** Their phone (with content `phone`): why it's out of use, and who they can reach. */
   phone?: PhoneView;
+  /** Why they can't be sent out (visiting) right now ("Nobody to mind the baby"), as the sim would refuse it. */
+  homebound?: string;
   /** Routines, goals and wishes (the player's household only). */
   plan?: PlanView;
 }
@@ -563,7 +565,7 @@ export interface ContactView {
   id: number;
   /** What keeps them from the phone ("Asleep", "At work", "Busy"...), or null when free. */
   status: string | null;
-  /** Per phone action (content order): why it's out with them right now, or null. */
+  /** Per phone action (content order): why it's out with them right now (the sim would refuse the order), or null. */
   why: (string | null)[];
 }
 
