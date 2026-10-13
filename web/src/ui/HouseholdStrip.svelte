@@ -75,7 +75,7 @@
       </button>
       <div class="today"><TodayTimeline sim={s} height={5} /></div>
       {#if action?.active}
-        <span class="progress"><span style="width:{action.progress * 100}%"></span></span>
+        <span class="progress"><span style="transform:scaleX({action.progress})"></span></span>
       {/if}
       {#if away && s.awayUntil === null && game.follow !== s.id}
         <button class="go" title="Follow {s.name}" onclick={() => services.controls.follow(s.id)}>
@@ -196,11 +196,15 @@
     height: 3px;
     background: var(--hairline);
   }
+  /* Scaled rather than sized: the compositor animates a transform, while a width transition would
+     lay out and repaint the page every frame (updates restart it about eight times a second). */
   .progress span {
     display: block;
     height: 100%;
     background: var(--accent);
-    transition: width 0.3s linear;
+    transform-origin: left;
+    will-change: transform;
+    transition: transform 0.3s linear;
   }
   .go {
     position: absolute;

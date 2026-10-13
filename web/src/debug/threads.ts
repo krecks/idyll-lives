@@ -21,8 +21,13 @@ export interface ThreadStats {
     isolated: boolean;
   };
   main: {
-    /** Share of the time spent on frames, 0..1. */
+    /**
+     * Share of the time spent on frames, 0..1: the game's frame callback and the browser's style,
+     * layout and paint after it (`FrameMeter`; until it has measured, the callback alone).
+     */
     busy: number;
+    /** Share of the time in the game's frame callback alone. */
+    frameWork: number;
     /** Tasks over 50 ms in the last ten seconds, and the longest, ms (null: not supported). */
     longTasks: number | null;
     longestTaskMs: number;
@@ -49,6 +54,63 @@ function forgetLongTasks(now: number): void {
   while (longTasks.length && longTasks[0].at < now - LONG_TASK_WINDOW_MS) longTasks.shift();
 }
 
+/** The meter stops this long (ms) after the last reading (the overlay closed). */
+const METER_IDLE_MS = 2000;
+
+/**
+ * What the browser does for each frame after its frame callbacks (style, layout, paint, handing
+ * the picture over), which the game's own frame timing leaves out: a message posted from the last
+ * callback of each frame arrives once the browser has finished the frame. Measured as a share of
+ * the time, only while someone reads it (the overlay is open).
+ */
+class FrameMeter {
+  private running = false;
+  private lastRead = 0;
+  /** Time (ms) since `since`, counted until `counted` (a frame held up past the next one counts once). */
+  private spent = 0;
+  private since = 0;
+  private counted = 0;
+  private readonly done = new MessageChannel();
+
+  constructor() {
+    this.done.port1.onmessage = (e: MessageEvent<number>) => {
+      const now = performance.now();
+      this.spent += Math.max(0, now - Math.max(e.data, this.counted));
+      this.counted = now;
+    };
+  }
+
+  /** Share of the time since the last reading, or null until frames have been measured. */
+  read(): number | null {
+    const now = performance.now();
+    this.lastRead = now;
+    const span = now - this.since;
+    const share = this.running && this.counted > this.since && span > 0 ? Math.min(1, this.spent / span) : null;
+    this.spent = 0;
+    this.since = now;
+    if (!this.running) {
+      this.running = true;
+      requestAnimationFrame(this.frame);
+    }
+    return share;
+  }
+
+  /**
+   * Each frame, after the game's callback (asked for later, it runs later): a message that arrives
+   * once the browser has finished the frame.
+   */
+  private readonly frame = () => {
+    if (performance.now() - this.lastRead > METER_IDLE_MS) {
+      this.running = false;
+      return;
+    }
+    this.done.port2.postMessage(performance.now());
+    requestAnimationFrame(this.frame);
+  };
+}
+
+const frameMeter = new FrameMeter();
+
 export function threadStats(
   render: RenderStats,
   sim: SimThreadStats | null,
@@ -57,7 +119,8 @@ export function threadStats(
   forgetLongTasks(performance.now());
   // Chrome only.
   const heapBytes = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null;
-  const mainBusy = Math.min(1, (render.cpuMs * render.fps) / 1000);
+  const frameWork = Math.min(1, (render.cpuMs * render.fps) / 1000);
+  const mainBusy = Math.min(1, frameWork + (frameMeter.read() ?? 0));
   const voice = { ...voiceThreadStats(), ...director };
   const llm = llmStats();
   // On the GPU the model keeps about one core busy while it writes.
@@ -71,6 +134,7 @@ export function threadStats(
     },
     main: {
       busy: mainBusy,
+      frameWork,
       longTasks: longTasksSupported ? longTasks.length : null,
       longestTaskMs: longTasks.reduce((n, t) => Math.max(n, t.ms), 0),
       heapBytes,

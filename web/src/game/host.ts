@@ -290,7 +290,7 @@ class GameHost {
 }
 
 function liveOptions(s: Settings) {
-  return { resolutionScale: s.resolutionScale, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap, reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches };
+  return { resolution: s.resolution, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap, reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches };
 }
 
 /** Reduce motion: the setting (as applied to the page) or the system's. */

@@ -35,6 +35,8 @@ export interface CameraPose {
 
 export interface RenderStats {
   backend: string;
+  /** The graphics preset it draws with (`render/quality.ts`). */
+  preset: string;
   fps: number;
   frameMs: number;
   /** Main-thread time spent on a frame (game update and draw submission), smoothed, ms. */
@@ -45,6 +47,9 @@ export interface RenderStats {
   renderWidth: number;
   renderHeight: number;
   renderScale: number;
+  /** The display's refresh rate as measured (Hz), and every how many refreshes a frame is drawn (the frame rate cap; `babylon/pacing.ts`). */
+  refreshHz: number;
+  refreshDivisor: number;
   /** GPU time per frame (ms) while it is measured (`measureGpu`); null: not measured, or the browser can't. */
   gpuMs: number | null;
   /** Main-thread time posing the residents per frame, smoothed (ms). */
@@ -111,8 +116,8 @@ export interface RendererDeps {
 
 /** Settings that can change while a game is running. */
 export interface LiveRenderOptions {
-  /** Fraction of native resolution, 0.5..1. */
-  resolutionScale: number;
+  /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`babylon/resolution.ts`). */
+  resolution: 'auto' | number;
   cameraSensitivity: number;
   /** Frames per second at most; 0: as many as the display shows. */
   fpsCap: number;

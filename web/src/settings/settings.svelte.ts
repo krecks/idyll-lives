@@ -3,25 +3,18 @@
  * listed in `RESTART_KEYS` take effect the next time a game is started or loaded.
  */
 
-import { QUALITY, type QualitySettings } from '../render/quality';
-
-export type QualityPreset = keyof typeof QUALITY;
+import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
+import { MIN_SCALE, type Resolution } from '../render/babylon/resolution';
 
 export interface Settings {
-  renderer: 'auto' | 'webgl';
-  /** Fraction of native resolution, 0.5..1. */
-  resolutionScale: number;
+  /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
+  graphics: GraphicsPreset;
+  /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/babylon/resolution.ts`). */
+  resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
   fpsCap: number;
-  /** Shadow map size (1024, 2048 or 4096). */
-  shadowDetail: number;
-  /** 4× multisampling; off: FXAA. */
-  antiAliasing: boolean;
-  /** Every lamp lights (clustered lighting) rather than the four nearest the biggest rooms. */
-  allLamps: boolean;
-  /** The nearest mirrors reflect the room live. */
-  mirrors: boolean;
-  ambientOcclusion: boolean;
+  /** `webgl` draws with WebGL2 even where WebGPU works (Troubleshooting). */
+  renderer: 'auto' | 'webgl';
   autonomy: boolean;
   /** 0 disables autosave. */
   autosaveMinutes: number;
@@ -76,20 +69,16 @@ export interface Settings {
   tipsSeen: string[];
 }
 
-export const RESTART_KEYS: readonly (keyof Settings)[] = ['renderer', 'shadowDetail', 'antiAliasing', 'allLamps', 'mirrors', 'ambientOcclusion'];
+export const RESTART_KEYS: readonly (keyof Settings)[] = ['renderer', 'graphics'];
 
 // Legacy key from the project's old name; kept so saves survive (and settings with them).
 const STORAGE_KEY = 'open-sims-wasm.settings';
 
 export const DEFAULT_SETTINGS: Settings = {
-  renderer: 'auto',
-  resolutionScale: 1,
+  graphics: 'medium',
+  resolution: 'auto',
   fpsCap: 60,
-  shadowDetail: QUALITY.high.shadowMapSize,
-  antiAliasing: QUALITY.high.msaaSamples > 1,
-  allLamps: QUALITY.high.clusteredLamps,
-  mirrors: QUALITY.high.mirrors > 0,
-  ambientOcclusion: QUALITY.high.ambientOcclusion,
+  renderer: 'auto',
   autonomy: true,
   autosaveMinutes: 5,
   cameraSensitivity: 1,
@@ -118,15 +107,37 @@ export const DEFAULT_SETTINGS: Settings = {
   tipsSeen: [],
 };
 
+/** Graphics settings before the three presets (0.1): the quality preset, then its parts set one by one. */
+interface OldGraphics {
+  quality?: string;
+  resolutionScale?: number;
+  shadowDetail?: number;
+  antiAliasing?: boolean;
+  allLamps?: boolean;
+  mirrors?: boolean;
+  ambientOcclusion?: boolean;
+}
+
+/**
+ * The preset for graphics settings from before the presets were fixed: Low if they were Low (the
+ * old quality preset, or the parts as the old Low set them), anything else Medium (High and the old
+ * defaults too: Medium is everyone's default now).
+ */
+export function migrateGraphics(old: OldGraphics): GraphicsPreset {
+  if (old.quality === 'low') return 'low';
+  const low = old.resolutionScale === 0.75 && old.shadowDetail === 1024 && old.antiAliasing === false && old.allLamps === false && old.mirrors === false && !old.ambientOcclusion;
+  return low ? 'low' : 'medium';
+}
+
 function load(): Settings {
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings> & { quality?: QualityPreset };
-    // Settings from before the quality preset was split up: what that preset set.
-    const old = stored.quality && stored.shadowDetail === undefined ? QUALITY[stored.quality] : undefined;
-    const preset = old ? { shadowDetail: old.shadowMapSize, antiAliasing: old.msaaSamples > 1, allLamps: old.clusteredLamps } : {};
-    const merged = { ...DEFAULT_SETTINGS, ...preset, ...stored };
-    // Settings that are gone (bloom, tilt-shift, the quality preset, the visual style) aren't kept.
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings> & OldGraphics;
+    const merged = { ...DEFAULT_SETTINGS, ...stored };
+    if (stored.graphics === undefined) merged.graphics = migrateGraphics(stored);
+    // Settings that are gone (bloom, tilt-shift, the quality preset and its parts, the visual style) aren't kept.
     for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete (merged as Record<string, unknown>)[k];
+    if (!isGraphicsPreset(merged.graphics)) merged.graphics = DEFAULT_SETTINGS.graphics;
+    if (merged.resolution !== 'auto' && !(merged.resolution >= MIN_SCALE && merged.resolution <= 1)) merged.resolution = DEFAULT_SETTINGS.resolution;
     // Babble (0.14–0.19) is gone: anything but a language we have becomes the default.
     if (!['en'].includes(merged.voiceLanguage)) merged.voiceLanguage = DEFAULT_SETTINGS.voiceLanguage;
     return merged;
@@ -163,45 +174,10 @@ export function resetSettings(keys?: readonly (keyof Settings)[]): void {
   for (const k of keys) (settings as unknown as Record<string, unknown>)[k] = structuredClone(DEFAULT_SETTINGS[k]);
 }
 
-/** Settings › Performance's quick picks: each sets the image, light and shadow settings at once (`high`: the defaults). */
-export const GRAPHICS_PRESETS = {
-  low: { resolutionScale: 0.75, shadowDetail: QUALITY.low.shadowMapSize, antiAliasing: QUALITY.low.msaaSamples > 1, allLamps: QUALITY.low.clusteredLamps, mirrors: false, ambientOcclusion: false },
-  medium: { resolutionScale: 1, shadowDetail: QUALITY.medium.shadowMapSize, antiAliasing: QUALITY.medium.msaaSamples > 1, allLamps: QUALITY.medium.clusteredLamps, mirrors: false, ambientOcclusion: false },
-  high: {
-    resolutionScale: DEFAULT_SETTINGS.resolutionScale,
-    shadowDetail: DEFAULT_SETTINGS.shadowDetail,
-    antiAliasing: DEFAULT_SETTINGS.antiAliasing,
-    allLamps: DEFAULT_SETTINGS.allLamps,
-    mirrors: DEFAULT_SETTINGS.mirrors,
-    ambientOcclusion: DEFAULT_SETTINGS.ambientOcclusion,
-  },
-} satisfies Record<string, Partial<Settings>>;
-export type GraphicsPreset = keyof typeof GRAPHICS_PRESETS;
-
-/** The preset the graphics settings match, or `custom`. */
-export function graphicsPreset(s: Settings): GraphicsPreset | 'custom' {
-  for (const [id, preset] of Object.entries(GRAPHICS_PRESETS)) {
-    if (Object.entries(preset).every(([k, v]) => s[k as keyof Settings] === v)) return id as GraphicsPreset;
-  }
-  return 'custom';
-}
-
-/** Renderer quality from settings; `?quality=low|medium|high|ultra` still overrides for testing. */
-export function qualityFromSettings(s: Settings, params: URLSearchParams): QualitySettings {
-  const preset = QUALITY[params.get('quality') as QualityPreset] as QualitySettings | undefined;
-  const chosen: QualitySettings = preset ?? {
-    shadowMapSize: s.shadowDetail,
-    msaaSamples: s.antiAliasing ? 4 : 1,
-    ambientOcclusion: s.ambientOcclusion,
-    snapshotRendering: true,
-    clusteredLamps: s.allLamps,
-    mirrors: s.mirrors ? QUALITY.high.mirrors : 0,
-    // Low's lighter landscape with the Low preset only.
-    lawnDensity: QUALITY[graphicsPreset(s) === 'low' ? 'low' : 'high'].lawnDensity,
-    landscapeShadows: QUALITY[graphicsPreset(s) === 'low' ? 'low' : 'high'].landscapeShadows,
-  };
-  return {
-    ...chosen,
-    snapshotRendering: chosen.snapshotRendering && params.get('snapshot') !== '0',
-  };
+/** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off. */
+export function qualityFromSettings(s: Settings, params: URLSearchParams): RenderQuality {
+  const asked = params.get('quality');
+  const preset = isGraphicsPreset(asked) ? asked : s.graphics;
+  const q = QUALITY[preset];
+  return { ...q, preset, snapshotRendering: q.snapshotRendering && params.get('snapshot') !== '0' };
 }

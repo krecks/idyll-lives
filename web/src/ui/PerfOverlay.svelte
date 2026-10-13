@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { graphicsPreset, settings } from '../settings/settings.svelte';
   import { saveDebugReport } from './debugReport';
   import { game } from './state.svelte';
 
@@ -16,8 +15,6 @@
 
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const mb = (bytes: number) => `${(bytes / 2 ** 20).toFixed(0)} MB`;
-  /** The graphics preset (`?quality=` overrides it for testing). */
-  const preset = $derived(new URLSearchParams(location.search).get('quality') ?? graphicsPreset(settings));
 </script>
 
 {#if game.perfOpen}
@@ -33,14 +30,15 @@
       {@const s = game.stats}
       <h4>Main thread</h4>
       <div><span>Backend</span><b>{s.backend}</b></div>
-      <div><span>Preset</span><b>{preset}</b></div>
+      <div><span>Preset</span><b>{s.preset}</b></div>
       <div><span>Resolution</span><b>{s.renderWidth}×{s.renderHeight} · {pct(s.renderScale)}</b></div>
+      <div><span>Display</span><b>{Math.round(s.refreshHz)} Hz ÷ {s.refreshDivisor}</b></div>
       <div><span>FPS</span><b>{s.fps.toFixed(0)}</b></div>
       <div><span>Frame</span><b>{s.frameMs.toFixed(1)} ms</b></div>
-      <div><span>Frame work</span><b>{s.cpuMs.toFixed(1)} ms</b></div>
+      <div><span>Frame work</span><b>{s.cpuMs.toFixed(1)} ms{t ? ` · ${pct(t.main.frameWork)}` : ''}</b></div>
       <div><span>GPU</span><b>{s.gpuMs === null ? 'n/a' : `${s.gpuMs.toFixed(1)} ms`}</b></div>
       <div><span>Residents</span><b>{s.residentsMs.toFixed(2)} ms</b></div>
-      {#if t}<div><span>Busy</span><b>{pct(t.main.busy)}</b></div>{/if}
+      {#if t}<div title="Frames from start to finish: the game's work, then the browser's style, layout and paint (not the interface's updates between frames)"><span>Busy (frames)</span><b>{pct(t.main.busy)}</b></div>{/if}
       <div><span>Draw calls</span><b>{s.drawCalls}</b></div>
       <div><span>Snapshot rendering</span><b>{s.snapshotRendering ? 'on' : 'off'}</b></div>
       {#if t?.main.longTasks != null}

@@ -1,5 +1,10 @@
 //! Browser bindings for `sim-core`. Keep this layer thin: no game logic here.
 
+// SIMD comes from `.cargo/config.toml`'s rustflags, which a `RUSTFLAGS` in the environment replaces
+// rather than adds to: such a build stops here instead of shipping a slower wasm without it.
+#[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
+compile_error!("the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too");
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use sim_core::save::SAVE_VERSION;

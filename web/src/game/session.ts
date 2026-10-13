@@ -1384,7 +1384,7 @@ export async function startSession(
     },
     applySettings(s) {
       renderer.configure({
-        resolutionScale: s.resolutionScale,
+        resolution: s.resolution,
         cameraSensitivity: s.cameraSensitivity,
         fpsCap: s.fpsCap,
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,

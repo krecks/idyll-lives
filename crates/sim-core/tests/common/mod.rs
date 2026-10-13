@@ -349,6 +349,8 @@ enum State {
     Away,
     /// Being talked to by this resident.
     Engaged(u32),
+    /// Being talked to at home by this guest.
+    Hosting(u32),
     Idle,
     /// A baby in the crib (they lie there for days): never stuck.
     Crib,
@@ -368,6 +370,9 @@ impl State {
             State::Waiting(_) => Some(1.0),
             State::Away => Some(16.0),
             State::Engaged(_) => Some(2.0),
+            // A guest keeps the hosts company (content `visits.company`): one chat after another
+            // for most of the visit (`visits.hours`, 2.5 h; twice that when the player sent them).
+            State::Hosting(_) => Some(6.0),
             State::Idle => Some(6.0),
             State::Crib => None,
         }
@@ -399,7 +404,9 @@ fn state(w: &World, s: &Sim) -> State {
         return State::Away;
     }
     if let Some(t) = s.engaged_with {
-        return State::Engaged(t);
+        let home = w.households[s.household as usize].plot;
+        let guest = w.sims.get(t as usize).and_then(|g| g.visiting).is_some_and(|v| Some(v.plot) == home);
+        return if guest { State::Hosting(t) } else { State::Engaged(t) };
     }
     let Some(act) = s.current() else { return State::Idle };
     let d = doing(&act.task.kind);
@@ -446,14 +453,16 @@ fn describe(w: &World, st: State) -> String {
         State::Routing(d) => format!("Routing {}", thing(d)),
         State::Waiting(d) => format!("Waiting {}", thing(d)),
         State::Engaged(t) => format!("Engaged by {}", w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
+        State::Hosting(t) => format!("Engaged by guest {}", w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
         st => format!("{st:?}"),
     }
 }
 
 /// Watches for residents stuck in one state: asleep for 13 hours (a baby in the crib is
 /// exempt), using something or talking for 6, walking for 4, waiting, queued or knocking for
-/// 1, away for 16, being talked to for 2, or idle for 6. Call `sample` after every tick (or
-/// step); it looks every `Watch::EVERY` ticks. Each stretch is reported once, in `stuck`.
+/// 1, away for 16, being talked to for 2 (by a guest at home: 6), or idle for 6. Call `sample`
+/// after every tick (or step); it looks every `Watch::EVERY` ticks. Each stretch is reported
+/// once, in `stuck`.
 ///
 /// With `WATCH=<name>` (or `<name>@<day>`) in the environment it prints what that resident
 /// does (from that day), one line per change, to see the story behind a report.

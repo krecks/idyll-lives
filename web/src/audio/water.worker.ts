@@ -1,26 +1,30 @@
-/** Makes the water sounds (`water.ts`) off the main thread: asked for a kind at a sample rate, sends back its two channels. */
+/**
+ * Makes the sounds that take a moment off the main thread: the water sounds (`water.ts`), asked
+ * for by kind, and the birds' songs (`birdsong.ts`), asked for by bird and version, each at a
+ * sample rate. Sends back the samples (two channels for water, one for a song).
+ */
 
+import { songSamples, type Voice } from './birdsong';
 import { WATER, type WaterKind } from './water';
 
-export interface WaterRequest {
-  kind: WaterKind;
-  rate: number;
-}
+export type SoundRequest = { kind: WaterKind; rate: number } | { bird: Voice; version: number; rate: number };
 
-export interface WaterReply extends WaterRequest {
-  left: Float32Array;
-  right: Float32Array;
-}
+export type SoundReply = { kind: WaterKind; rate: number; left: Float32Array; right: Float32Array } | { bird: Voice; version: number; rate: number; samples: Float32Array };
 
 interface WorkerScope {
-  onmessage: ((e: MessageEvent<WaterRequest>) => void) | null;
-  postMessage(message: WaterReply, transfer?: Transferable[]): void;
+  onmessage: ((e: MessageEvent<SoundRequest>) => void) | null;
+  postMessage(message: SoundReply, transfer?: Transferable[]): void;
 }
 
 const scope = self as unknown as WorkerScope;
 
 scope.onmessage = (e) => {
-  const { kind, rate } = e.data;
-  const { left, right } = WATER[kind](rate);
-  scope.postMessage({ kind, rate, left, right }, [left.buffer, right.buffer]);
+  const q = e.data;
+  if ('bird' in q) {
+    const samples = songSamples(q.bird, q.version, q.rate);
+    scope.postMessage({ ...q, samples }, [samples.buffer]);
+    return;
+  }
+  const { left, right } = WATER[q.kind](q.rate);
+  scope.postMessage({ kind: q.kind, rate: q.rate, left, right }, [left.buffer, right.buffer]);
 };

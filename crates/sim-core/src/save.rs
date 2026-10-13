@@ -957,7 +957,7 @@ impl World {
             return Err(Error::new(format!("corrupt save: household '{}' lives on an unknown plot", h.name)));
         }
 
-        // Keep object ids stable: a removed object type would shift ids, so tasks are remapped.
+        // Object ids may change from the save's (a removed object type, or tops placed last): tasks are remapped.
         // Things standing on tops go in once everything else stands.
         let mut object_ids = HashMap::new();
         let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);

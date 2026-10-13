@@ -3,6 +3,11 @@
 //! and size and with its mouth shapes (the worker runs Supertonic 3 with ONNX Runtime Web in
 //! between). Keep this layer thin.
 
+// SIMD comes from `.cargo/config.toml`'s rustflags, which a `RUSTFLAGS` in the environment replaces
+// rather than adds to: such a build stops here instead of shipping a slower wasm without it.
+#[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
+compile_error!("the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too");
+
 use voice::{Engine, G2p, Lexicon, LineInputs, VoiceParams, dsp};
 use wasm_bindgen::prelude::*;
 

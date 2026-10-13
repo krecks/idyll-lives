@@ -8,7 +8,7 @@
 
 import type { GoalView, SimView } from '../../core/protocol';
 import { services } from '../services';
-import { askToast, dropToast } from '../state.svelte';
+import { askToast, dropToast, game } from '../state.svelte';
 import { money } from '../format';
 import { goalText } from '../story';
 import { actOnWish, brokenAtHome, describeHomeWish } from './homeWishes';
@@ -35,6 +35,21 @@ export function ideaToasts() {
   let last = new Set<string>();
   /** The latest snapshot (a toast is answered later, when indices may have shifted). */
   let sims: SimView[] = [];
+  /** What the last ideas came from (see `sameSources`). */
+  let sources: unknown[] = [];
+
+  /**
+   * Ideas come from each resident's name and the parts of their plan below (which keep their
+   * objects until they change), and fix wishes from the things in the home. Updates arrive about
+   * eight times a second, mostly with only needs and actions changed: then there's nothing to redo.
+   */
+  function sameSources(next: SimView[]): boolean {
+    const now: unknown[] = [game.objects, game.plots, game.households, game.home];
+    for (const s of next) now.push(s.id, s.name, s.plan?.suggestions, s.plan?.purchase, s.plan?.wishes, s.plan?.homeWishes);
+    const same = now.length === sources.length && now.every((v, i) => v === sources[i]);
+    sources = now;
+    return same;
+  }
 
   /** Runs `act` with where a goal idea is on the resident's list now, if it still is. */
   function withSuggestion(sim: number, key: string, act: (i: number) => void) {
@@ -99,6 +114,7 @@ export function ideaToasts() {
     /** Each snapshot: toasts for new ideas, and away with those that are gone. */
     update(next: SimView[]) {
       sims = next;
+      if (sameSources(next)) return;
       const now = ideas();
       for (const [key, id] of open) {
         if (!now.has(key)) {
