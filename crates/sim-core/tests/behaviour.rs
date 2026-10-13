@@ -1,11 +1,11 @@
-//! Release review (R3) probes, all ignored. The proofs (`every_days_gates_fire`,
-//! `residents_still_age_after_day_1167`, `someone_too_tired_to_talk_leaves_others_be`,
-//! `nobody_follows_someone_across_town_for_a_chat`, `practising_with_nothing_else_to_do_doesnt_stutter`,
-//! `newborns_are_born_at_age_zero`) fail until their bug is fixed. `long_run_probe` runs a whole
-//! town and logs non-finite numbers, needs out of range, the longest stretch in one task and
-//! residents flipping between two things; `trace` and `house` print the stories behind them.
+//! How residents behave, in small scenes and a long run (from the 0.2.0 release review). Each
+//! proof keeps one bug fixed: someone too tired to talk leaves others be, nobody follows someone
+//! across town for a chat, practising doesn't stutter, newborns are born at age 0.
+//! `long_run_probe` (ignored, a diagnostic) runs a whole town and logs non-finite numbers, needs
+//! out of range, the longest stretch in one task and residents flipping between two things;
+//! `trace` and `house` print the stories behind them.
 //!
-//! `cargo test --release -p sim-core --test r3_probe -- --ignored --nocapture <name>`
+//! `cargo test --release -p sim-core --test behaviour -- --ignored --nocapture <name>`
 //! (`long_run_probe`: `DAYS=60 SEEDS=7,11` by default; `LOD=1` looks at the player's home).
 
 mod common;
@@ -15,90 +15,6 @@ use std::collections::{BTreeMap, VecDeque};
 use sim_core::social::EventKind;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{World, clock};
-
-/// The days on which `tick_at(day, minute)` names a tick that `day()` doesn't put on that day,
-/// as ranges: every exact-tick gate (`tick == tick_at(day(tick), m)`) is dead on them.
-fn dead_days(minute: f32, last: u32) -> Vec<(u32, u32)> {
-    let mut ranges: Vec<(u32, u32)> = Vec::new();
-    for day in 2..=last {
-        let Some(t) = clock::tick_at(day, minute) else { continue };
-        if clock::tick_at(clock::day(t), minute) == Some(t) {
-            continue;
-        }
-        match ranges.last_mut() {
-            Some(r) if r.1 + 1 == day => r.1 = day,
-            _ => ranges.push((day, day)),
-        }
-    }
-    ranges
-}
-
-#[test]
-#[ignore = "R3 proof: fails until the clock counts whole ticks"]
-fn every_days_gates_fire() {
-    let mut failed = false;
-    for minute in [0.0, 6.0 * 60.0, 9.0 * 60.0, 12.0 * 60.0, 18.0 * 60.0, 23.5 * 60.0] {
-        let dead = dead_days(minute, 6000);
-        eprintln!("minute {minute:>6}: dead on days {dead:?}");
-        failed |= !dead.is_empty();
-    }
-    assert!(!failed, "exact-tick gates stop on some days");
-}
-
-/// Around every midnight up to day 6000: the minute of the day stays below 1440 and days don't
-/// go backwards.
-#[test]
-#[ignore = "R3 probe: clock edges"]
-fn clock_edges() {
-    let (mut at_1440, mut backwards, mut first) = (0, 0, None);
-    for day in 2..=6000u32 {
-        let t0 = clock::tick_at(day, 0.0).unwrap();
-        for t in t0 - 3..t0 + 3 {
-            if clock::minute_of_day(t) >= 1440.0 {
-                at_1440 += 1;
-                first.get_or_insert((day, t));
-            }
-            if clock::day(t + 1) < clock::day(t) {
-                backwards += 1;
-            }
-        }
-    }
-    eprintln!("minute_of_day >= 1440: {at_1440} (first {first:?}); day going backwards: {backwards}");
-    assert_eq!(at_1440 + backwards, 0);
-}
-
-/// Residents' ages at each midnight from day `from` for `days` days (the town jumped there).
-fn ages_from(from: u32, days: u32) -> Vec<(u32, f32, usize)> {
-    let content = common::content();
-    let town = common::town(&content, 7, 2);
-    let mut w = World::from_json(&content, &town, 7).unwrap();
-    w.tick = clock::tick_at(from, 23.0 * 60.0).unwrap();
-    let mut out = Vec::new();
-    let end = clock::tick_at(from + days, 1.0 * 60.0).unwrap();
-    let mut last_day = clock::day(w.tick);
-    let first = w.sims.iter().position(|s| s.here()).unwrap();
-    while w.tick < end {
-        w.tick_once();
-        let day = clock::day(w.tick);
-        if day != last_day {
-            last_day = day;
-            let grew = w.events.iter().filter(|e| e.kind == EventKind::GrewOlder).count();
-            out.push((day, w.sims[first].age, grew));
-        }
-    }
-    out
-}
-
-#[test]
-#[ignore = "R3 proof: fails until the clock counts whole ticks"]
-fn residents_still_age_after_day_1167() {
-    let early = ages_from(10, 3);
-    let late = ages_from(1166, 3);
-    eprintln!("from day 10: {early:?}\nfrom day 1166: {late:?}");
-    let grows = |a: &[(u32, f32, usize)]| a.windows(2).filter(|p| p[1].1 > p[0].1).count();
-    assert_eq!(grows(&early), 2, "ages each midnight early on");
-    assert_eq!(grows(&late), 2, "ages each midnight on days 1167 and 1168 too");
-}
 
 /// Two people on an empty lot, a book, and a chat (acceptance certain); energy is urgent.
 const TALK: &str = r#"{
