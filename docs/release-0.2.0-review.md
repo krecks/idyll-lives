@@ -314,7 +314,7 @@ What each feature costs on Medium (GPU time saved by leaving it out; median of 3
 | Night grade | – | +0.01 | – | −0.80 | −1 | 0 |
 | Canvas MSAA, frosted glass, mirrors | within noise | – | within noise | – | 0 | 0 |
 
-Changes under about 1 ms are noise. The canvas MSAA isn't measurable on Apple but costs about 3 ms on Intel by the bandwidth model. No mirror faced the camera in the village, so mirrors weren't really measured.
+Changes under about 1 ms are noise. The canvas MSAA isn't measurable on Apple but costs about 3 ms on Intel by the bandwidth model. No mirror faced the camera in the village, so mirrors weren't really measured. (P1's sign-off found that one does within the runner's default 20 s window, which P1's 10 s runs missed: §3.5.1.)
 
 **Estimate for Intel HD 620 at 1080p.** No Intel hardware was available, so two models scale the M3's GPU time:
 - **Formula:** T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, with k = 16 and B = twice the render-target bytes touched a frame. k assumes an M3 Pro GPU of about 6.4 TFLOPS; 7.4 TFLOPS would give k = 18.5.
@@ -332,7 +332,7 @@ Changes under about 1 ms are noise. The canvas MSAA isn't measurable on Apple bu
 - With only the invisible savings, Medium stays under 30 fps on either model: about 8–9 fps by the formula, about 19–22 fps by the split model.
 - The two models differ by about 3×. One run on a real HD 620 laptop would settle it.
 
-**Running the benchmark.** Open the game with `?bench=village&quality=medium&hour=13&cam=orbit&res=1`; this works on the deployed site, so it can run on a real HD 620 laptop, and `&renderer=webgl` compares WebGL2. It warms up for 5 s, measures for 20 s, and then shows a summary with a "Copy result" button (also in `window.__benchResult`; with the dev server it is written to `bench-results/`). `diag=` leaves features out (`noshadows`, `noaa`, `nocanvasaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight`), and `diag=freeze` stops time for screenshots; the flags are documented at the top of `web/src/debug/bench.ts`. `node tools/bench/render.mjs --preview --build` builds the game and runs presets × backends × scenarios (`--throughput` turns vsync off, `--throttle 1,3`, `--diags none,noshadows,…`, `--runs 3` for medians). `--shots <dir>` takes 9 fixed reference poses, and `--compare <dirA> <dirB>` counts the pixels that differ. `node tools/bench/scene.mjs --name village` makes the scenes in `web/public/bench/`.
+**Running the benchmark.** Open the game with `?bench=village&quality=medium&hour=13&cam=orbit&res=1`; this works on the deployed site, so it can run on a real HD 620 laptop, and `&renderer=webgl` compares WebGL2. It warms up for 5 s, measures for 20 s, and then shows a summary with a "Copy result" button (also in `window.__benchResult`; with the dev server it is written to `bench-results/`). `diag=` leaves features out (`noshadows`, `noaa`, `nocanvasaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight`; `nocanvasaa` went with the canvas MSAA in e750d68), and `diag=freeze` stops time for screenshots; the flags are documented at the top of `web/src/debug/bench.ts`. `node tools/bench/render.mjs --preview --build` builds the game and runs presets × backends × scenarios (`--throughput` turns vsync off, `--throttle 1,3`, `--diags none,noshadows,…`, `--runs 3` for medians). `--shots <dir>` takes 9 fixed reference poses, and `--compare <dirA> <dirB>` counts the pixels that differ. `node tools/bench/scene.mjs --name village` makes the scenes in `web/public/bench/`.
 
 | ID | Severity | Where | Problem | Proposed fix |
 |---|---|---|---|---|
@@ -401,7 +401,7 @@ Measured savings at speed 5, `r = 3`:
 | Fix | Finding | Saving |
 |---|---|---|
 | Bars as `transform: scaleX` | P2-01 | 59 ms/s with the panel closed, about 140 ms/s with the SimPanel open |
-| Lighting at most 4 times a second | P2-04 | about 25 ms/s directly, plus about 30 ms/s from fewer thaws (noisy) |
+| Lighting at most 4 times a second (0.2.0 chose at most 10 times a second, 465c287) | P2-04 | about 25 ms/s directly, plus about 30 ms/s from fewer thaws (noisy) |
 | Cached canvas size in `project()` | P2-02 | about 14 ms/s, up to 39 ms/s with many bubbles |
 | Smaller `buildAhead` jobs | P2-06 | removes the only long task in play |
 | Idea toasts only when residents change | P2-05 | 2–3 ms/s |
@@ -761,7 +761,7 @@ G1 (merge accaaad) and G2 (merge 5f72a7c). G1 measured on a MacBook Pro M3 Pro i
 | P1-14 | Only the pose texture's rows that changed since the last upload (residents drawn, or just hidden) go to the GPU, as one band; none while paused. | a02080f | Residents' update 0.17 → 0.14 ms (WebGPU, with vsync); frame CPU within noise. |
 | P1-04 (part) | The game's shadow map draws only the casters that can reach it: those wholly outside its square round the lot (1 m margin) are left out; residents are always drawn. The menus' town draws all its casters as before. | 12f09fa | Medium, WebGPU, orbit by day: draws 540 → 429 (shadow 262 → 152), shadow triangles 1.70 → 0.81 M, 140 → 148 fps; Build mode 62 → 71 fps. WebGL2 orbit by day 163 → 173 fps. |
 | P1-04 (part) | The shadow map is drawn only when something in it changed: the lighting step, the caster list, a thing placed, moved or hidden, roofs and storeys, and residents whose pose changed. While paused (Build mode, menus) it isn't drawn at all. In live play, with residents in view, it is still drawn every frame (they breathe), §4. | 71e6c9a | Medium, Build mode (paused): WebGPU GPU 8.54 → 4.96 ms, shadow draws 152 → 0, 71 → 78 fps; WebGL2 77 → 91 fps. Live with residents in view: unchanged (WebGPU 148 → 146 fps, within noise). Residents' shadows follow every pose (checked by eye). |
-| P1-11, P2-04 | The lighting is also updated at most every 100 ms of real time: at the fastest speeds 10 times a second instead of 20. At speed 1 its half-minute steps are 500 ms apart anyway. Materials already thaw only for a change one could see. | 465c287 | Medium, dusk path at speed 5, with vsync: lighting updates 20.1 → 9.7 a second. With the CPU slowed 3×: WebGPU CPU 19.24 → 18.48 ms a frame (46 → 48 fps); WebGL2 13.39 → 12.15 ms, 65 → 72 fps, frame p95 24.2 → 17.5 ms. |
+| P1-11, P2-04 | The lighting is also updated at most every 100 ms of real time: at the fastest speeds 10 times a second instead of 20. At speed 1 its half-minute steps are 500 ms apart anyway. Materials already thaw only for a change one could see. | 465c287 | Medium, dusk path at speed 5, with vsync: lighting updates 20.1 → 9.7 a second. (G2's CPU timings for this step are in its commit body; for the CPU in play see below.) |
 | P1-09 (rest) | A mirror's reflection target (about 56 MB of GPU memory at 1080p: a 1024×1024 RGBA16F target with 4× MSAA and depth) is made when a mirror first reflects in its slot, and let go 10 s after no mirror used it, or at once in a world without mirrors. Resolution and MSAA stay: both cuts showed (§4). | 64e6152 | High, the village's bathroom mirror: made when it comes into view, let go 10 s after turning away, reflects as before. |
 | P2-08 (rest), P1-10 (rest) | Behind the pause menu, an overlay (Settings, Load game, Credits), the planner and the crash screen, the renderer draws 2 more frames and then none until the menu closes; the frosted glass keeps blurring the last frame. A screenshot, `framesRendered` and a resized canvas still get their frames. | f2ad0c8 | Frames behind the pause menu: every frame (30 in 500 ms, dev build) → 0 in 1 s; the menus' town behind Settings 60 → 0 a second, back to 60 after closing; both backends. Each held frame saves what a frame costs: Medium in orbit by day, about 6 ms of main thread and 5 ms of GPU on the M3. |
 | R1-09 (rest) | Babylon's own clock, which runs the build effects' sparkles and dust, is held to 100 ms a frame (`Scene.MaxDeltaTime`), like everything else the game moves by frame time. | 969699d | The first frame after a hidden tab or a stall no longer jumps them ahead. |
@@ -786,28 +786,27 @@ G1's A/B (fps; GPU and CPU in ms a frame; render targets in MB a frame):
 
 - WebGPU's GPU times move within its ±1 ms run-to-run noise. High now has 4096 shadows, yet costs what the old 2048 High did.
 - Medium with vsync, CPU ms: WebGPU 5.72 → 5.31 by day and 6.07 → 5.40 at night; WebGL2 4.08 → 3.40 and 3.95 → 3.58.
-- The baseline's `?quality=medium` had 1 live mirror, but no mirror was drawn on these paths, so the Medium rows compare like with like.
+- The baseline's `?quality=medium` had 1 live mirror, but no mirror was drawn in G1's 8 s windows, so the Medium rows compare like with like (with the runner's default 20 s window it does reflect: see below).
 - **Medium still looks the same.** All 18 reference shots (9 poses × 2 backends) differ from P1's baseline in under 0.15 % of their pixels, by more than 2 of 255 (the most changed 0.095 %). The only differences are the far road's lane markings (P1-17) and one mirror, which the new Medium, like the old in-game Medium, doesn't reflect live.
 
-G2 measured each change against the step before it, on the M3 Pro in Chrome 153, 1920×1080, DPR 1, production build, median of 3 interleaved runs, in the `village` scene, without vsync unless a row says so; the full tables are in each commit's body. The rows above give the main figures. Many runs were noisy (load average 5–6), and the wide view's culling A/B was inconclusive.
+G2 measured each change against the step before it, on the M3 Pro in Chrome 153, 1920×1080, DPR 1, production build, median of 3 interleaved runs, in the `village` scene, without vsync unless a row says so; the full tables are in each commit's body. The rows above give the main figures. Many runs were noisy (load average 5–6), and the wide view's culling A/B was inconclusive. G2's last measuring campaigns (about 14:40–15:20) partly fell in a window when the Mac ran on battery (14:56–16:27 by its power log), so its own whole-branch table may include battery runs; P1's sign-off re-measured on AC power, and its numbers below take precedence.
 
-G2's branch as a whole, against a428263 (fps, or GPU or frame time a frame):
+0.2.0 against the review's start, measured by P1's sign-off (P1s): MacBook Pro M3 Pro on AC power, Chrome for Testing 153.0.8010.12 headed, 1920×1080 at DPR 1, production builds via `vite preview`, `render.mjs --throughput` (no vsync), median of 3 with base and main alternating. Base is 44809e7 (4cde174 plus P1's benchmark tooling, which 4cde174 lacks), run with `diag=nomirrors` on Medium (see below); main is 5f72a7c. WebGPU GPU is the pass span (for High by day its p50: bogus timestamps spoiled two averages); WebGL2 is the frame p50, as P1 used.
 
-| Preset, light | WebGPU | WebGL2 |
-|---|---|---|
-| Medium, orbit by day | GPU 8.99 → 5.60 ms, 84 → 146 fps | frame 8.16 → 6.18 ms |
-| Medium, orbit at night | 78 → 103 fps | frame 8.02 → 6.98 ms |
-| Medium, dusk | GPU 9.35 → 7.93 ms | 121 → 137 fps |
-| Medium, wide | GPU 6.91 → 6.10 ms | 132 → 138 fps |
-| Low, orbit by day | GPU 5.04 → 4.10 ms | 157 → 205 fps |
-| Low, orbit at night | GPU 5.60 → 4.14 ms | 155 → 185 fps |
-| Low, dusk | GPU 5.52 → 4.28 ms | 155 → 195 fps |
-| Low, wide | GPU 5.35 → 4.74 ms | 159 → 190 fps |
+| Preset, light | WebGPU fps | WebGPU GPU ms | WebGL2 fps | WebGL2 frame ms | Draws: main / shadow / mirror | Triangles M | Render targets MB |
+|---|---|---|---|---|---|---|---|
+| Low, day | 113 → 155 | 6.02 → 4.32 | 161 → 198 | 6.19 → 4.74 | 252/242/0 → 276/146/0 | 6.03 → 3.43 | 120 → 64 |
+| Low, night | 113 → 154 | 6.16 → 4.53 | 153 → 179 | 6.31 → 5.19 | 253/242/0 → 278/157/0 | 6.03 → 3.49 | 129 → 73 |
+| Medium, day | 89 → 144 | 8.73 → 5.58 | 122 → 160 | 8.11 → 5.61 | 252/242/0 → 277/152/0 | 6.03 → 3.71 | 216 → 141 |
+| Medium, night | 82 → 107 | 8.84 → 7.39 | 113 → 157 | 8.38 → 5.59 | 253/242/0 → 278/163/0 | 6.03 → 3.77 | 225 → 150 |
+| High, day | 78 → 132 | 10.23 → 6.06 | 107 → 157 | 8.46 → 5.40 | 252/242/49 → 276/152/50 | 6.75 → 4.22 | 216 → 217 |
+| High, night | 80 → 91 | 8.62 → 8.24 | 116 → 108 | 8.02 → 8.11 | 253/242/48 → 277/163/54 | 6.73 → 4.31 | 225 → 225 |
 
-- On the merged branch against `main` without G2, orbit by day: Medium WebGPU GPU 9.16 → 5.47 ms (92 → 158 fps), Medium WebGL2 frame 7.12 → 4.97 ms, Low WebGPU 152 → 179 fps, Low WebGL2 181 → 248 fps.
-- The baselines' WebGPU runs stalled often (the P1-16 pattern), so their fps is pessimistic.
-- **Medium still looks the same.** Per change, against the build before (in a window): at most 0.12 % of pixels off by more than 2 of 255, all on the far road's lane markings (P1-17). The merged branch against `main` (both headless): at most 0.115 %, the same far-road noise.
-- Live play with residents in view costs about what it did for the shadow map; the savings there are the lamps by day, nature culling and shadow-caster culling.
+- High isn't like for like: the base had 2048 shadows, 0.2.0 has 4096.
+- At night Medium barely improved on WebGPU (8.84 → 7.39 ms): lit lamps still cost, and the night range cap for the lamp cluster (P1-02) wasn't done.
+- **Mirrors:** with the runner's default 20 s window a mirror does face the camera on the orbit, so the base's Medium (1 live mirror at the time) reflected, about 45 extra draws a frame; P1's 10 s and G1's 8 s windows missed it. A/B runs against the base need `diag=nomirrors` on Medium. 0.2.0's High mirror averages 50–64 extra draws and 0.5 M triangles a frame; its GPU cost was within noise, except +3 ms on WebGL2 at night (inconclusive, as it reflects for only part of the window).
+- **Medium still looks the same.** Per change, against the build before (in a window): at most 0.12 % of pixels off by more than 2 of 255, all on the far road's lane markings (P1-17). The merged branch against `main` (both headless): at most 0.115 %, the same far-road noise. V1's 18 shots against the baseline: at most 0.118 %, the far road and the bathroom mirror.
+- **CPU in play:** these savings are GPU savings. At 3× CPU slow-down (with vsync) P1s found no CPU gain in play: 8 of 12 cells were 0.6–3.9 ms a frame worse. The main scene has about 970–1,370 meshes against 650; the nature cells add 24–25 main-pass draws in the orbit (+10 %) and 57 in the wide view (+21 %), while the shadow pass drops by 79–96. P2's sign-off saw the same pattern (§3.5.2). G3 is working on it. *(G3's numbers to come.)* <!-- G3 -->
 
 #### 3.5.2 Main thread (P2)
 
@@ -826,6 +825,8 @@ M1's branch as a whole (production build, speed 5, 3× CPU):
 | Longest idle callback | 19.5 → 4.5 ms | 19.4 → 4.7 ms |
 
 With the SimPanel open the frame rate went 57.8 → 60.8 fps. M1's runs saw no long task; the baseline had one of 55 ms in one of three panel-closed runs. At speed 1 with the panel closed: busy 68 → 60 %, layouts 99 → 8 a second, interface updates 5.9 → 3.7 ms/s.
+
+**After G2's merge** (P2's sign-off, at 5f72a7c): G1's and M1's figures were measured before G2's work was merged, and G2's merge raised the CPU cost of a frame. WebGPU draw calls per frame in play went 87.5 → 102.7 at speed 1 and 89.1 → 104.7 at speed 5, and the menus' town's replayed draws 48k → 75k per 5 s (+55 %). At 3× CPU and speed 5 the frame p95 went 18 → 37 ms, with 19–60 long tasks (50–142 ms) per 30 s, and the menus' town at 30 fps took 25.7 ms of frame work instead of 14.6 (82 % busy instead of 49 %). P2 measured on battery, so these timings are only indicative; the draw counts don't depend on power. The suspect is the nature cells (9e801a5), which put every cell in view from the menu overview. G3 is fixing it, and its re-measure replaces the "no long tasks" of P2-06 and the menu's 45 → 24 % of P2-08 below. *(G3's numbers to come.)* <!-- G3 -->
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
