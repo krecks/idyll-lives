@@ -95,7 +95,6 @@ fn two_days_of_the_century() {
 /// A game that's run for years of play: from day 1166 everyone still ages at every midnight
 /// (and the rest of the checks hold) for a few days.
 #[test]
-#[ignore = "fails on main until R3-01 (the f32 clock skips midnight from day 1167)"]
 fn the_town_still_ages_after_day_1167() {
     let content = common::content();
     let town = common::town(&content, 7, 3);
@@ -197,37 +196,37 @@ fn the_watch_sees_residents_stuck() {
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_7() {
     whole_story(&century(7, false, None));
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_7_lower_detail() {
     whole_story(&century(7, true, None));
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_11() {
     whole_story(&century(11, false, None));
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_11_lower_detail() {
     whole_story(&century(11, true, None));
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_19() {
     whole_story(&century(19, false, None));
 }
 
 #[test]
-#[ignore = "long (--release -- --ignored); fails on main until R3-08 (newborns are born half a year old)"]
+#[ignore = "long: run with --release -- --ignored"]
 fn a_century_seed_19_lower_detail() {
     whole_story(&century(19, true, None));
 }
