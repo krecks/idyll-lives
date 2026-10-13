@@ -1,5 +1,5 @@
 /**
- * Rendering benchmark: `?bench=<scene>` plays the game state `public/bench/<scene>.json` with the
+ * Rendering benchmark: `?bench=<scene>` plays the game state `public/bench/<scene>.json.gz` with the
  * camera on a path fixed in time, and measures how frames are made. Loaded only with the flag;
  * the settings it changes (no watching camera, no autosave, its resolution and frame cap) apply
  * to its page alone and are never saved.

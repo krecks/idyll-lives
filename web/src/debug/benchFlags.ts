@@ -12,7 +12,7 @@ export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirro
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
-  /** `public/bench/<scene>.json`: the game state to play. */
+  /** `public/bench/<scene>.json.gz`: the game state to play. */
   scene: string;
   /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
