@@ -93,36 +93,33 @@ def _linear(rgb):
 # ---- primitives --------------------------------------------------------------------------
 # Every builder returns a Blender object centred on `at`, with its material appended. Sizes are
 # full extents (a cube of size 0.4 is 0.4 m across), matching the game's `box`/`cylinder` parts.
+# Sizes and scales go into the mesh itself, so a `bevel` is in metres on every side.
 
 def cube(name, size, at=(0, 0, 0), material=None, rot=(0, 0, 0), smooth=False, bevel=0.0, bevel_segments=2):
     bpy.ops.mesh.primitive_cube_add(size=1.0)
-    obj = _finish(name, at, rot, material, smooth, bevel, bevel_segments)
-    obj.scale = size
-    return obj
+    _scale_mesh(size)
+    return _finish(name, at, rot, material, smooth, bevel, bevel_segments)
 
 
 def sphere(name, radius, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 0),
            segments=24, rings=16, smooth=True, bevel=0.0, bevel_segments=2):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, radius=radius)
-    obj = _finish(name, at, rot, material, smooth, bevel, bevel_segments)
-    obj.scale = scale
-    return obj
+    _scale_mesh(scale)
+    return _finish(name, at, rot, material, smooth, bevel, bevel_segments)
 
 
 def cylinder(name, radius, depth, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 0),
              verts=24, smooth=True, bevel=0.0, bevel_segments=2):
     bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=radius, depth=depth)
-    obj = _finish(name, at, rot, material, smooth, bevel, bevel_segments)
-    obj.scale = scale
-    return obj
+    _scale_mesh(scale)
+    return _finish(name, at, rot, material, smooth, bevel, bevel_segments)
 
 
 def cone(name, r1, r2, depth, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 0),
          verts=24, smooth=True, bevel=0.0, bevel_segments=2):
     bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=r1, radius2=r2, depth=depth)
-    obj = _finish(name, at, rot, material, smooth, bevel, bevel_segments)
-    obj.scale = scale
-    return obj
+    _scale_mesh(scale)
+    return _finish(name, at, rot, material, smooth, bevel, bevel_segments)
 
 
 def torus(name, major_radius, minor_radius, at=(0, 0, 0), material=None, rot=(0, 0, 0),
@@ -194,6 +191,13 @@ def rock(name, radius, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 
         v.co.z -= low
     obj.scale = scale
     return obj
+
+
+def _scale_mesh(scale):
+    """Scales the new object's mesh (not the object): a modifier added later works in metres."""
+    from mathutils import Matrix
+    if tuple(scale) != (1, 1, 1):
+        bpy.context.object.data.transform(Matrix.Diagonal((*scale, 1.0)))
 
 
 def _finish(name, at, rot, material, smooth, bevel, bevel_segments):
