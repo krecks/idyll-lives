@@ -1452,6 +1452,9 @@ export class Characters {
         rig.reachW = Math.max(0, rig.reachW - step * 3);
         rig.holdW = Math.max(0, rig.holdW - step * 1.6);
         rig.liftW = Math.max(0, rig.liftW - step * 1.6);
+        // Walking off (given an order), or the baby no longer lying there as a baby: back in the crib at once.
+        const held = rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
+        if (curr[o + k.moving] > 0 || held?.body.stage !== 'baby' || curr[H + rig.cuddleBaby * S + k.pose] !== Pose.Lie) rig.liftW = 0;
         if (rig.liftW <= 0) rig.cuddleBaby = -1;
       }
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.heldBy[rig.cuddleBaby] = j;
