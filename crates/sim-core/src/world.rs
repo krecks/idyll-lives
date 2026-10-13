@@ -814,8 +814,8 @@ pub(crate) struct SimBrief {
     /// Plot the Sim is standing on.
     pub plot: Option<u32>,
     pub away: bool,
-    /// On their way out: to work, on a visit or to something in a public place (so the last
-    /// grown-up at home with a baby knows they will be; see `life::minding_baby`).
+    /// On their way off their home plot, now or later in their queue (`life::leaving_home`; so
+    /// the last grown-up at home with a baby knows they will be: `life::minding_baby`).
     pub leaving: bool,
     /// A baby (cared for in a crib), and their needs (so carers know what's wanted).
     pub baby: bool,
@@ -2021,11 +2021,7 @@ impl World {
                 household: s.household,
                 plot: plot.filter(|_| s.here()),
                 away: s.away_until.is_some() || !s.here(),
-                leaving: s.current.as_ref().map(|a| &a.task).into_iter().chain(s.queue.front()).any(|t| match t.kind {
-                    TaskKind::Work | TaskKind::Visit { .. } => true,
-                    TaskKind::Use { object, .. } => self.object_plot.get(object as usize).copied().flatten().is_some_and(|p| self.plots[p as usize].public),
-                    _ => false,
-                }),
+                leaving: crate::life::leaving_home(self, s),
                 baby: s.here() && self.content.life.baby(s.age),
                 needs: s.needs,
                 here: s.here(),
@@ -2929,6 +2925,7 @@ fn pick_autonomous(
     // The last grown-up at home with a baby doesn't go out (`life::minding_baby`), unless for
     // an essential need about to run out that home has nothing for.
     let minding = crate::life::minding_baby(sim, ctx);
+    let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
     for obj in usable
         .iter()
@@ -2937,7 +2934,8 @@ fn pick_autonomous(
     {
         let plot = ctx.object_plot[obj.id as usize];
         let allowed = access(ctx, sim, plot);
-        let outing = || plot.is_some_and(|p| ctx.plots[p as usize].public) && !content.objects[obj.def].interactions.iter().any(|i| (0..content.needs.len()).any(|n| stranded & (1 << n) != 0 && i.total_gain[n] > 0.0));
+        // (Off the home plot: a public place or the street.)
+        let outing = || plot != own && !content.objects[obj.def].interactions.iter().any(|i| (0..content.needs.len()).any(|n| stranded & (1 << n) != 0 && i.total_gain[n] > 0.0));
         if allowed == Access::None || (minding && outing()) {
             continue;
         }
@@ -3079,7 +3077,8 @@ fn pick_autonomous(
             (Some(a), Some(b)) => a == b,
             _ => distance <= SOCIAL_RANGE,
         };
-        if !same_place {
+        // Nor out on the street, minding the baby.
+        if !same_place || (minding && other.plot != own) {
             continue;
         }
         // Not over the fence into someone else's garden to chat (a guest is welcome at the host's).
@@ -3150,7 +3149,7 @@ fn pick_autonomous(
             (Some(a), Some(b)) => a == b,
             _ => distance <= SOCIAL_RANGE,
         };
-        if !same_place {
+        if !same_place || (minding && leader.plot != own) {
             continue;
         }
         if let Some(b) = leader.plot

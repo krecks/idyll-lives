@@ -394,15 +394,46 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
 
 // ---- Childcare ----------------------------------------------------------------------------
 
+/// Whether `task` takes someone whose home is `home` off that plot: to work, on a visit, over
+/// to theirs after a call, or to use, repair or tidy something, walk somewhere, or chat with
+/// or join someone anywhere else (a public place, a neighbour's, the street).
+fn takes_off(w: &World, task: &TaskKind, home: u32) -> bool {
+    let away = |plot: Option<u32>| plot != Some(home);
+    let of = |sim: u32| w.sims.get(sim as usize).and_then(|t| w.plot_at(t.tile().0, t.tile().1));
+    match *task {
+        TaskKind::Work => true,
+        TaskKind::Visit { plot } => plot != home,
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => away(w.object_plot.get(object as usize).copied().flatten()),
+        TaskKind::MoveTo { x, z } => away(w.plot_at(x.floor() as i32, z.floor() as i32)),
+        TaskKind::Clean { x, z } => away(w.plot_at(x, z)),
+        TaskKind::Social { target, .. } => away(of(target)),
+        TaskKind::Join { leader } => away(of(leader)),
+        TaskKind::Phone { action, answer, .. } => {
+            w.content.phone.actions.get(action).is_some_and(|a| a.meet == Some(crate::phone::Meet::There))
+                && matches!(answer, crate::phone::Answer::Pending | crate::phone::Answer::Yes)
+        }
+        TaskKind::GoHome | TaskKind::Answer { .. } | TaskKind::Spot { .. } | TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => false,
+    }
+}
+
+/// Whether `s` is on their way off their home plot (or about to be): what they're doing or
+/// anything they're yet to do takes them off it (`takes_off`). The one test of who's leaving
+/// for childcare, whether at work time, for a player's order, on the phone or by their own
+/// choice.
+pub(crate) fn leaving_home(w: &World, s: &Sim) -> bool {
+    let Some(home) = w.households.get(s.household as usize).and_then(|h| h.plot) else { return false };
+    s.current.as_ref().map(|a| &a.task).into_iter().chain(&s.queue).any(|t| takes_off(w, &t.kind, home))
+}
+
 /// Whether a grown-up of household `h` other than `except` is at home on `plot` to look after
-/// a baby (not about to leave for work; back from a visit once they're on the lot).
+/// a baby (not on their way out: `leaving_home`; back from a visit once they're on the lot).
 fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
     w.sims.iter().enumerate().any(|(j, s)| {
         Some(j) != except
             && s.here()
             && s.household as usize == h
             && s.away_until.is_none()
-            && !heading_out(s)
+            && !leaving_home(w, s)
             && s.adult(&w.content)
             && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
     })
@@ -448,8 +479,9 @@ pub(crate) fn check_cover_at(w: &World, i: usize, plot: Option<u32>) -> Result<(
 }
 
 /// Whether `sim` is the last grown-up at home with a baby of theirs there (content
-/// `life.childcare`): they don't go out on their own (visits, outings to public places) and
-/// leave the baby alone; sent out by the player, a babysitter comes (see `childcare`).
+/// `life.childcare`): they don't go out on their own (visits, outings, meeting up, a chat off
+/// the lot) and leave the baby alone; sent out by the player, a babysitter comes (see
+/// `childcare`). Anyone else on their way out (`SimBrief::leaving`) isn't home for long.
 pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
     let content = ctx.content;
     if content.life.childcare.is_none() || !sim.adult(content) {
@@ -458,7 +490,6 @@ pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
     let Some(home) = ctx.households[sim.household as usize].plot else { return false };
     let me = sim.id as usize;
     let at_home = |b: &SimBrief| b.here && !b.away && b.household == sim.household && b.plot == Some(home);
-    // (Anyone else on their way out won't be home for long.)
     at_home(&ctx.briefs[me]) && ctx.briefs.iter().any(|b| b.baby && at_home(b)) && !ctx.briefs.iter().enumerate().any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
 }
 
