@@ -7,7 +7,7 @@
  * and colours chosen in the household creator (`appearance.top`, `bottom`, `shoes`, `bottomColor`,
  * `shoesColor`) are worn as chosen; whatever is missing (Sims from older saves) is picked
  * deterministically from the Sim's id, so a Sim always wears the same clothes. Pyjamas recolour
- * the same garments.
+ * the same garments. Babies wear a romper instead of a skirt (`ROMPER`).
  */
 
 import type { Appearance } from '../../../game/household';
@@ -26,6 +26,11 @@ const BOTTOMS: Record<string, readonly string[]> = {
   male: ['bottom.trousers', 'bottom.trousers', 'bottom.trousers', 'bottom.shorts', 'bottom.suit'],
 };
 const SHOE_PARTS = ['shoes.sneakers', 'shoes.sneakers', 'shoes.trainers', 'shoes.boots', 'shoes.dress'] as const;
+/**
+ * What a baby wears for a skirt: shorts in the top's colour, one piece. A skirt's shell can't follow
+ * a baby's legs, drawn up and fallen apart in the crib or in someone's arms.
+ */
+const ROMPER = 'bottom.shorts';
 /** Shoes that go with formal clothes. */
 const FORMAL = new Set(['top.suit', 'bottom.suit', 'bottom.skirt']);
 
@@ -126,17 +131,21 @@ export function outfitFor(id: number, gender: string, appearance: Appearance | n
   const chosen = (part: string | undefined, prefix: string) => (part && part.startsWith(prefix) && has(part) ? part : null);
   const isHex = (c: string | undefined) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
   const topPart = chosen(appearance?.top, 'top.') ?? pick(TOPS[gender] ?? TOPS.male, r(7));
-  const bottomPart = chosen(appearance?.bottom, 'bottom.') ?? pick(BOTTOMS[gender] ?? BOTTOMS.male, r(6));
-  const skirt = bottomPart === 'bottom.skirt';
+  const picked = chosen(appearance?.bottom, 'bottom.') ?? pick(BOTTOMS[gender] ?? BOTTOMS.male, r(6));
+  const skirt = picked === 'bottom.skirt';
+  const romper = skirt && (body.stage === 'baby' || appearance?.stage === 'baby') && has(ROMPER);
+  const bottomPart = romper ? ROMPER : picked;
   let bottom: [number, number, number];
-  if (isHex(appearance?.bottomColor)) {
+  if (romper) {
+    bottom = top;
+  } else if (isHex(appearance?.bottomColor)) {
     bottom = hexToLinear(appearance!.bottomColor, '#33415C');
   } else {
     bottom = hexToLinear(pick(skirt ? SKIRTS : TROUSERS, r(2)), '#33415C');
     // Avoid a bottom that matches the top too closely.
     if (Math.abs(luminance(bottom) - luminance(top)) < 0.03) bottom = hexToLinear(pick(TROUSERS, r(3)), '#2B2D33');
   }
-  const shoePart = chosen(appearance?.shoes, 'shoes.') ?? pickShoes(topPart, bottomPart, r(8));
+  const shoePart = chosen(appearance?.shoes, 'shoes.') ?? pickShoes(topPart, picked, r(8));
   if (sleep) {
     top = hexToLinear(pick(SLEEP_TOP, r(5)), '#9DB4D9');
     bottom = top.map((v) => v * 0.8) as [number, number, number];
