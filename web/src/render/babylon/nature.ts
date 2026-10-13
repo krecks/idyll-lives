@@ -164,7 +164,11 @@ export class Landscape {
   /** Lawn tufts and flowers, per model and cell (see `TUFT_CELL`): each instance's original matrix and town tile (-1 outside the town). */
   private lawn: { meshes: Mesh[]; base: Float32Array; shown: Float32Array; tiles: Int32Array; hidden: Uint8Array }[] = [];
 
-  constructor(world: WorldStructure) {
+  /** `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half). */
+  constructor(
+    world: WorldStructure,
+    private readonly lawnDensity = 1,
+  ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
     this.d = groundDepth(world);
@@ -521,10 +525,13 @@ export class Landscape {
         tuftTiles.push(-1);
       }
     }
+    // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
+    const d = this.lawnDensity;
+    const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     this.lawn = [];
     for (const [key, matrices, tiles, size] of [
-      ['model.grassTuft', tufts, tuftTiles, TUFT_CELL],
-      ['model.flowers', flowers, flowerTiles, FLOWER_CELL],
+      ['model.grassTuft', thin(tufts), thin(tuftTiles), TUFT_CELL],
+      ['model.flowers', thin(flowers), thin(flowerTiles), FLOWER_CELL],
     ] as const) {
       const square = (x: number, z: number) => `${Math.floor(x / size)},${Math.floor(z / size)}`;
       for (const { meshes, indices } of await instanced(scene, assets, key, matrices, 0, false, square)) {

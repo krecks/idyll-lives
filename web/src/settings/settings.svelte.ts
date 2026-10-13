@@ -196,6 +196,9 @@ export function qualityFromSettings(s: Settings, params: URLSearchParams): Quali
     snapshotRendering: true,
     clusteredLamps: s.allLamps,
     mirrors: s.mirrors ? QUALITY.high.mirrors : 0,
+    // Low's lighter landscape with the Low preset only.
+    lawnDensity: QUALITY[graphicsPreset(s) === 'low' ? 'low' : 'high'].lawnDensity,
+    landscapeShadows: QUALITY[graphicsPreset(s) === 'low' ? 'low' : 'high'].landscapeShadows,
   };
   return {
     ...chosen,

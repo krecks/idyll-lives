@@ -17,13 +17,21 @@ export interface QualitySettings {
   clusteredLamps: boolean;
   /** How many mirrors (the nearest the camera) reflect the room live; 0: none. Each draws the scene once more at half resolution. */
   mirrors: number;
+  /** Share of the lawn's grass tufts and flowers drawn (always the same ones; the rest of the placement is unchanged). */
+  lawnDensity: number;
+  /** The woods round the town cast shadows (the lot's own trees, the street and the house always do). */
+  landscapeShadows: boolean;
 }
 
+/** Low's lighter landscape (weak GPUs); the other presets draw all of it. */
+const FULL_LANDSCAPE = { lawnDensity: 1, landscapeShadows: true };
+const LIGHT_LANDSCAPE = { lawnDensity: 0.5, landscapeShadows: false };
+
 export const QUALITY: Record<'low' | 'medium' | 'high' | 'ultra', QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: false, mirrors: 0 },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 1 },
+  low: { shadowMapSize: 1024, msaaSamples: 1, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: false, mirrors: 0, ...LIGHT_LANDSCAPE },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 1, ...FULL_LANDSCAPE },
   // Ambient occlusion is off by default: Babylon 9.29's SSAO2 intermittently fails to bind its
   // sampler on WebGPU startup (~1 in 4 loads). Enable with `?quality=ultra` to test fixes.
-  high: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 2 },
-  ultra: { shadowMapSize: 4096, msaaSamples: 4, ambientOcclusion: true, snapshotRendering: true, clusteredLamps: true, mirrors: 3 },
+  high: { shadowMapSize: 2048, msaaSamples: 4, ambientOcclusion: false, snapshotRendering: true, clusteredLamps: true, mirrors: 2, ...FULL_LANDSCAPE },
+  ultra: { shadowMapSize: 4096, msaaSamples: 4, ambientOcclusion: true, snapshotRendering: true, clusteredLamps: true, mirrors: 3, ...FULL_LANDSCAPE },
 };

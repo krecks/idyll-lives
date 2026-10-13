@@ -674,7 +674,7 @@ export class BabylonRenderer implements Renderer {
     const nature = await this.useNature('world', world);
     // No grass through floors of rooms built (or furniture bought) since the lawn was scattered.
     nature.landscape.refreshLawn(world);
-    this.natureCasters = nature.casters;
+    this.natureCasters = this.quality.landscapeShadows ? nature.casters : [];
     this.templatesInUse.clear();
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
@@ -2117,7 +2117,7 @@ export class BabylonRenderer implements Renderer {
   /** Shadow casters of what is on screen: the overview, or the game world (its walls only with walls up). */
   private updateShadowList(): void {
     const map = this.shadows.getShadowMap()!;
-    if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...(this.natureIn.town?.casters ?? [])];
+    if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...((this.quality.landscapeShadows && this.natureIn.town?.casters) || [])];
     else map.renderList = this.wallMode === 'up' ? [...this.baseCasters, ...this.wallCasters] : this.baseCasters;
     this.sunShadows.moved();
   }
@@ -2132,7 +2132,7 @@ export class BabylonRenderer implements Renderer {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world);
+      const landscape = new Landscape(world, this.quality.lawnDensity);
       const created: NatureSet = { landscape, meshes: [], casters: [], users: new Set(), pending: 0, ready: Promise.resolve() };
       created.ready = landscape.build(this.scene, this.deps.assets, world).then((nature) => {
         created.meshes = nature.meshes;
