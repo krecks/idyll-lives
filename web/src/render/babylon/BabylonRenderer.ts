@@ -470,6 +470,13 @@ export class BabylonRenderer implements Renderer {
   private readonly qTmp = new Quaternion();
   private readonly vProj = new Vector3();
   private readonly viewport = new Viewport(0, 0, 1, 1);
+  /**
+   * The canvas's size on the page (CSS px), kept up to date by `sizeWatch`. `project` runs for
+   * every bubble each frame, after the interface's changes: reading `clientWidth` there would
+   * make the browser redo style and layout in the middle of the frame.
+   */
+  private readonly cssSize = { width: 0, height: 0 };
+  private sizeWatch: ResizeObserver | null = null;
   /** Camera alpha, beta, radius, target x/y/z and screen offset x/y at the last frame. */
   private readonly lastView = new Float64Array(8);
 
@@ -483,6 +490,13 @@ export class BabylonRenderer implements Renderer {
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
+    const measure = () => {
+      this.cssSize.width = this.canvas.clientWidth;
+      this.cssSize.height = this.canvas.clientHeight;
+    };
+    measure();
+    this.sizeWatch = new ResizeObserver(measure);
+    this.sizeWatch.observe(canvas);
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     // No multisampling on the canvas: only the last full-screen pass draws to it, so it would only
     // cost memory traffic (66 MB a frame at 1080p; screenshots without it are the same, P1-06).
@@ -930,8 +944,8 @@ export class BabylonRenderer implements Renderer {
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
-    this.viewport.width = this.canvas.clientWidth;
-    this.viewport.height = this.canvas.clientHeight;
+    this.viewport.width = this.cssSize.width;
+    this.viewport.height = this.cssSize.height;
     this.vTmp.set(x, y, z);
     // The overview moves the camera just before drawing: project with its current matrices.
     const transform = this.townMode ? this.camera.getTransformationMatrix() : this.scene.getTransformMatrix();
@@ -1904,6 +1918,7 @@ export class BabylonRenderer implements Renderer {
     this.warmPass++;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
+    this.sizeWatch?.disconnect();
     this.unwatchPixelRatio?.();
     this.overview?.dispose();
     this.engine.dispose();
@@ -2050,8 +2065,8 @@ export class BabylonRenderer implements Renderer {
   /** Overview per frame: camera rig, highlights, lighting at the menu's hour. Allocation-free. */
   private townFrame(dt: number): void {
     const overview = this.overview!;
-    const w = this.canvas.clientWidth || 1;
-    const h = this.canvas.clientHeight || 1;
+    const w = this.cssSize.width || 1;
+    const h = this.cssSize.height || 1;
     overview.rig.setViewport(w, h);
     overview.frame(Math.min(0.1, dt / 1000), w / h);
     // The light eases between the screens' hours (about two seconds).

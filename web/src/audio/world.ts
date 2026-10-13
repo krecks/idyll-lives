@@ -15,9 +15,10 @@ import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { Renderer } from '../render/types';
 import { game } from '../ui/state.svelte';
+import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
 import { audioContext, bus, updateVolumes } from './mixer';
 import { WATER, type Stereo, type WaterKind } from './water';
-import type { WaterReply, WaterRequest } from './water.worker';
+import type { SoundReply, SoundRequest } from './water.worker';
 
 const TICK_MS = 100;
 /** Updates come with drawn frames: this long without one (the picture stopped), everything fades out. */
@@ -80,12 +81,12 @@ export class WorldSound {
   private readonly loops = new Map<LoopKind, Loop>();
   private bed: Loop | null = null;
   private crickets: Loop | null = null;
-  private readonly birds = new Birds();
+  private readonly made = new WorkerSounds();
+  private readonly birds = new Birds(this.made);
   /** Residents knocking last tick (by id), and when each knocks again (ms). */
   private readonly knocking = new Map<number, number>();
   /** Residents in the bath (by id), and when they got in (ms). */
   private readonly bathers = new Map<number, number>();
-  private readonly water = new WaterBuffers();
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
@@ -166,7 +167,7 @@ export class WorldSound {
       let loop = this.loops.get(kind);
       if (!loop && target === 0) continue;
       if (!loop) {
-        const made = def.water ? this.water.get(def.water, ac.sampleRate) : def.make;
+        const made = def.water ? this.made.water(def.water, ac.sampleRate) : def.make;
         // Water still being made: it starts when it's ready.
         if (!made) continue;
         loop = this.loop(ac, out, made, def.filter);
@@ -217,7 +218,7 @@ export class WorldSound {
     }
     this.loops.clear();
     this.birds.dispose();
-    this.water.dispose();
+    this.made.dispose();
   }
 
   /** Stereo position from where the resident is on screen; off screen counts as far to the side. */
@@ -252,21 +253,44 @@ export class WorldSound {
 }
 
 /**
- * The water sounds as audio buffers, made by a worker (they take a moment): the one first wanted,
- * then the rest one after another. Made on the spot if workers aren't available.
+ * Sounds that take a moment to make, made by a worker as audio buffers: the water sounds (the one
+ * first wanted, then the rest one after another) and the birds' songs (each when first wanted).
+ * Made on the spot if workers aren't available.
  */
-class WaterBuffers {
+class WorkerSounds {
   private worker: Worker | null = null;
-  private readonly ready = new Map<WaterKind, AudioBuffer>();
   private rate = 0;
+  private readonly ready = new Map<WaterKind, AudioBuffer>();
+  private waterAsked = false;
+  /** Bird songs by `songKey`: made, or asked for (null). */
+  private readonly songs = new Map<string, AudioBuffer | null>();
 
-  /** The sound at the sample rate, or null while it's still being made. */
-  get(kind: WaterKind, rate: number): AudioBuffer | null {
-    if (rate !== this.rate) this.start(kind, rate);
+  /** The water sound at the sample rate, or null while it's still being made. */
+  water(kind: WaterKind, rate: number): AudioBuffer | null {
+    this.at(rate);
     let b = this.ready.get(kind);
     if (!b && !this.worker) {
       b = stereoBuffer(WATER[kind](rate), rate);
       this.ready.set(kind, b);
+    } else if (!b && !this.waterAsked) {
+      this.waterAsked = true;
+      const kinds = Object.keys(WATER) as WaterKind[];
+      for (const k of [kind, ...kinds.filter((k) => k !== kind)]) this.worker!.postMessage({ kind: k, rate } satisfies SoundRequest);
+    }
+    return b ?? null;
+  }
+
+  /** A version of a bird's song at the sample rate, or null while it's still being made. */
+  song(bird: Voice, version: number, rate: number): AudioBuffer | null {
+    this.at(rate);
+    const key = songKey(bird, version);
+    let b = this.songs.get(key);
+    if (!b && !this.worker) {
+      b = monoBuffer(songSamples(bird, version, rate), rate);
+      this.songs.set(key, b);
+    } else if (b === undefined) {
+      this.songs.set(key, null);
+      this.worker!.postMessage({ bird, version, rate } satisfies SoundRequest);
     }
     return b ?? null;
   }
@@ -276,29 +300,41 @@ class WaterBuffers {
     this.worker = null;
   }
 
-  private start(first: WaterKind, rate: number): void {
+  /** Starts over at another sample rate (the worker starts the first time). */
+  private at(rate: number): void {
+    if (rate === this.rate) return;
     this.rate = rate;
     this.ready.clear();
-    if (!this.worker) {
-      try {
-        this.worker = new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' });
-      } catch {
-        return;
-      }
-      this.worker.onmessage = (e: MessageEvent<WaterReply>) => {
-        if (e.data.rate === this.rate) this.ready.set(e.data.kind, stereoBuffer(e.data, e.data.rate));
-      };
-      this.worker.onerror = () => this.dispose();
+    this.songs.clear();
+    this.waterAsked = false;
+    if (this.worker) return;
+    try {
+      this.worker = new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' });
+    } catch {
+      return;
     }
-    const kinds = Object.keys(WATER) as WaterKind[];
-    for (const kind of [first, ...kinds.filter((k) => k !== first)]) this.worker.postMessage({ kind, rate } satisfies WaterRequest);
+    this.worker.onmessage = (e: MessageEvent<SoundReply>) => {
+      const r = e.data;
+      if (r.rate !== this.rate) return;
+      if ('bird' in r) this.songs.set(songKey(r.bird, r.version), monoBuffer(r.samples, r.rate));
+      else this.ready.set(r.kind, stereoBuffer(r, r.rate));
+    };
+    this.worker.onerror = () => this.dispose();
   }
 }
+
+const songKey = (bird: Voice, version: number) => `${bird.seed}:${version}`;
 
 function stereoBuffer(s: Stereo, rate: number): AudioBuffer {
   const b = new AudioBuffer({ numberOfChannels: 2, length: s.left.length, sampleRate: rate });
   b.copyToChannel(s.left as Float32Array<ArrayBuffer>, 0);
   b.copyToChannel(s.right as Float32Array<ArrayBuffer>, 1);
+  return b;
+}
+
+function monoBuffer(samples: Float32Array, rate: number): AudioBuffer {
+  const b = new AudioBuffer({ numberOfChannels: 1, length: samples.length, sampleRate: rate });
+  b.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
   return b;
 }
 
@@ -319,145 +355,6 @@ function daylight(hour: number): number {
 
 // Birds: a few neighbourhood birds, each of a species with its own song, singing in bouts by day.
 
-/** One note of a song. */
-interface Note {
-  /** Seconds, and seconds of silence after it. */
-  len: number;
-  gap: number;
-  /** Pitch through the note in multiples of the bird's own pitch, spread evenly over the note and joined in a smooth curve. */
-  pitch: number[];
-  level?: number;
-}
-
-interface Species {
-  name: string;
-  /** Range of an individual's own pitch (Hz). */
-  pitch: [number, number];
-  /** A fast warble on every note: rate (Hz) and depth (part of the pitch); the level dips with it by `flutter`. */
-  vibrato: [number, number];
-  flutter: number;
-  /** Level of the 2nd harmonic (a third of it for the 3rd). */
-  overtone: number;
-  /** Seconds to fade each note in and out (less on short notes). */
-  fade: number;
-  /** Highest frequencies kept (Hz), before distance takes more off. */
-  bright: number;
-  level: number;
-  /** Songs in a bout, seconds between them and seconds of rest after the bout, when birds are busiest. */
-  bout: [number, number];
-  pause: [number, number];
-  rest: [number, number];
-  /** Whether it takes turns with the other birds (waits for a quiet moment, sometimes answers one). */
-  turns: boolean;
-  /** One song; `r` varies it a little, so each bird has a few versions of its own. */
-  song: (r: () => number) => Note[];
-}
-
-const SPECIES: Species[] = [
-  {
-    // "Tee-cher tee-cher tee-cher", like a great tit.
-    name: 'tit',
-    pitch: [3700, 4300],
-    vibrato: [34, 0.004],
-    flutter: 0.06,
-    overtone: 0.05,
-    fade: 0.018,
-    bright: 7000,
-    level: 0.8,
-    bout: [3, 6],
-    pause: [2, 4],
-    rest: [25, 60],
-    turns: true,
-    song: (r) => {
-      const notes: Note[] = [];
-      const pairs = 3 + Math.floor(r() * 3);
-      for (let i = 0; i < pairs; i++) {
-        const level = i === pairs - 1 ? 0.85 : 1;
-        notes.push({ len: 0.11, gap: 0.04, pitch: [1.04, 1.01, 0.98], level });
-        notes.push({ len: 0.13, gap: 0.09, pitch: [0.8, 0.74, 0.7, 0.68], level: 0.8 * level });
-      }
-      return notes;
-    },
-  },
-  {
-    // A run of quick notes falling in steps, then a flourish, like a chaffinch.
-    name: 'finch',
-    pitch: [3300, 3800],
-    vibrato: [26, 0.006],
-    flutter: 0.1,
-    overtone: 0.09,
-    fade: 0.008,
-    bright: 8000,
-    level: 0.75,
-    bout: [4, 8],
-    pause: [5, 9],
-    rest: [30, 80],
-    turns: true,
-    song: (r) => {
-      const notes: Note[] = [];
-      const steps = [
-        { count: 5 + Math.floor(r() * 3), pitch: 1.3, len: 0.042, gap: 0.032 },
-        { count: 4 + Math.floor(r() * 2), pitch: 1.1, len: 0.05, gap: 0.03 },
-        { count: 3 + Math.floor(r() * 2), pitch: 0.94, len: 0.06, gap: 0.032 },
-      ];
-      for (const [s, step] of steps.entries()) {
-        for (let i = 0; i < step.count; i++) {
-          const p = step.pitch * (1 - 0.01 * i);
-          notes.push({ len: step.len, gap: step.gap, pitch: [p * 1.12, p, p * 0.9], level: 0.65 + 0.12 * s });
-        }
-      }
-      notes.push({ len: 0.09, gap: 0.03, pitch: [1, 0.86, 0.8], level: 0.9 });
-      notes.push({ len: 0.26, gap: 0, pitch: [0.9, 1.2, 1.3, 1.1, 0.78], level: 1 });
-      return notes;
-    },
-  },
-  {
-    // A soft cascade of liquid notes running down the scale, like a willow warbler.
-    name: 'warbler',
-    pitch: [2900, 3300],
-    vibrato: [21, 0.02],
-    flutter: 0.3,
-    overtone: 0.12,
-    fade: 0.014,
-    bright: 6500,
-    level: 0.75,
-    bout: [3, 6],
-    pause: [6, 12],
-    rest: [30, 80],
-    turns: true,
-    song: (r) => {
-      const count = 11 + Math.floor(r() * 4);
-      return Array.from({ length: count }, (_, i) => {
-        const x = i / (count - 1);
-        const p = 1.5 - 0.6 * x;
-        const last = i >= count - 2;
-        const level = Math.min(1, 0.45 + 1.2 * x) * (last ? 0.9 : 1);
-        return last ? { len: 0.12, gap: 0.04, pitch: [p, p * 1.08, p * 0.92], level } : { len: 0.075, gap: 0.035, pitch: [p * 0.97, p * 1.04, p * 0.98], level };
-      });
-    },
-  },
-  {
-    // "Coo-COOO-coo", low and soft, like a collared dove; now and then.
-    name: 'dove',
-    pitch: [470, 560],
-    vibrato: [7, 0.005],
-    flutter: 0.15,
-    overtone: 0.15,
-    fade: 0.06,
-    bright: 1600,
-    level: 1.6,
-    bout: [3, 6],
-    pause: [1.4, 2.2],
-    rest: [90, 200],
-    turns: false,
-    song: () => [
-      { len: 0.2, gap: 0.08, pitch: [0.96, 1, 0.97], level: 0.8 },
-      { len: 0.55, gap: 0.12, pitch: [0.98, 1.06, 1.06, 1.02, 0.94], level: 1 },
-      { len: 0.3, gap: 0, pitch: [0.95, 0.97, 0.88], level: 0.75 },
-    ],
-  },
-];
-
 /** The neighbourhood's birds: their species, where they sit left to right, and the two further off that only join the dawn chorus. */
 const FLOCK: { species: string; pan: number; dawn?: boolean }[] = [
   { species: 'tit', pan: -0.55 },
@@ -467,30 +364,26 @@ const FLOCK: { species: string; pan: number; dawn?: boolean }[] = [
   { species: 'tit', pan: 0.8, dawn: true },
   { species: 'warbler', pan: -0.8, dawn: true },
 ];
-/** Versions of its song each bird has. */
-const VERSIONS = 3;
 /** Overall level of the birds. */
 const BIRD_LEVEL = 0.05;
+/** A bird whose song is still being made tries again after this long (ms). */
+const SONG_WAIT_MS = 250;
 
 /** One of the neighbourhood's birds. */
 interface Bird {
   species: Species;
-  seed: number;
+  /** Its own pitch, pace and nearness: what its songs are made from. */
+  voice: Voice;
   /** Only sings in the dawn chorus. */
   dawn: boolean;
-  /** Its own pitch (Hz), pace (1 = as written), place left to right and nearness (1 = nearest). */
-  pitch: number;
-  pace: number;
+  /** Its place left to right. */
   pan: number;
-  near: number;
   /** Songs left in its bout, when it sings next and when its song ends (ms, 0 = not yet set). */
   left: number;
   next: number;
   until: number;
   /** Its level and place, made on its first song. */
   out: { gain: GainNode; panner: StereoPannerNode } | null;
-  /** Versions of its song, made on first use. */
-  songs: (AudioBuffer | undefined)[];
 }
 
 /**
@@ -501,24 +394,16 @@ interface Bird {
 class Birds {
   private readonly flock: Bird[];
 
-  constructor() {
+  /** `made` makes their songs (off the main thread). */
+  constructor(private readonly made: WorkerSounds) {
     const r = random(0x5eed1e55);
     this.flock = FLOCK.map(({ species: name, pan, dawn = false }, i) => {
       const species = SPECIES.find((sp) => sp.name === name) ?? SPECIES[0];
-      return {
-        species,
-        seed: i,
-        dawn,
-        pitch: between(r, species.pitch),
-        pace: 0.92 + r() * 0.16,
-        pan: pan + (r() - 0.5) * 0.15,
-        near: dawn ? 0.35 + r() * 0.15 : 0.6 + r() * 0.4,
-        left: 0,
-        next: 0,
-        until: 0,
-        out: null,
-        songs: [],
-      };
+      const pitch = between(r, species.pitch);
+      const pace = 0.92 + r() * 0.16;
+      const place = pan + (r() - 0.5) * 0.15;
+      const near = dawn ? 0.35 + r() * 0.15 : 0.6 + r() * 0.4;
+      return { species, voice: { species: species.name, seed: i, pitch, pace, near }, dawn, pan: place, left: 0, next: 0, until: 0, out: null };
     });
   }
 
@@ -548,12 +433,18 @@ class Birds {
         b.next = now + 300 + Math.random() * 1200;
         continue;
       }
+      // A version of its song (made off the main thread the first time: it sings once that's done).
+      const song = this.made.song(b.voice, Math.floor(Math.random() * VERSIONS), ac.sampleRate);
+      if (!song) {
+        b.next = now + SONG_WAIT_MS;
+        continue;
+      }
       if (b.left <= 0) b.left = Math.round(between(Math.random, sp.bout) * (1 + 0.5 * chorus));
-      const seconds = this.sing(ac, out, b, t + 0.03 + Math.random() * 0.05, BIRD_LEVEL * sp.level * b.near * (0.5 + 0.5 * day));
-      b.until = now + seconds * 1000;
+      this.sing(ac, out, b, song, t + 0.03 + Math.random() * 0.05, BIRD_LEVEL * sp.level * b.voice.near * (0.5 + 0.5 * day));
+      b.until = now + song.duration * 1000;
       if (sp.turns) singing++;
       b.left--;
-      if (b.left > 0) b.next = b.until + between(Math.random, sp.pause) * b.pace * (1.4 - 0.4 * active) * 1000;
+      if (b.left > 0) b.next = b.until + between(Math.random, sp.pause) * b.voice.pace * (1.4 - 0.4 * active) * 1000;
       else b.next = b.until + (between(Math.random, sp.rest) * 1000) / active;
       // Sometimes another bird answers.
       const other = this.flock[Math.floor(Math.random() * this.flock.length)];
@@ -572,8 +463,8 @@ class Birds {
     for (const b of this.flock) b.out?.panner.disconnect();
   }
 
-  /** Plays one version of the bird's song; returns its length in seconds. */
-  private sing(ac: AudioContext, out: AudioNode, b: Bird, at: number, level: number): number {
+  /** Plays one version of the bird's song. */
+  private sing(ac: AudioContext, out: AudioNode, b: Bird, song: AudioBuffer, at: number, level: number): void {
     if (!b.out) {
       const gain = ac.createGain();
       const panner = ac.createStereoPanner();
@@ -581,80 +472,13 @@ class Birds {
       gain.connect(panner).connect(out);
       b.out = { gain, panner };
     }
-    const v = Math.floor(Math.random() * VERSIONS);
-    let song = b.songs[v];
-    if (!song || song.sampleRate !== ac.sampleRate) song = b.songs[v] = songBuffer(ac, b, v);
     const source = ac.createBufferSource();
     source.buffer = song;
     source.connect(b.out.gain);
     b.out.gain.gain.setValueAtTime(level, at);
     source.onended = () => source.disconnect();
     source.start(at);
-    return song.duration;
   }
-}
-
-/**
- * One version of a bird's song: each note a sine following its pitch curve with a fast warble and a
- * quiet overtone, faded in and out, then softened and given a faint echo as if from a garden away.
- */
-function songBuffer(ac: BaseAudioContext, bird: Bird, version: number): AudioBuffer {
-  const sp = bird.species;
-  const r = random(Math.imul(bird.seed * VERSIONS + version + 1, 0x9e3779b1));
-  const notes = sp.song(r);
-  const rate = ac.sampleRate;
-  const shift = 1 + (r() - 0.5) * 0.03;
-  let seconds = 0.3;
-  for (const n of notes) seconds += (n.len * 1.04 + n.gap) * bird.pace;
-  const b = ac.createBuffer(1, Math.ceil(seconds * rate), rate);
-  const d = b.getChannelData(0);
-  const [wobble, depth] = sp.vibrato;
-  let at = 0;
-  for (const n of notes) {
-    const len = n.len * bird.pace * (1 + (r() - 0.5) * 0.08);
-    const count = Math.round(len * rate);
-    const fade = Math.min(sp.fade, len / 3);
-    const tune = bird.pitch * shift * (1 + (r() - 0.5) * 0.02);
-    const speed = (2 * Math.PI * wobble * (0.9 + r() * 0.2)) / rate;
-    const start = Math.round(at * rate);
-    let phase = 0;
-    let vib = r() * 2 * Math.PI;
-    for (let j = 0; j < count && start + j < d.length; j++) {
-      const time = j / rate;
-      const w = Math.sin(vib);
-      phase += (2 * Math.PI * tune * curve(n.pitch, j / count) * (1 + depth * w)) / rate;
-      vib += speed;
-      const edge = Math.min(1, time / fade, (len - time) / fade);
-      const amp = (0.5 - 0.5 * Math.cos(Math.PI * edge)) * (n.level ?? 1) * (1 - sp.flutter * (0.5 + 0.5 * w));
-      d[start + j] += amp * (Math.sin(phase) + sp.overtone * (Math.sin(2 * phase) + Math.sin(3 * phase) / 3));
-    }
-    at += len + n.gap * bird.pace;
-  }
-  distance(d, rate, sp.bright * (0.7 + 0.3 * bird.near), 1 - bird.near);
-  return b;
-}
-
-/** A smooth curve through evenly spaced points, at `x` from 0 to 1. */
-function curve(points: number[], x: number): number {
-  if (points.length === 1) return points[0];
-  const u = x * (points.length - 1);
-  const i = Math.min(points.length - 2, Math.floor(u));
-  const f = u - i;
-  const p0 = points[Math.max(0, i - 1)];
-  const p1 = points[i];
-  const p2 = points[i + 1];
-  const p3 = points[Math.min(points.length - 1, i + 2)];
-  return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)));
-}
-
-/** Softens a sound as if from across the gardens: highs rolled off, and faint echoes off nearby walls. */
-function distance(d: Float32Array, rate: number, cutoff: number, far: number): void {
-  const a = 1 - Math.exp((-2 * Math.PI * cutoff) / rate);
-  let lp = 0;
-  for (let i = 0; i < d.length; i++) d[i] = lp += (d[i] - lp) * a;
-  const taps = [0.023, 0.037, 0.053, 0.071, 0.097, 0.127, 0.163, 0.211].map((delay, i) => [Math.round(delay * rate), (i % 2 ? -0.07 : 0.08) * Math.exp(-delay / 0.09) * (0.6 + far)]);
-  // From the end back, so echoes don't echo again.
-  for (let i = d.length - 1; i >= 0; i--) for (const [k, level] of taps) if (i >= k) d[i] += d[i - k] * level;
 }
 
 function between(r: () => number, [a, b]: [number, number]): number {

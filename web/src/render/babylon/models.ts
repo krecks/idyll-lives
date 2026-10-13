@@ -101,6 +101,9 @@ export async function buildModel(
   }
   const parts = entry?.placeholder ?? fallbackParts(footprint, options.radius);
   const resized = options.resize ? resizeParts(parts, footprint, options.resize) : parts;
+  // Built ahead (`buildAhead`): in stretches of idle time.
+  const stretch = aheadStretch;
+  if (stretch) return (stretch.build = buildPlaceholderAhead(scene, name, resized, options.lod ?? 0, stretch));
   return buildPlaceholder(scene, name, resized, options.lod ?? 0);
 }
 
@@ -169,7 +172,25 @@ export function resizeParts(parts: readonly PlaceholderPart[], from: readonly [n
 function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
   const groups = new PartGroups(scene);
   parts.forEach((part, index) => groups.addPart(part, lod, index));
-  const { meshes, tints, bones } = groups.build(name);
+  return placeholderTemplate(parts, groups, groups.build(name));
+}
+
+/**
+ * `buildPlaceholder` for a model built ahead: part by part, then group by group, while its stretch
+ * of idle time lasts, and on in the next idle moment. The pieces stay hidden until it's whole.
+ * Nothing (an empty model) if the scene is let go meanwhile.
+ */
+async function buildPlaceholderAhead(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1, stretch: Stretch): Promise<ModelTemplate> {
+  const groups = new PartGroups(scene);
+  for (const [index, part] of parts.entries()) {
+    if (stretch.spent && !(await stretch.next(scene))) return { meshes: [], tints: [], bones: [], height: 0 };
+    groups.addPart(part, lod, index).setEnabled(false);
+  }
+  const built = await groups.buildAhead(name, stretch);
+  return built ? placeholderTemplate(parts, groups, built) : { meshes: [], tints: [], bones: [], height: 0 };
+}
+
+function placeholderTemplate(parts: PlaceholderPart[], groups: PartGroups, { meshes, tints, bones }: BuiltGroups): ModelTemplate {
   const mirrors = parts.filter((p) => p.mirror).map(mirrorSurface);
   const boxes = parts.map(partBox);
   const outline = boxes.length ? { minX: Math.min(...boxes.map((b) => b.lo[0])), maxX: Math.max(...boxes.map((b) => b.hi[0])), minZ: Math.min(...boxes.map((b) => b.lo[2])), maxZ: Math.max(...boxes.map((b) => b.hi[2])) } : undefined;
@@ -231,12 +252,13 @@ class PartGroups {
     return info.plain ? { alpha: encodeFinish(info.roughness, info.metallic), group: PLAIN } : { alpha: 1, group: key };
   }
 
-  addPart(part: PlaceholderPart, lod: 0 | 1, index: number): void {
+  addPart(part: PlaceholderPart, lod: 0 | 1, index: number): Mesh {
     const { alpha, group } = this.finish(part.material ?? DEFAULT_FINISH);
     const mesh = partMesh(this.scene, part, lod, index, alpha);
     this.height = Math.max(this.height, part.at[1] + part.size[1] / 2);
     this.bottom = Math.min(this.bottom, part.at[1] - part.size[1] / 2);
     this.add(mesh, part.tint ?? null, group, part.bone ?? null);
+    return mesh;
   }
 
   add(mesh: Mesh, tint: TintSlot | null, finish: string, bone: BoneName | null): void {
@@ -246,22 +268,42 @@ class PartGroups {
     this.groups.set(key, group);
   }
 
-  build(name: string): { meshes: Mesh[]; tints: (TintSlot | null)[]; bones: (BoneName | null)[] } {
-    const meshes: Mesh[] = [];
-    const tints: (TintSlot | null)[] = [];
-    const bones: (BoneName | null)[] = [];
-    for (const { tint, finish, bone, meshes: group } of this.groups.values()) {
-      const merged = group.length === 1 ? group[0] : Mesh.MergeMeshes(group, true, true);
-      if (!merged) continue;
-      const suffix = finish === PLAIN ? '' : `@${finish.replace('material.finish.', '')}`;
-      merged.name = `${name}${tint ? `:${tint}` : ''}${bone ? `#${bone}` : ''}${suffix}`;
-      merged.material = finish === PLAIN ? this.lib.plainFinish() : this.lib.finish(finish);
-      meshes.push(merged);
-      tints.push(tint);
-      bones.push(bone);
-    }
-    return { meshes, tints, bones };
+  build(name: string): BuiltGroups {
+    const built: BuiltGroups = { meshes: [], tints: [], bones: [] };
+    for (const group of this.groups.values()) this.merge(name, group, built);
+    return built;
   }
+
+  /** `build` in stretches of idle time (see `buildPlaceholderAhead`); the meshes show once all are merged. */
+  async buildAhead(name: string, stretch: Stretch): Promise<BuiltGroups | null> {
+    const built: BuiltGroups = { meshes: [], tints: [], bones: [] };
+    for (const group of this.groups.values()) {
+      if (stretch.spent && !(await stretch.next(this.scene))) return null;
+      this.merge(name, group, built)?.setEnabled(false);
+    }
+    for (const mesh of built.meshes) mesh.setEnabled(true);
+    return built;
+  }
+
+  /** Merges one group into a mesh (added to `built`). */
+  private merge(name: string, { tint, finish, bone, meshes: group }: { tint: TintSlot | null; finish: string; bone: BoneName | null; meshes: Mesh[] }, built: BuiltGroups): Mesh | null {
+    const merged = group.length === 1 ? group[0] : Mesh.MergeMeshes(group, true, true);
+    if (!merged) return null;
+    const suffix = finish === PLAIN ? '' : `@${finish.replace('material.finish.', '')}`;
+    merged.name = `${name}${tint ? `:${tint}` : ''}${bone ? `#${bone}` : ''}${suffix}`;
+    merged.material = finish === PLAIN ? this.lib.plainFinish() : this.lib.finish(finish);
+    built.meshes.push(merged);
+    built.tints.push(tint);
+    built.bones.push(bone);
+    return merged;
+  }
+}
+
+/** A model's merged meshes, with each one's tint slot and bone. */
+interface BuiltGroups {
+  meshes: Mesh[];
+  tints: (TintSlot | null)[];
+  bones: (BoneName | null)[];
 }
 
 /** Group key for parts drawn with the shared plain finish. */
@@ -614,26 +656,66 @@ export function prefetchModels(entries: Iterable<ModelEntry | undefined>): void 
 
 /** Idle time (ms) left below which `buildAhead` waits for the next idle moment. */
 const IDLE_SLICE_MS = 6;
+/**
+ * Longest stretch of work (ms) on a model built ahead before it waits for the next idle moment.
+ * A whole tree or park table takes 10–15 ms on a fast laptop and three times that on a slow one.
+ */
+const AHEAD_STRETCH_MS = 4;
+/** Longest wait (ms) for an idle moment once a model is under way, so it's never left half made for long. */
+const AHEAD_WAIT_MS = 200;
+
+/** The work on one model built ahead, in stretches of idle time. */
+class Stretch {
+  private until = performance.now() + AHEAD_STRETCH_MS;
+  /** It waited for more idle time: `build` is done when the model is whole. */
+  waited = false;
+  build: Promise<unknown> | null = null;
+
+  get spent(): boolean {
+    return performance.now() >= this.until;
+  }
+
+  /** Waits for the next idle moment, for another stretch; false if the scene was let go meanwhile. */
+  async next(scene: Scene): Promise<boolean> {
+    this.waited = true;
+    await new Promise<void>((resolve) => idle(() => resolve(), AHEAD_WAIT_MS));
+    this.until = performance.now() + AHEAD_STRETCH_MS;
+    return !scene.isDisposed;
+  }
+}
+
+/** Set while `buildAhead` runs a job: the generated model it builds goes in stretches of idle time. */
+let aheadStretch: Stretch | null = null;
 
 /**
  * Runs `jobs` in idle moments, as many as fit in each, until they are done or `current()` turns
- * false: generated models built ahead (each a few ms) without holding up a frame.
+ * false: generated models built ahead without holding up a frame. A model that takes longer than
+ * a stretch goes on in the next idle moments, and the next job waits for it.
  */
 export function buildAhead(jobs: (() => void)[], current: () => boolean): void {
+  const more = () => {
+    if (jobs.length) idle(step);
+  };
   const step = (deadline?: IdleDeadline) => {
     if (!current()) return;
     while (jobs.length) {
-      jobs.shift()!();
+      const stretch = (aheadStretch = new Stretch());
+      try {
+        jobs.shift()!();
+      } finally {
+        aheadStretch = null;
+      }
+      if (stretch.waited) return void stretch.build?.then(more, more);
       if (!deadline || deadline.timeRemaining() < IDLE_SLICE_MS) break;
     }
-    if (jobs.length) idle(step);
+    more();
   };
   idle(step);
 }
 
 /** Runs `fn` when the page is idle (soon anyway; a short timeout where idle callbacks are missing). */
-function idle(fn: (deadline?: IdleDeadline) => void): void {
-  if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout: 2000 });
+function idle(fn: (deadline?: IdleDeadline) => void, timeout = 2000): void {
+  if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
   else setTimeout(fn, 50);
 }
 
