@@ -7,7 +7,7 @@
 use serde_json::{Value, json};
 use sim_core::World;
 use sim_core::social::FORMER;
-use sim_core::world::TaskKind;
+use sim_core::world::{Phase, Sim, TaskKind};
 
 fn content_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content")
@@ -60,6 +60,7 @@ pub fn check(w: &World) {
     }
     let n = w.sims.len();
     let content_needs = w.content.needs.len();
+    let max_level = w.content.skill_rules.max_level;
     for (i, s) in w.sims.iter().enumerate() {
         assert_eq!(s.id as usize, i, "Sim ids are their index");
         assert!(
@@ -73,26 +74,49 @@ pub fn check(w: &World) {
         for (k, v) in s.needs[..content_needs].iter().enumerate() {
             assert!((0.0..=1.0).contains(v), "{}'s need {k} is {v}", s.name);
         }
+        // Every number about them is a real one in its range (NaN is in none).
+        assert!(s.yaw.is_finite() && s.yaw.abs() <= std::f32::consts::TAU, "{} faces {}", s.name, s.yaw);
+        assert!((0.0..=150.0).contains(&s.age), "{} is {} years old", s.name, s.age);
+        for (k, v) in s.skills[..w.content.skills.len()].iter().enumerate() {
+            assert!((0.0..=max_level).contains(v), "{}'s skill {k} is {v}", s.name);
+        }
+        let mood = s.mood(&w.content);
+        assert!((0.0..=1.0).contains(&mood), "{}'s mood is {mood}", s.name);
+        assert!((0.0..=100.0).contains(&s.grade), "{}'s grade is {}", s.name, s.grade);
         assert!((s.household as usize) < w.households.len());
         if let Some(t) = s.engaged_with {
             assert!((t as usize) < n && t as usize != i);
         }
         if let Some(act) = s.current() {
-            match act.task.kind {
-                TaskKind::Use { object, .. } => {
-                    let o = &w.objects[object as usize];
-                    assert!(
-                        o.users().any(|u| u as usize == i),
-                        "{} uses object {object} without holding a slot",
-                        s.name
-                    );
+            task_refs(w, i, &act.task.kind, "is doing");
+            if let TaskKind::Use { object, .. } = act.task.kind {
+                let o = &w.objects[object as usize];
+                assert!(
+                    o.users().any(|u| u as usize == i),
+                    "{} uses object {object} without holding a slot",
+                    s.name
+                );
+            }
+            match &act.phase {
+                Phase::Routing { waypoints, next } => {
+                    assert!(*next <= waypoints.len(), "{} walks past the end of their route", s.name);
+                    assert!(waypoints.iter().flatten().all(|v| v.is_finite()), "{} walks to nowhere: {waypoints:?}", s.name);
                 }
-                TaskKind::Social { target, .. } => {
-                    assert!((target as usize) < n && target as usize != i)
+                Phase::Using { elapsed } | Phase::Conversing { elapsed, .. } => {
+                    assert!(elapsed.is_finite() && *elapsed >= 0.0, "{} has been at it for {elapsed} minutes", s.name)
                 }
-                TaskKind::Visit { plot } => assert!((plot as usize) < w.plots.len()),
                 _ => {}
             }
+        }
+        for t in s.queue() {
+            task_refs(w, i, &t.kind, "has queued");
+        }
+        if let Some(kind) = follow_up(s) {
+            follow_up_refs(w, i, &kind);
+        }
+        if let Some(h) = &s.held {
+            assert!(h.def < w.content.items.len(), "{} holds an unknown item", s.name);
+            assert!(h.quality.is_finite() && (0.0..=10.0).contains(&h.quality), "{} holds something of quality {}", s.name, h.quality);
         }
         if let Some(v) = s.visiting {
             assert!((v.plot as usize) < w.plots.len());
@@ -102,6 +126,48 @@ pub fn check(w: &World) {
             assert!(job.level < career.levels.len());
             assert!((0.0..=100.0).contains(&job.performance));
             assert!((0.0..=1.0).contains(&job.satisfaction));
+        }
+    }
+    // Objects are their index in the list, of a known kind, worn 0..1 and of a quality there is.
+    let max_quality = w.content.object_rules.max_quality;
+    for (k, o) in w.objects.iter().enumerate() {
+        assert_eq!(o.id as usize, k, "object ids are their index");
+        assert!(o.def < w.content.objects.len(), "object {k} is of an unknown kind");
+        assert!((0.0..=1.0).contains(&o.wear), "object {k} is worn {}", o.wear);
+        assert!(o.quality <= max_quality, "object {k} has quality {}", o.quality);
+        for u in o.users() {
+            assert!((u as usize) < n, "object {k} is held by unknown resident {u}");
+        }
+    }
+    for (t, d) in w.dirt.iter().enumerate() {
+        assert!((0.0..=1.0).contains(d), "tile {t} has dirt {d}");
+    }
+    // Relationships: friendship and romance within ±100, chemistry within ±1.
+    let m = w.relationships.len();
+    for a in 0..m {
+        for b in 0..m {
+            let r = w.relationships.get(a, b);
+            let c = w.relationships.chemistry(a, b);
+            assert!(
+                r.friendship.abs() <= 100.0 && r.romance.abs() <= 100.0 && c.abs() <= 1.0,
+                "{a} and {b}: friendship {}, romance {}, chemistry {c}",
+                r.friendship,
+                r.romance
+            );
+        }
+    }
+    // Households: money that makes sense, homes on the town's plots (one each), parents-to-be
+    // who are residents.
+    for (h, hh) in w.households.iter().enumerate() {
+        assert!(hh.funds.abs() < 1_000_000_000, "{} has {} in the bank", hh.name, hh.funds);
+        if let Some(p) = hh.plot {
+            assert!((p as usize) < w.plots.len(), "{} lives on unknown plot {p}", hh.name);
+            assert!(!w.plots[p as usize].public, "{} lives in the park", hh.name);
+            assert!(!w.households[..h].iter().any(|o| o.plot == Some(p)), "two households live on plot {p}");
+        }
+        if let Some(e) = hh.expecting {
+            let [a, b] = e.parents.map(|p| p as usize);
+            assert!(a < n && b < n && a != b, "{} expects a baby from {:?}", hh.name, e.parents);
         }
     }
     // Every object slot holder is someone who is using or heading to that object.
@@ -137,8 +203,11 @@ pub fn check(w: &World) {
                     Some(a) => chain(&a.task.kind),
                     None => s.queue().next().is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
                 },
-                "{} carries something while doing something else",
-                s.name
+                "{} carries a {} while doing {:?}, then {:?}",
+                s.name,
+                s.held.map_or("?", |h| w.content.items[h.def].id.as_str()),
+                s.current().map(|a| (a.task.kind, &a.phase)),
+                s.queue().map(|t| t.kind).collect::<Vec<_>>()
             );
         }
     }
@@ -151,6 +220,8 @@ pub fn check(w: &World) {
         let (x, z) = it.at.tile();
         assert!(w.lot.in_bounds(x, z), "item {} is off the lot", it.id);
         assert!(it.id < w.items.next_id);
+        assert!(it.def < w.content.items.len(), "item {} is of an unknown kind", it.id);
+        assert!(it.quality.is_finite() && (0.0..=10.0).contains(&it.quality), "item {} has quality {}", it.id, it.quality);
     }
     // Partners are mutual and one at a time.
     for a in 0..n {
@@ -169,6 +240,72 @@ pub fn check(w: &World) {
         // A resident slot, or a former resident whose name is kept.
         let known = |r: u32| if r & FORMER != 0 { ((r & !FORMER) as usize) < w.former.len() } else { (r as usize) < n };
         assert!(known(e.a) && known(e.b) && e.c.is_none_or(known), "{e:?} names someone unknown");
+    }
+}
+
+/// What resident `i`'s task names exists: objects (and the interaction asked for), residents,
+/// plots, recipes, socials, accidents and phone actions.
+fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
+    let (c, n) = (&w.content, w.sims.len());
+    let name = &w.sims[i].name;
+    let object = |o: Option<u32>| o.is_none_or(|o| (o as usize) < w.objects.len());
+    let ok = match *kind {
+        TaskKind::Use { object: o, interaction } => {
+            w.objects.get(o as usize).is_some_and(|o| interaction < c.objects[o.def].interactions.len())
+        }
+        TaskKind::MoveTo { x, z } => x.is_finite() && z.is_finite() && w.lot.in_bounds(x.floor() as i32, z.floor() as i32),
+        TaskKind::Social { target, social } => (target as usize) < n && target as usize != i && social < c.socials.len(),
+        TaskKind::Join { leader } => (leader as usize) < n && leader as usize != i,
+        TaskKind::Work | TaskKind::GoHome => true,
+        TaskKind::Visit { plot } => (plot as usize) < w.plots.len(),
+        TaskKind::Answer { guest } => (guest as usize) < n,
+        TaskKind::Clean { x, z } => w.lot.in_bounds(x, z),
+        TaskKind::Repair { object: o } => object(Some(o)),
+        TaskKind::Spot { accident } => accident < c.accidents.len(),
+        TaskKind::Cook { recipe, station, origin, .. } => recipe < c.recipes.len() && object(station) && object(origin),
+        TaskKind::Eat { seat, .. } => object(seat),
+        TaskKind::Dishes { station, .. } => object(station),
+        TaskKind::Phone { action, contact, seat, .. } => {
+            action < c.phone.actions.len() && contact.is_none_or(|t| (t as usize) < n) && object(seat)
+        }
+    };
+    assert!(ok, "{name} {doing} {kind:?}, which names something that isn't there ({} objects)", w.objects.len());
+}
+
+/// What a resident does next before choosing anything else (washing hands after the toilet),
+/// as its `TaskKind` debug text. The field isn't public, so it's read from the resident's debug
+/// text: a follow-up isn't remapped when objects are sold or moved (R2-01), and a stale one
+/// crashes the game when it's started.
+pub fn follow_up(s: &Sim) -> Option<String> {
+    const FIELD: &str = "follow_up: Some(Task { kind: ";
+    let text = format!("{s:?}");
+    let rest = &text[text.find(FIELD)? + FIELD.len()..];
+    Some(rest[..rest.find(", directed: ")?].to_string())
+}
+
+/// A number field (`object: 3`, or `seat: Some(3)`) in a task's debug text.
+pub fn debug_field(kind: &str, field: &str) -> Option<u32> {
+    let at = kind.find(&format!("{field}: "))? + field.len() + 2;
+    let rest = kind[at..].strip_prefix("Some(").unwrap_or(&kind[at..]);
+    rest[..rest.find(|c: char| !c.is_ascii_digit())?].parse().ok()
+}
+
+/// A follow-up names an object there is, and an interaction it has.
+fn follow_up_refs(w: &World, i: usize, kind: &str) {
+    let name = &w.sims[i].name;
+    for field in ["object", "station", "origin", "seat"] {
+        if let Some(o) = debug_field(kind, field) {
+            assert!((o as usize) < w.objects.len(), "{name}'s next thing is {kind}, an object that isn't there");
+        }
+    }
+    if let (Some(o), Some(k)) = (debug_field(kind, "object"), debug_field(kind, "interaction")) {
+        let def = &w.content.objects[w.objects[o as usize].def];
+        assert!(
+            (k as usize) < def.interactions.len(),
+            "{name}'s next thing is {kind}, but object {o} is a {} with {} interactions",
+            def.id,
+            def.interactions.len()
+        );
     }
 }
 
