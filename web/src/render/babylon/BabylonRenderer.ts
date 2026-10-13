@@ -132,6 +132,8 @@ const SHADOW_EDGE_FADE = 0.15;
  */
 const ROOM_LIGHTS = 4;
 const CLUSTERED_LIGHTS = 32;
+/** Range (m) of an interior light while it is dark: it then covers next to no cluster tiles (see `applyRoomLights`). */
+const DARK_LAMP_RANGE = 0.01;
 /** Brightness of a lamp at night (times its content `intensity`). */
 const LAMP_POWER = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
@@ -2251,7 +2253,7 @@ export class BabylonRenderer implements Renderer {
     const make = (i: number) => {
       const light = new PointLight(`room${i}`, new Vector3(0, HIDDEN_Y, 0), this.scene);
       light.falloffType = Light.FALLOFF_GLTF;
-      light.range = 7;
+      light.range = DARK_LAMP_RANGE;
       light.intensity = 0;
       light.specular = new Color3(0.4, 0.35, 0.3);
       return light;
@@ -3378,6 +3380,9 @@ export class BabylonRenderer implements Renderer {
         light.intensity = lit * FILL_POWER * (4 + Math.min(use.area, 30) * 0.35);
         light.range = 4 + Math.sqrt(use.area) * 1.4;
       }
+      // A dark one (all of them by day) adds nothing, but the cluster would still sort it into the
+      // screen's tiles by its range for every pixel to loop over: next to no range keeps it out.
+      if (light.intensity === 0) light.range = DARK_LAMP_RANGE;
       light.diffuse.copyFrom(this.lampColor);
     });
   }
