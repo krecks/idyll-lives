@@ -22,7 +22,7 @@ PREVIEW = os.path.join(HERE, 'previews')
 # palette (rebuilt after every reset, which drops the old materials)
 def _palette():
     global STONE, STONE_DARK, STONE_WARM, WATER, MOSS, LEAF, LEAF_LIGHT, WOOD, WOOD_DARK
-    global METAL, METAL_DARK, SKIN, NOSE, BEARD, TUNIC, HAT, SOIL, BIRD_BROWN, BEAK
+    global METAL, METAL_DARK, PAINT, SKIN, NOSE, BEARD, TUNIC, HAT, SOIL, BIRD_BROWN, BEAK
     global FLOWER_PINK, FLOWER_YELLOW, FLOWER_WHITE, GLOW
     STONE = G.mat('stone', '#B9B2A6', 0.85)
     STONE_DARK = G.mat('stone_dark', '#8F887C', 0.9)
@@ -35,6 +35,7 @@ def _palette():
     WOOD_DARK = G.mat('wood_dark', '#6E5232', 0.8)
     METAL = G.mat('metal', '#5A6068', 0.45, 0.9)
     METAL_DARK = G.mat('metal_dark', '#2E3236', 0.5, 0.8)
+    PAINT = G.mat('paint', '#3E7A6A', 0.4, 0.5)  # the placeholder wheelbarrow's green tray
     SKIN = G.mat('skin', '#F0C6A4', 0.55)
     NOSE = G.mat('nose', '#E8A08A', 0.6)
     BEARD = G.mat('beard', '#EDE8DE', 0.9)
@@ -50,7 +51,7 @@ def _palette():
 
 
 STONE = STONE_DARK = STONE_WARM = WATER = MOSS = LEAF = LEAF_LIGHT = None
-WOOD = WOOD_DARK = METAL = METAL_DARK = SKIN = NOSE = BEARD = TUNIC = HAT = None
+WOOD = WOOD_DARK = METAL = METAL_DARK = PAINT = SKIN = NOSE = BEARD = TUNIC = HAT = None
 SOIL = BIRD_BROWN = BEAK = FLOWER_PINK = FLOWER_YELLOW = FLOWER_WHITE = GLOW = None
 
 
@@ -124,7 +125,7 @@ def _lantern():
 
 
 def _wheelbarrow():
-    green = METAL
+    green = PAINT
     # tray: a bottom and four tilted side panels
     G.cube('tray', (0.44, 0.56, 0.035), at=(0, 0.02, 0.40), material=green, bevel=0.008)
     G.cube('tray_back', (0.50, 0.03, 0.24), at=(0, 0.27, 0.51), material=green, rot=(-20, 0, 0), bevel=0.008)
