@@ -1,31 +1,48 @@
 # Builds the game and publishes it on GitHub Pages: https://<owner>.github.io/<repo>/
-# Runs when a release tag (`v0.2.0`) is pushed (and by hand from the Actions tab); pushes to
-# main alone don't publish. The github-pages environment must allow `v*` tags to deploy.
+# Runs when a release tag (`v0.2.0`) is pushed, and by hand from the Actions tab or with
+# `gh workflow run pages.yml --ref <branch>`: by hand it builds and checks everything, a dry run of
+# the release, and publishes only with `-f deploy=true`. Pushes to main alone don't publish. The
+# github-pages environment must allow `v*` tags (and any branch that is deployed by hand).
+# Run it by hand on main just before tagging: caches saved by a tag run can't be read by the next
+# tag, those saved on main can.
 name: Deploy to GitHub Pages
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publish the build on GitHub Pages (otherwise build and check only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# One run at a time; a second one waits rather than cancelling a deploy halfway.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # No RUSTFLAGS here: it would replace .cargo/config.toml's and drop SIMD from the wasm.
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      # The version pinned in rust-toolchain.toml, with clippy and the wasm32 target.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+          cargo clippy --version
       - uses: Swatinem/rust-cache@v2
       # Must match the wasm-bindgen crate version in Cargo.lock.
       - uses: taiki-e/install-action@v2
@@ -41,15 +58,28 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Version check (web and Rust must match, and the tag if there is one)
+      - name: Version check (web, Rust and Cargo.lock match; on a release tag, the tag and CHANGELOG.md too)
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           version=$(node tools/release/version.mjs)
-          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "v$version" ]; then
-            echo "Tag ${{ github.ref_name }} doesn't match version $version"; exit 1
+          if [ "$REF_TYPE" = "tag" ]; then
+            if [ "$REF_NAME" != "v$version" ]; then echo "::error::Tag $REF_NAME doesn't match version $version"; exit 1; fi
+            if ! grep -qE "^## ${version//./\\.}( |$)" CHANGELOG.md; then echo "::error::CHANGELOG.md has no '## $version' heading"; exit 1; fi
           fi
+          echo "Version $version"
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Simulation tests
-        run: cargo test -p sim-core
+        run: cargo test -p sim-core --locked
+
+      # Examples are only compiled by cargo test; this one should also run (dev profile, so its
+      # timings are rough).
+      - name: Quick benchmark runs
+        run: cargo run -p sim-core --example tickbench --locked
 
       # Compressed asset copies (tools/assets/optimize.mjs, run by the build), cached by content
       # hash so only changed files are encoded again.
@@ -59,16 +89,67 @@ jobs:
           key: assets-${{ hashFiles('tools/assets/optimize.mjs', 'web/public/assets/**') }}
           restore-keys: assets-
 
-      - name: Build
+      # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
+      # float16) and the language model (about 260 MB), kept between runs so a release doesn't
+      # depend on those sites. The fetch scripts check every file's SHA-256 and fetch again what
+      # doesn't match, so an old cache can't slip through.
+      - uses: actions/cache@v4
+        with:
+          path: web/public/voice
+          key: voice-${{ hashFiles('tools/voice/fetch.mjs', 'tools/voice/fp16.mjs') }}
+          restore-keys: voice-
+      - uses: actions/cache@v4
+        with:
+          path: web/public/llm
+          key: llm-${{ hashFiles('tools/llm/fetch.mjs') }}
+          restore-keys: llm-
+
+      - name: Install
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: WebAssembly, voice model and language model
         working-directory: web
         run: |
-          pnpm install --frozen-lockfile
           pnpm wasm
           pnpm voice
+          pnpm llm
+
+      # With CI set, a missing dictionary fails these instead of skipping them.
+      - name: Voice tests
+        run: cargo test -p voice --release --locked
+
+      - name: Checks
+        working-directory: web
+        run: |
           pnpm check:voice
           pnpm check
           pnpm lint
-          pnpm exec vite build --base=/${{ github.event.repository.name }}/
+
+      # Also optimises the wasm (binaryen) and writes THIRD-PARTY-LICENSES.txt.
+      - name: Build
+        working-directory: web
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: pnpm exec vite build --base="/$REPO_NAME/"
+
+      # Pages publishes at most 1 GB; the voice and language models are most of it.
+      - name: Site size
+        run: |
+          du -h --apparent-size --max-depth=1 web/dist | sort -h
+          find web/dist -type f -size +20M -printf '%s\t%p\n' | sort -n
+          size=$(du -sm --apparent-size web/dist | cut -f1)
+          echo "web/dist: $size MB"
+          if [ "$size" -gt 900 ]; then echo "::error::web/dist is $size MB, over the 900 MB kept below Pages' 1 GB limit"; exit 1; fi
+
+      # The wasm with its function names, to read the stack of a crash report (the site's are stripped).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-with-names-${{ github.sha }}
+          path: |
+            web/src/core/wasm-pkg/sim_wasm_bg.wasm
+            web/src/voice/wasm-pkg/voice_wasm_bg.wasm
+          retention-days: 90
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -77,7 +158,10 @@ jobs:
 
   deploy:
     needs: build
+    # Release tags publish; a run by hand only with deploy checked.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
