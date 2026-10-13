@@ -28,6 +28,8 @@ export { Constants } from '@babylonjs/core/Engines/constants';
 export { Engine } from '@babylonjs/core/Engines/engine';
 export { ShaderStore } from '@babylonjs/core/Engines/shaderStore';
 export { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
+export { WebGPUPerfCounter } from '@babylonjs/core/Engines/WebGPU/webgpuPerfCounter';
+export type { RenderTargetWrapper } from '@babylonjs/core/Engines/renderTargetWrapper';
 export { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation';
 export { ClusteredLightContainer } from '@babylonjs/core/Lights/Clustered/clusteredLightContainer';
 export { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';

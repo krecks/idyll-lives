@@ -74,7 +74,10 @@
     dragging = { ...t, x: e.clientX, y: e.clientY };
   }
   function windowMove(e: PointerEvent) {
-    if (dragging) dragging = { ...dragging, x: e.clientX, y: e.clientY };
+    if (!dragging) return;
+    // The button went up where we didn't see it (another window): the chip isn't dropped.
+    if (e.buttons === 0) return void (dragging = null);
+    dragging = { ...dragging, x: e.clientX, y: e.clientY };
   }
   function windowUp(e: PointerEvent) {
     if (!dragging) return;
@@ -141,7 +144,7 @@
   const bad = $derived(conflicts(routines).size > 0);
 </script>
 
-<svelte:window onpointermove={windowMove} onpointerup={windowUp} />
+<svelte:window onpointermove={windowMove} onpointerup={windowUp} onpointercancel={() => (dragging = null)} onblur={() => (dragging = null)} />
 
 <Modal title="Planner" onclose={close} width={1180}>
   <div class="planner">

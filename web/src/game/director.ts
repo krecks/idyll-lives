@@ -81,12 +81,20 @@ export class Director {
 
   /** Objects the player just placed: their first use is worth a look. */
   noteBuilt(ids: readonly number[], now: number): void {
+    this.prune(now);
     for (const id of ids) this.fresh.set(id, now);
   }
 
   /** New story events (any importance; the notable ones about people at home get a shot). */
   noteEvents(events: readonly SocialEvent[], now: number): void {
+    this.prune(now);
     for (const e of events) if (e.importance >= 1) this.events.set(e.id, { event: e, at: now });
+  }
+
+  /** Forgets what's no longer new (also while not watching, so nothing piles up). */
+  private prune(now: number): void {
+    for (const [id, at] of this.fresh) if (now - at > NEW_OBJECT_MS) this.fresh.delete(id);
+    for (const [id, { at }] of this.events) if (now - at > EVENT_MS) this.events.delete(id);
   }
 
   start(now: number): void {
@@ -114,8 +122,7 @@ export class Director {
   update(now: number, force = false): void {
     if (!this.running || (!force && now - this.lastScan < SCAN_MS)) return;
     this.lastScan = now;
-    for (const [id, at] of this.fresh) if (now - at > NEW_OBJECT_MS) this.fresh.delete(id);
-    for (const [id, { at }] of this.events) if (now - at > EVENT_MS) this.events.delete(id);
+    this.prune(now);
 
     const [minHold, maxHold] = HOLD[this.deps.pace()];
     const held = (now - this.since) / 1000;

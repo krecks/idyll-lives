@@ -619,7 +619,9 @@ export class VoiceDirector {
   private panFor(index: number): number {
     if (!this.renderer.simHead(index, this.head) || !this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) return 0;
     const width = window.innerWidth || 1;
-    return Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
+    const pan = Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
+    // Web Audio throws on a non-finite value (and that would stop the frame).
+    return Number.isFinite(pan) ? pan : 0;
   }
 
   private pan(frame: FrameState): void {
