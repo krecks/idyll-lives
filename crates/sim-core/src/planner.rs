@@ -634,7 +634,7 @@ pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     let day = clock::day(tick);
     let minute = clock::minute_of_day(tick);
-    let review = clock::tick_at(day, w.content.planner.review_hour * 60.0) == Some(tick);
+    let review = clock::at_minute(tick, w.content.planner.review_hour * 60.0);
     for i in 0..w.sims.len() {
         if !w.sims[i].here() {
             continue;

@@ -11,7 +11,7 @@ use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 use crate::social::{self, ActiveFeeling, EventLog, Prefer, Relationships};
-use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_SECOND, ai, conversation};
+use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, ai, conversation};
 
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
@@ -24,10 +24,10 @@ const MIN_AUTONOMY_SCORE: f32 = 0.01;
 const SOCIAL_RANGE: f32 = 45.0;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
 const BABY_CRIES_BELOW: f32 = 0.3;
-pub const TICKS_PER_DAY: u64 = (24.0 * 60.0 / MINUTES_PER_TICK) as u64;
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+pub const TICKS_PER_DAY: u64 = crate::clock::TICKS_PER_DAY;
+const TICKS_PER_HOUR: u64 = 60 * TICKS_PER_MINUTE;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
-pub(crate) const ROOM_REFRESH_TICKS: u64 = (10.0 / MINUTES_PER_TICK) as u64;
+pub(crate) const ROOM_REFRESH_TICKS: u64 = 10 * TICKS_PER_MINUTE;
 /// How far (centimetres, per axis) an object can stand off the middle of its footprint: half a
 /// tile, so its middle stays on its tile (see `ObjectInstance::offset`).
 pub const MAX_OFFSET: i8 = 50;
@@ -1729,7 +1729,7 @@ impl World {
             return false;
         }
         let quiet = members.all(|s| s.away_until.is_some() || s.asleep(&self.content));
-        let hour_ago = self.tick.saturating_sub((60.0 / MINUTES_PER_TICK) as u64);
+        let hour_ago = self.tick.saturating_sub(TICKS_PER_HOUR);
         quiet
             && !self.events.iter().rev().take_while(|e| e.tick >= hour_ago).any(|e| {
                 e.kind.importance() >= 1

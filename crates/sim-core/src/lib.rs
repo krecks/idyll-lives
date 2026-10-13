@@ -44,5 +44,7 @@ pub use world::World;
 
 /// Fixed simulation rate in ticks per real second (at 1× speed).
 pub const TICKS_PER_SECOND: u32 = 20;
-/// One game minute passes per real second at 1× speed.
+/// One game minute passes per real second at 1× speed. The clock counts these whole ticks (see
+/// `clock.rs`); `MINUTES_PER_TICK` is only for durations.
+pub const TICKS_PER_MINUTE: u64 = TICKS_PER_SECOND as u64;
 pub const MINUTES_PER_TICK: f32 = 1.0 / TICKS_PER_SECOND as f32;
