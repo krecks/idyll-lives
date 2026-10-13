@@ -3,6 +3,7 @@
 
 mod common;
 
+use serde_json::json;
 use sim_core::items::ItemAt;
 use sim_core::social::EventKind;
 use sim_core::world::{Phase, TaskKind};
@@ -268,6 +269,44 @@ fn without_a_stove_a_gourmet_meal_is_never_made_but_a_simple_one_is() {
     order(&mut w, 0, FRIDGE, "meal");
     ticks(&mut w, 60.0);
     assert!(w.items.list.iter().any(|it| it.def == item_def(&w, "mealPot")), "{:?}", w.items.list);
+}
+
+/// The kitchen content with a TV to pass the time, hunger urgent below 0.1, and takeout as the
+/// shipped content has it: only when home has nothing for hunger.
+fn with_a_tv() -> String {
+    let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+    c["accidents"][0].as_object_mut().unwrap().remove("crowdedGraceMinutes");
+    c["autonomy"] = json!({"urgent": ["hunger"], "urgentBelow": 0.1});
+    c["objects"].as_array_mut().unwrap().push(json!({"id": "tv", "name": "TV", "price": 200, "interactions": [
+        {"id": "watch", "label": "Watch TV", "minutes": 60, "effects": {"fun": 0.5}, "tags": ["lounge"]}]}));
+    c.to_string()
+}
+
+#[test]
+fn a_stove_without_a_fridge_is_no_food_at_home() {
+    // Every recipe starts at the fridge: with none, the stove is nothing to eat. Ada, starving,
+    // orders takeout and watches TV meanwhile, rather than getting up from it every minute for
+    // a hunger the stove can't fill (and never eating).
+    let kitchen = r#"{"def":"counter","x":2,"z":1,"rot":0},{"def":"stove","x":3,"z":1,"rot":0},{"def":"tv","x":7,"z":1,"rot":0}"#;
+    let tv = 2;
+    let mut w = World::from_json(&with_a_tv(), &town(kitchen, 1), 3).unwrap();
+    w.sims[0].needs[..3].copy_from_slice(&[0.05, 0.2, 1.0]);
+    let (mut since, mut cut_short) = (None, 0);
+    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let watching = w.sims[0].current().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { object, .. }, Phase::Using { .. }) if object == tv));
+        match (watching, since) {
+            (true, None) => since = Some(w.tick),
+            (false, Some(from)) => {
+                cut_short += usize::from(w.tick - from <= 2);
+                since = None;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(w.events.iter().filter(|e| e.kind == EventKind::Accident).count(), 1, "Ada ordered takeout");
+    assert!(w.sims[0].needs[0] > 0.5, "and isn't hungry any more: {}", w.sims[0].needs[0]);
+    assert!(cut_short <= 1, "Ada got up from the TV at once {cut_short} times");
 }
 
 #[test]

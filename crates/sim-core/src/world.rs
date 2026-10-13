@@ -4182,9 +4182,10 @@ fn home_fills(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], n: usize) -> boo
 }
 
 /// Which of the needs in `mask` (bit per need) their home has something working for (not
-/// counting what's only done with a baby there). `free`: only what they could go and use now,
-/// with a place on it free (or theirs already), and not something they couldn't get to a moment
-/// ago (every bed taken is no bed for them tonight).
+/// counting what's only done with a baby there, nor a recipe the home lacks a station for: a
+/// stove is no food without a fridge). `free`: only what they could go and use now, with a
+/// place on it free (or theirs already), and not something they couldn't get to a moment ago
+/// (every bed taken is no bed for them tonight).
 fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free: bool) -> u32 {
     let Some(home) = ctx.households[sim.household as usize].plot else {
         return 0;
@@ -4192,9 +4193,12 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
     let usable = |o: &ObjectInstance| {
         !free || ((o.has_free_slot(ctx.content.objects[o.def].slots) || o.slot_of(sim.id).is_some()) && !sim.couldnt_reach(o.id, ctx.tick))
     };
+    // (Busy or not: a cook waits for a station.)
+    let stations = crate::cooking::home_stations(ctx, sim.household, objects);
+    let possible = |r: usize| ctx.content.recipes[r].possible(stations);
     let mut found = 0;
     for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken() && usable(o)) {
-        for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares()) {
+        for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares() && i.recipe.is_none_or(possible)) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
         if found == mask {
