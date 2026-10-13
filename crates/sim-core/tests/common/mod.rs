@@ -597,7 +597,10 @@ impl Long {
         self.watch.sample(w);
         if w.events.last_id() > self.seen {
             let new: Vec<_> = w.events.iter().rev().take_while(|e| e.id > self.seen).collect();
-            assert_eq!(new.len() as u64, w.events.last_id() - self.seen, "the story log dropped events before they were counted");
+            // (Ids can skip one an undo took back; the log only forgets the oldest when it's full.)
+            let full = w.events.iter().count() >= sim_core::social::EVENT_LOG_CAPACITY;
+            let oldest = w.events.iter().next().map_or(0, |e| e.id);
+            assert!(!full || oldest <= self.seen + 1, "the story log dropped events before they were counted");
             for e in new {
                 *self.story.entry(format!("{:?}", e.kind)).or_default() += 1;
                 if e.kind == sim_core::social::EventKind::Born {
