@@ -3,9 +3,13 @@
  * `BabylonRenderer.applyLighting`), but Babylon draws every caster of its list into it, wherever
  * it stands: the street's far houses, the woods round the town. Only casters whose bounds reach
  * into the square are drawn; the rest would add no texel.
+ *
+ * And the square stays put while the camera turns, so the map is drawn again only when something
+ * in it changed (`moved`): the sun's step, a Sim's pose, a thing placed or hidden, the walls. While
+ * the game is paused (Buy and Build mode too) it isn't drawn at all.
  */
 
-import { Frustum, Plane, type AbstractMesh, type ShadowGenerator } from './core';
+import { Frustum, Plane, RenderTargetTexture, type AbstractMesh, type ShadowGenerator } from './core';
 
 /** Metres a caster's bounds may lie past the square's sides and still be drawn (bounds that lag behind a thing springing into place). */
 const MARGIN = 1;
@@ -13,16 +17,26 @@ const MARGIN = 1;
 export class SunShadows {
   private readonly planes = Array.from({ length: 6 }, () => new Plane(0, 0, 0, 0));
   private readonly inside: AbstractMesh[] = [];
-  /** The menus' town: its map is fitted round all its casters, so every one is drawn. */
-  private all = false;
+  private readonly map: RenderTargetTexture;
+  /** The menus' town: its map is fitted round all its casters, and drawn every frame. */
+  private overview = false;
 
   constructor(private readonly generator: ShadowGenerator) {
-    generator.getShadowMap()!.getCustomRenderList = (_pass, casters, count) => (this.all || !casters ? null : this.cull(casters, count));
+    this.map = generator.getShadowMap()!;
+    this.map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    this.map.getCustomRenderList = (_pass, casters, count) => (this.overview || !casters ? null : this.cull(casters, count));
   }
 
-  /** Draws every caster (the overview) or only those reaching into the map (the game). */
-  drawAll(on: boolean): void {
-    this.all = on;
+  /** The menus' town (every caster, every frame) or the game. */
+  setOverview(on: boolean): void {
+    this.overview = on;
+    this.map.refreshRate = on ? 1 : RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    this.moved();
+  }
+
+  /** Something in the map changed: it is drawn again in the next frame. */
+  moved(): void {
+    this.map.resetRefreshCounter();
   }
 
   private cull(casters: readonly AbstractMesh[], count: number): AbstractMesh[] {
