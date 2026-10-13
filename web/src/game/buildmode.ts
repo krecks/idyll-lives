@@ -27,7 +27,7 @@ import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
-import { approachCandidates, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
+import { approachTile, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
 
 /** Preview calls the renderer offers in Build mode. */
 interface BuildPreview {
@@ -50,7 +50,7 @@ interface BuildPreview {
       w: number;
       d: number;
       resize?: ObjectResize;
-      front?: { x: number; z: number };
+      front?: { x: number; z: number; out: number };
       valid: boolean;
     } | null,
   ): void;
@@ -561,8 +561,7 @@ export class BuildBuyInput {
     const onPlot = (tx: number, tz: number) => tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d;
     // Only things on the same layer take each other's place (a picture over a sofa, a rug under it).
     const layer = this.content.layer(def);
-    const takenOn = (on: string, tx: number, tz: number) =>
-      game.objects.some((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === on);
+    const takenOn = (on: string, tx: number, tz: number) => this.taken(on, tx, tz, moving);
     for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!onPlot(tx, tz) || takenOn(layer, tx, tz)) return null;
     if (def.outdoors) {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.indoors(tx, tz)) return 'Goes outdoors';
@@ -581,9 +580,7 @@ export class BuildBuyInput {
     const unused = def.interactions.length === 0;
     const front = frontTile(x, z, w, d, rot);
     if (!unused && !onPlot(front[0], front[1])) return null;
-    const free = ({ tile: [tx, tz], inner: [ix, iz] }: { tile: [number, number]; inner: [number, number] }) =>
-      onPlot(tx, tz) && !takenOn('floor', tx, tz) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
-    if (!unused && !approachCandidates(def, x, z, rot, size).some(free)) return def.approach === 'around' ? 'No free side to sit down from' : null;
+    if (!unused && !approachTile(def, x, z, rot, size, this.standable(moving))) return def.approach === 'around' ? 'No free side to sit down from' : 'Nowhere free to use it from';
     // As the simulation: no wall through the footprint, or between it and where it's used from.
     for (let tz = z; tz < z + d; tz++) {
       for (let tx = x; tx < x + w; tx++) {
@@ -602,6 +599,23 @@ export class BuildBuyInput {
     return moving !== null || (def.price !== undefined && game.affords(def.price)) ? true : null;
   }
 
+  /** Whether something on layer `on` (other than `moving`) takes a tile. */
+  private taken(on: string, tx: number, tz: number, moving: number | null): boolean {
+    return game.objects.some((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === on);
+  }
+
+  /**
+   * Whether a resident can stand on a tile beside a thing to use it, as the simulation has it
+   * (`approach_tiles`): on the home plot, nothing on its floor (bar `moving`), no diagonal wall
+   * through it and no wall between it and the thing's own tile next to it.
+   */
+  private standable(moving: number | null): (c: { tile: [number, number]; inner: [number, number] }) => boolean {
+    const home = this.home();
+    return ({ tile: [tx, tz], inner: [ix, iz] }) =>
+      !!home && tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d &&
+      !this.taken('floor', tx, tz, moving) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+  }
+
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */
   private wallBetween(ax: number, az: number, bx: number, bz: number): boolean {
     const edge =
@@ -613,11 +627,13 @@ export class BuildBuyInput {
     const p = this.placement(ground);
     if (!p) return this.preview.setPlacementGhost?.(null);
     const style = p && game.placing?.objectId != null ? (game.objects.find((o) => o.id === game.placing!.objectId)?.style ?? 0) : (game.placing?.style ?? game.householdStyle);
-    // The arrow marks where it's used from: nothing for things nobody uses (or on a top).
+    // The arrow marks where it'll be used from (the other middle tile in front when the front is
+    // taken; nowhere free, the front, red as the rest of it): nothing for things nobody uses (or on a top).
     const used = p.def.interactions.length > 0 && p.def.layer !== 'surface';
-    const [fx, fz] = frontTile(p.x, p.z, p.w, p.d, p.rot);
+    const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
+    const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz } : undefined, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }

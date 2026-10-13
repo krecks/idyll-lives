@@ -875,7 +875,8 @@ export class BabylonRenderer implements Renderer {
     }
     if (fresh) this.ghostSpawn = 0;
     this.ghostShown = true;
-    // The arrow rides with the ghost but ignores its free turn: the use tile goes by quarter turns.
+    // The arrow rides with the ghost but ignores its free turn: the use tile goes by quarter turns
+    // (a seat used from beside or behind: it points away from the seat there).
     const arrow = this.ghostArrow;
     if (arrow.isEnabled() !== !!ghost.front) {
       arrow.setEnabled(!!ghost.front);
@@ -888,7 +889,7 @@ export class BabylonRenderer implements Renderer {
       const s = Math.sin(yaw);
       // World offset into the ghost's turned frame; just above the floor below the floating ghost.
       arrow.position.set(dx * c - dz * s, -0.04, dx * s + dz * c);
-      arrow.rotation.y = (-(ghost.turn ?? 0) * Math.PI) / 180;
+      arrow.rotation.y = ((ghost.front.out - ghost.rot) * Math.PI) / 2 - ((ghost.turn ?? 0) * Math.PI) / 180;
     }
     if (ghost.valid !== this.ghostValid) {
       this.ghostValid = ghost.valid;

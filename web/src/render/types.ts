@@ -129,8 +129,8 @@ export interface PlacementGhost {
   d: number;
   /** Resized: its kind's footprint (tiles) and its own size (m) across and deep before turning, and centimetres taller. */
   resize?: ObjectResize;
-  /** The tile a Sim uses it from, marked with an arrow (must stay clear). */
-  front?: { x: number; z: number };
+  /** The tile a Sim uses it from, marked with an arrow pointing `out` of it (quarter turns as `rot`; must stay clear). */
+  front?: { x: number; z: number; out: number };
   valid: boolean;
 }
 
