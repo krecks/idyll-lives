@@ -120,7 +120,6 @@ fn meal_on(w: &mut World, table: u32) -> u32 {
 /// matches tiles, not the host): selling a fruit bowl standing on the dining table, or the rug
 /// under it, throws away the dinner on the table.
 #[test]
-#[ignore = "release review: fails until R2-02 is fixed"]
 fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
     let mut lost = Vec::new();
     for (extra, at) in [("fruitBowl", None), ("rugLarge", Some([4, 4, 0]))] {
@@ -152,7 +151,6 @@ fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
 /// R2-02 (moving): `carry_items` also matches tiles, so moving the fruit bowl to another table
 /// takes the dinner with it.
 #[test]
-#[ignore = "release review: fails until R2-02 is fixed"]
 fn moving_a_fruit_bowl_leaves_the_dinner_on_the_table() {
     let mut w = world();
     let table = buy(&mut w, "tableDining4", 5, 5);

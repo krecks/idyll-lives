@@ -644,12 +644,12 @@ impl World {
         if self.content.objects[obj.def].price.is_none() {
             return Err(Error::new("that can't be sold"));
         }
-        // Food and dishes on it (or kept in it) go too.
-        let host = obj.clone();
-        self.drop_items_with(&host);
         let mut sold = crate::surface::riders(&self.content, &self.objects, object);
         sold.push(object);
         sold.sort_unstable();
+        // Food and dishes on it (or kept in it) go too, not what's on the table under it.
+        let held: Vec<u32> = self.items_held_by(&sold).into_iter().map(|(item, _)| item).collect();
+        self.drop_items(&held);
         let mut refund = 0;
         // Highest id first: the ids before it stay put.
         for &id in sold.iter().rev() {
@@ -702,6 +702,8 @@ impl World {
         let mut ids = riders.clone();
         ids.push(object);
         ids.sort_unstable();
+        // Food and dishes on or in them (not what's on the table under it) come along.
+        let held = self.items_held_by(&ids);
         let mut lifted: Vec<ObjectInstance> = ids.iter().rev().map(|&id| self.remove_object(id)).collect();
         lifted.reverse();
         let old = lifted.iter().find(|o| o.id == object).expect("lifted it").clone();
@@ -715,6 +717,7 @@ impl World {
             let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
             let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
             let delta = turned(&self.objects[id as usize]) - turned(&old);
+            let mut placed = vec![(old.clone(), id)];
             for r in lifted.iter().filter(|o| o.id != object) {
                 let (x, z, offset) = match (old_top, new_top) {
                     (Some(a), Some(b)) => {
@@ -730,13 +733,18 @@ impl World {
                 let rid = self
                     .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.style, r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
-                let placed = &mut self.objects[rid as usize];
-                placed.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
-                placed.wear = r.wear;
+                let o = &mut self.objects[rid as usize];
+                o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
+                o.wear = r.wear;
+                placed.push((r.clone(), rid));
             }
-            // Food and dishes on it (or kept in it) come along.
-            let new = self.objects[id as usize].clone();
-            self.carry_items(&old, &new);
+            for (was, now) in placed {
+                let items: Vec<u32> = held.iter().filter(|&&(_, holder)| holder == was.id).map(|&(item, _)| item).collect();
+                if !items.is_empty() {
+                    let new = self.objects[now as usize].clone();
+                    self.carry_items(&was, &new, &items);
+                }
+            }
             Ok(id)
         })();
         if result.is_err() {

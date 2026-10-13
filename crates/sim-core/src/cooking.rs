@@ -1639,16 +1639,29 @@ fn update(w: &mut World) {
 }
 
 impl World {
-    /// Items on or in `old` follow it to where it stands now (`new`, the same object moved or
-    /// turned), turning with it.
-    pub(crate) fn carry_items(&mut self, old: &ObjectInstance, new: &ObjectInstance) {
+    /// The items on or in any of `objects` (their holder, see `items::holder`; not what merely
+    /// shares a tile with them, like the dinner on the table under a fruit bowl or over a rug),
+    /// with the object holding each. Asked before any of them is lifted or sold.
+    pub(crate) fn items_held_by(&self, objects: &[u32]) -> Vec<(u32, u32)> {
+        self.items
+            .list
+            .iter()
+            .filter_map(|it| {
+                let holder = crate::items::holder(&self.content, &self.objects, &it.at)?;
+                objects.contains(&holder).then_some((it.id, holder))
+            })
+            .collect()
+    }
+
+    /// Items `items` (on or in `old`) follow it to where it stands now (`new`, the same object
+    /// moved or turned), turning with it.
+    pub(crate) fn carry_items(&mut self, old: &ObjectInstance, new: &ObjectInstance, items: &[u32]) {
         let content = &self.content;
         let (from, to) = (old.centre(content), new.centre(content));
         let turn = (i32::from(new.rot) - i32::from(old.rot)).rem_euclid(4);
-        let tiles: Vec<(i32, i32)> = old.tiles(content).collect();
         let mut moved = false;
         for it in &mut self.items.list {
-            if matches!(it.at, ItemAt::Floor { .. }) || !tiles.contains(&it.at.tile()) {
+            if matches!(it.at, ItemAt::Floor { .. }) || !items.contains(&it.id) {
                 continue;
             }
             let c = it.at.centre();
@@ -1678,13 +1691,12 @@ impl World {
         }
     }
 
-    /// Items on or in `obj` go with it (it's being sold).
-    pub(crate) fn drop_items_with(&mut self, obj: &ObjectInstance) {
-        let tiles: Vec<(i32, i32)> = obj.tiles(&self.content).collect();
+    /// Items `items` go (what they were on or in is being sold).
+    pub(crate) fn drop_items(&mut self, items: &[u32]) {
         let before = self.items.list.len();
-        self.items.list.retain(|it| matches!(it.at, ItemAt::Floor { .. }) || !tiles.contains(&it.at.tile()));
+        self.items.list.retain(|it| !items.contains(&it.id));
         if self.items.list.len() != before {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 
