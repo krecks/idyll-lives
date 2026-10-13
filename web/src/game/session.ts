@@ -80,6 +80,8 @@ const WARM_FRAMES = 3;
 const PORTRAIT_WAIT_MS = 8000;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
+const JOURNAL_SIZE = 300;
 /** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
 const REPEATING = new Set(['r', 'R', 'PageUp', 'PageDown', 'z', 'Z', 'y', 'Y']);
 
@@ -880,7 +882,8 @@ export async function startSession(
 
   function onStory(fresh: SocialEvent[]) {
     const now = Date.now();
-    if (game.journal.length) game.journal = [...game.journal, ...fresh];
+    // The open journal keeps up (it's fetched again when it opens).
+    if (game.journalOpen && game.journal.length) game.journal = game.journal.concat(fresh).slice(-JOURNAL_SIZE);
     director.noteEvents(fresh.filter(aboutUs), performance.now());
     // The feed: what happens to the household, and the town's bigger news.
     const news = fresh.filter((e) => (aboutUs(e) && e.importance >= 1) || e.importance >= 2 || (aboutUs(e) && e.kind === 'skillUp'));
