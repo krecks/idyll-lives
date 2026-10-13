@@ -192,3 +192,23 @@ fn the_toilet_before_bed_and_on_getting_up() {
         assert_eq!(seen.get(last_sleep + 1).map(|s| s.0), Some(TOILET), "seed {seed}: the toilet on getting up: {seen:?}");
     }
 }
+
+/// Needs stay within 0..1 whatever modifiers do: one that would decay backwards stops at full,
+/// one an activity would fill backwards stops at empty (content refuses such modifiers; this
+/// holds anyway).
+#[test]
+fn needs_stay_between_empty_and_full() {
+    let mut w = World::from_json(&common::content(), TOWN, 1).unwrap();
+    w.autonomy = false;
+    let (hunger, fun) = (need(&w, "hunger"), need(&w, "fun"));
+    w.sims[0].mods.need_decay[hunger] = -50.0;
+    w.sims[0].mods.need_gain[fun] = -50.0;
+    let watch = w.content.objects[w.objects[CINEMA as usize].def].interactions.iter().position(|i| i.total_gain[fun] > 0.0).unwrap();
+    w.apply(Command::Use { sim: 0, object: CINEMA, interaction: watch }).unwrap();
+    for _ in 0..(60.0 / MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let needs = &w.sims[0].needs[..w.content.needs.len()];
+        assert!(needs.iter().all(|n| (0.0..=1.0).contains(n)), "needs out of range: {needs:?}");
+    }
+    assert_eq!(w.sims[0].needs[hunger], 1.0, "hunger decayed backwards up to full, no further");
+}

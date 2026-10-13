@@ -3,6 +3,17 @@
 import type { Appearance, SimSpawn } from '../game/household';
 import type { SnapshotLayout } from './snapshot';
 
+/**
+ * The object a command by id is meant for, as the view shows it (its kind and tile): ids shift
+ * when anything before it is sold or moved, and the simulation skips a command whose object
+ * isn't there any more (`sim-core` `command::Seen`).
+ */
+export interface Seen {
+  def: string;
+  x: number;
+  z: number;
+}
+
 /** Mirrors `sim-core/src/command.rs`. */
 export type Command =
   | { type: 'setSpeed'; speed: number }
@@ -13,7 +24,7 @@ export type Command =
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
-  | { type: 'use'; sim: number; object: number; interaction: number }
+  | { type: 'use'; sim: number; object: number; interaction: number; seen?: Seen }
   /** Eat a serving of food (an item), or clear it away to the sink. */
   | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
   | { type: 'moveTo'; sim: number; x: number; z: number }
@@ -34,13 +45,13 @@ export type Command =
    * (negative: shorter) than its kind.
    */
   | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
-  | { type: 'sell'; household: number; object: number }
+  | { type: 'sell'; household: number; object: number; seen?: Seen }
   /** The paid quick fix for something worn or broken. */
-  | { type: 'repair'; household: number; object: number }
-  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
-  | { type: 'restyle'; household: number; object: number; style: number }
+  | { type: 'repair'; household: number; object: number; seen?: Seen }
+  | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number; seen?: Seen }
+  | { type: 'restyle'; household: number; object: number; style: number; seen?: Seen }
   | { type: 'setStyle'; household: number; style: number }
-  | { type: 'upgrade'; household: number; object: number }
+  | { type: 'upgrade'; household: number; object: number; seen?: Seen }
   | { type: 'build'; household: number; edits: EdgeEdit[] }
   | { type: 'paint'; household: number; faces: FacePaint[] }
   | { type: 'paintFloor'; household: number; tiles: FloorPaint[] }
@@ -846,6 +857,12 @@ export function storeyRow(world: StoreyLayout, k: number): number {
   const b = world.basement;
   const block = k < 0 ? (b ?? 0) : b !== undefined && k >= b ? k + 1 : k;
   return block * groundDepth(world);
+}
+
+/** What a command naming object `id` sends as `seen`: the object as the view shows it. */
+export function seenAt(objects: readonly ObjectPlacement[], id: number): Seen | undefined {
+  const o = objects.find((o) => o.id === id);
+  return o && { def: o.def, x: o.x, z: o.z };
 }
 
 /** The lowest storey: -1 with a basement, else 0 (the ground). */

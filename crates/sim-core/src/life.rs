@@ -199,7 +199,7 @@ fn job_market(w: &mut World, day: u32) {
     let Some(market) = w.content.career_rules.market.clone() else {
         return;
     };
-    if clock::tick_at(day, market.hour * 60.0) != Some(w.tick) || !w.autonomy {
+    if !clock::at_minute(w.tick, market.hour * 60.0) || !w.autonomy {
         return;
     }
     let tick = w.tick;
@@ -873,7 +873,7 @@ fn charge_rent(w: &mut World, day: u32) {
     let Some(rent) = w.content.rent.clone() else {
         return;
     };
-    if clock::tick_at(day, rent.hour * 60.0) != Some(w.tick) {
+    if !clock::at_minute(w.tick, rent.hour * 60.0) {
         return;
     }
     let tick = w.tick;

@@ -17,6 +17,10 @@ use crate::social::{
 pub const MAX_NEEDS: usize = 8;
 /// Upper bound on distinct interaction tags (stored as a bitmask).
 pub const MAX_TAGS: usize = 64;
+/// Most genders content may have (who someone is attracted to is a bit per gender).
+pub const MAX_GENDERS: usize = 32;
+/// Fastest a trait, perk, feeling or anything else may make someone walk (times the normal pace).
+pub const MAX_WALK_SPEED: f32 = 10.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Upper bound on the number of skills, so per-Sim skills fit in a fixed array.
@@ -2087,6 +2091,7 @@ pub(crate) struct ModifiersRaw {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TraitRaw {
     id: String,
     label: String,
@@ -2137,27 +2142,39 @@ pub(crate) fn build_modifiers(
     ctx: &str,
 ) -> Result<Modifiers, Error> {
     let tag = |t: &str| lookup(ix.tags, t, ctx, "tag");
+    // Multipliers (decay, gain, preference, skill gain) are at least 0, everything a number.
+    let factor = |v: f32, what: &str| {
+        if v >= 0.0 && v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: {what} {v} must be a number ≥ 0"))) }
+    };
+    let number = |v: f32, what: &str| {
+        if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: {what} must be a number"))) }
+    };
     let mut m = Modifiers::default();
     for (need, v) in &raw.need_decay {
-        m.need_decay[lookup(ix.needs, need, ctx, "need")?] = *v;
+        m.need_decay[lookup(ix.needs, need, ctx, "need")?] = factor(*v, "needDecay")?;
     }
     for (need, v) in &raw.need_gain {
-        m.need_gain[lookup(ix.needs, need, ctx, "need")?] = *v;
+        m.need_gain[lookup(ix.needs, need, ctx, "need")?] = factor(*v, "needGain")?;
     }
     for (t, v) in &raw.tag_preference {
-        m.tag_preference[tag(t)?] = *v;
+        m.tag_preference[tag(t)?] = factor(*v, "tagPreference")?;
     }
     for (t, v) in &raw.tag_acceptance {
-        m.tag_acceptance[tag(t)?] = *v;
+        m.tag_acceptance[tag(t)?] = number(*v, "tagAcceptance")?;
     }
     for (t, v) in &raw.tag_success {
-        m.tag_success[tag(t)?] = *v;
+        m.tag_success[tag(t)?] = number(*v, "tagSuccess")?;
     }
     for (skill, v) in &raw.skill_gain {
-        m.skill_gain[lookup(ix.skills, skill, ctx, "skill")?] = *v;
+        m.skill_gain[lookup(ix.skills, skill, ctx, "skill")?] = factor(*v, "skillGain")?;
     }
-    m.walk_speed = raw.walk_speed.unwrap_or(1.0);
-    m.mood = raw.mood;
+    // Residents walk: a speed of 0 (or less) would leave them walking for ever.
+    m.walk_speed = match raw.walk_speed {
+        None => 1.0,
+        Some(v) if v > 0.0 && v <= MAX_WALK_SPEED => v,
+        Some(v) => return Err(Error::new(format!("{ctx}: walkSpeed {v} must be above 0 and at most {MAX_WALK_SPEED}"))),
+    };
+    m.mood = number(raw.mood, "mood")?;
     Ok(m)
 }
 
@@ -2234,6 +2251,10 @@ impl Content {
                 "content must define 1..={MAX_NEEDS} needs"
             )));
         }
+        // (Needs only fall over time: a negative decay would push one past full.)
+        if let Some(n) = raw.needs.iter().find(|n| !(n.decay_per_hour >= 0.0 && n.decay_per_hour.is_finite())) {
+            return Err(Error::new(format!("need '{}': decayPerHour {} must be a number ≥ 0", n.id, n.decay_per_hour)));
+        }
 
         let needs: Vec<NeedDef> = raw
             .needs
@@ -2251,6 +2272,9 @@ impl Content {
             .enumerate()
             .map(|(i, n)| (n.id.as_str(), i))
             .collect();
+        if need_index.len() != needs.len() {
+            return Err(Error::new("duplicate need id"));
+        }
 
         // Tags come from object interactions and socials; everything else refers to them.
         let mut tags: Vec<String> = Vec::new();
@@ -2311,6 +2335,12 @@ impl Content {
             .enumerate()
             .map(|(i, m)| (social::feeling_id(m).to_owned(), i))
             .collect();
+        if emotion_index.len() != raw.emotions.len() {
+            return Err(Error::new("duplicate emotion id"));
+        }
+        if feeling_index.len() != raw.feelings.len() {
+            return Err(Error::new("duplicate feeling id"));
+        }
         if raw.skills.len() > MAX_SKILLS {
             return Err(Error::new(format!("at most {MAX_SKILLS} skills")));
         }
@@ -2374,6 +2404,13 @@ impl Content {
                     obj.id
                 )));
             }
+            // (Nothing bigger can be bought, see `World::check_size`.)
+            if obj.footprint.iter().any(|&f| f > crate::world::MAX_SIZE) {
+                return Err(Error::new(format!("object '{}': a footprint is at most {MAX} × {MAX} tiles", obj.id, MAX = crate::world::MAX_SIZE)));
+            }
+            if let Some((i, it)) = obj.interactions.iter().enumerate().find(|(i, it)| obj.interactions[..*i].iter().any(|o| o.id == it.id)) {
+                return Err(Error::new(format!("object '{}': interaction {i} repeats the id '{}'", obj.id, it.id)));
+            }
             let mut interactions = Vec::with_capacity(obj.interactions.len());
             for it in &obj.interactions {
                 let ctx = format!("{}.{}", obj.id, it.id);
@@ -2384,7 +2421,7 @@ impl Content {
                     .transpose()?;
                 // A recipe takes as long as its steps.
                 let minutes = recipe.map_or(it.minutes, |r| recipes[r].minutes);
-                if minutes <= 0.0 {
+                if !(minutes > 0.0 && minutes.is_finite()) {
                     return Err(Error::new(format!("{ctx}: minutes must be > 0")));
                 }
                 let mut own_gain = [0.0; MAX_NEEDS];
@@ -2667,6 +2704,11 @@ impl Content {
         {
             return Err(Error::new("duplicate social id"));
         }
+        for (id, p) in &raw.bond_presets {
+            if !((-100.0..=100.0).contains(&p.friendship) && (-100.0..=100.0).contains(&p.romance)) {
+                return Err(Error::new(format!("bond preset '{id}': friendship and romance are -100..100")));
+            }
+        }
         let social_rules = social::parse_rules(&raw.social_rules, &raw.bond_presets, &ix)?;
         let chats = socials.iter().flat_map(|s| s.actor_gain.iter().chain(&s.target_gain).enumerate());
         let urgent = raw
@@ -2897,7 +2939,7 @@ impl Content {
             .collect();
         workweek.sort_by(|a, b| a.fit.total_cmp(&b.fit));
         let career_rules = CareerRules {
-            commute_minutes: cr.commute_minutes.unwrap_or(30.0),
+            commute_minutes: time(cr.commute_minutes.unwrap_or(30.0), "careerRules.commuteMinutes")?,
             late_minutes: cr.late_minutes.unwrap_or(60.0),
             missed_penalty: cr.missed_penalty.unwrap_or(20.0),
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
@@ -2936,20 +2978,22 @@ impl Content {
             fatigue_recovery_per_hour: sr.fatigue_recovery_per_hour.unwrap_or(0.0),
         };
         let dr = &raw.day_rhythm;
-        let tag_mask = |tags: &[String]| {
-            tags.iter()
-                .filter_map(|t| tag_index.get(t.as_str()))
-                .fold(0, |m: TagMask, i| m | (1 << i))
+        // Tags content names here must exist (a typo would quietly switch something off).
+        let tag_mask = |tags: &[String], ctx: &str| -> Result<TagMask, Error> {
+            tags.iter().try_fold(0, |m: TagMask, t| Ok(m | (1 << lookup(&tag_index, t, ctx, "tag")?)))
         };
         let multipliers =
             |map: &HashMap<String, f32>, ctx: &str| -> Result<[f32; MAX_NEEDS], Error> {
                 let mut out = [1.0; MAX_NEEDS];
                 for (k, v) in map {
+                    if !(*v >= 0.0 && v.is_finite()) {
+                        return Err(Error::new(format!("{ctx}: the {k} multiplier {v} must be a number ≥ 0")));
+                    }
                     out[lookup(&need_index, k, ctx, "need")?] = *v;
                 }
                 Ok(out)
             };
-        let sleep_tags = tag_mask(&dr.sleep_tags);
+        let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
         let mut slept = [0.0f32; MAX_NEEDS];
         for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
             for (n, g) in inter.total_gain.iter().enumerate() {
@@ -2973,7 +3017,7 @@ impl Content {
             rest_need: (0..MAX_NEEDS).filter(|&n| slept[n] > 0.0).max_by(|&a, &b| slept[a].total_cmp(&slept[b])),
             lie_in_hours: dr.lie_in_hours.unwrap_or(0.5),
             sleep_quality_bonus: dr.sleep_quality_bonus.unwrap_or(0.06),
-            nap_tags: tag_mask(&dr.nap_tags),
+            nap_tags: tag_mask(&dr.nap_tags, "dayRhythm.napTags")?,
             nap_cooldown_hours: dr.nap_cooldown_hours.unwrap_or(4.0),
             exhausted_below: dr.exhausted_below.unwrap_or(0.2),
             habits: dr
@@ -3009,7 +3053,7 @@ impl Content {
                         needs: mask,
                         below,
                         tend_below: b.tend_below.unwrap_or(0.6).clamp(below, 1.0),
-                        cooldown_ticks: (b.cooldown_minutes.unwrap_or(90.0).max(0.0) / crate::MINUTES_PER_TICK) as u64,
+                        cooldown_ticks: (time(b.cooldown_minutes.unwrap_or(90.0), "dayRhythm.babyWakes.cooldownMinutes")?.max(0.0) / crate::MINUTES_PER_TICK) as u64,
                         finish_minutes: b.finish_minutes.unwrap_or(15.0).max(0.0),
                         feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
                     })
@@ -3049,9 +3093,9 @@ impl Content {
                     dirt: a.dirt.clamp(0.0, 1.0),
                     feeling: feeling(&a.feeling, &ctx)?,
                     cost: a.cost.max(0),
-                    cooldown_ticks: (a.cooldown_hours.unwrap_or(2.0).max(0.0) * 60.0 / crate::MINUTES_PER_TICK) as u64,
-                    grace_ticks: (a.grace_minutes.unwrap_or(30.0).max(0.0) / crate::MINUTES_PER_TICK) as u64,
-                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| (m.max(0.0) / crate::MINUTES_PER_TICK) as u64),
+                    cooldown_ticks: (time(a.cooldown_hours.unwrap_or(2.0), &ctx)?.max(0.0) * 60.0 / crate::MINUTES_PER_TICK) as u64,
+                    grace_ticks: (time(a.grace_minutes.unwrap_or(30.0), &ctx)?.max(0.0) / crate::MINUTES_PER_TICK) as u64,
+                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| time(m, &ctx)).transpose()?.map(|m| (m.max(0.0) / crate::MINUTES_PER_TICK) as u64),
                     another_room: a
                         .another_room
                         .as_ref()
@@ -3071,9 +3115,13 @@ impl Content {
                                 label: r.label.clone(),
                                 minutes,
                                 pose: r.pose,
-                                anim: r.anim.as_deref().and_then(|n| animations.iter().position(|x| x == n)),
+                                anim: r
+                                    .anim
+                                    .as_deref()
+                                    .map(|n| anim_index(n).ok_or_else(|| Error::new(format!("{ctx}: unknown anim '{n}' (declare it in \"animations\")"))))
+                                    .transpose()?,
                                 gain_per_minute: need_array(&r.gains, &ctx)?.map(|g| g / minutes),
-                                tags: tag_mask(&r.tags),
+                                tags: tag_mask(&r.tags, &ctx)?,
                             })
                         })
                         .transpose()?,
@@ -3083,15 +3131,18 @@ impl Content {
         let room_kinds = raw
             .room_kinds
             .iter()
-            .map(|k| RoomKind {
-                id: k.id.clone(),
-                label: k.label.clone().unwrap_or_else(|| k.id.clone()),
-                tags: tag_mask(&k.tags),
-                essentials: k.essentials.iter().map(|e| tag_mask(e)).filter(|&m| m != 0).collect(),
-                size: k.size.unwrap_or([4.0, 9.0]),
-                exclusive: k.exclusive,
+            .map(|k| {
+                let ctx = format!("room kind '{}'", k.id);
+                Ok(RoomKind {
+                    id: k.id.clone(),
+                    label: k.label.clone().unwrap_or_else(|| k.id.clone()),
+                    tags: tag_mask(&k.tags, &ctx)?,
+                    essentials: k.essentials.iter().map(|e| tag_mask(e, &ctx)).collect::<Result<Vec<_>, Error>>()?.into_iter().filter(|&m| m != 0).collect(),
+                    size: k.size.unwrap_or([4.0, 9.0]),
+                    exclusive: k.exclusive,
+                })
             })
-            .collect();
+            .collect::<Result<_, Error>>()?;
         let rr = &raw.room_rules;
         let room_rules = RoomRules {
             weights: rr.weights.unwrap_or([0.2, 0.2, 0.2, 0.25, 0.15]),
@@ -3108,7 +3159,7 @@ impl Content {
             dislike_feeling: feeling(&rr.dislike_feeling, "roomRules")?,
             dirt: {
                 let mut d: Vec<(TagMask, f32)> =
-                    rr.dirt.iter().map(|(t, &v)| (tag_mask(std::slice::from_ref(t)), v.max(0.0))).filter(|(m, _)| *m != 0).collect();
+                    rr.dirt.iter().map(|(t, &v)| Ok((tag_mask(std::slice::from_ref(t), "roomRules.dirt")?, v.max(0.0)))).collect::<Result<_, Error>>()?;
                 d.sort_by_key(|e| e.0);
                 d
             },
@@ -3118,7 +3169,7 @@ impl Content {
                 threshold: rr.clean.threshold.unwrap_or(0.15),
                 amount: rr.clean.amount.unwrap_or(0.7),
                 interest: rr.clean.interest.unwrap_or(0.6),
-                tags: tag_mask(&rr.clean.tags.clone().unwrap_or_else(|| vec!["chores".into(), "cleaning".into()])),
+                tags: tag_mask(&clean_tags, "roomRules.clean")?,
                 anim: animations.iter().position(|a| a == "clean"),
             },
         };
@@ -3137,13 +3188,17 @@ impl Content {
             repair: RepairRules {
                 label: rp.label.clone().unwrap_or_else(|| "Repair".into()),
                 minutes: rp.minutes.unwrap_or(45.0).max(1.0),
-                skill: rp.skill.as_deref().and_then(|s| skill_index.get(s).copied()),
+                skill: rp.skill.as_deref().map(|s| lookup(&skill_index, s, "objectRules.repair", "skill")).transpose()?,
                 skill_gain: rp.skill_gain_per_hour.unwrap_or(0.3),
                 chance: rp.chance.unwrap_or(0.5),
                 chance_per_level: rp.chance_per_level.unwrap_or(0.08),
                 interest: rp.interest.unwrap_or(0.7),
                 cost: rp.cost.unwrap_or(0.3),
-                tags: tag_mask(&rp.tags.clone().unwrap_or_else(|| vec!["chores".into()])),
+                // (By default its chores tag, if content has one.)
+                tags: match &rp.tags {
+                    Some(tags) => tag_mask(tags, "objectRules.repair")?,
+                    None => tag_index.get("chores").map_or(0, |&i| 1 << i),
+                },
                 anim: animations.iter().position(|a| a == "tinker"),
             },
             max_quality: or.max_quality.unwrap_or(3),
@@ -3151,6 +3206,13 @@ impl Content {
             upgrade_cost: or.upgrade_cost.unwrap_or(0.3),
             resale: or.resale.unwrap_or(0.5),
         };
+        // (Selling for more than was paid would be a money machine; an upgrade costs something.)
+        if !(0.0..=1.0).contains(&object_rules.resale) {
+            return Err(Error::new(format!("objectRules.resale {} must be 0..1 (a share of what was paid)", object_rules.resale)));
+        }
+        if !(object_rules.upgrade_cost >= 0.0 && object_rules.upgrade_cost.is_finite()) {
+            return Err(Error::new(format!("objectRules.upgradeCost {} must be a number ≥ 0", object_rules.upgrade_cost)));
+        }
         let build = BuildRules {
             wall: raw.build.wall.unwrap_or(40),
             door: raw.build.door.unwrap_or(150),
@@ -3273,6 +3335,10 @@ impl Content {
             return Err(Error::new("duplicate perk id"));
         }
 
+        // (Who someone is attracted to is a bit per gender.)
+        if raw.genders.len() > MAX_GENDERS {
+            return Err(Error::new(format!("at most {MAX_GENDERS} genders")));
+        }
         let genders: Vec<GenderDef> = raw
             .genders
             .iter()
@@ -3453,6 +3519,12 @@ impl Content {
     }
 }
 
+/// A time content gives (minutes or hours): a number (1e39 reads as infinity, which would
+/// overflow the ticks it becomes).
+fn time(v: f32, ctx: &str) -> Result<f32, Error> {
+    if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: times must be numbers"))) }
+}
+
 fn lookup(index: &HashMap<&str, usize>, key: &str, ctx: &str, kind: &str) -> Result<usize, Error> {
     index
         .get(key)
@@ -3502,7 +3574,7 @@ mod tests {
         "socials":[{"id":"chat","label":"Chat","minutes":15,"tags":["social","friendly"],
           "needs":{"social":0.3},"success":{"friendship":3,"targetFriendship":3,"feeling":"goodChat"}}],
         "bondPresets":{"roommates":{"friendship":25}},
-        "socialRules":{"defaultBond":"roommates","busyTags":["food","nonexistent"]},
+        "socialRules":{"defaultBond":"roommates","busyTags":["food"]},
         "traits":[
           {"id":"foodie","label":"Foodie","effects":{"tagPreference":{"food":2},"needDecay":{"hunger":1.2}}},
           {"id":"neat","label":"Neat","conflicts":["slob"]},
@@ -3525,7 +3597,7 @@ mod tests {
         assert_eq!(c.objects[1].interactions[0].tags, 0b110);
         assert_eq!(c.socials[0].success.feeling, Some(0));
         assert_eq!(c.feelings[0].emotion, Some(0));
-        assert_eq!(c.social_rules.busy_tags, 1, "unknown busy tags are ignored");
+        assert_eq!(c.social_rules.busy_tags, 1);
         assert_eq!(c.social_rules.default_bond.unwrap().friendship, 25.0);
     }
 
@@ -3637,5 +3709,84 @@ mod tests {
         assert!(c.validate_identity("female", &["male".into()]).is_ok());
         assert!(c.validate_identity("robot", &[]).is_err());
         assert!(c.validate_identity("male", &["robot".into()]).is_err());
+    }
+
+    /// Content that would break the game is refused, saying what's wrong: walking speeds,
+    /// decays and multipliers, too many genders, recipe steps, resale and upgrade prices, a
+    /// footprint, repeated ids, bond presets, names nothing has, and times too big to be numbers.
+    #[test]
+    fn refuses_content_that_would_break_the_game() {
+        use serde_json::json;
+        let refused = |edit: &dyn Fn(&mut serde_json::Value), says: &str| {
+            let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+            edit(&mut c);
+            match Content::from_json(&c.to_string()) {
+                Ok(_) => panic!("accepted, expected: {says}"),
+                Err(e) => assert!(e.to_string().contains(says), "{e} (expected: {says})"),
+            }
+        };
+        // (1e39 is past what an f32 holds: it reads as infinity.)
+        let inf = || json!(1e39);
+        refused(&|c| c["traits"][3]["effects"]["walkSpeed"] = json!(0), "lazy: walkSpeed 0 must be above 0");
+        refused(&|c| c["traits"][3]["effects"]["walkSpeed"] = json!(-1.0), "walkSpeed -1 must be above 0");
+        refused(&|c| c["perks"][1]["effects"]["walkSpeed"] = json!(11), "at most 10");
+        refused(&|c| c["perks"][1]["effects"]["walkSpeed"] = inf(), "fast: walkSpeed inf");
+        refused(&|c| c["emotions"][0]["effects"]["walkSpeed"] = json!(0), "happy: walkSpeed");
+        refused(&|c| c["feelings"][0]["effects"] = json!({"walkSpeed": 0}), "goodChat: walkSpeed");
+        refused(&|c| c["needs"][0]["decayPerHour"] = json!(-0.1), "need 'hunger': decayPerHour -0.1");
+        refused(&|c| c["traits"][0]["effects"]["needDecay"]["hunger"] = json!(-1), "foodie: needDecay -1");
+        refused(&|c| c["perks"][0]["effects"]["needGain"] = json!({"hunger": -1}), "iron: needGain -1");
+        refused(&|c| c["emotions"][0]["effects"]["tagPreference"]["friendly"] = json!(-1), "happy: tagPreference -1");
+        refused(&|c| c["dayRhythm"] = json!({"nightDecay": {"hunger": -0.5}}), "dayRhythm: the hunger multiplier -0.5");
+        refused(&|c| c["genders"] = (0..33).map(|i| json!({"id": format!("g{i}"), "label": "G"})).collect(), "at most 32 genders");
+        refused(&|c| c["objectRules"] = json!({"resale": 1.5}), "objectRules.resale 1.5 must be 0..1");
+        refused(&|c| c["objectRules"] = json!({"resale": -0.5}), "objectRules.resale");
+        refused(&|c| c["objectRules"] = json!({"upgradeCost": -0.3}), "objectRules.upgradeCost -0.3");
+        refused(&|c| c["objects"][1]["footprint"] = json!([7, 1]), "object 'tv': a footprint is at most 6 × 6 tiles");
+        refused(
+            &|c| {
+                let it = c["objects"][0]["interactions"][0].clone();
+                c["objects"][0]["interactions"].as_array_mut().unwrap().push(it);
+            },
+            "object 'fridge': interaction 1 repeats the id 'snack'",
+        );
+        refused(&|c| c["needs"].as_array_mut().unwrap().push(json!({"id": "fun", "label": "Fun", "decayPerHour": 0.1})), "duplicate need id");
+        refused(&|c| c["emotions"].as_array_mut().unwrap().push(json!({"id": "happy", "label": "Happy"})), "duplicate emotion id");
+        refused(&|c| c["feelings"].as_array_mut().unwrap().push(json!({"id": "goodChat", "label": "Good", "hours": 1})), "duplicate feeling id");
+        refused(&|c| c["bondPresets"]["roommates"]["friendship"] = json!(150), "bond preset 'roommates': friendship and romance are -100..100");
+        refused(&|c| c["bondPresets"]["roommates"]["romance"] = json!(-101), "bond preset 'roommates'");
+        refused(&|c| c["socialRules"]["busyTags"] = json!(["food", "nonexistent"]), "socialRules.busyTags: unknown tag 'nonexistent'");
+        refused(&|c| c["socialRules"]["guestTags"] = json!(["bathrom"]), "socialRules.guestTags: unknown tag 'bathrom'");
+        refused(&|c| c["dayRhythm"] = json!({"sleepTags": ["slep"]}), "dayRhythm.sleepTags: unknown tag 'slep'");
+        refused(&|c| c["dayRhythm"] = json!({"napTags": ["nap"]}), "dayRhythm.napTags: unknown tag 'nap'");
+        refused(&|c| c["roomKinds"] = json!([{"id": "den", "tags": ["screen"], "essentials": [["scren"]]}]), "room kind 'den': unknown tag 'scren'");
+        refused(&|c| c["roomRules"] = json!({"dirt": {"fod": 0.1}}), "roomRules.dirt: unknown tag 'fod'");
+        refused(&|c| c["objectRules"] = json!({"repair": {"skill": "handiness"}}), "objectRules.repair: unknown skill 'handiness'");
+        refused(&|c| c["objectRules"] = json!({"repair": {"tags": ["chore"]}}), "objectRules.repair: unknown tag 'chore'");
+        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "anim": "snooze"}}]), "accident 'doze': unknown anim 'snooze'");
+        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "tags": ["sleep"]}}]), "accident 'doze': unknown tag 'sleep'");
+        refused(&|c| c["activities"] = json!([{"id": "tv", "label": "TV", "tags": ["scren"]}]), "activity 'tv': unknown tag 'scren'");
+        refused(&|c| c["cooking"] = json!({"eatTags": ["fod"]}), "cooking.eatTags: unknown tag 'fod'");
+        refused(
+            &|c| {
+                c["items"] = json!([{"id": "pot", "label": "Pot"}]);
+                let step = json!({"at": ["counter"], "minutes": 1});
+                c["recipes"] = json!([{"id": "stew", "label": "Stew", "item": "pot", "steps": vec![step; 256]}]);
+            },
+            "recipe 'stew': 1 to 255 steps",
+        );
+        refused(&|c| c["feelings"][0]["hours"] = inf(), "goodChat: hours must be > 0");
+        refused(&|c| c["objects"][0]["interactions"][0]["minutes"] = inf(), "fridge.snack: minutes must be > 0");
+        refused(&|c| c["socials"][0]["minutes"] = inf(), "chat: minutes must be > 0");
+        refused(&|c| c["careerRules"] = json!({"commuteMinutes": 1e39}), "careerRules.commuteMinutes: times must be numbers");
+        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]), "accident 'doze': times must be numbers");
+        refused(&|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}), "dayRhythm.babyWakes.cooldownMinutes");
+        refused(&|c| c["cooking"] = json!({"inviteMinutes": 1e39}), "cooking.inviteMinutes must be a number");
+        // (Each of these on its own is fine.)
+        let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        c["objectRules"] = json!({"resale": 1.0, "upgradeCost": 0.0});
+        c["bondPresets"]["roommates"]["friendship"] = json!(-100);
+        c["perks"][1]["effects"]["walkSpeed"] = json!(10);
+        assert!(Content::from_json(&c.to_string()).is_ok());
     }
 }

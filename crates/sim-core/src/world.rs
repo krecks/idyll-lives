@@ -11,7 +11,7 @@ use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 use crate::social::{self, ActiveFeeling, EventLog, Prefer, Relationships};
-use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_SECOND, ai, conversation};
+use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, ai, conversation};
 
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
@@ -24,10 +24,10 @@ const MIN_AUTONOMY_SCORE: f32 = 0.01;
 const SOCIAL_RANGE: f32 = 45.0;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
 const BABY_CRIES_BELOW: f32 = 0.3;
-pub const TICKS_PER_DAY: u64 = (24.0 * 60.0 / MINUTES_PER_TICK) as u64;
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+pub const TICKS_PER_DAY: u64 = crate::clock::TICKS_PER_DAY;
+const TICKS_PER_HOUR: u64 = 60 * TICKS_PER_MINUTE;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
-pub(crate) const ROOM_REFRESH_TICKS: u64 = (10.0 / MINUTES_PER_TICK) as u64;
+pub(crate) const ROOM_REFRESH_TICKS: u64 = 10 * TICKS_PER_MINUTE;
 /// How far (centimetres, per axis) an object can stand off the middle of its footprint: half a
 /// tile, so its middle stays on its tile (see `ObjectInstance::offset`).
 pub const MAX_OFFSET: i8 = 50;
@@ -866,6 +866,8 @@ pub struct World {
     /// Bumped per slot when someone new takes it (views rebuild that resident).
     pub(crate) generations: Vec<u32>,
     pub(crate) rng: Rng,
+    /// The seed the game started from (0: unknown, a save from before v23), for bug reports.
+    pub seed: u32,
     pub(crate) structure_version: u32,
     /// Bumped when the lot itself changes (walls, doors, windows, fences, coverings, floors),
     /// not when only objects, residents or households do: views can then leave the lot out.
@@ -972,6 +974,7 @@ impl World {
 
     pub fn new(content: Content, lot_file: &LotFile, seed: u32) -> Result<Self, Error> {
         let mut world = Self::empty(content, Lot::from_file(lot_file)?, Rng::new(seed));
+        world.seed = seed;
         // Storeys from the file before its objects (stairs, furniture upstairs).
         let storeys = lot_file.storeys.unwrap_or(1).clamp(1, 4);
         if storeys > 1 || lot_file.basement {
@@ -1099,6 +1102,7 @@ impl World {
             former: Vec::new(),
             generations: Vec::new(),
             rng,
+            seed: 0,
             structure_version: 1,
             lot_version: 1,
             briefs: Vec::new(),
@@ -1334,7 +1338,7 @@ impl World {
         if stairs {
             self.refresh_stairs();
         }
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(self.objects.len() as u32 - 1)
     }
 
@@ -1484,7 +1488,7 @@ impl World {
             self.retire_slot(slot);
             self.sims[slot] = sim;
             self.relationships.clear(slot);
-            self.generations[slot] += 1;
+            self.generations[slot] = self.generations[slot].wrapping_add(1);
         } else {
             self.sims.push(sim);
             self.relationships.grow(self.sims.len());
@@ -1555,7 +1559,7 @@ impl World {
             }
         }
         self.relationships.clear(i);
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
     }
 
     /// A resident's own modifiers: traits and perks, and what their life stage does (then the
@@ -1639,7 +1643,7 @@ impl World {
         if let Some(name) = name.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
             self.households[h].name = name.to_string();
         }
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         self.events
             .push_detail(self.tick, social::EventKind::MovedIn, first, None, None);
         Ok(())
@@ -1729,7 +1733,7 @@ impl World {
             return false;
         }
         let quiet = members.all(|s| s.away_until.is_some() || s.asleep(&self.content));
-        let hour_ago = self.tick.saturating_sub((60.0 / MINUTES_PER_TICK) as u64);
+        let hour_ago = self.tick.saturating_sub(TICKS_PER_HOUR);
         quiet
             && !self.events.iter().rev().take_while(|e| e.tick >= hour_ago).any(|e| {
                 e.kind.importance() >= 1
@@ -1775,7 +1779,7 @@ impl World {
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
-                self.structure_version += 1;
+                self.structure_version = self.structure_version.wrapping_add(1);
                 let (kind, n) = match news {
                     News::Broke(o) => (social::EventKind::Broke, self.objects[o as usize].def as i64),
                     News::Repaired(o) => (social::EventKind::Repaired, self.objects[o as usize].def as i64),
@@ -2160,6 +2164,11 @@ impl World {
         if self.rooms_version != self.structure_version {
             self.refresh_rooms();
         }
+        // Someone an order or an edit stopped (the sink they carried dishes to was moved) puts
+        // down what they carry now, not when time moves on (Build mode stands still).
+        if self.sims.iter().any(|s| s.held.is_some()) {
+            crate::cooking::settle(self);
+        }
         match snapshot {
             Some(s) => self.remember(s),
             None if !keeps_history => {
@@ -2169,6 +2178,20 @@ impl World {
             None => {}
         }
         Ok(())
+    }
+
+    /// `apply` for a command from the player's view that names an object by id, with what the
+    /// view showed there (`seen`, see `command::Seen`): when the object at that id isn't that
+    /// one any more (ids shifted since), nothing happens and it returns `Ok(false)`.
+    pub fn apply_seen(&mut self, cmd: Command, seen: Option<&crate::command::Seen>) -> Result<bool, Error> {
+        if let (Some(seen), Some(id)) = (seen, cmd.object()) {
+            let same = self.objects.get(id as usize).is_some_and(|o| (o.x, o.z) == (seen.x, seen.z) && self.content.objects[o.def].id == seen.def);
+            if !same {
+                return Ok(false);
+            }
+        }
+        self.apply(cmd)?;
+        Ok(true)
     }
 
     fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
@@ -2306,7 +2329,26 @@ impl World {
                         self.content.objects[obj.def].name.to_lowercase()
                     )));
                 }
-                let household = self.sim(sim)?.household as usize;
+                // Only their own home's things and public places', and what guests may use where
+                // they're a guest (or on their way to be one).
+                let s = self.sim(sim)?;
+                let plot = self.object_plot.get(object as usize).copied().flatten();
+                let visiting = |p: u32| {
+                    let visit = |t: &Task| matches!(t.kind, TaskKind::Visit { plot } if plot == p);
+                    s.current.as_ref().is_some_and(|a| visit(&a.task)) || s.queue.iter().any(visit)
+                };
+                let allowed = match order_access(&self.households, &self.plots, s, plot) {
+                    Access::None if plot.is_some_and(visiting) => Access::Guest,
+                    a => a,
+                };
+                let thing = self.content.objects[obj.def].name.to_lowercase();
+                if allowed == Access::None {
+                    return Err(Error::new(format!("the {thing} isn't {}'s to use", s.name)));
+                }
+                if allowed == Access::Guest && !guest_may(&self.content, inter) {
+                    return Err(Error::new(format!("{} is a guest there, and guests don't {}", s.name, inter.label.to_lowercase())));
+                }
+                let household = s.household as usize;
                 if !affordable(inter.cost, self.households[household].funds) {
                     return Err(Error::new(format!(
                         "not enough money: {} costs {}",
@@ -2740,7 +2782,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         }
         let decay =
             def.decay_per_minute * sim.mods.need_decay[n] * rhythm_factor * minutes;
-        sim.needs[n] = (sim.needs[n] - decay).max(0.0);
+        sim.needs[n] = (sim.needs[n] - decay).clamp(0.0, 1.0);
     }
 
     // At work: off the map until `life::update` brings them back.
@@ -2816,7 +2858,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         } else if let Some(task) = sim.queue.pop_front() {
             start_task(sim, task, ctx, objects, items);
         } else {
-            sim.idle_ticks += sim.steps;
+            sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
             // Babies don't choose anything: they lie in a crib and are cared for.
             if content.life.baby(sim.age) {
                 if let Some(task) = crib_for(sim, ctx, objects) {
@@ -2855,7 +2897,30 @@ pub(crate) enum Access {
 }
 
 pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
-    let home = ctx.households[sim.household as usize].plot;
+    access_in(ctx.households, ctx.plots, sim, plot)
+}
+
+/// Whether a guest may use `inter` at the host's: nothing private (sleeping, washing; the
+/// toilet is fine), no cooking and no caring for the host's baby.
+pub(crate) fn guest_may(content: &Content, inter: &crate::content::Interaction) -> bool {
+    let rules = &content.social_rules;
+    inter.tags & rules.busy_tags & !rules.guest_tags == 0 && inter.recipe.is_none() && !inter.cares()
+}
+
+/// What the player may have `sim` use on `plot`: as `access`, but their own home and public
+/// places stay theirs to use while they're a guest somewhere.
+pub(crate) fn order_access(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
+    let home = households[sim.household as usize].plot;
+    match plot {
+        None => Access::Full,
+        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        _ => access_in(households, plots, sim, plot),
+    }
+}
+
+/// `access` outside a step.
+pub(crate) fn access_in(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
+    let home = households[sim.household as usize].plot;
     // A guest stays at the host's place until it's time to go home.
     if let Some(visit) = sim.visiting {
         return if plot == Some(visit.plot) {
@@ -2866,7 +2931,7 @@ pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
     }
     match plot {
         None => Access::Full,
-        Some(p) if ctx.plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
         Some(p) if sim.visiting.is_some_and(|v| v.plot == p) => Access::Guest,
         Some(_) => Access::None,
     }
@@ -3398,15 +3463,25 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(obj) = objects.get(object as usize) else {
                 return;
             };
+            // (Not one it doesn't have: an id from before something was sold or moved.)
+            let Some(inter) = content.objects[obj.def].interactions.get(interaction) else {
+                return;
+            };
             if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
                 return;
             }
-            let inter = &content.objects[obj.def].interactions[interaction];
+            // Never other people's things; what the player asks a guest to do, only what guests
+            // may (washing hands at the host's sink after the toilet is fine).
+            let plot = ctx.object_plot.get(object as usize).copied().flatten();
+            let allowed = if task.directed { order_access(ctx.households, ctx.plots, sim, plot) } else { access(ctx, sim, plot) };
+            if allowed == Access::None || (allowed == Access::Guest && task.directed && !guest_may(content, inter)) {
+                return;
+            }
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {
                 return;
             }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
-            let tags = content.objects[obj.def].interactions[interaction].tags;
+            let tags = inter.tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
         }
         TaskKind::MoveTo { x, z } => ([x, z], (x.floor() as i32, z.floor() as i32), 0),
@@ -3775,12 +3850,12 @@ fn use_object(
             any_gain = true;
             fills |= 1 << n;
             let g = g * sim.mods.need_gain[n] * boost;
-            sim.needs[n] = (sim.needs[n] + g * minutes).min(1.0);
+            sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
             satisfied &= sim.needs[n] >= 0.999;
         } else {
             if g < 0.0 {
                 // Costs (a workout makes you hungry and sweaty).
-                sim.needs[n] = (sim.needs[n] + g * minutes).max(0.0);
+                sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
                 emptying |= sim.needs[n] < low && !content.needs[n].room;
             }
             // (Surroundings are never urgent: they follow the room, nothing fills them. Nor is

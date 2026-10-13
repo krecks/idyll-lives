@@ -45,25 +45,24 @@ pub fn default_age(rules: &crate::content::LifeRules, name: &str, slot: usize) -
 /// Once a day at midnight: everyone a year-fraction older; a new life stage is a story event
 /// and a feeling, and changes what the stage does to them.
 pub(crate) fn update(w: &mut World) {
-    if clock::tick_at(clock::day(w.tick), 0.0) == Some(w.tick) {
+    if clock::at_minute(w.tick, 0.0) {
         births(w);
     }
     if let Some(rules) = w.content.life.moving
-        && clock::tick_at(clock::day(w.tick), rules.hour * 60.0) == Some(w.tick)
+        && clock::at_minute(w.tick, rules.hour * 60.0)
         && w.autonomy
     {
         moving(w, &rules);
     }
     if let Some(rules) = w.content.life.newcomers
-        && clock::tick_at(clock::day(w.tick), rules.hour * 60.0) == Some(w.tick)
+        && clock::at_minute(w.tick, rules.hour * 60.0)
         && w.autonomy
     {
         newcomers(w, &rules);
         neighbours_adopt(w);
     }
     let Some(days_per_year) = w.lifespan.days_per_year(w.content.life.days_per_year) else { return };
-    let day = clock::day(w.tick);
-    if clock::tick_at(day, 0.0) != Some(w.tick) {
+    if !clock::at_minute(w.tick, 0.0) {
         return;
     }
     for i in 0..w.sims.len() {

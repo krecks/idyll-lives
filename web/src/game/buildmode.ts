@@ -22,7 +22,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, seenAt, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
 import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
@@ -665,7 +665,7 @@ export class BuildBuyInput {
         // Put down where it was: nothing to send (a move renumbers it and is an undo step).
         const was = game.objects.find((o) => o.id === placing.objectId);
         const same = was && was.x === p.x && was.z === p.z && was.rot === p.rot && (was.turn ?? 0) === p.turn && offsetKey(was.offset) === offsetKey(p.offset);
-        if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
+        if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, seen: seenAt(game.objects, placing.objectId) });
         // Moved: the original stays hidden until it shows up in its new place.
         this.preview.setHeldObject?.(null, !same);
         game.placing = null;
@@ -785,6 +785,16 @@ export class BuildBuyInput {
     }
     const lift = sel.lift ?? 0;
     this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
+  }
+
+  /** A move sent from elsewhere (rotate, reset size): once it lands, the object it renumbered is picked again. */
+  reselectAt(at: { def: string; x: number; z: number; rot: number }): void {
+    this.reselect = at;
+  }
+
+  /** Before undo or redo (they renumber objects): an owned object in hand (carried, dragged or resized) goes back; a new purchase stays on the cursor. */
+  dropOwned(): void {
+    if (this.resizing || this.dragging || game.placing?.objectId != null) this.cancel();
   }
 
   /** A new structure arrived: picks again what an edit renumbered. */
@@ -911,7 +921,7 @@ export class BuildBuyInput {
       const n = r.now;
       const changed = n.size !== undefined && (n.cx !== r.cx || n.cz !== r.cz || n.ex !== r.ex || n.ez !== r.ez || n.tall !== r.tall);
       if (changed && n.valid && n.size) {
-        this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall });
+        this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall, seen: seenAt(game.objects, r.id) });
         this.reselect = { def: r.def.id, x: n.x, z: n.z, rot: r.rot };
       }
       this.preview.setHeldObject?.(null, changed && n.valid);
@@ -939,7 +949,7 @@ export class BuildBuyInput {
     const was = game.objects.find((o) => o.id === drag.id);
     const same = !!p && !!was && was.x === p.x && was.z === p.z && was.rot === p.rot && offsetKey(was.offset) === offsetKey(p.offset);
     if (p?.valid && was && !same) {
-      this.send({ type: 'moveObject', household: game.home, object: drag.id, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
+      this.send({ type: 'moveObject', household: game.home, object: drag.id, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, seen: seenAt(game.objects, drag.id) });
       this.reselect = { def: was.def, x: p.x, z: p.z, rot: p.rot };
       this.preview.setHeldObject?.(null, true);
     } else {

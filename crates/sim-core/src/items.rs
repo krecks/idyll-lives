@@ -124,7 +124,7 @@ impl Items {
         item.id = self.next_id;
         self.next_id += 1;
         self.list.push(item);
-        self.version += 1;
+        self.version = self.version.wrapping_add(1);
         self.next_id - 1
     }
 
@@ -133,13 +133,14 @@ impl Items {
     }
 
     pub fn get_mut(&mut self, id: u32) -> Option<&mut ItemInstance> {
-        self.version += 1;
-        self.position(id).map(|i| &mut self.list[i])
+        let i = self.position(id)?;
+        self.version = self.version.wrapping_add(1);
+        Some(&mut self.list[i])
     }
 
     pub fn remove(&mut self, id: u32) -> Option<ItemInstance> {
         let i = self.position(id)?;
-        self.version += 1;
+        self.version = self.version.wrapping_add(1);
         Some(self.list.remove(i))
     }
 

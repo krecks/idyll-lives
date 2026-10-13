@@ -403,7 +403,7 @@ pub(crate) fn parse_feeling(raw: &FeelingRaw, ix: &Indices) -> Result<FeelingDef
             raw.id
         )));
     }
-    if raw.hours <= 0.0 {
+    if !(raw.hours > 0.0 && raw.hours.is_finite()) {
         return Err(Error::new(format!("{}: hours must be > 0", raw.id)));
     }
     Ok(FeelingDef {
@@ -442,7 +442,7 @@ pub(crate) fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result
 
 pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices) -> Result<SocialDef, Error> {
     let ctx = raw.id.as_str();
-    if raw.minutes <= 0.0 {
+    if !(raw.minutes > 0.0 && raw.minutes.is_finite()) {
         return Err(Error::new(format!("{ctx}: minutes must be > 0")));
     }
     let anim = match raw.animation.as_deref() {
@@ -479,12 +479,6 @@ pub(crate) fn parse_rules(
     presets: &HashMap<String, BondPreset>,
     ix: &Indices,
 ) -> Result<SocialRules, Error> {
-    // Busy/romantic tags that no interaction uses are simply ignored.
-    let mask = |tags: &[String]| {
-        tags.iter()
-            .filter_map(|t| ix.tags.get(t.as_str()))
-            .fold(0, |m: TagMask, i| m | (1 << i))
-    };
     let default_bond = match &raw.default_bond {
         None => None,
         Some(p) => Some(
@@ -494,9 +488,9 @@ pub(crate) fn parse_rules(
         ),
     };
     Ok(SocialRules {
-        busy_tags: mask(&raw.busy_tags),
-        guest_tags: mask(&raw.guest_tags),
-        romantic_tags: mask(&raw.romantic_tags),
+        busy_tags: tag_mask(&raw.busy_tags, ix, "socialRules.busyTags")?,
+        guest_tags: tag_mask(&raw.guest_tags, ix, "socialRules.guestTags")?,
+        romantic_tags: tag_mask(&raw.romantic_tags, ix, "socialRules.romanticTags")?,
         default_bond,
         jealousy_range: raw.jealousy_range.unwrap_or(8.0),
         jealousy_friendship: raw.jealousy_friendship.unwrap_or(-10.0),
@@ -673,8 +667,8 @@ impl Relationships {
         for (x, y, kin) in [(a, b, preset.kin), (b, a, preset.kin.inverse())] {
             let r = self.get_mut(x, y);
             r.met = true;
-            r.friendship = preset.friendship;
-            r.romance = preset.romance;
+            r.friendship = preset.friendship.clamp(-100.0, 100.0);
+            r.romance = preset.romance.clamp(-100.0, 100.0);
             r.partners = preset.partners;
             if !kin.is_none() {
                 r.kin = kin;
@@ -1050,6 +1044,33 @@ impl EventLog {
     /// Id of the latest event.
     pub fn last_id(&self) -> u64 {
         self.next_id
+    }
+
+    /// The events told after event `id`.
+    pub(crate) fn since(&self, id: u64) -> Vec<SocialEvent> {
+        self.events.iter().filter(|e| e.id > id).copied().collect()
+    }
+
+    /// Takes these events (by id) out of the story (an edit was undone); returns those it had.
+    pub(crate) fn take(&mut self, events: &[SocialEvent]) -> Vec<SocialEvent> {
+        let mut taken = Vec::new();
+        self.events.retain(|e| {
+            let gone = events.iter().any(|t| t.id == e.id);
+            if gone {
+                taken.push(*e);
+            }
+            !gone
+        });
+        taken
+    }
+
+    /// Tells `events` again (an undone edit was made again), under new ids; returns them.
+    pub(crate) fn put_back(&mut self, events: Vec<SocialEvent>) -> Vec<SocialEvent> {
+        let from = self.next_id;
+        for e in events {
+            self.add(e);
+        }
+        self.since(from)
     }
 
     /// Rebuilds a log from a save (oldest first); ids carry on after `next_id`.

@@ -293,7 +293,17 @@ pub(crate) fn parse(
     if stations.iter().enumerate().any(|(i, s)| stations[..i].contains(s)) {
         return Err(Error::new("cooking: duplicate station"));
     }
-    let tag_mask = |tags: &[String]| tags.iter().filter_map(|t| ix.tags.get(t.as_str())).fold(0, |m: TagMask, i| m | (1 << i));
+    // Tags content gives must exist; of the defaults, those content has (eating then may have none).
+    let tag_mask = |tags: &Option<Vec<String>>, default: &[&str], ctx: &str| -> Result<TagMask, Error> {
+        match tags {
+            Some(tags) => tags.iter().try_fold(0, |m: TagMask, t| {
+                let i = ix.tags.get(t.as_str()).ok_or_else(|| Error::new(format!("{ctx}: unknown tag '{t}'")))?;
+                Ok(m | (1 << i))
+            }),
+            None => Ok(default.iter().filter_map(|t| ix.tags.get(t)).fold(0, |m: TagMask, i| m | (1 << i))),
+        }
+    };
+    let finite = |v: f32, ctx: &str| if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx} must be a number"))) };
     let anim = |a: &Option<String>, fallback: &str, ctx: &str| -> Result<Option<usize>, Error> {
         match a {
             Some(a) => ix
@@ -323,20 +333,19 @@ pub(crate) fn parse(
         feed_family: raw.feed_family.unwrap_or(0.15).max(0.0),
         hungry_below: raw.hungry_below.unwrap_or(0.5),
         invited_boost: raw.invited_boost.unwrap_or(2.5).max(0.0),
-        invite_minutes: raw.invite_minutes.unwrap_or(60.0).max(0.0),
-        station_wait_minutes: raw.station_wait_minutes.unwrap_or(10.0).max(0.0),
+        invite_minutes: finite(raw.invite_minutes.unwrap_or(60.0), "cooking.inviteMinutes")?.max(0.0),
+        station_wait_minutes: finite(raw.station_wait_minutes.unwrap_or(10.0), "cooking.stationWaitMinutes")?.max(0.0),
         dirty_dirt_per_hour: raw.dirty_dirt_per_hour.unwrap_or(0.02).max(0.0),
         skip_penalty: raw.skip_penalty.unwrap_or(0.05).clamp(0.0, 0.5),
-        seat_tags: tag_mask(&raw.seat_tags.clone().unwrap_or_else(|| vec!["lounge".into(), "food".into()])),
-        seat_avoid: tag_mask(&raw.seat_avoid.clone().unwrap_or_else(|| vec!["spa".into(), "hygiene".into(), "bathroom".into()])),
+        seat_tags: tag_mask(&raw.seat_tags, &["lounge", "food"], "cooking.seatTags")?,
+        seat_avoid: tag_mask(&raw.seat_avoid, &["spa", "hygiene", "bathroom"], "cooking.seatAvoid")?,
         default_surface_height: raw.default_surface_height.unwrap_or(0.9).max(0.0),
         serve_range: raw.serve_range.unwrap_or(6.0).max(1.0),
         eat_label: raw.eat_label.clone().unwrap_or_else(|| "Eat".into()),
-        // (Tags content doesn't have are left out: eating then has none.)
-        eat_tags: tag_mask(&raw.eat_tags.clone().unwrap_or_else(|| vec!["food".into()])),
+        eat_tags: tag_mask(&raw.eat_tags, &["food"], "cooking.eatTags")?,
         eat_anim: anim(&raw.eat_anim, "eat", "cooking.eatAnim")?,
         dishes_label: raw.dishes_label.clone().unwrap_or_else(|| "Wash the dishes".into()),
-        dishes_tags: tag_mask(&raw.dishes_tags.clone().unwrap_or_else(|| vec!["chores".into(), "cleaning".into()])),
+        dishes_tags: tag_mask(&raw.dishes_tags, &["chores", "cleaning"], "cooking.dishesTags")?,
         dishes_anim: anim(&raw.dishes_anim, "wash", "cooking.dishesAnim")?,
         dishes_interest: raw.dishes_interest.unwrap_or(0.6).max(0.0),
         dishes: station_bit("dishes"),
@@ -375,8 +384,9 @@ pub(crate) fn parse(
         if recipe_defs.iter().any(|d: &RecipeDef| d.id == r.id) {
             return Err(Error::new(format!("duplicate recipe '{}'", r.id)));
         }
-        if r.steps.is_empty() {
-            return Err(Error::new(format!("{ctx}: no steps")));
+        // (A cook counts the steps in a byte.)
+        if r.steps.is_empty() || r.steps.len() > u8::MAX as usize {
+            return Err(Error::new(format!("{ctx}: 1 to {} steps", u8::MAX)));
         }
         let [lo, hi] = r.servings;
         if lo == 0 || hi < lo {
@@ -1634,21 +1644,34 @@ fn update(w: &mut World) {
     }
     w.items.list = keep;
     if changed {
-        w.items.version += 1;
+        w.items.version = w.items.version.wrapping_add(1);
     }
 }
 
 impl World {
-    /// Items on or in `old` follow it to where it stands now (`new`, the same object moved or
-    /// turned), turning with it.
-    pub(crate) fn carry_items(&mut self, old: &ObjectInstance, new: &ObjectInstance) {
+    /// The items on or in any of `objects` (their holder, see `items::holder`; not what merely
+    /// shares a tile with them, like the dinner on the table under a fruit bowl or over a rug),
+    /// with the object holding each. Asked before any of them is lifted or sold.
+    pub(crate) fn items_held_by(&self, objects: &[u32]) -> Vec<(u32, u32)> {
+        self.items
+            .list
+            .iter()
+            .filter_map(|it| {
+                let holder = crate::items::holder(&self.content, &self.objects, &it.at)?;
+                objects.contains(&holder).then_some((it.id, holder))
+            })
+            .collect()
+    }
+
+    /// Items `items` (on or in `old`) follow it to where it stands now (`new`, the same object
+    /// moved or turned), turning with it.
+    pub(crate) fn carry_items(&mut self, old: &ObjectInstance, new: &ObjectInstance, items: &[u32]) {
         let content = &self.content;
         let (from, to) = (old.centre(content), new.centre(content));
         let turn = (i32::from(new.rot) - i32::from(old.rot)).rem_euclid(4);
-        let tiles: Vec<(i32, i32)> = old.tiles(content).collect();
         let mut moved = false;
         for it in &mut self.items.list {
-            if matches!(it.at, ItemAt::Floor { .. }) || !tiles.contains(&it.at.tile()) {
+            if matches!(it.at, ItemAt::Floor { .. }) || !items.contains(&it.id) {
                 continue;
             }
             let c = it.at.centre();
@@ -1674,17 +1697,16 @@ impl World {
             moved = true;
         }
         if moved {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 
-    /// Items on or in `obj` go with it (it's being sold).
-    pub(crate) fn drop_items_with(&mut self, obj: &ObjectInstance) {
-        let tiles: Vec<(i32, i32)> = obj.tiles(&self.content).collect();
+    /// Items `items` go (what they were on or in is being sold).
+    pub(crate) fn drop_items(&mut self, items: &[u32]) {
         let before = self.items.list.len();
-        self.items.list.retain(|it| matches!(it.at, ItemAt::Floor { .. }) || !tiles.contains(&it.at.tile()));
+        self.items.list.retain(|it| !items.contains(&it.id));
         if self.items.list.len() != before {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 
@@ -1699,7 +1721,7 @@ impl World {
             }
         }
         if moved {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 }

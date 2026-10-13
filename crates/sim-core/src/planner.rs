@@ -249,11 +249,10 @@ pub(crate) fn parse(
         if out.iter().any(|o: &ActivityDef| o.id == a.id) {
             return Err(Error::new(format!("duplicate activity '{}'", a.id)));
         }
-        let tags = a
-            .tags
-            .iter()
-            .filter_map(|t| tag_index.get(t.as_str()))
-            .fold(0, |m: TagMask, i| m | (1 << i));
+        let tags = a.tags.iter().try_fold(0, |m: TagMask, t| {
+            let i = tag_index.get(t.as_str()).ok_or_else(|| Error::new(format!("activity '{}': unknown tag '{t}'", a.id)))?;
+            Ok::<_, Error>(m | (1 << i))
+        })?;
         out.push(ActivityDef {
             id: a.id.clone(),
             label: a.label.clone(),
@@ -634,7 +633,7 @@ pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     let day = clock::day(tick);
     let minute = clock::minute_of_day(tick);
-    let review = clock::tick_at(day, w.content.planner.review_hour * 60.0) == Some(tick);
+    let review = clock::at_minute(tick, w.content.planner.review_hour * 60.0);
     for i in 0..w.sims.len() {
         if !w.sims[i].here() {
             continue;
