@@ -119,6 +119,12 @@ const FENCE_PREVIEW_HEIGHT = 1.0;
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
 /**
+ * And real milliseconds at least: at the fastest speeds the minutes passed every snapshot (20 a
+ * second), and each update can thaw the materials for a few frames. At normal speed the steps are
+ * 500 ms apart anyway.
+ */
+const LIGHT_MIN_MS = 100;
+/**
  * Metres of the game's sun shadow map beyond the lot's corners (nearby trees and the street
  * still shade it), and the outer share of it over which shadows fade out.
  */
@@ -345,6 +351,8 @@ export class BabylonRenderer implements Renderer {
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
+  /** When the lighting was last updated in the game (`FrameState.now`; see `LIGHT_MIN_MS`). */
+  private lastLightAt = 0;
   /**
    * Storeys (sim-core `storeys.rs`): how many at and above the ground, the lowest (-1 with a
    * basement), where their rows are, and the one in view (see `storeyShown`: higher ones are
@@ -741,9 +749,11 @@ export class BabylonRenderer implements Renderer {
     // Behind the overview the game world waits (nothing of it is drawn).
     if (this.townMode) return;
     const snapshot = this.webgpu?.snapshotRendering ?? false;
-    if (Math.abs(minute - this.lastLightMinute) >= (snapshot ? LIGHT_STEP_SNAPSHOT : LIGHT_STEP)) {
+    const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
+    if (due && Math.abs(minute - this.lastLightMinute) >= (snapshot ? LIGHT_STEP_SNAPSHOT : LIGHT_STEP)) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
+      this.lastLightAt = frame.now;
       this.resetSnapshot();
     }
     // Lights go out in rooms where everyone is asleep.
