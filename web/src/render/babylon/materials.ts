@@ -430,6 +430,8 @@ export class MaterialLibrary {
   private readonly thawed = new Set<PBRMaterial>();
   private refreezeFrames = 0;
   private shadowMaterial: StandardMaterial | null = null;
+  /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
+  anisotropy = 8;
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
   /** The ground dug away over a basement in view (see `digInto`). */
@@ -582,7 +584,11 @@ export class MaterialLibrary {
     }
   }
 
-  /** Loads a prefiltered `.env` environment; resolves (without throwing) even when it fails. */
+  /**
+   * Loads a prefiltered `.env` environment; resolves (without throwing) even when it fails. The
+   * file is fetched here rather than by Babylon, so the download `index.html` starts with the page
+   * (`earlySky`) can be the one used.
+   */
   loadEnvironment(url: string): Promise<boolean> {
     return new Promise((resolve) => {
       let done = false;
@@ -592,16 +598,25 @@ export class MaterialLibrary {
         if (!ok) console.warn(`[render] environment ${url} unavailable; using lights only`);
         resolve(ok);
       };
-      try {
-        const tex = new CubeTexture(url, this.scene, null, false, null, () => {
-          this.scene.environmentTexture = tex;
-          finish(true);
-        }, () => finish(false), undefined, true, '.env');
-        tex.rotationY = Math.PI * 0.35;
-        setTimeout(() => finish(false), 15000);
-      } catch {
-        finish(false);
-      }
+      setTimeout(() => finish(false), 15000);
+      const download = () => fetch(url).then((res) => (res.ok ? res.arrayBuffer() : null));
+      (earlySky(url)?.then((bytes) => bytes ?? download()) ?? download())
+        .then((bytes) => {
+          if (!bytes) throw new Error('not loaded');
+          // (Also after the time limit: the sky lights the scene once it's there.)
+          const tex = new CubeTexture(url, this.scene, {
+            buffer: new Uint8Array(bytes),
+            prefiltered: true,
+            forcedExtension: '.env',
+            onLoad: () => {
+              this.scene.environmentTexture = tex;
+              finish(true);
+            },
+            onError: () => finish(false),
+          });
+          tex.rotationY = Math.PI * 0.35;
+        })
+        .catch(() => finish(false));
     });
   }
 
@@ -668,7 +683,7 @@ export class MaterialLibrary {
     if (!tex) {
       tex = textureWithFallback(url, this.scene, srgb);
       tex.uScale = tex.vScale = scale;
-      tex.anisotropicFilteringLevel = 8;
+      tex.anisotropicFilteringLevel = this.anisotropy;
       this.textures.set(id, tex);
     }
     return tex;
@@ -703,6 +718,19 @@ export function textureWithFallback(source: string, scene: Scene, srgb: boolean,
   tex.gammaSpace = srgb;
   if (anisotropy !== undefined) tex.anisotropicFilteringLevel = anisotropy;
   return tex;
+}
+
+/**
+ * The sky's lighting as `index.html` started fetching it with the page (`earlyEnvironment` in
+ * vite.config.ts), if that's `url`. Taken once: later loads (the portrait studios) fetch it again,
+ * from the browser's cache.
+ */
+function earlySky(url: string): Promise<ArrayBuffer | null> | null {
+  const page = self as { __skyEnv?: { url: string; bytes: Promise<ArrayBuffer | null> } };
+  const early = page.__skyEnv;
+  if (!early || new URL(early.url, location.href).href !== url) return null;
+  delete page.__skyEnv;
+  return early.bytes;
 }
 
 /** Whether a lighting value moved enough to pass on (see `LIGHT_CHANGE`). */

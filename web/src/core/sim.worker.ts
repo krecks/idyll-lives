@@ -18,8 +18,13 @@ const scope = self as unknown as WorkerScope;
 
 const UI_INTERVAL_MS = 100;
 const STATS_INTERVAL_MS = 1000;
-/** After a stall (tab hidden, debugger), skip the backlog instead of fast-forwarding. */
-const MAX_BACKLOG_MS = 1000;
+/**
+ * Steps run back to back, at most, to catch up after one ran late. A longer backlog (a stall: a
+ * slow step, the debugger, a busy machine) is dropped rather than run as a burst, which the
+ * renderer would show as a jump; if steps keep taking longer than their share, the game runs
+ * slower than its speed (the debug overlay's steps per second say so).
+ */
+const MAX_CATCH_UP = 2;
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
@@ -191,7 +196,8 @@ function runLoop(stepMs: number): void {
       steps = busyMs = maxMs = 0;
     }
     next += stepMs;
-    if (now - next > MAX_BACKLOG_MS) next = now;
+    // (Steps due by now run at once: at most MAX_CATCH_UP of them.)
+    next = Math.max(next, now - (MAX_CATCH_UP - 1) * stepMs);
     setTimeout(step, Math.max(0, next - now));
   };
   setTimeout(step, stepMs);

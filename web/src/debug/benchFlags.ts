@@ -8,18 +8,18 @@
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nocanvasaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
   /** `public/bench/<scene>.json`: the game state to play. */
   scene: string;
-  /** `?quality=` (today's presets in `render/quality.ts`; the renderer reads it itself). */
+  /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
   hour: number | null;
   cam: BenchCamera;
-  /** Render scale: 0.5..1, or `auto` (what the game picks: today the graphics preset's own). */
+  /** Render scale: 0.5..1, or `auto` (the player's resolution setting). */
   res: number | 'auto';
   /** Seconds measured, after `warmup` seconds of the same camera path. */
   secs: number;

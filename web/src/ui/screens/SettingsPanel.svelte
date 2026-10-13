@@ -5,7 +5,9 @@
 
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { GRAPHICS_PRESETS, graphicsPreset, resetSettings, RESTART_KEYS, settings, type GraphicsPreset, type Settings } from '../../settings/settings.svelte';
+  import { resetSettings, RESTART_KEYS, settings, type Settings } from '../../settings/settings.svelte';
+  import type { GraphicsPreset } from '../../render/quality';
+  import { MIN_SCALE } from '../../render/babylon/resolution';
   import { app } from '../app.svelte';
   import { services } from '../services';
   import { game, toast } from '../state.svelte';
@@ -57,7 +59,7 @@
 
   /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
-    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['resolutionScale', 'fpsCap', 'antiAliasing', 'shadowDetail', 'allLamps', 'mirrors', 'ambientOcclusion', 'renderer'] },
+    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'resolution', 'fpsCap', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
@@ -85,13 +87,12 @@
     ((e.currentTarget as HTMLElement).querySelectorAll('button')[next] as HTMLElement | undefined)?.focus();
   }
 
-  // Performance: a preset, or "Custom" once anything is changed by hand (the rows under Fine-tune).
-  const preset = $derived(graphicsPreset(settings));
-  let fineTune = $state(graphicsPreset(settings) === 'custom');
-  function pickPreset(id: GraphicsPreset | 'custom') {
-    if (id === 'custom') return void (fineTune = true);
-    Object.assign(settings, GRAPHICS_PRESETS[id]);
-  }
+  /** What each graphics preset is for (`render/quality.ts`). */
+  const GRAPHICS_HINTS: Record<GraphicsPreset, string> = {
+    low: 'For older laptops: simpler shadows, edges and lamps.',
+    medium: 'For most computers: the full look.',
+    high: 'For strong graphics cards: sharper shadows, and mirrors reflect the room.',
+  };
 
   // Remember restart-only values when opened during a game, to show a notice if they change.
   const initial = Object.fromEntries(RESTART_KEYS.map((k) => [k, settings[k]]));
@@ -164,6 +165,9 @@
     }
   }
   const percent = (v: number) => `${Math.round(v * 100)}%`;
+
+  // Resolution: Auto, or a share of the screen's own of the player's choosing (the slider; kept while on Auto).
+  let customResolution = $state(settings.resolution === 'auto' ? 1 : settings.resolution);
 
   // Frame rate cap: a preset, or a number of the player's own (`custom`, -1 in the control).
   const FPS_PRESETS = [30, 60, 120, 0];
@@ -278,21 +282,47 @@
     {/if}
 
     {#if page === 'performance'}
-      <p class="intro">If the game stutters, pick a lower quality: the resolution saves the most.</p>
+      <p class="intro">If the game stutters, pick Low or a lower resolution.</p>
       <section>
         <h3>Quality</h3>
-        <SettingRow title="Graphics" hint="Resolution, light and shadows, set together." details="Low draws at 75% resolution with simple shadows and only the nearest lamps. High is the default. Fine-tune sets each part on its own.">
+        <SettingRow title="Graphics" hint={GRAPHICS_HINTS[settings.graphics]} details="Low: simpler shadows, edges and lamps, for older laptops. Medium: the full look, for most computers. High: sharper shadows, and mirrors reflect the room, for strong graphics cards." badges={[NEXT_LOAD]}>
           <Segmented
             label="Graphics"
-            value={preset}
+            bind:value={settings.graphics}
             options={[
               { value: 'low', label: 'Low' },
               { value: 'medium', label: 'Medium' },
               { value: 'high', label: 'High' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Resolution"
+          hint={settings.resolution === 'auto' ? 'Full detail up to 1920×1080; bigger screens are scaled up.' : 'Lower is softer, but much faster.'}
+          details="Auto keeps 4K and Retina screens about as fast as a 1080p one. Custom draws that share of the screen's own resolution."
+        >
+          <Segmented
+            label="Resolution"
+            value={settings.resolution === 'auto' ? 'auto' : 'custom'}
+            options={[
+              { value: 'auto', label: 'Auto' },
               { value: 'custom', label: 'Custom' },
             ]}
-            onchange={pickPreset}
+            onchange={(v) => (settings.resolution = v === 'auto' ? 'auto' : customResolution)}
           />
+          {#if settings.resolution !== 'auto'}
+            <input
+              class="slider"
+              type="range"
+              min={MIN_SCALE}
+              max="1"
+              step="0.05"
+              aria-label="Resolution scale"
+              value={settings.resolution}
+              oninput={(e) => (settings.resolution = customResolution = Number(e.currentTarget.value))}
+            />
+            <output>{percent(settings.resolution)}</output>
+          {/if}
         </SettingRow>
         <SettingRow title="Frame rate cap" hint="A cap saves power and keeps laptops cooler." details="No cap draws as often as the display refreshes.">
           <Segmented
@@ -311,57 +341,19 @@
           {/if}
         </SettingRow>
       </section>
-      <button class="disclosure" aria-expanded={fineTune} onclick={() => (fineTune = !fineTune)}>
-        <span class="chev" class:open={fineTune}><Icon name="icon.ui.chevron" size={14} /></span>Fine-tune
-      </button>
-      {#if fineTune}
-        <section>
-          <h3>Image</h3>
-          <SettingRow title="Resolution" hint="Lower is softer, but much faster.">
-            <input class="slider" type="range" min="0.5" max="1" step="0.05" aria-label="Resolution scale" bind:value={settings.resolutionScale} />
-            <output>{percent(settings.resolutionScale)}</output>
-          </SettingRow>
-          <SettingRow title="Smooth edges" hint="Removes jagged edges." details="4× multisampling. Off uses a cheaper filter that blurs edges a little." badges={[NEXT_LOAD]}>
-            <Toggle label="Smooth edges" bind:checked={settings.antiAliasing} />
-          </SettingRow>
-        </section>
-        <section>
-          <h3>Light and shadow</h3>
-          <SettingRow title="Shadow detail" hint="Each step up uses four times the graphics memory." badges={[NEXT_LOAD]}>
-            <Segmented
-              label="Shadow detail"
-              bind:value={settings.shadowDetail}
-              options={[
-                { value: 1024, label: 'Low' },
-                { value: 2048, label: 'Medium' },
-                { value: 4096, label: 'High' },
-              ]}
-            />
-          </SettingRow>
-          <SettingRow title="Every lamp lights" hint="Off: only the four lamps nearest the biggest rooms." details="On: up to 32 lamps light their rooms. Costs little on WebGPU, more on WebGL2." badges={[NEXT_LOAD]}>
-            <Toggle label="Every lamp lights" bind:checked={settings.allLamps} />
-          </SettingRow>
-          <SettingRow title="Mirror reflections" hint="The two mirrors nearest the camera show the room." details="Each draws the scene once more while it is on screen." badges={[NEXT_LOAD]}>
-            <Toggle label="Mirror reflections" bind:checked={settings.mirrors} />
-          </SettingRow>
-          <SettingRow title="Ambient occlusion" hint="Soft contact shadows in corners and under furniture." details="Costly, and may fail to start on some WebGPU drivers." badges={['Experimental', NEXT_LOAD]}>
-            <Toggle label="Ambient occlusion" bind:checked={settings.ambientOcclusion} />
-          </SettingRow>
-        </section>
-        <section>
-          <h3>Engine</h3>
-          <SettingRow title="Graphics API" hint="WebGL2 is the fallback if the game won't draw." details="WebGPU (Auto, where there is one) is faster." badges={[NEXT_LOAD]}>
-            <Segmented
-              label="Graphics API"
-              bind:value={settings.renderer}
-              options={[
-                { value: 'auto', label: 'Auto' },
-                { value: 'webgl', label: 'WebGL2' },
-              ]}
-            />
-          </SettingRow>
-        </section>
-      {/if}
+      <section>
+        <h3>Troubleshooting</h3>
+        <SettingRow title="Graphics API" hint="WebGL2 is the fallback if the game won't draw." details="WebGPU (Auto, where there is one) is faster." badges={[NEXT_LOAD]}>
+          <Segmented
+            label="Graphics API"
+            bind:value={settings.renderer}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: 'webgl', label: 'WebGL2' },
+            ]}
+          />
+        </SettingRow>
+      </section>
     {:else if page === 'gameplay'}
       {#if app.screen === 'game'}
         <section>
@@ -739,30 +731,6 @@
     height: 28px;
     padding: 0 10px;
     font-size: 12px;
-  }
-  .disclosure {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 12px 0 8px;
-    border-radius: var(--radius-pill);
-    font-size: 12.5px;
-    font-weight: 650;
-    color: var(--text-muted);
-  }
-  .disclosure:hover {
-    background: var(--hairline);
-    color: var(--text);
-  }
-  .chev {
-    display: inline-grid;
-    transform: rotate(90deg);
-    transition: transform var(--fast) var(--ease);
-  }
-  .chev.open {
-    transform: rotate(180deg);
   }
   .page {
     display: flex;

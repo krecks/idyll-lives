@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -184,6 +184,128 @@ function releaseWasm(): Plugin {
   };
 }
 
+/**
+ * The sky's lighting (the base manifest's `environment.sky`, a 1 MB `.env`) starts downloading
+ * with the page, next to the game's script and data, instead of once the renderer starts and asks
+ * for it: a script in `index.html` fetches it, and `MaterialLibrary.loadEnvironment` takes the
+ * bytes (`self.__skyEnv`). (Not a `<link rel=preload>`: under the isolation service worker Chrome
+ * doesn't hand a preload to `fetch()`, and the file would download twice.)
+ */
+function earlyEnvironment(): Plugin {
+  let base = '/';
+  return {
+    name: 'early-environment',
+    configResolved(config) {
+      base = config.base;
+    },
+    transformIndexHtml() {
+      const manifest = JSON.parse(readFileSync(new URL('./public/assets/manifest.json', import.meta.url), 'utf8')) as { entries: Record<string, { url?: string }> };
+      const file = manifest.entries['environment.sky']?.url;
+      if (!file) return [];
+      // As the asset registry resolves it (src/assets/registry.ts, build.ts), so the URLs match.
+      const url = new URL(file, `http://x${base}assets/manifest.json`);
+      const href = JSON.stringify(`${url.pathname}${url.search ? `${url.search}&` : '?'}v=${BUILD_ID}`);
+      const children = `self.__skyEnv = { url: ${href}, bytes: fetch(${href}).then((res) => (res.ok ? res.arrayBuffer() : null)).catch(() => null) };`;
+      return [{ tag: 'script', children, injectTo: 'head' }];
+    },
+  };
+}
+
+/**
+ * The asset manifests ship without their spaces (public/ keeps them readable): the base one is
+ * 1.46 MB pretty-printed and 0.59 MB minified.
+ */
+function minifiedManifests(): Plugin {
+  let outDir = '';
+  return {
+    name: 'minified-manifests',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const dir = join(outDir, 'assets');
+      for (const file of await readdir(dir, { recursive: true })) {
+        if (basename(file) !== 'manifest.json') continue;
+        const path = join(dir, file);
+        await writeFile(path, JSON.stringify(JSON.parse(await readFile(path, 'utf8'))));
+      }
+    },
+  };
+}
+
+/**
+ * `bundle.json`: what every start fetches from public/ in one file (src/assets/bundle.ts):
+ * `content/base.json` and the files it includes, the house templates, the asset manifests and the
+ * packs they list, and the index of compressed copies; each file's text, minified, by its path
+ * below the base URL. The files still ship one by one beside it.
+ */
+function dataBundle(): Plugin {
+  let outDir = '';
+  return {
+    name: 'data-bundle',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const files: Record<string, string> = {};
+      /** Adds a file below public/ (or `from`); returns its JSON. */
+      const add = async (path: string, from = join(fileURLToPath(new URL('./public/', import.meta.url)), path)) => {
+        const json = JSON.parse(await readFile(from, 'utf8')) as Record<string, unknown>;
+        files[path] = JSON.stringify(json);
+        return json;
+      };
+      // As Content.load and AssetRegistry.load resolve them: relative to the file that lists them.
+      const relative = (path: string, name: string) => new URL(name, `http://x/${path}`).pathname.slice(1);
+      const base = await add('content/base.json');
+      for (const name of (base.include as string[] | undefined) ?? []) await add(relative('content/base.json', name));
+      await add('content/houses.json');
+      await add('content/housegen.json');
+      const manifests = async (path: string): Promise<void> => {
+        const manifest = await add(path);
+        for (const pack of (manifest.packs as string[] | undefined) ?? []) await manifests(relative(path, pack));
+      };
+      await manifests('assets/manifest.json');
+      if (process.env.LL_ASSETS !== 'source') {
+        const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
+        await add('assets/optimized.json', join(tool.OUT, 'optimized.json'));
+      }
+      await writeFile(join(outDir, 'bundle.json'), JSON.stringify(files));
+    },
+  };
+}
+
+/**
+ * The isolation service worker (public/isolation-sw.js) gets this build's id, which names the
+ * cache it keeps the build's hashed files in: every build is a new version of the worker, so
+ * returning players' browsers install it and drop the last build's cache. The worker tells the
+ * build's files by their names in `assets/`, so no file from public/ may look like one.
+ */
+function isolationWorker(): Plugin {
+  let outDir = '';
+  return {
+    name: 'isolation-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const file = join(outDir, 'isolation-sw.js');
+      const code = await readFile(file, 'utf8');
+      const stamped = code.replace("const BUILD = 'dev';", `const BUILD = '${BUILD_ID}';`);
+      if (stamped === code) throw new Error("isolation-worker: no `const BUILD = 'dev';` in isolation-sw.js");
+      await writeFile(file, stamped);
+      const pattern = /const HASHED = \/(.+)\/;/.exec(code)?.[1];
+      if (!pattern) throw new Error('isolation-worker: no `const HASHED = /…/;` in isolation-sw.js');
+      const hashed = new RegExp(pattern);
+      const own = await readdir(fileURLToPath(new URL('./public/assets/', import.meta.url))).catch(() => [] as string[]);
+      const clash = own.filter((name) => hashed.test(name));
+      if (clash.length) throw new Error(`isolation-worker: public/assets/${clash[0]} looks like a hashed build file (the service worker would keep it for good)`);
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -232,7 +354,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), optimizedAssets(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },

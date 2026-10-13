@@ -132,3 +132,34 @@ fn newcomers_move_into_vacant_houses() {
     assert!(w.sims.iter().filter(|s| s.here()).all(|s| w.households[s.household as usize].plot != player_plot || s.household == 0));
     assert!(!w.sims.iter().any(|s| s.here() && s.household == 0), "nobody moved into the player's home");
 }
+
+/// A couple moving in with their grown child bring a grown-up, not a baby (with life stages
+/// from a baby's up, a baby newcomer had no crib and stood at the door until it was two).
+#[test]
+fn newcomers_are_grown_up() {
+    let content = CONTENT
+        .replace(
+            r#""life":{"daysPerYear":2,"#,
+            r#""life":{"daysPerYear":2,"startAge":[25,30],"stages":[{"id":"baby","label":"Baby","from":0,"baby":true},
+                {"id":"child","label":"Child","from":2,"school":true},{"id":"youngAdult","label":"Young adult","from":18}],"#,
+        )
+        .replace(
+            r#""rules":{"maxHousehold":4},"#,
+            r#""rules":{"maxHousehold":4},"names":{"first":["Ana","Ben","Cleo","Dev"],"last":["Moss","Reed"]},
+               "genders":[{"id":"female","label":"Female"},{"id":"male","label":"Male"}],"#,
+        );
+    // Three beds in the house for sale: room for a couple and a child.
+    let town = town("", "").replace(r#"{"def":"bed","x":22,"z":2}"#, r#"{"def":"double","x":22,"z":2},{"def":"bed","x":26,"z":2}"#);
+    let mut families = 0;
+    for seed in 1..=40 {
+        let mut w = World::from_json(&content, &town, seed).unwrap();
+        assert!(sim_core::lifecycle::arrive(&mut w, 2));
+        let h = w.households.iter().position(|h| h.plot == Some(2)).unwrap();
+        let members: Vec<usize> = (0..w.sims.len()).filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h).collect();
+        for &i in &members {
+            assert!(w.sims[i].adult(&w.content), "seed {seed}: {} moved in at {}", w.sims[i].name, w.sims[i].age);
+        }
+        families += usize::from(members.len() == 3 && w.relationships.get(members[0], members[1]).partners);
+    }
+    assert!(families > 0, "no couple moved in with a grown child");
+}
