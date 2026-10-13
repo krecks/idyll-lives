@@ -76,6 +76,25 @@ fn things_on_a_wall_or_ceiling_share_tiles_with_furniture() {
 }
 
 #[test]
+fn a_lamp_left_without_a_ceiling_doesnt_spoil_the_save() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    buy(&mut w, "sofa", 2, 1, 0).unwrap();
+    buy(&mut w, "pendant", 5, 4, 0).unwrap();
+    // Taking down a stretch of the right wall opens the room to the garden: the lamp, which
+    // building lets stay, now hangs where there is no ceiling.
+    let open = sim_core::command::EdgeEdit {
+        axis: sim_core::command::EdgeAxis::V, x: 9, z: 3, kind: sim_core::command::EdgeKind::Open, cover: None, form: None, style: None, sill: None, head: None,
+    };
+    w.apply(Command::Build { household: 0, edits: vec![open] }).unwrap();
+    assert_eq!(w.lot.room_at(5, 4), sim_core::lot::OUTDOORS, "the room is open to the outdoors");
+    assert_eq!(w.objects.len(), 2);
+    // The save loads, without the lamp that can't hang there; the rest stays.
+    let loaded = World::from_save_json(CONTENT, &w.save_json()).expect("the save loads");
+    let defs: Vec<&str> = loaded.objects.iter().map(|o| loaded.content.objects[o.def].id.as_str()).collect();
+    assert_eq!(defs, ["sofa"]);
+}
+
+#[test]
 fn bunk_beds_put_both_sleepers_in_the_middle() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let bed = buy(&mut w, "bunk", 6, 2, 0).unwrap() as usize;
