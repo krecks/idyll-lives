@@ -16,6 +16,7 @@
 
 import {
   ArcRotateCamera,
+  type ArcRotateCameraKeyboardMoveInput,
   type ArcRotateCameraPointersInput,
   type Camera,
   Color3,
@@ -244,6 +245,8 @@ export class BabylonRenderer implements Renderer {
   private active = false;
   /** This frame's time (ms, clamped to `MAX_FRAME_MS`), for everything in the scene that moves with it. */
   private frameDt = 0;
+  /** The arrow keys' camera nudges per frame at 60 fps (see `paceKeys`). */
+  private keyNudge = { angularSpeed: 0, panningSensibility: 0, zoomingSensibility: 0 };
   /** The watching director's hold on the game camera (see `setGameShot`). */
   private gameRig!: GameCameraRig;
   /** Resident the camera keeps centred while the player turns and zooms (`followSim`). */
@@ -1879,6 +1882,7 @@ export class BabylonRenderer implements Renderer {
   private readonly renderFrame = () => {
     const start = performance.now();
     const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
+    this.paceKeys(dt);
     this.onFrame?.(performance.now());
     if (this.townMode && this.overview) {
       this.townFrame(dt);
@@ -1894,6 +1898,21 @@ export class BabylonRenderer implements Renderer {
       }
     }
   };
+
+  /**
+   * Babylon's keyboard camera input (arrows turn, Ctrl+arrows pan, +/- zoom) nudges the camera by
+   * a fixed amount per drawn frame: scaled by the frame's time, it moves as fast at any frame rate
+   * as at 60 fps.
+   */
+  private paceKeys(dtMs: number): void {
+    const keys = this.camera.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
+    if (!keys) return;
+    const k = Math.max(0.05, (dtMs * 60) / 1000);
+    const at60 = this.keyNudge;
+    keys.angularSpeed = at60.angularSpeed * k;
+    keys.panningSensibility = at60.panningSensibility / k;
+    keys.zoomingSensibility = at60.zoomingSensibility / k;
+  }
 
   // --- setup -------------------------------------------------------------------------
 
@@ -1913,6 +1932,8 @@ export class BabylonRenderer implements Renderer {
     // A slightly longer lens than the default flattens perspective a little: the dollhouse look.
     cam.fov = 0.7;
     cam.attachControl(true);
+    const keys = cam.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
+    if (keys) this.keyNudge = { angularSpeed: keys.angularSpeed, panningSensibility: keys.panningSensibility, zoomingSensibility: keys.zoomingSensibility };
     this.gameRig = new GameCameraRig(cam, { radius: RADIUS_LIMITS, beta: [0.3, 1.35] }, (i, out) => this.simHead(i, out));
     // Holds the game view while the town overview drives the camera (never drawn).
     this.parked = new ArcRotateCamera('parkedCamera', cam.alpha, cam.beta, cam.radius, Vector3.Zero(), this.scene);
