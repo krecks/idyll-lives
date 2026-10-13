@@ -1740,7 +1740,8 @@ export class Characters {
       }
 
       // Position / speed / facing.
-      if (!rig.visible) {
+      const appeared = !rig.visible;
+      if (appeared) {
         rig.x = tx;
         rig.z = tz;
         rig.yaw = tyaw;
@@ -1804,7 +1805,7 @@ export class Characters {
       const carry = item ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
 
       // Activity → clip.
-      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry, dt);
+      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry, dt, appeared);
       rig.lastPose = pose;
 
       // Advance and blend.
@@ -1886,7 +1887,7 @@ export class Characters {
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
-      this.writeBlanket(rig, i, pose, dt);
+      this.writeBlanket(rig, i, pose, dt, appeared);
       this.writeCarried(rig, i, item);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
 
@@ -1951,6 +1952,8 @@ export class Characters {
     carry: string,
     /** Seconds since the last frame (0 while paused). */
     dt: number,
+    /** Drawn again (back in view, on the storey shown, home from away): no fading in from what they did when last seen. */
+    fresh: boolean,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
     const set = this.set!;
@@ -2232,6 +2235,14 @@ export class Characters {
       rig.upperTarget = 1;
     } else {
       rig.upperTarget = 0;
+    }
+
+    if (fresh) {
+      copyPlayer(rig.cur, rig.prev);
+      rig.w = 1;
+      rig.upperW = rig.upperTarget;
+      rig.approach = reach;
+      rig.hands = hands;
     }
   }
 
@@ -2901,12 +2912,12 @@ export class Characters {
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
    * and to the bed's foot end, pulled up over ~0.5 s when the Sim lies down; zero-scaled otherwise.
    */
-  private writeBlanket(rig: SimRig, i: number, pose: number, dt: number): void {
+  private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
     const blanket = this.blankets.get(rig.body.family);
     if (!blanket) return;
     const bed = rig.bed;
     const under = pose === Pose.Lie && LYING.has(rig.cur.key) && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
-    rig.cover = clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
+    rig.cover = fresh ? (under ? 1 : 0) : clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
     const m = blanket.matrices;
     const o = i * 16;
     if (rig.cover <= 0 || !bed) {
