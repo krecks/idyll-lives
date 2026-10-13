@@ -1,6 +1,9 @@
 //! Undo in build and buy mode: every edit can be taken back (furniture, walls, floors, money)
 //! while time stands still; once it moves on, or the household gets other orders, it can't.
 
+mod common;
+
+use serde_json::json;
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind, FloorPaint};
 use sim_core::lot::Edge;
 use sim_core::{Command, World};
@@ -270,4 +273,56 @@ fn the_lot_version_moves_only_with_the_lot() {
     let lean: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json_with(&w, false)).unwrap();
     assert!(lean.get("walls").is_none() && lean.get("rooms").is_none() && lean["objects"].is_array());
     assert_eq!(lean["lotVersion"], undone);
+}
+
+/// The shipped content: Ada alone on an open plot with money to spend.
+fn shipped() -> World {
+    const TOWN: &str = r#"{"width":16,"depth":16,
+        "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":14,"entry":[8.5,13.5]}],
+        "households":[{"name":"Player","plot":0,"player":true,"funds":100000}],
+        "sims":[{"name":"Ada","household":0,"x":8.5,"z":8.5,"traits":["bookworm"]}]}"#;
+    let mut w = World::from_json(&common::content(), TOWN, 1).unwrap();
+    w.apply(Command::SetSpeed { speed: 0 }).unwrap();
+    w
+}
+
+fn order(w: &mut World, cmd: serde_json::Value) {
+    w.apply(Command::from_json(&cmd.to_string()).unwrap()).unwrap();
+}
+
+/// Goals, routines and free will set after an edit aren't taken back with it, by undo or redo
+/// (those orders don't end the edits that can be undone).
+#[test]
+fn undo_and_redo_keep_the_orders_given_since() {
+    let mut w = shipped();
+    let paid = funds(&w);
+    buy(&mut w, "sofa", 4, 4);
+    order(&mut w, json!({"type": "addGoal", "sim": 0, "goal": {"def": "skill", "skill": "cooking", "target": 4}}));
+    order(&mut w, json!({"type": "setRoutines", "sim": 0, "routines": [{"activity": "read", "days": 0x7f, "start": 18 * 60, "minutes": 60}]}));
+    w.apply(Command::SetAutonomy { enabled: false, household: Some(0) }).unwrap();
+    let orders = |w: &World| (w.sims[0].planner.goals.len(), w.sims[0].planner.routines.len(), w.households[0].free_will);
+    assert_eq!(orders(&w), (1, 1, false));
+    undo(&mut w);
+    assert!(w.objects.is_empty(), "the sofa went back");
+    assert_eq!(funds(&w), paid, "and the money came back");
+    assert_eq!(orders(&w), (1, 1, false), "the goal, the routine and free will stay as set");
+    redo(&mut w);
+    assert_eq!(w.objects.len(), 1);
+    assert_eq!(orders(&w), (1, 1, false));
+}
+
+/// Undoing an upgrade takes its story back (it's told again on redo).
+#[test]
+fn undoing_an_upgrade_takes_back_its_story() {
+    let mut w = shipped();
+    buy(&mut w, "sofa", 4, 4);
+    let upgraded = |w: &World| w.events.iter().filter(|e| e.kind == sim_core::social::EventKind::Upgraded).count();
+    w.apply(Command::Upgrade { household: 0, object: 0 }).unwrap();
+    assert_eq!(upgraded(&w), 1);
+    undo(&mut w);
+    assert_eq!((w.objects[0].quality, upgraded(&w)), (0, 0), "no upgrade, no story of one");
+    redo(&mut w);
+    assert_eq!((w.objects[0].quality, upgraded(&w)), (1, 1));
+    undo(&mut w);
+    assert_eq!(upgraded(&w), 0);
 }

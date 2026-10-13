@@ -1052,6 +1052,33 @@ impl EventLog {
         self.next_id
     }
 
+    /// The events told after event `id`.
+    pub(crate) fn since(&self, id: u64) -> Vec<SocialEvent> {
+        self.events.iter().filter(|e| e.id > id).copied().collect()
+    }
+
+    /// Takes these events (by id) out of the story (an edit was undone); returns those it had.
+    pub(crate) fn take(&mut self, events: &[SocialEvent]) -> Vec<SocialEvent> {
+        let mut taken = Vec::new();
+        self.events.retain(|e| {
+            let gone = events.iter().any(|t| t.id == e.id);
+            if gone {
+                taken.push(*e);
+            }
+            !gone
+        });
+        taken
+    }
+
+    /// Tells `events` again (an undone edit was made again), under new ids; returns them.
+    pub(crate) fn put_back(&mut self, events: Vec<SocialEvent>) -> Vec<SocialEvent> {
+        let from = self.next_id;
+        for e in events {
+            self.add(e);
+        }
+        self.since(from)
+    }
+
     /// Rebuilds a log from a save (oldest first); ids carry on after `next_id`.
     pub fn restore(next_id: u64, events: impl IntoIterator<Item = SocialEvent>) -> Self {
         let mut events: VecDeque<SocialEvent> = events.into_iter().collect();

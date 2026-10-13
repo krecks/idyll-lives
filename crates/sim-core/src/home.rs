@@ -38,6 +38,10 @@ pub(crate) struct HomeSnapshot {
     plots: Vec<crate::world::Plot>,
     /// Food and dishes (they move and go with the furniture they're on).
     items: crate::items::Items,
+    /// The story's latest event id when it was taken, and the events the edit after it told
+    /// (an upgrade): undo takes them out of the story, redo tells them again.
+    events_before: u64,
+    story: Vec<crate::social::SocialEvent>,
 }
 
 fn edge_kind(kind: EdgeKind) -> Edge {
@@ -108,12 +112,14 @@ impl World {
             households: self.households.clone(),
             plots: self.plots.clone(),
             items: self.items.clone(),
+            events_before: self.events.last_id(),
+            story: Vec::new(),
         })
     }
 
     /// Keeps `before` for undo if the edit changed anything (an edit that changed nothing, like
     /// drawing a wall where one stands, leaves no step).
-    pub(crate) fn remember(&mut self, before: HomeSnapshot) {
+    pub(crate) fn remember(&mut self, mut before: HomeSnapshot) {
         let h = before.household;
         let lot_changed = before.lot != self.lot;
         if lot_changed {
@@ -130,6 +136,7 @@ impl World {
         if self.undo.len() >= UNDO_DEPTH {
             self.undo.remove(0);
         }
+        before.story = self.events.since(before.events_before);
         self.undo.push(before);
         self.redo.clear();
     }
@@ -152,8 +159,11 @@ impl World {
         if self.undo.last().is_none_or(|s| s.household != h) {
             return Err(Error::new("nothing to undo"));
         }
-        let now = self.home_snapshot(household).expect("the household has a home");
-        let s = self.undo.pop().expect("checked above");
+        let mut now = self.home_snapshot(household).expect("the household has a home");
+        let mut s = self.undo.pop().expect("checked above");
+        // What the edit told goes from the story (and comes back with a redo).
+        now.story = self.events.take(&s.story);
+        self.keep_orders(&mut s);
         self.redo.push(now);
         self.restore(s);
         Ok(())
@@ -165,11 +175,35 @@ impl World {
         if self.redo.last().is_none_or(|s| s.household != h) {
             return Err(Error::new("nothing to redo"));
         }
-        let now = self.home_snapshot(household).expect("the household has a home");
-        let s = self.redo.pop().expect("checked above");
+        let mut now = self.home_snapshot(household).expect("the household has a home");
+        let mut s = self.redo.pop().expect("checked above");
+        now.story = self.events.put_back(std::mem::take(&mut s.story));
+        self.keep_orders(&mut s);
         self.undo.push(now);
         self.restore(s);
         Ok(())
+    }
+
+    /// Undo and redo put back the home, money and residents as an edit left them, but not the
+    /// orders given since (they don't end the edits that can be undone, see `World::apply`):
+    /// goals and suggestions, routines, free will and an answered purchase request (with the
+    /// feeling a no brought) stay as they are now.
+    fn keep_orders(&self, s: &mut HomeSnapshot) {
+        for (then, now) in s.sims.iter_mut().zip(&self.sims) {
+            let (p, q) = (&mut then.planner, &now.planner);
+            p.routines.clone_from(&q.routines);
+            p.skip_household.clone_from(&q.skip_household);
+            p.goals.clone_from(&q.goals);
+            p.suggestions.clone_from(&q.suggestions);
+            p.run.clone_from(&q.run);
+            p.purchase = q.purchase;
+            then.feelings.clone_from(&now.feelings);
+            then.mods = now.mods.clone();
+        }
+        for (then, now) in s.households.iter_mut().zip(&self.households) {
+            then.free_will = now.free_will;
+            then.routines.clone_from(&now.routines);
+        }
     }
 
     pub(crate) fn restore(&mut self, s: HomeSnapshot) {
