@@ -86,7 +86,7 @@ export class Studio {
     readonly canvas: HTMLCanvasElement,
     readonly webgpu: boolean,
   ) {
-    this.frame = { prev: this.snap, curr: this.snap, alpha: 0, layout: LAYOUT, now: 0 };
+    this.frame = { prev: this.snap, curr: this.snap, alpha: 0, steps: 1, layout: LAYOUT, now: 0 };
     const [blob, pool] = this.makeShadows();
     this.blob = blob;
     this.pool = pool;

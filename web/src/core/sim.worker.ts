@@ -31,6 +31,8 @@ let lastLot = -1;
 let lastRegion = '';
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
+/** Sim steps run so far: published with each snapshot (the renderer's clock counts steps, not snapshots). */
+let simSteps = 0;
 
 scope.onmessage = (e) => {
   const msg = e.data;
@@ -98,6 +100,7 @@ function runLoop(stepMs: number): void {
   const step = () => {
     const start = performance.now();
     game!.advance();
+    simSteps++;
     publish();
     let now = performance.now();
     if (now - lastUi >= UI_INTERVAL_MS) {
@@ -136,10 +139,10 @@ function publish(): void {
   // Re-create the view each time: WASM memory growth detaches old views.
   const view = new Float32Array(memory.buffer, g.snapshot_ptr(), g.snapshot_len());
   if (writer) {
-    writer.write(view);
+    writer.write(view, simSteps);
   } else {
     const copy = view.slice();
-    scope.postMessage({ type: 'snapshot', data: copy }, [copy.buffer]);
+    scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
   const version = g.structure_version();
   if (version !== lastStructure) {

@@ -814,7 +814,7 @@ export type FromWorker =
   /** JSON, or null with `error`. */
   | { type: 'blueprint'; requestId: number; data: string | null; error?: string }
   /** Fallback transport when SharedArrayBuffer is unavailable. */
-  | { type: 'snapshot'; data: Float32Array }
+  | { type: 'snapshot'; data: Float32Array; step: number }
   /** About once a second. */
   | { type: 'stats'; stats: SimThreadStats }
   | { type: 'error'; message: string; fatal: boolean };
