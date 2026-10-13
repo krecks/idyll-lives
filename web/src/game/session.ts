@@ -9,7 +9,7 @@ import { Content } from '../content/content';
 import { SaveRefused, SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey } from '../core/protocol';
-import { AUTOSAVE_ID, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -139,16 +139,20 @@ export async function startSession(
   let household: string;
   /** The save being loaded (none for a new game). */
   let saved: SaveRecord | undefined;
+  /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
+  let gameId: string;
   if (request.kind === 'new') {
     const templates = await loadTemplates();
     const lot = assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan });
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
+    gameId = crypto.randomUUID();
   } else {
     saved = await readSave(request.saveId);
     if (!saved) throw new Error('That save no longer exists.');
     source = { save: saved.data };
     household = saved.household;
+    gameId = saved.game ?? saved.id;
   }
 
   progress('Starting the simulation', 0.15);
@@ -793,6 +797,7 @@ export async function startSession(
       savedAt: Date.now(),
       thumbnail,
       autosave,
+      game: gameId,
       data,
     };
     await writeSave(record);
@@ -801,12 +806,12 @@ export async function startSession(
   /** When the game last autosaved (or started). */
   let autosavedAt = -Infinity;
   let autosaveFailed = false;
-  /** Autosaves the game being played; a failure is told once. */
+  /** Autosaves the game being played into the older of its two autosaves; a failure is told once. */
   const autosave = async () => {
     if (!revealed || disposed) return;
     autosavedAt = performance.now();
     try {
-      await store(`${household} · Autosave`, AUTOSAVE_ID, true);
+      await store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
     } catch (err) {
       console.warn('[save] autosave failed', err);
       if (autosaveFailed) return;
@@ -1300,8 +1305,7 @@ export async function startSession(
       }, PREFETCH_PICTURES_MS);
     },
     save(name, slotId) {
-      const id = slotId ?? crypto.randomUUID();
-      return store(name, id, id === AUTOSAVE_ID);
+      return store(name, slotId ?? crypto.randomUUID(), false);
     },
     applySettings(s) {
       renderer.configure({

@@ -18,6 +18,11 @@ export interface SaveMeta {
   /** Small JPEG data URL, if one could be captured. */
   thumbnail: string | null;
   autosave: boolean;
+  /**
+   * The game the save belongs to: made at New game and carried through loading and saving
+   * (its autosaves rotate together). Saves from before there were games are each their own.
+   */
+  game?: string;
   /** This version of the game (`__APP_VERSION__`) found the save to be from a newer one: kept, not offered. */
   tooNewFor?: string;
 }
@@ -25,8 +30,6 @@ export interface SaveMeta {
 export interface SaveRecord extends SaveMeta {
   data: string;
 }
-
-export const AUTOSAVE_ID = 'autosave';
 
 /** A save the game can't open: `message` says so in plain words (and whether it was kept). */
 export class UnloadableSave extends Error {
@@ -167,6 +170,13 @@ export function playable(save: SaveMeta): boolean {
 /** The newest save Continue can open. */
 export async function latestSave(): Promise<SaveMeta | undefined> {
   return (await listSaves()).find(playable);
+}
+
+/** Each game keeps its two newest autosaves: the slot to write next is the empty or the older one. */
+export async function nextAutosaveId(game: string): Promise<string> {
+  const slots = [0, 1].map((i) => `autosave:${game}:${i}`);
+  const savedAt = new Map((await listSaves()).map((s) => [s.id, s.savedAt]));
+  return slots.reduce((a, b) => ((savedAt.get(b) ?? 0) < (savedAt.get(a) ?? 0) ? b : a));
 }
 
 /**
