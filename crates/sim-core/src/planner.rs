@@ -249,11 +249,10 @@ pub(crate) fn parse(
         if out.iter().any(|o: &ActivityDef| o.id == a.id) {
             return Err(Error::new(format!("duplicate activity '{}'", a.id)));
         }
-        let tags = a
-            .tags
-            .iter()
-            .filter_map(|t| tag_index.get(t.as_str()))
-            .fold(0, |m: TagMask, i| m | (1 << i));
+        let tags = a.tags.iter().try_fold(0, |m: TagMask, t| {
+            let i = tag_index.get(t.as_str()).ok_or_else(|| Error::new(format!("activity '{}': unknown tag '{t}'", a.id)))?;
+            Ok::<_, Error>(m | (1 << i))
+        })?;
         out.push(ActivityDef {
             id: a.id.clone(),
             label: a.label.clone(),

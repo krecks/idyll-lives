@@ -293,7 +293,17 @@ pub(crate) fn parse(
     if stations.iter().enumerate().any(|(i, s)| stations[..i].contains(s)) {
         return Err(Error::new("cooking: duplicate station"));
     }
-    let tag_mask = |tags: &[String]| tags.iter().filter_map(|t| ix.tags.get(t.as_str())).fold(0, |m: TagMask, i| m | (1 << i));
+    // Tags content gives must exist; of the defaults, those content has (eating then may have none).
+    let tag_mask = |tags: &Option<Vec<String>>, default: &[&str], ctx: &str| -> Result<TagMask, Error> {
+        match tags {
+            Some(tags) => tags.iter().try_fold(0, |m: TagMask, t| {
+                let i = ix.tags.get(t.as_str()).ok_or_else(|| Error::new(format!("{ctx}: unknown tag '{t}'")))?;
+                Ok(m | (1 << i))
+            }),
+            None => Ok(default.iter().filter_map(|t| ix.tags.get(t)).fold(0, |m: TagMask, i| m | (1 << i))),
+        }
+    };
+    let finite = |v: f32, ctx: &str| if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx} must be a number"))) };
     let anim = |a: &Option<String>, fallback: &str, ctx: &str| -> Result<Option<usize>, Error> {
         match a {
             Some(a) => ix
@@ -323,20 +333,19 @@ pub(crate) fn parse(
         feed_family: raw.feed_family.unwrap_or(0.15).max(0.0),
         hungry_below: raw.hungry_below.unwrap_or(0.5),
         invited_boost: raw.invited_boost.unwrap_or(2.5).max(0.0),
-        invite_minutes: raw.invite_minutes.unwrap_or(60.0).max(0.0),
-        station_wait_minutes: raw.station_wait_minutes.unwrap_or(10.0).max(0.0),
+        invite_minutes: finite(raw.invite_minutes.unwrap_or(60.0), "cooking.inviteMinutes")?.max(0.0),
+        station_wait_minutes: finite(raw.station_wait_minutes.unwrap_or(10.0), "cooking.stationWaitMinutes")?.max(0.0),
         dirty_dirt_per_hour: raw.dirty_dirt_per_hour.unwrap_or(0.02).max(0.0),
         skip_penalty: raw.skip_penalty.unwrap_or(0.05).clamp(0.0, 0.5),
-        seat_tags: tag_mask(&raw.seat_tags.clone().unwrap_or_else(|| vec!["lounge".into(), "food".into()])),
-        seat_avoid: tag_mask(&raw.seat_avoid.clone().unwrap_or_else(|| vec!["spa".into(), "hygiene".into(), "bathroom".into()])),
+        seat_tags: tag_mask(&raw.seat_tags, &["lounge", "food"], "cooking.seatTags")?,
+        seat_avoid: tag_mask(&raw.seat_avoid, &["spa", "hygiene", "bathroom"], "cooking.seatAvoid")?,
         default_surface_height: raw.default_surface_height.unwrap_or(0.9).max(0.0),
         serve_range: raw.serve_range.unwrap_or(6.0).max(1.0),
         eat_label: raw.eat_label.clone().unwrap_or_else(|| "Eat".into()),
-        // (Tags content doesn't have are left out: eating then has none.)
-        eat_tags: tag_mask(&raw.eat_tags.clone().unwrap_or_else(|| vec!["food".into()])),
+        eat_tags: tag_mask(&raw.eat_tags, &["food"], "cooking.eatTags")?,
         eat_anim: anim(&raw.eat_anim, "eat", "cooking.eatAnim")?,
         dishes_label: raw.dishes_label.clone().unwrap_or_else(|| "Wash the dishes".into()),
-        dishes_tags: tag_mask(&raw.dishes_tags.clone().unwrap_or_else(|| vec!["chores".into(), "cleaning".into()])),
+        dishes_tags: tag_mask(&raw.dishes_tags, &["chores", "cleaning"], "cooking.dishesTags")?,
         dishes_anim: anim(&raw.dishes_anim, "wash", "cooking.dishesAnim")?,
         dishes_interest: raw.dishes_interest.unwrap_or(0.6).max(0.0),
         dishes: station_bit("dishes"),
@@ -375,8 +384,9 @@ pub(crate) fn parse(
         if recipe_defs.iter().any(|d: &RecipeDef| d.id == r.id) {
             return Err(Error::new(format!("duplicate recipe '{}'", r.id)));
         }
-        if r.steps.is_empty() {
-            return Err(Error::new(format!("{ctx}: no steps")));
+        // (A cook counts the steps in a byte.)
+        if r.steps.is_empty() || r.steps.len() > u8::MAX as usize {
+            return Err(Error::new(format!("{ctx}: 1 to {} steps", u8::MAX)));
         }
         let [lo, hi] = r.servings;
         if lo == 0 || hi < lo {

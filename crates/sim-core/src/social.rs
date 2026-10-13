@@ -403,7 +403,7 @@ pub(crate) fn parse_feeling(raw: &FeelingRaw, ix: &Indices) -> Result<FeelingDef
             raw.id
         )));
     }
-    if raw.hours <= 0.0 {
+    if !(raw.hours > 0.0 && raw.hours.is_finite()) {
         return Err(Error::new(format!("{}: hours must be > 0", raw.id)));
     }
     Ok(FeelingDef {
@@ -442,7 +442,7 @@ pub(crate) fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result
 
 pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices) -> Result<SocialDef, Error> {
     let ctx = raw.id.as_str();
-    if raw.minutes <= 0.0 {
+    if !(raw.minutes > 0.0 && raw.minutes.is_finite()) {
         return Err(Error::new(format!("{ctx}: minutes must be > 0")));
     }
     let anim = match raw.animation.as_deref() {
@@ -479,12 +479,6 @@ pub(crate) fn parse_rules(
     presets: &HashMap<String, BondPreset>,
     ix: &Indices,
 ) -> Result<SocialRules, Error> {
-    // Busy/romantic tags that no interaction uses are simply ignored.
-    let mask = |tags: &[String]| {
-        tags.iter()
-            .filter_map(|t| ix.tags.get(t.as_str()))
-            .fold(0, |m: TagMask, i| m | (1 << i))
-    };
     let default_bond = match &raw.default_bond {
         None => None,
         Some(p) => Some(
@@ -494,9 +488,9 @@ pub(crate) fn parse_rules(
         ),
     };
     Ok(SocialRules {
-        busy_tags: mask(&raw.busy_tags),
-        guest_tags: mask(&raw.guest_tags),
-        romantic_tags: mask(&raw.romantic_tags),
+        busy_tags: tag_mask(&raw.busy_tags, ix, "socialRules.busyTags")?,
+        guest_tags: tag_mask(&raw.guest_tags, ix, "socialRules.guestTags")?,
+        romantic_tags: tag_mask(&raw.romantic_tags, ix, "socialRules.romanticTags")?,
         default_bond,
         jealousy_range: raw.jealousy_range.unwrap_or(8.0),
         jealousy_friendship: raw.jealousy_friendship.unwrap_or(-10.0),

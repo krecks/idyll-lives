@@ -17,6 +17,7 @@ const CONTENT: &str = r#"{
        "rest":{"label":"Asleep on the floor","minutes":120,"pose":"lie","gains":{"energy":0.45},"tags":["sleep"]}},
       {"id":"takeout","need":"hunger","story":"ordered takeout","cost":25,"cooldownHours":2,"graceMinutes":0,
        "rest":{"label":"Eat takeout","minutes":20,"gains":{"hunger":0.7},"tags":["food"]}}],
+    "tags":["sleep","food"],
     "economy":{"startingFunds":1000}}"#;
 
 const TOWN: &str = r#"{"width":12,"depth":10,
