@@ -276,6 +276,36 @@ function dataBundle(): Plugin {
   };
 }
 
+/**
+ * The isolation service worker (public/isolation-sw.js) gets this build's id, which names the
+ * cache it keeps the build's hashed files in: every build is a new version of the worker, so
+ * returning players' browsers install it and drop the last build's cache. The worker tells the
+ * build's files by their names in `assets/`, so no file from public/ may look like one.
+ */
+function isolationWorker(): Plugin {
+  let outDir = '';
+  return {
+    name: 'isolation-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const file = join(outDir, 'isolation-sw.js');
+      const code = await readFile(file, 'utf8');
+      const stamped = code.replace("const BUILD = 'dev';", `const BUILD = '${BUILD_ID}';`);
+      if (stamped === code) throw new Error("isolation-worker: no `const BUILD = 'dev';` in isolation-sw.js");
+      await writeFile(file, stamped);
+      const pattern = /const HASHED = \/(.+)\/;/.exec(code)?.[1];
+      if (!pattern) throw new Error('isolation-worker: no `const HASHED = /…/;` in isolation-sw.js');
+      const hashed = new RegExp(pattern);
+      const own = await readdir(fileURLToPath(new URL('./public/assets/', import.meta.url))).catch(() => [] as string[]);
+      const clash = own.filter((name) => hashed.test(name));
+      if (clash.length) throw new Error(`isolation-worker: public/assets/${clash[0]} looks like a hashed build file (the service worker would keep it for good)`);
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -324,7 +354,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
