@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { quiet } from './quiet.mjs';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const args = process.argv.slice(2);
@@ -48,6 +49,7 @@ const { chromium } = await playwright();
 const browser = await chromium.launch({ headless: false, executablePath: process.env.CHROME || undefined, args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await page.addInitScript(quiet);
   page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
   await page.goto(`${base}/?debug&seed=7`);
   // (Dev server modules, imported by their paths: the same instances the game uses.)

@@ -33,6 +33,7 @@ import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { quiet } from './quiet.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const WEB = join(ROOT, 'web/');
@@ -132,6 +133,7 @@ const browser = await chromium.launch({
 /** Opens one benchmark page and waits for `key` on window (its result, or readiness for a screenshot). */
 async function open(query, throttle, key, timeoutMs) {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+  await context.addInitScript(quiet);
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   try {
