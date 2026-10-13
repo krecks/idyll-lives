@@ -222,7 +222,6 @@ fn practice_lasts_its_time_while_the_skill_is_wanted() {
 }
 
 #[test]
-#[ignore = "R3 proof: fails until a newborn isn't aged the moment they're born"]
 fn newborns_are_born_at_age_zero() {
     let content = common::content();
     let town = common::town(&content, 7, 2);
@@ -235,9 +234,17 @@ fn newborns_are_born_at_age_zero() {
         w.tick_once();
     }
     let born = w.events.iter().find(|e| e.kind == EventKind::Born).expect("the baby was born");
-    let age = w.sims[born.a as usize].age;
+    let (baby, parent) = (born.a as usize, adults[0] as usize);
+    let age = w.sims[baby].age;
     eprintln!("born at age {age}");
     assert_eq!(age, 0.0, "a newborn is a day's ageing old already");
+    // From the next midnight on, a day older each night, like everyone else.
+    let before = w.sims[parent].age;
+    let midnight = clock::tick_at(3, 0.0).unwrap();
+    while w.tick < midnight {
+        w.tick_once();
+    }
+    assert!(w.sims[baby].age > 0.0 && w.sims[baby].age == w.sims[parent].age - before, "the baby ages from the next night");
 }
 
 /// What a resident is doing, as something to compare: the task kind and what it's with (not

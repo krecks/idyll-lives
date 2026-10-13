@@ -45,8 +45,10 @@ pub fn default_age(rules: &crate::content::LifeRules, name: &str, slot: usize) -
 /// Once a day at midnight: everyone a year-fraction older; a new life stage is a story event
 /// and a feeling, and changes what the stage does to them.
 pub(crate) fn update(w: &mut World) {
+    // (Born tonight: not a day older already, below.)
+    let mut born = Vec::new();
     if clock::tick_at(clock::day(w.tick), 0.0) == Some(w.tick) {
-        births(w);
+        born = births(w);
     }
     if let Some(rules) = w.content.life.moving
         && clock::tick_at(clock::day(w.tick), rules.hour * 60.0) == Some(w.tick)
@@ -68,7 +70,7 @@ pub(crate) fn update(w: &mut World) {
     }
     let mut out_of_cribs = Vec::new();
     for i in 0..w.sims.len() {
-        if !w.sims[i].here() {
+        if !w.sims[i].here() || born.contains(&i) {
             continue;
         }
         let rules = &w.content.life;
@@ -573,9 +575,10 @@ pub(crate) fn room_for_one(w: &World, h: usize) -> bool {
         && w.sims.iter().filter(|s| s.here()).count() < crate::world::MAX_SIMS
 }
 
-/// At midnight: babies who are due are born.
-fn births(w: &mut World) {
+/// At midnight: babies who are due are born (returned).
+fn births(w: &mut World) -> Vec<usize> {
     let today = clock::day(w.tick);
+    let mut born = Vec::new();
     for h in 0..w.households.len() {
         let Some(e) = w.households[h].expecting.filter(|e| e.due <= today) else { continue };
         w.households[h].expecting = None;
@@ -585,8 +588,10 @@ fn births(w: &mut World) {
         }
         if let Some(baby) = add_child(w, h, 0.0, &parents, true) {
             w.events.push(w.tick, EventKind::Born, baby, parents.first().copied().unwrap_or(baby), parents.get(1).copied());
+            born.push(baby);
         }
     }
+    born
 }
 
 /// Adopts a baby (or a child) into household `h`, for content `adoption` (free in Creative).
