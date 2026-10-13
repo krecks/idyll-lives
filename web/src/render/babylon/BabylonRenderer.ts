@@ -444,6 +444,9 @@ export class BabylonRenderer implements Renderer {
     } else {
       this.engine = new Engine(canvas, true, { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
     }
+    // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
+    // GPU is gone, and the game's own buffers can't be rebuilt in place.
+    this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
 
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
