@@ -130,10 +130,11 @@ impl G2p {
             return None;
         }
         // Unknown: spell short all-caps words ("CPU"), guess the rest.
-        if word.len() <= 4 && word == word.to_uppercase() {
-            if let Some(ps) = self.nnp(word) {
-                return Some(ps);
-            }
+        if word.len() <= 4
+            && word == word.to_uppercase()
+            && let Some(ps) = self.nnp(word)
+        {
+            return Some(ps);
         }
         let guess = rules::guess(word);
         (!guess.is_empty()).then_some(guess)
@@ -168,10 +169,10 @@ impl G2p {
                 return self.lookup(&possessive, stress);
             }
         }
-        if let Some(stem) = word.strip_suffix('\'') {
-            if self.is_known(stem) {
-                return self.lookup(stem, stress);
-            }
+        if let Some(stem) = word.strip_suffix('\'')
+            && self.is_known(stem)
+        {
+            return self.lookup(stem, stress);
         }
         self.stem_s(&word, stress)
             .or_else(|| self.stem_ed(&word, stress))
@@ -515,13 +516,13 @@ fn tokenize(text: &str) -> Vec<Token> {
             continue;
         }
         // [word](/phonemes/)
-        if c == '[' {
-            if let Some((word, phonemes, len)) = parse_link(&chars[i..]) {
-                tokens.push(Token::Word { text: word, fixed: Some(phonemes), space });
-                space = false;
-                i += len;
-                continue;
-            }
+        if c == '['
+            && let Some((word, phonemes, len)) = parse_link(&chars[i..])
+        {
+            tokens.push(Token::Word { text: word, fixed: Some(phonemes), space });
+            space = false;
+            i += len;
+            continue;
         }
         if word_char(c) {
             let start = i;

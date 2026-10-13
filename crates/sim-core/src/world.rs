@@ -4202,6 +4202,34 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     sim.idle_ticks = 0;
 }
 
+/// A free crib at home for a baby (one with no other baby in it): they're put straight in.
+fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task> {
+    let home = ctx.households[sim.household as usize].plot?;
+    let content = ctx.content;
+    let (object, interaction) = ctx.index.on(home).iter().find_map(|&o| {
+        let o = &objects[o as usize];
+        let def = &content.objects[o.def];
+        let i = def.interactions.iter().position(|it| it.baby)?;
+        let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
+        (!o.broken() && !taken && o.can_use_in(sim.id, def.slots_for(i))).then_some((o.id, i))
+    })?;
+    let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
+    sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false })
+}
+
+/// Whether partners `a` and `b` could have a baby now: at home together, grown-ups young enough,
+/// none on the way, and room for one more.
+fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
+    let Some(rules) = ctx.content.life.pregnancy else { return false };
+    let (x, y) = (&ctx.briefs[a], &ctx.briefs[b]);
+    let h = x.household as usize;
+    let fits = |s: &SimBrief| s.adult && s.age <= rules.max_age;
+    let members = ctx.briefs.iter().filter(|s| s.here && s.household as usize == h).count();
+    fits(x) && fits(y) && y.household == x.household && ctx.households[h].expecting.is_none()
+        && members < ctx.content.rules.max_household
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4404,32 +4432,4 @@ mod tests {
         assert_eq!(w.sims[0].tile(), front);
         assert_eq!(w.sims[0].seated_from, None);
     }
-}
-
-/// A free crib at home for a baby (one with no other baby in it): they're put straight in.
-fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task> {
-    let home = ctx.households[sim.household as usize].plot?;
-    let content = ctx.content;
-    let (object, interaction) = ctx.index.on(home).iter().find_map(|&o| {
-        let o = &objects[o as usize];
-        let def = &content.objects[o.def];
-        let i = def.interactions.iter().position(|it| it.baby)?;
-        let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
-        (!o.broken() && !taken && o.can_use_in(sim.id, def.slots_for(i))).then_some((o.id, i))
-    })?;
-    let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
-    sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
-    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false })
-}
-
-/// Whether partners `a` and `b` could have a baby now: at home together, grown-ups young enough,
-/// none on the way, and room for one more.
-fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
-    let Some(rules) = ctx.content.life.pregnancy else { return false };
-    let (x, y) = (&ctx.briefs[a], &ctx.briefs[b]);
-    let h = x.household as usize;
-    let fits = |s: &SimBrief| s.adult && s.age <= rules.max_age;
-    let members = ctx.briefs.iter().filter(|s| s.here && s.household as usize == h).count();
-    fits(x) && fits(y) && y.household == x.household && ctx.households[h].expecting.is_none()
-        && members < ctx.content.rules.max_household
 }

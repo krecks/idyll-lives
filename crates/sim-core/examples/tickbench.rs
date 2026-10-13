@@ -4,8 +4,18 @@ use std::time::Instant;
 
 use sim_core::World;
 
-const CONTENT: &str = include_str!("../../../web/public/content/base.json");
+const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/public/content/");
 const LOT: &str = include_str!("../../../web/public/content/lots/starter.json");
+
+/// base.json plus every file in its `"include"` list, merged the way the game loads them.
+fn content() -> String {
+    let read = |name: &str| std::fs::read_to_string(format!("{DIR}{name}")).unwrap_or_else(|e| panic!("{name}: {e}"));
+    let base = read("base.json");
+    let includes: Vec<String> = serde_json::from_value(serde_json::from_str::<serde_json::Value>(&base).unwrap()["include"].clone()).unwrap();
+    let parts: Vec<String> = includes.iter().map(|n| read(n)).collect();
+    let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+    sim_core::merge_content(&base, &parts).unwrap_or_else(|e| panic!("{e}"))
+}
 
 fn main() {
     let mut lot: serde_json::Value = serde_json::from_str(LOT).unwrap();
@@ -15,7 +25,7 @@ fn main() {
         .enumerate()
         .map(|(i, n)| serde_json::json!({ "name": n, "traits": ["cheerful"], "x": 8.5 + i as f32, "z": 3.0 }))
         .collect();
-    let content: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+    let content: serde_json::Value = serde_json::from_str(&content()).unwrap();
     for (label, socials) in [("with socials", true), ("without socials", false)] {
         let mut c = content.clone();
         if !socials {

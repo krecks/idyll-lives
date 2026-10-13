@@ -17,6 +17,8 @@ const PHASES: usize = 256;
 const CUTOFF: f64 = 0.94;
 
 /// `input` read at a step of `depth` (output length `input.len() / depth`, rounded). `depth` 1 returns a copy.
+// `!(step > 0.0)` on purpose: it also turns away NaN, which `step <= 0.0` would let through.
+#[allow(clippy::neg_cmp_op_on_partial_ord)]
 pub fn resample(input: &[f32], depth: f32) -> Vec<f32> {
     let step = depth as f64;
     if input.is_empty() || !(step > 0.0) || (step - 1.0).abs() < 1e-6 {

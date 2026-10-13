@@ -14,6 +14,8 @@ export interface DebugReport {
   note: string;
   /** Game version the report was taken with. */
   version: string;
+  /** The commit that version was built from (short hash). */
+  commit: string;
   createdAt: string;
   url: string;
   userAgent: string;

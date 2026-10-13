@@ -8,7 +8,8 @@
  *   and its four ONNX graphs with their weights stored as 16-bit floats (`fp16.mjs`: half the
  *   size, the same arithmetic; a `NOTICE` says so) and gzipped (`.onnxz`, unpacked by the
  *   browser): 398 MB as published, 185 MB here. https://huggingface.co/Supertone/supertonic-3
- * - Misaki's US English dictionaries (Apache-2.0), for mouth shapes: https://github.com/hexgrad/misaki
+ * - Misaki's US English dictionaries (Apache-2.0, its licence goes along as `misaki-LICENSE`), for
+ *   mouth shapes: https://github.com/hexgrad/misaki
  *
  * Everything is pinned to a revision and checked against its SHA-256 (the converted graphs too:
  * the conversion is deterministic), so every build speaks the same. Files already present with
@@ -25,7 +26,8 @@ import { weightsToFp16 } from './fp16.mjs';
 const OUT = fileURLToPath(new URL('../../web/public/voice/', import.meta.url));
 
 const SUPERTONIC = 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323';
-const MISAKI = 'https://raw.githubusercontent.com/hexgrad/misaki/fba1236595f2d2bf21d414ba6e57d25256afada3/misaki/data';
+const MISAKI_REPO = 'https://raw.githubusercontent.com/hexgrad/misaki/fba1236595f2d2bf21d414ba6e57d25256afada3';
+const MISAKI = `${MISAKI_REPO}/misaki/data`;
 
 /** The model's folder under `voice/`: a new version gets a new folder, so browsers never mix versions. */
 export const MODEL_DIR = 'supertonic-3/';
@@ -61,6 +63,8 @@ const FILES = [
 /** Files in the model's folder earlier versions wrote (the graphs as published). */
 const OBSOLETE_IN_MODEL = GRAPHS.map((g) => `${g.name}.onnx`);
 const OBSOLETE = ['pocket-en-2026-04', 'presets-2.pcm', 'presets-2.json', 'presets-2.stamp', 'presets-1.pcm', 'presets-1.json', 'presets-1.stamp', 'paradee-8m.onnx', 'paradee-8m-edit1.onnx', 'paradee-8m.json', 'kitten-nano-0.8-edit1.onnx', 'kitten-nano-0.8-edit2.onnx', 'kitten-nano-0.8-voices.f32'];
+/** Misaki's licence (Apache-2.0: recipients get a copy), next to the dictionary made from it. */
+const LEXICON_LICENSE = { url: `${MISAKI_REPO}/LICENSE`, out: 'misaki-LICENSE', sha256: 'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4' };
 const LEXICON = [
   { url: `${MISAKI}/us_gold.json`, sha256: 'dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f' },
   { url: `${MISAKI}/us_silver.json`, sha256: 'de8f67be911bb6c659187b4a65fd966b6a30e56350e0f790d763210b053ac475' },
@@ -118,6 +122,11 @@ for (const g of GRAPHS) {
 await writeFile(`${OUT}${MODEL_DIR}NOTICE`, NOTICE);
 for (const name of OBSOLETE) await rm(OUT + name, { force: true, recursive: true });
 for (const name of OBSOLETE_IN_MODEL) await rm(OUT + MODEL_DIR + name, { force: true });
+
+if (!(await existing(OUT + LEXICON_LICENSE.out, LEXICON_LICENSE.sha256))) {
+  console.log(`voice: downloading ${LEXICON_LICENSE.out}`);
+  await writeFile(OUT + LEXICON_LICENSE.out, await download(LEXICON_LICENSE));
+}
 
 /**
  * The dictionary as `word<TAB>phonemes` lines, gzipped. Gold entries win over silver ones; for

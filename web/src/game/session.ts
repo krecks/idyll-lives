@@ -696,6 +696,7 @@ export async function startSession(
       const report: DebugReport = {
         note,
         version: __APP_VERSION__,
+        commit: __APP_COMMIT__,
         createdAt: new Date().toISOString(),
         url: location.href,
         userAgent: navigator.userAgent,

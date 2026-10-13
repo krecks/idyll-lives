@@ -383,7 +383,7 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
             let size = if player {
                 player_size
             } else {
-                (bedrooms + rng.below(2) as usize).clamp(1, 4)
+                (bedrooms + rng.below(2)).clamp(1, 4)
             };
             let size = size.min(layout.max_residents.saturating_sub(sims.len()));
             if size == 0 {

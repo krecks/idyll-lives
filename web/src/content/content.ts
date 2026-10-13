@@ -4,6 +4,8 @@
  * authority on rules; `validateCharacter` mirrors its checks for instant UI feedback.
  */
 
+import { withBuild } from '../assets/build';
+
 export interface NeedDef {
   id: string;
   label: string;
@@ -914,7 +916,7 @@ export function mergeDeep(a: Json, b: Json): Json {
 }
 
 export async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url);
+  const res = await fetch(withBuild(url));
   if (!res.ok) throw new Error(`failed to load ${url}: ${res.status}`);
   return res.text();
 }

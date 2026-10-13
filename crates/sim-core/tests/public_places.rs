@@ -31,10 +31,13 @@ fn footprint(content: &Value, def: &str) -> (i64, i64) {
         .map_or((1, 1), |f| (f[0].as_i64().unwrap(), f[1].as_i64().unwrap()))
 }
 
+/// What `stamp` gives: walls, doors, windows, objects, and where visitors arrive.
+type Stamped = (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>, [f64; 2]);
+
 /// A public place stamped on a plot at `(x0, 0)` of a medium lot's size, turned round (the south
 /// side of the street) like `town.ts` does it: walls, doors, windows, objects (turns kept,
 /// offsets the other way) and where visitors arrive.
-fn stamp(content: &Value, place: &Value, (w, d): (i64, i64), x0: i64, rotated: bool) -> (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>, [f64; 2]) {
+fn stamp(content: &Value, place: &Value, (w, d): (i64, i64), x0: i64, rotated: bool) -> Stamped {
     let n = |v: &Value| v.as_i64().unwrap();
     let list = |k: &str| place[k].as_array().cloned().unwrap_or_default();
     let walls = list("walls")

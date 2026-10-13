@@ -38,7 +38,7 @@ const TOWN: &str = r#"{"width":16,"depth":12,
                {"def":"bed","x":11,"z":1},{"def":"toilet","x":13,"z":2},
                {"def":"plant","x":2,"z":8},{"def":"plant","x":4,"z":8}]}"#;
 
-fn room<'a>(w: &'a World, x: i32, z: i32) -> &'a sim_core::rooms::RoomInfo {
+fn room(w: &World, x: i32, z: i32) -> &sim_core::rooms::RoomInfo {
     w.room_at_tile(x, z).unwrap()
 }
 

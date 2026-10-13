@@ -9,6 +9,7 @@
  * (x, y, z, w); matrices are column-major (Babylon's array layout).
  */
 
+import { withBuild } from '../../../assets/build';
 import { optimizedUrl } from '../../../assets/registry';
 import { buildClips } from './clips';
 
@@ -280,7 +281,7 @@ export function loadCharacterSet(url: string): Promise<CharacterSet> {
 }
 
 async function fetchOk(url: string): Promise<Response> {
-  const res = await fetch(url);
+  const res = await fetch(withBuild(url));
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   return res;
 }

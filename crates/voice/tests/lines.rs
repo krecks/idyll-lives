@@ -74,6 +74,8 @@ fn lines(v: &Value, at: &str, out: &mut Vec<(String, String)>) {
 fn g2p() -> Option<G2p> {
     let path = content_dir().join("../voice/en-us.lexz");
     let Ok(file) = std::fs::File::open(&path) else {
+        // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
+        assert!(std::env::var_os("CI").is_none(), "{} missing in CI (run `node tools/voice/fetch.mjs` first)", path.display());
         eprintln!("skipped: {} missing (run `node tools/voice/fetch.mjs`)", path.display());
         return None;
     };
@@ -181,10 +183,10 @@ fn keys_name_content_that_exists() {
         v.get(section).and_then(Value::as_object).map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default()
     };
     let mut tone = |at: &str, v: &Value| {
-        if let Some(t) = v.get("tone") {
-            if !t.as_str().is_some_and(|t| TONES.contains(&t)) {
-                wrong.push(format!("{at}: unknown tone {t}"));
-            }
+        if let Some(t) = v.get("tone")
+            && !t.as_str().is_some_and(|t| TONES.contains(&t))
+        {
+            wrong.push(format!("{at}: unknown tone {t}"));
         }
     };
     let mut unknown = Vec::new();
