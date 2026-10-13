@@ -1,6 +1,6 @@
 # Graphics settings and performance
 
-*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. The targets for Intel laptops below are goals estimated from Mac measurements, not yet measured on Intel hardware. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
+*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. The target for Intel laptops below, Medium at 30 fps, is estimated from Mac measurements and not yet measured on Intel hardware; Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
 
 Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolution.ts` (Auto resolution), `web/src/render/babylon/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
@@ -37,15 +37,15 @@ Removed in 0.2.0: Ultra, Custom and the fine-tune toggles, and ambient occlusion
 
 ## Targets
 
-The owner's targets are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
+The owner's target machines are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
 
-| Preset | Goal | P1's estimate before 0.2.0 (§2.5.1) | Status |
+| Preset | 0.2.0 target | P1's estimate before 0.2.0 (§2.5.1) | Status |
 |---|---|---|---|
-| Medium | 30 fps or more | about 6–10 fps | A goal, not a release gate |
-| Low | 60 fps or more | about 9–27 fps at 75 % scale | A goal, not a release gate |
+| Medium | 30 fps or more | about 6–10 fps | An estimate, not yet measured on Intel hardware; not a release gate |
+| Low | none: best effort | about 9–27 fps at 75 % scale | The owner made Low at 60 fps not a 0.2.0 target |
 
-- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by about 3×. The owner confirms the targets on real hardware with the benchmark (the release review's §5).
-- **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, a guaranteed 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
+- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by about 3×. The owner confirms them on real hardware with the benchmark (the release review's §5).
+- **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
 - **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, WebGPU spends 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, and WebGL2 10–19 ms (54–98 fps). So on WebGPU the CPU alone also keeps Low from 60 fps there (P1-07).
 - *(pending: the estimate with G2's savings.)* <!-- G2 -->
 
