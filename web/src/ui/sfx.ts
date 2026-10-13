@@ -1,7 +1,7 @@
 /**
  * Little interface sounds, synthesised with Web Audio (no sound files): picking things up,
  * putting them down, money changing hands, walls going up. Quiet by design, and off with the
- * "Sound effects" setting. The audio context starts on the first sound after a user gesture.
+ * "Sound effects" setting. Played through the mixer (`audio/mixer.ts`).
  */
 
 import { audioContext, bus } from '../audio/mixer';

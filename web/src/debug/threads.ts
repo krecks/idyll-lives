@@ -40,7 +40,13 @@ const longTasksSupported = typeof PerformanceObserver !== 'undefined' && Perform
 if (longTasksSupported) {
   new PerformanceObserver((list) => {
     for (const e of list.getEntries()) longTasks.push({ at: e.startTime + e.duration, ms: e.duration });
+    // Also when nobody reads them (the overlay closed): only the last ten seconds are kept.
+    forgetLongTasks(performance.now());
   }).observe({ type: 'longtask', buffered: true });
+}
+
+function forgetLongTasks(now: number): void {
+  while (longTasks.length && longTasks[0].at < now - LONG_TASK_WINDOW_MS) longTasks.shift();
 }
 
 export function threadStats(
@@ -48,8 +54,7 @@ export function threadStats(
   sim: SimThreadStats | null,
   director: VoiceDirectorStats,
 ): ThreadStats {
-  const now = performance.now();
-  while (longTasks.length && longTasks[0].at < now - LONG_TASK_WINDOW_MS) longTasks.shift();
+  forgetLongTasks(performance.now());
   // Chrome only.
   const heapBytes = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null;
   const mainBusy = Math.min(1, (render.cpuMs * render.fps) / 1000);

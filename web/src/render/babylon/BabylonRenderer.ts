@@ -798,7 +798,8 @@ export class BabylonRenderer implements Renderer {
     // The overview moves the camera just before drawing: project with its current matrices.
     const transform = this.townMode ? this.camera.getTransformationMatrix() : this.scene.getTransformMatrix();
     Vector3.ProjectToRef(this.vTmp, Matrix.IdentityReadOnly, transform, this.viewport, this.vProj);
-    if (this.vProj.z < 0 || this.vProj.z > 1) return false;
+    // Behind the camera, or not a point at all (a NaN position).
+    if (!(this.vProj.z >= 0 && this.vProj.z <= 1 && Number.isFinite(this.vProj.x) && Number.isFinite(this.vProj.y))) return false;
     out.x = this.vProj.x;
     out.y = this.vProj.y;
     return true;

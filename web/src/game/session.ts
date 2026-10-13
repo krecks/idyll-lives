@@ -80,6 +80,10 @@ const WARM_FRAMES = 3;
 const PORTRAIT_WAIT_MS = 8000;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
+const JOURNAL_SIZE = 300;
+/** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
+const REPEATING = new Set(['r', 'R', 'PageUp', 'PageDown', 'z', 'Z', 'y', 'Y']);
 
 export interface GameSession {
   /** Saves into `slotId` (a new slot when omitted). Returns the slot id. */
@@ -269,6 +273,9 @@ export async function startSession(
     if (game.watching) stopWatching();
   }
   const onInput = () => takeBack();
+  /** The button last clicked: it keeps focus, but Space still pauses (unlike on a button reached with the keyboard). */
+  let clicked: Element | null = null;
+  const onPress = (e: PointerEvent) => (clicked = e.target instanceof Element ? e.target.closest('button') : null);
   let hudTimer: ReturnType<typeof setTimeout> | undefined;
   const onMove = () => {
     // Moving the mouse doesn't take the camera, but it does count as being here (and wakes a
@@ -284,6 +291,8 @@ export async function startSession(
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   let autosaveMinutes = -1;
+  /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
+  let showFps: boolean | null = null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -873,7 +882,8 @@ export async function startSession(
 
   function onStory(fresh: SocialEvent[]) {
     const now = Date.now();
-    if (game.journal.length) game.journal = [...game.journal, ...fresh];
+    // The open journal keeps up (it's fetched again when it opens).
+    if (game.journalOpen && game.journal.length) game.journal = game.journal.concat(fresh).slice(-JOURNAL_SIZE);
     director.noteEvents(fresh.filter(aboutUs), performance.now());
     // The feed: what happens to the household, and the town's bigger news.
     const news = fresh.filter((e) => (aboutUs(e) && e.importance >= 1) || e.importance >= 2 || (aboutUs(e) && e.kind === 'skillUp'));
@@ -1026,6 +1036,7 @@ export async function startSession(
       buildBuy.release(g && inLot(g.x, g.z) ? g : null, moved);
     },
     cancel: () => buildBuy.cancelDrawing(),
+    abort: () => buildBuy.abortPress(),
   });
 
   /** Puts what the eyedropper picked up in hand: a build tool with its look, or another object. */
@@ -1043,7 +1054,13 @@ export async function startSession(
   }
 
   const onKey = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)) return;
+    // A held key repeats only what's worth repeating (turning, storeys, undo and redo); toggles happen once.
+    if (e.repeat && !REPEATING.has(e.key)) {
+      if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
+      return;
+    }
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
       if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
@@ -1074,6 +1091,8 @@ export async function startSession(
     }
     switch (e.key) {
       case ' ':
+        // A button reached with the keyboard (a menu's arrow keys) is pressed with Space.
+        if (t instanceof HTMLButtonElement && t !== clicked) return;
         e.preventDefault();
         return controls.togglePause();
       case '0':
@@ -1219,6 +1238,7 @@ export async function startSession(
       pointer = attachPointer();
       window.addEventListener('keydown', onKey);
       window.addEventListener('pointerdown', onInput, true);
+      window.addEventListener('pointerdown', onPress, true);
       canvas.addEventListener('wheel', onInput, { capture: true, passive: true });
       window.addEventListener('keydown', onInput, true);
       window.addEventListener('pointermove', onMove, { passive: true });
@@ -1266,11 +1286,10 @@ export async function startSession(
       });
       bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
-      game.perfOpen = s.showFps;
+      if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
       if (s.autosaveMinutes !== autosaveMinutes) {
         autosaveMinutes = s.autosaveMinutes;
         clearInterval(autosaveTimer);
-      clearTimeout(prefetchTimer);
         if (autosaveMinutes > 0) {
           autosaveTimer = setInterval(() => {
             if (game.pauseMenu) return;
@@ -1293,9 +1312,11 @@ export async function startSession(
       ideas.clear();
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
+      clearTimeout(prefetchTimer);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pointerdown', onInput, true);
+      window.removeEventListener('pointerdown', onPress, true);
       canvas.removeEventListener('wheel', onInput, true);
       window.removeEventListener('keydown', onInput, true);
       window.removeEventListener('pointermove', onMove);
