@@ -13,7 +13,9 @@ Fixes came in two waves of agents, each on its own branch:
 - **Wave A:** F1a and F1b (simulation), F2a (crash safety), F2b (input, audio and small web fixes), F2c (saves and start-up), F4 (animation), F5 (build, CI and licences), T1 (long-run tests).
 - **Wave B:** G1 (presets, resolution, pacing), L1 (load time and stepping), G2 (GPU savings nobody can see) and M1 (main thread).
 
-Every agent's branch is merged. The release workflow's first dry run passed on Linux (§3.6, R5-02), and on `main` clippy is clean and the tests pass (§3.8).
+After the waves, V1 verified `main` end to end (§3.9), and a sign-off agent for each reviewer re-checked its findings on `main`. F8 (pensions) and F9 (the range cooker, which R3's sign-off found) fixed what came up there, and the coordinator fixed a few things straight on `main` (§3). Every agent's branch is merged. The release workflow's first dry run passed on Linux (§3.6, R5-02), and on `main` clippy is clean and the tests pass (§3.8, §3.9).
+
+Sign-off: R1, R2, R3, R4, R5 and P3 agreed, with corrections this document takes in. P1's one blocker was wording (Medium's 30 fps on Intel laptops is a target the estimate says it probably misses, §2.8). P2's blocker is a CPU regression from G2's merge, which G3 is fixing (§3.5.1, §3.5.2). *(G3's result to come.)* <!-- G3 -->
 
 Severity:
 - **critical**: a crash, data loss, or a release blocker.
