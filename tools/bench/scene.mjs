@@ -7,7 +7,8 @@
  *
  *   node tools/bench/scene.mjs --name village [--world medium|forest|mountain|…] [--hour 18] [--port 5221]
  *
- * Starts its own Vite on `--port` (or uses `--url`). Needs Playwright like render.mjs.
+ * Starts its own Vite on `--port` (or uses `--url`). Needs Playwright like render.mjs, and runs
+ * headless on the real GPU like it (`--headed` for a window).
  */
 
 import { spawn } from 'node:child_process';
@@ -46,7 +47,7 @@ if (!flag('url', null)) {
 }
 
 const { chromium } = await playwright();
-const browser = await chromium.launch({ headless: false, executablePath: process.env.CHROME || undefined, args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+const browser = await chromium.launch({ headless: !process.argv.includes('--headed'), ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }), args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await page.addInitScript(quiet);
