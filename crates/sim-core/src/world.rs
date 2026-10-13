@@ -700,6 +700,11 @@ impl Sim {
             _ => None,
         }
     }
+
+    /// Whether they couldn't get to object `id` a moment ago (see `stuck`), and won't try again yet.
+    pub(crate) fn couldnt_reach(&self, id: u32, tick: u64) -> bool {
+        self.stuck.is_some_and(|(kind, until)| tick < until && matches!(kind, TaskKind::Use { object, .. } if object == id))
+    }
 }
 
 /// How a house's roof looks: a roof style and a roof colour (indices into the content's
@@ -2930,7 +2935,7 @@ fn pick_autonomous(
     let short: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < low).fold(0, |m, n| m | 1 << n);
     let walk_per_minute = WALK_SPEED * sim.mods.walk_speed / MINUTES_PER_TICK;
     let urgent = urgent_needs(sim, ctx, objects);
-    let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n));
+    let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n), false);
     // How far away the nearest thing for each need is, and how long until they leave for work
     // or school (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
@@ -3972,19 +3977,25 @@ fn ready_to_leave(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Ta
     habit(sim, ctx, objects, HabitTime::Leave, ctx.briefs[sim.id as usize].plot)
 }
 
-/// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge).
+/// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge),
+/// busy or not.
 fn home_fills(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], n: usize) -> bool {
-    home_needs(sim, ctx, objects, 1 << n) != 0
+    home_needs(sim, ctx, objects, 1 << n, false) != 0
 }
 
 /// Which of the needs in `mask` (bit per need) their home has something working for (not
-/// counting what's only done with a baby there).
-fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32) -> u32 {
+/// counting what's only done with a baby there). `free`: only what they could go and use now,
+/// with a place on it free (or theirs already), and not something they couldn't get to a moment
+/// ago (every bed taken is no bed for them tonight).
+fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free: bool) -> u32 {
     let Some(home) = ctx.households[sim.household as usize].plot else {
         return 0;
     };
+    let usable = |o: &ObjectInstance| {
+        !free || ((o.has_free_slot(ctx.content.objects[o.def].slots) || o.slot_of(sim.id).is_some()) && !sim.couldnt_reach(o.id, ctx.tick))
+    };
     let mut found = 0;
-    for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken()) {
+    for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken() && usable(o)) {
         for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares()) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
@@ -3995,15 +4006,15 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32) -> u3
     found
 }
 
-/// Essentials about to run out (`AutonomyRules::urgent`) that something at home fills (bit
-/// per need): residents see to them before anything else.
+/// Essentials about to run out (`AutonomyRules::urgent`) that something at home they could use
+/// now fills (bit per need): residents see to them before anything else.
 fn urgent_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> u32 {
     let content = ctx.content;
     let rules = &content.autonomy;
     let low = (0..content.needs.len())
         .filter(|&n| !content.needs[n].room && rules.urgent & (1 << n) != 0 && sim.needs[n] < rules.urgent_below)
         .fold(0, |m, n| m | 1 << n);
-    if low == 0 { 0 } else { home_needs(sim, ctx, objects, low) }
+    if low == 0 { 0 } else { home_needs(sim, ctx, objects, low, true) }
 }
 
 /// Whether one of the needs in `mask` would run down below `floor` in `minutes` of something

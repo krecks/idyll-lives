@@ -156,6 +156,43 @@ fn practising_with_nothing_else_to_do_doesnt_stutter() {
     assert!(starts <= 2, "Ann started tending {starts} times in 30 minutes");
 }
 
+/// A bed and a toilet; energy and the bladder are urgent below 0.1.
+const NIGHT: &str = r#"{
+    "needs":[{"id":"energy","label":"Energy","decayPerHour":0.05},{"id":"bladder","label":"Bladder","decayPerHour":0.1}],
+    "autonomy":{"urgent":["energy","bladder"],"urgentBelow":0.1},
+    "dayRhythm":{"sleepTags":["sleep"]},
+    "objects":[{"id":"bed","name":"Bed","footprint":[1,2],"interactions":[
+        {"id":"sleep","label":"Sleep","minutes":480,"pose":"lie","effects":{"energy":1.0},"tags":["sleep"]}]},
+      {"id":"toilet","name":"Toilet","interactions":[{"id":"use","label":"Use","minutes":5,"effects":{"bladder":1.0},"after":"wash"}]},
+      {"id":"sink","name":"Sink","interactions":[{"id":"wash","label":"Wash hands","minutes":1,"effects":{"bladder":0.0},"tags":["wash"],"autonomous":false}]}]}"#;
+
+fn night_town() -> World {
+    let lot = r#"{"width":12,"depth":12,"plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}],
+        "households":[{"name":"Home","plot":0,"player":true}],
+        "objects":[{"def":"bed","x":2,"z":2,"rot":0},{"def":"toilet","x":8,"z":2,"rot":0},{"def":"sink","x":10,"z":2,"rot":0}],
+        "sims":[{"name":"Ann","x":5.5,"z":7.5},{"name":"Bob","x":2.5,"z":5.5}]}"#;
+    World::from_json(NIGHT, lot, 5).unwrap()
+}
+
+#[test]
+fn worn_out_with_every_bed_taken_they_still_finish_on_the_toilet() {
+    let mut w = night_town();
+    // Bob has the only bed; Ann is worn out (nothing she can do about it) and needs the toilet.
+    w.apply(sim_core::Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
+    w.sims[0].needs[..2].copy_from_slice(&[0.05, 0.3]);
+    let mut on_toilet = 0;
+    for _ in 0..20 * 20 {
+        w.tick_once();
+        w.sims[0].needs[0] = 0.05;
+        if matches!(w.sims[0].current(), Some(a) if matches!(a.task.kind, TaskKind::Use { object: 1, .. }) && matches!(a.phase, Phase::Using { .. })) {
+            on_toilet += 1;
+        }
+    }
+    assert!(matches!(w.sims[1].current().map(|a| a.task.kind), Some(TaskKind::Use { object: 0, .. })), "Bob is in bed");
+    let minutes = on_toilet as f32 * sim_core::MINUTES_PER_TICK;
+    assert!(minutes >= 2.0 && w.sims[0].needs[1] > 0.9, "Ann was cut off on the toilet: {minutes:.2} minutes, bladder {:.2}", w.sims[0].needs[1]);
+}
+
 #[test]
 fn practice_lasts_its_time_while_the_skill_is_wanted() {
     let content = r#"{
