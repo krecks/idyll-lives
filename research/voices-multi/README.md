@@ -1,5 +1,11 @@
 # Research: genuinely different resident voices (2026-10-10)
 
+*Historical. This research chose KittenTTS nano, which shipped in 0.1.0. Since 2026-10-12 (0.2.0)
+residents speak with Supertone's Supertonic 3 on WebGPU instead; see
+[docs/design/voices.md](../../docs/design/voices.md). "Today" below means 2026-10-10, when the
+game spoke with Paradee-8M, which was removed before 0.1.0. The game was MIT-licensed then; it has
+been GPL-3.0-or-later since 0.1.0.*
+
 Throwaway research, no production changes. Question: how can residents get really different
 voices, men included, within the browser constraints (one WASM thread, no cross-origin
 isolation, never costing frames, 30-60 MB, MIT-compatible, deterministic)?
@@ -12,7 +18,7 @@ for asking!", "I had the strangest dream last night." (14/31/37 characters).
 
 | Model | File (gzip) | ms per line (Chrome) | x real time | Voices | Male/female apart? | UTMOS (men) | Licence |
 |---|---|---|---|---|---|---|---|
-| Paradee-8M, pitch only (today) | 9.0 MB (7.4) | 203-462 | 5.2-6.4 | 1 | no: same speaker, cos 0.92 within / 0.81 across | 2.5-3.2 | Apache-2.0 |
+| Paradee-8M, pitch only (the game's voice on 2026-10-10) | 9.0 MB (7.4) | 203-462 | 5.2-6.4 | 1 | no: same speaker, cos 0.92 within / 0.81 across | 2.5-3.2 | Apache-2.0 |
 | Paradee-8M + depth | same | same + 1-2 ms resample | same | 1 | across yes (0.23), within no (0.76) | 2.9-3.5 | Apache-2.0 |
 | Kokoro-82M q8 / q8f16, WASM | 92 / 86 MB (62 / 56) | 2800-4500 (Node) | 0.55-0.57 | 28 + blends | yes (0.32 / 0.15) | 4.1-4.3 | Apache-2.0 |
 | Kokoro-82M fp32/fp16/q4f16, WebGPU | 326/163/155 MB | 1190-1750 (first line 1.3-7 s) | 1.1-1.5 | 28 + blends | yes | 4.1-4.3 | Apache-2.0 |
