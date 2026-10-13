@@ -217,7 +217,10 @@ pub(crate) fn update(w: &mut World) {
                 }
             }
             State::Waiting(ticks) => {
-                if gap > s.distance + ENGAGE_SLACK + 0.6 {
+                // About to drop (or burst) themselves: the talk would break off at once.
+                if sims[i].pressed(content) {
+                    end_activity(&mut sims[i], content, objects);
+                } else if gap > s.distance + ENGAGE_SLACK + 0.6 {
                     chase(&nav, &walk, sims, i, t, content, objects);
                 } else if sims[t].available_for_social(content) {
                     engage(

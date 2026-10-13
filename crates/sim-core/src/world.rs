@@ -3076,8 +3076,11 @@ fn pick_autonomous(
         }
     }
 
+    // About to drop (or burst): no time to talk, as a chat would break off at once and leave the
+    // other one's activity dropped for nothing (`available_for_social` asks the same of them).
+    let pressed = sim.pressed(content);
     for (j, other) in ctx.briefs.iter().enumerate() {
-        if j == me || !other.available {
+        if j == me || !other.available || pressed {
             continue;
         }
         // Chat with people on the same lot (or nearby on the street); crossing town is a visit.
@@ -3150,7 +3153,7 @@ fn pick_autonomous(
             continue;
         };
         let s = &content.socials[social];
-        if !s.joinable || !leader.here || leader.away {
+        if !s.joinable || !leader.here || leader.away || pressed {
             continue;
         }
         let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
@@ -3268,8 +3271,9 @@ fn pick_autonomous(
     }
 
     // The phone: texting, calling or inviting people who aren't here, scrolling (`phone.rs`).
+    // (Nor a call or a text, pressed.)
     for (s, action, contact) in crate::phone::candidates(sim, ctx, &felt, &feel) {
-        if s > MIN_AUTONOMY_SCORE {
+        if s > MIN_AUTONOMY_SCORE && !(pressed && contact.is_some()) {
             candidates.push((s, Choice::Phone(action, contact)));
         }
     }

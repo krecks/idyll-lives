@@ -32,7 +32,6 @@ fn talk_town(width: u32, sims: &str) -> World {
 }
 
 #[test]
-#[ignore = "R3 proof: fails until someone about to drop doesn't start chats"]
 fn someone_too_tired_to_talk_leaves_others_be() {
     let mut w = talk_town(16, r#"{"name":"Ann","x":4.5,"z":5.5},{"name":"Bob","x":8.5,"z":5.5}"#);
     // Ann is about to drop (pressed: a chat would end at once) and lonely; Bob wants to read.
@@ -57,6 +56,25 @@ fn someone_too_tired_to_talk_leaves_others_be() {
     }
     eprintln!("Bob was pulled into {cut_short} chats that ended at once in 30 minutes; his fun is {:.2}", w.sims[1].needs[2]);
     assert!(cut_short <= 1, "Bob was pulled into {cut_short} chats that ended at once");
+}
+
+#[test]
+fn told_to_chat_while_about_to_drop_they_leave_the_other_be() {
+    let mut w = talk_town(16, r#"{"name":"Ann","x":4.5,"z":5.5},{"name":"Bob","x":8.5,"z":5.5}"#);
+    w.apply(sim_core::Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.sims[0].needs[..3].copy_from_slice(&[0.05, 0.1, 1.0]);
+    w.apply(sim_core::Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
+    for _ in 0..20 * 3 {
+        w.tick_once();
+    }
+    assert!(matches!(w.sims[1].current().map(|a| &a.phase), Some(Phase::Using { .. })), "Bob is reading");
+    w.apply(sim_core::Command::Social { sim: 0, target: 1, social: 0 }).unwrap();
+    for _ in 0..20 * 5 {
+        w.tick_once();
+        assert!(w.sims[1].engaged_with.is_none(), "Bob's reading was dropped for a chat that ends at once");
+    }
+    assert!(w.sims[0].current().is_none(), "Ann gave up on the chat");
+    assert!(matches!(w.sims[1].current().map(|a| &a.phase), Some(Phase::Using { .. })), "Bob reads on");
 }
 
 #[test]
