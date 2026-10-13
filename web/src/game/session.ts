@@ -1173,6 +1173,8 @@ export async function startSession(
   };
 
   const statsTimer = setInterval(() => {
+    // GPU timing costs a little, so it runs only while the overlay is open.
+    renderer.measureGpu(game.perfOpen);
     if (!game.perfOpen) return;
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
