@@ -77,7 +77,7 @@ Unlike the art above, these come with their own licences: the model under the **
 |---|---|---|---|---|
 | `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`tools/voice/fp16.mjs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE`) |
 | `supertonic-3/tts.json`, `unicode_indexer.json`, `F1.json`…`F5.json`, `M1.json`…`M5.json` | Supertonic 3 (revision `3cadd1ee`): config, text indexer and ten voice styles, **unchanged** | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3 | BigScience OpenRAIL-M (`supertonic-3/LICENSE`) |
-| `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 |
+| `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 (`misaki-LICENSE`) |
 
 **Use restrictions.** Supertonic 3's licence (`supertonic-3/LICENSE`, shipped with it) forbids certain uses of the model and of what it makes, among them breaking the law, harming or exploiting minors, spreading verifiably false information to harm others, defamation and harassment, and impersonation for harm; see its Attachment A. Anyone who gets the game with the model is bound by the same restrictions. The voice names the game shows (Ada, Bea, Cleo, Dora, Elsie, Arlo, Ben, Cal, Dex, Ezra) are ours; the model calls its voices F1–F5 and M1–M5.
 
@@ -91,7 +91,7 @@ Optional (Settings → Voices → Lines → Language model), its 4-bit ONNX buil
 
 | Model | Files | By | Source | Licence |
 |---|---|---|---|---|
-| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser), `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 |
+| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser), `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
 
 The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. The model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
 
