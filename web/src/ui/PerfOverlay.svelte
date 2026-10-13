@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { settings } from '../settings/settings.svelte';
   import { saveDebugReport } from './debugReport';
   import { game } from './state.svelte';
 
@@ -16,8 +15,6 @@
 
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const mb = (bytes: number) => `${(bytes / 2 ** 20).toFixed(0)} MB`;
-  /** The graphics preset (`?quality=` overrides it for testing). */
-  const preset = $derived(new URLSearchParams(location.search).get('quality') ?? settings.graphics);
 </script>
 
 {#if game.perfOpen}
@@ -33,8 +30,9 @@
       {@const s = game.stats}
       <h4>Main thread</h4>
       <div><span>Backend</span><b>{s.backend}</b></div>
-      <div><span>Preset</span><b>{preset}</b></div>
+      <div><span>Preset</span><b>{s.preset}</b></div>
       <div><span>Resolution</span><b>{s.renderWidth}×{s.renderHeight} · {pct(s.renderScale)}</b></div>
+      <div><span>Display</span><b>{Math.round(s.refreshHz)} Hz ÷ {s.refreshDivisor}</b></div>
       <div><span>FPS</span><b>{s.fps.toFixed(0)}</b></div>
       <div><span>Frame</span><b>{s.frameMs.toFixed(1)} ms</b></div>
       <div><span>Frame work</span><b>{s.cpuMs.toFixed(1)} ms</b></div>

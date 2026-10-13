@@ -1589,6 +1589,7 @@ export class BabylonRenderer implements Renderer {
   stats(): RenderStats {
     return {
       backend: `${this.webgpu ? 'WebGPU' : 'WebGL2'}${this.lampCluster ? ' · clustered lamps' : ''}`,
+      preset: this.quality.preset,
       fps: this.engine.getFps(),
       frameMs: this.engine.getDeltaTime(),
       cpuMs: this.cpuMs,
@@ -1597,6 +1598,8 @@ export class BabylonRenderer implements Renderer {
       renderWidth: this.engine.getRenderWidth(),
       renderHeight: this.engine.getRenderHeight(),
       renderScale: 1 / (this.engine.getHardwareScalingLevel() * window.devicePixelRatio),
+      refreshHz: this.pacer.refreshHz,
+      refreshDivisor: this.pacer.divisor,
       gpuMs: this.gpuMs(),
       residentsMs: this.characters?.updateMs ?? 0,
     };
