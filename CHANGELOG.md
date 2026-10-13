@@ -25,7 +25,7 @@ In this release babies are cared for, meals are cooked from start to finish, eve
 
 ### Stability and saves
 - **A crash screen** instead of a silent freeze: if the game hits an error it says so ("Your last save is safe."), offers to reload, and can save a debug report. If only drawing or the interface broke, it offers Save and reload. After a graphics reset (a driver update, a GPU switch) the game offers Save and reload too, and if WebGPU won't start it draws with WebGL instead.
-- **Damaged and too-new saves:** a save that can't be opened no longer blocks Continue. A damaged one is removed with a short notice; one from a newer version is kept and marked.
+- **Damaged and too-new saves:** a save that can't be opened no longer blocks Continue. One the game finds damaged is removed with a short notice. One from a newer version, or one this version fails to load, is kept and marked ("This version couldn't open it"): Continue skips it, Load game can still export it, and a later version tries again.
 - **Saves you can keep:** Load game can export any save as a file and import it again, and the game asks the browser to keep its saves.
 - **Autosaves per game:** each game keeps its own two latest autosaves, so one game no longer overwrites another's. The game also autosaves when you leave the tab, and says so if an autosave fails. "Game saved" only shows once the save is really stored.
 - **Long games:** from game day 1167 (about 7.8 hours at the fastest speed) births, ageing and deaths used to stop. They don't any more.
@@ -49,7 +49,9 @@ Measured on an M3 Pro in Chrome, 1920×1080:
 
 ### Fixes
 - **Residents:** a resident too tired to talk no longer pulls others into chats all night; nobody follows someone across town for a chat; practising a skill no longer stutters on and off; worn out with every bed taken, residents no longer give up the toilet at once; residents no longer use something that broke on the way, nor the neighbours' things when sent; two housemates no longer both walk over to the same repair; newborns are born at age 0; a family moving into town brings a grown-up child, not a baby left at the door; new residents start with the skills their traits give.
-- **Money:** a recipe given up after buying the ingredients gives the money back.
+- **Money:** a recipe given up after buying the ingredients gives the money back. Residents at retirement age (65) without a job now retire with a basic pension of $500 a week, and every pension is at least that; a job you give a retiree sticks.
+- **Kitchens:** buying a range cooker no longer sells the fridge, and a stove without a fridge no longer counts as food at home, so hungry residents order takeout instead of going round in circles.
+- **Saves and crashes:** Load game lists a save's own household, not everyone in town, and no "Autosave failed" notice shows over the crash screen.
 - **Input, interface and sound:** after Alt+Tab, Build mode no longer picks up the floor on a plain click; a wall or carried object no longer sticks to the mouse; held keys no longer flicker pause or panels; the arrow keys turn the camera as fast at any frame rate; reduce motion also stills the scene's decorative movement. News in the feed can't be clicked once it has faded, and with reduced motion on it shows for 10 seconds instead of not at all. A master volume, sound stops when the game is in the background ("Mute in background", on), and an option to pause when the window loses focus.
 - **Content packs:** content that would break the game (a walking speed of 0, a resale price above 1, a recipe of 300 steps, an unknown tag) is refused with a clear message (`docs/content-packs.md`).
 
@@ -59,7 +61,7 @@ Measured on an M3 Pro in Chrome, 1920×1080:
 - **Runs on:** desktop Chrome, Edge, Brave or Safari with WebGPU; other browsers use the WebGL2 fallback. Voices and the language model need WebGPU. Tested on Apple Silicon Macs in Chrome. On older Intel laptops (HD 620-class graphics) Medium's target is 30 fps, but it hasn't been measured on Intel hardware: scaled from Mac measurements, Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low there is best effort.
 
 ### Licence
-Idyll Lives is free software under the GNU General Public License v3.0 (or later). Third-party parts keep their own licences: the art is CC0; the voice model, Supertone's Supertonic 3, is under the BigScience OpenRAIL-M licence, whose use restrictions bind everyone who plays; the dictionary (Misaki) is Apache-2.0; and the optional language model (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0. Every build lists the code it bundles with its licences in `THIRD-PARTY-LICENSES.txt`, and Credits names them.
+Idyll Lives is free software under the GNU General Public License v3.0 (or later). Third-party parts keep their own licences: the art is CC0; the voice model, Supertone's Supertonic 3, is under the BigScience OpenRAIL-M licence, whose use restrictions bind everyone who plays; the dictionary (Misaki) is Apache-2.0; and the optional language model (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0. Every build lists the code and files it bundles with their licence texts in `THIRD-PARTY-LICENSES.txt` (the Zstandard texture decoder and TalkingHead's facial expressions included), and Credits names them.
 
 ## 0.1.0 — 2026-10-10
 
