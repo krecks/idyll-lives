@@ -197,6 +197,93 @@ fn a_better_one_replaces_the_old() {
     assert_eq!(count(&w, old), olds - 1, "the old one was sold");
 }
 
+/// A small catalog: a fridge, a bigger one that does all it does and more, a range cooker that
+/// shares the gourmet dinner with the fridges but is no fridge, and a bed and a double bed.
+const CATALOG: &str = r#"{
+    "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.0},{"id":"energy","label":"Energy","decayPerHour":0.0},
+             {"id":"fun","label":"Fun","decayPerHour":0.0}],
+    "items":[{"id":"ingredients","label":"Ingredients"},{"id":"mealPot","label":"Meal","serving":"mealPlate"},
+             {"id":"mealPlate","label":"Plate of food"}],
+    "recipes":[
+      {"id":"meal","label":"Make a meal","item":"mealPot","servings":[1,4],"effects":{"hunger":0.9},
+       "steps":[{"at":["ingredients"],"minutes":5,"holds":"ingredients"},{"at":["stove","oven"],"minutes":20,"optional":true}]},
+      {"id":"gourmet","label":"Cook a gourmet meal","item":"mealPot","servings":[2,4],"effects":{"hunger":1.0},
+       "steps":[{"at":["ingredients"],"minutes":5,"holds":"ingredients"},{"at":["stove"],"minutes":45}]}],
+    "objects":[
+      {"id":"fridge","name":"Fridge","price":600,"group":"appliances","stations":["ingredients"],"stores":true,"interactions":[
+        {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.3}},
+        {"id":"meal","label":"Make a meal","recipe":"meal"},
+        {"id":"gourmet","label":"Cook a gourmet meal","recipe":"gourmet"}]},
+      {"id":"fridgeBig","name":"Big fridge","price":1500,"group":"appliances","stations":["ingredients"],"stores":true,"interactions":[
+        {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.35}},
+        {"id":"meal","label":"Make a meal","recipe":"meal"},
+        {"id":"gourmet","label":"Cook a gourmet meal","recipe":"gourmet"},
+        {"id":"coldDrink","label":"Cold drink","minutes":5,"effects":{"fun":0.05}}]},
+      {"id":"rangeCooker","name":"Range cooker","price":1600,"group":"appliances","stations":["stove","oven"],"interactions":[
+        {"id":"cook","label":"Cook dinner","recipe":"meal"},
+        {"id":"gourmet","label":"Cook a gourmet meal","recipe":"gourmet"}]},
+      {"id":"bed","name":"Bed","price":300,"group":"beds","footprint":[1,2],"interactions":[
+        {"id":"sleep","label":"Sleep","minutes":480,"pose":"lie","effects":{"energy":1.0}}]},
+      {"id":"bedDouble","name":"Double bed","price":900,"group":"beds","footprint":[2,2],"slots":2,"interactions":[
+        {"id":"sleep","label":"Sleep","minutes":480,"pose":"lie","effects":{"energy":1.0}},
+        {"id":"read","label":"Read in bed","minutes":30,"pose":"lie","effects":{"fun":0.2}}]}],
+    "goals":[{"id":"own","label":"Have a {object}","kind":"own"}]}"#;
+
+/// Two homes on a street, each with a fridge and a bed: the player's (Ada) and the neighbours'
+/// (Ned), who buy for themselves.
+const STREET: &str = r#"{"width":24,"depth":10,
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[6.5,9.5]},{"name":"Next door","x":12,"z":0,"w":12,"d":10,"entry":[18.5,9.5]}],
+    "households":[{"name":"Player","plot":0,"player":true,"funds":50000},{"name":"Neighbours","plot":1,"funds":50000}],
+    "objects":[{"def":"fridge","x":1,"z":1,"rot":0},{"def":"bed","x":4,"z":1,"rot":0},
+               {"def":"fridge","x":13,"z":1,"rot":0},{"def":"bed","x":16,"z":1,"rot":0}],
+    "sims":[{"name":"Ada","household":0,"x":6.5,"z":6.5},{"name":"Ned","household":1,"x":18.5,"z":6.5}]}"#;
+
+/// What's at home for household `h`, by object type id (sorted).
+fn at_home(w: &World, h: usize) -> Vec<&str> {
+    let plot = w.households[h].plot;
+    let mut ids: Vec<&str> = w.objects.iter().filter(|o| w.plot_at(o.x, o.z) == plot).map(|o| w.content.objects[o.def].id.as_str()).collect();
+    ids.sort_unstable();
+    ids
+}
+
+/// Ada (the player says yes to her request) and Ned (buys it himself) each get `id` at the
+/// morning review.
+fn both_buy(id: &str) -> World {
+    let mut w = World::from_json(CATALOG, STREET, 9).unwrap();
+    for i in 0..2 {
+        apply(&mut w, json!({"type": "addGoal", "sim": i, "goal": {"def": "own", "object": id}})).unwrap();
+    }
+    review(&mut w);
+    assert!(w.sims[0].planner.purchase.is_some_and(|p| p.open), "Ada asks for the {id}");
+    apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    for h in 0..2 {
+        assert!(planner::has_at_home(&w, h, w.content.object_index(id).unwrap()), "household {h} bought the {id}");
+    }
+    w
+}
+
+#[test]
+fn a_range_cooker_goes_in_beside_the_fridge() {
+    // It shares the gourmet dinner with the fridge, but selling the fridge for it would leave no
+    // snacks and nothing to cook with.
+    let w = both_buy("rangeCooker");
+    for h in 0..2 {
+        assert_eq!(at_home(&w, h), ["bed", "fridge", "rangeCooker"], "household {h} keeps its fridge");
+    }
+}
+
+#[test]
+fn a_better_fridge_or_bed_still_replaces_the_old_one() {
+    let w = both_buy("fridgeBig");
+    for h in 0..2 {
+        assert_eq!(at_home(&w, h), ["bed", "fridgeBig"], "household {h} sold the old fridge");
+    }
+    let w = both_buy("bedDouble");
+    for h in 0..2 {
+        assert_eq!(at_home(&w, h), ["bedDouble", "fridge"], "household {h} sold the old bed");
+    }
+}
+
 #[test]
 fn wants_and_requests_survive_saving() {
     let mut w = town(26);
