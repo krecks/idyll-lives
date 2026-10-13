@@ -1,7 +1,7 @@
 /**
  * Landscape around the town: terrain with rolling hills, forests, lawn details and a sky
- * dome. Everything is static and instanced (a draw call per model type and area, see
- * `FOREST_SECTORS`), generated deterministically from the town's seed so a loaded game looks the same.
+ * dome. Everything is static and instanced (a draw call per model type, and in the game per area,
+ * see `FOREST_SECTORS`), generated deterministically from the town's seed so a loaded game looks the same.
  *
  * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
  * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
@@ -13,6 +13,7 @@
 
 import {
   Color3,
+  Constants,
   MaterialPluginBase,
   Matrix,
   Mesh,
@@ -60,22 +61,27 @@ const WATER_Y = -0.35;
 /** Sand from the shoreline up the bank (m). */
 const BEACH = 8;
 /**
- * Plants are drawn in groups the camera leaves out when they're out of view (a model drawn as one
- * mesh over the whole landscape never is): the woods in this many sectors round the town, lawn
- * tufts and flowers in squares of these sizes (m; flowers are sparser, so bigger squares for about
- * as many triangles a draw). A model with fewer triangles in all than `SPLIT_TRIANGLES` stays one
- * mesh: the draw calls more (seen from far out, most sectors are in view) would cost more than the
- * triangles they save.
+ * In the game, plants are drawn in groups the camera leaves out when they're out of view (a model
+ * drawn as one mesh over the whole landscape never is): the woods in this many sectors round the
+ * town, lawn tufts in squares of this size (m). A model part with fewer triangles in all than
+ * `SPLIT_TRIANGLES` (bark, flowers) stays one mesh: the draw calls more would cost the main thread
+ * more than the triangles they save. Each group is a mesh of its own, and every mesh costs the main
+ * thread a little each frame whether drawn or not, so the squares are wide. The menus' town, which
+ * has the whole landscape in view, draws each part whole (see `NatureResult.only`).
  */
 const FOREST_SECTORS = 8;
-const TUFT_CELL = 32;
-const FLOWER_CELL = 96;
+const TUFT_CELL = 64;
 const SPLIT_TRIANGLES = 36_000;
 
 export interface NatureResult {
   meshes: Mesh[];
-  /** Meshes that should cast shadows. */
+  /**
+   * Meshes that should cast shadows: the woods near the town, whole in the game too (its shadow
+   * map round the viewed lot would draw each group reaching into it, a draw each).
+   */
   casters: Mesh[];
+  /** Plants drawn only in the game (in groups) or only in the menus' town (whole); the rest are drawn in both. */
+  only: Map<Mesh, 'game' | 'town'>;
 }
 
 // ---- Deterministic noise ------------------------------------------------------------
@@ -161,7 +167,7 @@ export class Landscape {
   private readonly roads: CountryRoads;
   /** Farm fields in town (no lawn on them). */
   private readonly fields: { x: number; z: number; w: number; d: number }[];
-  /** Lawn tufts and flowers, per model and cell (see `TUFT_CELL`): each instance's original matrix and town tile (-1 outside the town). */
+  /** Lawn tufts and flowers, per model, whole and in groups (see `TUFT_CELL`): each instance's original matrix and town tile (-1 outside the town). */
   private lawn: { meshes: Mesh[]; base: Float32Array; shown: Float32Array; tiles: Int32Array; hidden: Uint8Array }[] = [];
 
   /** `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half). */
@@ -276,15 +282,20 @@ export class Landscape {
   async build(scene: Scene, assets: AssetRegistry, world: WorldStructure): Promise<NatureResult> {
     const meshes: Mesh[] = [];
     const casters: Mesh[] = [];
+    const only = new Map<Mesh, 'game' | 'town'>();
     meshes.push(this.terrain(scene));
     if (this.land.water) meshes.push(this.water(scene));
     meshes.push(...this.roads.build(scene));
-    for (const forest of await this.forests(scene, assets)) {
-      meshes.push(...forest.meshes);
-      if (forest.casts) casters.push(...forest.meshes);
-    }
-    meshes.push(...(await this.lawns(scene, assets, world)));
-    return { meshes, casters };
+    const add = ({ shared, whole, cells }: Instanced, casts = false) => {
+      const groups = cells.flatMap((cell) => cell.meshes);
+      meshes.push(...shared, ...whole, ...groups);
+      for (const mesh of whole) only.set(mesh, 'town');
+      for (const mesh of groups) only.set(mesh, 'game');
+      if (casts) casters.push(...shared, ...whole);
+    };
+    for (const forest of await this.forests(scene, assets)) add(forest, forest.casts);
+    for (const lawn of await this.lawns(scene, assets, world)) add(lawn);
+    return { meshes, casters, only };
   }
 
   private terrain(scene: Scene): Mesh {
@@ -414,7 +425,7 @@ export class Landscape {
    * near the town are the full models and cast shadows; further ones use the `*.far` models (a few
    * blobs each, built at the low level of detail), which don't.
    */
-  private async forests(scene: Scene, assets: AssetRegistry): Promise<{ meshes: Mesh[]; casts: boolean }[]> {
+  private async forests(scene: Scene, assets: AssetRegistry): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
     const near = new Map<string, Matrix[]>();
     const far = new Map<string, Matrix[]>();
@@ -466,7 +477,7 @@ export class Landscape {
         bucket.set(key, [...(bucket.get(key) ?? []), m]);
       }
     }
-    const out: { meshes: Mesh[]; casts: boolean }[] = [];
+    const out: (Instanced & { casts: boolean })[] = [];
     const [cx, cz] = [this.w / 2, this.d / 2];
     const sector = (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     for (const [bucket, casts] of [
@@ -474,7 +485,7 @@ export class Landscape {
       [far, false],
     ] as const) {
       for (const [key, list] of bucket) {
-        out.push({ meshes: (await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector)).flatMap((cell) => cell.meshes), casts });
+        out.push({ ...(await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector)), casts });
       }
     }
     return out;
@@ -484,7 +495,7 @@ export class Landscape {
    * Grass tufts and wildflowers on the town's tiles. Every unpaved tile gets some; the ones
    * indoors or under furniture are hidden by `refreshLawn` (rooms and furniture change in build mode).
    */
-  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure): Promise<Mesh[]> {
+  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure): Promise<Instanced[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
     const covered = [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...this.fields];
     const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
@@ -529,19 +540,30 @@ export class Landscape {
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     this.lawn = [];
-    for (const [key, matrices, tiles, size] of [
-      ['model.grassTuft', thin(tufts), thin(tuftTiles), TUFT_CELL],
-      ['model.flowers', thin(flowers), thin(flowerTiles), FLOWER_CELL],
+    const out: Instanced[] = [];
+    // About `TUFT_CELL` squares over the town; the tufts scattered round it join the squares at its edge
+    // (on their own they would be draws of a few tufts each).
+    const [tw, td] = [world.width, groundDepth(world)];
+    const [nx, nz] = [Math.max(1, Math.round(tw / TUFT_CELL)), Math.max(1, Math.round(td / TUFT_CELL))];
+    const square = (x: number, z: number) => `${Math.min(nx - 1, Math.max(0, Math.floor((x / tw) * nx)))},${Math.min(nz - 1, Math.max(0, Math.floor((z / td) * nz)))}`;
+    for (const [key, matrices, tiles, cell] of [
+      ['model.grassTuft', thin(tufts), thin(tuftTiles), square],
+      // (Flowers are sparse: too few triangles for groups to pay.)
+      ['model.flowers', thin(flowers), thin(flowerTiles), undefined],
     ] as const) {
-      const square = (x: number, z: number) => `${Math.floor(x / size)},${Math.floor(z / size)}`;
-      for (const { meshes, indices } of await instanced(scene, assets, key, matrices, 0, false, square)) {
+      const lawn = await instanced(scene, assets, key, matrices, 0, false, cell);
+      // Every instance, in the parts drawn whole; then each group's.
+      const groups = [{ meshes: [...lawn.shared, ...lawn.whole], indices: matrices.map((_, k) => k) }, ...lawn.cells];
+      for (const { meshes, indices } of groups) {
+        if (!meshes.length) continue;
         const base = new Float32Array(indices.length * 16);
         indices.forEach((k, i) => matrices[k].copyToArray(base, i * 16));
         this.lawn.push({ meshes, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) });
       }
+      out.push(lawn);
     }
     this.refreshLawn(world);
-    return this.lawn.flatMap((l) => l.meshes);
+    return out;
   }
 
   /**
@@ -599,10 +621,21 @@ function scatter(x: number, z: number, rand: () => number, scale: number, y = 0)
 }
 
 /**
+ * A model's meshes drawn with thin instances: the parts drawn whole in the game and the menus'
+ * town (`shared`), and those also drawn in groups (see `SPLIT_TRIANGLES`): whole in the town
+ * (`whole`), in groups in the game (`cells`; each keeps its instances in their order, `indices`
+ * into `matrices`).
+ */
+interface Instanced {
+  shared: Mesh[];
+  whole: Mesh[];
+  cells: { meshes: Mesh[]; indices: number[] }[];
+}
+
+/**
  * One template per model key, drawn with thin instances; static, so bounds are computed once.
- * `cell` groups the instances (by where they stand) into meshes of their own, sharing the
- * template's geometry and materials, so those out of view aren't drawn; each group keeps its
- * instances in their order (`indices` into `matrices`). Models with few triangles stay one group.
+ * `cell` groups the instances by where they stand: the parts with enough triangles get a copy per
+ * group (sharing the template's materials), which the game's camera leaves out when out of view.
  */
 async function instanced(
   scene: Scene,
@@ -612,27 +645,34 @@ async function instanced(
   lod: 0 | 1 = 0,
   fixed = true,
   cell?: (x: number, z: number) => string,
-): Promise<{ meshes: Mesh[]; indices: number[] }[]> {
-  if (matrices.length === 0) return [];
+): Promise<Instanced> {
+  if (matrices.length === 0) return { shared: [], whole: [], cells: [] };
   const template = await buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod });
-  const triangles = template.meshes.reduce((n, mesh) => n + mesh.getTotalIndices() / 3, 0) * matrices.length;
-  const split = cell && triangles >= SPLIT_TRIANGLES ? cell : () => '';
   const groups = new Map<string, number[]>();
-  matrices.forEach((m, i) => {
-    const k = split(m.m[12], m.m[14]);
-    const group = groups.get(k);
-    if (group) group.push(i);
-    else groups.set(k, [i]);
-  });
-  // Copies are made before any instances are set (a clone would copy them), each with its own
-  // geometry: Babylon keeps a mesh's instance buffer with its geometry's vertex buffers.
+  if (cell) {
+    matrices.forEach((m, i) => {
+      const k = cell(m.m[12], m.m[14]);
+      const group = groups.get(k);
+      if (group) group.push(i);
+      else groups.set(k, [i]);
+    });
+  }
+  const split = groups.size > 1 ? template.meshes.filter((mesh) => (mesh.getTotalIndices() / 3) * matrices.length >= SPLIT_TRIANGLES) : [];
+  // Copies are made before any instances are set, each with its own geometry: Babylon keeps a
+  // mesh's instance buffer with its geometry's vertex buffers. New meshes, not clones: a clone
+  // gets the template's fields as its own, an object of another shape, and that slowed Babylon's
+  // loops over all the scene's meshes each frame (at 3x CPU slow-down, +0.7 ms a frame in the
+  // menus' town, whose groups are switched off).
   const copy = (mesh: Mesh, c: number) => {
-    const clone = mesh.clone(`${mesh.name}#${c}`);
-    clone.makeGeometryUnique();
-    return clone;
+    const part = new Mesh(`${mesh.name}#${c}`, scene);
+    mesh.geometry?.copy(`${mesh.geometry.id}#${c}`).applyToMesh(part);
+    part.material = mesh.material;
+    // Groups are flat and wide: their boxes fit them far better than the spheres Babylon tests by default.
+    part.cullingStrategy = Constants.MESHES_CULLINGSTRATEGY_STANDARD;
+    return part;
   };
-  const cells = [...groups.values()].map((indices, c) => ({ meshes: c === 0 ? template.meshes : template.meshes.map((mesh) => copy(mesh, c)), indices }));
-  for (const { meshes, indices } of cells) {
+  const cells = split.length ? [...groups.values()].map((indices, c) => ({ meshes: split.map((mesh) => copy(mesh, c)), indices })) : [];
+  for (const { meshes, indices } of [{ meshes: template.meshes, indices: matrices.map((_, k) => k) }, ...cells]) {
     const buffer = new Float32Array(indices.length * 16);
     indices.forEach((k, i) => matrices[k].copyToArray(buffer, i * 16));
     for (const mesh of meshes) {
@@ -642,7 +682,7 @@ async function instanced(
       mesh.freezeWorldMatrix();
     }
   }
-  return cells;
+  return { shared: template.meshes.filter((mesh) => !split.includes(mesh)), whole: split, cells };
 }
 
 // ---- Garden dressing ------------------------------------------------------------------
