@@ -4,11 +4,16 @@
 //!
 //! `cargo test --release --test soak -- --ignored` runs the long version; with `LOD=1` the
 //! player's home is looked at and the rest of the town runs at lower detail (`lod.rs`).
+//!
+//! The busy player runs are the opposite: a big town with someone at the controls every few
+//! game hours (buying, selling and moving things at home, giving orders, changing the speed and
+//! looking around town), with the checks of the century runs (`century.rs`).
 
 mod common;
 
+use sim_core::command::ItemAction;
 use sim_core::social::EventKind;
-use sim_core::{MINUTES_PER_TICK, World, clock, life};
+use sim_core::{Command, MINUTES_PER_TICK, World, clock, life};
 
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 
@@ -256,4 +261,282 @@ fn a_town_over_a_lifetime() {
     assert!(w.sims.len() <= sim_core::world::MAX_SIMS);
     eprintln!("whole run: {story:?}");
     assert!(story.contains_key("Died") && story.contains_key("MovedIn"), "lives end and new ones begin");
+}
+
+// ---- A busy player in a big town -------------------------------------------------------------
+
+/// As big a town as `big_town.rs`: 34 houses on two streets with furnished yards (thousands of
+/// objects), and as many residents as a town holds.
+const BIG: common::Layout = common::Layout { columns: 9, streets: 2, yards: true, max_residents: sim_core::world::MAX_SIMS };
+
+/// Someone at the controls: every few game hours a session of orders, or of edits at home
+/// (paused, as build mode is), from a seeded random number generator.
+struct Player {
+    rng: common::Lcg,
+    household: u32,
+    /// The plot being looked at (the game's camera; lower detail is for the rest).
+    view: u32,
+    next: u64,
+    /// Per command: tried, and done (the world said yes).
+    tried: std::collections::BTreeMap<&'static str, (usize, usize)>,
+    /// Residents whose next thing or current use names another kind of thing after an edit.
+    stale: Vec<String>,
+}
+
+impl Player {
+    fn new(seed: u64, w: &World) -> Self {
+        let household = w.households.iter().position(|h| h.player).expect("a player household") as u32;
+        let view = w.households[household as usize].plot.expect("the player has a home");
+        Player { rng: common::Lcg::new(seed ^ 0x5eed), household, view, next: 0, tried: Default::default(), stale: Vec::new() }
+    }
+
+    fn pick<T: Copy>(&mut self, list: &[T]) -> Option<T> {
+        (!list.is_empty()).then(|| list[self.rng.below(list.len())])
+    }
+
+    fn chance(&mut self, p: f64) -> bool {
+        self.rng.next() < p
+    }
+
+    fn apply(&mut self, w: &mut World, what: &'static str, cmd: Command) {
+        let edit = cmd.home_edit().is_some() || matches!(cmd, Command::Undo { .. } | Command::Redo { .. });
+        let before = edit.then(|| uses(w));
+        let ok = w.apply(cmd.clone()).is_ok();
+        let e = self.tried.entry(what).or_default();
+        e.0 += 1;
+        e.1 += usize::from(ok);
+        let Some(before) = before else { return };
+        for (i, (was, now)) in before.iter().zip(uses(w)).enumerate() {
+            for (k, label) in ["next thing", "current use"].into_iter().enumerate() {
+                let (Some((o, Some(def))), Some((o2, def2))) = (was[k], now[k]) else { continue };
+                if def2 != Some(def) {
+                    let name = |d: Option<usize>| d.map_or("nothing".to_string(), |d| w.content.objects[d].id.clone());
+                    self.stale.push(format!(
+                        "day {} {:.2}h: {}'s {label} was object {o} ({}); after {cmd:?} it's object {o2} ({})",
+                        clock::day(w.tick),
+                        clock::hour(w.tick),
+                        w.sims[i].name,
+                        name(Some(def)),
+                        name(def2)
+                    ));
+                }
+            }
+        }
+    }
+
+    /// The things at home (not the stairs: people upstairs need them).
+    fn at_home(&self, w: &World) -> Vec<u32> {
+        let Some(plot) = w.households[self.household as usize].plot else { return vec![] };
+        w.objects.iter().filter(|o| w.plot_at(o.x, o.z) == Some(plot) && !w.content.objects[o.def].stairs).map(|o| o.id).collect()
+    }
+
+    fn session(&mut self, w: &mut World) {
+        let h = self.household;
+        let mine: Vec<u32> = w.sims.iter().filter(|s| s.here() && s.household == h).map(|s| s.id).collect();
+        let everyone: Vec<u32> = w.sims.iter().filter(|s| s.here()).map(|s| s.id).collect();
+        let plot = w.households[h as usize].plot;
+        if let Some(home) = plot.filter(|_| self.chance(0.4)) {
+            // Build and buy mode: time stands still while the home changes.
+            self.apply(w, "pause", Command::SetSpeed { speed: 0 });
+            for _ in 0..1 + self.rng.below(5) {
+                let things = self.at_home(w);
+                let Some(object) = self.pick(&things) else { break };
+                let o = w.objects[object as usize].clone();
+                let roll = self.rng.below(100);
+                if roll < 20 {
+                    let funds = w.households[h as usize].funds;
+                    let priced: Vec<usize> = (0..w.content.objects.len()).filter(|&d| w.content.objects[d].price.is_some_and(|p| p <= funds)).collect();
+                    if let Some(d) = self.pick(&priced) {
+                        let object = w.content.objects[d].id.clone();
+                        self.apply(w, "buy", Command::Buy { household: h, object, at: None, style: None, turn: None, offset: None, size: None, tall: None });
+                    }
+                } else if roll < 40 {
+                    self.apply(w, "sell", Command::Sell { household: h, object });
+                } else if roll < 65 {
+                    // Picked up and put down where it was, or turned.
+                    let rot = if self.chance(0.5) { o.rot } else { self.rng.below(4) as u8 };
+                    self.apply(w, "move in place", Command::MoveObject { household: h, object, x: o.x, z: o.z, rot, turn: None, offset: None, size: None, tall: None });
+                } else if roll < 80 {
+                    let p = w.plots[home as usize].clone();
+                    let (x, z) = (p.x + self.rng.below(p.w as usize) as i32, p.z + self.rng.below(p.d as usize) as i32);
+                    let rot = self.rng.below(4) as u8;
+                    self.apply(w, "move", Command::MoveObject { household: h, object, x, z, rot, turn: None, offset: None, size: None, tall: None });
+                } else if roll < 85 {
+                    self.apply(w, "upgrade", Command::Upgrade { household: h, object });
+                } else if roll < 90 {
+                    self.apply(w, "repair", Command::Repair { household: h, object });
+                } else if roll < 95 {
+                    let style = self.rng.below(3) as u8;
+                    self.apply(w, "restyle", Command::Restyle { household: h, object, style });
+                } else {
+                    self.apply(w, "undo", Command::Undo { household: h });
+                }
+            }
+            let speed = 1 + self.rng.below(5) as u8;
+            self.apply(w, "speed", Command::SetSpeed { speed });
+        } else {
+            // Live mode: orders for the household.
+            for _ in 0..1 + self.rng.below(4) {
+                let Some(sim) = self.pick(&mine) else { break };
+                let roll = self.rng.below(100);
+                if roll < 35 {
+                    // Something at home or in the park.
+                    let mut usable = self.at_home(w);
+                    usable.extend(w.objects.iter().filter(|o| w.plot_at(o.x, o.z).is_some_and(|p| w.plots[p as usize].public)).map(|o| o.id));
+                    let Some(object) = self.pick(&usable) else { continue };
+                    let count = w.content.objects[w.objects[object as usize].def].interactions.len();
+                    if count > 0 {
+                        let interaction = self.rng.below(count);
+                        self.apply(w, "use", Command::Use { sim, object, interaction });
+                    }
+                } else if roll < 45 {
+                    let p = w.plots[self.rng.below(w.plots.len())].clone();
+                    let (x, z) = (p.x as f32 + self.rng.next() as f32 * p.w as f32, p.z as f32 + self.rng.next() as f32 * p.d as f32);
+                    self.apply(w, "walk", Command::MoveTo { sim, x, z });
+                } else if roll < 60 {
+                    let others: Vec<u32> = everyone.iter().copied().filter(|&t| t != sim).collect();
+                    if let Some(target) = self.pick(&others) {
+                        let social = self.rng.below(w.content.socials.len());
+                        self.apply(w, "social", Command::Social { sim, target, social });
+                    }
+                } else if roll < 68 {
+                    let plot = self.rng.below(w.plots.len()) as u32;
+                    self.apply(w, "visit", Command::Visit { sim, plot });
+                } else if roll < 74 {
+                    self.apply(w, "go home", Command::GoHome { sim });
+                } else if roll < 82 && !w.content.phone.actions.is_empty() {
+                    let action = self.rng.below(w.content.phone.actions.len());
+                    let contact = self.pick(&everyone).filter(|&c| c != sim);
+                    self.apply(w, "phone", Command::Phone { sim, action, contact });
+                } else if roll < 88 {
+                    let items: Vec<u32> = w.items.list.iter().filter(|it| it.household == h).map(|it| it.id).collect();
+                    if let Some(item) = self.pick(&items) {
+                        let action = if self.chance(0.5) { ItemAction::Eat } else { ItemAction::Clear };
+                        self.apply(w, "item", Command::UseItem { sim, item, action });
+                    }
+                } else if roll < 95 {
+                    let index = self.rng.below(3);
+                    self.apply(w, "cancel", Command::Cancel { sim, index });
+                } else {
+                    let enabled = self.chance(0.5);
+                    self.apply(w, "skip quiet hours", Command::SetAutoFast { enabled });
+                }
+            }
+            if self.chance(0.3) {
+                let speed = 1 + self.rng.below(5) as u8;
+                self.apply(w, "speed", Command::SetSpeed { speed });
+            }
+        }
+        // The camera: mostly at home, now and then another lot.
+        if self.chance(0.2) {
+            self.view = match plot.filter(|_| self.chance(0.5)) {
+                Some(home) => home,
+                None => self.rng.below(w.plots.len()) as u32,
+            };
+            common::look_at(w, self.view);
+        }
+        // An hour or four until the next.
+        self.next = w.tick + common::TICKS_PER_HOUR * (1 + self.rng.below(4) as u64);
+    }
+}
+
+/// What a resident's next thing (the follow-up) and their current use name: the object and its
+/// kind (None: there's no such object).
+type Uses = [Option<(u32, Option<usize>)>; 2];
+
+/// Everyone's `Uses`, by slot.
+fn uses(w: &World) -> Vec<Uses> {
+    let def = |o: u32| w.objects.get(o as usize).map(|o| o.def);
+    w.sims
+        .iter()
+        .map(|s| {
+            let next = common::follow_up(s).and_then(|k| common::debug_field(&k, "object")).map(|o| (o, def(o)));
+            let now = match s.current().map(|a| a.task.kind) {
+                Some(sim_core::world::TaskKind::Use { object, .. }) => Some((object, def(object))),
+                _ => None,
+            };
+            [next, now]
+        })
+        .collect()
+}
+
+/// A big town for `days` with a busy player, checked as the century runs are; saved and loaded
+/// twice on the way.
+fn busy(days: u32, seed: u64) {
+    let content = common::content();
+    let town = common::town_with(&content, seed, 3, BIG);
+    let mut w = World::from_json(&content, &town, seed as u32).expect("the big town loads");
+    let mut player = Player::new(seed, &w);
+    common::look_at(&mut w, player.view);
+    let mut long = common::Long::new(&w, 8..=sim_core::world::MAX_SIMS);
+    // The streets' back yards touch, so getting from one street to the other goes round the
+    // end of the row: across town and over is some 300 m, over 4 hours for a tired walker.
+    long.watch = common::Watch::new().routing_hours(6.0);
+    let end = clock::tick_at(days + 1, 0.0).unwrap();
+    let mut reloads: Vec<u64> = [days / 3, 2 * days / 3].iter().map(|&d| clock::tick_at(d, 13.0 * 60.0 + 37.0).unwrap()).collect();
+    let started = std::time::Instant::now();
+    let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        while w.tick < end {
+            w.advance();
+            long.after(&w);
+            if w.tick >= player.next {
+                // (Checked on the hour, after a tick: some of what an order changes settles
+                // on the next one, like putting down what someone holds.)
+                player.session(&mut w);
+                // (Build mode ends with the session: time never stands still for long.)
+                if w.speed == 0 {
+                    w.apply(Command::SetSpeed { speed: 1 }).unwrap();
+                }
+            }
+            if reloads.first().is_some_and(|&t| w.tick >= t) {
+                reloads.remove(0);
+                w = common::reload(&w, &content);
+                common::look_at(&mut w, player.view);
+            }
+        }
+    }));
+    let label = format!("busy player, seed {seed}");
+    if run.is_err() {
+        eprintln!("{label}: failed on day {} at {:.2} h (tick {})", clock::day(w.tick), clock::hour(w.tick), w.tick);
+    }
+    eprintln!(
+        "{label}: {} days in {:.1} s; {} residents at the end ({}..{} seen), {} objects",
+        clock::day(w.tick) - 1,
+        started.elapsed().as_secs_f64(),
+        w.sims.iter().filter(|s| s.here()).count(),
+        long.fewest,
+        long.most,
+        w.objects.len()
+    );
+    eprintln!("{label}: commands (tried, done) {:?}", player.tried);
+    eprintln!("{label}: story {:?}", long.story);
+    for s in &player.stale {
+        eprintln!("{label}: stale: {s}");
+    }
+    for p in &long.problems {
+        eprintln!("{label}: {p}");
+    }
+    for s in &long.watch.stuck {
+        eprintln!("{label}: stuck: {s}");
+    }
+    if let Err(e) = run {
+        std::panic::resume_unwind(e);
+    }
+    assert!(player.stale.is_empty(), "{} times a resident's next thing or current use named another kind of thing after an edit", player.stale.len());
+    long.assert_ok();
+    for kind in ["Born", "Died", "PaidRent"] {
+        assert!(long.told(kind), "nobody {kind}: {:?}", long.story);
+    }
+}
+
+#[test]
+#[ignore = "long (--release -- --ignored); fails on main until R2-01 (a stale follow-up panics after furniture moves, day 6), then on T1-01 (in a full town a couple tries for a baby back to back, 2 h)"]
+fn a_big_town_with_a_busy_player_for_two_months() {
+    busy(60, 7);
+}
+
+#[test]
+#[ignore = "long (--release -- --ignored); fails on main until R2-01 (stale follow-ups), R3-03 (chasing a departing guest) and R3-08 (newborns half a year old)"]
+fn a_big_town_with_a_busy_player_over_a_lifetime() {
+    busy(150, 11);
 }
