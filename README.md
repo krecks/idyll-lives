@@ -2,33 +2,50 @@
 
 A home-building game with a living simulation that runs in the browser: you build and design your home, and its residents live in it on their own while you watch (see "Game direction" in [PLAN.md](PLAN.md)). The game logic is written in Rust and compiled to WebAssembly; rendering runs on the GPU through WebGPU, with a WebGL2 fallback. The interface is Svelte 5 with plain CSS. Desktop only.
 
-**▶ Play it in your browser: https://krecks.github.io/idyll-lives/** (desktop Chrome, Edge, Brave or Safari; other browsers use the WebGL2 fallback).
+**▶ Play it in your browser: https://krecks.github.io/idyll-lives/** (desktop Chrome, Edge, Brave or Safari; other browsers use the WebGL2 fallback). Resident voices and the language model for their lines need WebGPU.
 
-See [PLAN.md](PLAN.md) for the research, architecture, milestones and known issues.
+See [PLAN.md](PLAN.md) for the research, architecture, milestones and known issues, and [CHANGELOG.md](CHANGELOG.md) for what each release brought.
 
 ## Run it
 
-Requirements: Rust (stable) with the `wasm32-unknown-unknown` target, `wasm-bindgen-cli` 0.2.129, Node 22 and pnpm.
+Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.97.0 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Node 22 and pnpm.
 
 ```sh
-rustup target add wasm32-unknown-unknown
+rustup toolchain install       # in the repo: the pinned toolchain, as CI does
 cargo install wasm-bindgen-cli --version 0.2.129
 cd web
 pnpm install
-pnpm dev          # builds the WASM module, then starts Vite on http://localhost:5173
+pnpm dev          # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
+
+The first `pnpm dev` or `pnpm build` downloads the voice model (398 MB as published, stored as 185 MB) and the language model (294 MB of weights, stored gzipped as 255 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
-| `pnpm dev` | Rebuild WASM + dev server |
+| `pnpm dev` | `wasm`, `voice` and `llm`, then the dev server |
 | `pnpm build` / `pnpm preview` | Production build / serve it |
+| `pnpm wasm` | Build the simulation's WASM (release, `--locked`) |
+| `pnpm voice` | Build the voice WASM and fetch the voice model and dictionary (`tools/voice/fetch.mjs`) |
+| `pnpm llm` | Fetch the language model (`tools/llm/fetch.mjs`) |
 | `pnpm check` | Type-check TypeScript and Svelte |
 | `pnpm lint` | Lint the web code |
 | `pnpm test:sim` | Run the Rust simulation tests |
+| `pnpm test:voice` | Run the voice crate's tests (needs `pnpm voice` for the dictionary) |
+| `pnpm check:voice` | Check the voices in Node against golden hashes (`tools/voice/check.mjs`) |
+| `pnpm check:llm` | Check the language model's prompts, cleaning and golden lines in Node (`tools/llm/check.mjs`; several minutes) |
+| `pnpm devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
 | `pnpm assets` | Build or update the compressed asset copies (the build does this too) |
 | `pnpm decoders` | Refresh `public/decoders` after a Babylon upgrade |
 
-**Hosting:** pushing a release tag (`v0.2.0`, matching the version; see `tools/release/version.mjs`) builds the game and publishes it on GitHub Pages (`.github/workflows/pages.yml`); pushes to `main` alone don't. For the fastest snapshot path a server can send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. The dev and preview servers already do. Without these headers the game still runs, but snapshots are copied instead of shared.
+From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `node tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `node tools/release/version.mjs` (the version, see [Versions and releasing](#versions-and-releasing)).
+
+**The production build** also:
+- runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`tools/release/wasm-opt.mjs`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
+- writes `bundle.json`: the content, house templates and asset manifests every start needs, in one file. The files still ship one by one beside it;
+- writes `THIRD-PARTY-LICENSES.txt` with the licences of the code it bundles, and fails if one is missing;
+- gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release never mixes with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out.
+
+**Hosting:** the game needs cross-origin isolation for its fastest path (the simulation's snapshots in shared memory). The dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages can't, so `index.html` registers a service worker (`public/isolation-sw.js`) that adds the headers, and the page loads once more under it. The worker also keeps the build's hashed files (`assets/<name>-<hash>.js`, `.css`, `.wasm`, `.woff2`) in a cache of the build's own, so returning players load them without asking the server again; a new build's worker deletes the old cache. Without isolation the game still runs, but snapshots are copied instead of shared.
 
 ## Playing
 
@@ -66,9 +83,25 @@ pnpm dev          # builds the WASM module, then starts Vite on http://localhost
 | R, Delete | Rotate / sell the object in hand or selected (Build › Furnish) |
 | Esc | Steps back: put down what's in hand, leave Build, close the journal, stop following, close a resident's panel — then the pause menu (save, load, settings, quit) |
 | F3 | Performance overlay (with *Save debug report*) |
-| F8 | Save a debug report: screenshot, game state and recent errors. With `pnpm dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file. |
+| F8 | Save a debug report: screenshot, game state, settings, the build's version and commit, and recent errors. With `pnpm dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
 
-URL options: `?quality=low|medium|high`, `?renderer=webgl`, `?snapshot=0`, `?seed=42`, `?lot=starter`, `?pack=packs/my-art/manifest.json`.
+**Graphics:** Settings › Performance has three presets. Medium is the default and the game's intended look; Low is for older laptops (FXAA, 1024 shadows, the four lamps nearest the biggest rooms); High adds 4096 shadows and two live mirrors. Resolution is Auto (the screen's own pixels up to about 1920×1080, scaled up beyond) or Custom (50–100 %), and the frame rate cap (60 by default) is paced in whole display refreshes. The targets for laptops with Intel HD 620/530 graphics at 1080p, Medium at 30 fps and Low at 60, are goals estimated from Mac measurements, not yet measured on Intel hardware. Every knob, its cost, and the benchmark: [docs/design/graphics.md](docs/design/graphics.md).
+
+URL options:
+
+| Option | What it does |
+|---|---|
+| `?quality=low\|medium\|high` | Overrides the graphics preset for this page |
+| `?renderer=webgl` | Draws with WebGL2 even where WebGPU works |
+| `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
+| `?hour=13` | Holds the lighting at that hour |
+| `?diag=noshadows,nonature,…` | Leaves features out of the picture to measure what they cost; `freeze` stops time for screenshots |
+| `?debug` | Console helpers: `__controls`, `__world()`, `__send(command)`, `__showPlot(i)`, `__characters`, and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
+| `?seed=42` | The random seed of a new game |
+| `?pack=packs/my-art/manifest.json` | Loads an extra asset pack (can be repeated) |
+| `?snapshot=0` | Turns off WebGPU snapshot rendering (the menus' town) |
+| `?lights=clustered\|forward` | Forces how lamps are lit |
+| `?state=<name>`, `?debugReport=<name>` | Dev server only: starts in a game state written by the simulation's tests (`DUMP_STATES=1 cargo test`), or in a saved debug report |
 
 ## Architecture
 
@@ -95,7 +128,7 @@ Main thread                                   Sim worker
 | `web/src/game` | Wiring and input (the only place that knows every module) | Grow logic that belongs in a module |
 
 **Performance rules**
-- The CPU runs the game; the GPU draws it. The main thread uploads one snapshot per tick and replays recorded GPU commands (WebGPU snapshot rendering).
+- The CPU runs the game; the GPU draws it. The main thread reads one snapshot per tick and draws the world live; the menus' town replays recorded GPU commands (WebGPU snapshot rendering).
 - Every object type is one draw call (thin instances); residents are thin instances whose matrix buffer is updated once per frame.
 - No allocations in the frame loop or the sim tick. The snapshot layout is defined once, in Rust.
 - The UI gets changes only, at about 10 Hz, never the whole view and never per frame.
@@ -130,14 +163,26 @@ Everything gameplay-related is JSON in `web/public/content/`:
 - `base.json`: needs, genders, traits, perks, objects, **social interactions** (requirements, success chances, outcomes, animation), emotions, feelings, bond presets, social rules, **careers** (levels, pay, hours, workdays, work effects), **daily schedule** windows, visit rules, starting funds, story-feed texts.
 - `houses.json`: house layouts and the park, stamped onto town plots.
 
-Add an object to `content/base.json` (footprint, interactions, need effects, model key), add its model key to the manifest, and place it in a lot file under `content/lots/`. `cargo test` validates the shipped content (`crates/sim-core/tests/shipped_content.rs`).
+Add an object to `content/base.json` (footprint, interactions, need effects, model key) and its model key to the manifest; homes are furnished from `houses.json` and `housegen.json`, or bought in the game. (`content/lots/starter.json` is only for the tests and the pack checker.) Content is checked when it loads: a value that would break the game is refused with the file and id in the message. `cargo test` validates the shipped content (`crates/sim-core/tests/shipped_content.rs`).
 
-Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of the world is described in [docs/design/look.md](docs/design/look.md).
+A production build serves the content from `bundle.json`, which wins over the loose files: to edit content inside a built site, rebuild it or delete `dist/bundle.json`.
 
-## Versions
+Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of the world is described in [docs/design/look.md](docs/design/look.md), the graphics settings in [docs/design/graphics.md](docs/design/graphics.md).
 
-The current version is **0.1.0**, the first release. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits) and the Rust workspace in `Cargo.toml`. `node tools/release/version.mjs` prints it and fails if the two differ (the deploy workflow checks this); `node tools/release/version.mjs 0.2.0` sets both. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md). Saves have their own format version (`SAVE_VERSION` in `crates/sim-core/src/save.rs`), so saves made before 0.1.0 still load.
+## Versions and releasing
+
+The current version is **0.2.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `node tools/release/version.mjs` prints it and fails if they differ (CI checks this); `node tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 23 since 0.2.0 (0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+
+**Releasing** (`.github/workflows/pages.yml`):
+1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too), and a `## <x.y.z> — <date>` section in CHANGELOG.md. Commit both on `main`.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
+3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish.
+4. Check the live site: the menu shows the new version, F3 shows Shared memory: on, and a game runs.
+
+Each CI run keeps the WASM with its function names as an artifact for 90 days, to read the stack of a crash report (the site's WASM is stripped).
 
 ## Licence
 
-Idyll Lives is free software, released under the [GNU General Public License v3.0 (or later)](LICENSE). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. Third-party parts keep their own licences: the art listed in [`web/public/assets/CREDITS.md`](web/public/assets/CREDITS.md) is CC0, the voice model (Supertone's Supertonic 3) is under the BigScience OpenRAIL-M licence (with its use restrictions), the dictionary is Apache-2.0, and the optional language model for residents' lines (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0 (all listed there).
+Idyll Lives is free software, released under the [GNU General Public License v3.0 (or later)](LICENSE). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. Third-party parts keep their own licences: the art listed in [`web/public/assets/CREDITS.md`](web/public/assets/CREDITS.md) is CC0, the voice model (Supertone's Supertonic 3) is under the BigScience OpenRAIL-M licence (with its use restrictions), the dictionary is Apache-2.0, and the optional language model for residents' lines (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0 (all listed there). Every production build also writes `THIRD-PARTY-LICENSES.txt` with the licence texts of the code it bundles (Babylon.js, Svelte, ONNX Runtime Web, the Rust crates in the WASM and others); the in-game Credits link both.
