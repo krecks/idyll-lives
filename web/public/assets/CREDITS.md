@@ -1,6 +1,6 @@
 # Third-party assets
 
-All of the third-party art below is **CC0 1.0 (public domain)**. You don't have to credit it, but we list it so it's easy to trace and replace.
+All of the third-party *art* below is **CC0 1.0 (public domain)**. You don't have to credit it, but we list it so it's easy to trace and replace. The voice model, the dictionary, the language model and the decoders further down have their own licences, and so do the libraries the game is built with (`../THIRD-PARTY-LICENSES.txt`, written by every build: each one with its licence text).
 Downloaded 2026-10-07. Textures were resized and re-encoded (JPG). Fabric, wood, foliage, grass, wall, siding, roof, carpet, wallpaper and painted-wood albedo maps were converted to greyscale "detail" maps, so manifest, house and room colours set the hue.
 
 ## Textures (`textures/`)
