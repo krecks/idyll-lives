@@ -111,7 +111,14 @@ pub fn check(w: &World) {
         for t in s.queue() {
             task_refs(w, i, &t.kind, "has queued");
         }
-        if let Some(kind) = follow_up(s) {
+        // (A follow-up is started when they have nothing in hand: that's when it has to name
+        // what's there. Reading it is slow, so only then, and once a game minute for tests that
+        // check every tick.)
+        if s.current().is_none()
+            && s.here()
+            && w.tick.is_multiple_of(20)
+            && let Some(kind) = follow_up(s)
+        {
             follow_up_refs(w, i, &kind);
         }
         if let Some(h) = &s.held {
