@@ -13,7 +13,7 @@ Fixes came in two waves of agents, each on its own branch:
 - **Wave A:** F1a and F1b (simulation), F2a (crash safety), F2b (input, audio and small web fixes), F2c (saves and start-up), F4 (animation), F5 (build, CI and licences), T1 (long-run tests).
 - **Wave B:** G1 (presets, resolution, pacing), L1 (load time and stepping), G2 (GPU savings nobody can see) and M1 (main thread).
 
-*(G2 was still running when this was written; its parts are marked "pending".)*
+Every agent's branch is merged. The release workflow's first dry run passed on Linux (§3.6, R5-02), and on `main` clippy is clean and the tests pass (§3.8).
 
 Severity:
 - **critical**: a crash, data loss, or a release blocker.
@@ -626,7 +626,7 @@ Every fix was made on an agent's branch and merged into `main` with `git merge -
 | (soak runs) | 67244b5 | Two corrected test expectations |
 | L1 | 0c561b4 | Load time, service-worker caching, catch-up cap |
 | G1 | accaaad | Presets, Auto resolution, FramePacer, menu at 30 fps |
-| G2 | *(pending)* | *(pending)* <!-- G2 --> |
+| G2 | 5f72a7c | Dark lamps out of the cluster, nature culled in cells, shadow casters culled and the map redrawn only when something moves, nothing drawn behind full-screen menus, mirrors' memory on demand, the lighting throttle, the pose texture, Low's lawn and woods |
 | M1 | dee213f | Bars by transform, bubbles without forced layout, idea toasts only on change, models built ahead in small steps, bird songs off the main thread, F3's Busy |
 
 Some small fixes went straight onto `main`: f1993e5 (the bed purchase leaves a week's rent), b565f95 (T1-01, §3.7), 954506d (the long runs and the day-1167 test un-ignored), 1a01ce1 (the last structure counters wrap, §3.2), f2b1b43 (code comments on how loading orders furniture and where the benchmark's scenes are) and f5f08bf (the feed, §3.7).
@@ -746,7 +746,7 @@ Also from F2a: debug reports include Babylon's own errors, such as a shader file
 
 #### 3.5.1 GPU and rendering (P1)
 
-G1 (merge accaaad) and G2 *(pending)*. G1 measured on a MacBook Pro M3 Pro in Chrome for Testing 153 (headed), 1920×1080 at DPR 1, with `tools/bench/render.mjs --preview --throughput` (production build, no vsync), median of 3, A/B against a428263 (`main` when G1 started).
+G1 (merge accaaad) and G2 (merge 5f72a7c). G1 measured on a MacBook Pro M3 Pro in Chrome for Testing 153 (headed), 1920×1080 at DPR 1, with `tools/bench/render.mjs --preview --throughput` (production build, no vsync), median of 3, A/B against a428263 (`main` when G1 started).
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
@@ -756,7 +756,16 @@ G1 (merge accaaad) and G2 *(pending)*. G1 measured on a MacBook Pro M3 Pro in Ch
 | P1-09 (part) | Low and Medium reflect in no mirror, High in 2 (decision). | 2a71891 | High's mirror cost wasn't measured: no mirror faces the camera on the benchmark's paths. |
 | P1-11 (part), P2-04 (part) | Low updates the lighting every 10 game minutes at speed 3 and up and in quiet hours. | 2a71891 | – |
 | P1-15 | Auto resolution draws native pixels up to a budget of 1920×1080 (2.07 MP). | fb084dc | A 1512×982 MacBook window at DPR 2: 3024×1964 → 1786×1160 (59 %). A 3840×2160 screen: 1920×1080 (50 %). |
-| *(pending)* <!-- G2 --> | *(pending: G2's rows. Planned: P1-01 nature culled in chunks, P1-02 dark lamps out of the cluster by day, P1-04 the shadow map redrawn only when something moves, P1-09 High's mirrors, P1-11 the lighting throttle, P1-14 the pose texture, drawing held behind full-screen menus, the dt clamp, and Low's trims: fewer lamps and tufts, thinner far woods.)* | | |
+| P1-02 | A lamp that is off gets a range of 1 cm: it covers next to no tiles of the clustered lighting and still adds nothing, with no shader change. Lit lamps keep their range. (Low's 4 forward lamps by day: not done, §4.) | cae471c | Medium, WebGPU, orbit by day: GPU 8.87 → 6.49 ms, 92 → 119 fps; at night unchanged (8.16 → 8.19 ms). WebGL2 by day: frame 7.59 → 6.89 ms, 132 → 145 fps. |
+| P1-01 | The landscape's 44,655 plants are grouped by where they stand (lawn tufts in 32 m squares, flowers in 96 m squares, the woods in 8 sectors round the town), each group a mesh of its own, so the camera leaves out those out of view. Models under 36,000 triangles in all stay one mesh. The placement is generated exactly as before. | 9e801a5 | Medium, WebGPU, orbit by day: GPU 6.08 → 5.17 ms, 118 → 140 fps, triangles 6.01 → 4.56 M (draws 493 → 538). Wide view: GPU 5.98 → 5.52 ms. WebGL2: frame 6.79 → 5.99 ms (orbit), 6.94 → 6.73 ms (wide). |
+| P1-14 | Only the pose texture's rows that changed since the last upload (residents drawn, or just hidden) go to the GPU, as one band; none while paused. | a02080f | Residents' update 0.17 → 0.14 ms (WebGPU, with vsync); frame CPU within noise. |
+| P1-04 (part) | The game's shadow map draws only the casters that can reach it: those wholly outside its square round the lot (1 m margin) are left out; residents are always drawn. The menus' town draws all its casters as before. | 12f09fa | Medium, WebGPU, orbit by day: draws 540 → 429 (shadow 262 → 152), shadow triangles 1.70 → 0.81 M, 140 → 148 fps; Build mode 62 → 71 fps. WebGL2 orbit by day 163 → 173 fps. |
+| P1-04 (part) | The shadow map is drawn only when something in it changed: the lighting step, the caster list, a thing placed, moved or hidden, roofs and storeys, and residents whose pose changed. While paused (Build mode, menus) it isn't drawn at all. In live play, with residents in view, it is still drawn every frame (they breathe), §4. | 71e6c9a | Medium, Build mode (paused): WebGPU GPU 8.54 → 4.96 ms, shadow draws 152 → 0, 71 → 78 fps; WebGL2 77 → 91 fps. Live with residents in view: unchanged (WebGPU 148 → 146 fps, within noise). Residents' shadows follow every pose (checked by eye). |
+| P1-11, P2-04 | The lighting is also updated at most every 100 ms of real time: at the fastest speeds 10 times a second instead of 20. At speed 1 its half-minute steps are 500 ms apart anyway. Materials already thaw only for a change one could see. | 465c287 | Medium, dusk path at speed 5, with vsync: lighting updates 20.1 → 9.7 a second. With the CPU slowed 3×: WebGPU CPU 19.24 → 18.48 ms a frame (46 → 48 fps); WebGL2 13.39 → 12.15 ms, 65 → 72 fps, frame p95 24.2 → 17.5 ms. |
+| P1-09 (rest) | A mirror's reflection target (about 56 MB of GPU memory at 1080p: a 1024×1024 RGBA16F target with 4× MSAA and depth) is made when a mirror first reflects in its slot, and let go 10 s after no mirror used it, or at once in a world without mirrors. Resolution and MSAA stay: both cuts showed (§4). | 64e6152 | High, the village's bathroom mirror: made when it comes into view, let go 10 s after turning away, reflects as before. |
+| P2-08 (rest), P1-10 (rest) | Behind the pause menu, an overlay (Settings, Load game, Credits), the planner and the crash screen, the renderer draws 2 more frames and then none until the menu closes; the frosted glass keeps blurring the last frame. A screenshot, `framesRendered` and a resized canvas still get their frames. | f2ad0c8 | Frames behind the pause menu: every frame (30 in 500 ms, dev build) → 0 in 1 s; the menus' town behind Settings 60 → 0 a second, back to 60 after closing; both backends. Each held frame saves what a frame costs: Medium in orbit by day, about 6 ms of main thread and 5 ms of GPU on the M3. |
+| R1-09 (rest) | Babylon's own clock, which runs the build effects' sparkles and dust, is held to 100 ms a frame (`Scene.MaxDeltaTime`), like everything else the game moves by frame time. | 969699d | The first frame after a hidden tab or a stall no longer jumps them ahead. |
+| Low's trims | Two new knobs in the preset table: `lawnDensity` (Low 0.5: every other tuft and flower, always the same ones) and `landscapeShadows` (Low false: the woods round the town cast no shadows; the lot's garden trees, the street and the house still do). Medium and High keep everything. | 4516430 | Low, WebGPU, orbit by day: GPU 4.51 → 4.03 ms, triangles 3.73 → 3.44 M, draws 429 → 423, nature instances 44,655 → 24,245. WebGL2 timer 6.05 → 5.55 ms. |
 
 G1's A/B (fps; GPU and CPU in ms a frame; render targets in MB a frame):
 
@@ -780,7 +789,25 @@ G1's A/B (fps; GPU and CPU in ms a frame; render targets in MB a frame):
 - The baseline's `?quality=medium` had 1 live mirror, but no mirror was drawn on these paths, so the Medium rows compare like with like.
 - **Medium still looks the same.** All 18 reference shots (9 poses × 2 backends) differ from P1's baseline in under 0.15 % of their pixels, by more than 2 of 255 (the most changed 0.095 %). The only differences are the far road's lane markings (P1-17) and one mirror, which the new Medium, like the old in-game Medium, doesn't reflect live.
 
-*(pending: G2's before/after numbers.)* <!-- G2 -->
+G2 measured each change against the step before it, on the M3 Pro in Chrome 153, 1920×1080, DPR 1, production build, median of 3 interleaved runs, in the `village` scene, without vsync unless a row says so; the full tables are in each commit's body. The rows above give the main figures. Many runs were noisy (load average 5–6), and the wide view's culling A/B was inconclusive.
+
+G2's branch as a whole, against a428263 (fps, or GPU or frame time a frame):
+
+| Preset, light | WebGPU | WebGL2 |
+|---|---|---|
+| Medium, orbit by day | GPU 8.99 → 5.60 ms, 84 → 146 fps | frame 8.16 → 6.18 ms |
+| Medium, orbit at night | 78 → 103 fps | frame 8.02 → 6.98 ms |
+| Medium, dusk | GPU 9.35 → 7.93 ms | 121 → 137 fps |
+| Medium, wide | GPU 6.91 → 6.10 ms | 132 → 138 fps |
+| Low, orbit by day | GPU 5.04 → 4.10 ms | 157 → 205 fps |
+| Low, orbit at night | GPU 5.60 → 4.14 ms | 155 → 185 fps |
+| Low, dusk | GPU 5.52 → 4.28 ms | 155 → 195 fps |
+| Low, wide | GPU 5.35 → 4.74 ms | 159 → 190 fps |
+
+- On the merged branch against `main` without G2, orbit by day: Medium WebGPU GPU 9.16 → 5.47 ms (92 → 158 fps), Medium WebGL2 frame 7.12 → 4.97 ms, Low WebGPU 152 → 179 fps, Low WebGL2 181 → 248 fps.
+- The baselines' WebGPU runs stalled often (the P1-16 pattern), so their fps is pessimistic.
+- **Medium still looks the same.** Per change, against the build before (in a window): at most 0.12 % of pixels off by more than 2 of 255, all on the far road's lane markings (P1-17). The merged branch against `main` (both headless): at most 0.115 %, the same far-road noise.
+- Live play with residents in view costs about what it did for the shadow map; the savings there are the lamps by day, nature culling and shadow-caster culling.
 
 #### 3.5.2 Main thread (P2)
 
@@ -843,7 +870,7 @@ F5 (merge cc88635), F1a (R5-05, R5-08), F2c (R5-07, R5-09, R5-10, R5-11), F2b (R
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
 | R5-01 | CI runs `pnpm llm` before the build. | 87d8875 | – |
-| R5-02 | The workflow can be run by hand on any branch: `gh workflow run pages.yml --ref <branch> -f deploy=false` builds and checks everything, and publishes only with `-f deploy=true`. Release tags publish as before. Running it before tagging is part of the release. | 87d8875 | F5 didn't run it. |
+| R5-02 | The workflow can be run by hand on any branch: `gh workflow run pages.yml --ref <branch> -f deploy=false` builds and checks everything, and publishes only with `-f deploy=true`. Release tags publish as before. Running it before tagging is part of the release. | 87d8875 | The first dry run (run 38393256436, on `release/0.2.0-ci` at f5f08bf, `deploy=false`): the build job passed in 9 min 23 s on Linux, and the deploy was skipped. Its annotations are warnings, not failures (§4, R5-29). |
 | R5-03 | Fixed by the 0.2.0 deploy. | – | – |
 | R5-05 | SAVE_VERSION 23 stores `seed`, the seed the game started from (absent: 0, unknown). `World::seed` and the wasm `Game.seed` expose it; nothing in the web reads it yet, but F8 reports carry the whole save. | 2f7eb97 | – |
 | R5-06 | `__APP_COMMIT__` (the short `GITHUB_SHA` in CI, else `git rev-parse --short HEAD`) shows in Credits ("Version 0.1.0 (build abc1234)") and in the F8 report. | 7f5ea0d | – |
@@ -854,7 +881,7 @@ F5 (merge cc88635), F1a (R5-05, R5-08), F2c (R5-07, R5-09, R5-10, R5-11), F2b (R
 | R5-12 | CI caches `web/public/voice` and `web/public/llm`, keyed on the fetch scripts (which check every SHA-256). | 87d8875 | – |
 | R5-13 | `cancel-in-progress: false`: a second run waits. | 87d8875 | – |
 | R5-14 | CI gates: clippy with `-D warnings`, the voice tests after `pnpm voice` (they fail instead of skipping when `CI` is set), tickbench must run, and `--locked` on every cargo call, the npm scripts included. `rust-toolchain.toml` pins 1.97.0 with clippy, rustfmt and wasm32. `timeout-minutes` is 45 for the build and 20 for the deploy. | 87d8875, 57dfe1a, 495d7e0 | – |
-| R5-15 (part) | CI lists `dist` by size and fails over 900 MB. Whether Pages serves the 255 MB file in full is for the dry run (§4). | 87d8875 | `dist` is 522 MB (F5's build). |
+| R5-15 (part) | CI lists `dist` by size and fails over 900 MB. Whether Pages serves the 255 MB file in full is checked on the live site (§4). | 87d8875 | The dry run's site: 489 MB (assets 56 MB, voice 181 MB, language model 248 MB; the largest file `llm/lfm2.5-350m/model_q4.onnx_dataz`, 255.5 MB), under the 900 MB guard. |
 | R5-17 | `pnpm llm` fetches the LFM Open License, pinned by SHA-256, from Liquid AI's own repository (LiquidAI/LFM2.5-350M at 9e6c6ccf; the ONNX export has no copy). | 89b6dbc | – |
 | R5-18, R5-20 (part) | Credits has "Voices and language model" (each model and its licence, the OpenRAIL-M use restrictions in one sentence, a link to the licence) and "Open-source libraries" (links to `THIRD-PARTY-LICENSES.txt` and `assets/CREDITS.md`). `CREDITS.md` says only the art is CC0. | 5f6bd01 | – |
 | R5-19 | Production builds write `dist/THIRD-PARTY-LICENSES.txt` (`tools/release/licenses.mjs`): the 6 npm packages found in the bundles, the 18 crates in the two wasm files, Inter, the meshopt decoder and the three model licences, each text once (79 KB). The build fails if a licence text is missing. Misaki's licence ships as `voice/misaki-LICENSE`, and Inter's as `assets/inter-LICENSE.txt`. | 59d37cb, 89b6dbc | – |
@@ -887,6 +914,7 @@ F5 (merge cc88635), F1a (R5-05, R5-08), F2c (R5-07, R5-09, R5-10, R5-11), F2b (R
 - **Results with the fixes:** all 6 century runs and all 4 soak runs pass. These are release builds on an Apple Silicon Mac, as reported by the agents that fixed the last failures. A century run takes 13–14 s with lower detail and 19–23 s without; the 150-day soak takes about 44 s.
   - Two soak expectations were wrong, not the sim: no birth is possible in the full 60-day town, and a guest keeping the host company for a whole visit isn't stuck (2d2dc17, fdcca34).
 - **The suite:** `cargo test -p sim-core` reported 453 passed, 0 failed and 20 ignored on the last sim branch merged (de0a880), against 390 passed and 9 ignored at 4cde174 (§2.3).
+- **On `main` before the release** (the parent of aaadacb, run by the coordinator): `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace` without the voice crate 455 passed and 20 ignored; `cargo test -p voice --release` 32 passed. The CI dry run passed on Linux (R5-02, §3.6).
 
 ## 4. Found but not fixed
 
@@ -894,17 +922,14 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 
 | ID | Severity | What's left | Why not in 0.2.0 | Recommendation | Target |
 |---|---|---|---|---|---|
-| P1-01, P1-02, P1-04, P1-09, P1-11, P1-14 | critical to low | *(pending: what G2 leaves of these.)* <!-- G2 --> | | | |
-| P1-07, P2-07 | high | Submitting about 493 draws costs 5.1–6.7 ms of CPU a frame on WebGPU (M3 Pro), 21–31 ms at 3× CPU, so on WebGPU Low can't reach 60 fps on the target CPUs. | The owner put the low-end work off (§2.8). | Halve the draws: merge the static shadow casters per lot (P1-04) and trim Low. Retry snapshot rendering in play, with the pose texture updated outside the recorded bundles. Measure on an Intel laptop (§5) before choosing WebGL2 for weak GPUs. | v0.3 |
+| P1-07, P2-07 | high | Submitting about 493 draws cost 5.1–6.7 ms of CPU a frame on WebGPU (M3 Pro), 21–31 ms at 3× CPU, so on WebGPU Low can't reach 60 fps on the target CPUs. G2's culling brought the orbit by day to 429 draws (152 of them for the shadow map); at 3× CPU on the dusk path WebGPU still spends about 18.5 ms a frame (§3.5.1). | The owner put the low-end work off (§2.8). | Halve the draws: merge the static shadow casters per lot (P1-04) and trim Low. Retry snapshot rendering in play, with the pose texture updated outside the recorded bundles. Measure on an Intel laptop (§5) before choosing WebGL2 for weak GPUs. | v0.3 |
 | P1-12 | high | Low draws the same lot, street and furniture geometry as Medium: 2.2 M triangles in the main pass and 1.54 M in the shadow pass, a floor of about 2.5 ms on the M3 after any trim. | Generated LODs were put off (§2.8). | LODs for furniture and the street's houses, low-detail shadow copies of furniture, and the neighbours' houses as overview shells on Low. | v0.3 |
-| P1-04 (rest) | high | The 242 shadow-map draws aren't merged into a few shadow-only meshes per lot. *(pending: whether G2's "redrawn only when something moves" covers part of it.)* <!-- G2 --> | A larger change than the release allowed. | Merge static casters per lot (house and fences, the street's houses and props, garden trees): about 10–20 shadow draws instead of 242. | v0.3 |
-| Running CSS animations (new) | low | Chrome recalculates style every frame for each running CSS animation, even a transform-only one, and on a 120 Hz display that's every refresh. The bar transitions and the low-need pulse are always running, and each feed entry runs its own for 12 s: about 0.13 ms a frame at full CPU speed (M1, M3 Pro). | Removing it means dropping the bar transitions or the pulse, which changes the look (§6). | The owner decides; if so, bars that jump to their value and a still low-need marker. | v0.3 |
-| P2-06 (side effect, new) | low | A model still being built ahead when the camera arrives may appear up to a few hundred ms later than before. | The cost of building in 4 ms steps. | Leave it unless players notice. | never |
+| P1-04 (rest) | medium (was high) | In live play the shadow map is still drawn every frame while residents are in view, because they breathe: 152 shadow draws and 0.81 M triangles a frame after G2's culling (it was 242 and 1.70 M). The static casters aren't merged either. Paused, in Build mode and behind menus it isn't drawn any more. | A per-frame path for residents alone (a cached static map plus a depth copy each frame) needs a depth-writing blit in both WGSL and GLSL; culling had already cut the map to 152 draws (§6). | Residents' shadows in their own per-frame path over a cached static map, or merge the static casters per lot (house and fences, the street's houses and props, garden trees). | v0.3 |
 | Trapped loads (new) | medium | A save whose load traps is deleted as damaged. That would also delete a valid save that hits a loader bug or runs out of memory. | Follows the decision for damaged saves (F2c). | Treat a trap like a too-new save: keep it, mark it, skip it, and offer it in a debug report. | 0.2.1 |
-| P1-16 | medium | With vsync and the cap off, WebGPU frames stall under a saturated GPU (35–43 long tasks in 10 s, frame p95 60–137 ms on the M3) while WebGL2 stays smooth. A weak GPU is always saturated. | Needs Intel hardware. | The owner's bench run on an HD 620 with and without `&renderer=webgl` (§5) decides whether weak GPUs should draw with WebGL2. | 0.2.1, after §5 |
-| P1-08 | medium | The benchmark's Build scenario runs at about 60 fps in every preset, against 88–120 fps for the same orbit in Live. The cause wasn't found. | Not investigated. | Start with the catalog pictures' second engine (`render/preview/items.ts`) and the paused session's frame clock. | 0.2.1 |
+| P1-16 | medium | With vsync and the cap off, WebGPU frames stall under a saturated GPU (35–43 long tasks in 10 s, frame p95 60–137 ms on the M3) while WebGL2 stays smooth. A weak GPU is always saturated. G2's baseline runs on WebGPU stalled the same way. | Needs Intel hardware. | The owner's bench run on an HD 620 with and without `&renderer=webgl` (§5) decides whether weak GPUs should draw with WebGL2. | 0.2.1, after §5 |
+| P1-08 | medium | The benchmark's Build scenario ran at about 60 fps in every preset, against 88–120 fps for the same orbit in Live. G2's shadow work raised it (Medium, WebGPU, no vsync: 62 → 71 → 78 fps), but it is still well below the orbit in Live (146 fps). The cause wasn't found. | Not investigated. | Start with the catalog pictures' second engine (`render/preview/items.ts`) and the paused session's frame clock. | 0.2.1 |
 | P2-03 | medium | The interface's frosted blur is redone every frame over the moving 3D view; Low keeps it. | Not among the Low trims in the revised scope (§2.8). | Measure it on an Intel laptop; if it costs 1 ms or more, a plain tint on Low. | v0.3 |
-| R5-15 (rest) | medium | Whether the Pages CDN serves the 255 MB language-model file in full is unverified. A player who turns on voices and the language model downloads about 476 MB (voices 216.7 MB with ONNX Runtime, the model 259 MB), against Pages' soft limit of 100 GB a month. | Checked in the release's dry run and live check. | Check the file in the dry run and on the live site; split it, or host the models on Hugging Face or a CDN, only if that shows a problem (owner question). | 0.2.0 release step |
+| R5-15 (rest) | medium | Whether the Pages CDN serves the 255 MB language-model file in full is unverified: the dry run built a 489 MB site whose largest file is that model (255.5 MB), but it didn't publish. A player who turns on voices and the language model downloads about 476 MB (voices 216.7 MB with ONNX Runtime, the model 259 MB), against Pages' soft limit of 100 GB a month. | Checked in the release's dry run and live check. | Check the file on the live site after the release; split it, or host the models on Hugging Face or a CDN, only if that shows a problem (owner question). | 0.2.0 release step |
 | P3-08 | low | A* has no expansion cap, so an unreachable goal floods the town: one late step, never a stall. | Dropped on purpose (L1): the largest successful search took 9,527 expansions and a failed flood about 26,800 (under 3×), 10–22 floods per 100+ town-days, so a safe cap would trim only about a third of a rare flood. | Reject goals in a disconnected area (region connectivity) and remember unreachable targets; R3-11 now does the latter for uses, cleaning, repairs, washing up and visits. | v0.3 |
 | P3-03 | low | About 60 shader chunks load in 3–4 dependent waves while the renderer starts. | Dropped on purpose (L1): preloading saved 0.13 s to the menu only at 80 ms latency, nothing at 20 ms or unthrottled, and made warm loads 25–55 ms slower. Returning players now get these files from the service worker's cache. | Leave it. | never |
 | R5-24 | low | The isolation service worker's reload flag (`littlelives.isolationReload` in session storage) is never cleared, so a page whose worker is evicted in a long session runs without isolation and doesn't retry. | Left untouched (L1). | Clear the flag once the page is isolated. | 0.2.1 |
@@ -918,6 +943,12 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | Open 0.1 tab (new) | low | An open tab of 0.1.0 blocks the save storage's upgrade to version 2. Load game says to close it, but the main menu just shows no saves. | Rare, and only once. | Say it on the main menu too. | 0.2.1 |
 | Licence links (new) | low | The model licences (`voice/supertonic-3/LICENSE`, `voice/misaki-LICENSE`, `llm/lfm2.5-350m/LICENSE`) have no file extension, so a server may send them as `application/octet-stream` and Credits' link downloads the file instead of showing it. Seen on the local server; Pages unconfirmed. | Found at the end of F5. | Ship `.txt` copies, or link the same texts in `THIRD-PARTY-LICENSES.txt`. | 0.2.1 |
 | Bench fps (new) | low | The benchmark's `fps` counts its own `requestAnimationFrame` ticks, not drawn frames: right without a cap (its default), misleading with one. | Found by G1. | Count drawn frames. | 0.2.1 |
+| P1-02 (Low) | low | Low keeps its 4 forward lamps in the largest rooms, dark by day, in the shader. | Dropped on purpose (G2): turning them off by day saved 0.2–0.3 ms of GPU but froze the game for 170–250 ms at the first dawn or dusk switch, and compiling both shader sets while loading didn't remove the freeze (§6). | Leave it, unless a way to switch without recompiling turns up. | v0.3 |
+| P1-01 (Low) | low | On Low the lawn is thinned everywhere, not drawn only round the viewed lot. | The landscape is built once per town and shared with the menus' town, outliving lot switches. | Part of the low-end work. | v0.3 |
+| P1-09 (High) | low | High's mirrors still reflect at 0.75 of the screen with 4× MSAA. | Both cuts showed (G2). Half resolution: 0.9 % of the mirror's pixels off by more than 16 of 255 against today (softer). Dropping MSAA as well: 1.4 % off by more than 16 against half resolution with MSAA (stair steps on dark edges). | Owner question (§6). | never |
+| Running CSS animations (new) | low | Chrome recalculates style every frame for each running CSS animation, even a transform-only one, and on a 120 Hz display that's every refresh. The bar transitions and the low-need pulse are always running, and each feed entry runs its own for 12 s: about 0.13 ms a frame at full CPU speed (M1, M3 Pro). | Removing it means dropping the bar transitions or the pulse, which changes the look (§6). | The owner decides; if so, bars that jump to their value and a still low-need marker. | v0.3 |
+| P2-06 (side effect, new) | low | A model still being built ahead when the camera arrives may appear up to a few hundred ms later than before. | The cost of building in 4 ms steps. | Leave it unless players notice. | never |
+| R5-29 | low | The dry run's annotations: `actions/checkout@v4`, `actions/cache@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `actions/configure-pages@v5` and `pnpm/action-setup@v4` target Node 20, which GitHub has deprecated (they were run on Node 24, and worked). `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19. Warnings, not failures. | Seen in the first dry run. | Bump the actions to their Node 24 majors, and run the dry run again after the label change. | 0.2.1 |
 | P3-17 | low | CI runs only on a release tag or by hand: no job on push or pull request. | Not in scope. | A push and pull-request job with `cargo test` and clippy that prints the big town's ticks per second without gating. | 0.2.1 |
 | R5-22 | low | Settings have no version: migrations guess from which keys exist, and only graphics and resolution are range-checked. | Not in scope. | A `settingsVersion` with ordered migrations, and numbers clamped after the merge. | v0.3 |
 | Menu stutter (new) | low | Preparing the latest save behind the menu shows as 2–3 frames of 100–175 ms in the first seconds on the menu (M3 Pro), roughly three times that on the target CPUs. | The cost of P3-01's faster menu. | Build that world in slices, as playing an existing household already does. | v0.3 |
@@ -961,7 +992,9 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 - [ ] P1-16: compare WebGPU with WebGL2 for long tasks and the frame interval's p95 and p99. If WebGPU stalls where WebGL2 doesn't, weak GPUs may be better off on WebGL2 (§4).
 - [ ] Play 10 minutes on Medium (the default) and 10 on Low, with F3 open: frame rate, GPU time, Busy (frames), and whether Auto resolution shows 1920×1080 · 100 %.
 - [ ] Main thread on a real slow CPU: at speed 5 with a resident's panel open, F3's "Busy (frames)" and long tasks. M1 measured the main thread 82 % busy there with the M3's CPU slowed 3× (§3.5.2), standing in for these laptops; that was from a trace, and F3 reads a few points lower than a trace. Note any long task or hitch, for example when the camera follows someone onto another lot.
-- [ ] *(pending: anything G2 asks to check on Intel.)* <!-- G2 -->
+- [ ] Low's look on Intel: half the lawn's tufts and flowers, and no shadows from the woods round the town. It should still look like the same place.
+- [ ] Open the pause menu or Settings in a game: the blurred picture behind stays still, and the laptop's GPU use (Task Manager, or Activity Monitor's GPU History) drops until the menu closes.
+- [ ] On High, a mirror that comes into view reflects the room at once (its reflection is now made only when needed).
 
 **Safari and Firefox** (not tested by any agent):
 - [ ] Safari 26 with WebGPU: the first visit reloads once for the isolation service worker, and F3 shows Shared memory: on. A new game, Save, reload the page, Continue.
@@ -1018,7 +1051,7 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 
 ## 6. Open questions for the owner
 
-Nothing waited on these: each has a default that shipped in 0.2.0, and a different answer would be a change for a later release. The §2.7 questions not listed here were answered by the decisions in §2.8, or by a fix in §3 (R1-17, P3-01).
+Nothing waited on these: each has a default that shipped in 0.2.0, and a different answer would be a change for a later release. The §2.7 questions not listed here were answered by the decisions in §2.8, or by a fix in §3 (R1-17, P3-01, and P2-08: the menus' town is drawn at 30 fps and nothing is drawn behind full-screen menus).
 
 | Question | What shipped | From |
 |---|---|---|
@@ -1042,7 +1075,10 @@ Nothing waited on these: each has a default that shipped in 0.2.0, and a differe
 | On Low, the lighting steps every 10 game minutes at speed 3 and up and in the quiet-hours time-lapse, so the sun moves in visible steps about once a second. Acceptable? | Shipped. | G1 |
 | Should weak GPUs (Intel HD 620-class) get Low, or WebGL2, by default at first start? | No detection: everyone starts on Medium with WebGPU where it works (put off, §2.8). §5's bench run informs it. | P1 |
 | Should Low replace the interface's frosted blur with a plain tint (P2-03)? | No: Low keeps the blur. | P2 |
-| *(pending: G2's questions, e.g. Low without the neighbours' house interiors (P1-01, P1-12), and whether drawing stops behind full-screen menus.)* <!-- G2 --> | | G2 |
+| Should High's mirrors reflect at half resolution, or without MSAA, to save GPU time and memory? Both showed: about 1 % of the mirror's pixels off by more than 16 of 255. | No: full resolution (0.75 of the screen) and 4× MSAA, as before. Only their memory is now taken on demand. | G2 |
+| Should residents' shadows get their own per-frame path, so that live play stops redrawing the whole shadow map? It needs a depth-writing blit in both WGSL and GLSL. | Not in 0.2.0: the map is still drawn every frame while residents are in view, from 152 draws after culling. A v0.3 candidate (§4). | G2 |
+| Low's 4 forward lamps stay in the shader by day, dark. Turning them off by day saved 0.2–0.3 ms of GPU but froze the game for 170–250 ms at the first dawn or dusk switch. | Kept, dark by day. | G2 |
+| Should Low leave out the neighbours' house interiors, and draw the lawn only round the viewed lot (P1-01, P1-12)? | No: Low draws the neighbours as Medium does, and thins the lawn to half everywhere (the landscape is shared with the menus' town). | P1, G2 |
 | Chrome recalculates style every frame for each running CSS animation (the bar transitions, the low-need pulse, a feed entry's fade): about 0.13 ms a frame at full CPU speed on the M3 Pro, every refresh on a 120 Hz display. Removing it means dropping the bar transitions or the pulse, which changes the look. Worth it? | Kept: the bar transitions and the low-need pulse are unchanged (now animated by transform, P2-01). | M1 |
 | **Saves and crashes** | | |
 | A save whose load traps is deleted as damaged, like a corrupt one. Should it be kept and marked instead (§4)? | Deleted, with a notice. | F2c |

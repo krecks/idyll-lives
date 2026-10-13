@@ -2,7 +2,8 @@
 
 *Design notes for how Idyll Lives looks. Inspired by classic life-simulation games, described
 here on our own terms. Status: 0.2.0. This is the Medium graphics preset, everyone's default; Low
-and High change a few things (softer or sharper shadows, fewer lamps, live mirrors), listed in
+and High change a few things (softer or sharper shadows, fewer lamps, half the lawn and no woods'
+shadows on Low, live mirrors on High), listed in
 [graphics.md](graphics.md).*
 
 The world has one look: warm, painterly realism with golden-hour light and blue moonlit nights.
@@ -34,7 +35,7 @@ Code: `web/src/render/look.ts` holds the look as data; `web/src/render/babylon/*
 | Nights | A blue moon fill with a strong night grade (0.85), so nights are clearly blue but not murky; warm lamps (`#FFC27A`) and glowing windows. |
 | Grading | ACES tone mapping, contrast 1.1, saturation +14. Split toning: warm highlights (hue 38) and cool shadows (hue 222). |
 | Effects | A light vignette and soft distance haze. |
-| Shadows | Soft, filtered shadows from one sun shadow map over a fixed circle round the lot. Its size comes with the graphics preset: 2048 on Medium (the default), 1024 on Low, 4096 on High. |
+| Shadows | Soft, filtered shadows from one sun shadow map over a fixed area round the lot. Its size comes with the graphics preset: 2048 on Medium (the default), 1024 on Low, 4096 on High. |
 
 ## The world
 

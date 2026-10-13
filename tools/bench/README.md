@@ -27,6 +27,6 @@ node tools/bench/render.mjs --compare /tmp/shots-base /tmp/shots-new --out /tmp/
 node tools/bench/scene.mjs --name village --world medium --hour 18
 ```
 
-The options are documented at the top of each script. To compare two builds, measure them back to back on the same machine, with nothing else running, and take medians of at least 3 runs; GPU times on Apple hardware vary by about ±1 ms between runs. Two runs of the same build differ by at most 1 of 255 in a few pixels, apart from a far road's lane markings (P1-17 in the release review).
+The options are documented at the top of each script. To compare two builds, measure them back to back on the same machine, with nothing else running, and take medians of at least 3 runs; GPU times on Apple hardware vary by about ±1 ms between runs. Shots of two runs of the same build taken in a window differed by at most 1 of 255 in a few pixels, apart from a far road's lane markings (P1-17 in the release review); headless ones in at most 0.12 % of their pixels (above).
 
 On a laptop without the repo, open the deployed game instead, e.g. `https://krecks.github.io/idyll-lives/?bench=village&quality=low&hour=13&res=1` (add `&renderer=webgl` for WebGL2), and press "Copy result" when it's done.
