@@ -843,6 +843,9 @@ pub enum EventKind {
     Babysitter,
     /// `a` stayed home from work to look after `b` (no money for a babysitter).
     StayedHome,
+    /// `a` is out of the crib (or came to live here) and there's no bed for them at home: fewer
+    /// bed places than people past the crib (told to the player's household, which buys its own).
+    NoBed,
 }
 
 impl EventKind {
@@ -855,7 +858,7 @@ impl EventKind {
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
-            | DeniedAgain | StayedHome => 1,
+            | DeniedAgain | StayedHome | NoBed => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
             | Declined | Babysitter => 0,
         }
