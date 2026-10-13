@@ -1791,8 +1791,10 @@ export class Characters {
         } else faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
-      const maxTurn = (moving ? 9 : 6) * dt;
-      rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12)), -maxTurn, maxTurn));
+      // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
+      const turn = moving ? clamp(gameRate, 1, 10) : 1;
+      const maxTurn = (moving ? 9 : 6) * dt * turn;
+      rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
 
