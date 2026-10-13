@@ -14,6 +14,7 @@
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
   import CreateNeighbourhood from './ui/screens/CreateNeighbourhood.svelte';
   import CreateWorld from './ui/screens/CreateWorld.svelte';
+  import CrashScreen from './ui/screens/CrashScreen.svelte';
   import Credits from './ui/screens/Credits.svelte';
   import LoadGame from './ui/screens/LoadGame.svelte';
   import LoadingScreen from './ui/screens/LoadingScreen.svelte';
@@ -50,6 +51,7 @@
       await loadGameData();
       app.dataReady = true;
     } catch (err) {
+      console.error('[boot] the game data failed to load', err);
       app.fatal = err instanceof Error ? err.message : String(err);
       return;
     }
@@ -189,7 +191,7 @@
 
 {#if app.fatal}
   <MenuBackdrop />
-  <div class="center"><div class="glass box"><b>Couldn't load game data</b><span>{app.fatal}</span></div></div>
+  <CrashScreen crash={{ kind: 'data', detail: app.fatal }} />
 {:else if app.booting}
   <LoadingScreen progress={app.boot} />
 {:else if app.screen === 'game'}
@@ -220,6 +222,8 @@
     {#if app.overlay === 'settings'}<SettingsPanel />{:else if app.overlay === 'load'}<LoadGame />{:else}<Credits />{/if}
   </Modal>
 {/if}
+
+{#if app.crash && !app.fatal}<CrashScreen crash={app.crash} />{/if}
 
 <div class="scaled toast-layer"><Toasts /></div>
 
@@ -258,19 +262,6 @@
   }
   .game-layer :global(.scene-veil.on) {
     opacity: 1;
-  }
-  .center {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-  }
-  .box {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 28px 36px;
-    max-width: 480px;
   }
   .toast-layer {
     position: fixed;

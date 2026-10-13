@@ -17,6 +17,16 @@ export interface Progress {
   value: number;
 }
 
+/**
+ * Why the game can't go on (the crash screen): the simulation stopped (`sim`), drawing broke
+ * (`render`), the GPU was reset (`graphics`), the interface failed (`interface`), or the game's
+ * data didn't load (`data`). `detail`: what went wrong, for the curious and for reports.
+ */
+export interface Crash {
+  kind: 'sim' | 'render' | 'graphics' | 'interface' | 'data';
+  detail: string;
+}
+
 class AppState {
   screen = $state<Screen>('menu');
   overlay = $state<Overlay>(null);
@@ -25,6 +35,8 @@ class AppState {
   sessionKey = $state(0);
   dataReady = $state(false);
   fatal = $state('');
+  /** The game can't go on: the crash screen shows (the first reason is kept). */
+  crash = $state.raw<Crash | null>(null);
   /** Drafts kept while moving back and forth through the new-game steps: the world (nobody living there yet), then the town with its neighbours. */
   world = $state.raw<NeighbourhoodDraft | null>(null);
   town = $state.raw<NeighbourhoodDraft | null>(null);
@@ -93,6 +105,11 @@ class AppState {
     this.overlay = null;
     this.request = null;
     this.screen = 'menu';
+  }
+
+  /** Shows the crash screen (unless it already shows for an earlier reason). */
+  crashed(crash: Crash): void {
+    this.crash ??= crash;
   }
 }
 

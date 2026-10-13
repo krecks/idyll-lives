@@ -1,7 +1,35 @@
 //! Browser bindings for `sim-core`. Keep this layer thin: no game logic here.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use sim_core::{Command, World, mesh, snapshot, view};
 use wasm_bindgen::prelude::*;
+
+/// A panic happened: the instance is broken (the build aborts on panic, leaving whatever the
+/// call was changing half done), so nothing it holds may be saved.
+static PANICKED: AtomicBool = AtomicBool::new(false);
+
+#[wasm_bindgen]
+extern "C" {
+    /// The worker's `__wasmPanic` (`sim.worker.ts`), which passes the message on to the game.
+    #[wasm_bindgen(catch, js_namespace = globalThis, js_name = __wasmPanic)]
+    fn report_panic(message: &str) -> Result<(), JsValue>;
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// Runs as the module starts. A panic aborts (`panic = "abort"`), and the trap only says
+/// "unreachable": the hook first passes on what panicked and where.
+#[wasm_bindgen(start)]
+fn start() {
+    std::panic::set_hook(Box::new(|info| {
+        PANICKED.store(true, Ordering::Relaxed);
+        let message = info.to_string();
+        if report_panic(&message).is_err() {
+            console_error(&message);
+        }
+    }));
+}
 
 #[wasm_bindgen]
 pub struct Game {
@@ -28,9 +56,20 @@ impl Game {
         Ok(Game::with_world(world))
     }
 
-    /// Serializes the whole game state (see `sim_core::save`).
-    pub fn save(&self) -> String {
-        self.world.save_json()
+    /// Serializes the whole game state (see `sim_core::save`). Refused after a panic: the state
+    /// may be half updated, and the last good save must not be overwritten with it.
+    pub fn save(&self) -> Result<String, JsError> {
+        if PANICKED.load(Ordering::Relaxed) {
+            return Err(JsError::new("the game stopped after an error"));
+        }
+        Ok(self.world.save_json())
+    }
+
+    /// Panics on purpose (`?debug`'s `__crash('panic')`): shows what the game does when the
+    /// simulation fails.
+    #[wasm_bindgen(js_name = debugPanic)]
+    pub fn debug_panic(&mut self, why: &str) {
+        panic!("{why}");
     }
 
     /// Runs one real-time step and refreshes the snapshot.

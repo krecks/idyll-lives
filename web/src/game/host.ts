@@ -11,9 +11,11 @@
 import type { WorldStructure } from '../core/protocol';
 import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
 import type { Renderer } from '../render/types';
-import { qualityFromSettings, RESTART_KEYS, type Settings } from '../settings/settings.svelte';
+import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { game } from '../ui/state.svelte';
+import { basicReport, within } from '../debug/report';
+import { plainState } from '../debug/snapshot.svelte';
 import type { HouseholdDraft } from './household';
 import { loadGameData, startSession, type GameSession, type StartRequest } from './session';
 
@@ -39,6 +41,8 @@ interface Entry {
   live: boolean;
   /** The session's scene is built and drawn (its progress reports end). */
   ready: boolean;
+  /** The session, once it exists. */
+  instance?: GameSession;
 }
 
 class GameHost {
@@ -54,6 +58,8 @@ class GameHost {
   private teardown: Promise<void> = Promise.resolve();
   /** The town the menus show (kept to show it again on a new renderer); null while in a game. */
   private town: { world: WorldStructure; minute: number } | null = null;
+  /** The game being played (once it has started), for the crash screen's "Save and reload". */
+  private played: GameSession | null = null;
 
   constructor() {
     this.root = document.createElement('div');
@@ -114,7 +120,8 @@ class GameHost {
    */
   prepare(request: StartRequest, settings: Settings): Promise<GameSession> {
     const key = requestKey(request);
-    if (this.current?.key === key) return this.current.session;
+    // (Unless its simulation stopped while it waited behind the menus: then a new one.)
+    if (this.current?.key === key && this.current.instance?.alive !== false) return this.current.session;
     this.release();
     const previous = this.teardown;
     const entry = { key, live: false, ready: false } as Entry;
@@ -129,6 +136,7 @@ class GameHost {
       });
     })();
     entry.session = entry.started.then(async (s) => {
+      entry.instance = s;
       await s.ready;
       entry.ready = true;
       if (this.current === entry) app.loading = null;
@@ -139,9 +147,8 @@ class GameHost {
     const session = entry.session;
     this.current = entry;
     session.catch(() => {
-      if (this.current?.session !== session) return;
-      this.current = null;
-      app.loading = null;
+      // A start that failed (or whose simulation stopped before it was shown): let go of what it set up.
+      if (this.current?.session === session) this.release();
     });
     return session;
   }
@@ -154,6 +161,7 @@ class GameHost {
     const session = await pending;
     const renderer = await this.renderer;
     if (!renderer || this.current !== entry) return session;
+    this.played = session;
     renderer.setActive(true);
     let veiled = false;
     if (renderer.townShown) {
@@ -181,6 +189,7 @@ class GameHost {
   release(): void {
     const current = this.current;
     this.current = null;
+    this.played = null;
     app.loading = null;
     if (!this.town) app.liveBackdrop = false;
     if (!current) return;
@@ -192,6 +201,31 @@ class GameHost {
       .then(() => renderer?.then((r) => this.syncActive(r)))
       .catch(() => {});
     game.reset();
+  }
+
+  /** The game being played can still be saved (its simulation runs). */
+  get canSave(): boolean {
+    return !!this.played?.alive;
+  }
+
+  /** Saves the game being played as a new save (if it still runs), then loads the page again. */
+  async saveAndReload(): Promise<void> {
+    const session = this.played;
+    if (session?.alive) await session.save(`${session.household} · Day ${game.day}`);
+    location.reload();
+  }
+
+  /** A debug report without asking a game (none runs, or it stopped): the log, settings, interface state and a picture. */
+  async basicReport(note: string): Promise<string> {
+    const renderer = await this.renderer?.catch(() => null);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const picture = renderer?.captureThumbnail(Math.round(this.canvas.clientWidth * scale), Math.round(this.canvas.clientHeight * scale));
+    return basicReport(note, {
+      settings: plainState(liveSettings),
+      ui: { screen: app.screen, crash: app.crash, fatal: app.fatal, ...plainState(game, ['catalog', 'threads']) },
+      renderer: renderer?.stats() ?? null,
+      screenshot: picture ? await within(picture, 4000, null) : null,
+    });
   }
 
   /** Draws only while something is on screen: the game, or the menus' town. */

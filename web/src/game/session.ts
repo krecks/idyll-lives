@@ -11,13 +11,14 @@ import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, S
 import { lowestStorey } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
-import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
+import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
 import { threadStats } from '../debug/threads';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
+import { app } from '../ui/app.svelte';
 import { services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
@@ -80,6 +81,8 @@ const WARM_FRAMES = 3;
 const PORTRAIT_WAIT_MS = 8000;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Longest wait for a debug report's picture or GPU details (it goes without them). */
+const REPORT_PART_MS = 4000;
 
 export interface GameSession {
   /** Saves into `slotId` (a new slot when omitted). Returns the slot id. */
@@ -89,7 +92,12 @@ export interface GameSession {
   setMenuPause(paused: boolean): void;
   /** The player's household (its address until a family moves in). */
   readonly household: string;
-  /** Resolves when the world is built and drawn and the HUD's portraits exist: revealing is then instant. */
+  /** The simulation still runs (it hasn't stopped after an error): the game can be saved. */
+  readonly alive: boolean;
+  /**
+   * Resolves when the world is built and drawn and the HUD's portraits exist: revealing is then
+   * instant. Rejects if the simulation stops before that.
+   */
   readonly ready: Promise<void>;
   /** Unpauses the game and attaches input. */
   reveal(): void;
@@ -156,9 +164,13 @@ export async function startSession(
   /** The scene build in progress; disposing waits for it so it can't add to the next session's scene. */
   let building: Promise<unknown> = Promise.resolve();
   let markReady: () => void = () => {};
+  let failReady: (err: Error) => void = () => {};
   /** The player household's portraits (requested with the first world). */
   let portraits: Promise<unknown> | null = null;
-  const ready = new Promise<void>((resolve) => (markReady = resolve));
+  const ready = new Promise<void>((resolve, reject) => {
+    markReady = resolve;
+    failReady = reject;
+  });
 
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
@@ -676,10 +688,12 @@ export async function startSession(
     },
     async debugReport(note) {
       const scale = Math.min(window.devicePixelRatio || 1, 2);
+      // A game that stopped has no state to save: the report still carries the log, the settings
+      // and the picture. Nothing here waits for long (drawing may have stopped too).
       const [save, screenshot, gpu] = await Promise.all([
-        bridge.requestSave(),
-        renderer.captureThumbnail(Math.round(canvas.clientWidth * scale), Math.round(canvas.clientHeight * scale)),
-        gpuInfo(),
+        bridge.alive ? bridge.requestSave().catch(() => null) : null,
+        within(renderer.captureThumbnail(Math.round(canvas.clientWidth * scale), Math.round(canvas.clientHeight * scale)), REPORT_PART_MS, null),
+        within(gpuInfo(), REPORT_PART_MS, null),
       ]);
       // Everything the HUD shows, minus the (large, static) catalog and the threads (reported on their own).
       const ui = plainState(game, ['catalog', 'threads']);
@@ -707,6 +721,9 @@ export async function startSession(
   // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
   if (params.has('debug')) {
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    // `__crash(what)`: fails on purpose, to see how the game copes. 'panic': the simulation panics;
+    // 'throw': an error its worker doesn't catch; 'hang': its worker hangs.
+    Object.assign(window, { __crash: (what: 'panic' | 'throw' | 'hang') => bridge.debugCrash(what) });
   }
   game.sharedMemory = bridge.sharedMemory;
   game.household = household;
@@ -719,6 +736,15 @@ export async function startSession(
     if (disposed) return;
     toast(message);
     if (game.mode === 'build') play('error');
+  });
+  // The simulation stopped for good. In play: the crash screen. Still being prepared: the start
+  // fails (the host lets go of it).
+  let stoppedWith: string | null = null;
+  bridge.onFatal((message) => {
+    if (disposed) return;
+    stoppedWith = message;
+    if (revealed) app.crashed({ kind: 'sim', detail: message });
+    else failReady(new Error(`The game stopped because of an error: ${message}`));
   });
   bridge.onUi((ui) => {
     if (disposed) return;
@@ -1044,6 +1070,8 @@ export async function startSession(
 
   const onKey = (e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    // Behind the crash screen only a debug report (F8) is taken.
+    if (app.crash && e.key !== 'F8') return;
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
       if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
@@ -1208,10 +1236,15 @@ export async function startSession(
     get household() {
       return household;
     },
+    get alive() {
+      return bridge.alive;
+    },
     ready,
     reveal() {
       if (revealed) return;
       revealed = true;
+      // Prepared, then the simulation stopped before the game was shown.
+      if (stoppedWith !== null) app.crashed({ kind: 'sim', detail: stoppedWith });
       renderer.setIdleOrbit(false);
       // A loaded debug report shows the view it was captured from.
       const pose = takePendingPose();

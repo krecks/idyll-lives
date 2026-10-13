@@ -24,6 +24,12 @@ const CLOCK_GAIN = 0.05;
 const CLOCK_RESET_STEPS = 2;
 /** How far past the newest snapshot motion may continue while waiting for a late one. */
 const MAX_EXTRAPOLATION = 1.3;
+/** Longest wait for the worker's answer to a request (a save, the journal…). */
+const REQUEST_LIMIT_MS = 15_000;
+/** The worker sends something every 100 ms (UI updates); this long without a word, it has hung. */
+const SILENCE_LIMIT_MS = 8000;
+const WATCHDOG_MS = 1000;
+const STOPPED = 'The game stopped because of an error.';
 
 export class SimBridge {
   readonly layout: SnapshotLayout;
@@ -58,8 +64,15 @@ export class SimBridge {
   private itemListeners: Listener<ItemPlacement[]>[] = [];
   private uiListeners: Listener<UiUpdate>[] = [];
   private errorListeners: Listener<string>[] = [];
+  private fatalListeners: Listener<string>[] = [];
   private nextRequest = 1;
-  private readonly requests = new Map<number, (value: never) => void>();
+  private readonly requests = new Map<number, { resolve: (value: never) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  /** Why the simulation is gone (it failed, or the game ended); null while it runs. */
+  private gone: string | null = null;
+  /** The watchdog: when the worker last said anything, and when it last looked. */
+  private lastHeard = performance.now();
+  private lastWatch = performance.now();
+  private readonly watchdog: ReturnType<typeof setInterval>;
 
   private constructor(
     worker: Worker,
@@ -77,7 +90,17 @@ export class SimBridge {
     this.curr = new Float32Array(layout.capacity);
     this.scratch = new Float32Array(layout.capacity);
     this.frameState = { prev: this.prev, curr: this.curr, alpha: 0, layout, now: 0 };
-    worker.onmessage = (e: MessageEvent<FromWorker>) => this.handle(e.data);
+    worker.onmessage = (e: MessageEvent<FromWorker>) => {
+      this.lastHeard = performance.now();
+      this.handle(e.data);
+    };
+    // Anything the worker's own guard didn't catch: the game can't be trusted to go on.
+    worker.onerror = (e) => {
+      e.preventDefault();
+      this.fail(`${e.message || 'The game stopped because of an error.'}${e.filename ? ` (${e.filename}:${e.lineno})` : ''}`);
+    };
+    worker.onmessageerror = () => this.fail("A message from the game couldn't be read.");
+    this.watchdog = setInterval(this.watch, WATCHDOG_MS);
   }
 
   static start(content: string, source: GameSource): Promise<SimBridge> {
@@ -96,6 +119,11 @@ export class SimBridge {
       };
       worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
     });
+  }
+
+  /** The simulation runs (it hasn't failed, and the game hasn't ended): it can answer and be saved. */
+  get alive(): boolean {
+    return this.gone === null;
   }
 
   get sharedMemory(): boolean {
@@ -133,17 +161,61 @@ export class SimBridge {
     return reply.data;
   }
 
+  /** `?debug`'s `__crash` (game/session.ts): the simulation fails on purpose. */
+  debugCrash(what: 'panic' | 'throw' | 'hang'): void {
+    this.worker.postMessage({ type: 'debugCrash', what } satisfies ToWorker);
+  }
+
+  /** Answers come back by id; none is waited for forever (a failed or hung game rejects them). */
   private request<T>(message: (requestId: number) => ToWorker): Promise<T> {
+    if (this.gone !== null) return Promise.reject(new Error(this.gone));
     const requestId = this.nextRequest++;
-    return new Promise<T>((resolve) => {
-      this.requests.set(requestId, resolve as (value: never) => void);
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => this.reject(requestId, new Error("The game didn't answer.")), REQUEST_LIMIT_MS);
+      this.requests.set(requestId, { resolve: resolve as (value: never) => void, reject, timer });
       this.worker.postMessage(message(requestId));
     });
   }
 
   private resolve(requestId: number, value: unknown): void {
-    this.requests.get(requestId)?.(value as never);
+    const request = this.requests.get(requestId);
+    if (!request) return;
     this.requests.delete(requestId);
+    clearTimeout(request.timer);
+    request.resolve(value as never);
+  }
+
+  private reject(requestId: number, err: Error): void {
+    const request = this.requests.get(requestId);
+    if (!request) return;
+    this.requests.delete(requestId);
+    clearTimeout(request.timer);
+    request.reject(err);
+  }
+
+  /** No word from the worker for too long while the page runs normally: it has hung. */
+  private readonly watch = () => {
+    const now = performance.now();
+    // A late look (a hidden tab's throttled timers, the main thread busy): the worker's messages
+    // may still be queued behind it, so start counting again.
+    if (document.hidden || now - this.lastWatch > 2 * WATCHDOG_MS) this.lastHeard = now;
+    this.lastWatch = now;
+    if (now - this.lastHeard > SILENCE_LIMIT_MS) this.fail('The game stopped responding.');
+  };
+
+  /** The simulation failed for good: its worker goes, every request fails, and the game is told (`onFatal`). */
+  private fail(message: string): void {
+    if (this.gone !== null) return;
+    console.error('[sim] the game stopped:', message);
+    this.end(STOPPED);
+    for (const fn of this.fatalListeners) fn(message);
+  }
+
+  private end(message: string): void {
+    this.gone = message;
+    clearInterval(this.watchdog);
+    this.worker.terminate();
+    for (const id of [...this.requests.keys()]) this.reject(id, new Error(message));
   }
 
   /** Latest world structure is replayed to late subscribers. */
@@ -181,6 +253,11 @@ export class SimBridge {
 
   onError(fn: Listener<string>): void {
     this.errorListeners.push(fn);
+  }
+
+  /** The simulation stopped for good (a trap, a failed step, an uncaught error, or it hung): what went wrong. */
+  onFatal(fn: Listener<string>): void {
+    this.fatalListeners.push(fn);
   }
 
   /** Pulls the newest snapshot. Call once per rendered frame, before `frame()`. */
@@ -232,7 +309,7 @@ export class SimBridge {
   }
 
   dispose(): void {
-    this.worker.terminate();
+    if (this.gone === null) this.end('The game has ended.');
   }
 
   private handle(msg: FromWorker): void {
@@ -272,8 +349,12 @@ export class SimBridge {
       case 'stats':
         this.threadStats = msg.stats;
         break;
+      case 'failed':
+        this.reject(msg.requestId, new Error(msg.message));
+        break;
       case 'error':
-        for (const fn of this.errorListeners) fn(msg.message);
+        if (msg.fatal) this.fail(msg.message);
+        else for (const fn of this.errorListeners) fn(msg.message);
         break;
       case 'ready':
         break;

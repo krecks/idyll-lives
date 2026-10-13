@@ -49,9 +49,9 @@
     session?.applySettings(s);
   });
 
-  // The world stands still while a menu is open.
+  // The world stands still while a menu (or the crash screen) is open.
   $effect(() => {
-    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen);
+    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen || app.crash !== null);
   });
 </script>
 
