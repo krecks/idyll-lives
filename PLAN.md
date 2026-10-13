@@ -235,8 +235,8 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - **Resolution:** Auto draws native pixels up to about 1920×1080 and doesn't step down when frames run slow (the owner put that off for 0.2.0). A Custom resolution draws 50–100 %.
 - **Presets:** the three graphics presets and their costs are in [docs/design/graphics.md](docs/design/graphics.md).
 
-**Targets (the owner, 0.2.0):** laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1080p: Medium at 30 fps or more, Low at 60 fps or more.
-- They are goals estimated from scaled Mac measurements, not release gates.
+**Targets (the owner, 0.2.0):** laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1080p: Medium at 30 fps or more. Low there is best effort; 60 fps on Low is not a 0.2.0 target.
+- Medium's 30 fps is an estimate from scaled Mac measurements, not yet measured on Intel hardware, and not a release gate.
 - Before 0.2.0, P1 estimated Medium at about 6–10 fps and Low at about 9–27 fps there, with the GPU as the limit.
 - The owner confirms them on real hardware with the in-game benchmark (`?bench=village`).
 
@@ -335,7 +335,7 @@ The snapshot memory layout is **defined once in Rust** (`sim-core/src/snapshot.r
 |---|---|---|
 | v0.3 | **Stable object ids** | Every object keeps an id of its own for life, so selling or moving one shifts nothing. That replaces the remapping of follow-ups, queues and unreachable things and the `seen` guard on commands that 0.2.0 uses, and saves keep their ids across a reload. |
 | v0.3 | **Unreachable goals** | A goal in an area the resident can't reach is refused before A* floods the town, instead of capping the search (P3-08). People join the unreachable memory (Social, Join). Walkers re-route when walls change. `structure_version` is split so a change refreshes only what it touched. Settings get a version and ordered migrations. |
-| v0.3 | **Low-end PCs** (best effort) | Measured first on real Intel HD 620/530 laptops with `?bench=village` (WebGPU and WebGL2). Then, as the numbers say: weak GPUs detected at first start and given Low or WebGL2; Auto resolution stepping down when frames run slow; fewer draw calls (static shadow casters merged per lot, snapshot rendering retried in play); generated LODs for furniture and the street's houses; neighbours' houses as shells on Low; an LDR path for Low. Goal: Medium at 30 fps and Low at 60 fps at 1080p on those laptops. |
+| v0.3 | **Low-end PCs** (best effort) | Measured first on real Intel HD 620/530 laptops with `?bench=village` (WebGPU and WebGL2). Then, as the numbers say: weak GPUs detected at first start and given Low or WebGL2; Auto resolution stepping down when frames run slow; fewer draw calls (static shadow casters merged per lot, snapshot rendering retried in play); generated LODs for furniture and the street's houses; neighbours' houses as shells on Low; an LDR path for Low. Goal: Medium at 30 fps at 1080p on those laptops, measured; Low as fast as the trims allow. |
 | next | Voices III: Auto mode | Auto picks the right mode without frame drops, and a slow machine steps down with a clear message (phase 6 of `docs/design/voices.md`). ONNX Runtime Web stays. |
 | later | Smarter thoughts (research) | The language model also writes thoughts for actions the utility AI already chose, feeding Resident voices. The utility AI keeps deciding; a model may at most re-rank its top-3 shortlist, entering the sim as a recorded command so saves and replays stay deterministic. |
 

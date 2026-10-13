@@ -55,7 +55,7 @@ Measured on an M3 Pro in Chrome, 1920×1080:
 ### Compatibility
 - **Saves:** the save format is version 23 (0.1.0 wrote 17); saves from 0.1.0 and from the builds after it load and play on. Saves now remember the seed the game started from.
 - **Settings:** a Low graphics setting from 0.1 stays Low; everything else becomes Medium. Players who never changed it had High's settings, so they now get Medium, which has no live mirrors. Resolution starts on Auto.
-- **Runs on:** desktop Chrome, Edge, Brave or Safari with WebGPU; other browsers use the WebGL2 fallback. Voices and the language model need WebGPU. Tested on Apple Silicon Macs in Chrome; the targets for older Intel laptops (Medium at 30 fps, Low at 60) are estimates, not yet measured on Intel hardware.
+- **Runs on:** desktop Chrome, Edge, Brave or Safari with WebGPU; other browsers use the WebGL2 fallback. Voices and the language model need WebGPU. Tested on Apple Silicon Macs in Chrome. On older Intel laptops, Medium at 30 fps is an estimate, not yet measured on Intel hardware; Low there is best effort.
 
 ### Licence
 Idyll Lives is free software under the GNU General Public License v3.0 (or later). Third-party parts keep their own licences: the art is CC0; the voice model, Supertone's Supertonic 3, is under the BigScience OpenRAIL-M licence, whose use restrictions bind everyone who plays; the dictionary (Misaki) is Apache-2.0; and the optional language model (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0. Every build lists the code it bundles with its licences in `THIRD-PARTY-LICENSES.txt`, and Credits names them.
