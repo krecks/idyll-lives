@@ -176,12 +176,18 @@ The current version is **0.2.0**. One version number covers the whole game: `web
 Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 23 since 0.2.0 (0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
-1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too), and a `## <x.y.z> — <date>` section in CHANGELOG.md. Commit both on `main`.
-2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
-3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish.
-4. Check the live site: the menu shows the new version, F3 shows Shared memory: on, and a game runs.
+1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
+3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
+4. Check the live site:
+   - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
+   - F3 shows Shared memory: on, and a game runs.
+   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 255,530,880 bytes (gunzipped, its SHA-256 is the one in `tools/llm/fetch.mjs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,568,968 bytes.
+5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-Each CI run keeps the WASM with its function names as an artifact for 90 days, to read the stack of a crash report (the site's WASM is stripped).
+**If a release goes wrong,** fix forward or redeploy the last good 0.2.x (`gh workflow run pages.yml --ref <tag> -f deploy=true`), not v0.1.0: 0.2.0 upgrades the browser's saves database to version 2, which v0.1.0 can't open, so it would list no saves and couldn't save. Nothing is lost; the saves come back with any 0.2.x.
+
+Each CI run keeps a WASM with function names as an artifact for 90 days. It is the un-optimised file, so its function numbers don't match a crash stack from the site (whose WASM is optimised and stripped).
 
 ## Licence
 
