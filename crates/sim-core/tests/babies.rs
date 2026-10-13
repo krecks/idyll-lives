@@ -559,3 +559,38 @@ fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
     assert!(cuddled, "Ada cuddled Bea");
     assert!(average > 0.35 && lowest > 0.0, "Bea stayed comfortable: average {average:.2}, lowest {lowest:.2}");
 }
+
+/// Bea lying in the crib (asleep or awake) and Ada feeding her, saved and loaded: Bea lies back in
+/// the crib, not on the changing table beside it, though Ada (who comes first) sets off for it
+/// before Bea is put back in. The crib turned every way.
+#[test]
+fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
+    use sim_core::snapshot::{self, HEADER_LEN, SIM_STRIDE, sim};
+    // Where Bea is and which way she faces, in the sim and as the renderer gets it, and her slot.
+    let bea = |w: &World| {
+        let mut out = vec![0.0; snapshot::CAPACITY];
+        snapshot::write(w, &mut out);
+        let row = &out[HEADER_LEN + SIM_STRIDE..];
+        let s = &w.sims[1];
+        let slot = w.objects[0].users.iter().position(|u| *u == Some(1));
+        (s.pos, s.yaw, s.pose, slot, [row[sim::X], row[sim::Z], row[sim::YAW], row[sim::POSE]])
+    };
+    for rot in 0..4 {
+        let town = TOWN.replace(r#"{"def":"crib","x":2,"z":2}"#, &format!(r#"{{"def":"crib","x":2,"z":2,"rot":{rot}}}"#));
+        for awake in [false, true] {
+            let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+            minutes(&mut w, 1);
+            assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "rot {rot}: Bea is in the crib");
+            if awake {
+                w.sims[1].needs[0] = 0.1;
+            }
+            w.apply(Command::Use { sim: 0, object: 0, interaction: 1 }).unwrap();
+            minutes(&mut w, 1);
+            let before = bea(&w);
+            assert_eq!(before.3, Some(0), "rot {rot}: Bea lies in the crib's slot");
+            let mut loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+            minutes(&mut loaded, 1);
+            assert_eq!(bea(&loaded), before, "rot {rot}, awake {awake}: Bea lies where she lay before the save");
+        }
+    }
+}

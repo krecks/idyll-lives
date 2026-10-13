@@ -200,6 +200,23 @@ pub struct ObjectDef {
     pub group: String,
 }
 
+impl ObjectDef {
+    /// The slots interaction `i` takes one of. A crib's first slot is the baby's (the crib on
+    /// its left, where `ObjectInstance::slot_position` lays them; the changing table beside it
+    /// is where carers stand), whoever gets there first: after loading a save, a carer may set
+    /// off for the crib before the baby is put back in it.
+    pub fn slots_for(&self, i: usize) -> std::ops::Range<usize> {
+        let slots = self.slots as usize;
+        if self.interactions[i].baby {
+            0..1
+        } else if self.interactions.iter().any(|it| it.baby) {
+            1.min(slots.saturating_sub(1))..slots
+        } else {
+            0..slots
+        }
+    }
+}
+
 /// Radius of a thing on the `Surface` layer when content gives none (m).
 pub const DEFAULT_RADIUS: f32 = 0.12;
 
