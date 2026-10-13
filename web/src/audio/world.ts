@@ -20,6 +20,8 @@ import { WATER, type Stereo, type WaterKind } from './water';
 import type { WaterReply, WaterRequest } from './water.worker';
 
 const TICK_MS = 100;
+/** Updates come with drawn frames: this long without one (the picture stopped), everything fades out. */
+const STALE_MS = 2000;
 /** Seconds for a loop to fade in or out. */
 const FADE = 0.4;
 /** Seconds a bath runs before the water's turned off and the bather settles in. */
@@ -87,6 +89,9 @@ export class WorldSound {
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
+  /** Faded out for want of updates (until the next one). */
+  private hushed = false;
+  private readonly watchdog = setInterval(() => this.hush(), STALE_MS / 2);
 
   constructor(
     private readonly renderer: Renderer,
@@ -97,6 +102,7 @@ export class WorldSound {
     const now = frame.now;
     if (now - this.lastTick < TICK_MS || this.disposed) return;
     this.lastTick = now;
+    this.hushed = false;
     updateVolumes();
     const ac = audioContext();
     const out = bus('world');
@@ -187,8 +193,19 @@ export class WorldSound {
     return ACTION_SOUNDS[tag];
   }
 
+  /** No updates for a while (drawing stopped): loops would hold their last level, so they fade out (back on the next update). */
+  private hush(): void {
+    if (this.hushed || this.disposed || performance.now() - this.lastTick < STALE_MS) return;
+    const ac = audioContext();
+    if (!ac) return;
+    this.hushed = true;
+    for (const loop of [...this.loops.values(), this.bed, this.crickets]) if (loop) fadeTo(loop.gain, 0, ac.currentTime);
+    this.birds.hush(ac.currentTime);
+  }
+
   dispose(): void {
     this.disposed = true;
+    clearInterval(this.watchdog);
     for (const loop of [...this.loops.values(), this.bed, this.crickets]) {
       if (!loop) continue;
       try {
@@ -542,6 +559,11 @@ class Birds {
         other.next = Math.min(other.next, b.until + 500 + Math.random() * 1500);
       }
     }
+  }
+
+  /** Fades out whoever is singing. */
+  hush(t: number): void {
+    for (const b of this.flock) if (b.out) fadeTo(b.out.gain, 0, t);
   }
 
   dispose(): void {

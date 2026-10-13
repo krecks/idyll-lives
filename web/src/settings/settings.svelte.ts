@@ -64,6 +64,10 @@ export interface Settings {
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
+  /** Every sound, 0..1. */
+  masterVolume: number;
+  /** Silent while another window has focus (sound always stops while the tab is hidden). */
+  muteInBackground: boolean;
   /** Build mode's dock: `compact` keeps one row of the catalog (more of the lot in view), `expanded` shows several. */
   catalogSize: 'compact' | 'expanded';
   /** First-use tips already dismissed (ids from `FirstTip`). */
@@ -105,6 +109,8 @@ export const DEFAULT_SETTINGS: Settings = {
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
+  masterVolume: 1,
+  muteInBackground: true,
   catalogSize: 'compact',
   tipsSeen: [],
 };

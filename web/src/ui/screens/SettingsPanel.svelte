@@ -61,7 +61,7 @@
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
-    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['sound', 'worldSound', 'worldVolume'] },
+    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
     { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
@@ -500,6 +500,10 @@
     {:else if page === 'audio'}
       <section>
         <h3>Sound</h3>
+        <SettingRow title="Master volume" hint="Every sound in the game.">
+          <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Master volume" bind:value={settings.masterVolume} />
+          <output>{percent(settings.masterVolume)}</output>
+        </SettingRow>
         <SettingRow title="Sound effects" hint="Little sounds when you buy, build and place things.">
           <Toggle label="Sound effects" bind:checked={settings.sound} />
         </SettingRow>
@@ -509,6 +513,9 @@
         <SettingRow title="World volume" disabled={!settings.worldSound}>
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="World volume" bind:value={settings.worldVolume} disabled={!settings.worldSound} />
           <output>{percent(settings.worldVolume)}</output>
+        </SettingRow>
+        <SettingRow title="Mute in background" hint="Silent while you're in another window." details="Sound always stops while the game's tab is hidden.">
+          <Toggle label="Mute in background" bind:checked={settings.muteInBackground} />
         </SettingRow>
       </section>
     {:else if page === 'voices'}
