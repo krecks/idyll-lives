@@ -11,9 +11,6 @@
 import '@babylonjs/core/Meshes/thinInstanceMesh';
 // `scene.createPickingRay` (analytic picking in `BabylonRenderer.pick`).
 import '@babylonjs/core/Culling/ray';
-// Multiple render targets, for ambient occlusion's geometry buffer (SSAO2, Ultra quality).
-import '@babylonjs/core/Engines/Extensions/engine.multiRender';
-import '@babylonjs/core/Engines/WebGPU/Extensions/engine.multiRender';
 
 export { Bone } from '@babylonjs/core/Bones/bone';
 export { Skeleton } from '@babylonjs/core/Bones/skeleton';
@@ -69,6 +66,5 @@ export { CreateScreenshotAsync } from '@babylonjs/core/Misc/screenshotTools';
 export type { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 export { PostProcess } from '@babylonjs/core/PostProcesses/postProcess';
 export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';
-export { SSAO2RenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline';
 export { Scene } from '@babylonjs/core/scene';
 export type { Nullable } from '@babylonjs/core/types';

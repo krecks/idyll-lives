@@ -42,7 +42,6 @@ import {
   SceneInstrumentation,
   CreateScreenshotAsync,
   ShadowGenerator,
-  SSAO2RenderingPipeline,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -59,7 +58,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
 import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
-import type { QualitySettings } from '../quality';
+import type { RenderQuality } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
 import type {
@@ -114,7 +113,7 @@ const HIDDEN_Y = -100;
 const PIT_MARGIN = 0.3;
 /** Height of the fence and gate preview while drawing. */
 const FENCE_PREVIEW_HEIGHT = 1.0;
-/** Game minutes between lighting updates (with / without snapshot rendering). */
+/** Game minutes between lighting updates (with / without snapshot rendering; at speed 3 and up and in quiet hours, the quality's `lightingStep`). */
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
 /**
@@ -461,7 +460,7 @@ export class BabylonRenderer implements Renderer {
 
   constructor(
     private readonly deps: RendererDeps,
-    private readonly quality: QualitySettings,
+    private readonly quality: RenderQuality,
   ) {
     const hour = Number(new URLSearchParams(location.search).get('hour'));
     this.fixedHour = Number.isFinite(hour) && new URLSearchParams(location.search).has('hour') ? hour : null;
@@ -505,6 +504,7 @@ export class BabylonRenderer implements Renderer {
     if (this.debug) Object.assign(window, { __scene: scene, __renderer: this });
     // PBR materials and image-based lighting; the environment must exist before materials compile.
     this.lib = MaterialLibrary.for(scene).setAssets(this.deps.assets);
+    this.lib.anisotropy = this.quality.anisotropy;
     // Frozen and thawed materials bind differently; a recording made while some were thawed
     // (lighting changes) goes stale once they refreeze, so record again.
     this.lib.onRefrozen = () => this.resetSnapshot();
@@ -728,7 +728,10 @@ export class BabylonRenderer implements Renderer {
     // Behind the overview the game world waits (nothing of it is drawn).
     if (this.townMode) return;
     const snapshot = this.webgpu?.snapshotRendering ?? false;
-    if (Math.abs(minute - this.lastLightMinute) >= (snapshot ? LIGHT_STEP_SNAPSHOT : LIGHT_STEP)) {
+    const h = layout.header;
+    const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
+    const step = snapshot ? LIGHT_STEP_SNAPSHOT : fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
+    if (Math.abs(minute - this.lastLightMinute) >= step) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
       this.resetSnapshot();
@@ -2273,19 +2276,6 @@ export class BabylonRenderer implements Renderer {
 
   private setupPostProcessing(): void {
     const q = this.quality;
-    if (q.ambientOcclusion) {
-      try {
-        const ssao = new SSAO2RenderingPipeline('ssao', this.scene, { ssaoRatio: 0.5, blurRatio: 1 }, [this.camera], true);
-        ssao.radius = 1.0;
-        ssao.totalStrength = 0.7;
-        ssao.samples = 16;
-        ssao.maxZ = 120;
-        ssao.expensiveBlur = true;
-      } catch (err) {
-        console.warn('[render] ambient occlusion unavailable', err);
-      }
-    }
-
     const post = (this.post = new DefaultRenderingPipeline('post', true, this.scene, [this.camera]));
     const aa = !this.diag.has('noaa');
     post.samples = aa ? q.msaaSamples : 1;

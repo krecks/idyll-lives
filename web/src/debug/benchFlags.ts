@@ -14,7 +14,7 @@ export type BenchDiag = (typeof BENCH_DIAGS)[number];
 export interface BenchFlags {
   /** `public/bench/<scene>.json`: the game state to play. */
   scene: string;
-  /** `?quality=` (today's presets in `render/quality.ts`; the renderer reads it itself). */
+  /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
   hour: number | null;

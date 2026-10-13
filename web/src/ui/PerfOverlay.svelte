@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { graphicsPreset, settings } from '../settings/settings.svelte';
+  import { settings } from '../settings/settings.svelte';
   import { saveDebugReport } from './debugReport';
   import { game } from './state.svelte';
 
@@ -17,7 +17,7 @@
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const mb = (bytes: number) => `${(bytes / 2 ** 20).toFixed(0)} MB`;
   /** The graphics preset (`?quality=` overrides it for testing). */
-  const preset = $derived(new URLSearchParams(location.search).get('quality') ?? graphicsPreset(settings));
+  const preset = $derived(new URLSearchParams(location.search).get('quality') ?? settings.graphics);
 </script>
 
 {#if game.perfOpen}

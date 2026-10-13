@@ -430,6 +430,8 @@ export class MaterialLibrary {
   private readonly thawed = new Set<PBRMaterial>();
   private refreezeFrames = 0;
   private shadowMaterial: StandardMaterial | null = null;
+  /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
+  anisotropy = 8;
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
   /** The ground dug away over a basement in view (see `digInto`). */
@@ -668,7 +670,7 @@ export class MaterialLibrary {
     if (!tex) {
       tex = textureWithFallback(url, this.scene, srgb);
       tex.uScale = tex.vScale = scale;
-      tex.anisotropicFilteringLevel = 8;
+      tex.anisotropicFilteringLevel = this.anisotropy;
       this.textures.set(id, tex);
     }
     return tex;

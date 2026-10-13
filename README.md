@@ -68,7 +68,7 @@ pnpm dev          # builds the WASM module, then starts Vite on http://localhost
 | F3 | Performance overlay (with *Save debug report*) |
 | F8 | Save a debug report: screenshot, game state and recent errors. With `pnpm dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file. |
 
-URL options: `?quality=low|medium|high|ultra`, `?renderer=webgl`, `?snapshot=0`, `?seed=42`, `?lot=starter`, `?pack=packs/my-art/manifest.json`.
+URL options: `?quality=low|medium|high`, `?renderer=webgl`, `?snapshot=0`, `?seed=42`, `?lot=starter`, `?pack=packs/my-art/manifest.json`.
 
 ## Architecture
 
