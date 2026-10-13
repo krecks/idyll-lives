@@ -2959,7 +2959,7 @@ impl Content {
             market: match &cr.market {
                 None => None,
                 Some(m) => Some(JobMarket {
-                    hour: m.hour.unwrap_or(9.5),
+                    hour: m.hour.unwrap_or(9.5).clamp(0.0, 23.9),
                     daily_chance: m.daily_chance.unwrap_or(0.35).clamp(0.0, 1.0),
                     quit_below: m.quit_below.unwrap_or(0.3),
                     quit_chance: m.quit_chance.unwrap_or(0.15).clamp(0.0, 1.0),
@@ -3074,7 +3074,7 @@ impl Content {
             .map(|r| {
                 Ok::<_, Error>(RentRules {
                     weekday: r.weekday.min(6),
-                    hour: r.hour,
+                    hour: r.hour.clamp(0.0, 23.9),
                     base: r.base,
                     per_tile: r.per_tile,
                     bills_base: r.bills_base,
@@ -3716,6 +3716,24 @@ mod tests {
         assert!(c.validate_identity("female", &["male".into()]).is_ok());
         assert!(c.validate_identity("robot", &[]).is_err());
         assert!(c.validate_identity("male", &["robot".into()]).is_err());
+    }
+
+    /// Once-a-day times are kept within the day, like moving's and newcomers': rent, the job
+    /// market and the planner's review at hour 24 or later would never come round.
+    #[test]
+    fn once_a_day_hours_stay_within_the_day() {
+        use serde_json::json;
+        let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        c["economy"] = json!({"rent": {"hour": 24, "base": 100}});
+        c["careerRules"] = json!({"market": {"hour": 30}});
+        c["planner"] = json!({"reviewHour": -1});
+        let c = Content::from_json(&c.to_string()).unwrap();
+        let hours = [c.rent.as_ref().unwrap().hour, c.career_rules.market.as_ref().unwrap().hour, c.planner.review_hour];
+        assert_eq!(hours, [23.9, 23.9, 0.0]);
+        for h in hours {
+            let t = crate::clock::tick_at(3, h * 60.0).unwrap();
+            assert!(crate::clock::at_minute(t, h * 60.0) && crate::clock::day(t) == 3, "hour {h} comes on day 3");
+        }
     }
 
     /// Content that would break the game is refused, saying what's wrong: walking speeds,

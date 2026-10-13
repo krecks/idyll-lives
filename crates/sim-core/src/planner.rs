@@ -281,7 +281,7 @@ pub(crate) fn parse(
         kept_feeling: feeling(&planner.kept_feeling, "planner")?,
         no_place_feeling: feeling(&planner.no_place_feeling, "planner")?,
         goal_feeling: feeling(&planner.goal_feeling, "planner")?,
-        review_hour: planner.review_hour.unwrap_or(d.review_hour),
+        review_hour: planner.review_hour.unwrap_or(d.review_hour).clamp(0.0, 23.9),
         max_goals: planner.max_goals.unwrap_or(d.max_goals),
         max_suggestions: planner.max_suggestions.unwrap_or(d.max_suggestions),
         goal_falloff: planner.goal_falloff.unwrap_or(d.goal_falloff).max(0.0),
