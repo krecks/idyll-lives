@@ -4439,7 +4439,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
 }
 
 /// Whether partners `a` and `b` could have a baby now: at home together, grown-ups young enough,
-/// none on the way, and room for one more.
+/// none on the way, and room for one more (in the home and in the town).
 fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
     let Some(rules) = ctx.content.life.pregnancy else { return false };
     let (x, y) = (&ctx.briefs[a], &ctx.briefs[b]);
@@ -4448,6 +4448,7 @@ fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
     let members = ctx.briefs.iter().filter(|s| s.here && s.household as usize == h).count();
     fits(x) && fits(y) && y.household == x.household && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
+        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
 }
 
 #[cfg(test)]

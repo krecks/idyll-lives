@@ -773,3 +773,48 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
         }
     }
 }
+
+/// A town as full as it gets (`MAX_SIMS`): partners don't keep trying for a baby that can't come.
+#[test]
+fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
+    let content = r#"{
+        "needs":[{"id":"social","label":"Social","decayPerHour":0.5}],
+        "objects":[],
+        "genders":[{"id":"female","label":"Female"},{"id":"male","label":"Male"}],
+        "tags":["romantic"],
+        "socials":[{"id":"tryForBaby","label":"Try for a baby","minutes":30,"tags":["romantic"],"prefer":"romance",
+                    "requires":{"partners":true},"acceptance":{"base":1.0},"needs":{"social":0.5},"success":{"effect":"conceive"}}],
+        "socialRules":{"romanticTags":["romantic"]},
+        "life":{"daysPerYear":2,"stages":[{"id":"baby","label":"Baby","from":0,"baby":true},{"id":"adult","label":"Adult","from":18}],
+            "pregnancy":{"chance":1.0,"days":2,"maxAge":50}},
+        "bondPresets":{"partners":{"friendship":55,"romance":75,"partners":true}}}"#;
+    let town = |people: usize| {
+        let mut sims = vec![
+            r#"{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30,"gender":"female"}"#.to_string(),
+            r#"{"name":"Ben","household":0,"x":5.5,"z":8.5,"age":32,"gender":"male"}"#.to_string(),
+        ];
+        sims.extend((2..people).map(|i| format!(r#"{{"name":"Old {i}","household":1,"x":{}.5,"z":20.5,"age":90}}"#, i % 12)));
+        format!(
+            r#"{{"width":12,"depth":24,
+            "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}},{{"name":"Home for the elderly","x":0,"z":12,"w":12,"d":12,"entry":[5.5,23.5]}}],
+            "households":[{{"name":"Moss","plot":0}},{{"name":"Elders","plot":1}}],
+            "objects":[],"sims":[{}],"relationships":[{{"a":0,"b":1,"preset":"partners"}}]}}"#,
+            sims.join(",")
+        )
+    };
+    let tries = |people: usize| {
+        let mut w = World::from_json(content, &town(people), 1).unwrap();
+        assert_eq!(w.sims.len(), people);
+        let mut tries = 0;
+        let mut was = false;
+        for _ in 0..6 * 60 {
+            minutes(&mut w, 1);
+            let now = matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Social { social: 0, .. }));
+            tries += (now && !was) as u32;
+            was = now;
+        }
+        tries
+    };
+    assert!(tries(sim_core::world::MAX_SIMS - 1) > 0, "with room in town they do");
+    assert_eq!(tries(sim_core::world::MAX_SIMS), 0, "in a full town they don't");
+}
