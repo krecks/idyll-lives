@@ -4,6 +4,7 @@ import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 // SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
 // CPU) requires cross-origin isolation. Where production hosting can't send these two headers
@@ -13,9 +14,20 @@ const crossOriginIsolation = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
 
-/** Where debug reports from the game land (dev server only): `<repo>/debug-reports/<name>/`. */
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
+/** The commit the game is built from, shown next to the version (Credits, bug reports): CI's, else git's HEAD. */
+function commit(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+const COMMIT = commit();
+
+/** Where debug reports from the game land (dev server only): `<repo>/debug-reports/<name>/`. */
 const REPORTS = fileURLToPath(new URL('../debug-reports', import.meta.url));
 /** Game states written by the simulation's tests (`DUMP_STATES=1 cargo test`): `<repo>/debug-states/<name>.json`. */
 const STATES = fileURLToPath(new URL('../debug-states', import.meta.url));
@@ -115,7 +127,7 @@ function optimizedAssets(): Plugin {
 export default defineConfig({
   plugins: [svelte(), debugReports(), optimizedAssets()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT) },
   server: { headers: crossOriginIsolation },
   preview: { headers: crossOriginIsolation },
   worker: { format: 'es' },

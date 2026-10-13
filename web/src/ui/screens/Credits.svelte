@@ -1,6 +1,7 @@
 <script lang="ts">
   /** Static credits and licences. */
   const version = __APP_VERSION__;
+  const commit = __APP_COMMIT__;
 </script>
 
 <div class="credits">
@@ -19,7 +20,7 @@
     <dt>Licence</dt>
     <dd>Free software under the GNU General Public License v3.0 (or later): you may use, study, share and modify it; if you distribute it or a modified version, you must make the source available under the same licence. Third-party art keeps its own licence (CC0).</dd>
   </dl>
-  <p class="small">Version {version}</p>
+  <p class="small">Version {version} (build {commit})</p>
 </div>
 
 <style>
