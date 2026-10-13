@@ -103,7 +103,7 @@
         {#each needs as need, i (need.id)}
           <div class="need" title="{need.label}: {Math.round(sim.needs[i] * 100)}%">
             <span class="need-label"><Icon name={need.icon} size={13} /><span>{need.label}</span></span>
-            <span class="need-bar"><span style="width:{sim.needs[i] * 100}%;background:{needColor(sim.needs[i])}"></span></span>
+            <span class="need-bar"><span style="transform:translateX({(sim.needs[i] - 1) * 100}%);background:{needColor(sim.needs[i])}"></span></span>
           </div>
         {/each}
       </div>
@@ -137,7 +137,7 @@
                 {action.label}{#if action.target !== null}<span class="with"> · {info(action.target)?.name}</span>{/if}
               </span>
               {#if action.active}
-                <span class="progress"><span style="width:{action.progress * 100}%"></span></span>
+                <span class="progress"><span style="transform:scaleX({action.progress})"></span></span>
               {/if}
               {#if mine}
                 <button class="cancel" aria-label="Cancel {action.label}" onclick={() => services.controls.cancelAction(i)}>
@@ -283,11 +283,14 @@
     background: var(--hairline);
     overflow: hidden;
   }
+  /* Bars move by transform, which the compositor animates (a width transition would lay out and
+     repaint every frame). A need bar slides in from the left, so its rounded end stays round. */
   .need-bar span {
     display: block;
     height: 100%;
     border-radius: inherit;
-    transition: width var(--slow) linear, background var(--slow) var(--ease);
+    will-change: transform;
+    transition: transform var(--slow) linear, background var(--slow) var(--ease);
   }
   .plan {
     display: grid;
@@ -477,7 +480,9 @@
     display: block;
     height: 100%;
     background: var(--accent);
-    transition: width var(--slow) linear;
+    transform-origin: left;
+    will-change: transform;
+    transition: transform var(--slow) linear;
   }
   .cancel {
     display: grid;
