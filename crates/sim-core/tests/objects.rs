@@ -198,3 +198,55 @@ fn a_repeated_rotate_does_not_move_another_object() {
     let lamp_now = w.objects.iter().find(|o| w.content.objects[o.def].id == "lamp").unwrap();
     assert_eq!((lamp_now.x, lamp_now.z), (11, 11), "the lamp (id {lamp} before) stays where it was");
 }
+
+/// Ada's home and her friend Bo's next door (a fridge each, and a shower at Bo's).
+const STREET: &str = r#"{"width":32,"depth":16,
+    "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":14,"entry":[8.5,13.5]},
+             {"name":"Bo's","x":16,"z":0,"w":16,"d":14,"entry":[24.5,13.5]}],
+    "households":[{"name":"Player","plot":0,"player":true,"funds":100000},{"name":"Bo","plot":1}],
+    "objects":[{"def":"fridge","x":3,"z":3},{"def":"fridge","x":20,"z":3},{"def":"shower","x":28,"z":3}],
+    "sims":[{"name":"Ada","household":0,"x":8.5,"z":8.5,"traits":["bookworm"]},{"name":"Bo","household":1,"x":24.5,"z":8.5,"traits":["bookworm"]}],
+    "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
+
+fn street() -> World {
+    let mut w = World::from_json(&common::content(), STREET, 1).unwrap();
+    w.autonomy = false;
+    w
+}
+
+/// R2-09 (owner: block it). The player can't send a resident to use another household's things,
+/// only their own home's, public places' and, as a guest, what guests may.
+#[test]
+fn the_neighbours_things_arent_yours_to_use() {
+    let mut w = street();
+    let (home_fridge, bos_fridge, bos_shower) = (0, 1, 2);
+    let snack = interaction(&w, bos_fridge, "snack");
+    let err = w.apply(Command::Use { sim: 0, object: bos_fridge, interaction: snack }).unwrap_err();
+    assert_eq!(err.to_string(), "the fridge isn't Ada's to use");
+    w.apply(Command::Use { sim: 0, object: home_fridge, interaction: snack }).unwrap();
+    // On her way to Bo's: a guest may have a snack, not a shower.
+    let mut w = street();
+    w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
+    w.apply(Command::Use { sim: 0, object: bos_fridge, interaction: snack }).unwrap();
+    let shower = interaction(&w, bos_shower, "shower");
+    let err = w.apply(Command::Use { sim: 0, object: bos_shower, interaction: shower }).unwrap_err();
+    assert_eq!(err.to_string(), "Ada is a guest there, and guests don't take a shower");
+}
+
+/// R2-09, checked again when the order comes up: Ada's snack at Bo's was fine on her way there,
+/// but the visit was called off, so she doesn't go over for it.
+#[test]
+fn a_guests_order_goes_when_the_visit_does() {
+    let mut w = street();
+    let bos_fridge = 1;
+    let snack = interaction(&w, bos_fridge, "snack");
+    w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
+    w.apply(Command::Use { sim: 0, object: bos_fridge, interaction: snack }).unwrap();
+    w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
+    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let at_bos = w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == bos_fridge));
+        assert!(!at_bos, "Ada set off for Bo's fridge");
+    }
+    assert!(w.sims[0].queue().next().is_none(), "the order was dropped");
+}

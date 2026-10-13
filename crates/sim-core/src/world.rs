@@ -2306,7 +2306,26 @@ impl World {
                         self.content.objects[obj.def].name.to_lowercase()
                     )));
                 }
-                let household = self.sim(sim)?.household as usize;
+                // Only their own home's things and public places', and what guests may use where
+                // they're a guest (or on their way to be one).
+                let s = self.sim(sim)?;
+                let plot = self.object_plot.get(object as usize).copied().flatten();
+                let visiting = |p: u32| {
+                    let visit = |t: &Task| matches!(t.kind, TaskKind::Visit { plot } if plot == p);
+                    s.current.as_ref().is_some_and(|a| visit(&a.task)) || s.queue.iter().any(visit)
+                };
+                let allowed = match order_access(&self.households, &self.plots, s, plot) {
+                    Access::None if plot.is_some_and(visiting) => Access::Guest,
+                    a => a,
+                };
+                let thing = self.content.objects[obj.def].name.to_lowercase();
+                if allowed == Access::None {
+                    return Err(Error::new(format!("the {thing} isn't {}'s to use", s.name)));
+                }
+                if allowed == Access::Guest && !guest_may(&self.content, inter) {
+                    return Err(Error::new(format!("{} is a guest there, and guests don't {}", s.name, inter.label.to_lowercase())));
+                }
+                let household = s.household as usize;
                 if !affordable(inter.cost, self.households[household].funds) {
                     return Err(Error::new(format!(
                         "not enough money: {} costs {}",
@@ -2855,7 +2874,30 @@ pub(crate) enum Access {
 }
 
 pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
-    let home = ctx.households[sim.household as usize].plot;
+    access_in(ctx.households, ctx.plots, sim, plot)
+}
+
+/// Whether a guest may use `inter` at the host's: nothing private (sleeping, washing; the
+/// toilet is fine), no cooking and no caring for the host's baby.
+pub(crate) fn guest_may(content: &Content, inter: &crate::content::Interaction) -> bool {
+    let rules = &content.social_rules;
+    inter.tags & rules.busy_tags & !rules.guest_tags == 0 && inter.recipe.is_none() && !inter.cares()
+}
+
+/// What the player may have `sim` use on `plot`: as `access`, but their own home and public
+/// places stay theirs to use while they're a guest somewhere.
+pub(crate) fn order_access(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
+    let home = households[sim.household as usize].plot;
+    match plot {
+        None => Access::Full,
+        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        _ => access_in(households, plots, sim, plot),
+    }
+}
+
+/// `access` outside a step.
+pub(crate) fn access_in(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
+    let home = households[sim.household as usize].plot;
     // A guest stays at the host's place until it's time to go home.
     if let Some(visit) = sim.visiting {
         return if plot == Some(visit.plot) {
@@ -2866,7 +2908,7 @@ pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
     }
     match plot {
         None => Access::Full,
-        Some(p) if ctx.plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
         Some(p) if sim.visiting.is_some_and(|v| v.plot == p) => Access::Guest,
         Some(_) => Access::None,
     }
@@ -3403,6 +3445,13 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             };
             if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
+                return;
+            }
+            // Never other people's things; what the player asks a guest to do, only what guests
+            // may (washing hands at the host's sink after the toilet is fine).
+            let plot = ctx.object_plot.get(object as usize).copied().flatten();
+            let allowed = if task.directed { order_access(ctx.households, ctx.plots, sim, plot) } else { access(ctx, sim, plot) };
+            if allowed == Access::None || (allowed == Access::Guest && task.directed && !guest_may(content, inter)) {
                 return;
             }
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {

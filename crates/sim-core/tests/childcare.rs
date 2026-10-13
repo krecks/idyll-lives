@@ -378,8 +378,8 @@ fn with_a_grandparent_at_home_the_last_parent_goes_to_the_park_without_a_babysit
 // ---- Two grown-ups sent out ---------------------------------------------------------------
 //
 // Ada and Dan at home with Cleo: once one of them is on their way out (a visit, the park, a
-// neighbour's fridge, a chat with Bo at his, a walk down the street, meeting up with Bo), the
-// other is the last one home.
+// chat with Bo at his, a walk down the street, meeting up with Bo), the other is the last one
+// home.
 
 const DAN: &str = r#",{"name":"Dan","household":0,"x":6.5,"z":8.5,"age":33}"#;
 
@@ -419,10 +419,10 @@ fn without_money_two_quick_orders_out_leave_someone_home() {
 #[test]
 fn any_order_off_the_lot_counts_as_leaving() {
     let refused = |err: sim_core::Error| assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
-    // Bo's fridge, a chat with Bo at his, a walk down the street, asking Bo on the phone to
-    // come over to his.
+    // The bench in the park, a chat with Bo at his, a walk down the street, asking Bo on the
+    // phone to come over to his. (Bo's fridge isn't Ada's to use.)
     let orders = [
-        Command::Use { sim: 0, object: 4, interaction: 0 },
+        Command::Use { sim: 0, object: 3, interaction: 0 },
         Command::Social { sim: 0, target: 2, social: 0 },
         Command::MoveTo { sim: 0, x: 30.5, z: 11.0 },
         Command::Phone { sim: 0, action: 0, contact: Some(2) },
