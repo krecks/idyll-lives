@@ -88,12 +88,14 @@ function patched(old: SimView | undefined, patch: SimPatch): SimView {
   if (fields.pension === null) delete sim.pension;
   if (fields.grade === null) delete sim.grade;
   if (fields.phone === null) delete sim.phone;
+  if (fields.homebound === null) delete sim.homebound;
   if (plan === null) delete sim.plan;
   else if (plan) sim.plan = { ...sim.plan, ...plan } as PlanView;
   if (patch.detail === false) {
     Object.assign(sim, NO_DETAILS);
     delete sim.grade;
     delete sim.phone;
+    delete sim.homebound;
     delete sim.plan;
   }
   return sim;
