@@ -608,7 +608,7 @@ impl World {
                 self.lot.set_floor((tx + dx) as u16, (tz + dz) as u16, c);
             }
             self.lot.compute_rooms();
-            self.structure_version += 1;
+            self.structure_version = self.structure_version.wrapping_add(1);
             self.refresh_rooms();
             // Everything else first, then what stands on tops.
             let on_top = |o: &&ObjectInstance| self.content.objects[o.def].layer == Layer::Surface;

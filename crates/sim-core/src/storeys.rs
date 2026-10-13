@@ -80,8 +80,8 @@ impl World {
         self.storeys = want;
         self.stairs.depth = depth as i32;
         self.refresh_stairs();
-        self.lot_version += 1;
-        self.structure_version += 1;
+        self.lot_version = self.lot_version.wrapping_add(1);
+        self.structure_version = self.structure_version.wrapping_add(1);
     }
 
     /// Rebuilds the stairs list from the stair objects (after objects come or go).

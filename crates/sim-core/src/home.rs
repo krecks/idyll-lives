@@ -123,7 +123,7 @@ impl World {
         let h = before.household;
         let lot_changed = before.lot != self.lot;
         if lot_changed {
-            self.lot_version += 1;
+            self.lot_version = self.lot_version.wrapping_add(1);
         }
         let changed = before.households[h].funds != self.households[h].funds
             || before.households[h].style != self.households[h].style
@@ -208,7 +208,7 @@ impl World {
 
     pub(crate) fn restore(&mut self, s: HomeSnapshot) {
         if s.lot != self.lot {
-            self.lot_version += 1;
+            self.lot_version = self.lot_version.wrapping_add(1);
         }
         self.lot = s.lot;
         self.objects = s.objects;
@@ -218,11 +218,11 @@ impl World {
         self.households = s.households;
         self.plots = s.plots;
         // (Bumped past both, so views send them again.)
-        let version = self.items.version.max(s.items.version) + 1;
+        let version = self.items.version.max(s.items.version).wrapping_add(1);
         self.items = s.items;
         self.items.version = version;
         self.refresh_stairs();
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
     }
 
     /// The roof over the household's home: a style and a colour (free; only for looks).
@@ -233,7 +233,7 @@ impl World {
             return Err(Error::new("unknown roof style or colour"));
         }
         self.plots[plot as usize].roof = Some(crate::world::RoofLook { style, color });
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -790,7 +790,7 @@ impl World {
     pub fn restyle(&mut self, household: u32, object: u32, style: u8) -> Result<(), Error> {
         self.home_object(household, object)?;
         self.objects[object as usize].style = self.check_style(style)?;
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -808,7 +808,7 @@ impl World {
         self.can_pay(h, cost, || format!("not enough money to repair the {name}"))?;
         self.pay(h, cost);
         self.objects[object as usize].wear = 0.0;
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -835,7 +835,7 @@ impl World {
         obj.quality += 1;
         obj.value += cost;
         let quality = obj.quality;
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         // Told about the household's first resident (nobody may live there yet).
         if let Some(member) = self.sims.iter().position(|s| s.here() && s.household as usize == h) {
             self.events.push_detail(
@@ -1058,7 +1058,7 @@ impl World {
             return Err(e);
         }
         self.pay(h, cost);
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -1111,7 +1111,7 @@ impl World {
             self.lot.set_look(at, look);
         }
         self.pay(h, cost);
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -1151,7 +1151,7 @@ impl World {
             self.lot.set_floor(x, z, covering);
         }
         self.pay(h, cost);
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
 
@@ -1254,7 +1254,7 @@ impl World {
         if self.content.objects[obj.def].stairs {
             self.refresh_stairs();
         }
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         obj
     }
 }

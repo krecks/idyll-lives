@@ -1644,7 +1644,7 @@ fn update(w: &mut World) {
     }
     w.items.list = keep;
     if changed {
-        w.items.version += 1;
+        w.items.version = w.items.version.wrapping_add(1);
     }
 }
 
@@ -1697,7 +1697,7 @@ impl World {
             moved = true;
         }
         if moved {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 
@@ -1721,7 +1721,7 @@ impl World {
             }
         }
         if moved {
-            self.items.version += 1;
+            self.items.version = self.items.version.wrapping_add(1);
         }
     }
 }

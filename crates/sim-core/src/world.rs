@@ -1338,7 +1338,7 @@ impl World {
         if stairs {
             self.refresh_stairs();
         }
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         Ok(self.objects.len() as u32 - 1)
     }
 
@@ -1488,7 +1488,7 @@ impl World {
             self.retire_slot(slot);
             self.sims[slot] = sim;
             self.relationships.clear(slot);
-            self.generations[slot] += 1;
+            self.generations[slot] = self.generations[slot].wrapping_add(1);
         } else {
             self.sims.push(sim);
             self.relationships.grow(self.sims.len());
@@ -1559,7 +1559,7 @@ impl World {
             }
         }
         self.relationships.clear(i);
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
     }
 
     /// A resident's own modifiers: traits and perks, and what their life stage does (then the
@@ -1643,7 +1643,7 @@ impl World {
         if let Some(name) = name.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
             self.households[h].name = name.to_string();
         }
-        self.structure_version += 1;
+        self.structure_version = self.structure_version.wrapping_add(1);
         self.events
             .push_detail(self.tick, social::EventKind::MovedIn, first, None, None);
         Ok(())
@@ -1779,7 +1779,7 @@ impl World {
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
-                self.structure_version += 1;
+                self.structure_version = self.structure_version.wrapping_add(1);
                 let (kind, n) = match news {
                     News::Broke(o) => (social::EventKind::Broke, self.objects[o as usize].def as i64),
                     News::Repaired(o) => (social::EventKind::Repaired, self.objects[o as usize].def as i64),
@@ -2853,7 +2853,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         } else if let Some(task) = sim.queue.pop_front() {
             start_task(sim, task, ctx, objects, items);
         } else {
-            sim.idle_ticks += sim.steps;
+            sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
             // Babies don't choose anything: they lie in a crib and are cared for.
             if content.life.baby(sim.age) {
                 if let Some(task) = crib_for(sim, ctx, objects) {
