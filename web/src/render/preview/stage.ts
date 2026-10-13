@@ -145,7 +145,7 @@ export class StageController implements SimStage {
     }
     this.studio.characters.directions[ROW] = row ? dir : null;
 
-    this.frame();
+    this.frame(dt);
   }
 
   /** Draws the stage (after posing). */
@@ -180,9 +180,10 @@ export class StageController implements SimStage {
    * Framing: the full body above the name card, or the face; in between, the target and the
    * distance blend (distance in log space, so zooming feels even).
    */
-  private frame(): void {
+  private frame(dt: number): void {
     const heads = this.studio.characters.heads;
-    if (this.studio.characters.visible[ROW]) this.headTop += (heads[ROW * 3 + 1] - this.headTop) * 0.2;
+    // (As quickly at any frame rate: about a fifth of the way per 60th of a second.)
+    if (this.studio.characters.visible[ROW]) this.headTop += (heads[ROW * 3 + 1] - this.headTop) * (1 - Math.exp(-dt * 12));
     const top = this.headTop + 0.06;
     const engine = this.studio.engine;
     const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());

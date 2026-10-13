@@ -1804,7 +1804,7 @@ export class Characters {
       const carry = item ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
 
       // Activity → clip.
-      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry);
+      this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry, dt);
       rig.lastPose = pose;
 
       // Advance and blend.
@@ -1949,6 +1949,8 @@ export class Characters {
     tag: string,
     /** The upper-body clip for what the Sim carries ('' = nothing). */
     carry: string,
+    /** Seconds since the last frame (0 while paused). */
+    dt: number,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
     const set = this.set!;
@@ -2191,7 +2193,8 @@ export class Characters {
       const t = rig.cur.key === 'standUp' ? rig.cur.time / rig.cur.clip!.duration : 0;
       rootFwd = edge * (1 - smooth(clamp((t - 0.3) / 0.6, 0, 1)));
     }
-    rig.hands += (hands - rig.hands) * Math.min(1, step * 5 + 0.02);
+    // (A little quicker at slow game speeds than the animation; still while paused.)
+    rig.hands += (hands - rig.hands) * (1 - Math.exp(-(step * 5 + dt * 1.2)));
 
     // Sequenced object use: the next clip when a one-shot ends, or after LOOP_STEP for loops.
     const cur = rig.cur;
