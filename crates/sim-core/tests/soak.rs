@@ -474,11 +474,17 @@ fn busy(days: u32, seed: u64) {
     long.watch = common::Watch::new().routing_hours(6.0);
     let end = clock::tick_at(days + 1, 0.0).unwrap();
     let mut reloads: Vec<u64> = [days / 3, 2 * days / 3].iter().map(|&d| clock::tick_at(d, 13.0 * 60.0 + 37.0).unwrap()).collect();
+    // Game hours in which partners somewhere could have had a baby, and the last one looked at.
+    let (mut chances, mut hour) = (0u32, w.tick / common::TICKS_PER_HOUR);
     let started = std::time::Instant::now();
     let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         while w.tick < end {
             w.advance();
             long.after(&w);
+            if w.tick / common::TICKS_PER_HOUR > hour {
+                hour = w.tick / common::TICKS_PER_HOUR;
+                chances += u32::from(room_for_a_baby(&w));
+            }
             if w.tick >= player.next {
                 // (Checked on the hour, after a tick: some of what an order changes settles
                 // on the next one, like putting down what someone holds.)
@@ -510,6 +516,7 @@ fn busy(days: u32, seed: u64) {
     );
     eprintln!("{label}: commands (tried, done) {:?}", player.tried);
     eprintln!("{label}: story {:?}", long.story);
+    eprintln!("{label}: {chances} hours in which partners could have had a baby");
     for s in &player.stale {
         eprintln!("{label}: stale: {s}");
     }
@@ -524,9 +531,36 @@ fn busy(days: u32, seed: u64) {
     }
     assert!(player.stale.is_empty(), "{} times a resident's next thing or current use named another kind of thing after an edit", player.stale.len());
     long.assert_ok();
-    for kind in ["Born", "Died", "PaidRent"] {
+    for kind in ["Died", "PaidRent"] {
         assert!(long.told(kind), "nobody {kind}: {:?}", long.story);
     }
+    // A baby only comes to partners young enough with room for one more at home, in a town
+    // that isn't full. This town starts full (64), and the 60-day run stays full until day 49,
+    // by when every couple is past content `pregnancy.maxAge` (50): no baby can come. So a
+    // birth is asked for only where partners had the chance for days.
+    if chances >= CHANCE_HOURS {
+        assert!(long.told("Born"), "nobody Born in {chances} hours partners could have had a baby: {:?}", long.story);
+    }
+}
+
+/// Game hours (in all) of partners able to have a baby after which a run must have had one.
+const CHANCE_HOURS: u32 = 5 * 24;
+
+/// Whether partners somewhere could have a baby now (as `could_conceive` in world.rs): two
+/// grown-ups no older than content `pregnancy.maxAge`, in one household with none on the way
+/// and room for one more, in a town that isn't full (`MAX_SIMS`).
+fn room_for_a_baby(w: &World) -> bool {
+    let Some(rules) = w.content.life.pregnancy else { return false };
+    if w.sims.iter().filter(|s| s.here()).count() >= sim_core::world::MAX_SIMS {
+        return false;
+    }
+    let fits = |s: &sim_core::world::Sim| s.here() && s.adult(&w.content) && s.age <= rules.max_age;
+    w.sims.iter().enumerate().filter(|(_, s)| fits(s)).any(|(a, s)| {
+        let members = w.sims.iter().filter(|o| o.here() && o.household == s.household).count();
+        w.households[s.household as usize].expecting.is_none()
+            && members < w.content.rules.max_household
+            && w.sims.iter().enumerate().any(|(b, o)| b != a && fits(o) && o.household == s.household && w.relationships.get(a, b).partners)
+    })
 }
 
 #[test]
