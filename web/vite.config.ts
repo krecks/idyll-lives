@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -130,8 +130,40 @@ function optimizedAssets(): Plugin {
   };
 }
 
+/**
+ * The release WebAssembly: once the build has written the simulation's and the voice's wasm, they
+ * are optimised and stripped by binaryen's wasm-opt (tools/release/wasm-opt.mjs: -O3, no name or
+ * producers sections; about a minute the first time, then cached). The dev server, and
+ * `npm run wasm` behind it, keep them as built.
+ */
+function releaseWasm(): Plugin {
+  let outDir = '';
+  let log: (line: string) => void = () => {};
+  return {
+    name: 'release-wasm',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      log = (line) => config.logger.info(line, { timestamp: true });
+    },
+    async closeBundle() {
+      const tool = await import(new URL('../tools/release/wasm-opt.mjs', import.meta.url).href);
+      const dir = join(outDir, 'assets');
+      const files = (await readdir(dir)).filter((f) => /^(sim|voice)_wasm_bg-[\w-]+\.wasm$/.test(f));
+      if (!files.some((f) => f.startsWith('sim_'))) throw new Error(`release-wasm: no sim_wasm_bg-*.wasm in ${dir}`);
+      await Promise.all(
+        files.map(async (f) => {
+          const start = performance.now();
+          const { before, after, cached } = await tool.optimizeWasm(join(dir, f));
+          log(`wasm-opt ${f}: ${before} -> ${after} bytes${cached ? ' (cached)' : `, ${((performance.now() - start) / 1000).toFixed(0)} s`}`);
+        }),
+      );
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [svelte(), debugReports(), optimizedAssets()],
+  plugins: [svelte(), debugReports(), optimizedAssets(), releaseWasm()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },
