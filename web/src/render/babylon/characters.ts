@@ -111,6 +111,15 @@ const GAME_RATE = [0, 1, 3, 10, 30, 60];
 const QUIET_SPEED = 4;
 /** Larger jumps between frames snap instead of sliding. */
 const SNAP_DISTANCE = 1.6;
+/**
+ * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
+ * a step covers metres; cutting corners of their path is the price): metres walked per tick
+ * (`world::WALK_SPEED`), the fastest walkers' trait and perk factors (1.15 x 1.2 in the base game,
+ * with room for packs) and some slack. Further than that, or not walking in both, is a jump.
+ */
+const WALK_PER_TICK = 0.075;
+const WALK_FASTEST = 1.5;
+const WALK_SLACK = 1.2;
 const DEFAULT_FADE = 0.25;
 
 /** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
@@ -1617,6 +1626,10 @@ export class Characters {
     const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
     const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
     const gameRate = GAME_RATE[gameSpeed] ?? 1;
+    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them).
+    const prevSpeed = prev[layout.header.speed] | 0;
+    const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
+    const reach = Math.max(SNAP_DISTANCE, WALK_PER_TICK * WALK_FASTEST * WALK_SLACK * Math.max(gameRate, GAME_RATE[prevGameSpeed] ?? 1) * frame.steps);
     const animRate = this.debugRate ?? Math.min(gameRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
@@ -1672,7 +1685,8 @@ export class Characters {
       let tz = cz;
       let th = ch;
       let tyaw = curr[o + k.yaw];
-      if (Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
+      const walking = curr[o + k.moving] > 0 && prev[o + k.moving] > 0;
+      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
         tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
         tz = pz + (cz - pz) * alpha;
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
