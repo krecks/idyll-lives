@@ -101,7 +101,7 @@ Production builds ship compressed copies of the assets above (KTX2 textures, mes
 
 | File(s) | What | Source | Authors | Licence |
 |---|---|---|---|---|
-| `babylon.ktx2Decoder.js`, `ktx2Transcoders/1/uastc_*.wasm` | KTX2 texture decoder and UASTC transcoders | Babylon.js 9.29.0 (cdn.babylonjs.com) | Babylon.js contributors | Apache-2.0 |
+| `babylon.ktx2Decoder.js`, `ktx2Transcoders/1/uastc_*.wasm` | KTX2 texture decoder and UASTC transcoders | Babylon.js 9.30.0 (cdn.babylonjs.com) | Babylon.js contributors | Apache-2.0 |
 | `ktx2Transcoders/1/msc_basis_transcoder.js`, `.wasm` | Basis Universal transcoder | Basis Universal, built by Babylon.js | Binomial LLC | Apache-2.0 |
 | `zstddec.wasm` | Zstandard decompression (UASTC KTX2) | zstddec, built by Babylon.js | Don McCurdy; Zstandard by Meta | MIT; BSD-3-Clause |
 | `meshopt_decoder.js` | meshopt geometry decoder | meshoptimizer 1.3.0 | Arseny Kapoulkine | MIT |
