@@ -682,14 +682,25 @@ pub fn reload(w: &World, content: &str) -> World {
     let loaded = World::from_save_json(content, &json).unwrap_or_else(|e| panic!("the save on day {} doesn't load: {e}", clock::day(w.tick)));
     check(&loaded);
     assert_eq!(loaded.tick, w.tick);
+    // The first difference, if any.
+    fn same<T: PartialEq + std::fmt::Debug>(what: &str, saved: Vec<T>, loaded: Vec<T>) {
+        if let Some(i) = (0..saved.len().max(loaded.len())).find(|&i| saved.get(i) != loaded.get(i)) {
+            panic!("{what} don't survive saving: {} saved, {} loaded; #{i} was {:?}, is {:?}", saved.len(), loaded.len(), saved.get(i), loaded.get(i));
+        }
+    }
     let who = |w: &World| w.sims.iter().map(|s| (s.name.clone(), s.here(), s.household, s.age.to_bits())).collect::<Vec<_>>();
-    assert_eq!(who(&loaded), who(w), "the residents survive saving");
+    same("the residents", who(w), who(&loaded));
     let homes = |w: &World| w.households.iter().map(|h| (h.plot, h.funds, h.expecting.map(|e| (e.parents, e.due)))).collect::<Vec<_>>();
-    assert_eq!(homes(&loaded), homes(w), "the households survive saving");
-    let things = |w: &World| w.objects.iter().map(|o| (o.def, o.x, o.z, o.rot)).collect::<Vec<_>>();
-    assert_eq!(things(&loaded), things(w), "the objects survive saving");
+    same("the households", homes(w), homes(&loaded));
+    // (Loading puts what stands on tops in last, so the order, and the ids, can change.)
+    let things = |w: &World| {
+        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits())).collect();
+        list.sort();
+        list
+    };
+    same("the objects", things(w), things(&loaded));
     let story = |w: &World| w.events.iter().map(|e| e.id).collect::<Vec<_>>();
-    assert_eq!(story(&loaded), story(w), "the story survives saving");
+    same("the story's events", story(w), story(&loaded));
     // Some things in hand start again from what's there (eating, washing up, a phone call, a
     // visitor at the door aren't saved), so the first load can tidy up; from then on a save
     // loads as it was.
