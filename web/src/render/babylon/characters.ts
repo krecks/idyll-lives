@@ -55,7 +55,9 @@ import {
   Skeleton,
   Matrix,
   VertexData,
+  type Engine,
   type Scene,
+  type WebGPUEngine,
 } from './core';
 import { BakedVertexAnimationManager } from '@babylonjs/core/BakedVertexAnimation/bakedVertexAnimationManager';
 import type { AssetRegistry } from '../../assets/registry';
@@ -677,6 +679,11 @@ export class Characters {
   private failed = false;
   private texture!: RawTexture;
   private data!: Float32Array;
+  /** The pose texture as last uploaded, and which rows were drawn then (see `upload`). */
+  private uploaded!: Float32Array;
+  private readonly uploadedVisible = new Uint8Array(MAX_CHARACTERS);
+  /** The last `update` changed how a drawn Sim looks (moved, breathed, blinked …): their shadows are drawn again. */
+  posed = false;
   private width = 0;
   private vat!: BakedVertexAnimationManager;
   /** Face morphs (null for sets without them) and the per-Sim channel mixer. */
@@ -815,6 +822,7 @@ export class Characters {
     const NB = set.bones.length;
     this.width = NB * 4 + APPEARANCE_TEXELS + MORPH_TEXELS;
     this.data = new Float32Array(this.width * MAX_CHARACTERS * 4);
+    this.uploaded = new Float32Array(this.data.length);
     this.texture = new RawTexture(
       this.data,
       this.width,
@@ -1172,6 +1180,9 @@ export class Characters {
       b.mesh.setEnabled(world.objects.some((o) => BLANKET_BEDS.has(o.def)));
     }
     this.texture.update(this.data);
+    this.uploaded.set(this.data);
+    this.uploadedVisible.set(this.visible);
+    this.posed = true;
   }
 
   /** `?debug` stress test: `n` extra animated Sims in a grid around (x, z), cloned from Sim 0. */
@@ -1934,7 +1945,7 @@ export class Characters {
     for (const p of this.props.values()) {
       if (p) for (const mesh of p.meshes) mesh.thinInstanceBufferUpdated('matrix');
     }
-    this.texture.update(this.data);
+    this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;
   }
 
@@ -2873,6 +2884,33 @@ export class Characters {
 
   private row(i: number): number {
     return i * this.width * 4;
+  }
+
+  /**
+   * Uploads the pose texture's rows that changed since the last upload (Sims drawn now, or just
+   * hidden), as one band of rows: a few of the 64 most frames, none while the game is paused.
+   */
+  private upload(): void {
+    const stride = this.width * 4;
+    const data = this.data;
+    const uploaded = this.uploaded;
+    let lo = -1;
+    let hi = -1;
+    for (let i = 0; i < MAX_CHARACTERS; i++) {
+      if (!this.visible[i] && !this.uploadedVisible[i]) continue;
+      this.uploadedVisible[i] = this.visible[i];
+      const end = (i + 1) * stride;
+      let k = i * stride;
+      while (k < end && data[k] === uploaded[k]) k++;
+      if (k === end) continue;
+      uploaded.set(data.subarray(k, end), k);
+      if (lo < 0) lo = i;
+      hi = i;
+    }
+    this.posed = lo >= 0;
+    const texture = this.texture.getInternalTexture();
+    if (lo < 0 || !texture) return;
+    (this.scene.getEngine() as Engine | WebGPUEngine).updateTextureData(texture, data.subarray(lo * stride, (hi + 1) * stride), 0, lo, this.width, hi - lo + 1);
   }
 
   private objectAt(x: number, z: number): PlacedObject | null {
