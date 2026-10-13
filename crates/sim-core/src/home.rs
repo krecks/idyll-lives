@@ -928,6 +928,7 @@ impl World {
                 && diagonal.is_none()
                 && self.objects.iter().any(|o| {
                     o.wall_edges(&self.content)
+                        .chain(o.body_edges(&self.content))
                         .any(|(p, q)| (p, q) == (a, b) || (q, p) == (a, b))
                 })
             {

@@ -147,6 +147,29 @@ function offsetKey(offset: [number, number] | undefined): string {
   return `${offset?.[0] ?? 0}:${offset?.[1] ?? 0}`;
 }
 
+/**
+ * Pairs of neighbouring tiles the body of a thing on tiles `x, z, w, d` (turned) stands across,
+ * `offset` off their middle and `extent` (cm, before turning) in size, as sim-core `body_edges`.
+ */
+function bodyEdges(x: number, z: number, w: number, d: number, rot: number, offset: readonly [number, number], extent: readonly [number, number]): [[number, number], [number, number]][] {
+  const [ex, ez] = rot % 2 === 0 ? extent : [extent[1], extent[0]];
+  // Its sides along one axis, in half centimetres (tile lines every 200).
+  const span = (at: number, tiles: number, off: number, size: number) => {
+    const mid = 2 * (at * 100 + off) + tiles * 100;
+    return [mid - size, mid + size];
+  };
+  const [x0, x1] = span(x, w, offset[0], ex);
+  const [z0, z1] = span(z, d, offset[1], ez);
+  // The tiles it overlaps, and the tile lines strictly inside it.
+  const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
+  const tiles = (lo: number, hi: number) => range(Math.floor(lo / 200), Math.floor((hi + 199) / 200));
+  const lines = (lo: number, hi: number) => range(Math.floor(lo / 200) + 1, Math.floor((hi - 1) / 200) + 1);
+  const edges: [[number, number], [number, number]][] = [];
+  for (const lx of lines(x0, x1)) for (const tz of tiles(z0, z1)) edges.push([[lx - 1, tz], [lx, tz]]);
+  for (const lz of lines(z0, z1)) for (const tx of tiles(x0, x1)) edges.push([[tx, lz - 1], [tx, lz]]);
+  return edges;
+}
+
 export class BuildBuyInput {
   private readonly preview: Partial<BuildPreview>;
   /** What stands on each wall edge now (`h:x:z` / `v:x:z` / `dp:x:z` / `dn:x:z`), for previews and costs. */
@@ -496,7 +519,7 @@ export class BuildBuyInput {
       let offset: [number, number] | undefined = step ? [cm(cx - x - w / 2), cm(cz - z - d / 2)] : undefined;
       // Things on a wall slide along it, never off it.
       if (offset && def.layer === 'wall') offset = rot % 2 === 0 ? [offset[0], 0] : [0, offset[1]];
-      const fit = this.fits(x, z, w, d, rot, placing.objectId, def, [fw, fd]);
+      const fit = this.fits(x, z, w, d, rot, placing.objectId, def, [fw, fd], offset, size);
       return { def, rot, turn: placing.turn, offset, x, z, w, d, valid: fit === true, reason: fit === true ? null : fit, lift: 0, size, tall };
     };
     const p = at(placing.rot);
@@ -567,8 +590,9 @@ export class BuildBuyInput {
   /**
    * Same checks as the simulation, minus reachability: on the home plot, free tiles, outdoors for
    * garden things, affordable. True, or why not (a short hint; null for the usual "doesn't fit").
+   * `offset` and `extent` (centimetres, before turning) place its body on its tiles.
    */
-  private fits(x: number, z: number, w: number, d: number, rot: number, moving: number | null, def: ObjectDef, size?: readonly [number, number]): true | string | null {
+  private fits(x: number, z: number, w: number, d: number, rot: number, moving: number | null, def: ObjectDef, size?: readonly [number, number], offset?: readonly [number, number], extent?: readonly [number, number]): true | string | null {
     const home = this.home();
     if (!home) return null;
     const onPlot = (tx: number, tz: number) => tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d;
@@ -601,6 +625,8 @@ export class BuildBuyInput {
         if ((tx + 1 < x + w && this.wallBetween(tx, tz, tx + 1, tz)) || (tz + 1 < z + d && this.wallBetween(tx, tz, tx, tz + 1))) return 'Blocked by a wall';
       }
     }
+    // Nor through its body where it stands off its tiles (sim-core `body_edges`).
+    if (offset && extent && bodyEdges(x, z, w, d, rot, offset, extent).some(([[ax, az], [bx, bz]]) => this.wallBetween(ax, az, bx, bz))) return 'Blocked by a wall';
     const [fx, fz] = front;
     const back = [
       [fx, fz - 1],
@@ -901,7 +927,7 @@ export class BuildBuyInput {
     const offset: [number, number] = [cm(cx - x - w / 2), cm(cz - z - d / 2)];
     const size: [number, number] = r.rot % 2 === 0 ? [Math.round(ex * 100), Math.round(ez * 100)] : [Math.round(ez * 100), Math.round(ex * 100)];
     const tiles: [number, number] = r.rot % 2 === 0 ? [w, d] : [d, w];
-    const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles);
+    const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
     r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
     const obj = game.objects.find((o) => o.id === r.id);
     const model = this.styledModel(r.def, obj?.style ?? 0);

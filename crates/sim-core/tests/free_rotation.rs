@@ -108,3 +108,21 @@ fn a_blueprint_turned_round_turns_the_offset_round_too() {
     assert_eq!(built.offset, [-25, 10]);
     assert_eq!(w.blueprint(1).unwrap().objects[0].offset, bp.objects[0].offset, "the same, seen from its own street");
 }
+
+#[test]
+fn nothing_stands_off_its_tile_through_a_wall() {
+    use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    // A wall between (2, 1) and (3, 1).
+    w.apply(Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall)] }).unwrap();
+    assert!(buy_at(&mut w, 0, "chair", 2, 1, [50, 0]).is_err(), "half through the wall");
+    assert!(buy_at(&mut w, 0, "chair", 3, 1, [-25, 0]).is_err(), "nor from the other side");
+    assert!(buy_at(&mut w, 0, "chair", 2, 1, [-50, 0]).is_ok(), "away from it is fine");
+    assert!(buy_at(&mut w, 0, "lamp", 3, 1, [0, 50]).is_ok(), "and along it");
+
+    // Nor a wall built through something standing off its tile.
+    buy_at(&mut w, 0, "chair", 6, 1, [50, 0]).unwrap();
+    let wall = |x| Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::V, x, 1, EdgeKind::Wall)] };
+    assert!(w.apply(wall(7)).is_err());
+    w.apply(wall(6)).unwrap();
+}

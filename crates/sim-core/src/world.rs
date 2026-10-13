@@ -250,6 +250,31 @@ impl ObjectInstance {
         (0..d).flat_map(move |dz| (0..w).map(move |dx| (x0 + dx, z0 + dz)))
     }
 
+    /// Pairs of neighbouring tiles its body stands across: off the middle of its footprint
+    /// (`offset`), it can reach past the footprint's side, and no wall may run through it there.
+    pub(crate) fn body_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+        let (w, d) = self.size(content);
+        let [ex, ez] = if self.rot.is_multiple_of(2) { self.extent } else { [self.extent[1], self.extent[0]] };
+        // Its sides along one axis, in half centimetres (tile lines every 200).
+        let span = |at: i32, tiles: i32, off: i8, size: u16| {
+            let mid = 2 * (at * 100 + off as i32) + tiles * 100;
+            (mid - size as i32, mid + size as i32)
+        };
+        let (x0, x1) = span(self.x, w, self.offset[0], ex);
+        let (z0, z1) = span(self.z, d, self.offset[1], ez);
+        // The tiles it overlaps, and the tile lines strictly inside it.
+        let tiles = |lo: i32, hi: i32| lo.div_euclid(200)..(hi + 199).div_euclid(200);
+        let lines = |lo: i32, hi: i32| lo.div_euclid(200) + 1..=(hi - 1).div_euclid(200);
+        let mut edges = Vec::new();
+        for lx in lines(x0, x1) {
+            edges.extend(tiles(z0, z1).map(|tz| ((lx - 1, tz), (lx, tz))));
+        }
+        for lz in lines(z0, z1) {
+            edges.extend(tiles(x0, x1).map(|tx| ((tx, lz - 1), (tx, lz))));
+        }
+        edges
+    }
+
     /// Pairs of neighbouring tiles that must not have a wall between them: inside the
     /// footprint, and from the footprint to the front tile.
     pub(crate) fn wall_edges(
@@ -1302,9 +1327,11 @@ impl World {
         if !self.lot.in_bounds(fx, fz) {
             return Err(Error::new(format!("'{name}' at {x},{z} faces off the lot")));
         }
-        // No wall or fence may run through the footprint or between the object and where it's
-        // used from.
-        if obj.wall_edges(&self.content).any(|(a, b)| {
+        // No wall or fence may run through the footprint, through the body where it stands off
+        // the footprint, or between the object and where it's used from.
+        let in_lot = |(a, b): &((i32, i32), (i32, i32))| self.lot.in_bounds(a.0, a.1) && self.lot.in_bounds(b.0, b.1);
+        let body = obj.body_edges(&self.content).into_iter().filter(in_lot);
+        if obj.wall_edges(&self.content).chain(body).any(|(a, b)| {
             self.lot.edge_between(a.0, a.1, b.0, b.1) != crate::lot::Edge::Open
         }) {
             return Err(Error::new(format!("'{name}' at {x},{z} is blocked by a wall")));
