@@ -66,7 +66,7 @@ Line numbers refer to 4cde174 unless a later commit is named.
   - The random generator is a seeded xorshift whose state is saved; the starting seed was not saved before this release.
 - **Where:** saves are kept in IndexedDB (`persistence/saves.ts`), each with metadata and a JPEG thumbnail.
   - Autosave writes one slot every 5 minutes by default.
-  - A new 9-house town saves to about 150 KB and grows to 200–220 KB over weeks of play (about 20 KB gzipped). A full town of 64 residents is about 1 MB (83 KB gzipped).
+  - A new 9-house town saves to about 150 KB and grows to 200–220 KB over weeks of play (about 20 KB gzipped). A full town of 64 residents is about 1 MB (83 KB gzipped). A default new game from the menus (14 households, 41 residents) is about 0.6 MB (43 KB gzipped).
 - **Elsewhere in the browser:** settings and blueprints live in localStorage.
 - **Load:** a save is handed to the worker, which builds the world with `Game.fromSave`.
 - **Starting fast:** the main menu prepares the latest save in the background so Continue starts at once.
@@ -94,19 +94,20 @@ How to read the tables:
 - Rows are sorted by severity and keep the reviewer's order within a severity. The IDs are the reviewers' own.
 - A finding reported by two reviewers is listed once, in the earlier area, with both IDs and the higher severity. A few closely related low findings from one reviewer share a row.
 - Items that need no action are left out of the tables; the important ones are under "Checked and fine". Information items with a proposed change are graded low.
-- R2 and R4 used a stricter scale than the one above: critical only for a crash or data loss likely in ordinary play, and high for a crash or corruption in plausible play. Their grades are kept, which is why nothing is graded critical.
+- R2 and R4 used a stricter scale than the one above: critical only for a crash or data loss likely in ordinary play, and high for a crash or corruption in plausible play. Their grades are kept, except that R2-01 and R4-01 are raised to critical by this document's scale: a crash or silent freeze reachable in ordinary play.
+- P1 graded against the HD 620 targets (Medium 30 fps, Low 60 fps). Its grades are kept, including P1-01 as critical.
 
 | Area | Critical | High | Medium | Low | Rows |
 |---|---|---|---|---|---|
 | 2.1 Animations and frame pacing (R1) | 0 | 2 | 4 | 11 | 17 |
-| 2.2 Objects and items (R2) | 0 | 1 | 4 | 14 | 19 |
+| 2.2 Objects and items (R2) | 1 | 0 | 4 | 14 | 19 |
 | 2.3 Simulation bugs and lints (R3) | 0 | 2 | 5 | 7 | 14 |
-| 2.4 Web robustness (R4) | 0 | 6 | 7 | 11 | 24 |
-| 2.5.1 GPU and rendering (P1) | – | – | – | – | – |
-| 2.5.2 Main thread (P2) | 0 | 2 | 4 | 5 | 11 |
+| 2.4 Web robustness (R4) | 1 | 5 | 7 | 11 | 24 |
+| 2.5.1 GPU and rendering (P1) | 1 | 7 | 6 | 3 | 17 |
+| 2.5.2 Main thread (P2) | 0 | 1 | 3 | 5 | 9 |
 | 2.5.3 Simulation, build and load (P3) | 0 | 0 | 3 | 10 | 13 |
 | 2.6 Release readiness (R5) | 0 | 4 | 12 | 11 | 27 |
-| **Total without P1** | **0** | **17** | **39** | **69** | **125** |
+| **Total** | **3** | **21** | **44** | **72** | **140** |
 
 ### 2.1 Animations and frame pacing
 
@@ -151,7 +152,7 @@ R2 read the object and item code, scanned all shipped content (539 objects, 24 i
 
 | ID | Severity | Where | Problem | Proposed fix |
 |---|---|---|---|---|
-| R2-01 | high | `crates/sim-core/src/home.rs:1179` | Selling or moving an object shifts the ids in residents' `current` and `queue` but not in `follow_up` or `stuck`. A pending follow-up then panics at `content.rs:210` when its id now names an object with fewer interactions, or sends the resident to the wrong object, possibly a neighbour's. NPC purchases also shift ids, mid-tick. Measured: about 1 crash per 1,200 Build-mode visits that move or sell something. | In `remove_object`, shift `follow_up` too (drop it if it used the removed object), and shift or clear `stuck`. In `start_task`, use `interactions.get()` and check `access`. Tests: the two R2-01 proofs. |
+| R2-01 | critical | `crates/sim-core/src/home.rs:1179` | Selling or moving an object shifts the ids in residents' `current` and `queue` but not in `follow_up` or `stuck`. A pending follow-up then panics at `content.rs:210` when its id now names an object with fewer interactions, or sends the resident to the wrong object, possibly a neighbour's. NPC purchases also shift ids, mid-tick. Measured: about 1 crash per 1,200 Build-mode visits that move or sell something. | In `remove_object`, shift `follow_up` too (drop it if it used the removed object), and shift or clear `stuck`. In `start_task`, use `interactions.get()` and check `access`. Tests: the two R2-01 proofs. |
 | R2-02 | medium | `crates/sim-core/src/cooking.rs:1682` | Items go with any object that shares their tile, not with their holder. Selling a fruit bowl or a rug deletes the dinner on the table, moving the fruit bowl carries the meal along, and a wall cabinet over the fridge carries off the leftovers. | Only touch items whose `items::holder(...)` is the object, worked out before the object is removed or lifted. Tests: the fruit-bowl and rug proofs. |
 | R2-03 | medium | `web/src/game/session.ts:541` | A move renumbers the object last, but Rotate (R, Shift+R, the Rotate and Turn 15° buttons) and Reset size don't reselect it. After one R the selection belongs to the next object: holding R rotates the home's objects one after another, and Delete or Sell then sells the wrong one. Found by reading; not checked in a browser. | Set `reselect` with the new rotation in `rotatePlacing` and `resetSize`. Better: have `moveObject` answer with the new id. |
 | R2-04 | medium | `crates/sim-core/src/world.rs:2460` | Commands name objects by position id, so a second command sent before the world update arrives hits whatever has that id now. Two quick rotates (key repeat is about 30 ms) turn the rug and then move the lamp onto it. In Live mode a pie-menu Use can hit another object after an NPC purchase. | The planned optional `seen {def, x, z}` check in `World::apply`. Test: `a_repeated_rotate_does_not_move_another_object`. |
@@ -170,6 +171,8 @@ R2 read the object and item code, scanned all shipped content (539 objects, 24 i
 | R2-18 | low | `crates/sim-core/src/content.rs:3152` | `resale` and `upgradeCost` aren't range-checked. A resale above 1 is a buy-and-sell money loop, below 0 selling costs money, and a negative `upgradeCost` pays the player. Shipped values are 0.6 and 0.3. | Require `0 ≤ resale ≤ 1` and `upgradeCost ≥ 0`. |
 | R2-20, R2-21, R2-22, R2-23, R3-13, R3-14, R3-16 | low | `crates/sim-core/src/content.rs:2159` | Content numbers aren't range-checked. A `walkSpeed` of 0 or less gives inf/NaN and a walker who never arrives; a negative decay pushes needs above 1; more than 32 genders overflow the attraction mask; bond presets, and relationships in a loaded save, aren't clamped to ±100. Shipped content is fine, and R3's 60-day probe saw no value out of range. | At load, reject a non-finite or non-positive `walkSpeed`, negative decay and more than 32 genders. Clamp bonds in `bond` and on save load. |
 | R2-24 | low | `crates/sim-core/src/content.rs:2939` | Unknown tags, animations and skills in day rhythms, accident rests and repair skills are dropped silently, so a typo turns a feature off (nobody counts as asleep; Repair trains nothing). Shipped content has none. | Use the erroring `lookup`. |
+
+R2 graded R2-01 high. It is raised to critical here: it is a crash reachable in ordinary play, through Build-mode edits and NPC purchases.
 
 **Checked and fine**
 - Seats reserve one slot each, and residents step one after another, so nothing is double-booked within a tick.
@@ -223,7 +226,7 @@ R4 tested how the web app fails: real wasm traps in the sim (through temporary, 
 
 | ID | Severity | Where | Problem | Proposed fix |
 |---|---|---|---|---|
-| R4-01 | high | `web/src/core/sim.worker.ts:98` | A panic in the sim's `step` freezes the clock and every resident with no message. It only reaches an uncaught worker `error` event (not the F8 log), and every later action toasts "recursive use of an object detected…". With `panic = abort` the message is just `unreachable`. R2-01 is one real path to it. | Guard `step` and every handler: on a trap, drop the game, stop the loop and post a fatal error. Keep `worker.onerror` after start and show a blocking panel ("The game stopped because of an error. Your last save is safe.") with Reload and Download debug report. A panic hook in `sim-wasm` passes the message and location. |
+| R4-01 | critical | `web/src/core/sim.worker.ts:98` | A panic in the sim's `step` freezes the clock and every resident with no message. It only reaches an uncaught worker `error` event (not the F8 log), and every later action toasts "recursive use of an object detected…". With `panic = abort` the message is just `unreachable`. R2-01 is one real path to it. | Guard `step` and every handler: on a trap, drop the game, stop the loop and post a fatal error. Keep `worker.onerror` after start and show a blocking panel ("The game stopped because of an error. Your last save is safe.") with Reload and Download debug report. A panic hook in `sim-wasm` passes the message and location. |
 | R4-02 | high | `web/src/core/sim.worker.ts:193` | A panic in a request handler (save, events, social options, commands) shows a 3.5 s `unreachable` toast, and the next tick freezes the game as in R4-01. After a trap the wasm instance can't be trusted. | The same guard: any trap ends the game instance, and nothing calls into it again. |
 | R4-03 | high | `web/src/core/bridge.ts:131` | After a sim error, Save never finishes. The pause menu stays at "Saving…" with only "Quit without saving" left, each autosave adds a hung promise, and F8 hangs too and then stays disabled for the session. | Keep `resolve` and `reject` per request. Reject them all on a fatal error, a worker error or dispose, and after a ~10 s timeout. Build the F8 report without a save when the worker is dead, and always clear `debugSaving`. |
 | R4-04 | high | `web/src/render/babylon/BabylonRenderer.ts:1819` | One exception in a frame stops drawing for good, because Babylon queues the next frame only after the current one returns. The HUD keeps changing over a frozen picture, and Save hangs (R4-06). GPU resets (R4-05) and NaN positions (R4-07) cause it. | try/catch around `renderFrame`, including `onFrame`: log the first error and keep the loop alive; after N errors in a row, show the R4-01 panel. Give frame waiters a timeout. |
@@ -248,6 +251,8 @@ R4 tested how the web app fails: real wasm traps in the sim (through temporary, 
 | R4-23 | low | `web/src/voice/tts.worker.ts:75` | A trap in the voice wasm is caught per line, and the worker keeps using an instance that may be corrupt. | On a `WebAssembly.RuntimeError`, post a fatal error so the voice service starts a new worker. |
 | R4-24 | low | `web/src/game/session.ts:1269` | Small known items, confirmed: any settings change closes the F3 overlay and, when the autosave interval changes, clears `prefetchTimer`; an abort listener in `items.ts:160` lacks `{once: true}`; the long-task list is trimmed only when read (negligible). | Change `perfOpen` only when `showFps` changes, move `clearTimeout(prefetchTimer)` to `dispose`, and use `{once: true}`. |
 
+R4 graded R4-01 high. It is raised to critical here: it is a silent freeze reachable in ordinary play, for example through R2-01.
+
 **Checked and fine**
 - No stale wasm memory views: the worker makes a new view per publish, mesh buffers are copied and freed, and the voice glue copies in and out.
 - Babylon clears camera keys on canvas blur, so camera keys don't stick.
@@ -267,7 +272,89 @@ Three reviewers measured performance on an Apple M3 Pro and scaled to the target
 
 #### 2.5.1 GPU and rendering
 
-*(GPU numbers from the benchmark follow.)*
+P1 built a rendering benchmark (`?bench=`, now on `main`) and measured every preset on WebGPU and WebGL2, with and without vsync, at 1× and 3× CPU. All numbers come from the benchmark:
+- **Machine:** MacBook Pro M3 Pro (18-core GPU), Chrome for Testing 153 headed, 1920×1080 at DPR 1, production build.
+- **Scene:** `village`, the default medium world (14 households, 41 residents), with 4 residents at home at 17:55. The camera orbits the home lot, flies wide, or sits in Build mode. Day runs hold the light at 13:00, night runs at 21:00.
+- **GPU time:** on WebGPU, the span from the start of a frame's first pass to the end of its last, from timestamp queries. WebGL2's timer reads too high, so its frame time without vsync is used instead.
+- **Spread:** with vsync the Apple GPU lowers its clock and GPU times read higher, so the Intel estimate uses runs without vsync. Runs vary by about ±1 ms, and the A/B tables are medians of 3.
+
+The GPU is what keeps both targets out of reach, and WebGPU's CPU cost alone also rules out Low at 60 fps on the target CPUs.
+
+Summary:
+- **GPU per frame on the M3** (WebGPU, no vsync): Medium 10.3–10.5 ms, Low 6.6–7.0 ms. Low at 75 % scale costs the same 6.7 ms: on this GPU, Low is limited by geometry, not by pixels.
+- **Every preset draws the same scene:** 6.0 M triangles a frame (2.26 M nature, 1.70 M shadow pass, 2.2 M lot, street and furniture) in 493 draw calls, 242 of them for the shadow map.
+- **CPU at 3×:** WebGPU spends 21–31 ms a frame (32–47 fps), 20–28 ms of it submitting draws. WebGL2 spends 10–19 ms (54–98 fps).
+- **HD 620 at 1080p:** Medium about 6–10 fps (target 30), Low about 9–27 fps (target 60), depending on the model. Both presets miss by 3–10×.
+- **Savings with no visible change:** dark lamps (3.1 ms by day on the M3), the canvas's 4× MSAA (66 MB a frame) and the shadow map's unused colour target (32 MB a frame). The last two are bandwidth that Apple's tile memory hides but Intel pays for.
+- **Low with trims:** without nature, shadows and the canvas MSAA, Low at 75 % drops from 5.2 to 2.45 ms on the M3 and from 491 to 224 draws. (That session measured Low at 75 % at 5.2 ms rather than 6.7; sessions differ by about ±20 %.) What remains is the lot, street and furniture geometry, so 60 fps also needs LODs (P1-12).
+- **The interface costs about 4 ms a frame on the M3** (65 → 88 fps without the HUD). The frosted blur isn't the cause.
+
+What each feature costs on Medium (GPU time saved by leaving it out; median of 3, no vsync):
+
+| Feature left out | WebGPU GPU, day | WebGPU GPU, night | WebGL2 frame, day | WebGL2 frame, night | Draws | Triangles |
+|---|---|---|---|---|---|---|
+| (Medium as is) | 10.58 ms | 12.16 ms | 12.10 ms | 12.19 ms | 493 | 6.01 M |
+| Clustered lamps (all 32 dark by day) | −3.07 | −4.28 | −0.80 | −1.64 | 0 | 0 |
+| Scene 4× MSAA | −3.03 | – | −0.30 | – | 0 | 0 |
+| Sun shadows | −1.20 | −1.50 | −1.53 | −2.26 | −242 | −1.70 M |
+| Nature (grass, flowers, forest) | −1.08 | – | −2.12 | – | −38 | −2.26 M |
+| Night grade | – | +0.01 | – | −0.80 | −1 | 0 |
+| Canvas MSAA, frosted glass, mirrors | within noise | – | within noise | – | 0 | 0 |
+
+Changes under about 1 ms are noise. The canvas MSAA isn't measurable on Apple but costs about 3 ms on Intel by the bandwidth model. No mirror faced the camera in the village, so mirrors weren't really measured.
+
+**Estimate for Intel HD 620 at 1080p.** No Intel hardware was available, so two models scale the M3's GPU time:
+- **Formula:** T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, with k = 16 and B = twice the render-target bytes touched a frame. k assumes an M3 Pro GPU of about 6.4 TFLOPS; 7.4 TFLOPS would give k = 18.5.
+- **Split model:** k = 5 for the time that doesn't depend on resolution (geometry and fixed costs; Gen9 sets up about 0.3–0.5 G triangles a second), k = 16 for pixel work, plus the same bandwidth term.
+
+| Preset, by day | M3 GPU | Render targets a frame | HD 620, formula | HD 620, split model | CPU at 3×, WebGPU / WebGL2 |
+|---|---|---|---|---|---|
+| Low at 100 % | 6.56 ms | 120 MB | 110 ms, 9 fps | ≈ 38 ms, ≈ 26 fps | 47 / 98 fps |
+| Low at 75 % | 6.74 ms | 73 MB | 111 ms, 9 fps | ≈ 37 ms, ≈ 27 fps | 47 / 98 fps |
+| Medium | 10.32 ms | 216 MB | 175 ms, 6 fps | ≈ 104 ms, ≈ 10 fps | 36 / 60 fps |
+
+- A bottom-up count for Low (6 M triangles at 0.4 G/s, PBR with overdraw, 120 MB read and written at 22 GB/s) gives 25–35 ms, close to the split model.
+- UHD 620 is about 5–10 % better, and HD 530 is similar.
+- Low at 75 % without nature, shadows and the canvas MSAA: 41 ms (24 fps) by the formula, about 14 ms (70+ fps) with k = 5. The CPU at 3× then drops to an estimated 10–12 ms on WebGPU.
+- With only the invisible savings, Medium stays under 30 fps on either model: about 8–9 fps by the formula, about 19–22 fps by the split model.
+- The two models differ by about 3×. One run on a real HD 620 laptop would settle it.
+
+**Running the benchmark.** Open the game with `?bench=village&quality=medium&hour=13&cam=orbit&res=1`; this works on the deployed site, so it can run on a real HD 620 laptop, and `&renderer=webgl` compares WebGL2. It warms up for 5 s, measures for 20 s, and then shows a summary with a "Copy result" button (also in `window.__benchResult`; with the dev server it is written to `bench-results/`). `diag=` leaves features out (`noshadows`, `noaa`, `nocanvasaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight`), and `diag=freeze` stops time for screenshots; the flags are documented at the top of `web/src/debug/bench.ts`. `node tools/bench/render.mjs --preview --build` builds the game and runs presets × backends × scenarios (`--throughput` turns vsync off, `--throttle 1,3`, `--diags none,noshadows,…`, `--runs 3` for medians). `--shots <dir>` takes 9 fixed reference poses, and `--compare <dirA> <dirB>` counts the pixels that differ. `node tools/bench/scene.mjs --name village` makes the scenes in `web/public/bench/`.
+
+| ID | Severity | Where | Problem | Proposed fix |
+|---|---|---|---|---|
+| P1-01 | critical | `web/src/render/babylon/nature.ts:580` | The 44,655 nature instances are 35 thin-instance meshes, one per model for the whole landscape, so their bounds are always in view and nothing is culled. They are 2.26 M of the 6.0 M triangles a frame in every preset, Low included. Leaving them out saves 1.1 ms GPU on the M3 and 2.1 ms a frame on WebGL2; on an HD 620, triangle setup makes them about 5–7 ms on their own. | Invisible, all presets: split each model's instances into spatial cells of about 32 m as separate thin-instance meshes, so frustum culling drops the cells behind the camera. Low: lawn tufts only on the viewed lot at half density, the far ring only from `.far` models, bushes and rocks only near. |
+| P1-02 | high | `web/src/render/babylon/BabylonRenderer.ts:1884` | Clustered lamps cost 3.1 ms of 10.6 ms GPU by day with every lamp dark, and 4.3 of 12.2 ms at night (WebGPU; on WebGL2 0.8 and 1.6 ms). Babylon bins all 32 lamps into tiles by range whatever their intensity, every PBR fragment loops over its tile's lamps, and the tile pass runs every frame. | Invisible (Medium, High): while a lamp's intensity is 0, give it a range of about 0 or move it out of view, which needs no shader recompile. At night, cap the cluster's `maxRange` at the largest lamp range (7 m). Low: today's 4 forward lamps, none by day. |
+| P1-03 | high | `web/src/render/babylon/BabylonRenderer.ts:1923` | The 4× MSAA HDR scene target (RGBA16F plus depth) touches 99.5 MB a frame and costs 3.0 ms of 10.6 ms GPU on the M3. On Intel its bandwidth alone is about 4.5 ms. P1 graded it high for Medium. | Medium keeps it (the look). Low: off, with FXAA as today; weak GPUs on Medium rely on Auto resolution. An LDR target for Low is document-only, as decided. |
+| P1-04 | high | `web/src/render/babylon/BabylonRenderer.ts:1872` | The sun's shadow map is redrawn every frame from 251 casters: 242 of the frame's 493 draws and 1.70 M triangles, 1.54 M of them lot, street and furniture. It costs 1.2 ms GPU by day and 1.5 ms at night, and half of the draw submission: about 2.8 ms a frame of CPU on the M3, 10 ms at 3×. | Merge the static casters into a few shadow-only meshes per lot (house and fences, the street's houses and props, garden trees): about 10–20 shadow draws instead of 242. Low: 1024 and only the viewed lot and residents as casters; optionally redraw every second frame. |
+| P1-06 | high | `web/src/render/babylon/BabylonRenderer.ts:433` | The canvas is 4× MSAA with a 4× depth-stencil (66 MB a frame at 1080p), but only the final full-screen pass draws to it: 31 % of Medium's render-target bytes and 55 % of Low's. On Apple it isn't measurable; on Intel it is about 3 ms by the bandwidth model. Screenshots without it are pixel-identical. P1 graded it high on Intel. | Invisible: `antialias: false` for both engines. |
+| P1-07, P2-07 | high | `web/src/render/babylon/BabylonRenderer.ts:3097` | Submitting the same 493 draws costs 5.1–6.7 ms a frame on WebGPU and 3.2–4.6 ms on WebGL2 (M3). At 3× CPU, WebGPU frames take 21–31 ms (32–47 fps) and WebGL2 10–19 ms (54–98 fps), so WebGPU alone can't reach Low's 60 fps on the target CPUs. P2 saw the same from the page: `scene.render` is 75–80 % of main-thread time, and Low is as busy as Medium (90–95 % at `r = 3`). | Halve the draws (P1-04 and the Low trims: 491 → 224 draws, about 10–12 ms at 3×). Retry snapshot rendering in play with the pose texture updated outside the recorded bundles, and measure it. Whether Low on Intel should default to WebGL2 is an owner question. |
+| P1-12 | high | `web/src/render/babylon/house.ts` | Without nature, the main pass still draws 2.2 M triangles and the shadow pass 1.54 M. Low draws exactly the same geometry as Medium, and at 75 % its GPU time doesn't drop (6.74 against 6.56 ms). This floor of about 2.5 ms is what remains after the Low trims. | LODs for furniture and the street's houses (the overview already has shells), and low-detail shadow copies for furniture, as the residents have. Low: neighbours' houses as overview shells. |
+| P1-15 | high | `web/src/render/babylon/BabylonRenderer.ts:2191` | Known: there is no pixel ceiling. On a 4K or DPR 2 screen Medium touches about 4× the bytes and pixels of these 1080p numbers. | The planned Auto resolution with a pixel budget. |
+| P1-05 | medium | `web/src/render/babylon/BabylonRenderer.ts:1872` | The shadow map has an RGBA16F colour target beside its depth texture, and PCF never reads it: 32 MB a frame written at 2048² (Medium) and 128 MB at 4096² (High). On Intel that is about 0.7 and 2.9 ms of write bandwidth. | Invisible: `new ShadowGenerator(size, sun, false, undefined, true)` (R16F) cuts the colour writes 4×. |
+| P1-08 | medium | Build mode (`?bench=…&cam=build`) | The benchmark's Build scenario runs at about 60 fps in every preset on both backends, against 88–120 fps for the same orbit in Live (Low on WebGPU: 119 → 66 fps, GPU 5.8 → 9.3 ms). The frosted glass and the scene counts don't explain it, and switching a running game into Build mode didn't reproduce it. The benchmark's game was paused from the moment it appeared. Cause not found. | Find what differs in a game revealed paused straight into Build mode. Start with the catalog pictures' second engine (`web/src/render/preview/items.ts`), which may keep drawing, and the paused session's frame clock. |
+| P1-09 | medium | `web/src/render/babylon/mirrors.ts:23` | Each live mirror draws the whole world again, nature included, into a 0.75-ratio RGBA16F target with 4× MSAA: about 50 MB a frame per mirror. The target is allocated even when nothing reflects. `QUALITY.medium` has 1 mirror while the interface's Medium has none, and the defaults come from High (2). The live cost wasn't measured. | High: reflection ratio 0.5, no MSAA (or 2×), no landscape in the reflection, and the target created on first use. Medium and Low: no mirrors, as decided. |
+| P1-10 | medium | `web/src/ui/theme.css:73` | The HUD as a whole costs about 4 ms a frame on the M3 (Live 65 → 88 fps without it, Build 39 → 52). On the GPU the frosted blur is within noise, which points at the HUD's per-frame style, layout and compositing (P2-01). On Intel the compositor's blur of large panels over a moving canvas should cost more; not measured (see P2-03). | Low: no blur, a plain tint (as P2-03). Medium and High keep the blur, but no full-screen blur over the moving 3D view (the Pause menu and Modal). Profile the HUD's per-frame work with P2-01. |
+| P1-11, P2-04 | medium | `web/src/render/babylon/BabylonRenderer.ts:639` | At speed 5 the lighting updates 20 times a second, and each update thaws the PBR materials for 3 frames. On the dusk path the update's CPU p95 is 4.7–6 ms against 0.3–0.4 ms otherwise; at 3× CPU there are 9–12 long tasks in 12 s and frame p99 is 67–71 ms. P2 measured 1.65 ms per call at `r = 3`, and limiting it to 4 Hz saved about 25–55 ms/s. | Rate-limit by real time as well as game time: P2 suggests at most every 250 ms, P1 every 2–3 s while only the sun's angle changes. Move environment intensity to a scene uniform (a material plugin is document-only, as decided). Low: lighting steps 10 game minutes apart. |
+| P1-16 | medium | Chrome's WebGPU under a saturated GPU | With vsync and the frame cap off, WebGPU frames stall (35–43 long tasks in 10 s, frame p95 60–137 ms) while WebGL2 stays smooth (p95 13–17 ms). A GPU-bound M3 with vsync doesn't stall, but a weak GPU is always saturated. P1 left the severity open until it is checked. | Run `?bench=village&quality=low` on an Intel laptop and compare WebGPU with `&renderer=webgl`. |
+| P1-13 | low | `web/src/render/babylon/BabylonRenderer.ts:1923` | After tone mapping, image processing still writes an RGBA16F target before FXAA: 16.6 MB a frame on Low. | Do FXAA inside the image-processing pass, or use an 8-bit intermediate; only if cheap in Babylon. |
+| P1-14 | low | `web/src/render/babylon/characters.ts:795` | The whole 64-row RGBA32F pose texture (about 250 KB) is uploaded every frame, though 4–5 residents are drawn. | Upload only the drawn residents' rows (`texture.update` with a sub-rectangle). |
+| P1-17 | low | Landscape roads (shared by the menu overview and the game) | Between page loads, a far road's lane markings render brighter or darker at the same frozen pose (0.03–0.12 % of pixels, both backends). Probably a frozen material that keeps the lighting of the moment it froze. Not verified. | Thaw or refreeze the shared landscape materials on the switch from the overview to the game, as `setEnvironmentIntensity` does for lit materials. |
+
+P1-07 and P1-11 include P2's matching findings (P2-07, P2-04), which are no longer listed in 2.5.2.
+
+**Checked and fine**
+- The benchmark changes nothing for players without its URL flags: the renderer hooks are null checks, its settings are never saved, its save slot is deleted, and GPU timing runs only while F3 or the benchmark is on.
+- The night grade is one full-screen pass, about 0 ms on the M3.
+- Two runs of the same build differ by at most 1/255 in a handful of pixels, apart from the far road (P1-17), so the reference shots can check that Medium still looks the same.
+- Babylon's own WebGPU frame timer reads about 0.4 ms on Apple GPUs and misses the drawing. The benchmark and F3 use the pass span instead (P1-18).
+- Not verified: Intel hardware, the cost of a live mirror, and whether CPU throttling slows the sim worker (probably not).
+
+**Corrections to earlier assumptions**
+- Lamps at intensity 0 don't just occupy cluster tiles: they cost the full 3.1 ms by day (P1-02).
+- The canvas MSAA is pure waste; screenshots without it are pixel-identical (P1-06).
+- Mirrors render at 0.75 of the screen, not half, with 4× MSAA, and the target exists even when nothing reflects (P1-09).
+- A default new game from the menus saves to about 0.6 MB, not 150 KB; §1 now says so.
 
 #### 2.5.2 Main thread
 
@@ -285,16 +372,16 @@ P2 profiled the production build (Medium, 1920×1080 at DPR 1, a 20-resident tow
 | ID | Severity | Where | Problem | Proposed fix |
 |---|---|---|---|---|
 | P2-01 | high | `web/src/ui/HouseholdStrip.svelte:200` | The action-progress bar in each household card is always on screen and animates `width`, as do the SimPanel's need bars. Every UI update restarts a 300 ms transition, so Chrome runs style, layout and paint on every vsync (120 Hz on ProMotion): 72–120 layouts a second. Without the transitions: −59 ms/s at speed 5, `r = 3` with the panel closed, about −140 ms/s with the SimPanel open. | Animate `transform: scaleX(v)` with `transform-origin: left` and `will-change: transform` on the inner span; no visible change. Or drop the transition, since updates arrive at 8 Hz. |
-| P2-07 | high | `web/src/render/babylon/BabylonRenderer.ts:1819` | The main thread is saturated at `r = 3`, and Low doesn't help. `scene.render` takes 2.9 ms a frame at `r = 1` and 8.5–10 ms at `r = 3`, 75–80 % of main-thread time; Low is 90–95 % busy, like Medium. The code comment that live drawing costs only ~0.2 ms more (`:3093`) is an M3 number. | For P1 and the owner: Low needs CPU-side cuts (fewer draw calls or shadow casters, merged static meshes, culling the near nature instances, or snapshot rendering in play). The app-side fixes in this table recover 10–20 % at speed 5. |
 | P2-02 | medium | `web/src/render/babylon/BabylonRenderer.ts:793` | `project()` reads the canvas's `clientWidth` and `clientHeight` for every bubble every frame, after DOM writes, which forces style and layout inside the frame (26.5 ms/s at speed 5, `r = 3`). With a cached size, `project` went from 14.8 to 0.6 ms/s. | Cache the canvas's CSS size (a ResizeObserver or the existing `onResize`) and use it in `project()` and `townFrame`. Do it together with R1-07. |
 | P2-03 | medium | `web/src/ui/theme.css:73` | The `backdrop-filter` blur on the 29 glass panels is redone every frame, because the canvas under it changes. Removing it leaves the main thread unchanged but lowers the GPU process's main thread by about 20 points of busy share (speed 5, `r = 3`, SimPanel open). On HD 620-class GPUs it is extra GPU time. | On Low only, replace the blur with a more opaque background (a `.low-gfx` class). Medium keeps the look, as decided. |
-| P2-04 | medium | `web/src/render/babylon/BabylonRenderer.ts:639` | At speed 5 every snapshot moves the clock 3 game minutes, so `applyLighting` runs 20 times a second (1.65 ms each at `r = 3`) and keeps the lit materials thawed through dawn and dusk. At most 4 times a second: `applyLighting` 33.1 → 8.4 ms/s, about 25–55 ms/s saved in all. | Rate-limit by real time too (at most every 250 ms), or scale `LIGHT_STEP` with the ticks per step. 15 game minutes per update doesn't show as a step. |
 | P2-08 | medium | `web/src/game/host.ts:198` | The menu town is drawn at full rate: 87 % main-thread busy at `r = 3` (25 % at `r = 1`), as much as play. | Cap the menu town at 30 fps with the FramePacer (estimated 87 → ~45 %), or stop drawing while a full-screen menu covers it (owner question). Cache the label obstacle rectangles. |
 | P2-05 | low | `web/src/game/session.ts:738` | Idea toasts are rebuilt on every UI message (7.7 a second) even when no resident changed: 2.1–2.9 ms/s at `r = 3`, about a quarter of all UI-message work. | `if (changed.sims) ideas.update(game.sims)`. |
 | P2-06 | low | `web/src/render/babylon/models.ts:622` | When `buildAhead`'s idle callback fires on its timeout, one model job still runs: 38–55 ms at `r = 3`. It is the only long task seen in play (one per 30 s at speed 5), and a visible hitch on target CPUs. | Run a job on timeout only if it fits, or re-arm after a frame. Better: split model building into smaller jobs. |
 | P2-11 | low | JS heap (production build) | Over 10 minutes at speed 5 (about 25 game days) the heap after forced GC grew from 153.5 to 160.2 MB, and DOM nodes from 960 to 1,129. Likely portraits and lists for new residents; not a leak by itself. | If time allows, a heap-snapshot diff over a 1-hour speed-5 run before release. |
 | P2-13 | low | `web/src/audio/world.ts:577` | Bird songs are made on the main thread inside the 10 Hz sound tick: 1–2 MB and a few ms per new song (cached afterwards). | Make them in the water-sound worker or in idle time. |
 | P2-14 | low | `web/src/debug/threads.ts:55` | F3 "Busy" counts only the frame callback, not style, layout, paint, UI messages or GC: it shows 70 % where the trace measures 80.5 %. | Use a long-animation-frame based busy share, or label it "Frame work share". |
+
+Two of P2's findings are listed with P1's in 2.5.1: P2-07 (the main thread is saturated at `r = 3` and Low doesn't help) with P1-07, and P2-04 (lighting updates 20 times a second at speed 5) with P1-11.
 
 Measured savings at speed 5, `r = 3`:
 
@@ -433,6 +520,8 @@ R5 built the site with the Pages base path, served it like Pages and played it. 
 
 ### 2.7 Questions for the owner
 
+Decisions: see §2.8.
+
 - **R2-01:** are stable object ids still deferred to v0.3? Remapping `follow_up` and `stuck` is a small, safe fix for v0.2.0.
 - **R2-05:** restore the traits' starting skills? New residents would start with skills, as designed.
 - **R2-09:** may the player send residents to use other households' things?
@@ -449,7 +538,35 @@ R5 built the site with the Pages base path, served it like Pages and played it. 
 - **R5-07:** one autosave per game, with 2 rotating slots?
 - **R5-09:** ask the browser for persistent storage, and add save export and import?
 - **R5-15:** keep the large model files on Pages (one file is 255 MB; about 430 MB per player who uses voices and the language model), split them, or host them on Hugging Face or a CDN?
-- **P2-07:** which CPU-side rendering cuts for Low at 60 fps: fewer draw calls or shadow casters, merged static meshes, culling the near nature instances, or snapshot rendering in play?
+- **P1-07, P2-07:** which CPU-side rendering cuts for Low at 60 fps: fewer draw calls or shadow casters, merged static meshes, culling the near nature instances, or snapshot rendering in play?
+- **P1-07:** should Low on Intel integrated GPUs default to WebGL2? The WebGL toggle stays under Troubleshooting either way.
+- **P1 (HD 620 estimate):** is Medium's 30 fps on an HD 620 to be reached only through Auto resolution, or should those GPUs default to Low (adapter detection at first start)?
+- **P1-01, P1-12:** may Low drop the neighbours' house interiors and the lawn beyond the viewed lot?
 - **P2-08:** cap the menu town at 30 fps, or stop drawing it behind full-screen menus?
 - **P2-03:** lower the glass blur everywhere, or only replace it on Low as decided?
 - **P3-01:** show the menu before the latest save is ready, with Continue showing the remaining progress?
+
+### 2.8 Owner decisions
+
+From planning, before the review:
+- **R2-01:** object ids stay position-based for 0.2.0 (the remap fix plus the `seen` guard of R2-04). Stable per-object ids are a v0.3 refactor.
+
+From the review gate (2026-10-13):
+- **R2-05:** fix the parse bug, so new residents start with the designed skills. Old saves keep theirs.
+- **R3-04:** practice runs its full session. Practising a skill the resident wants isn't ended by "needs satisfied"; it runs to the interaction's normal length or until practice fatigue makes interest 0.
+- **R3-05:** NPC households buy a bed when a child leaves the crib and there are fewer bed places than people, as with cribs. The player's household gets a notice that the child has no bed, and no automatic purchase.
+- **R2-09:** blocked. A directed Use is refused unless the resident has access (their own home, or the guest rules while visiting), and `start_task` checks again.
+- **R5-07:** one autosave per game, keeping the 2 most recent. A game is an id created at New game and carried in the save record's metadata.
+- **R5-09:** both: `navigator.storage.persist()` on the first save (silently), and Export and Import of a save file in Load game.
+- **R1-04, R1-05:** glide and jog, visual only. At speeds 4–5 walkers are interpolated (slight corner cutting is accepted). When the walk clip would need more than its natural rate, the existing `jog` clip plays, for children too. No change to the sim's walk speeds.
+- **R2-13:** refund the ingredient cost when a recipe is given up after paying.
+
+Defaults taken by the coordinator:
+- **R3-17:** no change in 0.2.0 (balance); documented for later.
+- **R4-05:** show "Graphics were reset" with Save and reload, which needs saving without a drawn frame (R4-06). A full renderer rebuild only if trivial.
+- **R5-10:** autosave on `visibilitychange` → hidden and on `pagehide` (throttled); no `beforeunload` prompt.
+- **R5-15:** verify the large model files in the Linux CI dry run, and split them only if it shows a problem.
+- **R1-08:** keep the keyboard camera keys and make them frame-rate independent.
+- **Balance:** no other gameplay balance changes in 0.2.0 beyond the decisions above.
+
+Graphics: *(pending)*
