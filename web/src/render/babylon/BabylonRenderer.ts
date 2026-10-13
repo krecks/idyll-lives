@@ -2794,7 +2794,9 @@ export class BabylonRenderer implements Renderer {
   }
 
   private async buildSims(world: WorldStructure): Promise<void> {
-    await this.characters.build(world);
+    // Residents carry on as they were (a world message comes with every change in it: a thing
+    // bought, sold, broken or mended, someone arriving or leaving ...).
+    await this.characters.build(world, 'residents');
     // Sims arrive at the lot's entry, in front of the door. The first time a lot is shown, view it
     // from that side (three-quarter angle) so the cutaway opens the front wall instead of the
     // full-height back wall hiding the arriving household. (Not when following someone there:

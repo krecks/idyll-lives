@@ -204,7 +204,7 @@ export class Studio {
     this.building = true;
     const sims = this.rows.flatMap((r, i) => (r ? [simInfo(i, r.look)] : []));
     void this.characters
-      .build({ sims, objects: [] }, true)
+      .build({ sims, objects: [] }, 'rows')
       .catch((err: unknown) => console.warn('[preview] build failed', err))
       .finally(() => {
         this.builtKey = key;

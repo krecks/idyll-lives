@@ -483,6 +483,8 @@ function copyPlayer(from: Player, to: Player): void {
 
 interface SimRig {
   id: number;
+  /** Who the row holds, in what body (see `build`: a rebuild keeps the rig only for the same). */
+  who: string;
   /** Height of the floor under them (upper storeys, part way up the stairs). */
   floorY: number;
   body: BodyData;
@@ -965,10 +967,14 @@ export class Characters {
 
   /**
    * Builds instances for the world's Sims (meshes and materials are cached). `keep` keeps the
-   * animation state of Sims whose row stays (previews restyling a Sim without restarting it).
-   * A Sim may carry `outfitId`, the id its outfit is derived from when it differs from its row.
+   * animation state (clips, blankets, pyjamas, a baby in someone's arms ...): `'rows'` of every
+   * row that stays (previews restyling a Sim without restarting it), `'residents'` of rows that
+   * still hold the same resident in the same body (the game: the world is rebuilt whenever
+   * something in it changes; a slot taken by someone new, or a body grown into the next life
+   * stage, starts afresh). A Sim may carry `outfitId`, the id its outfit is derived from when it
+   * differs from its row.
    */
-  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number; basement?: number }, keep = false): Promise<void> {
+  async build(world: Pick<WorldStructure, 'sims' | 'objects'> & { storeys?: number; storeyDepth?: number; basement?: number }, keep: 'rows' | 'residents' | false = false): Promise<void> {
     if (!(await this.init())) return;
     const set = this.set!;
     // Life stages other than the base bodies' (children, teens, elders …) load on demand, the
@@ -1021,13 +1027,19 @@ export class Characters {
       const stageScale = shaped ? 1 : (s.appearance?.stageScale ?? 1);
       const scale = ((BASE_HEIGHT[base.name] ?? 1.72) / base.height) * height * stageScale;
       const build = clampBuild(s.appearance?.build);
-      const rig: SimRig = {
+      const head = shaped ? 1 : (s.appearance?.stageHead ?? 1);
+      const stoop = s.appearance?.stageStoop ?? 0;
+      const who = `${s.name}|${s.generation ?? 0}|${s.gender}|${stage ?? ''}|${body.name}|${outfitId}`;
+      const old = kept[s.id];
+      // The same rig carries on (pyjamas: `asleep` is worked out again, and the outfit for it written, when next posed).
+      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, head, stoop, build, asleep: false }) : {
         id: s.id,
+        who,
         floorY: 0,
         body,
         scale,
-        head: shaped ? 1 : (s.appearance?.stageHead ?? 1),
-        stoop: s.appearance?.stageStoop ?? 0,
+        head,
+        stoop,
         build,
         seed: hash(s.id + 17),
         visible: false,
@@ -1095,8 +1107,6 @@ export class Characters {
         speechStart: 0,
         speechSeg: 0,
       };
-      const old = kept[s.id];
-      if (old) Object.assign(rig, old, { body, scale, build, asleep: false });
       this.sims[s.id] = rig;
       rig.day = outfitFor(outfitId, s.gender, s.appearance, body);
       rig.night = outfitFor(outfitId, s.gender, s.appearance, body, true);
