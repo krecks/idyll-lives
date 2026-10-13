@@ -2777,7 +2777,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         }
         let decay =
             def.decay_per_minute * sim.mods.need_decay[n] * rhythm_factor * minutes;
-        sim.needs[n] = (sim.needs[n] - decay).max(0.0);
+        sim.needs[n] = (sim.needs[n] - decay).clamp(0.0, 1.0);
     }
 
     // At work: off the map until `life::update` brings them back.
@@ -3845,12 +3845,12 @@ fn use_object(
             any_gain = true;
             fills |= 1 << n;
             let g = g * sim.mods.need_gain[n] * boost;
-            sim.needs[n] = (sim.needs[n] + g * minutes).min(1.0);
+            sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
             satisfied &= sim.needs[n] >= 0.999;
         } else {
             if g < 0.0 {
                 // Costs (a workout makes you hungry and sweaty).
-                sim.needs[n] = (sim.needs[n] + g * minutes).max(0.0);
+                sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
                 emptying |= sim.needs[n] < low && !content.needs[n].room;
             }
             // (Surroundings are never urgent: they follow the room, nothing fills them. Nor is

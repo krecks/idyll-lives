@@ -115,8 +115,17 @@ pub fn score_felt(needs: &[f32], weights: &[f32], gains: &[f32; MAX_NEEDS], dist
 /// Picks among the best candidates with weighted randomness, so Sims are not robotic.
 /// `candidates` are `(score, payload)`; returns the chosen payload.
 pub fn choose<T: Copy>(candidates: &mut [(f32, T)], roll: f32, top_n: usize) -> Option<T> {
-    candidates.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
-    let top = &candidates[..candidates.len().min(top_n)];
+    debug_assert!(candidates.iter().all(|c| c.0.is_finite()), "a choice scored {:?}", candidates.iter().find(|c| !c.0.is_finite()).map(|c| c.0));
+    pick(candidates, roll, top_n)
+}
+
+/// `choose`, leaving out scores that aren't numbers (NaN or infinity would make the pick the
+/// last of the best every time).
+fn pick<T: Copy>(candidates: &mut [(f32, T)], roll: f32, top_n: usize) -> Option<T> {
+    let score = |c: &(f32, T)| if c.0.is_finite() { c.0 } else { f32::NEG_INFINITY };
+    candidates.sort_unstable_by(|a, b| score(b).total_cmp(&score(a)));
+    let scored = candidates.iter().take_while(|c| c.0.is_finite()).count();
+    let top = &candidates[..scored.min(top_n)];
     let total: f32 = top.iter().map(|c| c.0).sum();
     if total <= 0.0 {
         return None;
@@ -198,5 +207,25 @@ mod tests {
     fn choose_respects_top_n() {
         let mut c = [(0.1, 'a'), (5.0, 'b'), (0.2, 'c')];
         assert_eq!(choose(&mut c, 0.99, 1), Some('b'));
+    }
+
+    /// A score that isn't a number never wins (it would have made every pick the last of the
+    /// best): it's left out.
+    #[test]
+    fn a_score_that_isnt_a_number_never_wins() {
+        for roll in [0.0, 0.5, 0.99] {
+            let mut c = [(f32::NAN, 'n'), (1.0, 'a'), (f32::INFINITY, 'i'), (0.5, 'b')];
+            let got = pick(&mut c, roll, 3);
+            assert!(matches!(got, Some('a' | 'b')), "roll {roll}: {got:?}");
+        }
+        assert_eq!(pick(&mut [(f32::NAN, 'n')], 0.5, 3), None);
+    }
+
+    /// In debug builds a score that isn't a number is a bug to look into.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "a choice scored")]
+    fn a_score_that_isnt_a_number_is_a_bug() {
+        choose(&mut [(f32::NAN, 'n'), (1.0, 'a')], 0.5, 3);
     }
 }
