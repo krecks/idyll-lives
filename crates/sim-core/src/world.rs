@@ -1606,13 +1606,32 @@ impl World {
         sim.planner.run = None;
         sim.planner.thought = None;
         sim.gone = Some(Gone { why, day });
-        for other in &mut self.sims {
+        // Nobody talks to them, listens in, opens the door to them or rings them any more (their
+        // slot may soon be someone else's), and a visitor waits for someone else to come.
+        let with_them = |t: &Task| match t.kind {
+            TaskKind::Social { target, .. } | TaskKind::Join { leader: target } | TaskKind::Answer { guest: target } => target == id,
+            TaskKind::Phone { contact, .. } => contact == Some(id),
+            _ => false,
+        };
+        let World { sims, content, objects, households, .. } = self;
+        for other in sims.iter_mut() {
             if other.engaged_with == Some(id) {
                 other.engaged_with = None;
             }
-            other.queue.retain(|t| !matches!(t.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id));
-            if other.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id)) {
-                other.current = None;
+            other.queue.retain(|t| !with_them(t));
+            if other.current.as_ref().is_some_and(|a| with_them(&a.task)) {
+                end_activity(other, content, objects);
+            }
+            if let Some(Activity { phase: Phase::Knocking { host, .. }, .. }) = other.current.as_mut()
+                && *host == Some(id)
+            {
+                *host = None;
+            }
+        }
+        // A baby on the way with them is no longer (nobody's named as a parent who isn't here).
+        for h in households.iter_mut() {
+            if h.expecting.is_some_and(|e| e.parents.contains(&id)) {
+                h.expecting = None;
             }
         }
         self.relationships.clear(i);
