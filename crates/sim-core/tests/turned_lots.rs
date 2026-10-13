@@ -58,6 +58,9 @@ fn things_two_tiles_wide_on_a_turned_lot_can_be_reached() {
     let content = common::content();
     for turned in [false, true] {
         let w = World::from_json(&content, &town(turned), 3).unwrap();
+        if turned {
+            common::dump_state(&w, "turned-bedroom");
+        }
         let nav = NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
         let start = (w.sims[0].pos[0].floor() as i32, w.sims[0].pos[1].floor() as i32);
         // The tile the house was furnished to keep clear in front of each.
@@ -70,6 +73,25 @@ fn things_two_tiles_wide_on_a_turned_lot_can_be_reached() {
             assert_eq!(surface::approach_tile(&w.content, &nav, o), tile, "turned {turned}");
             assert!(nav.find_path(start, tile).is_some(), "turned {turned}: can't get to {tile:?}");
         }
+    }
+}
+
+#[test]
+fn with_both_middle_tiles_taken_it_is_still_used_from_the_front() {
+    // Build mode marks the front then (the web's `approachTile` finds no free tile): nothing else
+    // is tried, so a thing boxed in on both is out of reach.
+    let content = common::content();
+    for turned in [false, true] {
+        let w = World::from_json(&content, &town(turned), 3).unwrap();
+        let o = &w.objects[BED as usize];
+        let front = o.front_tile(&w.content);
+        let mut blocked = w.blocked().to_vec();
+        for (x, z) in [front, (front.0 + 1, front.1)] {
+            blocked[w.lot.tile_index(x, z)] = true;
+        }
+        let nav = NavGrid { lot: &w.lot, blocked: &blocked, stairs: w.stair_map() };
+        assert_eq!(surface::approach_tiles(&w.content, &nav, o).collect::<Vec<_>>(), vec![front], "turned {turned}");
+        assert_eq!(surface::approach_tile(&w.content, &nav, o), front, "turned {turned}");
     }
 }
 

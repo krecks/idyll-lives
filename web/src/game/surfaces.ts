@@ -250,6 +250,26 @@ export function approachCandidates(def: Shape | undefined, x: number, z: number,
 }
 
 /**
+ * Where a resident will use a footprint from as things stand (sim-core `approach_tile`): the first
+ * of its `approachCandidates` that can be stood on (`standable`: free, and open to the tile of its
+ * own it's next to), so the other middle tile when the front is taken. Null: none can be. `out`
+ * is which way the tile lies from the footprint, in quarter turns as `rot`.
+ */
+export function approachTile(
+  def: Shape | undefined,
+  x: number,
+  z: number,
+  rot: number,
+  size: readonly [number, number] | undefined,
+  standable: (c: { tile: [number, number]; inner: [number, number] }) => boolean,
+): { tile: [number, number]; out: number } | null {
+  const found = approachCandidates(def, x, z, rot, size).find(standable);
+  if (!found) return null;
+  const [dx, dz] = [found.tile[0] - found.inner[0], found.tile[1] - found.inner[1]];
+  return { tile: found.tile, out: dz > 0 ? 0 : dx > 0 ? 1 : dz < 0 ? 2 : 3 };
+}
+
+/**
  * The top a seat with a `seatAt` faces (sim-core `faced_table`): the one over the tile in front of
  * it, of a kind it tucks under, on the same storey (`storeyDepth`: rows per storey, 0 for one)
  * with no wall between (`wallBetween`).
