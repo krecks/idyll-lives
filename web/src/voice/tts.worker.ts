@@ -55,6 +55,13 @@ let engine: Engine | null = null;
 let loading: Promise<void> | null = null;
 /** Lines are made one after another: a run must finish before the next starts. */
 let queue: Promise<void> = Promise.resolve();
+/** What our WebAssembly said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
+let panicked: string | null = null;
+
+(self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
+  panicked = message;
+  console.error(`[voice] ${message}`);
+};
 
 scope.onmessage = (e) => {
   const msg = e.data;
@@ -82,6 +89,13 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     scope.postMessage({ type: 'audio', id, samples, visemes, ms: performance.now() - start }, [samples.buffer, visemes.buffer]);
   } catch (err) {
     scope.postMessage({ type: 'error', id, message: String(err) });
+    // A trap (ours, or ONNX Runtime's) leaves that WebAssembly broken: its stack and memory are
+    // wherever the call stopped. Nothing here uses it again; the main thread starts a new worker.
+    if (err instanceof WebAssembly.RuntimeError) {
+      engine = null;
+      loading = null;
+      scope.postMessage({ type: 'error', message: panicked ?? String(err), restart: true });
+    }
   }
 }
 

@@ -59,7 +59,7 @@ function debugReports(): Plugin {
           for await (const chunk of req) chunks.push(chunk as Buffer);
           const { report, save, screenshot } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
             report: { createdAt: string; note: string };
-            save: string;
+            save: string | null;
             screenshot: string | null;
           };
           const slug = report.note.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -67,7 +67,8 @@ function debugReports(): Plugin {
           const dir = join(REPORTS, name);
           await mkdir(dir, { recursive: true });
           await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));
-          await writeFile(join(dir, 'save.txt'), save);
+          // No save when the game had stopped (or none ran): the report alone.
+          if (save !== null) await writeFile(join(dir, 'save.txt'), save);
           if (screenshot) await writeFile(join(dir, 'screenshot.jpg'), Buffer.from(screenshot.slice(screenshot.indexOf(',') + 1), 'base64'));
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ path: `debug-reports/${name}` }));

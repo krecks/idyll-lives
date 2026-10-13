@@ -78,6 +78,7 @@ import type {
   ResizeHandle,
   Renderer,
   RendererDeps,
+  RenderFailure,
   RenderStats,
   TownShot,
   ViewRect,
@@ -92,7 +93,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
 import { Geo } from './geometry';
 import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
-import { compressedTextureFeatures } from './loaders';
+import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
@@ -183,6 +184,10 @@ const WARM_WORLD_FRAMES = 4;
 const TEXTURE_WAIT_MS = 5000;
 /** Main-thread time (ms) a world build behind the overview runs before the menus' town draws a frame. */
 const BUILD_SLICE_MS = 8;
+/** Frames in a row that may fail to draw before drawing counts as broken (`onFailure`). */
+const FAILED_FRAMES_LIMIT = 60;
+/** Longest wait for `framesRendered` (drawing stopped, a hidden tab): then it goes on without them. */
+const FRAME_WAIT_LIMIT_MS = 15_000;
 
 /** A landscape, shared by the game world and the overview when they are the same town. */
 interface NatureSet {
@@ -248,6 +253,9 @@ export class BabylonRenderer implements Renderer {
   private followIndex: number | null = null;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private frameWaiters: { left: number; resolve: () => void }[] = [];
+  /** Frames in a row that failed to draw (each is caught, so the loop goes on). */
+  private failedFrames = 0;
+  onFailure: ((why: RenderFailure, error?: unknown) => void) | null = null;
   /**
    * Built model templates by key, kept across lot switches and sessions (building them
    * is expensive). Templates not used by the current world are disabled, not disposed.
@@ -448,15 +456,29 @@ export class BabylonRenderer implements Renderer {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
-    if (!forceWebGL && (await WebGPUEngine.IsSupportedAsync)) {
+    if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
       const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
-      await engine.initAsync();
-      this.engine = this.webgpu = engine;
-    } else {
-      this.engine = new Engine(canvas, !this.diag.has('nocanvasaa'), { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
+      try {
+        await engine.initAsync();
+        this.engine = this.webgpu = engine;
+      } catch (err) {
+        // An adapter but no device (a blocklisted driver, a device lost while starting): WebGL2,
+        // for the rest of the session.
+        console.warn('[render] WebGPU failed to start; drawing with WebGL2', err);
+        noteWebGpuFailed();
+        try {
+          engine.dispose();
+        } catch {
+          // Half started: nothing more to free.
+        }
+      }
     }
+    this.engine ??= new Engine(canvas, !this.diag.has('nocanvasaa'), { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
     // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
     if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
+    // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
+    // GPU is gone, and the game's own buffers can't be rebuilt in place.
+    this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
 
     const scene = (this.scene = new Scene(this.engine));
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
@@ -1678,7 +1700,16 @@ export class BabylonRenderer implements Renderer {
   }
 
   framesRendered(frames: number): Promise<void> {
-    return new Promise((resolve) => this.frameWaiters.push({ left: frames, resolve }));
+    return new Promise((resolve) => {
+      const waiter = { left: frames, resolve };
+      this.frameWaiters.push(waiter);
+      setTimeout(() => {
+        const i = this.frameWaiters.indexOf(waiter);
+        if (i < 0) return;
+        this.frameWaiters.splice(i, 1);
+        resolve();
+      }, FRAME_WAIT_LIMIT_MS);
+    });
   }
 
   setIdleOrbit(on: boolean): void {
@@ -1769,6 +1800,7 @@ export class BabylonRenderer implements Renderer {
 
   dispose(): void {
     this.warmPass++;
+    this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
     this.overview?.dispose();
     this.engine.dispose();
@@ -2034,20 +2066,30 @@ export class BabylonRenderer implements Renderer {
   private readonly renderFrame = () => {
     const start = performance.now();
     const probe = this.probe;
-    if (probe) {
-      const c = this.counts;
-      c.shadowDrawCalls = c.shadowTriangles = c.mirrorDrawCalls = c.mirrorTriangles = 0;
-      probe.before(start);
+    // Babylon asks for the next frame only after this one returns: a frame that throws must not
+    // stop drawing for good. The first error is logged; many in a row count as broken.
+    let updated = 0;
+    try {
+      if (probe) {
+        const c = this.counts;
+        c.shadowDrawCalls = c.shadowTriangles = c.mirrorDrawCalls = c.mirrorTriangles = 0;
+        probe.before(start);
+      }
+      const dt = this.engine.getDeltaTime();
+      if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
+      this.onFrame?.(performance.now());
+      if (probe) updated = performance.now();
+      if (this.townMode && this.overview) {
+        this.townFrame(dt);
+        if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
+      }
+      this.scene.render();
+      this.failedFrames = 0;
+    } catch (err) {
+      if (this.failedFrames === 0) console.error('[render] a frame failed', err);
+      if (++this.failedFrames === FAILED_FRAMES_LIMIT) this.onFailure?.('frames', err);
+      return;
     }
-    const dt = this.engine.getDeltaTime();
-    if (this.idleOrbit && !this.townMode) this.camera.alpha += dt * 0.00003;
-    this.onFrame?.(performance.now());
-    const updated = probe ? performance.now() : 0;
-    if (this.townMode && this.overview) {
-      this.townFrame(dt);
-      if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
-    }
-    this.scene.render();
     const end = performance.now();
     this.cpuMs += (end - start - this.cpuMs) * 0.1;
     if (this.gpuWanted.size && this.webgpu) this.settleSpans();

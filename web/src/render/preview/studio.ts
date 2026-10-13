@@ -30,7 +30,7 @@ import type { FrameState } from '../../core/bridge';
 import type { SimInfo } from '../../core/protocol';
 import type { SnapshotLayout } from '../../core/snapshot';
 import { Characters, MAX_CHARACTERS } from '../babylon/characters';
-import { compressedTextureFeatures } from '../babylon/loaders';
+import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from '../babylon/loaders';
 import { MaterialLibrary } from '../babylon/materials';
 import type { SimLook } from '../types';
 
@@ -96,17 +96,27 @@ export class Studio {
   static async create(deps: StudioDeps): Promise<Studio> {
     const canvas = document.createElement('canvas');
     canvas.className = 'sim-studio';
-    let engine: AbstractEngine;
+    let engine: AbstractEngine | null = null;
     let webgpu = false;
     const forceWebGL = deps.backend() === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
-    if (!forceWebGL && (await WebGPUEngine.IsSupportedAsync)) {
+    if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
       const gpu = new WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true, premultipliedAlpha: true, ...compressedTextureFeatures() });
-      await gpu.initAsync();
-      engine = gpu;
-      webgpu = true;
-    } else {
-      engine = new Engine(canvas, true, { adaptToDeviceRatio: true, premultipliedAlpha: true, alpha: true, stencil: false });
+      try {
+        await gpu.initAsync();
+        engine = gpu;
+        webgpu = true;
+      } catch (err) {
+        // As the game's renderer does: WebGL2 for the rest of the session.
+        console.warn('[previews] WebGPU failed to start; drawing with WebGL2', err);
+        noteWebGpuFailed();
+        try {
+          gpu.dispose();
+        } catch {
+          // Half started: nothing more to free.
+        }
+      }
     }
+    engine ??= new Engine(canvas, true, { adaptToDeviceRatio: true, premultipliedAlpha: true, alpha: true, stencil: false });
     engine.setHardwareScalingLevel(1 / Math.min(2, window.devicePixelRatio || 1));
     try {
       const scene = new Scene(engine);

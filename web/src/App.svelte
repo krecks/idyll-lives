@@ -3,6 +3,7 @@
   import { host } from './game/host';
   import { menuScene } from './game/menuScene';
   import { BENCH } from './debug/benchFlags';
+  import { watchLog } from './debug/log';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave } from './persistence/saves';
@@ -15,6 +16,7 @@
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
   import CreateNeighbourhood from './ui/screens/CreateNeighbourhood.svelte';
   import CreateWorld from './ui/screens/CreateWorld.svelte';
+  import CrashScreen from './ui/screens/CrashScreen.svelte';
   import Credits from './ui/screens/Credits.svelte';
   import LoadGame from './ui/screens/LoadGame.svelte';
   import LoadingScreen from './ui/screens/LoadingScreen.svelte';
@@ -29,12 +31,39 @@
   /** The in-game interface is a script chunk of its own: fetched once the menu is up, or when a game starts. */
   let GameView = $state.raw<Component | null>(null);
   let gameViewLoad: Promise<unknown> | null = null;
-  const loadGameView = () => (gameViewLoad ??= import('./ui/screens/GameView.svelte').then((m) => (GameView = m.default)));
+  const loadGameView = () =>
+    (gameViewLoad ??= import('./ui/screens/GameView.svelte').then(
+      (m) => (GameView = m.default),
+      (err: unknown) => {
+        // Fetched again on the next try; a game waiting for it goes back to the menu meanwhile.
+        gameViewLoad = null;
+        console.error('[app] the game screen failed to load', err);
+        app.newVersion = true;
+        if (app.screen === 'game') app.toMenu();
+      },
+    ));
+
+  /**
+   * A script file that didn't load: a new version replaced this one's files (they're hashed per
+   * version), or the network failed. Either way, reloading is the cure.
+   */
+  const MISSING_FILE = /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS/i;
 
   onMount(() => {
     host.mount(gameLayer);
+    window.addEventListener('vite:preloadError', () => (app.newVersion = true));
+    // Also what was caught and only logged (Babylon's shaders are fetched on first use).
+    watchLog((entry) => {
+      if (entry.level !== 'warn' && MISSING_FILE.test(entry.text)) app.newVersion = true;
+    });
     void boot();
   });
+
+  /** An error in the game's interface: the crash screen (outside the render that failed). */
+  function interfaceFailed(error: unknown) {
+    console.error('[ui] the game interface failed', error);
+    queueMicrotask(() => app.crashed({ kind: 'interface', detail: error instanceof Error ? error.message : String(error) }));
+  }
 
   /** Longest wait for one start-up step (a stuck step must not keep the menu away). */
   const STEP_LIMIT_MS = 45_000;
@@ -54,6 +83,7 @@
       await loadGameData();
       app.dataReady = true;
     } catch (err) {
+      console.error('[boot] the game data failed to load', err);
       app.fatal = err instanceof Error ? err.message : String(err);
       return;
     }
@@ -194,12 +224,17 @@
 
 {#if app.fatal}
   <MenuBackdrop />
-  <div class="center"><div class="glass box"><b>Couldn't load game data</b><span>{app.fatal}</span></div></div>
+  <CrashScreen crash={{ kind: 'data', detail: app.fatal }} />
 {:else if app.booting}
   <LoadingScreen progress={app.boot} />
 {:else if app.screen === 'game'}
   {#if GameView}
-    {#key app.sessionKey}<GameView />{/key}
+    {#key app.sessionKey}
+      <svelte:boundary onerror={interfaceFailed}>
+        <GameView />
+        {#snippet failed()}{/snippet}
+      </svelte:boundary>
+    {/key}
   {:else}
     <LoadingScreen progress={app.loading ?? { label: 'Moving in', value: 0 }} />
   {/if}
@@ -224,6 +259,17 @@
   <Modal title={titles[app.overlay]} width={app.overlay === 'credits' ? 520 : app.overlay === 'settings' ? 880 : 680} scroll={app.overlay !== 'settings'} onclose={() => (app.overlay = null)}>
     {#if app.overlay === 'settings'}<SettingsPanel />{:else if app.overlay === 'load'}<LoadGame />{:else}<Credits />{/if}
   </Modal>
+{/if}
+
+{#if app.crash && !app.fatal}<CrashScreen crash={app.crash} />{/if}
+
+{#if app.newVersion}
+  <div class="scaled update">
+    <div class="glass bar" role="alert">
+      <span>A new version is available.</span>
+      <button class="btn primary" onclick={() => location.reload()}>Reload</button>
+    </div>
+  </div>
 {/if}
 
 <div class="scaled toast-layer"><Toasts /></div>
@@ -264,18 +310,26 @@
   .game-layer :global(.scene-veil.on) {
     opacity: 1;
   }
-  .center {
+  /* "A new version is available": a bar at the top, over everything but the toasts. */
+  .update {
     position: fixed;
-    inset: 0;
+    inset: 16px 0 auto 0;
     display: grid;
     place-items: center;
+    pointer-events: none;
+    z-index: 55;
   }
-  .box {
+  .bar {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 28px 36px;
-    max-width: 480px;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 8px 8px 20px;
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    pointer-events: auto;
+  }
+  .bar .btn {
+    border-radius: var(--radius-pill);
   }
   .toast-layer {
     position: fixed;

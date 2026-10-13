@@ -7,7 +7,7 @@
 
 import type { CameraPose } from '../render/types';
 import { writeSave, type SaveRecord } from '../persistence/saves';
-import type { LogEntry } from './log';
+import { recentLog, type LogEntry } from './log';
 
 export interface DebugReport {
   /** What the report is about, typed by the player (may be empty). */
@@ -25,7 +25,8 @@ export interface DebugReport {
   /** Main, sim and voice threads (see `debug/threads.ts`). */
   threads: unknown;
   settings: unknown;
-  camera: CameraPose;
+  /** The game camera (null: no game was running). */
+  camera: CameraPose | null;
   /** UI state (mode, selection, panels, needs…) at capture time. */
   ui: unknown;
   log: LogEntry[];
@@ -35,10 +36,42 @@ export interface DebugReport {
 
 export interface DebugPayload {
   report: DebugReport;
-  /** The simulation's save data. */
-  save: string;
+  /** The simulation's save data (null: there was no game, or it had stopped). */
+  save: string | null;
   /** JPEG data URL of the 3D view, or null if capture failed. */
   screenshot: string | null;
+}
+
+/** `promise`, or `fallback` if it takes longer than `ms`. */
+export function within<T, F>(promise: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<F>((resolve) => (timer = setTimeout(() => resolve(fallback), ms)));
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * A report without a game to ask (the crash screen when no game runs, or game data that didn't
+ * load): the log, the settings, the interface state and a picture if one could be taken.
+ */
+export async function basicReport(note: string, parts: { settings: unknown; ui: unknown; renderer: unknown; screenshot: string | null }): Promise<string> {
+  const report: DebugReport = {
+    note,
+    version: __APP_VERSION__,
+    commit: __APP_COMMIT__,
+    createdAt: new Date().toISOString(),
+    url: location.href,
+    userAgent: navigator.userAgent,
+    screen: { width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio || 1 },
+    gpu: await within(gpuInfo(), 4000, null),
+    renderer: parts.renderer,
+    threads: null,
+    settings: parts.settings,
+    camera: null,
+    ui: parts.ui,
+    log: recentLog(),
+    saveMeta: { id: 'debug', name: 'Debug report', household: '', members: [], day: 0, minute: 0, savedAt: Date.now(), autosave: false },
+  };
+  return deliverReport({ report, save: null, screenshot: parts.screenshot });
 }
 
 /** Adapter details for the report (WebGPU only; empty when unavailable). */

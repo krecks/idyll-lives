@@ -40,3 +40,10 @@ registerBuiltInGLTFExtensions();
 export function compressedTextureFeatures(): { deviceDescriptor: GPUDeviceDescriptor } {
   return { deviceDescriptor: { requiredFeatures: ['texture-compression-bc', 'texture-compression-etc2', 'texture-compression-astc', 'timestamp-query'] } };
 }
+
+/** WebGPU had an adapter but failed to start once this session: later engines use WebGL2 straight away. */
+let webGpuBroken = false;
+export const webGpuFailed = (): boolean => webGpuBroken;
+export function noteWebGpuFailed(): void {
+  webGpuBroken = true;
+}

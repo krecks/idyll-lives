@@ -31,12 +31,29 @@ let lastLot = -1;
 let lastRegion = '';
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
+/** What the simulation said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
+let panicked: string | null = null;
+/** The simulation failed for good (`stop`): nothing calls into it again. */
+let stopped = false;
+/** `__crash('panic')`: the next step panics. */
+let panicNext = false;
+
+(self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
+  panicked = message;
+  console.error(`[sim] ${message}`);
+};
 
 scope.onmessage = (e) => {
   const msg = e.data;
+  if (msg.type === 'debugCrash') return debugCrash(msg.what);
+  // One guard for every message: a trap ends the game; anything else fails just that request
+  // (a command's error is told to the player).
+  const requestId = 'requestId' in msg ? msg.requestId : undefined;
   try {
     if (msg.type === 'init') {
       void start(msg.content, msg.source).catch((err) => fail(err, true));
+    } else if (requestId !== undefined && !game) {
+      throw new Error(stopped ? 'The game stopped because of an error.' : "The game isn't running.");
     } else if (msg.type === 'save' && game) {
       scope.postMessage({ type: 'saved', requestId: msg.requestId, data: game.save() });
     } else if (msg.type === 'view') {
@@ -58,6 +75,7 @@ scope.onmessage = (e) => {
       try {
         scope.postMessage({ type: 'blueprint', requestId: msg.requestId, data: game.blueprint(msg.household) });
       } catch (err) {
+        if (isTrap(err)) throw err;
         scope.postMessage({ type: 'blueprint', requestId: msg.requestId, data: null, error: err instanceof Error ? err.message : String(err) });
       }
     } else if (msg.type === 'socialOptions' && game) {
@@ -69,7 +87,9 @@ scope.onmessage = (e) => {
       postUi();
     }
   } catch (err) {
-    fail(err, false);
+    if (isTrap(err)) stop(err);
+    else if (requestId !== undefined) scope.postMessage({ type: 'failed', requestId, message: describe(err) });
+    else fail(err, false);
   }
 };
 
@@ -96,14 +116,22 @@ function runLoop(stepMs: number): void {
   let busyMs = 0;
   let maxMs = 0;
   const step = () => {
+    if (stopped) return;
     const start = performance.now();
-    game!.advance();
-    publish();
-    let now = performance.now();
-    if (now - lastUi >= UI_INTERVAL_MS) {
-      lastUi = now;
-      postUi();
+    let now: number;
+    try {
+      if (panicNext) game!.debugPanic('a panic on purpose (__crash)');
+      game!.advance();
+      publish();
       now = performance.now();
+      if (now - lastUi >= UI_INTERVAL_MS) {
+        lastUi = now;
+        postUi();
+        now = performance.now();
+      }
+    } catch (err) {
+      // The step loop is the game: whatever stopped a step, the game can't go on.
+      return stop(err);
     }
     steps++;
     busyMs += now - start;
@@ -191,6 +219,38 @@ function postUi(): void {
 }
 
 function fail(err: unknown, fatal: boolean): void {
-  const message = err instanceof Error ? err.message : String(err);
-  scope.postMessage({ type: 'error', message, fatal });
+  scope.postMessage({ type: 'error', message: describe(err), fatal });
+}
+
+/**
+ * A trap: a Rust panic (the build aborts on panic) or another WebAssembly fault, or
+ * wasm-bindgen's "recursive use" error (a call that trapped still holds the game). The instance
+ * is broken after any of them: its stack and allocator are wherever the call stopped.
+ */
+function isTrap(err: unknown): boolean {
+  return err instanceof WebAssembly.RuntimeError || (err instanceof Error && /recursive use of an object|Maximum call stack/.test(err.message));
+}
+
+/** The game failed for good: the loop stops, nothing calls into the instance again, and the main thread is told. */
+function stop(err: unknown): void {
+  if (stopped) return;
+  stopped = true;
+  game = null;
+  fail(err, true);
+}
+
+/** The error's message, or what the simulation said as it panicked. */
+function describe(err: unknown): string {
+  if (panicked !== null) return panicked;
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** `?debug`'s `__crash` (game/session.ts): fails on purpose, to see how the game copes. */
+function debugCrash(what: 'panic' | 'throw' | 'hang'): void {
+  if (what === 'panic') panicNext = true;
+  else if (what === 'throw') {
+    setTimeout(() => {
+      throw new Error('an error nothing caught, on purpose (__crash)');
+    });
+  } else for (;;);
 }

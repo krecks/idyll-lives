@@ -13,6 +13,7 @@ export interface LogEntry {
 const MAX_ENTRIES = 200;
 const MAX_TEXT = 2000;
 const entries: LogEntry[] = [];
+const watchers: ((entry: LogEntry) => void)[] = [];
 
 function describe(value: unknown): string {
   if (value instanceof Error) return `${value.name}: ${value.message}${value.stack ? `\n${value.stack}` : ''}`;
@@ -26,8 +27,15 @@ function describe(value: unknown): string {
 
 function push(level: LogEntry['level'], parts: unknown[]): void {
   const text = parts.map(describe).join(' ').slice(0, MAX_TEXT);
-  entries.push({ t: Math.round(performance.now()), level, text });
+  const entry: LogEntry = { t: Math.round(performance.now()), level, text };
+  entries.push(entry);
   if (entries.length > MAX_ENTRIES) entries.shift();
+  for (const fn of watchers) fn(entry);
+}
+
+/** Calls `fn` with every entry from now on (e.g. to notice files that failed to load). */
+export function watchLog(fn: (entry: LogEntry) => void): void {
+  watchers.push(fn);
 }
 
 let installed = false;

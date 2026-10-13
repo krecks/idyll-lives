@@ -270,6 +270,9 @@ export interface RoomOverlayTile {
   rgb: [number, number, number];
 }
 
+/** Why drawing broke: frame after frame failed, or the GPU was reset (its device or context lost). */
+export type RenderFailure = 'frames' | 'device';
+
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
   /**
@@ -362,8 +365,13 @@ export interface Renderer {
   run(onFrame: (now: number) => void): void;
   /** Pauses or resumes drawing (e.g. nothing to show behind a menu). */
   setActive(active: boolean): void;
-  /** Resolves once `frames` more frames have been drawn (shaders compiled, textures uploaded). */
+  /**
+   * Resolves once `frames` more frames have been drawn (shaders compiled, textures uploaded), or
+   * after a while without them (drawing stopped, a hidden tab): nothing waits for frames forever.
+   */
   framesRendered(frames: number): Promise<void>;
+  /** Drawing broke for good (`RenderFailure`); a failed frame is otherwise logged and the next one drawn. */
+  onFailure: ((why: RenderFailure, error?: unknown) => void) | null;
   /** Slowly circles the camera (for the live menu backdrop). */
   setIdleOrbit(on: boolean): void;
   /**

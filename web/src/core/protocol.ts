@@ -796,7 +796,9 @@ export type ToWorker =
   /** The next UI update sends everything. */
   | { type: 'resync' }
   /** Which part of the town to build geometry for (tile rectangle); null = everything. */
-  | { type: 'view'; region: [number, number, number, number] | null };
+  | { type: 'view'; region: [number, number, number, number] | null }
+  /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
+  | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };
 
 /** How the sim worker kept up over the last second (for the debug overlay). */
 export interface SimThreadStats {
@@ -828,6 +830,9 @@ export type FromWorker =
   | { type: 'snapshot'; data: Float32Array }
   /** About once a second. */
   | { type: 'stats'; stats: SimThreadStats }
+  /** A request (`requestId`) that couldn't be answered. */
+  | { type: 'failed'; requestId: number; message: string }
+  /** `fatal`: the simulation stopped for good (a trap, or a step that failed). */
   | { type: 'error'; message: string; fatal: boolean };
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
