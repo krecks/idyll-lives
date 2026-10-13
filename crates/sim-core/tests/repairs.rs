@@ -40,6 +40,23 @@ fn sit(w: &mut World) {
 }
 
 #[test]
+fn a_chair_that_broke_on_the_way_isnt_sat_on() {
+    let mut w = world();
+    w.sims[0].needs[0] = 0.2;
+    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+    w.tick_once();
+    assert!(w.sims[0].is_moving(), "on the way to the chair");
+    // Someone else wears it out before they get there.
+    w.objects[0].wear = 1.0;
+    for _ in 0..10 * 20 {
+        w.tick_once();
+        assert_ne!(w.sims[0].pose, sim_core::content::Pose::Sit, "sat on a broken chair");
+    }
+    assert!(w.sims[0].current().is_none() && !w.objects[0].in_use());
+    assert!(w.sims[0].needs[0] < 0.2, "nothing came of it");
+}
+
+#[test]
 fn things_wear_out_break_and_get_repaired() {
     let mut w = world();
     assert_eq!(w.content.objects[1].wear_per_use, 0.0, "plants don't wear out");

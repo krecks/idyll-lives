@@ -3933,12 +3933,17 @@ fn use_object(
 
 fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
-    // Paid on arrival; if the money ran out on the way, never mind.
+    // Paid on arrival; if the money ran out on the way, never mind. Nor is something used that
+    // broke on the way (someone else wore it out).
     if let Some(TaskKind::Use {
         object,
         interaction,
     }) = sim.current.as_ref().map(|a| a.task.kind)
     {
+        if objects[object as usize].broken() {
+            end_activity(sim, content, objects);
+            return;
+        }
         let cost = content.objects[objects[object as usize].def].interactions[interaction].cost;
         let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
         if !affordable(cost, funds) {

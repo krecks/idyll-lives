@@ -316,6 +316,32 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
 }
 
 #[test]
+fn a_stove_that_broke_on_the_way_is_left_for_the_other_one() {
+    let kitchen = format!(r#"{KITCHEN},{{"def":"stove","x":8,"z":1,"rot":0}}"#);
+    let mut w = world_with(&kitchen, 1, false);
+    order(&mut w, 0, FRIDGE, "meal");
+    let (mut broke, mut used) = (None, None);
+    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let Some(a) = w.sims[0].current() else { continue };
+        if let TaskKind::Cook { step: 2, station: Some(s), .. } = a.task.kind {
+            // On the way to the stove, someone else wears it out.
+            if broke.is_none() && matches!(a.phase, Phase::Routing { .. }) {
+                w.objects[s as usize].wear = 1.0;
+                broke = Some(s);
+            }
+            if matches!(a.phase, Phase::Using { .. }) {
+                assert!(!w.objects[s as usize].broken(), "cooking at a broken stove");
+                used = Some(s);
+            }
+        }
+    }
+    let broke = broke.expect("went to a stove");
+    assert!(used.is_some_and(|s| s != broke), "cooked at the other stove: {used:?}");
+    assert!(w.items.list.iter().any(|it| it.servings > 0), "and dinner was made");
+}
+
+#[test]
 fn cancelling_after_the_fridge_drops_the_ingredients_and_frees_the_counter() {
     let mut w = world_with(KITCHEN, 1, false);
     let funds = w.households[0].funds;
