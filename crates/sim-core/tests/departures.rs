@@ -4,7 +4,7 @@
 
 use sim_core::lot::SimSpawn;
 use sim_core::social::{EventKind, FORMER};
-use sim_core::world::GoneWhy;
+use sim_core::world::{GoneWhy, Phase, TaskKind};
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -115,4 +115,88 @@ fn newcomers_fill_gone_slots_before_new_ones_and_a_failed_move_changes_nothing()
     assert_eq!(w.save_json(), before);
     w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Fay"), spawn("Gus")], bonds: vec![] }).unwrap();
     assert_eq!((w.sims[1].name.as_str(), w.sims[3].name.as_str()), ("Fay", "Gus"));
+}
+
+/// Front doors and phones: what can be left pointing at someone who leaves.
+const DOOR_PHONE: &str = r#"{
+    "needs":[{"id":"social","label":"Social","decayPerHour":0.01}],
+    "objects":[{"id":"sofa","name":"Sofa","footprint":[2,1],"slots":2,"interactions":[{"id":"sit","label":"Sit","minutes":30,"pose":"sit","effects":{"social":0.01},"tags":["lounge"]}]}],
+    "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
+    "bondPresets":{"friends":{"friendship":60},"partners":{"friendship":55,"romance":75,"partners":true}},
+    "visits":{"needs":{"social":0.5},"hours":2,"minFriendship":10,"earliestHour":9,"latestHour":21,"door":{"waitMinutes":10,"welcomeFriendship":-20}},
+    "phone":{"seatRange":0,"actions":[{"id":"call","label":"Call","minutes":20,"contact":true,"tags":["social","phone"],"acceptance":{"base":1.0},"needs":{"social":0.3}}]},
+    "economy":{"startingFunds":500}}"#;
+
+/// Ada and Ben at home in the west; Bo and Cy next door.
+const STREET: &str = r#"{"width":40,"depth":14,
+    "plots":[{"name":"West","x":0,"z":0,"w":20,"d":10,"entry":[10.5,9.5]},{"name":"East","x":20,"z":0,"w":20,"d":10,"entry":[30.5,9.5]}],
+    "households":[{"name":"Ada","plot":0,"player":true},{"name":"Bo","plot":1}],
+    "objects":[{"def":"sofa","x":3,"z":2,"rot":0}],
+    "sims":[{"name":"Ada","household":0,"x":4.5,"z":5.5},{"name":"Ben","household":0,"x":5.5,"z":5.5},
+            {"name":"Bo","household":1,"x":25.5,"z":5.5},{"name":"Cy","household":1,"x":26.5,"z":5.5}],
+    "relationships":[{"a":0,"b":2,"preset":"friends"},{"a":1,"b":2,"preset":"friends"},{"a":0,"b":3,"preset":"friends"},{"a":0,"b":1,"preset":"partners"}]}"#;
+
+fn street() -> World {
+    let mut w = World::from_json(DOOR_PHONE, STREET, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < sim_core::clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w
+}
+
+fn doing(w: &World, i: usize) -> Vec<TaskKind> {
+    w.sims[i].current().map(|a| a.task.kind).into_iter().chain(w.sims[i].queue().map(|t| t.kind)).collect()
+}
+
+#[test]
+fn nobody_answers_the_door_to_or_stays_on_the_phone_with_someone_who_left() {
+    // Bo knocks at Ada's door; someone at home sets off to answer; Bo leaves town.
+    let mut w = street();
+    w.apply(Command::Visit { sim: 2, plot: 0 }).unwrap();
+    let answering = |w: &World| (0..2).find(|&i| doing(w, i).iter().any(|k| matches!(k, TaskKind::Answer { guest: 2 })));
+    for _ in 0..60 * 20 {
+        if answering(&w).is_some() {
+            break;
+        }
+        w.tick_once();
+    }
+    let host = answering(&w).expect("someone went to the door");
+    w.depart(2, GoneWhy::MovedAway);
+    assert_eq!(answering(&w), None, "{} still goes to the door for Bo", w.sims[host].name);
+
+    // Ada calls Cy, who leaves town during the call.
+    minutes(&mut w, 1);
+    w.apply(Command::Phone { sim: 0, action: 0, contact: Some(3) }).unwrap();
+    minutes(&mut w, 2);
+    assert!(matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Phone { contact: Some(3), .. })), "on the phone to Cy");
+    w.depart(3, GoneWhy::MovedAway);
+    assert!(!doing(&w, 0).iter().any(|k| matches!(k, TaskKind::Phone { .. })), "the line went dead");
+}
+
+#[test]
+fn a_visitor_whose_host_left_waits_for_someone_else() {
+    let mut w = street();
+    w.apply(Command::Visit { sim: 2, plot: 0 }).unwrap();
+    let host = |w: &World| match w.sims[2].current().map(|a| &a.phase) {
+        Some(Phase::Knocking { host, .. }) => *host,
+        _ => None,
+    };
+    for _ in 0..60 * 20 {
+        if host(&w).is_some() {
+            break;
+        }
+        w.tick_once();
+    }
+    let coming = host(&w).expect("someone's coming to the door") as usize;
+    w.depart(coming, GoneWhy::Died);
+    assert_ne!(host(&w), Some(coming as u32), "Bo still waits for someone who's gone");
+}
+
+#[test]
+fn a_baby_on_the_way_with_someone_who_left_is_no_longer() {
+    let mut w = street();
+    w.households[0].expecting = Some(sim_core::world::Expecting { parents: [0, 1], due: 3 });
+    w.depart(1, GoneWhy::MovedAway);
+    assert_eq!(w.households[0].expecting, None);
 }

@@ -15,6 +15,8 @@ use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND
 
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
+/// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
+pub(crate) const UNREACHABLE: usize = 4;
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
@@ -451,9 +453,14 @@ pub struct Sim {
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
     pub(crate) follow_up: Option<Task>,
-    /// What they last chose for themselves but couldn't get to (a plate on a counter nobody
-    /// can reach), and until when they don't choose it again. Not saved either.
-    pub(crate) stuck: Option<(TaskKind, u64)>,
+    /// The last few things they chose for themselves but couldn't get to (a plate on a counter
+    /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
+    /// don't choose it again: uses, eating, cleaning, repairs, washing up and visits (see
+    /// `remember_unreachable`; object ids follow `remap_unreachable`). Not saved either.
+    pub(crate) unreachable: [Option<(TaskKind, u64)>; UNREACHABLE],
+    /// Ticks the social they're on has spent waiting for its target, and following them since
+    /// it first got there (see `conversation::update`). Not saved.
+    pub(crate) social_waited: u32,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -697,6 +704,57 @@ impl Sim {
             _ => None,
         }
     }
+
+    /// What they couldn't get to a moment ago and won't choose again yet (`unreachable`).
+    pub(crate) fn unreachable_now(&self, tick: u64) -> impl Iterator<Item = TaskKind> + '_ {
+        self.unreachable.iter().flatten().filter(move |u| tick < u.1).map(|u| u.0)
+    }
+
+    /// Whether they couldn't get to object `id` a moment ago (`unreachable`), and won't try again yet.
+    pub(crate) fn couldnt_reach(&self, id: u32, tick: u64) -> bool {
+        self.unreachable_now(tick).any(|kind| matches!(kind, TaskKind::Use { object, .. } | TaskKind::Repair { object } if object == id))
+    }
+
+    /// They couldn't get to what they chose for themselves (`kind`): not again until `until`.
+    /// Only what can't be reached for long is remembered (things, places and visits; people
+    /// move); the oldest memory makes way.
+    pub(crate) fn remember_unreachable(&mut self, kind: TaskKind, until: u64) {
+        if !matches!(
+            kind,
+            TaskKind::Use { .. } | TaskKind::Eat { .. } | TaskKind::Clean { .. } | TaskKind::Repair { .. } | TaskKind::Dishes { .. } | TaskKind::Visit { .. }
+        ) {
+            return;
+        }
+        let same = self.unreachable.iter().position(|u| u.is_some_and(|u| same_target(u.0, kind)));
+        let slot = same.unwrap_or_else(|| (0..UNREACHABLE).min_by_key(|&k| self.unreachable[k].map_or(0, |u| u.1)).unwrap_or(0));
+        self.unreachable[slot] = Some((kind, until));
+    }
+
+    /// Objects moved (ids shifted, one gone): `remap` gives each object id in `unreachable` its
+    /// new id, or None for one that's gone (forgotten then).
+    pub(crate) fn remap_unreachable(&mut self, remap: impl Fn(u32) -> Option<u32>) {
+        for slot in &mut self.unreachable {
+            let Some((TaskKind::Use { object, .. } | TaskKind::Repair { object }, _)) = slot else { continue };
+            match remap(*object) {
+                Some(new) => *object = new,
+                None => *slot = None,
+            }
+        }
+    }
+}
+
+/// Whether two tasks are after the same thing (`Sim::unreachable`): the same use of an object,
+/// the same food, tile, broken object, dirty dish or house.
+fn same_target(a: TaskKind, b: TaskKind) -> bool {
+    match (a, b) {
+        (TaskKind::Use { object, interaction }, TaskKind::Use { object: o, interaction: i }) => (object, interaction) == (o, i),
+        (TaskKind::Eat { item, .. }, TaskKind::Eat { item: it, .. }) => item == it,
+        (TaskKind::Clean { x, z }, TaskKind::Clean { x: cx, z: cz }) => (x, z) == (cx, cz),
+        (TaskKind::Repair { object }, TaskKind::Repair { object: o }) => object == o,
+        (TaskKind::Dishes { item, .. }, TaskKind::Dishes { item: it, .. }) => item == it,
+        (TaskKind::Visit { plot }, TaskKind::Visit { plot: p }) => plot == p,
+        _ => false,
+    }
 }
 
 /// How a house's roof looks: a roof style and a roof colour (indices into the content's
@@ -829,6 +887,8 @@ pub(crate) struct SimBrief {
     /// In a conversation (leading it, being talked to or listening in): who started it and
     /// the social.
     pub conversing: Option<(u32, usize)>,
+    /// The tile they're tidying up (or on their way to), if any.
+    pub cleaning: Option<(i32, i32)>,
 }
 
 pub struct World {
@@ -1452,7 +1512,8 @@ impl World {
             current: None,
             idle_ticks: 0,
             follow_up: None,
-            stuck: None,
+            unreachable: [None; UNREACHABLE],
+            social_waited: 0,
             household: spawn.household,
             job,
             away_until: None,
@@ -1549,13 +1610,32 @@ impl World {
         sim.planner.run = None;
         sim.planner.thought = None;
         sim.gone = Some(Gone { why, day });
-        for other in &mut self.sims {
+        // Nobody talks to them, listens in, opens the door to them or rings them any more (their
+        // slot may soon be someone else's), and a visitor waits for someone else to come.
+        let with_them = |t: &Task| match t.kind {
+            TaskKind::Social { target, .. } | TaskKind::Join { leader: target } | TaskKind::Answer { guest: target } => target == id,
+            TaskKind::Phone { contact, .. } => contact == Some(id),
+            _ => false,
+        };
+        let World { sims, content, objects, households, .. } = self;
+        for other in sims.iter_mut() {
             if other.engaged_with == Some(id) {
                 other.engaged_with = None;
             }
-            other.queue.retain(|t| !matches!(t.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id));
-            if other.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target, .. } | TaskKind::Join { leader: target } if target == id)) {
-                other.current = None;
+            other.queue.retain(|t| !with_them(t));
+            if other.current.as_ref().is_some_and(|a| with_them(&a.task)) {
+                end_activity(other, content, objects);
+            }
+            if let Some(Activity { phase: Phase::Knocking { host, .. }, .. }) = other.current.as_mut()
+                && *host == Some(id)
+            {
+                *host = None;
+            }
+        }
+        // A baby on the way with them is no longer (nobody's named as a parent who isn't here).
+        for h in households.iter_mut() {
+            if h.expecting.is_some_and(|e| e.parents.contains(&id)) {
+                h.expecting = None;
             }
         }
         self.relationships.clear(i);
@@ -1831,10 +1911,11 @@ impl World {
                 end_activity(sim, content, &mut self.objects);
             }
             sim.follow_up = None;
+            let care = tasks.len();
             for task in tasks.into_iter().rev() {
                 sim.queue.push_front(task);
             }
-            sim.queue.truncate(MAX_QUEUE);
+            trim_queue(&mut sim.queue, care);
             if woken {
                 sim.night_woken = self.tick;
                 if let Some(f) = rules.feeling {
@@ -2042,6 +2123,7 @@ impl World {
                 adult: s.adult(&self.content),
                 age: s.age,
                 conversing: None,
+                cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -2380,13 +2462,14 @@ impl World {
                         TaskKind::Eat { item: Some(item), seat: None, plate: None, stage: 0 }
                     }
                     crate::command::ItemAction::Clear => {
-                        let dishes = self.content.cooking.dishes;
+                        // (With no sink, into the bin.)
+                        let dishes = self.content.cooking.dishes | self.content.cooking.bin;
                         let home = self.households[household as usize].plot;
                         let sink = self.objects.iter().any(|o| {
                             self.content.objects[o.def].stations & dishes != 0 && !o.broken() && self.object_plot[o.id as usize] == home
                         });
                         if !sink {
-                            return Err(Error::new("there's nowhere to wash up: buy a sink or a dishwasher"));
+                            return Err(Error::new("there's nowhere to wash up: buy a sink, a dishwasher or a bin"));
                         }
                         TaskKind::Dishes { item, station: None, stage: 0, scraps: 0 }
                     }
@@ -2611,6 +2694,17 @@ impl World {
             routine: false,
         });
         Ok(())
+    }
+}
+
+/// Keeps a queue within `MAX_QUEUE` by dropping what was chosen for them from the back, but
+/// never the first `keep` tasks (just put there), the player's orders, nor a recipe whose
+/// ingredients are paid for: for those, it goes over the cap.
+fn trim_queue(queue: &mut VecDeque<Task>, keep: usize) {
+    while queue.len() > MAX_QUEUE {
+        let paid = |t: &Task| matches!(t.kind, TaskKind::Cook { servings, .. } if servings > 0);
+        let Some(k) = queue.iter().rposition(|t| !t.directed && !paid(t)).filter(|&k| k >= keep) else { break };
+        queue.remove(k);
     }
 }
 
@@ -2874,7 +2968,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     start_task(sim, task, ctx, objects, items);
                     if sim.current.is_none() && sim.follow_up.is_none() {
                         let retry = social::minutes_to_ticks(content.autonomy.retry_minutes);
-                        sim.stuck = Some((task.kind, ctx.tick + retry));
+                        sim.remember_unreachable(task.kind, ctx.tick + retry);
                     }
                     // Catching up on a turn (`lod.rs`): they were idle until it was time to
                     // choose, so what they chose has only had the ticks since.
@@ -2991,7 +3085,7 @@ fn pick_autonomous(
     let short: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < low).fold(0, |m, n| m | 1 << n);
     let walk_per_minute = WALK_SPEED * sim.mods.walk_speed / MINUTES_PER_TICK;
     let urgent = urgent_needs(sim, ctx, objects);
-    let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n));
+    let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n), false);
     // How far away the nearest thing for each need is, and how long until they leave for work
     // or school (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
@@ -3141,8 +3235,11 @@ fn pick_autonomous(
         }
     }
 
+    // About to drop (or burst): no time to talk, as a chat would break off at once and leave the
+    // other one's activity dropped for nothing (`available_for_social` asks the same of them).
+    let pressed = sim.pressed(content);
     for (j, other) in ctx.briefs.iter().enumerate() {
-        if j == me || !other.available {
+        if j == me || !other.available || pressed {
             continue;
         }
         // Chat with people on the same lot (or nearby on the street); crossing town is a visit.
@@ -3215,7 +3312,7 @@ fn pick_autonomous(
             continue;
         };
         let s = &content.socials[social];
-        if !s.joinable || !leader.here || leader.away {
+        if !s.joinable || !leader.here || leader.away || pressed {
             continue;
         }
         let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
@@ -3262,9 +3359,13 @@ fn pick_autonomous(
         let p = &ctx.plots[plot as usize];
         let lot = ctx.nav.lot;
         let mut best: Option<(f32, i32, i32)> = None;
+        // (Not where they couldn't get to a moment ago, nor where someone else is tidying up:
+        // the next dirtiest spot instead.)
+        let mut out_of_reach: Vec<(i32, i32)> = sim.unreachable_now(ctx.tick).filter_map(|k| if let TaskKind::Clean { x, z } = k { Some((x, z)) } else { None }).collect();
+        out_of_reach.extend(ctx.briefs.iter().enumerate().filter(|&(j, _)| j != me).filter_map(|(_, b)| b.cleaning));
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
-                if !lot.in_bounds(x, z) {
+                if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
                     continue;
                 }
                 let i = lot.tile_index(x, z);
@@ -3308,7 +3409,8 @@ fn pick_autonomous(
                 candidates.push((s, Choice::Eat(item)));
             }
         }
-        if stations & rules.dishes != 0 {
+        // (With no sink, the dirty things go in the bin.)
+        if stations & (rules.dishes | rules.bin) != 0 {
             let mut best: Option<(f32, u32)> = None;
             let mut count = 0;
             for it in items.list.iter().filter(|it| it.household == sim.household && it.to_clear(content)) {
@@ -3333,8 +3435,9 @@ fn pick_autonomous(
     }
 
     // The phone: texting, calling or inviting people who aren't here, scrolling (`phone.rs`).
+    // (Nor a call or a text, pressed.)
     for (s, action, contact) in crate::phone::candidates(sim, ctx, &felt, &feel) {
-        if s > MIN_AUTONOMY_SCORE {
+        if s > MIN_AUTONOMY_SCORE && !(pressed && contact.is_some()) {
             candidates.push((s, Choice::Phone(action, contact)));
         }
     }
@@ -3377,11 +3480,16 @@ fn pick_autonomous(
         }
     }
 
-    // Not what they couldn't get to a moment ago (and would try again and again).
-    if let Some((stuck, _)) = sim.stuck.filter(|s| ctx.tick < s.1) {
-        candidates.retain(|&(_, choice)| match (choice, stuck) {
+    // Not what they couldn't get to a moment ago (and would try again and again, each time
+    // looking for a way there).
+    for kind in sim.unreachable_now(ctx.tick) {
+        candidates.retain(|&(_, choice)| match (choice, kind) {
             (Choice::Object(o, i), TaskKind::Use { object, interaction }) => (o, i) != (object, interaction),
             (Choice::Eat(it), TaskKind::Eat { item, .. }) => Some(it) != item,
+            (Choice::Clean(x, z), TaskKind::Clean { x: cx, z: cz }) => (x, z) != (cx, cz),
+            (Choice::Repair(o), TaskKind::Repair { object }) => o != object,
+            (Choice::Dishes(it), TaskKind::Dishes { item, .. }) => it != item,
+            (Choice::Visit(p), TaskKind::Visit { plot }) => p != plot,
             _ => true,
         });
     }
@@ -3507,11 +3615,8 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             };
             (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
         }
+        // (Their visit starts once there's a way there: see below.)
         TaskKind::Visit { plot } => {
-            sim.transition = Some(crate::life::Transition::Visit {
-                plot,
-                directed: task.directed,
-            });
             let door = ctx.plots[plot as usize].arrival_point();
             (
                 door,
@@ -3546,6 +3651,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(goal) = conversation::approach_tile(nav, other.pos, sim.pos) else {
                 return;
             };
+            sim.social_waited = 0;
             (
                 [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5],
                 goal,
@@ -3569,6 +3675,19 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
         return;
     };
+    if let TaskKind::Visit { plot } = task.kind {
+        sim.transition = Some(crate::life::Transition::Visit {
+            plot,
+            directed: task.directed,
+        });
+    }
+    // A place at it for the repair (two housemates don't both set off for it).
+    if let TaskKind::Repair { object } = task.kind {
+        let obj = &mut objects[object as usize];
+        if !obj.reserve(sim.id, content.objects[obj.def].slots) {
+            return;
+        }
+    }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
         if !obj.reserve_in(sim.id, content.objects[obj.def].slots_for(interaction)) {
@@ -3651,6 +3770,8 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     let Some(act) = sim.current.as_mut() else {
         return;
     };
+    // A use that ends on its first step, short of its time: given up straight away (see `after`).
+    let mut given_up = false;
     let finished = match &mut act.phase {
         // Waiting at the door; `life::doors` lets them in or sends them home.
         Phase::Knocking { ticks: waited, .. } => {
@@ -3704,6 +3825,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             false
         }
         Phase::Using { elapsed } => {
+            let first = *elapsed == 0.0;
             *elapsed += minutes;
             let elapsed = *elapsed;
             match act.task.kind {
@@ -3713,6 +3835,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 } => {
                     let urgent = urgent_needs(sim, ctx, objects);
                     let done = use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
+                    given_up = done && first && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| elapsed < i.minutes);
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
                     if done {
@@ -3803,7 +3926,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                         return;
                     }
                 } else if inter.after != 0 {
-                    sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                    // (Not after a use given up the moment it began: no hands to wash after a toilet
+                    // visit that didn't happen.)
+                    if !given_up {
+                        sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                    }
                 } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
                     // Up: the toilet first, out of habit.
                     sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
@@ -3899,7 +4026,14 @@ fn use_object(
             || (urgent && planned)
             || (chosen && pressing & fills == 0 && runs_out(sim, content, pressing, left, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine) || drained
+        // Practising a skill they still want to (as when choosing: at home or in a public place)
+        // goes on for its time too, until practice gets boring; stopping it as soon as the needs
+        // are full would have them back at it a moment later, over and over.
+        let practising = satisfied
+            && inter.trains_skills()
+            && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
+            && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising) || drained
     };
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {
@@ -3919,12 +4053,17 @@ fn use_object(
 
 fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
-    // Paid on arrival; if the money ran out on the way, never mind.
+    // Paid on arrival; if the money ran out on the way, never mind. Nor is something used that
+    // broke on the way (someone else wore it out).
     if let Some(TaskKind::Use {
         object,
         interaction,
     }) = sim.current.as_ref().map(|a| a.task.kind)
     {
+        if objects[object as usize].broken() {
+            end_activity(sim, content, objects);
+            return;
+        }
         let cost = content.objects[objects[object as usize].def].interactions[interaction].cost;
         let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
         if !affordable(cost, funds) {
@@ -4031,19 +4170,25 @@ fn ready_to_leave(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Ta
     habit(sim, ctx, objects, HabitTime::Leave, ctx.briefs[sim.id as usize].plot)
 }
 
-/// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge).
+/// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge),
+/// busy or not.
 fn home_fills(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], n: usize) -> bool {
-    home_needs(sim, ctx, objects, 1 << n) != 0
+    home_needs(sim, ctx, objects, 1 << n, false) != 0
 }
 
 /// Which of the needs in `mask` (bit per need) their home has something working for (not
-/// counting what's only done with a baby there).
-fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32) -> u32 {
+/// counting what's only done with a baby there). `free`: only what they could go and use now,
+/// with a place on it free (or theirs already), and not something they couldn't get to a moment
+/// ago (every bed taken is no bed for them tonight).
+fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free: bool) -> u32 {
     let Some(home) = ctx.households[sim.household as usize].plot else {
         return 0;
     };
+    let usable = |o: &ObjectInstance| {
+        !free || ((o.has_free_slot(ctx.content.objects[o.def].slots) || o.slot_of(sim.id).is_some()) && !sim.couldnt_reach(o.id, ctx.tick))
+    };
     let mut found = 0;
-    for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken()) {
+    for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken() && usable(o)) {
         for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares()) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
@@ -4054,15 +4199,15 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32) -> u3
     found
 }
 
-/// Essentials about to run out (`AutonomyRules::urgent`) that something at home fills (bit
-/// per need): residents see to them before anything else.
+/// Essentials about to run out (`AutonomyRules::urgent`) that something at home they could use
+/// now fills (bit per need): residents see to them before anything else.
 fn urgent_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> u32 {
     let content = ctx.content;
     let rules = &content.autonomy;
     let low = (0..content.needs.len())
         .filter(|&n| !content.needs[n].room && rules.urgent & (1 << n) != 0 && sim.needs[n] < rules.urgent_below)
         .fold(0, |m, n| m | 1 << n);
-    if low == 0 { 0 } else { home_needs(sim, ctx, objects, low) }
+    if low == 0 { 0 } else { home_needs(sim, ctx, objects, low, true) }
 }
 
 /// Whether one of the needs in `mask` would run down below `floor` in `minutes` of something
@@ -4260,7 +4405,7 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     let held = sim.current.take().and_then(|act| match act.task.kind {
-        TaskKind::Use { object, .. } => Some(object),
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,
@@ -4506,5 +4651,44 @@ mod tests {
         assert!(w.sims[0].needs[0] > 0.5);
         assert_eq!(w.sims[0].tile(), front);
         assert_eq!(w.sims[0].seated_from, None);
+    }
+
+    #[test]
+    fn a_full_queue_drops_neither_orders_nor_a_paid_recipe() {
+        let task = |kind, directed| Task { kind, directed, routine: false };
+        let walk = TaskKind::MoveTo { x: 1.0, z: 1.0 };
+        let cook = |servings| TaskKind::Cook { recipe: 0, step: 1, station: None, origin: None, servings, skipped: 0, minutes: 0 };
+        let care = task(TaskKind::Use { object: 0, interaction: 1 }, false);
+        // Chosen for them, unpaid: the last of those goes.
+        let mut q: VecDeque<Task> = [care, task(walk, true), task(cook(2), false), task(walk, false), task(walk, true), task(cook(0), false), task(walk, true)].into();
+        trim_queue(&mut q, 1);
+        assert_eq!(q.len(), MAX_QUEUE);
+        assert!(matches!(q[4].kind, TaskKind::MoveTo { .. }) && q[4].directed && matches!(q[2].kind, TaskKind::Cook { servings: 2, .. }));
+        // Nothing else to drop: over the cap.
+        let mut q: VecDeque<Task> = [care, task(cook(3), false)].into_iter().chain([task(walk, true); MAX_QUEUE]).collect();
+        trim_queue(&mut q, 1);
+        assert_eq!(q.len(), MAX_QUEUE + 2);
+    }
+
+    #[test]
+    fn what_they_couldnt_get_to_is_remembered_a_while() {
+        let mut w = world();
+        let s = &mut w.sims[0];
+        s.remember_unreachable(TaskKind::Use { object: 3, interaction: 1 }, 100);
+        s.remember_unreachable(TaskKind::Repair { object: 1 }, 100);
+        s.remember_unreachable(TaskKind::Visit { plot: 2 }, 50);
+        s.remember_unreachable(TaskKind::Clean { x: 4, z: 5 }, 200);
+        // People move: never remembered. Something remembered again just lasts longer.
+        s.remember_unreachable(TaskKind::Social { target: 1, social: 0 }, 300);
+        s.remember_unreachable(TaskKind::Visit { plot: 2 }, 80);
+        assert_eq!(s.unreachable_now(60).count(), 4);
+        assert!(s.couldnt_reach(3, 60) && s.couldnt_reach(1, 99) && !s.couldnt_reach(1, 100) && !s.couldnt_reach(2, 0));
+        // Full: the one that runs out first makes way.
+        s.remember_unreachable(TaskKind::Eat { item: Some(7), seat: None, plate: None, stage: 0 }, 300);
+        assert!(!s.unreachable_now(0).any(|k| matches!(k, TaskKind::Visit { .. })));
+        // Object 1 is gone and the ids after it shift down.
+        s.remap_unreachable(|o| if o == 1 { None } else { Some(if o > 1 { o - 1 } else { o }) });
+        assert!(s.couldnt_reach(2, 0) && !s.couldnt_reach(3, 0) && !s.couldnt_reach(1, 0));
+        assert_eq!(s.unreachable_now(0).count(), 3);
     }
 }

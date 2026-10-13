@@ -745,6 +745,10 @@ fn cook_next(
             _ => {}
         }
         if !s.optional {
+            // Given up after the ingredients were bought: they go back (the money too).
+            if servings > 0 {
+                sim.pending_spend -= r.cost(servings).max(0);
+            }
             return cannot_cook(sim, ctx, tags);
         }
         // Done without (no counter: chopped at the next station).
@@ -1194,9 +1198,12 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
             walk_to_any(sim, task, ctx, &item_access(ctx, objects, &it.at), tags);
         }
         1 => {
+            // (With nowhere to wash up, what they carry goes in the bin too: see `step_done`.)
+            let no_sink = station_mask(sim, ctx, objects) & rules.dishes == 0;
+            let scraps = if no_sink && sim.held.is_some() { scraps.max(1) } else { scraps };
             if scraps > 0
                 && let Found::At(o) = find_station(sim, ctx, objects, rules.bin, &[], None, false)
-                && go_to(sim, at(o, 1), ctx, objects, o, tags)
+                && go_to(sim, Task { kind: TaskKind::Dishes { item, station: Some(o), stage: 1, scraps }, ..task }, ctx, objects, o, tags)
             {
                 return;
             }
@@ -1279,6 +1286,23 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
     let Some(task) = sim.current.as_ref().map(|a| a.task) else {
         return;
     };
+    // The station or seat broke on the way (someone else wore it out): another one, or do without.
+    let spot = match task.kind {
+        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
+        TaskKind::Eat { seat, stage: 1, .. } => seat,
+        _ => None,
+    };
+    if spot.is_some_and(|o| objects[o as usize].broken()) {
+        end_activity(sim, content, objects);
+        return match task.kind {
+            TaskKind::Cook { .. } => cook_next(sim, left_off(task), ctx, objects, items, None, None),
+            TaskKind::Dishes { item, stage, scraps, .. } => {
+                dishes_next(sim, Task { kind: TaskKind::Dishes { item, station: None, stage, scraps }, ..task }, ctx, objects, items, None)
+            }
+            TaskKind::Eat { item, .. } => eat_next(sim, Task { kind: TaskKind::Eat { item, seat: None, plate: None, stage: 1 }, ..task }, ctx, objects, items),
+            _ => {}
+        };
+    }
     match task.kind {
         TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried } => {
             let r = &content.recipes[recipe];
@@ -1507,8 +1531,12 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
             if let Some(o) = station {
                 objects[o as usize].release(sim.id);
             }
-            // Scraped: on to the sink. Washed: the clean things are put away (out of hand now:
-            // called away, they're away already).
+            // Scraped: on to the sink (with none, the dirty things went in the bin as well).
+            // Washed: the clean things are put away (out of hand now: called away, they're away
+            // already).
+            if stage == 1 && station_mask(sim, ctx, objects) & content.cooking.dishes == 0 {
+                sim.held = None;
+            }
             if stage == 2 {
                 sim.held = None;
                 if let Some(o) = station {

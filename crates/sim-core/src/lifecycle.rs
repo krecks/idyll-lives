@@ -45,8 +45,10 @@ pub fn default_age(rules: &crate::content::LifeRules, name: &str, slot: usize) -
 /// Once a day at midnight: everyone a year-fraction older; a new life stage is a story event
 /// and a feeling, and changes what the stage does to them.
 pub(crate) fn update(w: &mut World) {
+    // (Born tonight: not a day older already, below.)
+    let mut born = Vec::new();
     if clock::at_minute(w.tick, 0.0) {
-        births(w);
+        born = births(w);
     }
     if let Some(rules) = w.content.life.moving
         && clock::at_minute(w.tick, rules.hour * 60.0)
@@ -65,8 +67,9 @@ pub(crate) fn update(w: &mut World) {
     if !clock::at_minute(w.tick, 0.0) {
         return;
     }
+    let mut out_of_cribs = Vec::new();
     for i in 0..w.sims.len() {
-        if !w.sims[i].here() {
+        if !w.sims[i].here() || born.contains(&i) {
             continue;
         }
         let rules = &w.content.life;
@@ -104,10 +107,14 @@ pub(crate) fn update(w: &mut World) {
             for o in &mut w.objects {
                 o.release(i as u32);
             }
+            out_of_cribs.push(i);
         }
         w.refresh_base_mods(i);
         w.structure_version += 1;
         w.events.push_detail(w.tick, EventKind::GrewOlder, i, Some(stage as i64), None);
+    }
+    for i in out_of_cribs {
+        bed_for_child(w, i);
     }
     for i in 0..w.sims.len() {
         if w.sims[i].here() {
@@ -513,6 +520,33 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     }
 }
 
+/// Child `i` is out of the crib (or came to live here past it) and needs a bed: with fewer bed
+/// places at home than people past the crib, a household the player doesn't play buys one (the
+/// cheapest, at the first good free spot, like `cribs_for_babies`); the player's is told
+/// (`EventKind::NoBed`) and buys its own.
+pub(crate) fn bed_for_child(w: &mut World, i: usize) {
+    let h = w.sims[i].household as usize;
+    let sleep = w.content.day_rhythm.sleep_tags;
+    let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else { return };
+    let people = members(w, h).into_iter().filter(|&j| !w.content.life.baby(w.sims[j].age)).count();
+    if beds(w, plot) >= people {
+        return;
+    }
+    if w.households[h].player {
+        w.events.push(w.tick, EventKind::NoBed, i, i, None);
+        return;
+    }
+    let bed = (0..w.content.objects.len())
+        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby))
+        .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
+        .min();
+    if let Some((price, bed)) = bed
+        && w.deliver(h as u32, bed).is_some()
+    {
+        w.pay(h, price);
+    }
+}
+
 // ---- Having children -----------------------------------------------------------------------
 
 /// Partners `a` and `b` tried for a baby and it went well: with content `pregnancy.chance`, one
@@ -540,9 +574,10 @@ pub(crate) fn room_for_one(w: &World, h: usize) -> bool {
         && w.sims.iter().filter(|s| s.here()).count() < crate::world::MAX_SIMS
 }
 
-/// At midnight: babies who are due are born.
-fn births(w: &mut World) {
+/// At midnight: babies who are due are born (returned).
+fn births(w: &mut World) -> Vec<usize> {
     let today = clock::day(w.tick);
+    let mut born = Vec::new();
     for h in 0..w.households.len() {
         let Some(e) = w.households[h].expecting.filter(|e| e.due <= today) else { continue };
         w.households[h].expecting = None;
@@ -552,8 +587,10 @@ fn births(w: &mut World) {
         }
         if let Some(baby) = add_child(w, h, 0.0, &parents, true) {
             w.events.push(w.tick, EventKind::Born, baby, parents.first().copied().unwrap_or(baby), parents.get(1).copied());
+            born.push(baby);
         }
     }
+    born
 }
 
 /// Adopts a baby (or a child) into household `h`, for content `adoption` (free in Creative).
@@ -578,6 +615,9 @@ pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::E
     let id = add_child(w, h, age, &parents, false).ok_or_else(|| Error::new("there's no room for another"))?;
     w.pay(h, cost);
     w.events.push(w.tick, EventKind::Adopted, id, parents[0], parents.get(1).copied());
+    if !w.content.life.baby(age) {
+        bed_for_child(w, id);
+    }
     Ok(id as u32)
 }
 

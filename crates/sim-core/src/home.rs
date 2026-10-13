@@ -1233,14 +1233,11 @@ impl World {
             sim.queue.retain(|t| !uses_object(&t.kind, id));
             // (A routine's next step, washing hands at this sink, goes with it.)
             sim.follow_up = sim.follow_up.take().filter(|t| !uses_object(&t.kind, id));
-            sim.stuck = sim.stuck.take().filter(|(t, _)| !uses_object(t, id));
             let current = sim.current.as_mut().map(|a| &mut a.task);
             for t in current.into_iter().chain(sim.queue.iter_mut()).chain(sim.follow_up.iter_mut()) {
                 shift_objects(&mut t.kind, id);
             }
-            if let Some((t, _)) = &mut sim.stuck {
-                shift_objects(t, id);
-            }
+            sim.remap_unreachable(|o| if o == id { None } else { Some(if o > id { o - 1 } else { o }) });
         }
         let obj = self.objects.remove(id as usize);
         self.object_plot.remove(id as usize);
@@ -1387,13 +1384,13 @@ mod tests {
     fn follow_ups_and_what_they_couldnt_reach_follow_the_object() {
         let mut w = World::from_json(CONTENT, LOT, 7).unwrap();
         w.sims[0].follow_up = Some(Task { kind: snack(2), directed: false, routine: true });
-        w.sims[0].stuck = Some((snack(1), 1000));
+        w.sims[0].remember_unreachable(snack(1), 1000);
         w.remove_object(0);
         assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(1));
-        assert_eq!(object(w.sims[0].stuck.map(|s| s.0)), Some(0));
+        assert_eq!(object(w.sims[0].unreachable[0].map(|s| s.0)), Some(0));
         w.remove_object(0);
         assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(0));
-        assert!(w.sims[0].stuck.is_none(), "the one they couldn't reach is gone");
+        assert!(w.sims[0].unreachable[0].is_none(), "the one they couldn't reach is gone");
         w.remove_object(0);
         assert!(w.sims[0].follow_up.is_none(), "the one they'd use next is gone");
     }
