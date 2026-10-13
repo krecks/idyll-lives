@@ -43,7 +43,7 @@ From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI 
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`tools/release/wasm-opt.mjs`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
 - writes `bundle.json`: the content, house templates and asset manifests every start needs, in one file. The files still ship one by one beside it;
 - writes `THIRD-PARTY-LICENSES.txt` with the licences of the code it bundles, and fails if one is missing;
-- gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release never mixes with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out.
+- gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release's data doesn't mix with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out, and `index.html` itself isn't versioned (Pages lets the browser keep it for 10 minutes).
 
 **Hosting:** the game needs cross-origin isolation for its fastest path (the simulation's snapshots in shared memory). The dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages can't, so `index.html` registers a service worker (`public/isolation-sw.js`) that adds the headers, and the page loads once more under it. The worker also keeps the build's hashed files (`assets/<name>-<hash>.js`, `.css`, `.wasm`, `.woff2`) in a cache of the build's own, so returning players load them without asking the server again; a new build's worker deletes the old cache. Without isolation the game still runs, but snapshots are copied instead of shared.
 

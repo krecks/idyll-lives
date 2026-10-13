@@ -517,7 +517,7 @@ R5 built the site with the Pages base path, served it like Pages and played it. 
 - Saves from v0.1.0 (version 17) and the live build (version 19) load with nothing dropped, run 2 game days through `common::check`, and save and reload. Loading the same save twice and running a quarter day gives byte-identical saves.
 - Save size isn't a problem: the story log is capped at 300 events, and relationships are 45 % of the 64-resident save. Saving takes at most 1.7 ms and loading 8.2 ms natively.
 - Bad saves don't slow the boot (1.2–1.4 s to the menu); the problem is what Continue does (R4-08, R5-04).
-- Not tested: Safari and Firefox with the service worker, the Pages CDN with the 255 MB and 120 MB files, and the Linux CI build. All need the dry run (R5-02).
+- Not tested: Safari and Firefox with the service worker, the Pages CDN with the 255 MB and 120 MB files, and the Linux CI build. All need the dry run (R5-02). (The Linux CI build has since passed in the dry run, §3.6; the large files can only be checked on the live site, §4.)
 
 **Corrections to earlier assumptions**
 - On the live site only the Supertonic voice paths return 404. The KittenTTS model and `voice/en-us.lexz` load, so voices work there today.
@@ -654,7 +654,7 @@ F4 (merge a428263), except R1-02 and R1-10 (G1, accaaad). F4 measured on an Appl
 | R1-06 | While moving, the turn limit and its smoothing scale with the game rate, up to 10×. | fac600f | Angle between facing and travel, 90th percentile: speed 3 14° → 0°, speed 5 57° → 0°. |
 | R1-07 | Bubbles, subtitles, room tags and the marker are placed from `onBeforeCameraRenderObservable` (`run(onFrame, onView)`), after the camera took the frame's input. | fc3d3f4 | Camera turned as a drag does, 1.5 s: overlay and drawn position differed in 78 of 78 frames (mean 3.2 px, max 13.3 px) → 0 of 80. |
 | R1-08 | The keys stay (decision); each frame their nudges are scaled by `dt × 60`. | af97b84 | ArrowLeft held 1.5 s, plus the 1.2 s glide, two runs: cap 30 −2.49/−2.54 rad and cap 60 −4.43/−5.27 → cap 30 −5.00/−5.22, cap 60 −5.15/−5.28, uncapped −5.02/−5.20. |
-| R1-09 | The frame time is clamped once to 100 ms and passed to everything that moves; the never-used `idleOrbit` is deleted. | 35d381b | One injected 3 s frame: camera swing 0.098 → 0.0015 rad, cloud turn 0.012 → 0.0004 rad. |
+| R1-09 | The frame time is clamped once to 100 ms and passed to everything that moves; the never-used `idleOrbit` is deleted. Babylon's own clock, which runs the build effects' particles, is held to 100 ms too since G2's 969699d. | 35d381b, 969699d | One injected 3 s frame: camera swing 0.098 → 0.0015 rad, cloud turn 0.012 → 0.0004 rad. |
 | R1-10 | The frame callback gets the timestamp of the refresh it draws for (from the FramePacer), and Babylon's frame time is measured between those timestamps. | e2ca9d6 | Not measured on its own. |
 | R1-11, R1-14 | Hands ease by `1 − exp(−(step × 5 + dt × 1.2))`, which is 0 while paused. The creator's framing eases by `1 − exp(−dt × 12)`. | ced877d | Paused with every resident's hands at 0.5: 1 s later 0.57/0.57/0.744 → 0.5/0.5/0.5. The creator's framing wasn't checked in a browser. |
 | R1-12 | On the first frame a resident is drawn again, the chosen clip starts fully faded in, and the layers, hands and blanket start at their targets. | 18f1a1b | Hidden 4 s at speed 3, then paused and shown: 8 of 8 residents frozen mid-crossfade (a sleeper uncovered) → 0 of 8. |
@@ -667,7 +667,7 @@ Also from F4: group conversations and still speech bubbles no longer make garbag
 
 ### 3.2 Objects and items (R2)
 
-F1a (merge 85c7e86), except R2-07, R2-08, R2-10, R2-12 and R2-13 (F1b, b00e999). R2's six proving tests are in `crates/sim-core/tests/objects.rs`, and none is ignored now. A new test, `tests/rearranging.rs`, sells, moves, turns and buys furniture at random about every 1.5 game minutes for two game days in two towns, with `common::check` after every edit (about 1,900 edits per town). With the R2-01 fix taken out, it panics within 1.4 s.
+F1a (merge 85c7e86), except R2-07, R2-08, R2-10, R2-12 and R2-13 (F1b, b00e999). R2's six proving tests are in `crates/sim-core/tests/objects.rs`, and none is ignored now. A new test, `tests/rearranging.rs`, sells, moves, turns and buys furniture at random about every 1.5 game minutes for two game days in two towns, with `common::check` after every edit (about 1,900 edits per town). With the R2-01 fix taken out it panicked within 1.4 s on F1a's branch; on `main` it panics late, about 7.6 s into an 8.2 s run (R2's sign-off). The reliable guard is R2-01's two proofs in `objects.rs`, which fail at once without the fix.
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
@@ -683,9 +683,9 @@ F1a (merge 85c7e86), except R2-07, R2-08, R2-10, R2-12 and R2-13 (F1b, b00e999).
 | R2-11 | Undo takes back the story events of its edit, and redo tells them again. Undo and redo also keep the goals, routines, free will and purchase answers given after the edit (a planning decision). | 4b56869 | `undoing_an_upgrade_takes_back_its_story`, `undo_and_redo_keep_the_orders_given_since`. |
 | R2-12 | With a bin but no sink or dishwasher, clearing away ends at the bin, both of residents' own accord and through "Clear away". With neither, plates still pile up (§4). | 1c2372a | – |
 | R2-13 | Giving up a paid recipe refunds its ingredients (decision). | 783dffb | – |
-| R2-14 | An item id past `u32::MAX` makes the save corrupt instead of wrapping. | 2f7eb97 | – |
+| R2-14 | An item id past `u32::MAX` in a save makes the save corrupt instead of wrapping. Only the ids of items already in the save are checked: the save's next-item counter isn't, and `Items::add` still adds 1 unchecked (§4). | 2f7eb97 | – |
 | R2-15, R2-16 | Version counters wrap on purpose, `Items::get_mut` no longer bumps when nothing is found, and `idle_ticks` saturates. The last four `structure_version` bumps in `lifecycle.rs` wrap too (1a01ce1). | c9d58e3, 1a01ce1 | – |
-| R2-17 to R2-25, R3-13, R3-14, R3-16 | Content that would break the game is refused at load, with the file and id in the message; the rules are in `docs/content-packs.md` ("What content is refused"). At run time, needs clamp to 0–1, and relationships clamp to ±100 on load and in bonds. | 04a216d, 6d2eb3c, 2f7eb97 | `refuses_content_that_would_break_the_game` has one case per rule. The shipped content still loads. |
+| R2-17 to R2-25, R3-13, R3-14, R3-16 | Content that would break the game is refused at load, with the id and the rule in the message (for example "lazy: walkSpeed 0 must be above 0"; the checks run on the merged content, so only merge errors name files); the rules are in `docs/content-packs.md` ("What content is refused"). At run time, needs clamp to 0–1, and relationships clamp to ±100 on load and in bonds. | 04a216d, 6d2eb3c, 2f7eb97 | `refuses_content_that_would_break_the_game` has one case per rule. The shipped content still loads. |
 
 Also from the rearranging test: someone carrying dishes kept holding them, with nothing to do, when an edit stopped their task (the sink was moved). `World::apply` now has them put the dishes down at once (335a8ab).
 
@@ -707,6 +707,8 @@ F1b (merge b00e999), except R3-01, R3-09, R3-12 and R3-15 (F1a, 85c7e86). F1b ra
 
 The probe never saw a value that wasn't finite or was out of range, nor anyone stuck walking.
 
+The "after" figures are from F1b's branch. On `main` at sign-off (R3's re-probe at e32d4e9), seed 7 / seed 11: quick restarts 37 / 648, A-B-A flips 98 / 117, A-B-A-B flips 34 / 28, falls asleep on the floor 12 / 6, activities over in 2 ticks or less 222 / 907, activity starts per waking hour 2.14 / 2.28. Seed 11's jump was the range cooker selling the fridge (§3.7); with F9's fix (rebased on 11b9b7d), quick restarts are 32 / 25 and short activities 177 / 173. The extra falls asleep on the floor fit f1993e5: a neighbour buys a child's bed only if a week's rent is left after.
+
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
 | R3-01, R3-09 | The clock counts whole ticks (`TICKS_PER_MINUTE = 20`), and every once-a-day gate asks `clock::at_minute`. `minute_of_day` can't return 1440 any more. Saves were already in whole ticks and don't change. | 78fdf79 | `the_town_still_ages_after_day_1167`: 76 missed ageings on days 1167–1170 → 0. Clock unit tests: days 2 to 10,000 each hit midnight exactly once. |
@@ -714,7 +716,7 @@ The probe never saw a value that wasn't finite or was out of range, nor anyone s
 | R3-03 | Waiting and following share one 10-minute limit. The actor follows only while the target is still someone to talk to, and only onto plots they'd chat on. | 5b87d03 | Most chases in one chat (probe). In the 150-day soak on f5fc4b5, 14 residents waited an hour or more following a guest who had left; the soak passes now. |
 | R3-04 | Practising a skill the resident still wants runs for the interaction's time, or until practice fatigue or a low need takes the interest away (decision). | e3b0b7d | Quick restarts (probe). |
 | R3-05 | When a child leaves the crib or is adopted, and the home has fewer bed places than people past the crib, a household the player doesn't play buys the cheapest bed, if a week's rent is left after paying. The player's household gets a `noBed` story event instead, once per child (decision). | 638500d, f1993e5 | Fell asleep on the floor (probe). |
-| R3-06 | The urgent needs that cut other things short count only what the resident could use now: a free place on it, and not something they couldn't reach a moment ago. | ff69241 | A-B-A-B flips (probe). |
+| R3-06 | The urgent needs that cut other things short count only things with a free place (or the resident's own) that weren't out of reach a moment ago. | ff69241 | A-B-A-B flips (probe). |
 | R3-07 | The hand-washing follow-up follows only a use that was under way. | f8cbe10 | – |
 | R3-08 | A baby born tonight starts ageing at the next midnight. | 695bde2 | Newborn age (probe), and every century run. |
 | R3-10, R3-11 | Residents remember up to four things they chose and couldn't reach (uses, eating, cleaning, repairs, washing up, visits) for the content's retry time. A visit begins only once there's a way there. `Sim::unreachable` replaces `Sim::stuck`. Social and Join aren't in the memory (§4). | 1a7490c | – |
@@ -724,7 +726,7 @@ The probe never saw a value that wasn't finite or was out of range, nor anyone s
 
 ### 3.4 Web robustness (R4)
 
-F2a (merge a8b3388), F2b (bc5ac13), F2c (9394264), and G1 (accaaad) for R4-10. Checked in headed Chromium on WebGPU on an Apple Silicon Mac. Hidden tabs were simulated by overriding `document.hidden`, and Alt+Tab with synthetic events.
+F2a (merge a8b3388), F2b (bc5ac13), F2c (9394264), and G1 (accaaad) for R4-10. Checked in headed Chromium on WebGPU on an Apple Silicon Mac; R4's sign-off re-check ran headless, still on the real GPU. Hidden tabs were simulated by overriding `document.hidden`, and Alt+Tab with synthetic events.
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
@@ -735,7 +737,7 @@ F2a (merge a8b3388), F2b (bc5ac13), F2c (9394264), and G1 (accaaad) for R4-10. C
 | R4-07 | `project()` returns false unless both outputs are finite, and the sound pans use 0 for a value that isn't finite. | 9877f02 | – |
 | R4-08, R5-04 | `Game.fromSave` says why a save fails: `tooNew`, `tooOld` or `corrupt` (decision). A too-new save is kept, marked and skipped; a too-old or damaged one is removed with a short notice; a failed save isn't prepared again in the same session. Since c939e8e (owner's decision), a save whose loading traps is kept too, marked for this version (`failedIn`): Continue skips it, Load game says "This version couldn't open it" and still exports it, and a later version tries again. Saves the simulation's own checks find damaged are still removed. | a6b8a67, c939e8e | Four bad saves newest (trapping, too new, too old, cut short): four notices, Continue lands on the good save, every failed worker closed. sim-wasm unit tests cover each kind, and the v0.1.0 (version 17) and live-site (version 19) saves load. The kept trapping save, checked headless: it and its data stay, Continue picks the next good save, Load is disabled, Export downloads it. |
 | R4-09 | A failed start terminates its worker. | 7fc9e9e | Sim wasm blocked: 3 workers alive after a boot and a Continue → 1 started, 1 closed, 0 left. |
-| R4-10 | Babylon's `adaptToDeviceRatio` is off. `applyResolution()` sets the scaling from the device pixel ratio and the resolution setting on start, on settings changes and resizes, and from a `matchMedia` resolution query (zoom, another screen). | fb084dc | Real browser zoom at 1.5×, 0.5× and 0.33×: applied again, about 2.07 MP each time. A move between monitors wasn't tested (one display). |
+| R4-10 | Babylon's `adaptToDeviceRatio` is off. `applyResolution()` sets the scaling from the device pixel ratio and the resolution setting on start, on settings changes and resizes, and from a `matchMedia` resolution query (zoom, another screen). | fb084dc | Real browser zoom at 1.5×, 0.5× and 0.33×: applied again, about 2.07 MP each time. A move between monitors wasn't tested (one display). The automatic re-apply can't be triggered headless (CDP's pixel-ratio override fires no resize or media-query change), so it rests on G1's real-zoom test. |
 | R4-11 | Build mode reads Alt and Shift from every pointer event, and forgets them when the window loses focus or the tab is hidden. | 9190394 | Synthetic Alt keydown, blur, focus, then a click: the Wall tool stays, no hint. A real Alt+click still picks. |
 | R4-12, R4-16, R5-21 | A master gain node with a Master volume setting. The audio context is suspended while the tab is hidden (voices stopped first), whatever the settings, and resumed when it's visible. "Mute in background" (on) fades out while another window has focus. The context starts from the first click or key and restarts after Safari's `interrupted`; there is no `resume()` on every sound any more, and world sounds fade when updates stop for 2 s. "Pause when the window loses focus" is new too (off). | 67d6937, 5f22b1c | With drawing stopped, the world's peak level went 0.036 → 0 within 3.5 s (before: it kept playing). Safari wasn't tested. |
 | R4-13, R5-16 | Every runtime fetch from `public/` carries the build id (`?v=<id>`), except the SHA-pinned `voice/` and `llm/`. A failed import of the game screen goes back to the menu, and `vite:preloadError` or a failed script fetch shows "A new version is available." with Reload. | 690105c, a44ac1a | Dev server: every `public/` request up to New game but `index.html` carries the id (350 of 589 requests). Each blocked chunk shows the banner. |
@@ -839,7 +841,7 @@ With the SimPanel open the frame rate went 57.8 → 60.8 fps. M1's runs saw no l
 
 | ID | What changed | Commit | Before → after |
 |---|---|---|---|
-| P2-08 | The town behind the menus is paced at 30 fps at most (36 on a 144 Hz display), in whole refreshes like the cap; the flight into the game runs at the game's rate. | f10d9e5 | Main menu on the M3 Pro, 120 Hz, production build, 8 s, main-thread task time from CDP: 60 fps and 20 % busy → 30 fps and 14 %; at 3× CPU slow-down, 45 % → 24 %. Every menu frame now stays 4 refreshes on screen. |
+| P2-08 | The town behind the menus is paced at about 30 fps, by the cap's rounding rule (as in §5's Cap 30 column: 36 on a 144 Hz display, 37.5 on 75 Hz, 33 on 165 Hz), in whole refreshes like the cap; the flight into the game runs at the game's rate. | f10d9e5 | Main menu on the M3 Pro, 120 Hz, production build, 8 s, main-thread task time from CDP: 60 fps and 20 % busy → 30 fps and 14 %; at 3× CPU slow-down, 45 % → 24 %. Every menu frame now stays 4 refreshes on screen. |
 | P2-01 | The household cards' action bars and the SimPanel's need and action bars move by transform, which the compositor animates: `scaleX` for action bars, `translateX` for need bars (so a bar's rounded end stays round). They used to animate `width`, and each update (about 8 a second) restarted a 300 ms transition, so the page was laid out and repainted on every display refresh. | d9b58d1 | Measured alone, panel closed: busy 68.7 → 61.4 %, work outside the frame callback 169 → 113 ms/s, layouts 119 → 11 a second (16.5 → 3.5 ms/s), the GPU process 23 → 16 % busy. Same look: old and new bars side by side, at rest and held at 0, ¼, ½ and ¾ of a transition, differ only in the anti-aliasing of a bar's end pixel (and in the shape of the 1–3 px sliver of a need under 3 %). |
 | P2-02 | The renderer keeps the canvas's size, updated by a ResizeObserver, for placing bubbles, panning sounds and the menu town's camera, instead of reading it from the page after the interface has changed it. | b70beaf | Dev server, 25 s CPU profiles, two runs each: `project` 23.7 → 0.4 ms/s, the bubbles' update 19.2 → 3.1 ms/s, the world sounds' update 8.9–11.4 → 1.0–1.3 ms/s (with P2-13). Forced style and layout inside the frame (trace, full CPU speed): 68 → 2 a second, 11.3 → 0.7 ms/s; what's left is a new bubble's pop. |
 | P2-05 | Goal ideas, things to buy and wishes are worked out again only when the residents' names, the parts of their plans that hold ideas, or (for repairs) the things at home changed. A plain "a resident changed" check would have saved almost nothing: some resident changes in nearly every update. | 519dd59 | Dev server: the toasts' update 2.0–2.5 → 0.1–0.2 ms/s. |
@@ -1031,7 +1033,7 @@ Every agent tested on Apple Silicon Macs in Chromium, with one display. This lis
 
 - [ ] On a 120 Hz and a 144 Hz display, each cap (Settings › Performance › Frame rate cap): F3's Display matches the table, and a walker crossing the lot moves evenly, without a hitch every second or two.
 - [ ] On a 90 Hz or 165 Hz display, cap 60 gives 45 or 55 fps (rounded down, §6). Say if that feels wrong.
-- [ ] The menus' town runs at 30 fps at most (36 on 144 Hz); the flight into a game is smooth.
+- [ ] The menus' town runs at about 30 fps, as in the Cap 30 column (36 on 144 Hz); the flight into a game is smooth.
 
 **4K and Retina screens, zoom, a second monitor:**
 - [ ] On a 4K or Retina screen with Resolution on Auto, F3's Resolution is about 2.07 million pixels (a 3840×2160 screen: 1920×1080 · 50 %) and the picture looks sharp.

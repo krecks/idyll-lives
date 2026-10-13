@@ -29,7 +29,7 @@ The same on every preset:
 - **The shadow map's colour target is R16F**, not the RGBA16F target that nothing read (P1-05).
 - **Auto resolution** with a budget of 1920×1080 (below).
 - **The FramePacer** for the frame rate cap (below).
-- **The menus' town** is drawn at 30 fps at most.
+- **The menus' town** is drawn at about 30 fps (the cap's rounding rule for 30, below).
 - **Dark lamps leave the cluster:** a lamp that is off gets a range of 1 cm, so it covers next to no tiles (P1-02).
 - **Nature is culled in cells:** the landscape's plants are grouped by where they stand (lawn tufts in 32 m squares, flowers in 96 m squares, the woods in 8 sectors round the town), so the camera leaves out those out of view (P1-01).
 - **The sun's shadow map** draws only the casters that can reach its square round the lot, and is drawn again only when something in it changed: the light, a thing placed or moved, walls, roofs or storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame (P1-04).
@@ -91,7 +91,7 @@ Babylon's own cap (`engine.maxFPS`) drew once enough time had piled up since the
 - **Rounding rule:** N is the smallest divisor whose rate isn't more than a quarter above the cap (with 2 % leeway for a measured rate a little off the nominal one): `N = max(1, ceil(Hz / (cap × 1.25 × 1.02)))`. So a cap the refresh rate doesn't divide becomes a rate it does, rounded up when that's within a quarter, and down otherwise.
 - **No cap** draws every refresh.
 - **The game's clocks** run on the timestamp of the refresh a frame is drawn for, not the moment its code runs. The residents' interpolation, the step counter and the director get that timestamp, and Babylon's frame time (camera glides and inertia, clouds, wind) is measured between those timestamps, so motion advances in the same even steps the frames are shown in. The frame time is clamped to 100 ms.
-- **The menus' town** is paced at 30 fps at most (`MENU_FPS`, which the rule makes 36 on a 144 Hz display), and the flight into a game at the game's cap.
+- **The menus' town** is paced at about 30 fps (`MENU_FPS` through the same rule, as in the Cap 30 column below: 36 on a 144 Hz display, 37.5 on 75 Hz), and the flight into a game at the game's cap.
 
 Frame rates the pacer gives:
 
