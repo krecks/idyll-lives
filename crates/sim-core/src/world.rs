@@ -2171,6 +2171,20 @@ impl World {
         Ok(())
     }
 
+    /// `apply` for a command from the player's view that names an object by id, with what the
+    /// view showed there (`seen`, see `command::Seen`): when the object at that id isn't that
+    /// one any more (ids shifted since), nothing happens and it returns `Ok(false)`.
+    pub fn apply_seen(&mut self, cmd: Command, seen: Option<&crate::command::Seen>) -> Result<bool, Error> {
+        if let (Some(seen), Some(id)) = (seen, cmd.object()) {
+            let same = self.objects.get(id as usize).is_some_and(|o| (o.x, o.z) == (seen.x, seen.z) && self.content.objects[o.def].id == seen.def);
+            if !same {
+                return Ok(false);
+            }
+        }
+        self.apply(cmd)?;
+        Ok(true)
+    }
+
     fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
         match cmd {
             Command::SetSpeed { speed } => {

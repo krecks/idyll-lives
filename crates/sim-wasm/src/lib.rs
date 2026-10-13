@@ -4,6 +4,12 @@ use sim_core::{Command, World, mesh, snapshot, view};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = debug)]
+    fn console_debug(message: &str);
+}
+
+#[wasm_bindgen]
 pub struct Game {
     world: World,
     snapshot: Box<[f32]>,
@@ -49,10 +55,13 @@ impl Game {
         self.snapshot.len()
     }
 
-    /// Applies a JSON-encoded `Command`.
+    /// Applies a JSON-encoded `Command`. One that names an object by id with what the view
+    /// showed there (`seen`) is skipped when that id names another object by now.
     pub fn command(&mut self, json: &str) -> Result<(), JsError> {
-        let cmd = Command::from_json(json).map_err(|e| JsError::new(&e.0))?;
-        self.world.apply(cmd).map_err(|e| JsError::new(&e.0))?;
+        let (cmd, seen) = Command::from_json_seen(json).map_err(|e| JsError::new(&e.0))?;
+        if !self.world.apply_seen(cmd, seen.as_ref()).map_err(|e| JsError::new(&e.0))? {
+            console_debug(&format!("skipped (the object's id changed): {json}"));
+        }
         snapshot::write(&self.world, &mut self.snapshot);
         Ok(())
     }

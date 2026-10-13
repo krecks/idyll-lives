@@ -6,6 +6,7 @@
 mod common;
 
 use sim_core::world::{Phase, TaskKind};
+use sim_core::command::Seen;
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
 /// An open 16×14 plot with one resident.
@@ -184,19 +185,59 @@ fn traits_give_their_starting_skills() {
 
 /// R2-04 (known: commands by position aren't idempotent). Holding R in Build mode sends
 /// `moveObject` again with the id the view had (`session.ts:543`): the first rotates the rug and
-/// renumbers it last, the second moves whatever took its id (the lamp) onto the rug.
+/// renumbers it last, the second moves whatever took its id (the lamp) onto the rug. With what
+/// the view saw at that id (`seen`), the second is skipped.
 #[test]
-#[ignore = "release review: fails until R2-04 is fixed"]
 fn a_repeated_rotate_does_not_move_another_object() {
     let mut w = world();
     let rug = buy(&mut w, "rugRound", 2, 2);
     let lamp = buy(&mut w, "lamp", 11, 11);
     let (x, z) = (w.objects[rug as usize].x, w.objects[rug as usize].z);
     let rotate = Command::MoveObject { household: 0, object: rug, x, z, rot: 1, turn: None, offset: None, size: None, tall: None };
-    w.apply(rotate.clone()).unwrap();
-    let _ = w.apply(rotate);
+    let seen = Seen { def: "rugRound".into(), x, z };
+    assert_eq!(w.apply_seen(rotate.clone(), Some(&seen)), Ok(true));
+    assert_eq!(w.apply_seen(rotate, Some(&seen)), Ok(false), "skipped: the lamp took the rug's id");
     let lamp_now = w.objects.iter().find(|o| w.content.objects[o.def].id == "lamp").unwrap();
     assert_eq!((lamp_now.x, lamp_now.z), (11, 11), "the lamp (id {lamp} before) stays where it was");
+    let rug_now = w.objects.iter().find(|o| w.content.objects[o.def].id == "rugRound").unwrap();
+    assert_eq!((rug_now.x, rug_now.z, rug_now.rot), (x, z, 1), "the rug turned once");
+}
+
+/// R2-04: every command by object id checks `seen` (selling, restyling, upgrading, repairing,
+/// using): a stale one changes nothing, not even the undo steps; one that matches goes ahead.
+#[test]
+fn commands_for_an_object_that_moved_on_are_skipped() {
+    let mut w = world();
+    let lamp = buy(&mut w, "lamp", 1, 11);
+    let sofa = buy(&mut w, "sofa", 4, 4);
+    let lamp_seen = Seen { def: "lamp".into(), x: 1, z: 11 };
+    w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
+    let before = (w.objects.clone(), w.households[0].funds, w.undo_steps(0));
+    let relax = interaction(&w, sofa - 1, "relax");
+    let stale = [
+        Command::Sell { household: 0, object: lamp },
+        Command::Restyle { household: 0, object: lamp, style: 1 },
+        Command::Upgrade { household: 0, object: lamp },
+        Command::Repair { household: 0, object: lamp },
+        Command::Use { sim: 0, object: lamp, interaction: relax },
+        Command::MoveObject { household: 0, object: lamp, x: 8, z: 8, rot: 0, turn: None, offset: None, size: None, tall: None },
+    ];
+    for cmd in stale {
+        let what = format!("{cmd:?}");
+        assert_eq!(w.apply_seen(cmd, Some(&lamp_seen)), Ok(false), "{what}");
+    }
+    assert_eq!((w.objects.clone(), w.households[0].funds, w.undo_steps(0)), before, "nothing changed");
+    assert!(w.sims[0].queue().next().is_none(), "nothing queued");
+    // The sofa as the view shows it now: it goes ahead.
+    let sofa_seen = Seen { def: "sofa".into(), x: 4, z: 4 };
+    assert_eq!(w.apply_seen(Command::Use { sim: 0, object: sofa - 1, interaction: relax }, Some(&sofa_seen)), Ok(true));
+    assert!(w.sims[0].queue().next().is_some(), "off to the sofa");
+    // From the UI: `seen` rides along in the command's JSON.
+    let json = r#"{"type":"sell","household":0,"object":0,"seen":{"def":"sofa","x":4,"z":4}}"#;
+    let (cmd, seen) = Command::from_json_seen(json).unwrap();
+    assert_eq!((cmd.object(), seen), (Some(0), Some(sofa_seen)));
+    let (_, seen) = Command::from_json_seen(r#"{"type":"sell","household":0,"object":0}"#).unwrap();
+    assert_eq!(seen, None);
 }
 
 /// Ada's home and her friend Bo's next door (a fridge each, and a shower at Bo's).

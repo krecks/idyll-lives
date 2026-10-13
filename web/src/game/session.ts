@@ -8,7 +8,7 @@ import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
 import { SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
-import { lowestStorey } from '../core/protocol';
+import { lowestStorey, seenAt } from '../core/protocol';
 import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
@@ -434,7 +434,7 @@ export async function startSession(
     },
     useObject(objectId, interaction) {
       if (game.mode !== 'live') return;
-      bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });
+      bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction, seen: seenAt(game.objects, objectId) });
       game.menu = null;
     },
     useItem(itemId, action) {
@@ -540,7 +540,7 @@ export async function startSession(
         play('rotate');
       } else if (game.buySelection !== null) {
         const obj = game.objects.find((o) => o.id === game.buySelection);
-        if (obj) bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turned(obj.def, obj.rot, obj.turn ?? 0) });
+        if (obj) bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turned(obj.def, obj.rot, obj.turn ?? 0), seen: seenAt(game.objects, obj.id) });
       }
     },
     cancelPlacing() {
@@ -550,12 +550,12 @@ export async function startSession(
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Selling what's in hand puts it down first (selling renumbers the objects after it).
       if (game.placing?.objectId === objectId) buildBuy.cancel();
-      bridge.send({ type: 'sell', household: game.home, object: objectId });
+      bridge.send({ type: 'sell', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
       game.buySelection = null;
       game.menu = null;
     },
     repair(objectId) {
-      bridge.send({ type: 'repair', household: game.home, object: objectId });
+      bridge.send({ type: 'repair', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
     },
     undo() {
       // The step count follows a little later; don't send more undos than there are steps.
@@ -575,7 +575,7 @@ export async function startSession(
       bridge.send({ type: 'redo', household: game.home });
     },
     restyle(objectId, style) {
-      bridge.send({ type: 'restyle', household: game.home, object: objectId, style });
+      bridge.send({ type: 'restyle', household: game.home, object: objectId, style, seen: seenAt(game.objects, objectId) });
     },
     resetSize(objectId) {
       const obj = game.objects.find((o) => o.id === objectId);
@@ -583,7 +583,7 @@ export async function startSession(
       if (!obj || !def) return;
       // Back to its kind's footprint from the same corner (the simulation refuses it if that doesn't fit).
       const [w, d] = def.footprint ?? [1, 1];
-      bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0 });
+      bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0, seen: seenAt(game.objects, obj.id) });
     },
     setHouseholdStyle(style) {
       bridge.send({ type: 'setStyle', household: game.home, style });
@@ -592,7 +592,7 @@ export async function startSession(
     /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
       if (!game.furnishing) return;
-      bridge.send({ type: 'upgrade', household: game.home, object: objectId });
+      bridge.send({ type: 'upgrade', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
       game.menu = null;
     },
     toggleEyedropper() {
