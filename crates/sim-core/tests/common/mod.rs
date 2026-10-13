@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use serde_json::{Value, json};
-use sim_core::World;
+use sim_core::{MINUTES_PER_TICK, World, clock};
 use sim_core::social::FORMER;
 use sim_core::world::{Phase, Sim, TaskKind};
 
@@ -307,6 +307,398 @@ fn follow_up_refs(w: &World, i: usize, kind: &str) {
             def.interactions.len()
         );
     }
+}
+
+/// A resident stuck in one state too long, as `Watch` saw it.
+#[derive(Debug, Clone)]
+pub struct Stuck {
+    pub sim: u32,
+    pub name: String,
+    /// The state, with what it's about (`Busy Use readingNook.curlUp`).
+    pub state: String,
+    /// The tick it started, and the tick it was seen to have lasted too long.
+    pub since: u64,
+    pub tick: u64,
+}
+
+impl std::fmt::Display for Stuck {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let at = |t: u64| format!("day {} {:05.2}h", clock::day(t), clock::hour(t));
+        write!(f, "{} (#{}) {} since {}, still at {} (tick {})", self.name, self.sim, self.state, at(self.since), at(self.tick), self.tick)
+    }
+}
+
+/// What a resident is doing, for `Watch`: the state, and what it's with (the same state with
+/// another thing is a new stretch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum State {
+    /// In bed (not a crib).
+    Asleep(Doing),
+    /// Using something (not a bed or a crib), or talking.
+    Busy(Doing),
+    Routing(Doing),
+    /// Waiting for someone to talk to, for a busy station, or at someone's door.
+    Waiting(Doing),
+    Away,
+    /// Being talked to by this resident.
+    Engaged(u32),
+    Idle,
+    /// A baby in the crib (they lie there for days): never stuck.
+    Crib,
+}
+
+/// A task without how far along it is: its kind and the thing or person it's with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Doing(u8, u32, u32);
+
+impl State {
+    /// Game hours in a row after which it's a resident stuck, not a long stretch.
+    fn limit(self) -> Option<f32> {
+        match self {
+            State::Asleep(_) => Some(13.0),
+            State::Busy(_) => Some(6.0),
+            State::Routing(_) => Some(4.0),
+            State::Waiting(_) => Some(1.0),
+            State::Away => Some(16.0),
+            State::Engaged(_) => Some(2.0),
+            State::Idle => Some(6.0),
+            State::Crib => None,
+        }
+    }
+}
+
+fn doing(kind: &TaskKind) -> Doing {
+    match *kind {
+        TaskKind::Use { object, interaction } => Doing(0, object, interaction as u32),
+        TaskKind::MoveTo { x, z } => Doing(1, x.to_bits(), z.to_bits()),
+        TaskKind::Social { target, social } => Doing(2, target, social as u32),
+        TaskKind::Join { leader } => Doing(3, leader, 0),
+        TaskKind::Work => Doing(4, 0, 0),
+        TaskKind::Visit { plot } => Doing(5, plot, 0),
+        TaskKind::GoHome => Doing(6, 0, 0),
+        TaskKind::Answer { guest } => Doing(7, guest, 0),
+        TaskKind::Clean { x, z } => Doing(8, x as u32, z as u32),
+        TaskKind::Repair { object } => Doing(9, object, 0),
+        TaskKind::Spot { accident } => Doing(10, accident as u32, 0),
+        TaskKind::Cook { recipe, step, .. } => Doing(11, recipe as u32, step as u32),
+        TaskKind::Eat { stage, .. } => Doing(12, stage as u32, 0),
+        TaskKind::Dishes { stage, .. } => Doing(13, stage as u32, 0),
+        TaskKind::Phone { action, .. } => Doing(14, action as u32, 0),
+    }
+}
+
+fn state(w: &World, s: &Sim) -> State {
+    if s.away_until.is_some() {
+        return State::Away;
+    }
+    if let Some(t) = s.engaged_with {
+        return State::Engaged(t);
+    }
+    let Some(act) = s.current() else { return State::Idle };
+    let d = doing(&act.task.kind);
+    match act.phase {
+        Phase::Using { .. } => {
+            let crib = match act.task.kind {
+                TaskKind::Use { object, interaction } => w
+                    .objects
+                    .get(object as usize)
+                    .and_then(|o| w.content.objects[o.def].interactions.get(interaction))
+                    .is_some_and(|i| i.baby),
+                _ => false,
+            };
+            if crib {
+                State::Crib
+            } else if s.asleep(&w.content) {
+                State::Asleep(d)
+            } else {
+                State::Busy(d)
+            }
+        }
+        Phase::Conversing { .. } => State::Busy(d),
+        Phase::Routing { .. } => State::Routing(d),
+        Phase::Waiting { .. } | Phase::Queued { .. } | Phase::Knocking { .. } => State::Waiting(d),
+    }
+}
+
+fn describe(w: &World, st: State) -> String {
+    let thing = |d: Doing| match d {
+        Doing(0, o, i) => w.objects.get(o as usize).map_or(format!("Use object {o}"), |obj| {
+            let def = &w.content.objects[obj.def];
+            format!("Use {}.{}", def.id, def.interactions.get(i as usize).map_or("?", |i| i.id.as_str()))
+        }),
+        Doing(2, t, s) => format!("Social {} with {}", w.content.socials.get(s as usize).map_or("?", |s| s.id.as_str()), w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
+        Doing(10, a, _) => format!("Spot {}", w.content.accidents.get(a as usize).map_or("?", |a| a.id.as_str())),
+        Doing(k, a, b) => {
+            let kinds = ["Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean", "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone"];
+            format!("{} {a} {b}", kinds[k as usize])
+        }
+    };
+    match st {
+        State::Asleep(d) => format!("Asleep: {}", thing(d)),
+        State::Busy(d) => format!("Busy {}", thing(d)),
+        State::Routing(d) => format!("Routing {}", thing(d)),
+        State::Waiting(d) => format!("Waiting {}", thing(d)),
+        State::Engaged(t) => format!("Engaged by {}", w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
+        st => format!("{st:?}"),
+    }
+}
+
+/// Watches for residents stuck in one state: asleep for 13 hours (a baby in the crib is
+/// exempt), using something or talking for 6, walking for 4, waiting, queued or knocking for
+/// 1, away for 16, being talked to for 2, or idle for 6. Call `sample` after every tick (or
+/// step); it looks every `Watch::EVERY` ticks. Each stretch is reported once, in `stuck`.
+///
+/// With `WATCH=<name>` (or `<name>@<day>`) in the environment it prints what that resident
+/// does (from that day), one line per change, to see the story behind a report.
+#[derive(Default)]
+pub struct Watch {
+    /// Per resident slot: their stretch in one state as of the last look.
+    last: Vec<Option<Stretch>>,
+    next: u64,
+    pub stuck: Vec<Stuck>,
+    trace: Option<(String, u32)>,
+    /// Hours of walking that count as stuck (`State::limit` unless set).
+    routing_hours: Option<f32>,
+}
+
+/// A resident's stretch in one state: since when, who it is (a slot can be someone new), how
+/// far they've walked in it (tiles, between looks) and where they were at the last look, and
+/// whether it was reported.
+#[derive(Clone)]
+struct Stretch {
+    state: State,
+    since: u64,
+    name: String,
+    walked: f32,
+    at: [f32; 2],
+    reported: bool,
+}
+
+impl Watch {
+    pub const EVERY: u64 = 20;
+
+    pub fn new() -> Self {
+        let trace = std::env::var("WATCH").ok().map(|v| match v.split_once('@') {
+            Some((name, day)) => (name.to_string(), day.parse().unwrap_or(1)),
+            None => (v, 1),
+        });
+        Watch { trace, ..Self::default() }
+    }
+
+    /// Walking for longer than `hours` counts as stuck (instead of 4: a town much bigger than
+    /// the game's has longer walks).
+    pub fn routing_hours(mut self, hours: f32) -> Self {
+        self.routing_hours = Some(hours);
+        self
+    }
+
+    pub fn sample(&mut self, w: &World) {
+        if w.tick < self.next {
+            return;
+        }
+        self.next = (w.tick / Self::EVERY + 1) * Self::EVERY;
+        self.last.resize(w.sims.len(), None);
+        for (i, s) in w.sims.iter().enumerate() {
+            if !s.here() {
+                self.last[i] = None;
+                continue;
+            }
+            let now = state(w, s);
+            if let Some((name, from)) = &self.trace
+                && *name == s.name
+                && clock::day(w.tick) >= *from
+                && self.last[i].as_ref().is_none_or(|st| st.state != now)
+            {
+                let route = match s.current().map(|a| &a.phase) {
+                    Some(Phase::Routing { waypoints, next }) => format!(", route {next}/{} to {:?}", waypoints.len(), waypoints.last()),
+                    _ => String::new(),
+                };
+                let home = w.households[s.household as usize].plot;
+                eprintln!("day {} {:05.2}h {name} (home plot {home:?}) at {:.1},{:.1}: {}{route}", clock::day(w.tick), clock::hour(w.tick), s.pos[0], s.pos[1], describe(w, now));
+            }
+            match &mut self.last[i] {
+                Some(st) if st.state == now && st.name == s.name => {
+                    st.walked += (s.pos[0] - st.at[0]).hypot(s.pos[1] - st.at[1]);
+                    st.at = s.pos;
+                    let hours = (w.tick - st.since) as f32 * MINUTES_PER_TICK / 60.0;
+                    let limit = match now {
+                        State::Routing(_) => self.routing_hours.or(now.limit()),
+                        _ => now.limit(),
+                    };
+                    if !st.reported && limit.is_some_and(|l| hours > l) {
+                        st.reported = true;
+                        let state = format!("{} (walked {:.0} m)", describe(w, now), st.walked);
+                        self.stuck.push(Stuck { sim: i as u32, name: s.name.clone(), state, since: st.since, tick: w.tick });
+                    }
+                }
+                entry => *entry = Some(Stretch { state: now, since: w.tick, name: s.name.clone(), walked: 0.0, at: s.pos, reported: false }),
+            }
+        }
+    }
+
+    /// Panics with everyone found stuck.
+    pub fn assert_quiet(&self) {
+        let list: Vec<String> = self.stuck.iter().map(|s| s.to_string()).collect();
+        assert!(list.is_empty(), "{} residents stuck:\n{}", list.len(), list.join("\n"));
+    }
+}
+
+pub const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+
+/// Keeps an eye on a long run: call `after` after every tick (or step). Every game hour it
+/// checks the world (`check`, which panics), and notes in `problems` anyone who didn't age
+/// exactly once at every midnight since the last look (or a newborn older than 0), and a town
+/// outside `population` residents; every `Watch::EVERY` ticks it watches for residents stuck
+/// and collects the story (the world's log keeps only the latest). `assert_ok` at the end.
+pub struct Long {
+    pub watch: Watch,
+    /// Every story event of the run, by kind.
+    pub story: std::collections::BTreeMap<String, usize>,
+    /// Residents here: the fewest and the most seen.
+    pub fewest: usize,
+    pub most: usize,
+    /// What went wrong besides `check` and `watch` (the first few of each kind).
+    pub problems: Vec<String>,
+    population: std::ops::RangeInclusive<usize>,
+    seen: u64,
+    hour: u64,
+    /// At the last hourly look: the day, and everyone's (name, age) by slot.
+    day: u32,
+    ages: Vec<Option<(String, f32)>>,
+    /// Babies born since the last look (slot, name).
+    born: Vec<(usize, String)>,
+    noted: std::collections::BTreeMap<&'static str, usize>,
+}
+
+impl Long {
+    pub fn new(w: &World, population: std::ops::RangeInclusive<usize>) -> Self {
+        let mut long = Long {
+            watch: Watch::new(),
+            story: Default::default(),
+            fewest: usize::MAX,
+            most: 0,
+            problems: Vec::new(),
+            population,
+            seen: w.events.last_id(),
+            hour: w.tick / TICKS_PER_HOUR,
+            day: clock::day(w.tick),
+            ages: Vec::new(),
+            born: Vec::new(),
+            noted: Default::default(),
+        };
+        long.look(w);
+        long
+    }
+
+    pub fn after(&mut self, w: &World) {
+        if w.tick < self.watch.next {
+            return;
+        }
+        self.watch.sample(w);
+        if w.events.last_id() > self.seen {
+            let new: Vec<_> = w.events.iter().rev().take_while(|e| e.id > self.seen).collect();
+            assert_eq!(new.len() as u64, w.events.last_id() - self.seen, "the story log dropped events before they were counted");
+            for e in new {
+                *self.story.entry(format!("{:?}", e.kind)).or_default() += 1;
+                if e.kind == sim_core::social::EventKind::Born {
+                    self.born.push((e.a as usize, w.sims[e.a as usize].name.clone()));
+                }
+            }
+            self.seen = w.events.last_id();
+        }
+        if w.tick / TICKS_PER_HOUR > self.hour {
+            self.hour = w.tick / TICKS_PER_HOUR;
+            self.look(w);
+        }
+    }
+
+    /// Notes a problem of `kind` (the first 10 of each).
+    fn note(&mut self, kind: &'static str, what: String) {
+        let n = self.noted.entry(kind).or_default();
+        *n += 1;
+        if *n <= 10 {
+            self.problems.push(format!("{kind}: {what}"));
+        }
+    }
+
+    fn look(&mut self, w: &World) {
+        check(w);
+        let day = clock::day(w.tick);
+        let when = format!("day {day} {:05.2}h", clock::hour(w.tick));
+        let year = w.lifespan.days_per_year(w.content.life.days_per_year).map(|d| 1.0 / d);
+        let midnights = day - self.day;
+        for (i, s) in w.sims.iter().enumerate() {
+            let Some(Some((name, age))) = self.ages.get(i) else { continue };
+            if !s.here() || s.name != *name {
+                continue;
+            }
+            // (Added up the way the life cycle does, so it's exact.)
+            let mut expected = *age;
+            for _ in 0..midnights {
+                expected += year.unwrap_or(0.0);
+            }
+            if s.age != expected {
+                let what = format!("{} was {age} on day {}, and is {} at {when} ({midnights} midnight(s) later)", s.name, self.day, s.age);
+                self.note("ageing", what);
+            }
+        }
+        for (i, name) in std::mem::take(&mut self.born) {
+            let s = &w.sims[i];
+            if s.here() && s.name == name && s.age != 0.0 {
+                self.note("ageing", format!("{name} was born on day {day} at the age of {}", s.age));
+            }
+        }
+        self.day = day;
+        self.ages = w.sims.iter().map(|s| s.here().then(|| (s.name.clone(), s.age))).collect();
+        let here = w.sims.iter().filter(|s| s.here()).count();
+        self.fewest = self.fewest.min(here);
+        self.most = self.most.max(here);
+        if !self.population.contains(&here) {
+            self.note("population", format!("{here} residents at {when}"));
+        }
+    }
+
+    /// Whether the run's story has an event of `kind` (`"Born"`).
+    pub fn told(&self, kind: &str) -> bool {
+        self.story.get(kind).is_some_and(|&n| n > 0)
+    }
+
+    /// Panics with every problem noted and everyone found stuck.
+    pub fn assert_ok(&self) {
+        let counts: Vec<String> = self.noted.iter().map(|(k, n)| format!("{n} {k}")).collect();
+        assert!(self.problems.is_empty(), "problems ({}):\n{}", counts.join(", "), self.problems.join("\n"));
+        self.watch.assert_quiet();
+    }
+}
+
+/// Saves `w` and loads it again: the loaded world passes `check`, has the same residents,
+/// households, objects and story, and saves the same again. Returns it (with no view: look at
+/// the lot again for lower detail).
+pub fn reload(w: &World, content: &str) -> World {
+    let json = w.save_json();
+    let loaded = World::from_save_json(content, &json).unwrap_or_else(|e| panic!("the save on day {} doesn't load: {e}", clock::day(w.tick)));
+    check(&loaded);
+    assert_eq!(loaded.tick, w.tick);
+    let who = |w: &World| w.sims.iter().map(|s| (s.name.clone(), s.here(), s.household, s.age.to_bits())).collect::<Vec<_>>();
+    assert_eq!(who(&loaded), who(w), "the residents survive saving");
+    let homes = |w: &World| w.households.iter().map(|h| (h.plot, h.funds, h.expecting.map(|e| (e.parents, e.due)))).collect::<Vec<_>>();
+    assert_eq!(homes(&loaded), homes(w), "the households survive saving");
+    let things = |w: &World| w.objects.iter().map(|o| (o.def, o.x, o.z, o.rot)).collect::<Vec<_>>();
+    assert_eq!(things(&loaded), things(w), "the objects survive saving");
+    let story = |w: &World| w.events.iter().map(|e| e.id).collect::<Vec<_>>();
+    assert_eq!(story(&loaded), story(w), "the story survives saving");
+    // Some things in hand start again from what's there (eating, washing up, a phone call, a
+    // visitor at the door aren't saved), so the first load can tidy up; from then on a save
+    // loads as it was.
+    let again = loaded.save_json();
+    let twice = World::from_save_json(content, &again).expect("a loaded game's save loads").save_json();
+    if twice != again {
+        // Where they part, with a little before it.
+        let at = again.bytes().zip(twice.bytes()).position(|(a, b)| a != b).unwrap_or(again.len().min(twice.len()));
+        let around = |s: &str| s[at.saturating_sub(300)..(at + 200).min(s.len())].to_string();
+        panic!("a loaded game saves differently from character {at}:\nsaved:   …{}\nresaved: …{}", around(&again), around(&twice));
+    }
+    loaded
 }
 
 /// A small deterministic random number generator for building fixtures.
