@@ -77,7 +77,8 @@ def image_size(blob):
 
 
 def node_matrices(gltf):
-    """World matrix (column-major 4x4 list) per mesh node, for the default scene."""
+    """(mesh, world matrix (column-major 4x4 list), moving part) per mesh node, for the default scene.
+    The moving part is the nearest node above it (or itself) that an animation moves, or None."""
     def local(n):
         if 'matrix' in n:
             return n['matrix']
@@ -96,16 +97,68 @@ def node_matrices(gltf):
     out = []
     nodes = gltf.get('nodes', [])
     scene = gltf.get('scenes', [{}])[gltf.get('scene', 0)]
+    moved = moved_nodes(gltf)
 
-    def walk(i, parent):
+    def walk(i, parent, part):
         m = mul(parent, local(nodes[i]))
+        part = i if i in moved else part
         if 'mesh' in nodes[i]:
-            out.append((nodes[i]['mesh'], m))
+            out.append((nodes[i]['mesh'], m, part))
         for c in nodes[i].get('children', []):
-            walk(c, m)
+            walk(c, m, part)
     for i in scene.get('nodes', []):
-        walk(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+        walk(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], None)
     return out
+
+
+def moved_nodes(gltf):
+    """The nodes the file's animations move."""
+    return {c['target']['node'] for a in gltf.get('animations', []) for c in a['channels'] if 'node' in c['target']}
+
+
+def first_value(gltf, binary, accessor):
+    """The first element of a float accessor (a clip's first key)."""
+    acc = gltf['accessors'][accessor]
+    if acc.get('componentType') != 5126:
+        return None
+    view = gltf['bufferViews'][acc['bufferView']]
+    n = {'SCALAR': 1, 'VEC3': 3, 'VEC4': 4}[acc['type']]
+    return struct.unpack_from(f'<{n}f', binary, view.get('byteOffset', 0) + acc.get('byteOffset', 0))
+
+
+def check_clips(gltf, binary, entry):
+    """(errors, warnings) for a file's animations: moving parts turned or slid by node clips
+    (docs/design/objects.md, "Moving parts"), each starting at rest, each played by the entry's `motions`."""
+    errors, warnings = [], []
+    animations, nodes = gltf.get('animations', []), gltf.get('nodes', [])
+    rest = {'rotation': [0, 0, 0, 1], 'translation': [0, 0, 0], 'scale': [1, 1, 1]}
+    for a in animations:
+        name = a.get('name', '')
+        for c in a['channels']:
+            path, node = c['target'].get('path'), c['target'].get('node')
+            if path not in rest or node is None:
+                errors.append(f'clip {name!r} animates {path} (only a node\'s rotation, translation or scale)')
+                continue
+            first = first_value(gltf, binary, a['samplers'][c['sampler']]['output'])
+            at_rest = nodes[node].get(path, rest[path])
+            if first is None or any(abs(first[k] - at_rest[k]) > 1e-3 for k in range(len(at_rest))):
+                errors.append(f'clip {name!r} starts {nodes[node].get("name", node)} away from where the file has it (the first key is the rest pose)')
+    moved = moved_nodes(gltf)
+    parents = {c: i for i, n in enumerate(nodes) for c in n.get('children', [])}
+    for i in sorted(moved):
+        p = parents.get(i)
+        while p is not None and p not in moved:
+            p = parents.get(p)
+        if p is not None:
+            warnings.append(f'{nodes[i].get("name", i)} moves inside {nodes[p].get("name", p)}, which moves too: the game moves it with its own clip only')
+    names = {a.get('name', '') for a in animations}
+    uses = (entry.get('motions') or {}).get('uses', {})
+    for use, clip in sorted(uses.items()):
+        if clip not in names:
+            errors.append(f'`motions` plays {clip!r} for {use!r}, which is no clip of the file')
+    for name in sorted(names - set(uses.values())):
+        warnings.append(f'clip {name!r} plays for no use (name it in the entry\'s `motions`)')
+    return errors, warnings
 
 
 def placeholder_box(parts):
@@ -138,9 +191,13 @@ def check(entry, finishes, path):
         errors.append(f'requires {ext}, which the game cannot read')
     if gltf.get('skins'):
         errors.append('has a skin: placed things are drawn as thin instances, without bones')
-    for what in ('animations', 'cameras'):
-        if gltf.get(what):
-            warnings.append(f'has {what}; the game drops them')
+    if any(prim.get('targets') for mesh in gltf.get('meshes', []) for prim in mesh['primitives']):
+        errors.append('has morph targets: placed things are drawn as thin instances, without them')
+    if gltf.get('cameras'):
+        warnings.append('has cameras; the game drops them')
+    clip_errors, clip_warnings = check_clips(gltf, binary, entry)
+    errors += clip_errors
+    warnings += clip_warnings
     if 'KHR_lights_punctual' in gltf.get('extensionsUsed', []):
         warnings.append('has lights; the game drops them (a lamp\'s light is the content\'s `light`)')
 
@@ -150,7 +207,8 @@ def check(entry, finishes, path):
     tris, groups = 0, set()
     # Per problem, the materials that have it.
     flags = {k: set() for k in ('unmapped', 'double', 'blend', 'emissive', 'uvs')}
-    for mesh_index, m in node_matrices(gltf):
+    # Draw calls: one per finish group, the still body's and each moving part's apart.
+    for mesh_index, m, part in node_matrices(gltf):
         for prim in gltf['meshes'][mesh_index]['primitives']:
             if prim.get('mode', 4) != 4:
                 errors.append('a primitive that is not triangles')
@@ -179,9 +237,9 @@ def check(entry, finishes, path):
                 finish = ov['finish']
                 if finish not in finishes:
                     errors.append(f'material {name!r} maps to {finish}, which is no finish in the manifests')
-                groups.add('plain' if finishes.get(finish) else finish)
+                groups.add((part, 'plain' if finishes.get(finish) else finish))
                 continue
-            groups.add(f'file:{name}')
+            groups.add((part, f'file:{name}'))
             flags['unmapped'].add(name)
             if mat.get('doubleSided'):
                 flags['double'].add(name)
@@ -240,6 +298,8 @@ def check(entry, finishes, path):
         warnings.append(f'texture {i} ({img.get("name", img.get("uri", "embedded"))}): a texture of its own, prefer the game\'s finishes')
 
     summary = f'{size / 1024:6.1f} KB {tris:6d} tris {len(groups)} draws {len(materials):2d} materials  {dims[0]:.2f} x {dims[1]:.2f} x {dims[2]:.2f} m'
+    if gltf.get('animations'):
+        summary += f'  {len(moved_nodes(gltf))} moving parts, {len(gltf["animations"])} clips'
     return errors, warnings, summary
 
 

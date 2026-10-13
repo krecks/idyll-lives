@@ -2,10 +2,11 @@
 
 *Status: the standard proposed for 0.3.0, written from the review of the first Blender models
 (the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 a new object's
-model is built in Blender and exported as glTF. The engine needs the changes in
-[Before Blender is the standard](#before-blender-is-the-standard) first: above all, a model from a
-file doesn't yet grow or shrink when a player resizes its object, which players can do to anything
-but stairs.*
+model is built in Blender and exported as glTF. Files now resize, are picked by what's drawn, load
+once per scene and can have [moving parts](#moving-parts) (branch `v0.3/object-motion`); the rest of
+[Before Blender is the standard](#before-blender-is-the-standard) is still to do. Mind
+[styles](#materials-finishes-tints-styles-and-quality): a model shows on lots only once its style
+variants come from it too.*
 
 An object is three things, joined by keys:
 
@@ -72,7 +73,7 @@ gate below, so the review does.
 - **Footprint:** the content's `footprint` is in whole 1 m tiles (`[1, 1]` by default). The model
   stays inside it with a few centimetres to spare, unless it is meant to meet its neighbour (a
   counter run). The contact shadow (1.15 × the footprint) and buy mode's checks follow the
-  footprint; picking follows the drawn outline (for a file, once the engine change below is in).
+  footprint; picking follows the drawn outline.
 - **Real size, uniform scale.** Build to the object's real size. `gamekit.fit` scales each axis
   on its own to hit an exact box; it stretched the garden lantern's hexagon 15 % wider than deep and
   squashed the boulders to 75 % of their depth and 120 % of their height. Use it only to check
@@ -148,6 +149,14 @@ finish it uses.
   When only colours change, the variants use the same file with their own `materials` colours
   (`{ "finish": "material.finish.fabric", "color": "#7A8FA6" }`); a variant with another shape gets
   its own file. Styles never change price or quality.
+- **Every placed object has a style** (sim-core `ObjectInstance::style`, 0 = `modern` by default),
+  and the renderer draws `model.<id>@<style>` whenever that entry exists. So a pack that overrides
+  only `model.<id>` changes the catalog picture and nothing on the lots while the base manifest has
+  style variants of it: the fridge (`model.fridge`, 2026-10-13) was drawn from primitives on every
+  lot, because `@modern`, `@cozy` and `@minimal` are placeholders of other shapes; its pack now draws
+  `@modern` with the Blender model too.
+- **Resizing** works for files, but not every object looks right resized (a fridge stretched wide);
+  whether some objects keep their size is still to be decided.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors** (17 models) are placeholder parts with `mirror`; a file can't reflect yet. Keep them
   primitive until the engine change below.
@@ -163,6 +172,33 @@ finish it uses.
 - When the engine reads one, a model's far version is a second file, `<id>.far.glb`, at about a
   quarter of the triangles (the placeholders' LOD 1 is about an eighth).
 
+## Moving parts
+
+A door, a lid or a drawer that moves while residents use the object: one node per moving part in
+the file, moved by a clip of its own. The fridge's doors (`kitchen_doors.py`) are the example.
+
+- **One node per part, its origin on the hinge** (or where a drawer slides from), named for what it
+  is (`door_fridge`). What moves with it is joined into it or parented to it (the handle). The rest
+  of the model is one node (`cabinet`). Parts inside parts move only with their own clip.
+- **One clip per part**, named `<part>_open` (an NLA track of that name; `gamekit.export_glb(…,
+  clips=True)` writes the tracks). Its first key is the rest pose, where the file has the part and
+  where the game draws it closed: frame 1 when exporting. Rotation (and translation, scale) of the
+  node only. Two keys are enough; the game blends between samples of the clip, 30 a second.
+- **When it plays** is the pack entry's `motions` (`objectMotion.ts`): the clip a use plays, by the
+  interaction's id or its animation tag, and `hold`, the seconds after a use starts that the clip
+  plays back (absent: when the use ends). Time is the residents' animation time: still while paused,
+  faster at higher speeds.
+  ```json
+  "motions": { "uses": { "fetch": "fridge_open", "drink": "fridge_open" }, "hold": 3.5 }
+  ```
+- **Cost:** each part is drawn on its own (one draw per finish group within it, and again in the sun's
+  shadow map): the fridge takes 3 draws, 1 for the cabinet and 1 per door. Count parts in the 1–3.
+  While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn; nothing
+  is done while all are still.
+- **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
+- **Not yet:** clips that play without a resident (a fountain's water, a fan), and the freezer door,
+  which no use opens (no interaction takes frozen food).
+
 ## Export settings
 
 `gamekit.export_glb` holds them; don't export by hand.
@@ -177,14 +213,17 @@ finish it uses.
 | Normals | on | Smooth and hard edges as modelled |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
 | Compression | none (no Draco) | The build adds meshopt; the game ships no Draco decoder |
-| Animation, skins, morphs | none | Placed things are thin instances without bones |
+| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest | Thin instances move whole nodes, not bones (below) |
+| Skins, morphs | none | Placed things are thin instances without bones |
 
 ## Validation
 
 - **`python3 -I -B tools/art/blender/check_glb.py`** reads every `.glb` the manifests use, with
-  its entry, and exits 1 on an error. Errors: more than 4 draw calls after the `materials` mapping,
-  triangles over the most for the model's size, a model below the floor, extensions the game can't
-  read, skins, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: over 3
+  its entry, and exits 1 on an error. Errors: more than 4 draw calls after the `materials` mapping
+  (each moving part's counted apart), triangles over the most for the model's size, a model below
+  the floor, extensions the game can't read, skins, morph targets, a clip that animates anything but
+  a node's transform or doesn't start at rest, a `motions` clip the file doesn't have, textures over
+  1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, over 3
   draws or the triangle target, unmapped, double-sided, see-through or emissive materials, unused
   UVs, an off-centre or floating origin, a size 10 % off the placeholder's, and a pack whose copy of
   the placeholder no longer matches the entry it overrides. Plain Python, so CI can run it; inside
@@ -269,17 +308,11 @@ Placement, turning, height, shadows, contact shadows, footprints, the fallback w
 WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and style colours already
 work for files.
 
-1. **Resizing (blocker).** `buildModel` passes `resize` to placeholders only: a file is drawn at
-   its own size whatever size the player gives the object (a gnome resized to 2 × 1 tiles and
-   40 cm taller stays 0.26 × 0.58 m; its placeholder grows to 0.57 × 0.97 m). Apply the same edge
-   bands and rise line as `resizeParts` to the file's vertices after baking.
-2. **Picking outline.** `loadGltf` returns no `outline`, so a file is picked anywhere on its tiles
-   rather than by what's drawn (the rug around a vase stops being clickable). Return the baked
-   meshes' bounds.
-3. **Materials left behind.** Every build of a file imports it again: the game's lot, the town
-   overview, each buy-mode preview and each catalog picture. Unmapped materials stay in the scene
-   when a preview's meshes go (five previews of the unmapped wheelbarrow left 40). Load each file
-   once per scene and share it, or dispose the file's own materials with the meshes.
+1. ~~**Resizing (blocker).**~~ Done: a file's vertices take the same edge bands and rise line as
+   `resizeParts` (`resizeMaps`, `resizeData`), and its moving parts' hinges move with them.
+2. ~~**Picking outline.**~~ Done: `loadGltf` returns the baked geometry's bounds.
+3. ~~**Materials left behind.**~~ Done: each file is imported once per scene (`loadFile`); builds
+   copy its geometry and share its materials.
 4. **Level of detail** for files: read `<id>.far.glb` (or a second mesh) for LOD 1, as nature's
    `*.far` keys, before plants, trees or crowded props come from Blender.
 5. **Mirrors** from files: a material mapped to `mirror` (front or back), giving `mirrors` like

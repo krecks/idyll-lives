@@ -38,12 +38,15 @@ compartment is the fridge** (normal food), separated by a real divider.
 | `tools/art/blender/kitchen_doors.py` | new: the same fridge with hinged door nodes and one clip per door |
 | `web/public/assets/models/kitchen/fridge.doors.glb` | new model (212.2 KB) |
 
-`fridge.doors.glb` is not registered in the pack: the engine does not keep a file's
-hierarchy or animations yet, so it would only add a gate warning. The one-line switch
-when the engine adapts is the pack entry's `url`. Until then the game draws the file
-closed and identical to `fridge.glb`: `loadGltf` bakes each mesh's world transform
-(`node.computeWorldMatrix(true)`) and drops the clips, so the door nodes still land in
-the right place.
+`fridge.doors.glb` is the file the pack registers (branch `v0.3/object-motion`): the game keeps
+each door as a moving part and plays `fridge_open` while a resident takes something out
+(the entry's `motions`: the `fetch` and `drink` animation tags, `hold` 3.5 s). `freezer_open`
+plays for no use yet: no interaction takes frozen food. `fridge.glb` stays as the flat build.
+
+On lots every fridge is styled (`model.fridge@modern` by default), and the style variants are
+placeholders of other shapes (docs/design/objects.md, styles). For now the pack also draws
+`@modern` with this model (`STYLED` in `kitchen.py`), keeping the `@modern` placeholder as its fallback.
+Other fridges (mini, built-in, French door, retro) are objects of their own and get models of their own.
 
 ## Design
 
@@ -141,7 +144,7 @@ renders are a throwaway script (`/tmp/state_render.py`), not a repo change.
   --python tools/art/blender/kitchen.py            # writes the .glb and the pack
 python3 -I -B tools/art/blender/check_glb.py model.fridge
 
-# the door build (its own file; not registered)
+# the door build (the registered file; also rewrites the pack)
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
   --python tools/art/blender/kitchen_doors.py      # writes fridge.doors.glb
 ```

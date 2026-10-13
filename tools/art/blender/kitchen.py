@@ -24,6 +24,12 @@ PREVIEW = os.path.join(HERE, 'previews')
 # The placeholder's back sits 9.4 cm behind the middle of its tile (`furniture_prims.BACK = -0.455`);
 # the model is centred like the garden decor, so every game depth is shifted back by that much.
 SHIFT = 0.094
+# Seconds (the residents' animation time) a door stays opening or open once a use starts: it opens in
+# 1.75 s (`kitchen_doors.py`), stays open while they reach in, then closes.
+HOLD = 3.5
+# The model entries this model draws: the plain fridge and, for now, the default style (every placed
+# fridge has a style, `modern` unless chosen), so it shows on the lots.
+STYLED = {'model.fridge': None, 'model.fridge@modern': None}
 
 
 def P(x, y, z):
@@ -173,10 +179,10 @@ def _write_pack():
     """Writes the pack entry from the base manifest's current placeholder, so it can't go stale."""
     with open(os.path.join(ASSETS, 'manifest.json')) as f:
         base = json.load(f)
-    placeholder = base['entries']['model.fridge']['placeholder']
     entry = {
         'type': 'model',
-        'url': '../../models/kitchen/fridge.glb',
+        # The doors' build (`kitchen_doors.py`): the same fridge, its doors opening while it's used.
+        'url': '../../models/kitchen/fridge.doors.glb',
         'materials': {
             '*': {'finish': 'material.finish.gloss'},
             'trim': {'finish': 'material.finish.satin'},
@@ -193,15 +199,23 @@ def _write_pack():
             'icecream': {'finish': 'material.finish.satin'},
             'peas': {'finish': 'material.finish.satin'},
         },
-        'placeholder': placeholder,
+        # Taking food or a drink out opens the fridge door (snacks, a recipe's ingredients, a cold
+        # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
+        'motions': {'uses': {'fetch': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
     }
+    # Every placed fridge has a style (0, `modern`, unless chosen), and a style's entry is drawn over the
+    # plain one: each style draws this model in its own colour. Each keeps its own placeholder as the fallback.
+    def styled(key, body):
+        materials = {**entry['materials'], 'body': body} if body else entry['materials']
+        return {**entry, 'materials': materials, 'placeholder': base['entries'][key]['placeholder']}
+    entries = {key: styled(key, body) for key, body in STYLED.items()}
     manifest = {
         '$comment': 'Blender-built kitchen models (tools/art/blender/kitchen.py). Replaces the '
                     'primitive-part placeholders by key; listed in the base manifest\'s packs. The '
                     'placeholder is kept as a fallback if a file fails to load, and the materials map '
                     'onto the game\'s finishes so a model costs one draw call per finish group.',
         'version': 1,
-        'entries': {'model.fridge': entry},
+        'entries': entries,
     }
     os.makedirs(os.path.dirname(PACK), exist_ok=True)
     with open(PACK, 'w') as f:

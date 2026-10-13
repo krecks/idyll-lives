@@ -24,7 +24,37 @@ export interface PopTarget {
   meshes: Mesh[];
   matrices: Float32Array;
   index: number;
+  /** Its moving parts (a fridge's doors), which follow the matrix (`writeMoving`). */
+  moving?: MovingTarget;
 }
+
+/** An instance's moving parts (`ModelMotion`): each part's meshes draw from a buffer of their own. */
+export interface MovingTarget {
+  /** Per part: its meshes and their buffer (the same index as the instance's). */
+  parts: { meshes: Mesh[]; matrices: Float32Array }[];
+  /** Per part: its pose now (16 floats each, identity at rest): where it is, before the instance's matrix. */
+  poses: Float32Array;
+}
+
+/** Writes an instance's moving parts after its matrix: each part's pose, then the instance's placement. */
+export function writeMoving(target: PopTarget): void {
+  const moving = target.moving;
+  if (!moving) return;
+  const o = target.index * 16;
+  Matrix.FromArrayToRef(target.matrices, o, mBase);
+  moving.parts.forEach(({ meshes, matrices }, k) => {
+    Matrix.FromArrayToRef(moving.poses, k * 16, mPose);
+    mPose.multiplyToRef(mBase, mPose);
+    mPose.copyToArray(matrices, o);
+    for (const mesh of meshes) {
+      if (mesh.isDisposed()) continue;
+      mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
+      mesh.thinInstanceBufferUpdated('matrix');
+    }
+  });
+}
+const mBase = new Matrix();
+const mPose = new Matrix();
 
 interface Ring {
   mesh: Mesh;
@@ -235,6 +265,7 @@ export class BuildEffects {
       if (mesh.isDisposed()) continue;
       mesh.thinInstanceBufferUpdated('matrix');
     }
+    writeMoving(p.target);
   }
 }
 

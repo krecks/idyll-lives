@@ -21,6 +21,7 @@
 import {
   Color3,
   ImportMeshAsync,
+  TransformNode,
   PBRMaterial,
   Matrix,
   Mesh,
@@ -32,7 +33,7 @@ import {
   type Scene,
 } from './core';
 import './loaders';
-import type { Material } from './core';
+import type { AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground, prefetch } from '../../assets/stream';
 import type { ModelEntry, PlaceholderPart, Vec3 } from '../../assets/types';
@@ -56,6 +57,48 @@ export interface ModelTemplate {
   mirrors?: MirrorSurface[];
   /** Its outline on the floor in model space (m: x and z, before turning), for picking it by what's drawn rather than its tiles. */
   outline?: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Its moving parts (a file's animated nodes: a fridge's doors) and the clips that move them. */
+  motion?: ModelMotion;
+}
+
+/**
+ * A model's moving parts: each is drawn by meshes of its own (at rest, where the file has it),
+ * which an instance moves with a matrix of its own (`clipPose`, before its placement).
+ */
+export interface ModelMotion {
+  /** Per mesh of the template: the moving part it belongs to, or -1 for the still body. */
+  parts: number[];
+  /** By the file's animation name. */
+  clips: Map<string, ModelClip>;
+}
+
+export interface ModelClip {
+  /** Seconds. */
+  duration: number;
+  /** Per part it moves: its pose in model space, sampled `CLIP_RATE` times a second (16 floats each). */
+  tracks: { part: number; poses: Float32Array }[];
+}
+
+/** Samples per second of a clip's poses. */
+const CLIP_RATE = 30;
+
+/**
+ * Where `clip` puts `part` at `seconds` (clamped to the clip) into `out`, relative to rest: its
+ * vertices at rest times `out` are where they are then. False (and `out` untouched) if the clip
+ * doesn't move that part.
+ */
+export function clipPose(clip: ModelClip, part: number, seconds: number, out: Float32Array, offset = 0): boolean {
+  const track = clip.tracks.find((t) => t.part === part);
+  if (!track) return false;
+  const last = track.poses.length / 16 - 1;
+  const at = clamp(seconds * CLIP_RATE, 0, last);
+  const i = Math.min(Math.floor(at), Math.max(0, last - 1));
+  const f = last > 0 ? at - i : 0;
+  const a = i * 16;
+  const b = Math.min(i + 1, last) * 16;
+  // Samples are close together: blending the matrices is as good as turning between them.
+  for (let k = 0; k < 16; k++) out[offset + k] = track.poses[a + k] * (1 - f) + track.poses[b + k] * f;
+  return true;
 }
 
 /**
@@ -94,7 +137,7 @@ export async function buildModel(
 ): Promise<ModelTemplate> {
   if (entry?.url) {
     try {
-      return await loadGltf(scene, name, entry);
+      return await loadGltf(scene, name, entry, footprint, options.resize);
     } catch (err) {
       console.warn(`[render] failed to load ${entry.url}, using placeholder`, err);
     }
@@ -123,30 +166,12 @@ const SMALL = 0.15;
  * to meet it. Small parts only move. Parts turned off the model's axes only move, too.
  */
 export function resizeParts(parts: readonly PlaceholderPart[], from: readonly [number, number], resize: Resize): PlaceholderPart[] {
-  const [tw, td] = resize.size;
-  const dy = resize.tall / 100;
-  if (tw === from[0] && td === from[1] && !dy) return [...parts];
+  if (!resizes(from, resize)) return [...parts];
   // Each part's turn and axis-aligned box in model space.
   const boxes = parts.map(partBox);
   const bottom = Math.min(...boxes.map((b) => b.lo[1]));
   const top = Math.max(...boxes.map((b) => b.hi[1]));
-  const span = Math.max(top - bottom, 1e-3);
-  // Upward (or, from the ceiling, downward): what lies past the line moves by `dy`.
-  const line = resize.ceiling ? top - RISE_FROM * span : bottom + RISE_FROM * span;
-  const lift = (v: number) => (resize.ceiling ? (v < line ? v - dy : v) : v > line ? v + dy : v);
-  // Along the floor: a band at each edge moves with it; the middle scales to fill.
-  const across = (half: number, half2: number) => {
-    const band = Math.min(EDGE_BAND, EDGE_SHARE * half);
-    const band2 = Math.min(band, EDGE_SHARE * half2);
-    const inner = half - band;
-    const inner2 = half2 - band2;
-    return (v: number) => {
-      const a = Math.abs(v);
-      const mapped = a <= inner ? (a * inner2) / Math.max(inner, 1e-6) : inner2 + ((a - inner) * band2) / band;
-      return Math.sign(v) * mapped;
-    };
-  };
-  const maps = [across(from[0] / 2, tw / 2), lift, across(from[1] / 2, td / 2)];
+  const { maps, span } = resizeMaps(from, resize, bottom, top);
   const widths = [from[0], span, from[1]];
   return parts.map((p, i) => {
     const { lo, hi, along } = boxes[i];
@@ -167,6 +192,62 @@ export function resizeParts(parts: readonly PlaceholderPart[], from: readonly [n
     }
     return { ...p, at, size };
   });
+}
+
+/** Whether `resize` changes a model of `from` tiles. */
+function resizes(from: readonly [number, number], resize: Resize): boolean {
+  return resize.size[0] !== from[0] || resize.size[1] !== from[1] || !!resize.tall;
+}
+
+/**
+ * The resizing of a model of `from` tiles whose height runs from `bottom` to `top`, as a map per
+ * axis (x, y, z) of where a point goes, and its slope there (how much the axis stretches).
+ */
+function resizeMaps(from: readonly [number, number], resize: Resize, bottom: number, top: number): { maps: ((v: number) => number)[]; slopes: ((v: number) => number)[]; span: number } {
+  const [tw, td] = resize.size;
+  const dy = resize.tall / 100;
+  const span = Math.max(top - bottom, 1e-3);
+  // Upward (or, from the ceiling, downward): what lies past the line moves by `dy`.
+  const line = resize.ceiling ? top - RISE_FROM * span : bottom + RISE_FROM * span;
+  const lift = (v: number) => (resize.ceiling ? (v < line ? v - dy : v) : v > line ? v + dy : v);
+  // Along the floor: a band at each edge moves with it; the middle scales to fill.
+  const across = (half: number, half2: number) => {
+    const band = Math.min(EDGE_BAND, EDGE_SHARE * half);
+    const band2 = Math.min(band, EDGE_SHARE * half2);
+    const inner = half - band;
+    const inner2 = half2 - band2;
+    const map = (v: number) => {
+      const a = Math.abs(v);
+      const mapped = a <= inner ? (a * inner2) / Math.max(inner, 1e-6) : inner2 + ((a - inner) * band2) / band;
+      return Math.sign(v) * mapped;
+    };
+    const slope = (v: number) => (Math.abs(v) <= inner ? inner2 / Math.max(inner, 1e-6) : band2 / band);
+    return { map, slope };
+  };
+  const [x, z] = [across(from[0] / 2, tw / 2), across(from[1] / 2, td / 2)];
+  return { maps: [x.map, lift, z.map], slopes: [x.slope, () => 1, z.slope], span };
+}
+
+/**
+ * A file's geometry resized as `resizeParts` resizes parts, point by point: the edges move out
+ * keeping their thickness, the middle stretches, and what lies above the rise line rises (a
+ * triangle across it stretches). Normals follow the stretch.
+ */
+function resizeData(data: VertexData, maps: ((v: number) => number)[], slopes: ((v: number) => number)[]): void {
+  const pos = data.positions!;
+  const nor = data.normals;
+  for (let i = 0; i < pos.length; i += 3) {
+    const [x, y, z] = [pos[i], pos[i + 1], pos[i + 2]];
+    if (nor) {
+      // A normal scales by the inverse of the stretch.
+      const n = [nor[i] / slopes[0](x), nor[i + 1] / slopes[1](y), nor[i + 2] / slopes[2](z)];
+      const l = Math.hypot(n[0], n[1], n[2]) || 1;
+      for (let k = 0; k < 3; k++) nor[i + k] = n[k] / l;
+    }
+    pos[i] = maps[0](x);
+    pos[i + 1] = maps[1](y);
+    pos[i + 2] = maps[2](z);
+  }
 }
 
 function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
@@ -636,6 +717,22 @@ interface ModelExtras {
   materials?: Record<string, MaterialOverride>;
   /** Extra placeholder primitives drawn with the model (in the final, fitted space). */
   parts?: PlaceholderPart[];
+  /** When the file's clips play (`objectMotion.ts`). */
+  motions?: Motions;
+}
+
+/** When a model's clips play: while residents use the object. */
+export interface Motions {
+  /** The clip a use plays, by the interaction's id or, failing that, its animation tag (`fetch`, `drink`). */
+  uses: Record<string, string>;
+  /** Seconds after a use starts that the clip plays back (a door that closes again); absent: when the use ends. */
+  hold?: number;
+}
+
+/** A model entry's `motions`, if it has any. */
+export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
+  const motions = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
+  return motions && Object.keys(motions.uses ?? {}).length ? motions : undefined;
 }
 
 interface MaterialOverride {
@@ -724,25 +821,164 @@ function idle(fn: (deadline?: IdleDeadline) => void, timeout = 2000): void {
  * A model being built is wanted now: background downloads wait for it.
  */
 function importModel(url: string, scene: Scene): ReturnType<typeof ImportMeshAsync> {
+  // Clips stay still: they're read (`readClips`), not played.
+  const options = { pluginOptions: { gltf: { animationStartMode: 0 } } } as Parameters<typeof ImportMeshAsync>[2];
   return foreground(async () => {
     const copy = optimizedUrl(url);
-    if (copy === url) return ImportMeshAsync(url, scene);
+    if (copy === url) return ImportMeshAsync(url, scene, options);
     try {
-      return await ImportMeshAsync(copy, scene);
+      return await ImportMeshAsync(copy, scene, options);
     } catch (err) {
       console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
-      return ImportMeshAsync(url, scene);
+      return ImportMeshAsync(url, scene, options);
     }
   });
 }
 
-async function loadGltf(scene: Scene, name: string, entry: ModelEntry): Promise<ModelTemplate> {
+/**
+ * A file as imported into a scene, once (`loadFile`): each of its meshes baked into model space at
+ * rest, with its material. Every build of it (the lot's, the town's, buy mode's held copy, a
+ * catalog picture, a resized copy) copies the geometry and shares the materials, so nothing of
+ * the file is left behind when a build's meshes go.
+ */
+interface LoadedFile {
+  pieces: FilePiece[];
+  /** Its moving parts: the nodes its animations move, each with its pivot (the node's origin at rest, in model space). */
+  parts: { name: string; pivot: Vector3 }[];
+  /** Its animations, by name, in the file's model space. */
+  clips: Map<string, ModelClip>;
+}
+
+interface FilePiece {
+  /** In the file's model space (its nodes' transforms baked in); builds copy it, never change it. */
+  data: VertexData;
+  /** The file's own material, kept as loaded: builds draw with copies of it (`fileMaterial`). */
+  material: Material | null;
+  /** The moving part it belongs to, or -1. */
+  part: number;
+}
+
+/** Files imported per scene, by URL (they go with the scene). */
+const loadedFiles = new WeakMap<Scene, Map<string, Promise<LoadedFile>>>();
+
+function loadFile(scene: Scene, url: string): Promise<LoadedFile> {
+  const files = loadedFiles.get(scene) ?? new Map<string, Promise<LoadedFile>>();
+  loadedFiles.set(scene, files);
+  let file = files.get(url);
+  if (!file) {
+    const loading = importFile(scene, url);
+    files.set(url, (file = loading));
+    // One that failed is tried again by the next build.
+    loading.catch(() => files.get(url) === loading && files.delete(url));
+  }
+  return file;
+}
+
+async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
+  const result = await importModel(url, scene);
+  for (const group of result.animationGroups) group.stop();
+  // The nodes the clips move: each, with all below it, is a moving part.
+  const moved = [...new Set(result.animationGroups.flatMap((g) => g.targetedAnimations.map((t) => t.target)))].filter((t): t is TransformNode => t instanceof TransformNode);
+  const atRest = (group: AnimationGroup) => {
+    for (const { animation, target } of group.targetedAnimations) (target as Record<string, unknown>)[animation.targetProperty] = animation.evaluate(group.from);
+  };
+  // At rest: where each clip starts.
+  result.animationGroups.forEach(atRest);
+  const rest = moved.map((node) => computeFromRoot(node).clone());
+  const partOf = (node: Node | null): number => {
+    for (let n = node; n; n = n.parent) {
+      const i = moved.indexOf(n as TransformNode);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const pieces: FilePiece[] = [];
+  for (const node of result.meshes) {
+    if (!(node instanceof Mesh) || node.getTotalVertices() === 0) continue;
+    // Bake the full hierarchy transform so thin-instance matrices place the model directly.
+    pieces.push({ data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part: partOf(node) });
+  }
+  const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation() }));
+  const clips = new Map(result.animationGroups.map((group) => [group.name, readClip(group, moved, rest)]));
+  result.animationGroups.forEach(atRest);
+  // The nodes and clips go; the materials stay with the file.
+  for (const node of [...result.transformNodes, ...result.meshes]) node.dispose(true, false);
+  for (const group of result.animationGroups) group.dispose();
+  return { pieces, parts, clips };
+}
+
+/** A clip's poses of the parts it moves (`ModelClip`): each node's world matrix then, relative to its world matrix at rest. */
+function readClip(group: AnimationGroup, moved: TransformNode[], rest: Matrix[]): ModelClip {
+  const animations = group.targetedAnimations;
+  const fps = animations[0]?.animation.framePerSecond || 60;
+  const duration = Math.max(0, (group.to - group.from) / fps);
+  const samples = Math.max(2, Math.ceil(duration * CLIP_RATE) + 1);
+  const targets = [...new Set(animations.map((a) => a.target))].filter((t): t is TransformNode => t instanceof TransformNode);
+  const tracks = targets.map((node) => ({ part: moved.indexOf(node), poses: new Float32Array(samples * 16) }));
+  const inverse = targets.map((node) => rest[moved.indexOf(node)].clone().invert());
+  const pose = new Matrix();
+  for (let s = 0; s < samples; s++) {
+    const frame = group.from + Math.min(s / CLIP_RATE, duration) * fps;
+    for (const { animation, target } of animations) (target as Record<string, unknown>)[animation.targetProperty] = animation.evaluate(frame);
+    targets.forEach((node, i) => {
+      // Vertices at rest, back into the node's own space, then out to where the node is now.
+      inverse[i].multiplyToRef(computeFromRoot(node), pose);
+      pose.copyToArray(tracks[i].poses, s * 16);
+    });
+  }
+  return { duration, tracks };
+}
+
+/** A node's world matrix, its parents' worked out first (they may have moved too). */
+function computeFromRoot(node: TransformNode): Matrix {
+  const chain: TransformNode[] = [];
+  for (let n: Node | null = node; n; n = n.parent) if (n instanceof TransformNode) chain.unshift(n);
+  for (const n of chain) n.computeWorldMatrix(true);
+  return node.getWorldMatrix();
+}
+
+/** The arrays of `data`, copied. */
+function copyData(data: VertexData): VertexData {
+  const copy = new VertexData();
+  for (const key of ['positions', 'normals', 'tangents', 'uvs', 'uvs2', 'colors', 'indices'] as const) {
+    const values = data[key];
+    if (values) (copy as unknown as Record<string, unknown>)[key] = values.slice();
+  }
+  return copy;
+}
+
+/** Copies of a file's materials as entries draw them (as loaded, or restyled by `color`, `roughness`, `metallic`), by restyling. */
+const materialCopies = new WeakMap<Material, Map<string, Material>>();
+
+/**
+ * The material a build draws a file's own `material` with: a copy per restyling, made once (the
+ * file's stays as loaded, for the next entry's restyling), and adopted into the game's lighting.
+ */
+function fileMaterial(lib: MaterialLibrary, material: Material | null, ov: MaterialOverride | undefined): Material | null {
+  if (!(material instanceof PBRMaterial)) return material;
+  const key = `${ov?.color ?? ''}|${ov?.roughness ?? ''}|${ov?.metallic ?? ''}`;
+  const copies = materialCopies.get(material) ?? new Map<string, Material>();
+  materialCopies.set(material, copies);
+  let copy = copies.get(key);
+  if (!copy) {
+    const made = material.clone(`${material.name}${key === '||' ? '' : `|${key}`}`);
+    if (ov?.color) made.albedoColor = material.albedoColor.multiply(Color3.FromHexString(ov.color).toLinearSpace());
+    if (ov?.roughness !== undefined) made.roughness = ov.roughness;
+    if (ov?.metallic !== undefined) made.metallic = ov.metallic;
+    lib.adopt(made);
+    copies.set(key, (copy = made));
+  }
+  return copy;
+}
+
+async function loadGltf(scene: Scene, name: string, entry: ModelEntry, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
   const extras = entry as ModelEntry & ModelExtras;
-  const result = await importModel(entry.url!, scene);
+  const file = await loadFile(scene, entry.url!);
   const fit = extras.fit;
   const s = fit ? 1 : (entry.scale ?? 1);
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
-  const extra = Matrix.Compose(
+  // The file's model space to this build's: `scale`, `rotationY` and `offset`, or `fit`.
+  let space = Matrix.Compose(
     new Vector3(s, s, s),
     Quaternion.RotationAxis(Vector3.Up(), ((entry.rotationY ?? 0) * Math.PI) / 180),
     fit ? Vector3.Zero() : new Vector3(ox, oy, oz),
@@ -750,81 +986,125 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry): Promise<
   const overrides = extras.materials ?? {};
   const overrideFor = (m: Material | null): MaterialOverride | undefined => (m && overrides[m.name]) ?? overrides['*'];
 
-  const lib = MaterialLibrary.for(scene);
-  const baked: Mesh[] = [];
-  for (const node of result.meshes) {
-    if (!(node instanceof Mesh) || node.getTotalVertices() === 0) continue;
-    if (overrideFor(node.material)?.hide) continue;
-    // Bake the full hierarchy transform so thin-instance matrices place the model directly.
-    const world = node.computeWorldMatrix(true).multiply(extra);
-    node.setParent(null);
-    node.position.setAll(0);
-    node.rotationQuaternion = null;
-    node.rotation.setAll(0);
-    node.scaling.setAll(1);
-    node.bakeTransformIntoVertices(world);
-    node.refreshBoundingInfo();
-    node.name = name;
-    baked.push(node);
+  // This build's copy of the geometry it shows.
+  const pieces = file.pieces.filter((p) => !overrideFor(p.material)?.hide).map((p) => ({ data: copyData(p.data).transform(space), material: p.material, part: p.part }));
+  if (fit && pieces.length) space = space.multiply(fitInto(pieces.map((p) => p.data), fit, extras.align ?? 'centre', [ox, oy, oz]));
+  const boxes = pieces.map((p) => dataBox(p.data));
+  // Resized by the player as placeholders are; each moving part's pivot goes where its hinge went.
+  const pivots = file.parts.map((p) => Vector3.TransformCoordinates(p.pivot, space));
+  const shifts = pivots.map(() => Vector3.Zero());
+  if (resize && boxes.length && resizes(footprint, resize)) {
+    const { maps, slopes } = resizeMaps(footprint, resize, Math.min(...boxes.map((b) => b.lo[1])), Math.max(...boxes.map((b) => b.hi[1])));
+    for (const p of pieces) resizeData(p.data, maps, slopes);
+    pivots.forEach((p, i) => shifts[i].set(maps[0](p.x) - p.x, maps[1](p.y) - p.y, maps[2](p.z) - p.z));
+    boxes.splice(0, boxes.length, ...pieces.map((p) => dataBox(p.data)));
   }
-  if (fit && baked.length) fitInto(baked, fit, extras.align ?? 'centre', [ox, oy, oz]);
 
-  const groups = new PartGroups(scene);
-  const kept: Mesh[] = [];
-  const tinted = new Set<Material>();
+  // The still body, then each moving part: meshes of their own (merged per finish within each).
+  const lib = MaterialLibrary.for(scene);
+  const meshes: Mesh[] = [];
+  const tints: (TintSlot | null)[] = [];
+  const parts: number[] = [];
   let height = 0;
   let bottom = Infinity;
-  for (const node of baked) {
-    height = Math.max(height, node.getBoundingInfo().boundingBox.maximum.y);
-    bottom = Math.min(bottom, node.getBoundingInfo().boundingBox.minimum.y);
-    const ov = overrideFor(node.material);
-    if (ov?.finish) {
-      groups.add(restyledMesh(scene, node, ov, groups.finish(ov.finish).alpha), null, groups.finish(ov.finish).group, null);
-      continue;
+  for (let part = -1; part < file.parts.length; part++) {
+    const groups = new PartGroups(scene);
+    const kept: Mesh[] = [];
+    pieces.forEach(({ data, material, part: of }, i) => {
+      if (of !== part) return;
+      height = Math.max(height, boxes[i].hi[1]);
+      bottom = Math.min(bottom, boxes[i].lo[1]);
+      const ov = overrideFor(material);
+      if (ov?.finish) {
+        groups.add(restyledMesh(scene, data, material, ov, groups.finish(ov.finish).alpha), null, groups.finish(ov.finish).group, null);
+        return;
+      }
+      const mesh = new Mesh(name, scene);
+      data.applyToMesh(mesh);
+      mesh.material = fileMaterial(lib, material, ov);
+      kept.push(mesh);
+    });
+    if (part < 0) {
+      extras.parts?.forEach((p, i) => groups.addPart(p, 0, i));
+      height = Math.max(height, groups.height);
+      bottom = Math.min(bottom, groups.bottom);
     }
-    const mat = node.material;
-    if (ov && mat instanceof PBRMaterial && !tinted.has(mat)) {
-      tinted.add(mat);
-      if (ov.color) mat.albedoColor = mat.albedoColor.multiply(Color3.FromHexString(ov.color).toLinearSpace());
-      if (ov.roughness !== undefined) mat.roughness = ov.roughness;
-      if (ov.metallic !== undefined) mat.metallic = ov.metallic;
-    }
-    lib.adopt(mat);
-    kept.push(node);
+    const merged = mergeByMaterial(kept, part < 0 ? name : `${name}|${file.parts[part].name}`);
+    const restyled = groups.build(part < 0 ? name : `${name}|${file.parts[part].name}`);
+    meshes.push(...merged, ...restyled.meshes);
+    tints.push(...merged.map(() => null), ...restyled.tints);
+    parts.push(...[...merged, ...restyled.meshes].map(() => part));
   }
-  extras.parts?.forEach((part, i) => groups.addPart(part, 0, i));
-  height = Math.max(height, groups.height);
-  bottom = Math.min(bottom, groups.bottom);
 
-  // Everything not kept (hierarchy nodes, hidden or restyled meshes, their unused materials) goes.
-  const used = new Set(kept.map((m) => m.material));
-  const unusedMaterials = new Set<Material>();
-  for (const node of result.meshes) if (node.material && !used.has(node.material)) unusedMaterials.add(node.material);
-  for (const node of [...result.transformNodes, ...result.meshes]) {
-    if (!kept.includes(node as Mesh)) node.dispose(true);
-  }
-  for (const m of unusedMaterials) m.dispose(false, true);
-  for (const group of result.animationGroups) group.dispose();
-
-  const merged = mergeByMaterial(kept, name);
-  const restyled = groups.build(name);
+  const lo = (k: number) => Math.min(...boxes.map((b) => b.lo[k]));
+  const hi = (k: number) => Math.max(...boxes.map((b) => b.hi[k]));
+  const outline = boxes.length ? { minX: lo(0), maxX: hi(0), minZ: lo(2), maxZ: hi(2) } : undefined;
   return {
-    meshes: [...merged, ...restyled.meshes],
-    tints: [...merged.map(() => null), ...restyled.tints],
-    bones: [...merged.map(() => null), ...restyled.bones],
+    meshes,
+    tints,
+    bones: meshes.map(() => null),
     height,
     bottom,
+    outline,
+    ...(file.parts.length && file.clips.size ? { motion: { parts, clips: buildClips(file.clips, space, shifts) } } : {}),
   };
 }
 
-/** Scales and moves baked meshes so their joint bounds fill `size`, bottom on y = 0. */
-function fitInto(meshes: Mesh[], [w, h, d]: Vec3, align: 'centre' | 'back', [ox, oy, oz]: Vec3): void {
+/**
+ * A file's clips in a build's model space: the file's `space` (`scale`, `rotationY`, `offset`,
+ * `fit`) taken into account, and each part's pose moved with its pivot (`shifts`) when resized.
+ */
+function buildClips(clips: Map<string, ModelClip>, space: Matrix, shifts: Vector3[]): Map<string, ModelClip> {
+  const inverse = space.clone().invert();
+  const pose = new Matrix();
+  const out = new Matrix();
+  return new Map(
+    [...clips].map(([name, clip]) => [
+      name,
+      {
+        duration: clip.duration,
+        tracks: clip.tracks.map(({ part, poses }) => {
+          const shift = shifts[part];
+          const [back, on] = [Matrix.Translation(-shift.x, -shift.y, -shift.z), Matrix.Translation(shift.x, shift.y, shift.z)];
+          const built = new Float32Array(poses.length);
+          for (let o = 0; o < poses.length; o += 16) {
+            Matrix.FromArrayToRef(poses, o, pose);
+            // Back to where the part was before resizing, into the file's space, posed, and out again.
+            back.multiplyToRef(inverse, out);
+            out.multiplyToRef(pose, out);
+            out.multiplyToRef(space, out);
+            out.multiplyToRef(on, out);
+            out.copyToArray(built, o);
+          }
+          return { part, poses: built };
+        }),
+      },
+    ]),
+  );
+}
+
+/** The box (`lo`, `hi`: corners along x, y, z) of a mesh's positions. */
+function dataBox(data: VertexData): { lo: number[]; hi: number[] } {
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  const pos = data.positions ?? [];
+  for (let i = 0; i < pos.length; i += 3) {
+    for (let k = 0; k < 3; k++) {
+      lo[k] = Math.min(lo[k], pos[i + k]);
+      hi[k] = Math.max(hi[k], pos[i + k]);
+    }
+  }
+  return { lo, hi };
+}
+
+/** Scales and moves geometry so its joint bounds fill `size`, bottom on y = 0; the matrix it did that with. */
+function fitInto(pieces: VertexData[], [w, h, d]: Vec3, align: 'centre' | 'back', [ox, oy, oz]: Vec3): Matrix {
   const min = new Vector3(Infinity, Infinity, Infinity);
   const max = new Vector3(-Infinity, -Infinity, -Infinity);
-  for (const m of meshes) {
-    const b = m.getBoundingInfo().boundingBox;
-    min.minimizeInPlace(b.minimum);
-    max.maximizeInPlace(b.maximum);
+  for (const data of pieces) {
+    const { lo, hi } = dataBox(data);
+    min.minimizeInPlace(Vector3.FromArray(lo));
+    max.maximizeInPlace(Vector3.FromArray(hi));
   }
   const ext = max.subtract(min);
   const sx = w / Math.max(ext.x, 1e-6);
@@ -834,20 +1114,18 @@ function fitInto(meshes: Mesh[], [w, h, d]: Vec3, align: 'centre' | 'back', [ox,
   const cz = align === 'back' ? min.z : (min.z + max.z) / 2;
   const tz = align === 'back' ? -0.5 + oz : oz;
   const m = Matrix.Scaling(sx, sy, sz).multiply(Matrix.Translation(ox - cx * sx, oy - min.y * sy, tz - cz * sz));
-  for (const mesh of meshes) {
-    mesh.bakeTransformIntoVertices(m);
-    mesh.refreshBoundingInfo();
-  }
+  for (const data of pieces) data.transform(m);
+  return m;
 }
 
 /**
- * A copy of a baked glTF mesh in placeholder form (positions, normals, metre UVs, vertex colour
+ * A copy of a file's geometry in placeholder form (positions, normals, metre UVs, vertex colour
  * carrying the finish), so it merges with placeholder parts of the same finish.
  */
-function restyledMesh(scene: Scene, node: Mesh, ov: MaterialOverride, alpha: number): Mesh {
-  const positions = node.getVerticesData(VertexBuffer.PositionKind)!;
-  const indices = node.getIndices() ?? Array.from({ length: positions.length / 3 }, (_, i) => i);
-  let normals = node.getVerticesData(VertexBuffer.NormalKind);
+function restyledMesh(scene: Scene, data: VertexData, material: Material | null, ov: MaterialOverride, alpha: number): Mesh {
+  const positions = data.positions!;
+  const indices = data.indices ?? Array.from({ length: positions.length / 3 }, (_, i) => i);
+  let normals = data.normals;
   if (!normals) {
     normals = new Float32Array(positions.length);
     VertexData.ComputeNormals(positions, indices, normals);
@@ -859,15 +1137,14 @@ function restyledMesh(scene: Scene, node: Mesh, ov: MaterialOverride, alpha: num
   const wound: number[] = [];
   for (let i = 0; i + 2 < indices.length; i += 3) pushTri(pos, nor, wound, indices[i], indices[i + 1], indices[i + 2]);
   const mesh = new Mesh('part', scene);
-  const data = new VertexData();
-  data.positions = Float32Array.from(positions);
-  data.normals = Float32Array.from(normals);
-  data.indices = Uint32Array.from(wound);
-  data.uvs = new Float32Array((positions.length / 3) * 2);
-  data.applyToMesh(mesh, true);
+  const restyled = new VertexData();
+  restyled.positions = Float32Array.from(positions);
+  restyled.normals = Float32Array.from(normals);
+  restyled.indices = Uint32Array.from(wound);
+  restyled.uvs = new Float32Array((positions.length / 3) * 2);
+  restyled.applyToMesh(mesh, true);
   boxProjectUVs(mesh);
-  const mat = node.material;
-  const c = ov.color ? Color3.FromHexString(ov.color) : mat instanceof PBRMaterial ? mat.albedoColor.toGammaSpace() : Color3.White();
+  const c = ov.color ? Color3.FromHexString(ov.color) : material instanceof PBRMaterial ? material.albedoColor.toGammaSpace() : Color3.White();
   const count = positions.length / 3;
   const colors = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) colors.set([c.r, c.g, c.b, alpha], i * 4);

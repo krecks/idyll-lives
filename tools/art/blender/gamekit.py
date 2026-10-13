@@ -262,10 +262,12 @@ def fit(obj, w, h, d):
     return obj
 
 
-def export_glb(path, objects=None, texcoords=False):
+def export_glb(path, objects=None, texcoords=False, clips=False):
     """
     Writes a .glb (all mesh objects unless given), +Y up so Blender -Y is the game's +Z front.
     Without textures the UVs stay out (`texcoords`): the game gives flat-coloured parts its own.
+    `clips`: a model with moving parts (docs/design/objects.md, "Moving parts") writes its clips, one
+    per NLA track name, and the scene's current frame as the rest pose (set it to the clips' first).
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     bpy.ops.object.select_all(action='DESELECT')
@@ -273,9 +275,10 @@ def export_glb(path, objects=None, texcoords=False):
     for o in objects:
         o.select_set(True)
     bpy.context.view_layer.objects.active = objects[0]
+    extra = {'export_animation_mode': 'NLA_TRACKS'} if clips else {'export_animations': False}
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
                               export_apply=True, export_yup=True, export_materials='EXPORT',
-                              export_texcoords=texcoords)
+                              export_texcoords=texcoords, **extra)
     return path
 
 

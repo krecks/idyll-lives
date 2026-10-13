@@ -94,7 +94,7 @@ import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF,
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
 import { Geo } from './geometry';
-import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { buildAhead, buildModel, motionsOf, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -103,7 +103,8 @@ import { ResizeHandles } from './handles';
 import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
-import { BuildEffects, type PopTarget } from './buildFx';
+import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
+import { ObjectMotion, restPoses, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
 import { renderScale, watchPixelRatio } from './resolution';
@@ -462,6 +463,8 @@ export class BabylonRenderer implements Renderer {
   private held: { id: number; saved: { target: PopTarget; matrix: Float32Array }[] } | null = null;
   private heldRelease: ReturnType<typeof setTimeout> | null = null;
   private fx!: BuildEffects;
+  /** Placed objects' moving parts, played while residents use them. */
+  private readonly motion = new ObjectMotion();
   private previewMeshes!: Record<'wall' | 'door' | 'window' | 'open', Mesh>;
   private previewBuffers!: Record<'wall' | 'door' | 'window' | 'open', Float32Array>;
   private previewValid = true;
@@ -830,6 +833,11 @@ export class BabylonRenderer implements Renderer {
     this.simCount = count;
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+    // Doors that open while residents use what they're on.
+    if (this.motion.update(frame, layout.actions ?? [])) {
+      this.sunShadows.moved();
+      this.resetSnapshot();
+    }
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
     this.mirrors.update(this.camera);
@@ -1125,6 +1133,7 @@ export class BabylonRenderer implements Renderer {
       mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
       mesh.thinInstanceBufferUpdated('matrix');
     }
+    writeMoving(target);
     this.sunShadows.moved();
     this.resetSnapshot();
   }
@@ -1934,6 +1943,7 @@ export class BabylonRenderer implements Renderer {
     this.walls = this.wallsLow = null;
     this.retireTemplates(new Set());
     this.placed = [];
+    this.motion.clear();
     this.wallItemsHidden.clear();
     this.held = null;
     this.characters?.clear();
@@ -3104,9 +3114,15 @@ export class BabylonRenderer implements Renderer {
     // Soft contact shadows under every object, sized to its footprint.
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
     const mirrors: MirrorInstance[] = [];
+    const moving: MovingObject[] = [];
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
+      // Moving parts (a fridge's doors) draw from buffers of their own, each instance posed on its own.
+      const motion = template.motion;
+      const motions = motion && motionsOf(this.deps.assets.get(this.objectModel(list[0]), 'model'));
+      const partCount = motion ? Math.max(-1, ...motion.parts) + 1 : 0;
+      const parts = Array.from({ length: partCount }, (_, k) => ({ meshes: template.meshes.filter((_, i) => motion!.parts[i] === k), matrices: new Float32Array(list.length * 16) }));
       const vary = this.deps.assets.get(this.objectModel(list[0]), 'model')?.vary ?? 0;
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
@@ -3156,17 +3172,22 @@ export class BabylonRenderer implements Renderer {
           bottom,
           wallRot: layer === 'wall' ? o.rot % 4 : undefined,
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
-          pop: { meshes: template.meshes, matrices, index: i },
+          pop: { meshes: template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
+        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id) });
         if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
       });
-      for (const mesh of template.meshes) {
-        mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
+      // At rest, the parts are where the body is.
+      for (const part of parts) part.matrices.set(matrices);
+      template.meshes.forEach((mesh, j) => {
+        const part = motion ? motion.parts[j] : -1;
+        mesh.thinInstanceSetBuffer('matrix', part < 0 ? matrices : parts[part].matrices, 16, part < 0);
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
-      }
+      });
     });
     this.mirrors.set(mirrors);
+    this.motion.set(moving);
     shown.forEach((o, i) => {
       const k = i * 16;
       const s = this.storeyOf(o.z);

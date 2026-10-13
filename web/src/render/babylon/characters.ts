@@ -108,9 +108,9 @@ const Anim = {
   Wave: 8,
 } as const;
 /** Sim ticks per frame step at each game speed (`clock::TICKS_PER_STEP`). */
-const GAME_RATE = [0, 1, 3, 10, 30, 60];
+export const GAME_RATE = [0, 1, 3, 10, 30, 60];
 /** Speed while time skips through quiet hours (`clock::AUTO_FAST_SPEED`). */
-const QUIET_SPEED = 4;
+export const QUIET_SPEED = 4;
 /** Larger jumps between frames snap instead of sliding. */
 const SNAP_DISTANCE = 1.6;
 /**

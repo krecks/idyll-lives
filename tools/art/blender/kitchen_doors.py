@@ -1,7 +1,7 @@
 # The fridge's doors as separate nodes with their origins on the hinge, plus a clip per door (each with its
-# own angle and duration) so the engine can open the freezer or the fridge on its own. Until then the game
-# bakes each mesh's world transform and drops the clips (models.ts `loadGltf`), so at rest the model draws
-# closed and identical to `kitchen.py`'s flat build. This is the model half of that feature, done ahead of the engine.
+# own angle) so the game can open the freezer or the fridge on its own: this is the file `model.fridge`
+# draws (the pack's `url`, written here and by `kitchen.py`), its doors played by the pack's `motions`.
+# At rest it draws closed and identical to `kitchen.py`'s flat build.
 #
 # Run:  blender --background --factory-startup --python tools/art/blender/kitchen_doors.py
 #       blender --background --factory-startup --python tools/art/blender/kitchen_doors.py -- --preview
@@ -116,20 +116,6 @@ def _check(objs, w, h, d, tol=0.02):
     print(f'[doors] fridge {got[0]:.3f} x {got[2]:.3f} x {got[1]:.3f} m (w x h x d), centred, on the floor')
 
 
-def _export(path, objs):
-    """As `gamekit.export_glb`, but NLA tracks of the same name become one animation, and the rest pose
-    is whatever the scene shows at the current frame, so the doors are exported closed."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    bpy.ops.object.select_all(action='DESELECT')
-    for o in objs:
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = objs[0]
-    bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
-                              export_apply=True, export_yup=True, export_materials='EXPORT',
-                              export_texcoords=False, export_animation_mode='NLA_TRACKS')
-    return path
-
-
 def main(argv):
     preview = '--preview' in argv
     os.makedirs(OUT, exist_ok=True)
@@ -144,8 +130,10 @@ def main(argv):
             bpy.context.scene.frame_set(frame)
             G.preview(os.path.join(PREVIEW, name), size=1.3)
     else:
+        # The rest pose is each clip's first key: the doors closed.
         bpy.context.scene.frame_set(1)
-        _export(os.path.join(OUT, 'fridge.doors.glb'), objs)
+        G.export_glb(os.path.join(OUT, 'fridge.doors.glb'), objs, clips=True)
+        K._write_pack()
         print('built fridge.doors.glb')
 
 
