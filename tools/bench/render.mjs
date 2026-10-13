@@ -7,6 +7,8 @@
  *
  *   node tools/bench/render.mjs [options]
  *     --port 5221              Vite's port (it starts its own; `--url http://localhost:5221` uses a running one)
+ *     --preview                the production build (`vite preview` of web/dist: compressed textures and
+ *                              models, minified code; what players get) instead of the dev server; `--build` builds it first
  *     --scene village          web/public/bench/<scene>.json(.gz)
  *     --presets low,medium,high
  *     --backends webgpu,webgl
@@ -98,8 +100,12 @@ async function playwright() {
 }
 
 let vite = null;
+if (has('build')) {
+  const build = spawn(`${WEB}node_modules/.bin/vite`, ['build'], { cwd: WEB, stdio: ['ignore', 'ignore', 'inherit'] });
+  await new Promise((resolve, reject) => build.on('exit', (code) => (code ? reject(new Error(`vite build failed (${code})`)) : resolve())));
+}
 if (!flag('url', null)) {
-  vite = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
+  vite = spawn(`${WEB}node_modules/.bin/vite`, [...(has('preview') ? ['preview'] : []), '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
   process.on('exit', () => vite.kill());
   await new Promise((resolve, reject) => {
     vite.stdout.on('data', (d) => String(d).includes('Local') && resolve());
