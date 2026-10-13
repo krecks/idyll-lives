@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { host } from '../../game/host';
   import type { GameSession } from '../../game/session';
+  import { UnloadableSave } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import Hud from '../Hud.svelte';
@@ -14,6 +15,7 @@
   /** The game screen: the canvas lives in the host (behind every screen); this adds the HUD. */
   let session = $state.raw<GameSession | null>(null);
   let error = $state('');
+  let errorTitle = $state("Couldn't start the game");
   /** The game is loaded (usually already, prepared behind the menus); until then, a loading screen. */
   let ready = $state(false);
 
@@ -36,6 +38,7 @@
         if (left) return;
         console.error(err);
         error = err instanceof Error ? err.message : String(err);
+        if (err instanceof UnloadableSave) errorTitle = "Couldn't open this save";
       });
     return () => {
       left = true;
@@ -63,7 +66,7 @@
 {:else if error}
   <div class="splash">
     <div class="glass box">
-      <b>Couldn't start the game</b>
+      <b>{errorTitle}</b>
       <span class="error">{error}</span>
       <button class="btn" onclick={() => app.toMenu()}>Back to menu</button>
     </div>

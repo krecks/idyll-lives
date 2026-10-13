@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { deleteSave, listSaves, type SaveMeta } from '../../persistence/saves';
+  import { deleteSave, listSaves, onSavesChanged, playable, type SaveMeta } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { clock, timeAgo } from '../format';
@@ -22,10 +22,12 @@
   async function remove(id: string) {
     await deleteSave(id);
     confirmDelete = null;
-    await refresh();
   }
 
-  onMount(refresh);
+  onMount(() => {
+    void refresh();
+    return onSavesChanged(() => void refresh());
+  });
 </script>
 
 {#if app.screen === 'game'}
@@ -48,6 +50,7 @@
           <b>{s.name}</b>
           <span>{s.members.join(', ')}</span>
           <span class="when">Day {s.day} · {clock(s.minute, settings.clock24h)} · saved {timeAgo(s.savedAt)}</span>
+          {#if !playable(s)}<span class="newer">Needs a newer version of Idyll Lives</span>{/if}
         </div>
         <div class="actions">
           {#if confirmDelete === s.id}
@@ -57,7 +60,7 @@
             <button class="btn ghost" aria-label="Delete {s.name}" onclick={() => (confirmDelete = s.id)}>
               <Icon name="icon.ui.trash" size={16} />
             </button>
-            <button class="btn primary" onclick={() => app.start({ kind: 'load', saveId: s.id })}>Load</button>
+            <button class="btn primary" disabled={!playable(s)} onclick={() => app.start({ kind: 'load', saveId: s.id })}>Load</button>
           {/if}
         </div>
       </li>
@@ -113,6 +116,11 @@
   }
   .when {
     font-size: 12px !important;
+  }
+  .info .newer {
+    font-size: 12px;
+    color: #8a5e0c;
+    font-weight: 550;
   }
   .actions {
     display: flex;

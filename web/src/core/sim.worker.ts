@@ -6,8 +6,8 @@
  * - world structure (geometry, placements) only when it changes.
  */
 
-import init, { Game } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, LeanWorld, MeshArrays, ToWorker, WorldStructure } from './protocol';
+import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
+import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, ToWorker, WorldStructure } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -75,7 +75,14 @@ scope.onmessage = (e) => {
 
 async function start(content: string, source: GameSource): Promise<void> {
   memory = (await init()).memory;
-  game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
+  try {
+    game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
+  } catch (err) {
+    if (!('save' in source)) throw err;
+    const { message, problem } = refusal(err);
+    scope.postMessage({ type: 'error', message, fatal: true, problem: problem ?? undefined });
+    return;
+  }
   watch(game);
   const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
 
@@ -86,6 +93,19 @@ async function start(content: string, source: GameSource): Promise<void> {
   publish();
   postUi();
   runLoop(1000 / layout.ticksPerSecond);
+}
+
+/**
+ * Why `Game.fromSave` failed: what the simulation found wrong with the save, or a trap while it
+ * loaded (a save that breaks the loader counts as damaged). No problem: the save isn't to blame.
+ */
+function refusal(err: unknown): { message: string; problem: SaveProblem | null } {
+  if (err instanceof LoadError) {
+    const out = { message: err.message, problem: (err.kind || null) as SaveProblem | null };
+    err.free();
+    return out;
+  }
+  return { message: err instanceof Error ? err.message : String(err), problem: err instanceof WebAssembly.RuntimeError ? 'corrupt' : null };
 }
 
 function runLoop(stepMs: number): void {

@@ -4,6 +4,8 @@
  * are kept in `meta` too, so lists (the menu, Load game) don't read every game.
  */
 
+import type { SaveProblem } from '../core/protocol';
+
 export interface SaveMeta {
   id: string;
   /** Player-facing slot name. */
@@ -16,6 +18,8 @@ export interface SaveMeta {
   /** Small JPEG data URL, if one could be captured. */
   thumbnail: string | null;
   autosave: boolean;
+  /** This version of the game (`__APP_VERSION__`) found the save to be from a newer one: kept, not offered. */
+  tooNewFor?: string;
 }
 
 export interface SaveRecord extends SaveMeta {
@@ -23,6 +27,17 @@ export interface SaveRecord extends SaveMeta {
 }
 
 export const AUTOSAVE_ID = 'autosave';
+
+/** A save the game can't open: `message` says so in plain words (and whether it was kept). */
+export class UnloadableSave extends Error {
+  constructor(
+    readonly saveId: string,
+    readonly problem: SaveProblem,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 // Legacy key from the project's old name; kept so saves survive.
 const DB_NAME = 'open-sims-wasm';
@@ -103,6 +118,20 @@ async function run<T>(mode: IDBTransactionMode, stores: string[], op: (tx: IDBTr
   });
 }
 
+/** Saves found this session to be unloadable: not offered to Continue or prepared again. */
+const refused = new Set<string>();
+const listeners = new Set<() => void>();
+
+/** Calls `fn` whenever saves were written, removed or set aside. Returns an unsubscribe function. */
+export function onSavesChanged(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function changed(): void {
+  for (const fn of listeners) fn();
+}
+
 /** Newest first, without the (large) game data. */
 export async function listSaves(): Promise<SaveMeta[]> {
   const all = await run('readonly', [META], (tx) => tx.objectStore(META).getAll() as IDBRequest<SaveMeta[]>);
@@ -118,6 +147,8 @@ export async function writeSave(record: SaveRecord): Promise<void> {
     tx.objectStore(STORE).put(record);
     tx.objectStore(META).put(metaOf(record));
   });
+  refused.delete(record.id);
+  changed();
 }
 
 export async function deleteSave(id: string): Promise<void> {
@@ -125,8 +156,37 @@ export async function deleteSave(id: string): Promise<void> {
     tx.objectStore(STORE).delete(id);
     tx.objectStore(META).delete(id);
   });
+  changed();
 }
 
+/** Whether Continue may offer the save (it isn't known to be unloadable). */
+export function playable(save: SaveMeta): boolean {
+  return !refused.has(save.id) && save.tooNewFor !== __APP_VERSION__;
+}
+
+/** The newest save Continue can open. */
 export async function latestSave(): Promise<SaveMeta | undefined> {
-  return (await listSaves())[0];
+  return (await listSaves()).find(playable);
+}
+
+/**
+ * Sets aside a save the game couldn't open: one from a newer version is kept (and no longer
+ * offered by this version), a too old or damaged one is removed. Returns the notice for players.
+ */
+export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<string> {
+  refused.add(save.id);
+  try {
+    if (problem === 'tooNew') await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), tooNewFor: __APP_VERSION__ }));
+    else await deleteSave(save.id);
+  } catch (err) {
+    console.warn('[saves] could not set aside an unloadable save', err);
+  }
+  changed();
+  return problemNotice(problem, save.name);
+}
+
+function problemNotice(problem: SaveProblem, name: string): string {
+  if (problem === 'tooNew') return `“${name}” is from a newer version of Idyll Lives, so this version can't open it. It's been kept.`;
+  if (problem === 'tooOld') return `“${name}” is from a version of Idyll Lives too old to open, so it was removed.`;
+  return `“${name}” is damaged and can't be opened, so it was removed.`;
 }

@@ -4,7 +4,7 @@
   import { menuScene } from './game/menuScene';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
-  import { latestSave } from './persistence/saves';
+  import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
   import { services } from './ui/services';
@@ -155,9 +155,20 @@
       await menuScene.settled();
       if (cancelled) return;
       if (screen === 'menu') {
-        const latest = await latestSave().catch(() => undefined);
-        if (cancelled || !latest || app.screen !== 'menu') return;
-        await host.prepare({ kind: 'load', saveId: latest.id }, snapshot).catch(() => {});
+        // A save that can't be opened is set aside (and the player told), and the next one tried.
+        for (;;) {
+          const latest = await latestSave().catch(() => undefined);
+          if (cancelled || !latest || app.screen !== 'menu') return;
+          try {
+            await host.prepare({ kind: 'load', saveId: latest.id }, snapshot);
+            return;
+          } catch (err) {
+            if (!(err instanceof UnloadableSave)) return;
+            // Unless Continue was clicked meanwhile: then the game screen says it.
+            const shown = app.request?.kind === 'load' && app.request.saveId === err.saveId;
+            if (!shown) toast(err.message, 7000);
+          }
+        }
       } else if (screen === 'home' && home) {
         await host.prepare(home, snapshot).catch(() => {});
       } else if (screen === 'play' && play) {

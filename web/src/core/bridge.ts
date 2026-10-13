@@ -3,8 +3,18 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
+import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
 import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
+
+/** The simulation refused a save (`problem` says why; the message is the simulation's own). */
+export class SaveRefused extends Error {
+  constructor(
+    readonly problem: SaveProblem,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 /** What the renderer needs each frame. Reused; do not keep references across frames. */
 export interface FrameState {
@@ -83,11 +93,15 @@ export class SimBridge {
   static start(content: string, source: GameSource): Promise<SimBridge> {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
-      worker.onerror = (e) => reject(new Error(e.message || 'sim worker failed to start'));
+      const failed = (err: Error) => {
+        worker.terminate();
+        reject(err);
+      };
+      worker.onerror = (e) => failed(new Error(e.message || 'sim worker failed to start'));
       worker.onmessage = (e: MessageEvent<FromWorker>) => {
         const msg = e.data;
         if (msg.type === 'ready') resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
-        else if (msg.type === 'error') reject(new Error(msg.message));
+        else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
       worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
     });

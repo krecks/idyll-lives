@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { listSaves, type SaveMeta } from '../../persistence/saves';
+  import { listSaves, onSavesChanged, playable, type SaveMeta } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import { clock, timeAgo } from '../format';
@@ -9,7 +9,8 @@
   import { enterMenu, menuArrows } from '../kit/menuKeys';
 
   let saves = $state<SaveMeta[]>([]);
-  const latest = $derived(saves[0]);
+  /** Continue skips saves known not to open (from a newer version, or found broken). */
+  const latest = $derived(saves.find(playable));
   /** The graphics API the game draws with: WebGPU where there is one, unless WebGL2 is asked for. */
   const webgpu = $derived(
     typeof navigator !== 'undefined' && 'gpu' in navigator && settings.renderer !== 'webgl' && new URLSearchParams(location.search).get('renderer') !== 'webgl',
@@ -18,14 +19,19 @@
   /** The neighbourhood drifting behind the menu. */
   let townName = $state('');
 
-  onMount(() => {
+  const refresh = () =>
     listSaves()
       .then((s) => (saves = s))
       .catch(() => (saves = []));
+
+  onMount(() => {
+    void refresh();
     menuScene
       .showcaseDraft()
       .then((d) => (townName = d.name))
       .catch(() => {});
+    // A save set aside (or imported) while the menu shows.
+    return onSavesChanged(() => void refresh());
   });
 </script>
 

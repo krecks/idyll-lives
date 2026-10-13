@@ -771,6 +771,12 @@ export interface SocialOption {
 /** How a session starts: a fresh lot (with the household placed) or a save file. */
 export type GameSource = { lot: string; seed: number } | { save: string };
 
+/**
+ * Why a save can't be opened: it's from a newer version of the game (kept), from a version
+ * too old to read, or damaged (both removed).
+ */
+export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt';
+
 export type ToWorker =
   | { type: 'init'; content: string; source: GameSource }
   | { type: 'command'; command: Command }
@@ -817,7 +823,8 @@ export type FromWorker =
   | { type: 'snapshot'; data: Float32Array }
   /** About once a second. */
   | { type: 'stats'; stats: SimThreadStats }
-  | { type: 'error'; message: string; fatal: boolean };
+  /** `problem`: the game couldn't start because of its save. */
+  | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem };
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {

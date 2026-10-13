@@ -6,10 +6,10 @@
 
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
-import { SimBridge } from '../core/bridge';
+import { SaveRefused, SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey } from '../core/protocol';
-import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { AUTOSAVE_ID, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -133,20 +133,26 @@ export async function startSession(
 
   let source: GameSource;
   let household: string;
+  /** The save being loaded (none for a new game). */
+  let saved: SaveRecord | undefined;
   if (request.kind === 'new') {
     const templates = await loadTemplates();
     const lot = assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan });
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
   } else {
-    const record = await readSave(request.saveId);
-    if (!record) throw new Error('That save no longer exists.');
-    source = { save: record.data };
-    household = record.household;
+    saved = await readSave(request.saveId);
+    if (!saved) throw new Error('That save no longer exists.');
+    source = { save: saved.data };
+    household = saved.household;
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await SimBridge.start(content.json, source);
+  const bridge = await SimBridge.start(content.json, source).catch(async (err: unknown) => {
+    // A save the game can't open is set aside (kept if it's from a newer version, else removed).
+    if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
+    throw err;
+  });
   progress('Building the world', 0.3);
   // Hold the clock until the player actually enters the game.
   bridge.send({ type: 'setSpeed', speed: 0 });
