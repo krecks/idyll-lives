@@ -2,7 +2,7 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## 0.2.0 — unreleased
+## 0.2.0 — 2026-10-13
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/
 
