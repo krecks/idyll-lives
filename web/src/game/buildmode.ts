@@ -1708,6 +1708,24 @@ export class BuildBuyInput {
     return true;
   }
 
+  /**
+   * A held press ended without its release (the pointer was cancelled, or the window lost focus):
+   * nothing it was doing happens. A wall run or paint stroke is dropped, a carried or resized
+   * object goes back, a door or window keeps its size.
+   */
+  abortPress(): void {
+    if (this.openingDrag) {
+      this.openingDrag = null;
+      this.preview.setLeftDragCamera?.(true);
+      this.clearPreviews();
+      this.handlesKey = '';
+      this.syncHandles();
+    }
+    if (this.resizing || this.dragging) this.cancel();
+    else this.cancelDrawing();
+    this.pressed = this.dropped = false;
+  }
+
   /** Escape: drop what's in hand. Returns true if there was something to cancel. */
   cancel(): boolean {
     this.carrying = null;

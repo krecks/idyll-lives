@@ -1026,6 +1026,7 @@ export async function startSession(
       buildBuy.release(g && inLot(g.x, g.z) ? g : null, moved);
     },
     cancel: () => buildBuy.cancelDrawing(),
+    abort: () => buildBuy.abortPress(),
   });
 
   /** Puts what the eyedropper picked up in hand: a build tool with its look, or another object. */

@@ -18,6 +18,8 @@ export interface PointerHandlers {
   release?(x: number, y: number, moved: boolean): void;
   /** Right-click (or right button during a taken gesture). Return true if it cancelled something. */
   cancel?(): boolean;
+  /** A taken gesture ended without its release (the pointer was cancelled or the window lost focus): undo it. `cancel` when not given. */
+  abort?(): void;
 }
 
 /** Movement (CSS px) after which a press counts as a camera drag, not a click. */
@@ -45,6 +47,9 @@ export class PointerInput {
     canvas.addEventListener('pointermove', this.onMove);
     canvas.addEventListener('pointerleave', this.onLeave);
     canvas.addEventListener('contextmenu', this.onContextMenu);
+    canvas.addEventListener('pointercancel', this.onLost);
+    canvas.addEventListener('lostpointercapture', this.onLost);
+    window.addEventListener('blur', this.onLost);
   }
 
   dispose(): void {
@@ -53,6 +58,9 @@ export class PointerInput {
     this.canvas.removeEventListener('pointermove', this.onMove);
     this.canvas.removeEventListener('pointerleave', this.onLeave);
     this.canvas.removeEventListener('contextmenu', this.onContextMenu);
+    this.canvas.removeEventListener('pointercancel', this.onLost);
+    this.canvas.removeEventListener('lostpointercapture', this.onLost);
+    window.removeEventListener('blur', this.onLost);
   }
 
   private readonly onDown = (e: PointerEvent) => {
@@ -111,6 +119,21 @@ export class PointerInput {
       this.taken = false;
     }
   }
+
+  /**
+   * The release won't come: the browser took the pointer (a pen or touch gesture), or the button
+   * went up in another window. A taken gesture is undone rather than left following the pointer.
+   * (After a normal release the capture is already gone and nothing is taken.)
+   */
+  private readonly onLost = () => {
+    if (!this.taken) return;
+    this.taken = false;
+    this.dragging = false;
+    // Should the release still arrive, it's ignored.
+    this.dropped = true;
+    if (this.handlers.abort) this.handlers.abort();
+    else this.handlers.cancel?.();
+  };
 
   private readonly onLeave = () => {
     // While a gesture is taken the pointer is captured; leaving doesn't end it.
