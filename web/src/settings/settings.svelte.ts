@@ -42,6 +42,8 @@ export interface Settings {
   autoSlow: boolean;
   /** Time-lapse while everyone at home sleeps or is at work. */
   skipQuietHours: boolean;
+  /** The game pauses while another window has focus (and plays on when it's back). */
+  pauseOnBlur: boolean;
   /**
    * Clicking residents and the floor: `inspect` looks at a resident first (commands from their
    * panel); `always` gives orders straight away, as before.
@@ -101,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideHudWhileWatching: false,
   autoSlow: true,
   skipQuietHours: true,
+  pauseOnBlur: false,
   directControl: 'inspect',
   voices: false,
   voiceLanguage: 'en',

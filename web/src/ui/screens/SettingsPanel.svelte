@@ -59,7 +59,7 @@
   const pages = [
     { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['resolutionScale', 'fpsCap', 'antiAliasing', 'shadowDetail', 'allLamps', 'mirrors', 'ambientOcclusion', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
-    { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours'] },
+    { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
     { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
     { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'subtitles'] },
@@ -440,6 +440,9 @@
         </SettingRow>
         <SettingRow title="Skip quiet hours" hint="Time-lapse while everyone at home sleeps or is at work.">
           <Toggle label="Skip quiet hours" bind:checked={settings.skipQuietHours} />
+        </SettingRow>
+        <SettingRow title="Pause when the window loses focus" hint="Time stands still while you're in another window, and goes on when you're back.">
+          <Toggle label="Pause when the window loses focus" bind:checked={settings.pauseOnBlur} />
         </SettingRow>
       </section>
     {:else if page === 'interface'}

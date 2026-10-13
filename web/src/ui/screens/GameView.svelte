@@ -49,11 +49,16 @@
     session?.applySettings(s);
   });
 
-  // The world stands still while a menu is open.
+  /** Another window has focus. */
+  let away = $state(false);
+
+  // The world stands still while a menu is open (and, if the player wants, while they're in another window).
   $effect(() => {
-    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen);
+    session?.setMenuPause(game.pauseMenu || app.overlay !== null || game.plannerOpen || (settings.pauseOnBlur && away));
   });
 </script>
+
+<svelte:window onblur={() => (away = true)} onfocus={() => (away = false)} />
 
 {#if session}
   <div class="scaled hud-root"><Hud /></div>
