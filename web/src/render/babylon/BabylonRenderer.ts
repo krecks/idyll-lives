@@ -86,7 +86,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
 import { Geo } from './geometry';
 import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
-import { compressedTextureFeatures } from './loaders';
+import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
@@ -437,13 +437,24 @@ export class BabylonRenderer implements Renderer {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
-    if (!forceWebGL && (await WebGPUEngine.IsSupportedAsync)) {
+    if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
       const engine = new WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
-      await engine.initAsync();
-      this.engine = this.webgpu = engine;
-    } else {
-      this.engine = new Engine(canvas, true, { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
+      try {
+        await engine.initAsync();
+        this.engine = this.webgpu = engine;
+      } catch (err) {
+        // An adapter but no device (a blocklisted driver, a device lost while starting): WebGL2,
+        // for the rest of the session.
+        console.warn('[render] WebGPU failed to start; drawing with WebGL2', err);
+        noteWebGpuFailed();
+        try {
+          engine.dispose();
+        } catch {
+          // Half started: nothing more to free.
+        }
+      }
     }
+    this.engine ??= new Engine(canvas, true, { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));

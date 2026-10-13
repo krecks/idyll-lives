@@ -13,9 +13,10 @@ import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
 import type { Renderer } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
-import { game } from '../ui/state.svelte';
+import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
+import { webGpuFailed } from '../render/babylon/loaders';
 import type { HouseholdDraft } from './household';
 import { loadGameData, startSession, type GameSession, type StartRequest } from './session';
 
@@ -60,6 +61,8 @@ class GameHost {
   private town: { world: WorldStructure; minute: number } | null = null;
   /** The game being played (once it has started), for the crash screen's "Save and reload". */
   private played: GameSession | null = null;
+  /** The player heard that WebGPU failed and WebGL2 draws instead. */
+  private toldFallback = false;
 
   constructor() {
     this.root = document.createElement('div');
@@ -254,6 +257,10 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = (why, err) => app.crashed(why === 'device' ? { kind: 'graphics', detail: 'The graphics device was lost.' } : { kind: 'render', detail: err instanceof Error ? err.message : String(err) });
       await renderer.init(this.canvas);
+      if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {
+        this.toldFallback = true;
+        toast("WebGPU didn't start on this computer, so the game draws with WebGL instead.", 6000);
+      }
       return renderer;
     })();
     // A new renderer while the menus show a town: show it there too.
