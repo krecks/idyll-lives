@@ -6,8 +6,8 @@
  * - world structure (geometry, placements) only when it changes.
  */
 
-import init, { Game } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, LeanWorld, MeshArrays, ToWorker, WorldStructure } from './protocol';
+import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
+import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, ToWorker, WorldStructure } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -52,6 +52,8 @@ scope.onmessage = (e) => {
   try {
     if (msg.type === 'init') {
       void start(msg.content, msg.source).catch((err) => fail(err, true));
+    } else if (msg.type === 'check') {
+      void check(msg.content, msg.save).catch((err) => fail(err, true));
     } else if (requestId !== undefined && !game) {
       throw new Error(stopped ? 'The game stopped because of an error.' : "The game isn't running.");
     } else if (msg.type === 'save' && game) {
@@ -95,7 +97,14 @@ scope.onmessage = (e) => {
 
 async function start(content: string, source: GameSource): Promise<void> {
   memory = (await init()).memory;
-  game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
+  try {
+    game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
+  } catch (err) {
+    if (!('save' in source)) throw err;
+    const { message, problem } = refusal(err);
+    scope.postMessage({ type: 'error', message, fatal: true, problem: problem ?? undefined });
+    return;
+  }
   watch(game);
   const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
 
@@ -106,6 +115,32 @@ async function start(content: string, source: GameSource): Promise<void> {
   publish();
   postUi();
   runLoop(1000 / layout.ticksPerSecond);
+}
+
+/** Opens a save only to see whether it can be played (an imported file), then lets it go. */
+async function check(content: string, save: string): Promise<void> {
+  await init();
+  try {
+    Game.fromSave(content, save).free();
+    scope.postMessage({ type: 'checked', problem: null, message: '' });
+  } catch (err) {
+    const { message, problem } = refusal(err);
+    if (problem) scope.postMessage({ type: 'checked', problem, message });
+    else scope.postMessage({ type: 'error', message, fatal: true });
+  }
+}
+
+/**
+ * Why `Game.fromSave` failed: what the simulation found wrong with the save, or a trap while it
+ * loaded (a save that breaks the loader counts as damaged). No problem: the save isn't to blame.
+ */
+function refusal(err: unknown): { message: string; problem: SaveProblem | null } {
+  if (err instanceof LoadError) {
+    const out = { message: err.message, problem: (err.kind || null) as SaveProblem | null };
+    err.free();
+    return out;
+  }
+  return { message: err instanceof Error ? err.message : String(err), problem: err instanceof WebAssembly.RuntimeError ? 'corrupt' : null };
 }
 
 function runLoop(stepMs: number): void {

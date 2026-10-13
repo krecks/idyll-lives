@@ -6,10 +6,10 @@
 
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
-import { SimBridge } from '../core/bridge';
+import { SaveRefused, SimBridge } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
 import { lowestStorey, seenAt } from '../core/protocol';
-import { AUTOSAVE_ID, readSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
@@ -46,6 +46,10 @@ const STATS_INTERVAL_MS = 500;
 /** After the player picks a storey, the view stays on it this long before following residents again. */
 const STOREY_STAY_MS = 8000;
 const THUMBNAIL = { width: 320, height: 200 };
+/** Longest wait for a save's picture (it needs a drawn frame); the save then keeps the last one. */
+const THUMBNAIL_WAIT_MS = 1000;
+/** Leaving the page (tab hidden, closed) autosaves at most this often. */
+const LEAVE_AUTOSAVE_MS = 60_000;
 
 export type StartRequest =
   | {
@@ -146,20 +150,30 @@ export async function startSession(
 
   let source: GameSource;
   let household: string;
+  /** The save being loaded (none for a new game). */
+  let saved: SaveRecord | undefined;
+  /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
+  let gameId: string;
   if (request.kind === 'new') {
     const templates = await loadTemplates();
     const lot = assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan });
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
+    gameId = crypto.randomUUID();
   } else {
-    const record = await readSave(request.saveId);
-    if (!record) throw new Error('That save no longer exists.');
-    source = { save: record.data };
-    household = record.household;
+    saved = await readSave(request.saveId);
+    if (!saved) throw new Error('That save no longer exists.');
+    source = { save: saved.data };
+    household = saved.household;
+    gameId = saved.game ?? saved.id;
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await SimBridge.start(content.json, source);
+  const bridge = await SimBridge.start(content.json, source).catch(async (err: unknown) => {
+    // A save the game can't open is set aside (kept if it's from a newer version, else removed).
+    if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
+    throw err;
+  });
   progress('Building the world', 0.3);
   // Hold the clock until the player actually enters the game.
   bridge.send({ type: 'setSpeed', speed: 0 });
@@ -811,11 +825,59 @@ export async function startSession(
     if (lastEvent >= 0 && fresh.length) onStory(fresh);
     if (events.length) lastEvent = events[events.length - 1].id;
   });
+  /** The newest picture of the game (a save while nothing is drawn, e.g. in a hidden tab, keeps it). */
+  let thumbnail = saved?.thumbnail ?? null;
+  /**
+   * Saves into slot `id`. Its picture needs a drawn frame: it's skipped in a hidden tab and waited
+   * for only so long, so saving works while nothing is drawn.
+   */
+  const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
+    const picture = document.hidden ? Promise.resolve(null) : Promise.race([renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+    const [data, taken] = await Promise.all([bridge.requestSave(), picture]);
+    thumbnail = taken ?? thumbnail;
+    const record: SaveRecord = {
+      id,
+      name,
+      household,
+      members: game.sims.map((s) => s.name),
+      day: game.day,
+      minute: game.minute,
+      savedAt: Date.now(),
+      thumbnail,
+      autosave,
+      game: gameId,
+      data,
+    };
+    await writeSave(record);
+    return id;
+  };
+  /** When the game last autosaved (or started). */
+  let autosavedAt = -Infinity;
+  let autosaveFailed = false;
+  /** Autosaves the game being played into the older of its two autosaves; a failure is told once. */
+  const autosave = async () => {
+    if (!revealed || disposed) return;
+    autosavedAt = performance.now();
+    try {
+      await store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
+    } catch (err) {
+      console.warn('[save] autosave failed', err);
+      if (autosaveFailed) return;
+      autosaveFailed = true;
+      toast(`Autosave failed: ${err instanceof Error ? err.message : err}. Save from the pause menu to keep your progress.`, 8000);
+    }
+  };
+  /** The tab is hidden or the page goes away (it may not come back): autosave, at most once a minute. */
+  const onLeave = () => {
+    if (autosaveMinutes > 0 && performance.now() - autosavedAt >= LEAVE_AUTOSAVE_MS) void autosave();
+  };
   // Back from a hidden tab (throttled, maybe suspended): start the HUD over from everything.
   const onVisibility = () => {
     if (!document.hidden) bridge.resyncUi();
+    else onLeave();
   };
   document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', onLeave);
   let itemsSeen: ItemPlacement[] = [];
   bridge.onItems((items) => {
     itemsSeen = items;
@@ -1280,6 +1342,8 @@ export async function startSession(
       revealed = true;
       // Prepared, then the simulation stopped before the game was shown.
       if (stoppedWith !== null) app.crashed({ kind: 'sim', detail: stoppedWith });
+      // Nothing to lose yet: leaving the page in the first minute doesn't autosave.
+      autosavedAt = performance.now();
       renderer.setIdleOrbit(false);
       // A loaded debug report shows the view it was captured from.
       const pose = takePendingPose();
@@ -1311,23 +1375,8 @@ export async function startSession(
         services.items.prefetch(content.shop.map((def) => ({ model: styledModel(content, assets, def, game.householdStyle), footprint: def.footprint ?? [1, 1] })));
       }, PREFETCH_PICTURES_MS);
     },
-    async save(name, slotId) {
-      const [data, thumbnail] = await Promise.all([bridge.requestSave(), renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)]);
-      const id = slotId ?? crypto.randomUUID();
-      const record: SaveRecord = {
-        id,
-        name,
-        household,
-        members: game.sims.map((s) => s.name),
-        day: game.day,
-        minute: game.minute,
-        savedAt: Date.now(),
-        thumbnail,
-        autosave: id === AUTOSAVE_ID,
-        data,
-      };
-      await writeSave(record);
-      return id;
+    save(name, slotId) {
+      return store(name, slotId ?? crypto.randomUUID(), false);
     },
     applySettings(s) {
       renderer.configure({
@@ -1343,8 +1392,7 @@ export async function startSession(
         clearInterval(autosaveTimer);
         if (autosaveMinutes > 0) {
           autosaveTimer = setInterval(() => {
-            if (game.pauseMenu) return;
-            session.save(`${household} · Autosave`, AUTOSAVE_ID).catch((err) => console.warn('[save] autosave failed', err));
+            if (!game.pauseMenu) void autosave();
           }, autosaveMinutes * 60_000);
         }
       }
@@ -1366,6 +1414,7 @@ export async function startSession(
       clearTimeout(prefetchTimer);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onLeave);
       window.removeEventListener('pointerdown', onInput, true);
       window.removeEventListener('pointerdown', onPress, true);
       canvas.removeEventListener('wheel', onInput, true);
@@ -1414,6 +1463,7 @@ export async function startSession(
       /** Sends a simulation command (benchmarks and checks). */
       send: (command: Parameters<typeof bridge.send>[0]) => bridge.send(command),
       save: (id: string) => session.save(id, id),
+      autosave: () => autosave(),
       plan: (id: number) => game.sims.find((x) => x.id === id)?.plan ?? null,
       objects: () => game.objects.map((o) => ({ id: o.id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn ?? 0, offset: o.offset ?? [0, 0] })),
       steps: () => ({ undo: game.undoSteps, redo: game.redoSteps }),

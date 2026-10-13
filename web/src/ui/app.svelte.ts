@@ -56,8 +56,8 @@ class AppState {
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
   /**
-   * Start-up: everything the menus and "Continue" need is loaded first (game data, renderer,
-   * the menu's town, the latest save) behind a loading screen; the menu shows after.
+   * Start-up: everything the menus need is loaded first (game data, renderer, the menu's town)
+   * behind a loading screen; the menu shows after (and prepares the latest save behind it).
    */
   booting = $state(true);
   boot = $state.raw<Progress>({ label: 'Loading', value: 0 });

@@ -2,7 +2,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use sim_core::{Command, World, mesh, snapshot, view};
+use sim_core::save::SAVE_VERSION;
+use sim_core::{Command, Content, World, mesh, snapshot, view};
 use wasm_bindgen::prelude::*;
 
 /// A panic happened: the instance is broken (the build aborts on panic, leaving whatever the
@@ -33,6 +34,69 @@ fn start() {
     }));
 }
 
+/// Oldest save version `sim_core::save` still reads (it migrates everything from 1 on).
+const OLDEST_SAVE_VERSION: u64 = 1;
+
+/// Why a save can't be opened. The menu keeps one from a newer version (and skips it) and
+/// removes one that is too old or damaged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SaveProblem {
+    TooNew,
+    TooOld,
+    Corrupt,
+}
+
+/// A failed `Game.fromSave`: `kind` says what's wrong with the save ("tooNew", "tooOld" or
+/// "corrupt"); it's empty when the save isn't to blame (the game's own data didn't load).
+#[wasm_bindgen]
+pub struct LoadError {
+    problem: Option<SaveProblem>,
+    message: String,
+}
+
+#[wasm_bindgen]
+impl LoadError {
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        match self.problem {
+            Some(SaveProblem::TooNew) => "tooNew",
+            Some(SaveProblem::TooOld) => "tooOld",
+            Some(SaveProblem::Corrupt) => "corrupt",
+            None => "",
+        }
+        .to_string()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn message(&self) -> String {
+        self.message.clone()
+    }
+}
+
+/// Loads a save; when that fails, works out whether (and how) the save is to blame.
+fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
+    World::from_save_json(content_json, save_json).map_err(|e| LoadError {
+        problem: save_problem(content_json, save_json),
+        message: e.0,
+    })
+}
+
+/// What's wrong with a save the simulation refused: its version (newer than this game, or
+/// older than it reads), else it's damaged. `None` when the game's own data is what failed.
+fn save_problem(content_json: &str, save_json: &str) -> Option<SaveProblem> {
+    if Content::from_json(content_json).is_err() {
+        return None;
+    }
+    let version = serde_json::from_str::<serde_json::Value>(save_json)
+        .ok()
+        .and_then(|v| v.get("version").and_then(serde_json::Value::as_u64));
+    Some(match version {
+        Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
+        Some(v) if v < OLDEST_SAVE_VERSION => SaveProblem::TooOld,
+        _ => SaveProblem::Corrupt,
+    })
+}
+
 #[wasm_bindgen]
 pub struct Game {
     world: World,
@@ -50,12 +114,10 @@ impl Game {
         Ok(Game::with_world(world))
     }
 
-    /// Restores a game from `save()` output.
+    /// Restores a game from `save()` output; throws a `LoadError` if it can't.
     #[wasm_bindgen(js_name = fromSave)]
-    pub fn from_save(content_json: &str, save_json: &str) -> Result<Game, JsError> {
-        let world =
-            World::from_save_json(content_json, save_json).map_err(|e| JsError::new(&e.0))?;
-        Ok(Game::with_world(world))
+    pub fn from_save(content_json: &str, save_json: &str) -> Result<Game, LoadError> {
+        load_save(content_json, save_json).map(Game::with_world)
     }
 
     /// The seed the game started from, for bug reports (0: unknown, a save from before v23).
@@ -243,5 +305,67 @@ impl MeshBuffers {
     #[wasm_bindgen(getter)]
     pub fn indices(&self) -> Vec<u32> {
         self.indices.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shipped content, merged like the web loader does (base.json plus its includes).
+    fn content() -> String {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");
+        let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
+        let base = read("base.json");
+        let v: serde_json::Value = serde_json::from_str(&base).unwrap();
+        let parts: Vec<String> =
+            v["include"].as_array().unwrap().iter().map(|n| read(n.as_str().unwrap())).collect();
+        let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+        sim_core::merge_content(&base, &parts).unwrap()
+    }
+
+    /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19).
+    fn old_save(name: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves").join(name);
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    fn problem(content: &str, save: &str) -> Option<SaveProblem> {
+        load_save(content, save).err().expect("the save is refused").problem
+    }
+
+    #[test]
+    fn old_releases_saves_load() {
+        let content = content();
+        for name in ["v0.1.0-day5.json", "d7c506e-day5.json"] {
+            let world = load_save(&content, &old_save(name))
+                .unwrap_or_else(|e| panic!("{name}: {}", e.message));
+            assert!(world.sims.len() > 10, "{name}: {} residents", world.sims.len());
+        }
+    }
+
+    #[test]
+    fn unloadable_saves_say_why() {
+        let content = content();
+        let good = old_save("v0.1.0-day5.json");
+        assert!(good.starts_with("{\"version\":17,"));
+        let with_version =
+            |v: &str| good.replacen("\"version\":17", &format!("\"version\":{v}"), 1);
+        assert_eq!(problem(&content, &with_version("999")), Some(SaveProblem::TooNew));
+        let next = (SAVE_VERSION + 1).to_string();
+        assert_eq!(problem(&content, &with_version(&next)), Some(SaveProblem::TooNew));
+        assert_eq!(problem(&content, &with_version("0")), Some(SaveProblem::TooOld));
+        assert_eq!(problem(&content, "garbage, not a save"), Some(SaveProblem::Corrupt));
+        assert_eq!(problem(&content, ""), Some(SaveProblem::Corrupt));
+        assert_eq!(problem(&content, &good[..5000]), Some(SaveProblem::Corrupt));
+        assert_eq!(problem(&content, "{\"version\":17}"), Some(SaveProblem::Corrupt));
+        assert_eq!(problem(&content, &with_version("-3")), Some(SaveProblem::Corrupt));
+        assert_eq!(problem(&content, &with_version("\"17\"")), Some(SaveProblem::Corrupt));
+        // The game's own data failing isn't the save's fault (it mustn't be removed for that).
+        assert_eq!(problem("{", &good), None);
+        assert_eq!(problem("{", &with_version("999")), None);
+        let err = load_save(&content, &with_version("999")).err().unwrap();
+        assert_eq!(err.kind(), "tooNew");
+        assert!(err.message().contains("999"), "{}", err.message());
     }
 }

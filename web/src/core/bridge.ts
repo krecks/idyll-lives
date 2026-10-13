@@ -3,8 +3,18 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
+import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
 import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
+
+/** The simulation refused a save (`problem` says why; the message is the simulation's own). */
+export class SaveRefused extends Error {
+  constructor(
+    readonly problem: SaveProblem,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 /** What the renderer needs each frame. Reused; do not keep references across frames. */
 export interface FrameState {
@@ -107,15 +117,15 @@ export class SimBridge {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
       // A start that failed doesn't leave its worker (and the simulation's memory) behind.
-      const failed = (message: string) => {
+      const failed = (err: Error) => {
         worker.terminate();
-        reject(new Error(message));
+        reject(err);
       };
-      worker.onerror = (e) => failed(e.message || 'sim worker failed to start');
+      worker.onerror = (e) => failed(new Error(e.message || 'sim worker failed to start'));
       worker.onmessage = (e: MessageEvent<FromWorker>) => {
         const msg = e.data;
         if (msg.type === 'ready') resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
-        else if (msg.type === 'error') failed(msg.message);
+        else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
       worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
     });
@@ -124,6 +134,20 @@ export class SimBridge {
   /** The simulation runs (it hasn't failed, and the game hasn't ended): it can answer and be saved. */
   get alive(): boolean {
     return this.gone === null;
+  }
+
+  /** Whether `save` opens (without starting a game): null if it does, else what's wrong with it. */
+  static checkSave(content: string, save: string): Promise<SaveProblem | null> {
+    const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
+    return new Promise<SaveProblem | null>((resolve, reject) => {
+      worker.onerror = (e) => reject(new Error(e.message || 'sim worker failed to start'));
+      worker.onmessage = (e: MessageEvent<FromWorker>) => {
+        const msg = e.data;
+        if (msg.type === 'checked') resolve(msg.problem);
+        else if (msg.type === 'error') reject(new Error(msg.message));
+      };
+      worker.postMessage({ type: 'check', content, save } satisfies ToWorker);
+    }).finally(() => worker.terminate());
   }
 
   get sharedMemory(): boolean {

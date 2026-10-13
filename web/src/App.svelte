@@ -6,7 +6,7 @@
   import { watchLog } from './debug/log';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
-  import { latestSave } from './persistence/saves';
+  import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
   import { services } from './ui/services';
@@ -70,8 +70,8 @@
   const within = (p: Promise<unknown>) => Promise.race([p, new Promise((resolve) => setTimeout(resolve, STEP_LIMIT_MS))]);
 
   /**
-   * Start-up behind the loading screen: game data, the renderer, the menu's town (its shaders
-   * compiled) and the latest save, prepared so "Continue" is instant. Then the menu.
+   * Start-up behind the loading screen: game data, the renderer and the menu's town (its shaders
+   * compiled). Then the menu, which prepares the latest save behind it so "Continue" is quick.
    */
   async function boot() {
     const step = (label: string, value: number) => (app.boot = { label, value });
@@ -99,19 +99,6 @@
           return menuScene.show(draft);
         }),
       );
-      const latest = await latestSave().catch(() => undefined);
-      if (latest && !['debugReport', 'state', 'bench'].some((k) => new URLSearchParams(location.search).has(k))) {
-        // The save's own steps fill the rest of the bar.
-        const stop = $effect.root(() => {
-          $effect(() => {
-            const p = app.loading;
-            if (p) step(p.label, 0.55 + 0.45 * p.value);
-          });
-        });
-        step('Preparing your saved game', 0.55);
-        await within(host.prepare({ kind: 'load', saveId: latest.id }, snapshot)).catch(() => {});
-        stop();
-      }
     } catch (err) {
       console.warn('[boot]', err);
     }
@@ -202,10 +189,22 @@
     const timer = setTimeout(async () => {
       await menuScene.settled();
       if (cancelled) return;
-      if (screen === 'menu') {
-        const latest = await latestSave().catch(() => undefined);
-        if (cancelled || !latest || app.screen !== 'menu') return;
-        await host.prepare({ kind: 'load', saveId: latest.id }, snapshot).catch(() => {});
+      // (Not when the page starts straight into a game or the benchmark.)
+      if (screen === 'menu' && !['debugReport', 'state', 'bench'].some((k) => new URLSearchParams(location.search).has(k))) {
+        // A save that can't be opened is set aside (and the player told), and the next one tried.
+        for (;;) {
+          const latest = await latestSave().catch(() => undefined);
+          if (cancelled || !latest || app.screen !== 'menu') return;
+          try {
+            await host.prepare({ kind: 'load', saveId: latest.id }, snapshot);
+            return;
+          } catch (err) {
+            if (!(err instanceof UnloadableSave)) return;
+            // Unless Continue was clicked meanwhile: then the game screen says it.
+            const shown = app.request?.kind === 'load' && app.request.saveId === err.saveId;
+            if (!shown) toast(err.message, 7000);
+          }
+        }
       } else if (screen === 'home' && home) {
         await host.prepare(home, snapshot).catch(() => {});
       } else if (screen === 'play' && play) {
