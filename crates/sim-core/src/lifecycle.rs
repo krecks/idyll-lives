@@ -537,7 +537,7 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
         w.events.push(w.tick, EventKind::NoBed, i, i, None);
         return;
     }
-    let bed =(0..w.content.objects.len())
+    let bed = (0..w.content.objects.len())
         .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby))
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
