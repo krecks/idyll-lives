@@ -629,7 +629,7 @@ Every fix was made on an agent's branch and merged into `main` with `git merge -
 | G2 | *(pending)* | *(pending)* <!-- G2 --> |
 | M1 | dee213f | Bars by transform, bubbles without forced layout, idea toasts only on change, models built ahead in small steps, bird songs off the main thread, F3's Busy |
 
-Some small fixes went straight onto `main`: f1993e5 (the bed purchase leaves a week's rent), b565f95 (T1-01, §3.7), 954506d (the long runs and the day-1167 test un-ignored) and f5f08bf (the feed, §3.7).
+Some small fixes went straight onto `main`: f1993e5 (the bed purchase leaves a week's rent), b565f95 (T1-01, §3.7), 954506d (the long runs and the day-1167 test un-ignored), 1a01ce1 (the last structure counters wrap, §3.2), f2b1b43 (code comments on how loading orders furniture and where the benchmark's scenes are) and f5f08bf (the feed, §3.7).
 
 ### 3.1 Animations and frame pacing (R1)
 
@@ -675,7 +675,7 @@ F1a (merge 85c7e86), except R2-07, R2-08, R2-10, R2-12 and R2-13 (F1b, b00e999).
 | R2-12 | With a bin but no sink or dishwasher, clearing away ends at the bin, both of residents' own accord and through "Clear away". With neither, plates still pile up (§4). | 1c2372a | – |
 | R2-13 | Giving up a paid recipe refunds its ingredients (decision). | 783dffb | – |
 | R2-14 | An item id past `u32::MAX` makes the save corrupt instead of wrapping. | 2f7eb97 | – |
-| R2-15, R2-16 | Version counters wrap on purpose, `Items::get_mut` no longer bumps when nothing is found, and `idle_ticks` saturates. (`lifecycle.rs` still uses `+= 1` in 4 places; §4.) | c9d58e3 | – |
+| R2-15, R2-16 | Version counters wrap on purpose, `Items::get_mut` no longer bumps when nothing is found, and `idle_ticks` saturates. The last four `structure_version` bumps in `lifecycle.rs` wrap too (1a01ce1). | c9d58e3, 1a01ce1 | – |
 | R2-17 to R2-25, R3-13, R3-14, R3-16 | Content that would break the game is refused at load, with the file and id in the message; the rules are in `docs/content-packs.md` ("What content is refused"). At run time, needs clamp to 0–1, and relationships clamp to ±100 on load and in bonds. | 04a216d, 6d2eb3c, 2f7eb97 | `refuses_content_that_would_break_the_game` has one case per rule. The shipped content still loads. |
 
 Also from the rearranging test: someone carrying dishes kept holding them, with nothing to do, when an edit stopped their task (the sink was moved). `World::apply` now has them put the dishes down at once (335a8ab).
@@ -911,7 +911,6 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | R3-11 (rest) | low | Social and Join targets aren't in the unreachable memory. | Deferred in the plan: people move. | Remember a person for a short time, or refuse a social whose target's plot can't be reached. | v0.3 |
 | R3-17 | low | Residents choose things 57–115 game minutes' walk away, even at night with almost no energy. | Balance (the coordinator's default). | The owner chooses: a stronger distance penalty at night, or a cap on autonomous trips. | v0.3 |
 | R2-12 (rest) | low | With neither a sink nor a bin, dirty plates and spoiled food still pile up and are scanned on every decision to eat. | A design call. | Cap or expire floor items per household. | v0.3 |
-| R2-15 (rest) | low | `lifecycle.rs` still bumps `structure_version` with `+= 1` in 4 places, which panics in a debug build after 4 billion bumps. | F1b was changing that file at the time. | `wrapping_add`, like every other version counter. | 0.2.1 |
 | R1-04 (rest) | low | The start and the end of a walk still jump at speeds 4–5: a walker standing in one snapshot isn't interpolated. | The decided rule glides only when walking in both snapshots (F4's question). | Glide also when walking in one snapshot and standing in the other. | 0.2.1 |
 | R1-15 (rest) | low | The household creator's preview still sways its plants with reduce motion on, and a change of the system's setting reaches the renderer only at the next settings change. | Found late (F4). | Pass `reducedMotion` to the preview, and listen to the media query. | 0.2.1 |
 | Start hang (new) | low | A hang inside `Game.fromSave` while a game starts isn't caught: `SimBridge.start` has no time limit, so "Moving in…" would stay. | Outside F2a's brief. | A time limit on start, as requests have. | 0.2.1 |
@@ -927,7 +926,7 @@ What the review found and 0.2.0 doesn't fix, by severity, with a recommendation 
 | P1-17 | low | A far road's lane markings render brighter or darker between page loads (0.03–0.12 % of pixels). | Not done. | Thaw or refreeze the shared landscape materials on the switch from the overview to the game. | v0.3 |
 | Background tabs (new) | low | In a background tab Chrome delays the sim worker's timers to 100–150 ms, so the game runs at about 80–85 % of its speed there (L1, before and after). | Browser behaviour. | Leave it unless players notice; a catch-up rule for hidden tabs would be the fix. | never |
 | Redeploy cache (new) | low | After a redeploy, a returning player's first visit puts the new hashed files into the old build's cache, which the new worker then deletes, so they're fetched again on the next visit (usually from the browser's own cache). | Found by L1. | Also serve files carrying `?v=<build>` from the cache. | v0.3 |
-| Ids across a reload (new) | low | Loading puts things that stand on tops in last, so object ids can change across a save and reload, though a comment in `save.rs` says ids stay stable. Tasks are remapped, so nothing breaks. | Position-based ids stay for 0.2.0 (decision). | Stable object ids (below). | v0.3 |
+| Ids across a reload (new) | low | Loading puts things that stand on tops in last, so object ids can change across a save and reload (the comment in `save.rs` says so since f2b1b43). Tasks are remapped, so nothing breaks. | Position-based ids stay for 0.2.0 (decision). | Stable object ids (below). | v0.3 |
 | R5-27 | low | `content/lots/starter.json` ships, though only tests and the pack checker read it. | Harmless. | Move it to `crates/sim-core/tests/data/`. | v0.3 |
 | Pause on blur (new) | low | With "Pause when the window loses focus" on, a player who switches away while a game loads may come back to it paused. | Rare, and the setting is off by default. | Leave it unless reported. | never |
 | `check:llm` (new) | low | The language model's checks aren't in CI: 7.3 minutes on 4 threads, against golden text made on arm64. | Too slow for every release. | Run `pnpm check:llm` by hand when the prompt, the cleaning rules or the model change. | never |
