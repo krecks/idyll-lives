@@ -43,6 +43,10 @@ parts in the manifests (original, CC0), drawn by `tools/art/furniture.py`, `furn
 `pack_<trait>.py`. They take their surfaces from the finishes and textures above. No downloaded
 models are used.
 
+The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
+`tools/art/blender/garden_decor.py` on the shared `tools/art/blender/gamekit.py` toolkit and exported as `.glb`
+(glTF, original, CC0). The other primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

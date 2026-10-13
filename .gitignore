@@ -10,3 +10,5 @@ node_modules
 /debug-states
 /bench-results
 /web/.assets
+__pycache__
+/tools/art/blender/previews
