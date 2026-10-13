@@ -110,7 +110,7 @@ pub(crate) fn update(w: &mut World) {
             out_of_cribs.push(i);
         }
         w.refresh_base_mods(i);
-        w.structure_version += 1;
+        w.structure_version = w.structure_version.wrapping_add(1);
         w.events.push_detail(w.tick, EventKind::GrewOlder, i, Some(stage as i64), None);
     }
     for i in out_of_cribs {
@@ -274,7 +274,7 @@ fn move_to(w: &mut World, i: usize, to: usize) {
     if let Some(pos) = arrive.filter(|_| sim.away_until.is_none()) {
         sim.pos = pos;
     }
-    w.structure_version += 1;
+    w.structure_version = w.structure_version.wrapping_add(1);
 }
 
 /// Partners move in together; grown children move out (or away).
@@ -458,7 +458,7 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     if w.init_relationships_for(&ids, &bonds).is_err() {
         return false;
     }
-    w.structure_version += 1;
+    w.structure_version = w.structure_version.wrapping_add(1);
     w.events.push_detail(w.tick, EventKind::MovedIn, ids[0], None, None);
     true
 }
@@ -666,7 +666,7 @@ fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -
     }
     let _ = w.init_relationships_for(&[id], &bonds);
     cribs_for_babies(w, h);
-    w.structure_version += 1;
+    w.structure_version = w.structure_version.wrapping_add(1);
     Some(id)
 }
 
