@@ -5,14 +5,14 @@
  * to its page alone and are never saved.
  *
  * URL flags (see `benchFlags.ts`):
- * - `quality=low|medium|high`: today's presets (`render/quality.ts`); without it, the player's settings.
+ * - `quality=low|medium|high`: the graphics presets (`render/quality.ts`); without it, the player's setting.
  * - `hour=13|21`: the lighting held at that hour; without it, the game's clock (the scene's evening).
  * - `cam=orbit` (24 m round the home lot, a turn in 40 s), `wide` (80 m, 90 s), `build` (orbit in
  *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame).
  * - `res=1` the full resolution (or 0.5–1); `res=auto` (default) what the game picks.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nocanvasaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features
  *   left out (to measure what each costs); `freeze` stops time for screenshots (`at=<s>` along the path).
  *
  * The result lands in `window.__benchResult` (with the dev server also in `bench-results/`) and in
@@ -22,7 +22,7 @@
 import { host } from '../game/host';
 import { deleteSave } from '../persistence/saves';
 import type { FrameCounts, RenderPassInfo } from '../render/types';
-import { GRAPHICS_PRESETS, settings, unsavedSettings } from '../settings/settings.svelte';
+import { settings, unsavedSettings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { services } from '../ui/services';
 import { game } from '../ui/state.svelte';
@@ -92,10 +92,9 @@ declare global {
 export function prepareBench(): void {
   const b = BENCH!;
   unsavedSettings();
-  const preset = b.quality ? GRAPHICS_PRESETS[b.quality] : null;
-  // The graphics preset's own settings (the renderer itself takes `?quality=`), then the benchmark's.
-  if (preset) Object.assign(settings, preset);
-  if (b.res !== 'auto') settings.resolutionScale = b.res;
+  // (The renderer takes `?quality=` itself; the setting too, for what shows it.)
+  if (b.quality) settings.graphics = b.quality;
+  if (b.res !== 'auto') settings.resolution = b.res;
   Object.assign(settings, { directorDelay: 0, autosaveMinutes: 0, fpsCap: b.cap, autoSlow: false, voices: false, showFps: false, reducedMotion: false });
   const css: string[] = [];
   if (!b.hud) css.push('.hud-root, .world-overlay, .toast-layer { display: none !important; }');

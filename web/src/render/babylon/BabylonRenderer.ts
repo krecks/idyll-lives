@@ -42,7 +42,6 @@ import {
   SceneInstrumentation,
   CreateScreenshotAsync,
   ShadowGenerator,
-  SSAO2RenderingPipeline,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -52,6 +51,7 @@ import {
   WebGPUEngine,
   WebGPUPerfCounter,
   type AbstractEngine,
+  type PerformanceMonitor,
   type RenderTargetTexture,
   type RenderTargetWrapper,
 } from './core';
@@ -59,7 +59,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
 import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
-import type { QualitySettings } from '../quality';
+import type { RenderQuality } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
 import type {
@@ -106,6 +106,8 @@ import { NightGrade } from './nightGrade';
 import { BuildEffects, type PopTarget } from './buildFx';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
+import { renderScale, watchPixelRatio } from './resolution';
+import { FramePacer } from './pacing';
 
 const ACCENT = Color3.FromHexString('#5B7CFA');
 /** Helpers are parked below the ground instead of toggling visibility (keeps snapshots valid). */
@@ -114,7 +116,13 @@ const HIDDEN_Y = -100;
 const PIT_MARGIN = 0.3;
 /** Height of the fence and gate preview while drawing. */
 const FENCE_PREVIEW_HEIGHT = 1.0;
-/** Game minutes between lighting updates (with / without snapshot rendering). */
+/**
+ * Frames per second at most for the menus' town: it moves slowly, and drawn at the display's rate
+ * it kept the main thread as busy as play (87 % at 3× CPU slow-down, P2-08). Paced like the cap
+ * (`pacing.ts`): 30 on 60 and 120 Hz displays, 36 on 144 Hz.
+ */
+const MENU_FPS = 30;
+/** Game minutes between lighting updates (with / without snapshot rendering; at speed 3 and up and in quiet hours, the quality's `lightingStep`). */
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
 /**
@@ -286,6 +294,8 @@ export class BabylonRenderer implements Renderer {
   // Town overview (menus), on its own camera layer; see `showTown`.
   private overview: TownOverview | null = null;
   private townMode = false;
+  /** The camera is flying from the overview into the game (drawn at the game's frame rate). */
+  private flyingIn = false;
   /** Overview lighting: the minute shown and the one it eases towards. */
   private townMinute = 18 * 60;
   private townMinuteGoal = 18 * 60;
@@ -331,7 +341,11 @@ export class BabylonRenderer implements Renderer {
   /** Lot the camera was last turned towards (see `buildSims`). */
   private framedView = '';
 
-  private options: LiveRenderOptions = { resolutionScale: 1, cameraSensitivity: 1, fpsCap: 60 };
+  private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 60 };
+  /** Draws frames in whole display refreshes, at most the frame rate cap (Babylon's frame requester). */
+  private readonly pacer = new FramePacer();
+  /** Stops watching the device pixel ratio (see `applyResolution`). */
+  private unwatchPixelRatio: (() => void) | null = null;
   private skyDome!: Sky;
   private readonly lighting = createLighting();
   private lastLightMinute = -1;
@@ -461,7 +475,7 @@ export class BabylonRenderer implements Renderer {
 
   constructor(
     private readonly deps: RendererDeps,
-    private readonly quality: QualitySettings,
+    private readonly quality: RenderQuality,
   ) {
     const hour = Number(new URLSearchParams(location.search).get('hour'));
     this.fixedHour = Number.isFinite(hour) && new URLSearchParams(location.search).has('hour') ? hour : null;
@@ -470,8 +484,11 @@ export class BabylonRenderer implements Renderer {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
+    // No multisampling on the canvas: only the last full-screen pass draws to it, so it would only
+    // cost memory traffic (66 MB a frame at 1080p; screenshots without it are the same, P1-06).
+    // The scene itself is smoothed in the post-processing pipeline (`msaaSamples`, or FXAA).
     if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
-      const engine = new WebGPUEngine(canvas, { antialias: !this.diag.has('nocanvasaa'), adaptToDeviceRatio: true, powerPreference: 'high-performance', ...compressedTextureFeatures() });
+      const engine = new WebGPUEngine(canvas, { antialias: false, powerPreference: 'high-performance', ...compressedTextureFeatures() });
       try {
         await engine.initAsync();
         this.engine = this.webgpu = engine;
@@ -487,9 +504,16 @@ export class BabylonRenderer implements Renderer {
         }
       }
     }
-    this.engine ??= new Engine(canvas, !this.diag.has('nocanvasaa'), { adaptToDeviceRatio: true, powerPreference: 'high-performance' });
+    this.engine ??= new Engine(canvas, false, { powerPreference: 'high-performance' });
+    // The drawing size follows the resolution setting and the device pixel ratio (not Babylon's
+    // `adaptToDeviceRatio`, which would scale our own level again when the ratio changes).
+    this.applyResolution();
+    this.unwatchPixelRatio = watchPixelRatio(this.onResize);
     // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
     if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
+    this.applyPacing();
+    this.engine.customAnimationFrameRequester = this.pacer;
+    this.timeFramesByRefresh();
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.engine.onContextLostObservable.add(() => this.onFailure?.('device'));
@@ -505,6 +529,7 @@ export class BabylonRenderer implements Renderer {
     if (this.debug) Object.assign(window, { __scene: scene, __renderer: this });
     // PBR materials and image-based lighting; the environment must exist before materials compile.
     this.lib = MaterialLibrary.for(scene).setAssets(this.deps.assets);
+    this.lib.anisotropy = this.quality.anisotropy;
     // Frozen and thawed materials bind differently; a recording made while some were thawed
     // (lighting changes) goes stale once they refreeze, so record again.
     this.lib.onRefrozen = () => this.resetSnapshot();
@@ -728,7 +753,10 @@ export class BabylonRenderer implements Renderer {
     // Behind the overview the game world waits (nothing of it is drawn).
     if (this.townMode) return;
     const snapshot = this.webgpu?.snapshotRendering ?? false;
-    if (Math.abs(minute - this.lastLightMinute) >= (snapshot ? LIGHT_STEP_SNAPSHOT : LIGHT_STEP)) {
+    const h = layout.header;
+    const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
+    const step = snapshot ? LIGHT_STEP_SNAPSHOT : fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
+    if (Math.abs(minute - this.lastLightMinute) >= step) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
       this.resetSnapshot();
@@ -954,8 +982,8 @@ export class BabylonRenderer implements Renderer {
     this.camera.angularSensibilityX = this.camera.angularSensibilityY = 1000 / s;
     this.camera.panningSensibility = 90 / s;
     this.camera.wheelDeltaPercentage = 0.012 * s;
-    // Babylon skips whole frames (nothing begun or presented) until the next one is due.
-    this.engine.maxFPS = options.fpsCap > 0 ? options.fpsCap : undefined;
+    // Frames are paced in whole display refreshes (`pacing.ts`), not by Babylon's `maxFPS`.
+    this.applyPacing();
     const still = (this.reducedMotion = !!options.reducedMotion);
     setWind(this.scene, still ? 0 : 1);
     this.characters.reducedMotion = still;
@@ -1561,6 +1589,7 @@ export class BabylonRenderer implements Renderer {
   stats(): RenderStats {
     return {
       backend: `${this.webgpu ? 'WebGPU' : 'WebGL2'}${this.lampCluster ? ' · clustered lamps' : ''}`,
+      preset: this.quality.preset,
       fps: this.engine.getFps(),
       frameMs: this.engine.getDeltaTime(),
       cpuMs: this.cpuMs,
@@ -1569,6 +1598,8 @@ export class BabylonRenderer implements Renderer {
       renderWidth: this.engine.getRenderWidth(),
       renderHeight: this.engine.getRenderHeight(),
       renderScale: 1 / (this.engine.getHardwareScalingLevel() * window.devicePixelRatio),
+      refreshHz: this.pacer.refreshHz,
+      refreshDivisor: this.pacer.divisor,
       gpuMs: this.gpuMs(),
       residentsMs: this.characters?.updateMs ?? 0,
     };
@@ -1722,7 +1753,7 @@ export class BabylonRenderer implements Renderer {
     chain.forEach((pp, i) => {
       const next = chain[i + 1];
       if (next) push(target(pp!.name, next.inputTexture));
-      else passes.push({ name: `${pp!.name} (canvas)`, width: engine.getRenderWidth(), height: engine.getRenderHeight(), samples: this.diag.has('nocanvasaa') ? 1 : 4, colorBytes: 4, depthBytes: 4 });
+      else passes.push({ name: `${pp!.name} (canvas)`, width: engine.getRenderWidth(), height: engine.getRenderHeight(), samples: 1, colorBytes: 4, depthBytes: 4 });
     });
     const casters = (map?.renderList ?? []).filter((m) => m.isEnabled() && m.isVisible) as Mesh[];
     const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
@@ -1733,7 +1764,7 @@ export class BabylonRenderer implements Renderer {
       backend: this.webgpu ? 'WebGPU' : 'WebGL2',
       gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : (engine as Engine).getGlInfo(),
       timerQuery: !!engine.getCaps().timerQuery,
-      render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: !this.diag.has('nocanvasaa') },
+      render: { width: engine.getRenderWidth(), height: engine.getRenderHeight(), hardwareScaling: engine.getHardwareScalingLevel(), devicePixelRatio: window.devicePixelRatio, canvasMsaa: false },
       quality: { ...this.quality, mirrors: this.mirrors.textures.length, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
       diag: [...this.diag],
       passes,
@@ -1873,6 +1904,7 @@ export class BabylonRenderer implements Renderer {
     this.warmPass++;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
+    this.unwatchPixelRatio?.();
     this.overview?.dispose();
     this.engine.dispose();
   }
@@ -1926,6 +1958,8 @@ export class BabylonRenderer implements Renderer {
     const rig = this.overview?.rig;
     if (glide > 0 && rig && this.active) {
       const p = this.parked;
+      this.flyingIn = true;
+      this.applyPacing();
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, glide * 1000 + 600);
         rig.glideTo({ alpha: p.alpha, beta: p.beta, radius: p.radius, x: p.target.x, z: p.target.z }, glide, () => {
@@ -1933,8 +1967,10 @@ export class BabylonRenderer implements Renderer {
           resolve();
         });
       });
+      this.flyingIn = false;
     }
     if (this.townMode) this.leaveTown();
+    this.applyPacing();
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -1967,6 +2003,7 @@ export class BabylonRenderer implements Renderer {
   private enterTown(): void {
     const cam = this.camera;
     this.townMode = true;
+    this.applyPacing();
     this.applyDig();
     copyPose(cam, this.parked);
     cam.detachControl();
@@ -2148,7 +2185,8 @@ export class BabylonRenderer implements Renderer {
       }
       const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
       this.paceKeys(dt);
-      this.onFrame?.(performance.now());
+      // The time of the refresh this frame is for: even steps, as the frames will show.
+      this.onFrame?.(this.pacer.frameTime || performance.now());
       if (probe) updated = performance.now();
       if (this.townMode && this.overview) {
         this.townFrame(dt);
@@ -2234,7 +2272,9 @@ export class BabylonRenderer implements Renderer {
     this.sun = new DirectionalLight('sun', new Vector3(-0.5, -1, 0.4), this.scene);
     this.sun.autoCalcShadowZBounds = true;
 
-    const shadows = (this.shadows = new ShadowGenerator(this.quality.shadowMapSize, this.sun));
+    // A red-only colour target (R16F): filtered shadows read only the depth texture beside it, so the
+    // RGBA16F one Babylon makes by default was written every frame and never read (P1-05).
+    const shadows = (this.shadows = new ShadowGenerator(this.quality.shadowMapSize, this.sun, false, undefined, true));
     shadows.usePercentageCloserFiltering = true;
     shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     shadows.bias = 0.0015;
@@ -2273,19 +2313,6 @@ export class BabylonRenderer implements Renderer {
 
   private setupPostProcessing(): void {
     const q = this.quality;
-    if (q.ambientOcclusion) {
-      try {
-        const ssao = new SSAO2RenderingPipeline('ssao', this.scene, { ssaoRatio: 0.5, blurRatio: 1 }, [this.camera], true);
-        ssao.radius = 1.0;
-        ssao.totalStrength = 0.7;
-        ssao.samples = 16;
-        ssao.maxZ = 120;
-        ssao.expensiveBlur = true;
-      } catch (err) {
-        console.warn('[render] ambient occlusion unavailable', err);
-      }
-    }
-
     const post = (this.post = new DefaultRenderingPipeline('post', true, this.scene, [this.camera]));
     const aa = !this.diag.has('noaa');
     post.samples = aa ? q.msaaSamples : 1;
@@ -2556,8 +2583,7 @@ export class BabylonRenderer implements Renderer {
       curves.shadowsDensity = LOOK.shadowsDensity;
     }
     this.scene.fogDensity = LOOK.fog;
-    const scale = Math.min(1, Math.max(0.5, this.options.resolutionScale));
-    this.engine.setHardwareScalingLevel(1 / (window.devicePixelRatio * scale));
+    this.applyResolution();
     this.markerPalette = LOOK.marker.map((hex) => {
       const c = Color3.FromHexString(hex).toLinearSpace();
       return [c.r * 1.2, c.g * 1.2, c.b * 1.2, 1];
@@ -3492,7 +3518,46 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  private readonly onResize = () => this.engine.resize();
+  private readonly onResize = () => this.applyResolution();
+
+  /**
+   * Babylon times each frame when it starts to run (`performance.now()`), which wanders by however
+   * long the browser took to get to it. It times them by the refresh they're drawn for instead (the
+   * pacer's `frameTime`): the frame time (`getDeltaTime`: camera glides and inertia, clouds, wind,
+   * fades) is then whole refreshes, as the frames show.
+   */
+  private timeFramesByRefresh(): void {
+    const engine = this.engine as unknown as { _measureFps?: () => void; _performanceMonitor?: PerformanceMonitor; _fps: number; _deltaTime: number };
+    const monitor = engine._performanceMonitor;
+    if (typeof engine._measureFps !== 'function' || !monitor) return;
+    engine._measureFps = () => {
+      monitor.sampleFrame(this.pacer.frameTime || undefined);
+      engine._fps = monitor.averageFPS;
+      engine._deltaTime = monitor.instantaneousFrameTime || 0;
+    };
+  }
+
+  /** The frame rate cap, and in the menus at most `MENU_FPS` (not while the camera flies into the game). */
+  private applyPacing(): void {
+    const cap = this.options.fpsCap;
+    const menu = this.townMode && !this.flyingIn;
+    this.pacer.setCap(menu ? (cap > 0 ? Math.min(cap, MENU_FPS) : MENU_FPS) : cap);
+  }
+
+  /**
+   * Sizes the drawing to the canvas, the device pixel ratio and the resolution setting
+   * (`resolution.ts`): on start, on settings changes, when the window resizes and when the pixel
+   * ratio changes (zoom, another screen).
+   */
+  private applyResolution(): void {
+    const engine = this.engine;
+    const dpr = window.devicePixelRatio || 1;
+    const scale = renderScale(this.canvas.clientWidth * dpr, this.canvas.clientHeight * dpr, this.options.resolution);
+    const level = 1 / (dpr * scale);
+    // (Setting the level resizes; the same level still needs a resize for a new canvas size.)
+    if (level !== engine.getHardwareScalingLevel()) engine.setHardwareScalingLevel(level);
+    else engine.resize();
+  }
 
   /** Image-based lighting from a prefiltered environment (manifest key `environment.sky`). */
   private async setupEnvironment(): Promise<void> {
