@@ -955,6 +955,28 @@ F5 (merge cc88635), F1a (R5-05, R5-08), F2c (R5-07, R5-09, R5-10, R5-11), F2b (R
 - **The suite:** `cargo test -p sim-core` reported 453 passed, 0 failed and 20 ignored on the last sim branch merged (de0a880), against 390 passed and 9 ignored at 4cde174 (§2.3).
 - **On `main` before the release** (the parent of aaadacb, run by the coordinator): `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace` without the voice crate 455 passed and 20 ignored; `cargo test -p voice --release` 32 passed. The CI dry run passed on Linux (R5-02, §3.6).
 
+### 3.9 Verification (V1)
+
+V1 verified `main` at 5f72a7c end to end on an Apple Silicon Mac, in Chromium (headless 60 Hz display, simulated focus loss, emulated pixel ratio). Every gate passed, and nothing blocks the release. Its two fixes (2caf64c, bbb9ee4) are in §3.7; its findings are in §4.
+
+| Gate / check | Result |
+|---|---|
+| Clippy, the workspace with all targets, and sim-wasm and voice-wasm for wasm32 | pass, 0 warnings |
+| `cargo test --workspace --exclude voice` | 455 passed, 0 failed, 20 ignored (66 s) |
+| `cargo test -p voice --release` | 32 passed (with the dictionary, nothing skipped) |
+| The ignored long runs, release | 20 of 20: century 6 (16–26 s each); soak 4 (7.7 / 15.8 / 20.6 / 41.3 s); big_town 2 (5.5 / 36.0 s); balance 14.1 s; behaviour 3 (up to 16.7 s); routines 0.6 s; ui_updates 0.3 s; generated_houses 0.5 s and generated_worlds 17.8 s, which test nothing without sample files (§4) |
+| `pnpm check`, `pnpm lint`, `check:voice`, `check:llm` | pass (3,161 files, 0 errors; 16 cleaning cases and 6 prompts) |
+| `npm run wasm`, `vite build`, the Pages build | pass: sim wasm 2,901,413 → 2,298,877 B after wasm-opt; `bundle.json` 3.1 MB; the build id in `isolation-sw.js`; `THIRD-PARTY-LICENSES.txt` 78,866 B (before 1a4018a) |
+| First visit, second visit, redeploy | 18/18: one reload, cross-origin isolated; the second visit asks for 0 hashed files; a redeploy loads the new build, asks for 0 old files and deletes the old cache |
+| New game, speeds, saves, export and import, bad saves | 33/33: speeds 1–5 run at 1.0 / 2.99 / 9.66 / 29.56 / 59.88 game minutes a second; two games keep two autosaves each; a 524 KB export imports and loads; the damaged save is removed with a notice, the version-999 save kept and flagged |
+| Crash screens | 33/33: panic, throw and hang (8.4 s) offer Reload, Main menu and the report, without "Save and reload"; the render crash offers it, and it works |
+| Build mode | 17/17 (dev server): no stuck Alt, `pointercancel` builds nothing, a double Sell sells only the selected object, held R turns only it |
+| Audio | 10/10: a hidden tab suspends the audio, Mute in background fades, pause on focus loss resumes at the old speed |
+| Graphics | 31/32: Auto at DPR 2 on 1920×1080 draws 2.07 MP; DPR 1 / 1.5 / 2 re-apply to 100 / 67 / 50 %; cap 30 gives 30.0 fps ("60 Hz ÷ 2"); nothing drawn behind full-screen menus; `?renderer=webgl` works. The miss: 25 fps in the 1.5 s after a resolution change, where the test expected 27 |
+| Settings from 0.1 | 7/7 |
+| Speed 5 for 3 game days | 6/6: 20 steps a second in all 111 samples; no faded feed entry clickable; walkers' largest step a frame 1.51 m, under the 1.6 m snap |
+| Medium looks the same | All 18 shots within 0.118 % of pixels: the far road (P1-17) and the bathroom mirror |
+
 ## 4. Found but not fixed
 
 What the review found and 0.2.0 doesn't fix, by severity, with a recommendation and a target: **0.2.1** (a small follow-up), **v0.3** (the next feature release) or **never** (not worth doing unless something changes). Rows marked "new" were found during the fixes and aren't in §2. Items the owner put off on purpose, and the plan's list of things left undone, follow the table.
