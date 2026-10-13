@@ -80,6 +80,8 @@ const WARM_FRAMES = 3;
 const PORTRAIT_WAIT_MS = 8000;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
+const REPEATING = new Set(['r', 'R', 'PageUp', 'PageDown', 'z', 'Z', 'y', 'Y']);
 
 export interface GameSession {
   /** Saves into `slotId` (a new slot when omitted). Returns the slot id. */
@@ -269,6 +271,9 @@ export async function startSession(
     if (game.watching) stopWatching();
   }
   const onInput = () => takeBack();
+  /** The button last clicked: it keeps focus, but Space still pauses (unlike on a button reached with the keyboard). */
+  let clicked: Element | null = null;
+  const onPress = (e: PointerEvent) => (clicked = e.target instanceof Element ? e.target.closest('button') : null);
   let hudTimer: ReturnType<typeof setTimeout> | undefined;
   const onMove = () => {
     // Moving the mouse doesn't take the camera, but it does count as being here (and wakes a
@@ -1044,7 +1049,13 @@ export async function startSession(
   }
 
   const onKey = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)) return;
+    // A held key repeats only what's worth repeating (turning, storeys, undo and redo); toggles happen once.
+    if (e.repeat && !REPEATING.has(e.key)) {
+      if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
+      return;
+    }
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
       if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
@@ -1075,6 +1086,8 @@ export async function startSession(
     }
     switch (e.key) {
       case ' ':
+        // A button reached with the keyboard (a menu's arrow keys) is pressed with Space.
+        if (t instanceof HTMLButtonElement && t !== clicked) return;
         e.preventDefault();
         return controls.togglePause();
       case '0':
@@ -1220,6 +1233,7 @@ export async function startSession(
       pointer = attachPointer();
       window.addEventListener('keydown', onKey);
       window.addEventListener('pointerdown', onInput, true);
+      window.addEventListener('pointerdown', onPress, true);
       canvas.addEventListener('wheel', onInput, { capture: true, passive: true });
       window.addEventListener('keydown', onInput, true);
       window.addEventListener('pointermove', onMove, { passive: true });
@@ -1297,6 +1311,7 @@ export async function startSession(
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pointerdown', onInput, true);
+      window.removeEventListener('pointerdown', onPress, true);
       canvas.removeEventListener('wheel', onInput, true);
       window.removeEventListener('keydown', onInput, true);
       window.removeEventListener('pointermove', onMove);
