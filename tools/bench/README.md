@@ -4,10 +4,10 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 
 | Script | Does |
 |---|---|
-| `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in headed Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses; `--compare <dirA> <dirB>` counts the pixels that differ. |
+| `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses; `--compare <dirA> <dirB>` counts the pixels that differ. |
 | `scene.mjs` | Makes a scene, `web/public/bench/<name>.json.gz`: a new game as the menus make one, with a household of four in the first home for sale, played at full speed to `--hour` on day 1, paused and saved. |
 
-Both need `pnpm wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own). Run them headed: headless Chromium falls back to a software GPU.
+Both need `pnpm wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
 
 ```sh
 # The production build (what players get), presets × both backends, no vsync, median of 3

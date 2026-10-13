@@ -10,8 +10,9 @@
  *
  * Needs `pnpm wasm`, `pnpm voice` and `pnpm llm` first, and Playwright:
  * `PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for
- * a browser of your own. `HEADED=1` shows the window (headless Chromium may have no GPU
- * adapter). Usage: `node tools/llm/devices.mjs`.
+ * a browser of your own (Chrome or Chrome for Testing: `chrome-headless-shell` has no GPU).
+ * In a window, for the display's real timing; `HEADLESS=1` runs without one (still on the real
+ * GPU, frames at 60 a second). Usage: `node tools/llm/devices.mjs`.
  */
 
 import { spawn } from 'node:child_process';
@@ -41,8 +42,9 @@ await new Promise((resolve, reject) => {
 
 const { chromium } = await playwright();
 const browser = await chromium.launch({
-  headless: !process.env.HEADED,
-  executablePath: process.env.CHROME || undefined,
+  headless: !!process.env.HEADLESS,
+  // (Without one of its own: Playwright's full Chromium, which has the GPU headless too.)
+  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
   args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPU', '--use-angle=metal', '--ignore-gpu-blocklist'],
 });
 let failed = false;

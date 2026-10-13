@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The rendering benchmark (`web/src/debug/bench.ts`) over a matrix: starts Vite, opens
- * `?bench=<scene>` in headed Chromium on the real GPU (WebGPU, and WebGL2 with `&renderer=webgl`)
+ * `?bench=<scene>` in Chromium on the real GPU (WebGPU, and WebGL2 with `&renderer=webgl`)
  * at 1920×1080, device pixel ratio 1, once per preset × backend × scenario × CPU slow-down ×
  * diagnostic, and writes every result as JSON and a markdown table (medians when `--runs` > 1).
  *
@@ -22,10 +22,17 @@
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
+ *   --headless / --headed      without or with a window (see below)
  *
  * Needs `pnpm wasm` first, and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't
- * installed, `CHROME=<executable>` for a browser of your own. Windows open far off to the right
- * (`--left`), out of the way.
+ * installed, `CHROME=<executable>` for a browser of your own.
+ *
+ * Measurements run in windows (far off to the right, `--left`): their timing is the real
+ * display's. Shots, which don't time anything, run headless: no window, nothing takes the focus
+ * from the app in front, and still the real GPU (Chromium's full build in its new headless mode;
+ * not `chrome-headless-shell`, which draws in software, so a `CHROME` must be Chrome or Chrome for
+ * Testing). `--headless` and `--headed` choose for either. A window's shots come out about 2 of
+ * 255 brighter (the screen's colour profile), so compare shots taken the same way.
  */
 
 import { spawn } from 'node:child_process';
@@ -86,6 +93,7 @@ const warmup = Number(flag('warmup', has('shots') ? '6' : '5'));
 const runs = Number(flag('runs', '1'));
 const extra = flag('extra', '');
 const throughput = has('throughput');
+const headed = has('headed') || (!has('shots') && !has('headless'));
 const left = Number(flag('left', '2600'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', has('shots') ? flag('shots') : join(ROOT, 'bench-results', stamp));
@@ -116,8 +124,9 @@ if (!flag('url', null)) {
 
 const { chromium } = await playwright();
 const browser = await chromium.launch({
-  headless: false,
-  executablePath: process.env.CHROME || undefined,
+  headless: !headed,
+  // (Without one of its own: Playwright's full Chromium, which has the GPU headless too.)
+  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
   args: [
     '--enable-unsafe-webgpu',
     // Full-precision GPU timestamps (otherwise rounded to 0.1 ms).
@@ -136,11 +145,13 @@ async function open(query, throttle, key, timeoutMs) {
   await context.addInitScript(quiet);
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
-  try {
-    const { windowId } = await cdp.send('Browser.getWindowForTarget');
-    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left, top: 0 } });
-  } catch {
-    // (Some window managers refuse; it still runs.)
+  if (headed) {
+    try {
+      const { windowId } = await cdp.send('Browser.getWindowForTarget');
+      await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left, top: 0 } });
+    } catch {
+      // (Some window managers refuse; it still runs.)
+    }
   }
   if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
   page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
