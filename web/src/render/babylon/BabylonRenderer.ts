@@ -562,6 +562,11 @@ export class BabylonRenderer implements Renderer {
     scene.onBeforeCameraRenderObservable.add((camera) => this.cameraMoved(camera));
     // `?debug`: expose the scene for inspection from the console / test harness.
     if (this.debug) Object.assign(window, { __scene: scene, __renderer: this });
+    // `?style=cel|soft` (dev only): the look study's test shading (debug/toon.ts).
+    const style = import.meta.env.DEV ? new URLSearchParams(location.search).get('style') : null;
+    if (style === 'cel' || style === 'soft') {
+      (await import('../../debug/toon')).toonGame(scene, style, () => this.sun?.direction ?? Vector3.Down(), () => this.wallMode === 'up');
+    }
     // PBR materials and image-based lighting; the environment must exist before materials compile.
     this.lib = MaterialLibrary.for(scene).setAssets(this.deps.assets);
     this.lib.anisotropy = this.quality.anisotropy;

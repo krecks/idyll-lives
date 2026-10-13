@@ -5,7 +5,8 @@
  *
  * URL: `?keys=model.tree,model.pine` (default: every `model.tree*`, `model.garden.*` and nature key),
  * `?filter=garden` (keys containing it), `?cols=6`, `?gap=5`, `?alpha=-1.2&beta=1.1&radius=30`,
- * `?labels=0`, `?pack=…` like the game.
+ * `?labels=0`, `?pack=…` like the game, `?style=cel|soft` a look test in another art style (`toon.ts`),
+ * `?outline=0` without cel's ink lines.
  */
 
 import {
@@ -16,6 +17,7 @@ import {
   HemisphericLight,
   ImageProcessingConfiguration,
   Matrix,
+  type Mesh,
   MeshBuilder,
   PBRMaterial,
   Scene,
@@ -28,6 +30,7 @@ import { MaterialLibrary } from '../render/babylon/materials';
 import { compressedTextureFeatures } from '../render/babylon/loaders';
 import { buildModel } from '../render/babylon/models';
 import { installNature } from '../render/babylon/nature';
+import { addInkOutlines, useToonLook, type ToonStyle } from './toon';
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -49,6 +52,8 @@ sun.diffuse = new Color3(1, 0.96, 0.88);
 const shadows = new ShadowGenerator(2048, sun);
 shadows.usePercentageCloserFiltering = true;
 shadows.bias = 0.002;
+const style = params.get('style') as ToonStyle | null;
+if (style) useToonLook(style, () => sun.direction, (m) => m.name !== 'ground');
 
 const base = import.meta.env.BASE_URL;
 const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
@@ -74,6 +79,7 @@ ground.receiveShadows = true;
 
 const labels = document.getElementById('labels')!;
 const spots: { key: string; at: Vector3; el: HTMLSpanElement }[] = [];
+const inked: Mesh[] = [];
 await Promise.all(
   keys.map(async (key, i) => {
     const x = (i % cols - (cols - 1) / 2) * gap;
@@ -83,6 +89,7 @@ await Promise.all(
       mesh.thinInstanceSetBuffer('matrix', Matrix.Translation(x, 0, z).asArray() as unknown as Float32Array, 16, true);
       mesh.receiveShadows = true;
       shadows.addShadowCaster(mesh);
+      inked.push(mesh);
     }
     if (params.get('labels') !== '0') {
       const el = document.createElement('span');
@@ -92,6 +99,8 @@ await Promise.all(
     }
   }),
 );
+
+if (style === 'cel' && params.get('outline') !== '0') addInkOutlines(scene, inked, 0.01);
 
 const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? -Math.PI / 2), Number(params.get('beta') ?? 1.05), Number(params.get('radius')) || Math.max(cols, rows) * gap * 1.05, Vector3.Zero(), scene);
 camera.attachControl(canvas, true);

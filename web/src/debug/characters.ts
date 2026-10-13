@@ -11,11 +11,12 @@
  *   resting face, a half and a full blink) / viseme;
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
- * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`.
+ * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`;
+ * - `?style=cel|soft` a look test in another art style (`toon.ts`), `?outline=0` without cel's ink lines.
  * Sets `window.__ready` once everything is drawn.
  */
 
-import { ArcRotateCamera, Color3, Color4, DirectionalLight, Engine, HemisphericLight, ImageProcessingConfiguration, Matrix, MeshBuilder, PBRMaterial, Scene, ShadowGenerator, Vector3 } from '../render/babylon/core';
+import { ArcRotateCamera, Color3, Color4, DirectionalLight, Engine, HemisphericLight, ImageProcessingConfiguration, Matrix, Mesh, MeshBuilder, PBRMaterial, Scene, ShadowGenerator, Vector3 } from '../render/babylon/core';
 import { AssetRegistry } from '../assets/registry';
 import type { FrameState } from '../core/bridge';
 import type { SimInfo } from '../core/protocol';
@@ -27,6 +28,7 @@ import { GARMENTS } from '../render/babylon/characters/outfit';
 import { WALL_HEIGHT } from '../render/babylon/house';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { VISEMES } from '../voice/visemes';
+import { addInkOutlines, useToonLook, type ToonStyle } from './toon';
 
 const params = new URLSearchParams(location.search);
 const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
@@ -133,6 +135,8 @@ sun.diffuse = new Color3(1, 0.96, 0.88);
 const shadowGen = new ShadowGenerator(2048, sun);
 shadowGen.usePercentageCloserFiltering = true;
 shadowGen.bias = 0.002;
+const style = params.get('style') as ToonStyle | null;
+if (style) useToonLook(style, () => sun.direction, (m) => m.name.startsWith('sim:'));
 
 const baseUrl = import.meta.env.BASE_URL;
 const assets = await AssetRegistry.load(`${baseUrl}assets/manifest.json`, []);
@@ -166,6 +170,10 @@ const characters = new Characters(scene, assets, lib);
 if (!(await characters.init())) throw new Error('characters unavailable');
 await characters.build({ sims, objects: [] });
 for (const m of characters.casters()) shadowGen.addShadowCaster(m);
+// Ink round bodies, clothes and hair (not eyes, brows, lashes or mouths).
+if (style === 'cel' && params.get('outline') !== '0') {
+  addInkOutlines(scene, scene.meshes.filter((m): m is Mesh => m instanceof Mesh && m.name.startsWith('sim:') && /^sim:(body|cloth|hair)$/.test(m.material?.name ?? '')), 0.007);
+}
 
 const clipName = params.get('clip');
 const held = params.get('t');
