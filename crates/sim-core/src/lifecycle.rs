@@ -143,11 +143,9 @@ fn retire_if_due(w: &mut World, i: usize) {
         return;
     }
     let Some(job) = sim.job.as_ref() else { return };
-    let level = &w.content.careers[job.career].levels[job.level];
-    let weekly = level.pay * i64::from(level.days.count_ones());
     let (career, grade) = (job.career, job.level);
     let feeling = rules.retire_feeling;
-    let pension = (weekly as f32 * rules.pension).round() as i64;
+    let pension = pension(&w.content, Some(job));
     let sim = &mut w.sims[i];
     sim.retired = true;
     sim.pension = pension;
@@ -156,6 +154,17 @@ fn retire_if_due(w: &mut World, i: usize) {
         social::add_feeling(&mut sim.feelings, f, &w.content.feelings, w.tick);
     }
     w.events.push_career(w.tick, EventKind::Retired, i, career, Some(grade as i64));
+}
+
+/// The weekly pension of someone retiring from `job` (None: they had none): content
+/// `life.pension` × its weekly pay, and at least `life.basicPension`.
+pub(crate) fn pension(content: &crate::content::Content, job: Option<&crate::life::Job>) -> i64 {
+    let share = job.map_or(0, |job| {
+        let level = &content.careers[job.career].levels[job.level];
+        let weekly = level.pay * i64::from(level.days.count_ones());
+        (weekly as f32 * content.life.pension).round() as i64
+    });
+    share.max(content.life.basic_pension)
 }
 
 /// Old age: the story tells it, family, partners and friends grieve, and they're gone.
