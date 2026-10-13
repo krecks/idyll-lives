@@ -26,7 +26,7 @@ Run Python with `-I` (isolated mode); downloads are treated as data only.
 | `apply_pack.py <trait> <entries.json>` | Merges entries into `web/public/assets/packs/<trait>/manifest.json` in place |
 | `blender/gamekit.py` | Shared Blender toolkit for the hand-built glTF models: `reset`, `mat`, `cube`/`sphere`/`cylinder`/`cone`/`torus`/`revolve`/`rock`, `rod`, `join_all`, `fit` (scale into an exact w×h×d box, bottom on the floor), `export_glb` (glTF, y up, front +Z), `stats` and `preview` |
 | `blender/garden_decor.py` | Real GLB garden decor (`model.garden.*`): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders, built from meshes and exported to `web/public/assets/models/garden/`. `-- --preview` renders them instead of exporting |
-| `blender/check_glb.py` | Round-trips the exported GLBs back through Blender: re-imports each file, prints its bounds and renders a preview |
+| `blender/check_glb.py` | The gate for glTF models (plain Python, no Blender): checks every `.glb` the manifests use against its entry (origin and size, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error. Inside Blender, `-- --preview` also re-imports each file and renders it to `previews/rt_<name>.png` |
 
 Nature and garden flow: `python3 -I -B nature.py ../../web/public/assets/manifest.json`. To look at the results without
 starting a game, run `pnpm dev` and open `/gallery.html` (dev only): it draws models in a grid with the game's loader,
@@ -42,6 +42,9 @@ shapes `lathe` (`profile`) and `torus`, drawn by `render/babylon/models.ts`.
 Blender flow (real glTF art): `blender/garden_decor.py` builds its models with `blender/gamekit.py` and exports
 `.glb` files into `web/public/assets/models/garden/`. The override pack `web/public/assets/packs/gardenDecor/manifest.json`
 (added to the base manifest's `packs`) maps each `model.garden.*` key to its file and keeps the old `placeholder` as a
-fallback. `tools/assets/optimize.mjs` makes the meshopt copy for the build. Run
-`/Applications/Blender.app/Contents/MacOS/Blender --background --python tools/art/blender/garden_decor.py`
-(add `-- --preview` to render the models instead of exporting, `blender/check_glb.py` to round-trip them back).
+fallback; its `materials` map each file's materials onto the game's finishes, so a model costs one draw call per
+finish group like the primitive models. `tools/assets/optimize.mjs` makes the meshopt copy for the build. Run
+`/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/blender/garden_decor.py`
+(Blender 5.2 LTS; add `-- --preview` to render the models instead of exporting), then
+`python3 -I -B tools/art/blender/check_glb.py` and the Khronos glTF validator. How to build a new object this way:
+[docs/design/objects.md](../../docs/design/objects.md).
