@@ -574,6 +574,7 @@
             <span class="eyebrow">Bottom</span>
             {#if wardrobe}{@render garments('bottom', wardrobe.bottoms, 'Bottom')}{/if}
             {@render colors('bottomColor', 'Bottom colour')}
+            {#if isBaby && sim.appearance.bottom === 'bottom.skirt'}<span class="hint small">Babies wear a romper in their top's colour: the skirt is for when they're older.</span>{/if}
           </div>
           <div class="field">
             <span class="eyebrow">Shoes</span>

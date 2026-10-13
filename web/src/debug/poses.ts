@@ -11,7 +11,8 @@
  * `?manual` (time only advances via `__poses.advance(seconds)`, for screenshots), `?seats=sofa,toilet`
  * (a man and a woman seated on each),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
- * the clip held at 8 times through it, on a man, a woman and a child; no stations).
+ * the clip held at 8 times through it, on a man, a woman and a child; no stations),
+ * `?bottom=bottom.skirt` (everyone who can wears that bottom).
  */
 
 import {
@@ -214,6 +215,7 @@ const STRIP_ROWS = [
 ];
 // `?seats=sofa,toilet`: a man and a woman sitting on each of those objects instead of the stations.
 const seats = params.get('seats')?.split(',');
+const bottom = params.get('bottom');
 const stations: Station[] = strip
   ? STRIP_ROWS.flatMap((r) => Array.from({ length: strip }, (_, k) => ({ label: `${r.label} ${k}/${strip}`, female: r.female, stage: r.stage, strip: k / strip })))
   : seats
@@ -314,6 +316,7 @@ const look = (id: number, female: boolean, stage?: string, height = 1, build = 1
     height,
     build,
     ...(stage ? { stage } : {}),
+    ...(bottom ? { bottom } : {}),
   },
   traits: [],
   perks: [],

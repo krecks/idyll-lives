@@ -168,7 +168,9 @@ fields) decides where it covers:
 A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
 bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
 rougher than skin. Shoes have a `colour` (sRGB hex). Skirts set `skirt: true` and their `leg` cut
-paints the thighs (the shell hangs over them).
+paints the thighs (the shell hangs over them). Babies don't wear skirts (the shell can't follow
+their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
+a romper (outfit.ts).
 
 Garment ids per family (outfit.ts):
 

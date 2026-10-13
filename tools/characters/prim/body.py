@@ -40,6 +40,8 @@ REGIONS = ['torso', 'arm', 'hand', 'leg', 'foot', 'neck', 'head', 'ear']
 TH12 = np.radians(np.arange(12) * 30.0)
 # The arm's root loop on the chest rings (k: torso ring index): right side, then mirrored.
 ARM_K = {'r': (2, 3, 4), 'l': (10, 9, 8)}
+# The thighs' first rings keep this far (x thigh radius) from the midline, either side of the crotch.
+CROTCH_GAP = 0.1
 # Seated: the clips' seat (characters.ts SEATS) is 0.45 m; `seatDrop` puts the hips on it.
 SEAT = 0.45
 
@@ -333,9 +335,14 @@ def body_cage(family, stage):
             (Ja + 0.1 * (Jk - Ja), 0.42, 0.42, 0.44, {f'calf_{s}': 0.5, f'foot_{s}': 0.5}, 0),
         ]
         prev = loop
-        for cc, a, bf, bb, w, cav in rings:
+        sx = 1 if s == 'r' else -1
+        for k, (cc, a, bf, bb, w, cav) in enumerate(rings):
             cc = cc.copy()
             pts = _ring(cc, X, Z, r_th * a, r_th * bf, r_th * bb, psi, 2.1)
+            if k == 0:
+                # The thigh's top stops short of the midline (a baby's plump thighs would cross it):
+                # the strip between it and the crotch would fold over when the legs spread.
+                pts[:, 0] = sx * np.maximum(sx * pts[:, 0], CROTCH_GAP * r_th)
             back = np.cos(psi) < -0.5
             cur = c.ring(pts, w, 'leg', cav=list(back * cav))
             c.band(prev, cur)
