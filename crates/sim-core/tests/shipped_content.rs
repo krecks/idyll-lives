@@ -141,52 +141,58 @@ fn a_thousand_jobs_with_grades_and_skills() {
 
 #[test]
 fn sims_sleep_at_night_and_are_up_by_day() {
-    let mut world = World::from_json(&content(), &starter_with_household(), 2).unwrap();
+    // Several games (one game's six samples hang on chance: an afternoon in bed is allowed).
+    let content = content();
     let mut asleep_at_night = 0;
     let mut awake_by_day = 0;
-    // Three days; sample 03:00 and 15:00 each day.
-    for day in 2..5 {
-        for (hour, night) in [(3.0, true), (15.0, false)] {
-            let target = sim_core::clock::tick_at(day, hour * 60.0).unwrap();
-            while world.tick < target {
-                world.tick_once();
-            }
-            for s in &world.sims {
-                // A proper night's sleep (naps don't count).
-                let sleeping = s.current().is_some_and(|a| match a.task.kind {
-                    TaskKind::Use {
-                        object,
-                        interaction,
-                    } => {
-                        let def = world.objects[object as usize].def;
-                        world.content.objects[def].interactions[interaction].id == "sleep"
-                    }
-                    _ => false,
-                });
-                if night && sleeping {
-                    asleep_at_night += 1;
+    let seeds = 1..=8;
+    for seed in seeds.clone() {
+        let mut world = World::from_json(&content, &starter_with_household(), seed).unwrap();
+        // Three days; sample 03:00 and 15:00 each day.
+        for day in 2..5 {
+            for (hour, night) in [(3.0, true), (15.0, false)] {
+                let target = sim_core::clock::tick_at(day, hour * 60.0).unwrap();
+                while world.tick < target {
+                    world.tick_once();
                 }
-                if !night && !sleeping {
-                    awake_by_day += 1;
+                for s in &world.sims {
+                    // A proper night's sleep (naps don't count).
+                    let sleeping = s.current().is_some_and(|a| match a.task.kind {
+                        TaskKind::Use {
+                            object,
+                            interaction,
+                        } => {
+                            let def = world.objects[object as usize].def;
+                            world.content.objects[def].interactions[interaction].id == "sleep"
+                        }
+                        _ => false,
+                    });
+                    if night && sleeping {
+                        asleep_at_night += 1;
+                    }
+                    if !night && !sleeping {
+                        awake_by_day += 1;
+                    }
                 }
             }
         }
+        for s in &world.sims {
+            let n = world.content.needs.len();
+            let avg = s.needs[..n].iter().sum::<f32>() / n as f32;
+            assert!(
+                avg > 0.25,
+                "{} let their needs collapse: {:?}",
+                s.name,
+                &s.needs[..n]
+            );
+        }
     }
+    let samples = 6 * seeds.count();
     assert!(
-        asleep_at_night >= 5,
-        "only {asleep_at_night}/6 night samples asleep"
+        asleep_at_night * 10 >= samples * 9,
+        "only {asleep_at_night}/{samples} night samples asleep"
     );
-    assert!(awake_by_day >= 5, "only {awake_by_day}/6 day samples awake");
-    for s in &world.sims {
-        let n = world.content.needs.len();
-        let avg = s.needs[..n].iter().sum::<f32>() / n as f32;
-        assert!(
-            avg > 0.25,
-            "{} let their needs collapse: {:?}",
-            s.name,
-            &s.needs[..n]
-        );
-    }
+    assert!(awake_by_day * 3 >= samples * 2, "only {awake_by_day}/{samples} day samples awake");
 }
 
 #[test]

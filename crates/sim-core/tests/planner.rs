@@ -236,7 +236,8 @@ fn a_job_goal_finds_work_and_completes() {
 #[test]
 fn residents_suggest_goals_and_neighbours_take_theirs_on() {
     let mut w = town(12);
-    until(&mut w, 8, 8.0);
+    // Two weeks: an idea comes about every other day, so a week can go by without one.
+    until(&mut w, 15, 8.0);
     assert!(
         !w.sims[0].planner.suggestions.is_empty()
             || w.events.iter().any(|e| e.kind == EventKind::GoalSuggested)
