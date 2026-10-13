@@ -7,6 +7,27 @@ use voice::{Engine, G2p, Lexicon, LineInputs, VoiceParams, dsp};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+extern "C" {
+    /// The worker's `__wasmPanic` (`tts.worker.ts`), which passes the message on.
+    #[wasm_bindgen(catch, js_namespace = globalThis, js_name = __wasmPanic)]
+    fn report_panic(message: &str) -> Result<(), JsValue>;
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// Runs as the module starts. A panic aborts (`panic = "abort"`), and the trap only says
+/// "unreachable": the hook first passes on what panicked and where.
+#[wasm_bindgen(start)]
+fn start() {
+    std::panic::set_hook(Box::new(|info| {
+        let message = info.to_string();
+        if report_panic(&message).is_err() {
+            console_error(&message);
+        }
+    }));
+}
+
+#[wasm_bindgen]
 pub struct Voice {
     engine: Engine,
 }

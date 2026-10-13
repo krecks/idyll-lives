@@ -83,6 +83,9 @@ let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
 /** Counters behind `voiceThreadStats` (not reactive: read by the overlay's timer). */
 const BUSY_WINDOW_MS = 5000;
 const counters = { loadMs: 0, lines: 0, totalMs: 0, lastMs: 0, audioSeconds: 0, recent: [] as { at: number; ms: number }[] };
+/** Times the engine broke and was started again this session (see `onMessage`). */
+const MAX_RESTARTS = 3;
+let restarts = 0;
 
 function post(msg: ToVoiceWorker): void {
   worker?.postMessage(msg);
@@ -118,6 +121,14 @@ function onMessage(msg: FromVoiceWorker): void {
     waiters = [];
     unload();
     voiceStatus.state = 'error';
+    // The engine broke making a line: a new worker takes over (the game only speaks while the
+    // engine is ready; a preview starts one itself). A few times a session at most.
+    if (msg.restart && settings.voices && restarts < MAX_RESTARTS) {
+      restarts++;
+      console.warn('[voice] the voice engine failed; starting it again:', msg.message);
+      voiceStatus.state = 'off';
+      void ensureVoice().catch(() => {});
+    }
   }
 }
 
