@@ -383,6 +383,32 @@ fn feeding(w: &World, i: usize) -> bool {
 }
 
 #[test]
+fn woken_by_a_crying_baby_none_of_the_players_orders_are_dropped() {
+    let mut w = night();
+    // Ada was told to sleep, and has a full queue of orders for the morning; Ben is more tired.
+    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.tick_once();
+    for k in 0..sim_core::world::MAX_QUEUE {
+        w.apply(Command::MoveTo { sim: 0, x: 3.5 + k as f32, z: 9.5 }).unwrap();
+    }
+    w.sims[0].needs[1] = 0.9;
+    w.sims[1].needs[1] = 0.5;
+    w.sims[2].needs[0] = 0.25;
+    let orders = |w: &World| w.sims[0].queue().filter(|t| t.directed && matches!(t.kind, sim_core::world::TaskKind::MoveTo { .. })).count();
+    assert_eq!(orders(&w), sim_core::world::MAX_QUEUE);
+    let mut woken = false;
+    for _ in 0..20 * 5 {
+        w.tick_once();
+        woken |= w.sims[0].queue().any(|t| !t.directed) || feeding(&w, 0);
+        if woken {
+            break;
+        }
+    }
+    assert!(woken, "Ada was woken for the baby");
+    assert_eq!(orders(&w), sim_core::world::MAX_QUEUE, "the morning's orders are all still there");
+}
+
+#[test]
 fn a_crying_baby_wakes_one_parent_at_night_who_feeds_her_and_goes_back_to_bed() {
     let mut w = night();
     // Getting hungry: below the crying level in half an hour.

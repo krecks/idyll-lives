@@ -1888,10 +1888,11 @@ impl World {
                 end_activity(sim, content, &mut self.objects);
             }
             sim.follow_up = None;
+            let care = tasks.len();
             for task in tasks.into_iter().rev() {
                 sim.queue.push_front(task);
             }
-            sim.queue.truncate(MAX_QUEUE);
+            trim_queue(&mut sim.queue, care);
             if woken {
                 sim.night_woken = self.tick;
                 if let Some(f) = rules.feeling {
@@ -2631,6 +2632,17 @@ impl World {
             routine: false,
         });
         Ok(())
+    }
+}
+
+/// Keeps a queue within `MAX_QUEUE` by dropping what was chosen for them from the back, but
+/// never the first `keep` tasks (just put there), the player's orders, nor a recipe whose
+/// ingredients are paid for: for those, it goes over the cap.
+fn trim_queue(queue: &mut VecDeque<Task>, keep: usize) {
+    while queue.len() > MAX_QUEUE {
+        let paid = |t: &Task| matches!(t.kind, TaskKind::Cook { servings, .. } if servings > 0);
+        let Some(k) = queue.iter().rposition(|t| !t.directed && !paid(t)).filter(|&k| k >= keep) else { break };
+        queue.remove(k);
     }
 }
 
@@ -4515,6 +4527,23 @@ mod tests {
         assert!(w.sims[0].needs[0] > 0.5);
         assert_eq!(w.sims[0].tile(), front);
         assert_eq!(w.sims[0].seated_from, None);
+    }
+
+    #[test]
+    fn a_full_queue_drops_neither_orders_nor_a_paid_recipe() {
+        let task = |kind, directed| Task { kind, directed, routine: false };
+        let walk = TaskKind::MoveTo { x: 1.0, z: 1.0 };
+        let cook = |servings| TaskKind::Cook { recipe: 0, step: 1, station: None, origin: None, servings, skipped: 0, minutes: 0 };
+        let care = task(TaskKind::Use { object: 0, interaction: 1 }, false);
+        // Chosen for them, unpaid: the last of those goes.
+        let mut q: VecDeque<Task> = [care, task(walk, true), task(cook(2), false), task(walk, false), task(walk, true), task(cook(0), false), task(walk, true)].into();
+        trim_queue(&mut q, 1);
+        assert_eq!(q.len(), MAX_QUEUE);
+        assert!(matches!(q[4].kind, TaskKind::MoveTo { .. }) && q[4].directed && matches!(q[2].kind, TaskKind::Cook { servings: 2, .. }));
+        // Nothing else to drop: over the cap.
+        let mut q: VecDeque<Task> = [care, task(cook(3), false)].into_iter().chain([task(walk, true); MAX_QUEUE]).collect();
+        trim_queue(&mut q, 1);
+        assert_eq!(q.len(), MAX_QUEUE + 2);
     }
 
     #[test]
