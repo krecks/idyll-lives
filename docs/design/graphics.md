@@ -1,6 +1,6 @@
 # Graphics settings and performance
 
-*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. The target for Intel laptops below, Medium at 30 fps, is estimated from Mac measurements and not yet measured on Intel hardware; Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
+*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. On the Intel laptops below, Medium's target is 30 fps. It hasn't been measured on Intel hardware: scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
 
 Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolution.ts` (Auto resolution), `web/src/render/babylon/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
@@ -12,11 +12,11 @@ Every knob is in one table, `QUALITY` in `quality.ts`; a new knob gets a field t
 
 | Knob | Low | Medium (default) | High | What it does, and what it costs on Medium |
 |---|---|---|---|---|
-| `shadowMapSize` | 1024 | 2048 | 4096 | The sun's shadow map, texels a side. Shadows cost 1.2 ms of GPU by day and 1.5 ms at night at 2048 (WebGL2: 1.5 and 2.3 ms of the frame) and half the frame's draw calls. Each step up is four times the texels. |
+| `shadowMapSize` | 1024 | 2048 | 4096 | The sun's shadow map, texels a side. P1 measured shadows at 1.2 ms of GPU by day and 1.5 ms at night at 2048 (WebGL2: 1.5 and 2.3 ms of the frame), and half the frame's draw calls (242 of 493). Since 0.2.0 culls the casters to the map, they are about a third (146–163 of about 430). Each step up is four times the texels. |
 | `msaaSamples` | 1 (FXAA) | 4 | 4 | 4× multisampling of the HDR scene: 3.0 ms of Medium's 10.6 ms by day, about 100 MB of memory traffic a frame at 1080p (about 4.5 ms on an Intel HD 620 by P1's bandwidth model). 1 means FXAA instead, a cheap filter pass with slightly softer edges. |
 | `anisotropy` | 4 | 8 | 8 | Anisotropic filtering of floor, wall, road and ground textures. Not measured on its own. |
 | `clusteredLamps` | false | true | true | Every lamp lights (clustered lighting, up to 32), rather than the four nearest the biggest rooms. P1 measured 3.1 ms by day (every lamp dark) and 4.3 ms at night on WebGPU, 0.8 and 1.6 ms on WebGL2. Since a dark lamp leaves the cluster, the cost by day is mostly gone (G2: 8.87 → 6.49 ms by day; the night is unchanged). Low's four lamps stay in the shader by day, dark. |
-| `mirrors` | 0 | 0 | 2 | How many mirrors (the nearest the camera) reflect the room live. Each draws the world once more, about 50 MB of memory traffic a frame; the live cost wasn't measured. Each reflection target, about 56 MB of GPU memory at 1080p (0.75 of the screen, 4× MSAA), exists only while a mirror reflects, and for 10 s after. |
+| `mirrors` | 0 | 0 | 2 | How many mirrors (the nearest the camera) reflect the room live. Each draws the world once more, about 50 MB of memory traffic a frame. In the village with the benchmark's default 20 s window, High's mirror averages 50–64 extra draws and 0.5 M triangles a frame; its GPU cost was within noise except +3 ms on WebGL2 at night (it reflects for only part of the window, so inconclusive). Before 0.2.0 Medium had 1 live mirror: A/B runs against that base need `diag=nomirrors`. Each reflection target, about 56 MB of GPU memory at 1080p (0.75 of the screen, 4× MSAA), exists only while a mirror reflects, and for 10 s after. |
 | `lightingStep` | 10 | 0.5 | 0.5 | Game minutes between lighting updates at speed 3 and up and in quiet hours (slower speeds: every half minute). Each update re-colours the sun, sky and lamps and can thaw the materials for a few frames: at speed 5 that was 20 updates a second, CPU p95 4.7–6 ms against 0.3–0.4 ms. On every preset the lighting also changes at most every 100 ms of real time, 10 times a second. |
 | `lawnDensity` | 0.5 | 1 | 1 | Share of the lawn's grass tufts and flowers drawn: 0.5 keeps every other one, always the same ones, standing where they did (24,245 of the landscape's 44,655 plants). With `landscapeShadows`, on Low by day: −0.29 M triangles, −6 shadow draws, −0.5 ms of GPU (WebGPU, orbit view). |
 | `landscapeShadows` | false | true | true | The woods round the town cast shadows. The lot's own garden trees, the street and the house always do. |
@@ -29,7 +29,7 @@ The same on every preset:
 - **The shadow map's colour target is R16F**, not the RGBA16F target that nothing read (P1-05).
 - **Auto resolution** with a budget of 1920×1080 (below).
 - **The FramePacer** for the frame rate cap (below).
-- **The menus' town** is drawn at 30 fps at most.
+- **The menus' town** is drawn at about 30 fps (the cap's rounding rule for 30, below).
 - **Dark lamps leave the cluster:** a lamp that is off gets a range of 1 cm, so it covers next to no tiles (P1-02).
 - **Nature is culled in cells:** the landscape's plants are grouped by where they stand (lawn tufts in 32 m squares, flowers in 96 m squares, the woods in 8 sectors round the town), so the camera leaves out those out of view (P1-01).
 - **The sun's shadow map** draws only the casters that can reach its square round the lot, and is drawn again only when something in it changed: the light, a thing placed or moved, walls, roofs or storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame (P1-04).
@@ -45,15 +45,16 @@ Removed in 0.2.0: Ultra, Custom and the fine-tune toggles, and ambient occlusion
 
 The owner's target machines are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
 
-| Preset | 0.2.0 target | P1's estimate before 0.2.0 (§2.5.1) | Status |
-|---|---|---|---|
-| Medium | 30 fps or more | about 6–10 fps | An estimate, not yet measured on Intel hardware; not a release gate |
-| Low | none: best effort | about 9–27 fps at 75 % scale | The owner made Low at 60 fps not a 0.2.0 target |
+| Preset | 0.2.0 target | Estimate for 0.2.0, by day / at night | Estimate before 0.2.0 (P1, §2.5.1) | Status |
+|---|---|---|---|---|
+| Medium | 30 fps or more | about 10–21 / 8–13 fps | about 6–10 fps | Probably falls short; not measured on Intel hardware; not a release gate |
+| Low | none: best effort | about 14–41 / 13–39 fps | about 9–27 fps | The owner made Low at 60 fps not a 0.2.0 target |
+| High | none | about 9–17 / 7–11 fps | about 6 fps | – |
 
-- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by about 3×. The owner confirms them on real hardware with the benchmark (the release review's §5).
+- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by 2–3×; at sign-off it applied the same models to 0.2.0 (on AC power, `render.mjs --throughput`, median of 3). Only a run on a real Intel laptop settles it; the owner does that with the benchmark (the release review's §5).
+- **Medium misses 30 fps on both models.** At night it barely improved (8.84 → 7.39 ms of GPU on the M3), because lit lamps still cost: the night range cap for the lamp cluster (P1-02) wasn't done.
 - **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
-- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, WebGPU spends 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, and WebGL2 10–19 ms (54–98 fps). So on WebGPU the CPU alone also keeps Low from 60 fps there (P1-07).
-- **Since the savings nobody can see** (G2), Medium by day on the M3 Pro takes 5.60 ms of GPU a frame instead of 8.99, and Low 4.10 ms instead of 5.04 (WebGPU, orbit view; below). Nobody has run P1's Intel estimate again with these numbers: the benchmark on a real laptop will tell.
+- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, 0.2.0 allows 47–57 fps on WebGPU and 78–98 fps on WebGL2, above every GPU estimate (P1's sign-off). Before 0.2.0 WebGPU spent 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, so on WebGPU the CPU alone also kept Low from 60 fps there (P1-07).
 
 ## Resolution
 
@@ -90,7 +91,7 @@ Babylon's own cap (`engine.maxFPS`) drew once enough time had piled up since the
 - **Rounding rule:** N is the smallest divisor whose rate isn't more than a quarter above the cap (with 2 % leeway for a measured rate a little off the nominal one): `N = max(1, ceil(Hz / (cap × 1.25 × 1.02)))`. So a cap the refresh rate doesn't divide becomes a rate it does, rounded up when that's within a quarter, and down otherwise.
 - **No cap** draws every refresh.
 - **The game's clocks** run on the timestamp of the refresh a frame is drawn for, not the moment its code runs. The residents' interpolation, the step counter and the director get that timestamp, and Babylon's frame time (camera glides and inertia, clouds, wind) is measured between those timestamps, so motion advances in the same even steps the frames are shown in. The frame time is clamped to 100 ms.
-- **The menus' town** is paced at 30 fps at most (`MENU_FPS`, which the rule makes 36 on a 144 Hz display), and the flight into a game at the game's cap.
+- **The menus' town** is paced at about 30 fps (`MENU_FPS` through the same rule, as in the Cap 30 column below: 36 on a 144 Hz display, 37.5 on 75 Hz), and the flight into a game at the game's cap.
 
 Frame rates the pacer gives:
 
@@ -175,18 +176,21 @@ The HD 620 estimate scales these: T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, wit
 - Medium's 18 reference shots differ from P1's baseline in under 0.15 % of their pixels: only the far road's lane markings (P1-17) and one mirror that Medium no longer reflects live.
 - The menus' town at 30 fps: main thread 20 → 14 % busy, 45 → 24 % at 3× CPU slow-down.
 
-**G2, the savings nobody can see** (the whole branch against a428263, production build, median of 3 interleaved runs; each change's own tables are in its commit body, and in the release review's §3.5.1):
+**0.2.0 against the review's start** (P1's sign-off, on AC power: base 44809e7, which is 4cde174 plus the benchmark tooling, with `diag=nomirrors` on Medium, against 5f72a7c; `render.mjs --throughput`, median of 3 alternating runs; WebGPU GPU is the pass span, WebGL2 the frame p50):
 
-| Preset, light | WebGPU | WebGL2 |
-|---|---|---|
-| Medium, orbit by day | GPU 8.99 → 5.60 ms, 84 → 146 fps | frame 8.16 → 6.18 ms |
-| Medium, orbit at night | 78 → 103 fps | frame 8.02 → 6.98 ms |
-| Medium, dusk | GPU 9.35 → 7.93 ms | 121 → 137 fps |
-| Medium, wide | GPU 6.91 → 6.10 ms | 132 → 138 fps |
-| Low, orbit by day | GPU 5.04 → 4.10 ms | 157 → 205 fps |
-| Low, orbit at night | GPU 5.60 → 4.14 ms | 155 → 185 fps |
-| Low, dusk | GPU 5.52 → 4.28 ms | 155 → 195 fps |
-| Low, wide | GPU 5.35 → 4.74 ms | 159 → 190 fps |
+| Preset, light | WebGPU fps | WebGPU GPU ms | WebGL2 fps | WebGL2 frame ms | Draws: main / shadow / mirror | Triangles M | Render targets MB |
+|---|---|---|---|---|---|---|---|
+| Low, day | 113 → 155 | 6.02 → 4.32 | 161 → 198 | 6.19 → 4.74 | 252/242/0 → 276/146/0 | 6.03 → 3.43 | 120 → 64 |
+| Low, night | 113 → 154 | 6.16 → 4.53 | 153 → 179 | 6.31 → 5.19 | 253/242/0 → 278/157/0 | 6.03 → 3.49 | 129 → 73 |
+| Medium, day | 89 → 144 | 8.73 → 5.58 | 122 → 160 | 8.11 → 5.61 | 252/242/0 → 277/152/0 | 6.03 → 3.71 | 216 → 141 |
+| Medium, night | 82 → 107 | 8.84 → 7.39 | 113 → 157 | 8.38 → 5.59 | 253/242/0 → 278/163/0 | 6.03 → 3.77 | 225 → 150 |
+| High, day | 78 → 132 | 10.23 → 6.06 | 107 → 157 | 8.46 → 5.40 | 252/242/49 → 276/152/50 | 6.75 → 4.22 | 216 → 217 |
+| High, night | 80 → 91 | 8.62 → 8.24 | 116 → 108 | 8.02 → 8.11 | 253/242/48 → 277/163/54 | 6.73 → 4.31 | 225 → 225 |
+
+- High isn't like for like: the base had 2048 shadows. G2's own whole-branch table may include runs on battery; these numbers take precedence.
+- **The processor's side:** these are GPU savings. At 3× CPU slow-down P1's sign-off found no CPU gain in play (8 of 12 cells 0.6–3.9 ms a frame worse): the nature cells add main-pass draws (+10 % in the orbit, +21 % in the wide view) while the shadow pass drops by 79–96. G3 is working on it. *(G3's numbers to come.)* <!-- G3 -->
+
+**G2, step by step** (each change against the one before, production build, median of 3 interleaved runs; each change's own tables are in its commit body, and in the release review's §3.5.1):
 
 | Change | What it saved (Medium unless said; against the step before) |
 |---|---|
@@ -194,7 +198,7 @@ The HD 620 estimate scales these: T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, wit
 | Nature in cells | WebGPU orbit by day: GPU 6.08 → 5.17 ms, triangles 6.01 → 4.56 M (draws 493 → 538) |
 | Shadow casters culled to the map | Draws 540 → 429 (shadow 262 → 152), shadow triangles 1.70 → 0.81 M, 140 → 148 fps |
 | Shadow map drawn only when something moved | Build mode (paused): GPU 8.54 → 4.96 ms, shadow draws 152 → 0; live play with residents in view unchanged |
-| Lighting at most 10 times a second | Dusk at speed 5: lighting updates 20.1 → 9.7 a second; with the CPU slowed 3×, WebGL2 frame CPU 13.39 → 12.15 ms (65 → 72 fps) |
+| Lighting at most 10 times a second | Dusk at speed 5: lighting updates 20.1 → 9.7 a second |
 | Pose rows of the residents in view | Residents' update 0.17 → 0.14 ms; frame CPU within noise |
 | Nothing drawn behind full-screen menus | The pause menu: every frame → 0; the menus' town behind Settings: 60 → 0 frames a second. Each held frame saves about 6 ms of main thread and 5 ms of GPU (orbit by day) |
 | Low's half lawn and no woods' shadows | Low, WebGPU orbit by day: GPU 4.51 → 4.03 ms, triangles 3.73 → 3.44 M |
