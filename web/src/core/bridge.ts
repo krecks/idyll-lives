@@ -83,11 +83,16 @@ export class SimBridge {
   static start(content: string, source: GameSource): Promise<SimBridge> {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
-      worker.onerror = (e) => reject(new Error(e.message || 'sim worker failed to start'));
+      // A start that failed doesn't leave its worker (and the simulation's memory) behind.
+      const failed = (message: string) => {
+        worker.terminate();
+        reject(new Error(message));
+      };
+      worker.onerror = (e) => failed(e.message || 'sim worker failed to start');
       worker.onmessage = (e: MessageEvent<FromWorker>) => {
         const msg = e.data;
         if (msg.type === 'ready') resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
-        else if (msg.type === 'error') reject(new Error(msg.message));
+        else if (msg.type === 'error') failed(msg.message);
       };
       worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
     });
