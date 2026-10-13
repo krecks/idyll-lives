@@ -168,7 +168,7 @@ The main thread's only rendering job is to upload the snapshot and **replay pre-
 - **Workers:** the game's own are the simulation, the voices, the language model and the water sounds; no asset worker was built. Saves are kept in IndexedDB, not OPFS.
 - **Drawing:** the game draws live. Snapshot rendering only replays the menus' town (above).
 - **Hosting:** GitHub Pages can't send the isolation headers, so a service worker (`public/isolation-sw.js`) adds them.
-- **The UI's transitions:** the release review found that CSS transitions on the progress and need bars did force per-frame style and layout (P2-01). *(pending: M1's fix.)* <!-- M1 -->
+- **The UI's transitions:** the release review found that CSS transitions of the bars' width forced style, layout and paint on every display refresh (P2-01). Since 0.2.0 the bars move by transform, which the compositor animates: layouts went from about 108 to 11 a second at speed 5. Chrome still recalculates style each frame for running CSS animations, about 0.13 ms a frame on an M3 Pro (the release review's §4).
 
 ---
 
