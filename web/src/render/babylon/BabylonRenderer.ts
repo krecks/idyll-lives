@@ -116,6 +116,12 @@ const HIDDEN_Y = -100;
 const PIT_MARGIN = 0.3;
 /** Height of the fence and gate preview while drawing. */
 const FENCE_PREVIEW_HEIGHT = 1.0;
+/**
+ * Frames per second at most for the menus' town: it moves slowly, and drawn at the display's rate
+ * it kept the main thread as busy as play (87 % at 3× CPU slow-down, P2-08). Paced like the cap
+ * (`pacing.ts`): 30 on 60 and 120 Hz displays, 36 on 144 Hz.
+ */
+const MENU_FPS = 30;
 /** Game minutes between lighting updates (with / without snapshot rendering; at speed 3 and up and in quiet hours, the quality's `lightingStep`). */
 const LIGHT_STEP = 0.5;
 const LIGHT_STEP_SNAPSHOT = 5;
@@ -288,6 +294,8 @@ export class BabylonRenderer implements Renderer {
   // Town overview (menus), on its own camera layer; see `showTown`.
   private overview: TownOverview | null = null;
   private townMode = false;
+  /** The camera is flying from the overview into the game (drawn at the game's frame rate). */
+  private flyingIn = false;
   /** Overview lighting: the minute shown and the one it eases towards. */
   private townMinute = 18 * 60;
   private townMinuteGoal = 18 * 60;
@@ -503,7 +511,7 @@ export class BabylonRenderer implements Renderer {
     this.unwatchPixelRatio = watchPixelRatio(this.onResize);
     // Screenshots that compare pixel for pixel: wind, clouds, fades and glides stand still.
     if (this.diag.has('freeze')) this.engine.getDeltaTime = () => 0;
-    this.pacer.setCap(this.options.fpsCap);
+    this.applyPacing();
     this.engine.customAnimationFrameRequester = this.pacer;
     this.timeFramesByRefresh();
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
@@ -975,7 +983,7 @@ export class BabylonRenderer implements Renderer {
     this.camera.panningSensibility = 90 / s;
     this.camera.wheelDeltaPercentage = 0.012 * s;
     // Frames are paced in whole display refreshes (`pacing.ts`), not by Babylon's `maxFPS`.
-    this.pacer.setCap(this.options.fpsCap);
+    this.applyPacing();
     const still = (this.reducedMotion = !!options.reducedMotion);
     setWind(this.scene, still ? 0 : 1);
     this.characters.reducedMotion = still;
@@ -1947,6 +1955,8 @@ export class BabylonRenderer implements Renderer {
     const rig = this.overview?.rig;
     if (glide > 0 && rig && this.active) {
       const p = this.parked;
+      this.flyingIn = true;
+      this.applyPacing();
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, glide * 1000 + 600);
         rig.glideTo({ alpha: p.alpha, beta: p.beta, radius: p.radius, x: p.target.x, z: p.target.z }, glide, () => {
@@ -1954,8 +1964,10 @@ export class BabylonRenderer implements Renderer {
           resolve();
         });
       });
+      this.flyingIn = false;
     }
     if (this.townMode) this.leaveTown();
+    this.applyPacing();
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -1988,6 +2000,7 @@ export class BabylonRenderer implements Renderer {
   private enterTown(): void {
     const cam = this.camera;
     this.townMode = true;
+    this.applyPacing();
     this.applyDig();
     copyPose(cam, this.parked);
     cam.detachControl();
@@ -3517,6 +3530,13 @@ export class BabylonRenderer implements Renderer {
       engine._fps = monitor.averageFPS;
       engine._deltaTime = monitor.instantaneousFrameTime || 0;
     };
+  }
+
+  /** The frame rate cap, and in the menus at most `MENU_FPS` (not while the camera flies into the game). */
+  private applyPacing(): void {
+    const cap = this.options.fpsCap;
+    const menu = this.townMode && !this.flyingIn;
+    this.pacer.setCap(menu ? (cap > 0 ? Math.min(cap, MENU_FPS) : MENU_FPS) : cap);
   }
 
   /**
