@@ -139,7 +139,8 @@ async function check(content: string, save: string): Promise<void> {
 
 /**
  * Why `Game.fromSave` failed: what the simulation found wrong with the save, or a trap while it
- * loaded (a save that breaks the loader counts as damaged). No problem: the save isn't to blame.
+ * loaded (`failed`: the save is kept, since a loader bug would otherwise remove good saves one by
+ * one). No problem: the save isn't to blame.
  */
 function refusal(err: unknown): { message: string; problem: SaveProblem | null } {
   if (err instanceof LoadError) {
@@ -147,7 +148,7 @@ function refusal(err: unknown): { message: string; problem: SaveProblem | null }
     err.free();
     return out;
   }
-  return { message: err instanceof Error ? err.message : String(err), problem: err instanceof WebAssembly.RuntimeError ? 'corrupt' : null };
+  return { message: err instanceof Error ? err.message : String(err), problem: err instanceof WebAssembly.RuntimeError ? 'failed' : null };
 }
 
 function runLoop(stepMs: number): void {

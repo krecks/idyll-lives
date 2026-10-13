@@ -784,9 +784,10 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 
 /**
  * Why a save can't be opened: it's from a newer version of the game (kept), from a version
- * too old to read, or damaged (both removed).
+ * too old to read, or damaged (both removed), or the simulation failed while loading it (kept:
+ * that may be the loader's fault rather than the save's, and a later version may open it).
  */
-export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt';
+export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
   | { type: 'init'; content: string; source: GameSource }

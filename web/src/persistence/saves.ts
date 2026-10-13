@@ -25,6 +25,8 @@ export interface SaveMeta {
   game?: string;
   /** This version of the game (`__APP_VERSION__`) found the save to be from a newer one: kept, not offered. */
   tooNewFor?: string;
+  /** This version of the game failed while loading the save: kept (it can be exported), not offered; a later version tries again. */
+  failedIn?: string;
 }
 
 export interface SaveRecord extends SaveMeta {
@@ -165,7 +167,7 @@ export async function deleteSave(id: string): Promise<void> {
 
 /** Whether Continue may offer the save (it isn't known to be unloadable). */
 export function playable(save: SaveMeta): boolean {
-  return !refused.has(save.id) && save.tooNewFor !== __APP_VERSION__;
+  return !refused.has(save.id) && save.tooNewFor !== __APP_VERSION__ && save.failedIn !== __APP_VERSION__;
 }
 
 /** The newest save Continue can open. */
@@ -181,13 +183,15 @@ export async function nextAutosaveId(game: string): Promise<string> {
 }
 
 /**
- * Sets aside a save the game couldn't open: one from a newer version is kept (and no longer
- * offered by this version), a too old or damaged one is removed. Returns the notice for players.
+ * Sets aside a save the game couldn't open: one from a newer version, or one the simulation failed
+ * to load, is kept (and no longer offered by this version); a too old or damaged one is removed.
+ * Returns the notice for players.
  */
 export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<string> {
   refused.add(save.id);
   try {
     if (problem === 'tooNew') await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), tooNewFor: __APP_VERSION__ }));
+    else if (problem === 'failed') await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), failedIn: __APP_VERSION__ }));
     else await deleteSave(save.id);
   } catch (err) {
     console.warn('[saves] could not set aside an unloadable save', err);
@@ -199,6 +203,7 @@ export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<
 function problemNotice(problem: SaveProblem, name: string): string {
   if (problem === 'tooNew') return `“${name}” is from a newer version of Idyll Lives, so this version can't open it. It's been kept.`;
   if (problem === 'tooOld') return `“${name}” is from a version of Idyll Lives too old to open, so it was removed.`;
+  if (problem === 'failed') return `This version of Idyll Lives couldn't open “${name}”. It's been kept: you can export it from Load game.`;
   return `“${name}” is damaged and can't be opened, so it was removed.`;
 }
 
@@ -206,6 +211,7 @@ function problemNotice(problem: SaveProblem, name: string): string {
 export function importProblemText(problem: SaveProblem): string {
   if (problem === 'tooNew') return "This save is from a newer version of Idyll Lives, so this version can't open it.";
   if (problem === 'tooOld') return 'This save is from a version of Idyll Lives too old to open.';
+  if (problem === 'failed') return "This version of Idyll Lives couldn't open this save.";
   return "This save is damaged and can't be opened.";
 }
 

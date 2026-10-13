@@ -96,7 +96,7 @@
           <b>{s.name}</b>
           <span>{s.members.join(', ')}</span>
           <span class="when">Day {s.day} · {clock(s.minute, settings.clock24h)} · saved {timeAgo(s.savedAt)}</span>
-          {#if !playable(s)}<span class="newer">Needs a newer version of Idyll Lives</span>{/if}
+          {#if !playable(s)}<span class="newer">{s.failedIn ? "This version couldn't open it" : 'Needs a newer version of Idyll Lives'}</span>{/if}
         </div>
         <div class="actions">
           {#if confirmDelete === s.id}
