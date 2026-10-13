@@ -154,7 +154,7 @@ To ship a whole art set without editing the base manifest, create a pack and lis
 { "version": 1, "entries": { "icon.need.hunger": { "type": "icon", "url": "icons/hunger.png", "mode": "image" } } }
 ```
 
-Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
+Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object in Blender (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
 
 ## Adding gameplay content
 

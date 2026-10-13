@@ -21,7 +21,9 @@
     "packs/loner/manifest.json",
     "packs/romantic/manifest.json",
     "packs/hotHeaded/manifest.json",
-    "packs/kind/manifest.json"
+    "packs/kind/manifest.json",
+    "packs/gardenDecor/manifest.json",
+    "packs/kitchen/manifest.json"
   ],
   "entries": {
     "material.wall": {

@@ -24,6 +24,9 @@ Run Python with `-I` (isolated mode); downloads are treated as data only.
 | `community.py` | The town's community things (`content/community.json`: street furniture, playground, food carts and vending machines, shop and café fittings) and the street dressing props (`model.street.*`, drawn as thin instances by `render/babylon/street.ts`), all primitive parts with at most four finishes each; writes `web/public/assets/community/manifest.json` (in the base manifest's `packs`). Validates footprints and finishes |
 | `catalog2.py` | The second catalogue's models (`content/catalog2/*.json`: separate tables and chairs, counters, sectional pieces, beds, tabletop things, lamps, garden things), all primitive parts; writes `web/public/assets/catalog2/manifest.json` (in the base manifest's `packs`). Things on the `surface` layer stand on y = 0 at their middle (the game lifts them onto their top). Also records each model's top (`TOPS`: rectangle and height), seat (`SEATS`) and bulb height (`LIGHTS`), with `surface_of`, `seat_of`, `radius_of` to keep the content's `surface`, `seat` and `radius` in line with the drawing. Validates footprints, tops and finishes (at most 4 per model) |
 | `apply_pack.py <trait> <entries.json>` | Merges entries into `web/public/assets/packs/<trait>/manifest.json` in place |
+| `blender/gamekit.py` | Shared Blender toolkit for the hand-built glTF models: `reset`, `mat`, `cube`/`sphere`/`cylinder`/`cone`/`torus`/`revolve`/`rock`, `rod`, `join_all`, `fit` (scale into an exact w×h×d box, bottom on the floor), `export_glb` (glTF, y up, front +Z), `stats` and `preview` |
+| `blender/garden_decor.py` | Real GLB garden decor (`model.garden.*`): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders, built from meshes and exported to `web/public/assets/models/garden/`. `-- --preview` renders them instead of exporting |
+| `blender/check_glb.py` | The gate for glTF models (plain Python, no Blender): checks every `.glb` the manifests use against its entry (origin and size, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error. Inside Blender, `-- --preview` also re-imports each file and renders it to `previews/rt_<name>.png` |
 
 Nature and garden flow: `python3 -I -B nature.py ../../web/public/assets/manifest.json`. To look at the results without
 starting a game, run `pnpm dev` and open `/gallery.html` (dev only): it draws models in a grid with the game's loader,
@@ -35,3 +38,13 @@ Typical flow: download → `process.py` → copy into `web/public/assets/texture
 Furniture flow: `catalog.py`, `catalog2.py` and `community.py` write their own manifests; `furniture.py` and
 `pack_<trait>.py` → `apply_entries.py` / `apply_pack.py`. Every model is primitive parts (`placeholder`), including the
 shapes `lathe` (`profile`) and `torus`, drawn by `render/babylon/models.ts`.
+
+Blender flow (real glTF art): `blender/garden_decor.py` builds its models with `blender/gamekit.py` and exports
+`.glb` files into `web/public/assets/models/garden/`. The override pack `web/public/assets/packs/gardenDecor/manifest.json`
+(added to the base manifest's `packs`) maps each `model.garden.*` key to its file and keeps the old `placeholder` as a
+fallback; its `materials` map each file's materials onto the game's finishes, so a model costs one draw call per
+finish group like the primitive models. `tools/assets/optimize.mjs` makes the meshopt copy for the build. Run
+`/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/blender/garden_decor.py`
+(Blender 5.2 LTS; add `-- --preview` to render the models instead of exporting), then
+`python3 -I -B tools/art/blender/check_glb.py` and the Khronos glTF validator. How to build a new object this way:
+[docs/design/objects.md](../../docs/design/objects.md).
