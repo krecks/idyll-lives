@@ -3590,6 +3590,8 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     let Some(act) = sim.current.as_mut() else {
         return;
     };
+    // A use that ends on its first step, short of its time: given up straight away (see `after`).
+    let mut given_up = false;
     let finished = match &mut act.phase {
         // Waiting at the door; `life::doors` lets them in or sends them home.
         Phase::Knocking { ticks: waited, .. } => {
@@ -3643,6 +3645,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             false
         }
         Phase::Using { elapsed } => {
+            let first = *elapsed == 0.0;
             *elapsed += minutes;
             let elapsed = *elapsed;
             match act.task.kind {
@@ -3652,6 +3655,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 } => {
                     let urgent = urgent_needs(sim, ctx, objects);
                     let done = use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
+                    given_up = done && first && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| elapsed < i.minutes);
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
                     if done {
@@ -3742,7 +3746,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                         return;
                     }
                 } else if inter.after != 0 {
-                    sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                    // (Not after a use given up the moment it began: no hands to wash after a toilet
+                    // visit that didn't happen.)
+                    if !given_up {
+                        sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                    }
                 } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
                     // Up: the toilet first, out of habit.
                     sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);

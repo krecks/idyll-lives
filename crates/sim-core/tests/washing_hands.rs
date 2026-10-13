@@ -87,6 +87,26 @@ fn after_the_toilet_hands_are_washed_at_the_nearest_sink() {
 }
 
 #[test]
+fn a_toilet_visit_given_up_at_once_has_no_hand_washing_after() {
+    let mut w = world();
+    let toilet = buy(&mut w, "toilet", 3, 3);
+    buy(&mut w, "sink", 5, 3);
+    // Sent with nothing to go for: off the toilet the moment they're on it.
+    let bladder = need(&w, "bladder");
+    w.sims[0].needs[bladder] = 1.0;
+    let use_it = w.content.objects[w.objects[toilet as usize].def].interactions.iter().position(|i| i.id == "use").unwrap();
+    w.apply(Command::Use { sim: 0, object: toilet, interaction: use_it }).unwrap();
+    let mut sat = 0;
+    for _ in 0..(10.0 / MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        sat += usize::from(using(&w).is_some_and(|(o, _)| o == toilet));
+        assert!(using(&w).is_none_or(|(o, _)| o == toilet), "went to wash their hands after a toilet visit that didn't happen");
+    }
+    assert!((1..=2).contains(&sat), "on the toilet for {sat} ticks");
+    assert!(w.sims[0].current().is_none() && w.sims[0].queue().next().is_none());
+}
+
+#[test]
 fn without_a_sink_nothing_follows_the_toilet() {
     let mut w = world();
     let toilet = buy(&mut w, "toilet", 3, 3);
