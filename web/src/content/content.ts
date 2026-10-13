@@ -5,6 +5,7 @@
  */
 
 import { withBuild } from '../assets/build';
+import { bundled } from '../assets/bundle';
 
 export interface NeedDef {
   id: string;
@@ -915,7 +916,10 @@ export function mergeDeep(a: Json, b: Json): Json {
   return out;
 }
 
+/** A file's text: from the build's bundle (`assets/bundle.ts`) when it's there, else fetched. */
 export async function fetchText(url: string): Promise<string> {
+  const text = await bundled(url);
+  if (text !== null) return text;
   const res = await fetch(withBuild(url));
   if (!res.ok) throw new Error(`failed to load ${url}: ${res.status}`);
   return res.text();

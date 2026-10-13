@@ -234,6 +234,48 @@ function minifiedManifests(): Plugin {
   };
 }
 
+/**
+ * `bundle.json`: what every start fetches from public/ in one file (src/assets/bundle.ts):
+ * `content/base.json` and the files it includes, the house templates, the asset manifests and the
+ * packs they list, and the index of compressed copies; each file's text, minified, by its path
+ * below the base URL. The files still ship one by one beside it.
+ */
+function dataBundle(): Plugin {
+  let outDir = '';
+  return {
+    name: 'data-bundle',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const files: Record<string, string> = {};
+      /** Adds a file below public/ (or `from`); returns its JSON. */
+      const add = async (path: string, from = join(fileURLToPath(new URL('./public/', import.meta.url)), path)) => {
+        const json = JSON.parse(await readFile(from, 'utf8')) as Record<string, unknown>;
+        files[path] = JSON.stringify(json);
+        return json;
+      };
+      // As Content.load and AssetRegistry.load resolve them: relative to the file that lists them.
+      const relative = (path: string, name: string) => new URL(name, `http://x/${path}`).pathname.slice(1);
+      const base = await add('content/base.json');
+      for (const name of (base.include as string[] | undefined) ?? []) await add(relative('content/base.json', name));
+      await add('content/houses.json');
+      await add('content/housegen.json');
+      const manifests = async (path: string): Promise<void> => {
+        const manifest = await add(path);
+        for (const pack of (manifest.packs as string[] | undefined) ?? []) await manifests(relative(path, pack));
+      };
+      await manifests('assets/manifest.json');
+      if (process.env.LL_ASSETS !== 'source') {
+        const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
+        await add('assets/optimized.json', join(tool.OUT, 'optimized.json'));
+      }
+      await writeFile(join(outDir, 'bundle.json'), JSON.stringify(files));
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -282,7 +324,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation },

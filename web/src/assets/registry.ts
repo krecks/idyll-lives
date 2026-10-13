@@ -9,6 +9,7 @@
  */
 
 import { withBuild, withoutBuild } from './build';
+import { bundled } from './bundle';
 import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
 
 const URL_FIELDS = ['url', 'texture'] as const;
@@ -57,9 +58,9 @@ export class AssetRegistry {
 
 /** A manifest followed by the packs it lists (depth first, in order), fetched in parallel. */
 async function fetchManifests(url: URL): Promise<[URL, Manifest][]> {
-  const res = await fetch(withBuild(url.href));
-  if (!res.ok) throw new Error(`failed to load asset manifest ${url}: ${res.status}`);
-  const manifest = (await res.json()) as Manifest;
+  const manifest = await readJson<Manifest>(url, (res) => {
+    if (!res.ok) throw new Error(`failed to load asset manifest ${url}: ${res.status}`);
+  });
   const packs = await Promise.all((manifest.packs ?? []).map((pack) => fetchManifests(new URL(pack, url))));
   return [[url, manifest], ...packs.flat()];
 }
@@ -70,14 +71,23 @@ const optimized = new Map<string, string>();
 /** Reads the build's index of compressed copies (there is none on the dev server). */
 async function loadOptimized(base: URL): Promise<void> {
   try {
-    const res = await fetch(withBuild(new URL('optimized.json', base).href));
-    // (The dev server answers a missing file with its index page.)
-    if (!res.ok || !res.headers.get('content-type')?.includes('json')) return;
-    const index = (await res.json()) as { files?: Record<string, string> };
+    const index = await readJson<{ files?: Record<string, string> }>(new URL('optimized.json', base), (res) => {
+      // (The dev server answers a missing file with its index page.)
+      if (!res.ok || !res.headers.get('content-type')?.includes('json')) throw new Error('no index');
+    });
     for (const [file, copy] of Object.entries(index.files ?? {})) optimized.set(new URL(file, base).href, new URL(copy, base).href);
   } catch {
     // No index: everything loads from its source file.
   }
+}
+
+/** A JSON file from the build's bundle (`bundle.ts`), else fetched; `check` vets the response. */
+async function readJson<T>(url: URL, check: (res: Response) => void): Promise<T> {
+  const text = await bundled(url.href);
+  if (text !== null) return JSON.parse(text) as T;
+  const res = await fetch(withBuild(url.href));
+  check(res);
+  return (await res.json()) as T;
 }
 
 /** The file to fetch for an asset URL: its compressed copy when the build made one. */
