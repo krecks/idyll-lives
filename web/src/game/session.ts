@@ -540,7 +540,12 @@ export async function startSession(
         play('rotate');
       } else if (game.buySelection !== null) {
         const obj = game.objects.find((o) => o.id === game.buySelection);
-        if (obj) bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turned(obj.def, obj.rot, obj.turn ?? 0), seen: seenAt(game.objects, obj.id) });
+        if (obj) {
+          const turn = turned(obj.def, obj.rot, obj.turn ?? 0);
+          bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turn, seen: seenAt(game.objects, obj.id) });
+          // (A move renumbers it: the selection follows it to its new id.)
+          buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: turn.rot });
+        }
       }
     },
     cancelPlacing() {
@@ -560,6 +565,8 @@ export async function startSession(
     undo() {
       // The step count follows a little later; don't send more undos than there are steps.
       if (game.mode !== 'build' || game.undoSteps <= 0) return;
+      // (It renumbers objects: something carried goes back first.)
+      buildBuy.dropOwned();
       game.undoSteps--;
       game.buildStart = null;
       game.buySelection = null;
@@ -568,6 +575,7 @@ export async function startSession(
     },
     redo() {
       if (game.mode !== 'build' || game.redoSteps <= 0) return;
+      buildBuy.dropOwned();
       game.redoSteps--;
       game.buildStart = null;
       game.buySelection = null;
@@ -584,6 +592,7 @@ export async function startSession(
       // Back to its kind's footprint from the same corner (the simulation refuses it if that doesn't fit).
       const [w, d] = def.footprint ?? [1, 1];
       bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0, seen: seenAt(game.objects, obj.id) });
+      buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: obj.rot });
     },
     setHouseholdStyle(style) {
       bridge.send({ type: 'setStyle', household: game.home, style });

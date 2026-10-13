@@ -774,6 +774,16 @@ export class BuildBuyInput {
     this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
   }
 
+  /** A move sent from elsewhere (rotate, reset size): once it lands, the object it renumbered is picked again. */
+  reselectAt(at: { def: string; x: number; z: number; rot: number }): void {
+    this.reselect = at;
+  }
+
+  /** Before undo or redo (they renumber objects): an owned object in hand (carried, dragged or resized) goes back; a new purchase stays on the cursor. */
+  dropOwned(): void {
+    if (this.resizing || this.dragging || game.placing?.objectId != null) this.cancel();
+  }
+
   /** A new structure arrived: picks again what an edit renumbered. */
   objectsChanged(): void {
     const r = this.reselect;
