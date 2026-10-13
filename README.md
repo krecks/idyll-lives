@@ -43,7 +43,7 @@ From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI 
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`tools/release/wasm-opt.mjs`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
 - writes `bundle.json`: the content, house templates and asset manifests every start needs, in one file. The files still ship one by one beside it;
 - writes `THIRD-PARTY-LICENSES.txt` with the licences of the code it bundles, and fails if one is missing;
-- gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release never mixes with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out.
+- gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release's data doesn't mix with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out, and `index.html` itself isn't versioned (Pages lets the browser keep it for 10 minutes).
 
 **Hosting:** the game needs cross-origin isolation for its fastest path (the simulation's snapshots in shared memory). The dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages can't, so `index.html` registers a service worker (`public/isolation-sw.js`) that adds the headers, and the page loads once more under it. The worker also keeps the build's hashed files (`assets/<name>-<hash>.js`, `.css`, `.wasm`, `.woff2`) in a cache of the build's own, so returning players load them without asking the server again; a new build's worker deletes the old cache. Without isolation the game still runs, but snapshots are copied instead of shared.
 
@@ -85,7 +85,7 @@ From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI 
 | F3 | Performance overlay (with *Save debug report*) |
 | F8 | Save a debug report: screenshot, game state, settings, the build's version and commit, and recent errors. With `pnpm dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
 
-**Graphics:** Settings › Performance has three presets. Medium is the default and the game's intended look; Low is for older laptops (FXAA, 1024 shadows, the four lamps nearest the biggest rooms, half the lawn's tufts and flowers, no shadows from the woods round the town); High adds 4096 shadows and two live mirrors. Resolution is Auto (the screen's own pixels up to about 1920×1080, scaled up beyond) or Custom (50–100 %), and the frame rate cap (60 by default) is paced in whole display refreshes. On laptops with Intel HD 620/530 graphics at 1080p, the target is Medium at 30 fps: an estimate from Mac measurements, not yet measured on Intel hardware. Low there is best effort, with no frame-rate target. Every knob, its cost, and the benchmark: [docs/design/graphics.md](docs/design/graphics.md).
+**Graphics:** Settings › Performance has three presets. Medium is the default and the game's intended look; Low is for older laptops (FXAA, 1024 shadows, the four lamps nearest the biggest rooms, half the lawn's tufts and flowers, no shadows from the woods round the town); High adds 4096 shadows and two live mirrors. Resolution is Auto (the screen's own pixels up to about 1920×1080, scaled up beyond) or Custom (50–100 %), and the frame rate cap (60 by default) is paced in whole display refreshes. On laptops with Intel HD 620/530 graphics at 1080p, Medium's target is 30 fps. It hasn't been measured on Intel hardware: scaled from Mac measurements, Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low there is best effort, with no frame-rate target. Every knob, its cost, and the benchmark: [docs/design/graphics.md](docs/design/graphics.md).
 
 URL options:
 
@@ -176,12 +176,18 @@ The current version is **0.2.0**. One version number covers the whole game: `web
 Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 23 since 0.2.0 (0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
-1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too), and a `## <x.y.z> — <date>` section in CHANGELOG.md. Commit both on `main`.
-2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
-3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish.
-4. Check the live site: the menu shows the new version, F3 shows Shared memory: on, and a game runs.
+1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
+3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
+4. Check the live site:
+   - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
+   - F3 shows Shared memory: on, and a game runs.
+   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 255,530,880 bytes (gunzipped, its SHA-256 is the one in `tools/llm/fetch.mjs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,568,968 bytes.
+5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-Each CI run keeps the WASM with its function names as an artifact for 90 days, to read the stack of a crash report (the site's WASM is stripped).
+**If a release goes wrong,** fix forward or redeploy the last good 0.2.x (`gh workflow run pages.yml --ref <tag> -f deploy=true`), not v0.1.0: 0.2.0 upgrades the browser's saves database to version 2, which v0.1.0 can't open, so it would list no saves and couldn't save. Nothing is lost; the saves come back with any 0.2.x.
+
+Each CI run keeps a WASM with function names as an artifact for 90 days. It is the un-optimised file, so its function numbers don't match a crash stack from the site (whose WASM is optimised and stripped).
 
 ## Licence
 

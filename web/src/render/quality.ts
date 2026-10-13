@@ -17,8 +17,9 @@ export type GraphicsPreset = 'low' | 'medium' | 'high';
 export interface QualitySettings {
   /**
    * Size of the sun's shadow map (texels a side). Shadows cost 1.2 ms by day and 1.5 ms at night at
-   * 2048 (WebGL2: 1.5 / 2.3 ms of the frame), and half the frame's draw calls. Each step up is four
-   * times the texels: 1024 is blurrier, 4096 sharper.
+   * 2048 (WebGL2: 1.5 / 2.3 ms of the frame), measured before 0.2.0 culled the casters to the map and
+   * redrew it only when something in it moves (now about a third of the frame's draw calls in play,
+   * none while nothing moves). Each step up is four times the texels: 1024 is blurrier, 4096 sharper.
    */
   shadowMapSize: number;
   /**
@@ -34,7 +35,8 @@ export interface QualitySettings {
   anisotropy: number;
   /**
    * Every lamp lights (clustered lighting, up to 32) rather than the four nearest the biggest
-   * rooms. 3.1 ms by day (every lamp dark) and 4.3 ms at night on WebGPU; 0.8 / 1.6 ms on WebGL2.
+   * rooms. At night 4.3 ms on WebGPU and 1.6 ms on WebGL2; by day about nothing, since 0.2.0 leaves
+   * dark lamps out of the cluster (before: 3.1 / 0.8 ms with every lamp dark).
    */
   clusteredLamps: boolean;
   /**

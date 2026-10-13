@@ -902,7 +902,9 @@ can be reached from the street.
 ## What content is refused
 
 Since 0.2.0 the simulation refuses content that would break the game when it loads, with the
-file, the id and the problem in the message (`crates/sim-core/src/content.rs`; one test case per
+id and the rule in the message, for example `lazy: walkSpeed 0 must be above 0`. The checks run
+on the merged content, so they don't name a file; only errors while merging the files do
+(`crates/sim-core/src/content.rs`; one test case per
 rule in `refuses_content_that_would_break_the_game`). Unknown keys are still ignored, because UI-only
 keys share these objects. The rules:
 
@@ -921,7 +923,10 @@ keys share these objects. The rules:
 | Times that become ticks: feelings' `hours`, interaction and social `minutes`, the commute, accident cooldowns and grace, the baby's quiet spell, cooking invitations and station waits | numbers (a value too large for a float, such as `1e39`, reads as infinity and is refused) | an infinite time overflowed the tick count |
 
 At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
-whatever the content says; a score that isn't a number is never chosen.
+whatever the content says; a score that isn't a number is never chosen. The hours of the
+once-a-day events are kept to 0–23.9 instead of being refused: rent (`economy.rent.hour`), the job
+market (`careerRules.market.hour`), the planner's review (`planner.reviewHour`), moving and
+newcomers. At 24 or later they would never come round.
 
 ## Checking a pack
 

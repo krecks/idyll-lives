@@ -281,7 +281,7 @@ pub(crate) fn parse(
         kept_feeling: feeling(&planner.kept_feeling, "planner")?,
         no_place_feeling: feeling(&planner.no_place_feeling, "planner")?,
         goal_feeling: feeling(&planner.goal_feeling, "planner")?,
-        review_hour: planner.review_hour.unwrap_or(d.review_hour),
+        review_hour: planner.review_hour.unwrap_or(d.review_hour).clamp(0.0, 23.9),
         max_goals: planner.max_goals.unwrap_or(d.max_goals),
         max_suggestions: planner.max_suggestions.unwrap_or(d.max_suggestions),
         goal_falloff: planner.goal_falloff.unwrap_or(d.goal_falloff).max(0.0),
@@ -1224,14 +1224,24 @@ fn same_kind(content: &Content, a: usize, b: usize) -> bool {
         && a.interactions.iter().any(|x| b.interactions.iter().any(|y| x.id == y.id))
 }
 
-/// The cheaper thing at home that `def` would replace (an upgrade), if any.
+/// Whether object type `new` does all `old` does: every use of it (by id), the cooking stations
+/// it is, and keeping leftovers. A range cooker shares the gourmet dinner with a fridge but is
+/// no fridge: selling the fridge for it would leave no snacks and no ingredients.
+fn covers(content: &Content, new: usize, old: usize) -> bool {
+    let (new, old) = (&content.objects[new], &content.objects[old]);
+    old.interactions.iter().all(|x| new.interactions.iter().any(|y| x.id == y.id))
+        && old.stations & !new.stations == 0
+        && (new.stores || !old.stores)
+}
+
+/// The cheaper thing at home that `def` would replace (an upgrade that does all it did), if any.
 fn replaces(w: &World, h: usize, def: usize) -> Option<u32> {
     let plot = w.households[h].plot?;
     let price = w.content.objects[def].price?;
     w.objects
         .iter()
         .zip(&w.object_plot)
-        .filter(|(o, p)| **p == Some(plot) && o.def != def && same_kind(&w.content, o.def, def))
+        .filter(|(o, p)| **p == Some(plot) && o.def != def && same_kind(&w.content, o.def, def) && covers(&w.content, def, o.def))
         .filter(|(o, _)| w.content.objects[o.def].price.is_some_and(|p| p < price))
         .min_by_key(|(o, _)| w.content.objects[o.def].price)
         .map(|(o, _)| o.id)

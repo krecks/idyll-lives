@@ -42,17 +42,19 @@ fn start() {
 /// Oldest save version `sim_core::save` still reads (it migrates everything from 1 on).
 const OLDEST_SAVE_VERSION: u64 = 1;
 
-/// Why a save can't be opened. The menu keeps one from a newer version (and skips it) and
-/// removes one that is too old or damaged.
+/// Why a save can't be opened. The menu keeps one from a newer version, and one this version
+/// failed to load (a later version may open it), and skips them; it removes one that is too old
+/// or damaged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SaveProblem {
     TooNew,
     TooOld,
     Corrupt,
+    Failed,
 }
 
-/// A failed `Game.fromSave`: `kind` says what's wrong with the save ("tooNew", "tooOld" or
-/// "corrupt"); it's empty when the save isn't to blame (the game's own data didn't load).
+/// A failed `Game.fromSave`: `kind` says what's wrong with the save ("tooNew", "tooOld",
+/// "corrupt" or "failed"); it's empty when the save isn't to blame (the game's own data didn't load).
 #[wasm_bindgen]
 pub struct LoadError {
     problem: Option<SaveProblem>,
@@ -67,6 +69,7 @@ impl LoadError {
             Some(SaveProblem::TooNew) => "tooNew",
             Some(SaveProblem::TooOld) => "tooOld",
             Some(SaveProblem::Corrupt) => "corrupt",
+            Some(SaveProblem::Failed) => "failed",
             None => "",
         }
         .to_string()
@@ -81,24 +84,30 @@ impl LoadError {
 /// Loads a save; when that fails, works out whether (and how) the save is to blame.
 fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
     World::from_save_json(content_json, save_json).map_err(|e| LoadError {
-        problem: save_problem(content_json, save_json),
+        problem: save_problem(content_json, save_json, &e.0),
         message: e.0,
     })
 }
 
-/// What's wrong with a save the simulation refused: its version (newer than this game, or
-/// older than it reads), else it's damaged. `None` when the game's own data is what failed.
-fn save_problem(content_json: &str, save_json: &str) -> Option<SaveProblem> {
+/// What's wrong with a save the simulation refused (`error`): its version (newer than this
+/// game, or older than it reads); damaged (it doesn't read as a save file, "invalid JSON …", or
+/// the loader's own checks found it so: "corrupt …", "saved lot …"); else this version failed to
+/// load something in it, which is no reason to remove it. `None` when the game's own data is what
+/// failed. (Errors are told apart by their words: parsing the save again here would put a second
+/// copy of its whole reader into the wasm.)
+fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<SaveProblem> {
     if Content::from_json(content_json).is_err() {
         return None;
     }
     let version = serde_json::from_str::<serde_json::Value>(save_json)
         .ok()
         .and_then(|v| v.get("version").and_then(serde_json::Value::as_u64));
+    let damaged = ["invalid JSON", "corrupt", "saved "].iter().any(|start| error.starts_with(start));
     Some(match version {
         Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
         Some(v) if v < OLDEST_SAVE_VERSION => SaveProblem::TooOld,
-        _ => SaveProblem::Corrupt,
+        _ if damaged => SaveProblem::Corrupt,
+        _ => SaveProblem::Failed,
     })
 }
 
@@ -366,6 +375,15 @@ mod tests {
         assert_eq!(problem(&content, "{\"version\":17}"), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &with_version("-3")), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &with_version("\"17\"")), Some(SaveProblem::Corrupt));
+        // A whole save this version fails to load (here a trait it doesn't know) isn't damaged: kept.
+        let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
+        odd["sims"][0]["traits"] = serde_json::json!(["noSuchTrait"]);
+        assert_eq!(problem(&content, &odd.to_string()), Some(SaveProblem::Failed));
+        assert_eq!(load_save(&content, &odd.to_string()).err().unwrap().kind(), "failed");
+        // The loader's own checks say damaged: removed.
+        let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
+        odd["households"][0]["plot"] = serde_json::json!(999);
+        assert_eq!(problem(&content, &odd.to_string()), Some(SaveProblem::Corrupt));
         // The game's own data failing isn't the save's fault (it mustn't be removed for that).
         assert_eq!(problem("{", &good), None);
         assert_eq!(problem("{", &with_version("999")), None);

@@ -225,7 +225,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - Adaptive resolution: render scale drops before frame rate does.
 
 **As built (0.2.0)**, where it differs from the plan above:
-- **Shadows:** one sun shadow map over a fixed area round the lot, 1024, 2048 or 4096 by preset. It draws only the casters that can reach that area (152 shadow draws by day in the village, from 242), and only when something in it changed: the light, the casters, a thing placed or moved, roofs and storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame, as they breathe (residents' shadows in a path of their own are a v0.3 candidate).
+- **Shadows:** one sun shadow map over a fixed area round the lot, 1024, 2048 or 4096 by preset. It draws only the casters that can reach that area (about 150 shadow draws by day in the village, from 242), and only when something in it changed: the light, the casters, a thing placed or moved, roofs and storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame, as they breathe (residents' shadows in a path of their own are a v0.3 candidate).
 - **Lamps:** clustered, up to 32, on Medium and High; the four nearest the biggest rooms on Low.
 - **Effects:** no ambient occlusion (removed in 0.2.0), bloom or tilt-shift. There is ACES tone mapping, a vignette and a night grade ([docs/design/look.md](docs/design/look.md)).
 - **No GPU culling:** there are no compute shaders or `drawIndirect`. Culling is Babylon's frustum culling on the CPU, and build effects use CPU particles.
@@ -236,7 +236,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - **Presets:** the three graphics presets and their costs are in [docs/design/graphics.md](docs/design/graphics.md).
 
 **Targets (the owner, 0.2.0):** laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1080p: Medium at 30 fps or more. Low there is best effort; 60 fps on Low is not a 0.2.0 target.
-- Medium's 30 fps is an estimate from scaled Mac measurements, not yet measured on Intel hardware, and not a release gate.
+- 30 fps is Medium's target, not a release gate, and it hasn't been measured on Intel hardware. Scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is estimated at about 14–41 fps by day.
 - Before 0.2.0, P1 estimated Medium at about 6–10 fps and Low at about 9–27 fps there, with the GPU as the limit.
 - The owner confirms them on real hardware with the in-game benchmark (`?bench=village`).
 
@@ -329,10 +329,11 @@ The snapshot memory layout is **defined once in Rust** (`sim-core/src/snapshot.r
 - **Lines:** an optional small language model, Liquid AI's **LFM2.5 350M** (LFM Open License v1.0, its 4-bit ONNX build as published, WebGPU only), writes residents' spoken lines from who they are and what's going on. The utility AI still decides everything.
 - **The release review:** a review of animations, objects, bugs, performance and release readiness came before the release ([docs/release-0.2.0-review.md](docs/release-0.2.0-review.md)). It fixed most of its 140 findings, among them the crash when furniture is sold or moved (R2-01) and the silent freeze on a sim error (R4-01). It also brought century-long and busy-player test runs, a crash screen, per-game autosaves with export and import, three graphics presets with Auto resolution, wasm-opt, and CI gates with a dry run.
 
-**Roadmap after 0.2.0** (one release each; a release that changes the save format bumps the save version and migrates older saves). The first rows come from what the release review found and left (its §4):
+**Roadmap after 0.2.0** (one release each; a release that changes the save format bumps the save version and migrates older saves). Most rows come from what the release review found and left (its §4). Two branches already hold v0.3 work and are not in 0.2.0: `v0.3/garden-decor` (garden decor built in Blender) and `v0.3/look-study` (a dev-only study of cel or soft shading, and a possible bug with plain finishes, which the release review's §4 lists for checking in play).
 
 | Release | Theme | Done when |
 |---|---|---|
+| v0.3 | **Objects built in Blender** (the owner's decision, 2026-10-13) | New objects are made in Blender and exported as glTF, as the standard. The pipeline is `tools/art/blender` on the branch `v0.3/garden-decor` (six garden decor models over their placeholders, as a pack); the standard goes into `docs/design/objects.md` once it is reviewed. The code-built placeholder models stay as fallbacks, or move over in time. |
 | v0.3 | **Stable object ids** | Every object keeps an id of its own for life, so selling or moving one shifts nothing. That replaces the remapping of follow-ups, queues and unreachable things and the `seen` guard on commands that 0.2.0 uses, and saves keep their ids across a reload. |
 | v0.3 | **Unreachable goals** | A goal in an area the resident can't reach is refused before A* floods the town, instead of capping the search (P3-08). People join the unreachable memory (Social, Join). Walkers re-route when walls change. `structure_version` is split so a change refreshes only what it touched. Settings get a version and ordered migrations. |
 | v0.3 | **Low-end PCs** (best effort) | Measured first on real Intel HD 620/530 laptops with `?bench=village` (WebGPU and WebGL2). Then, as the numbers say: weak GPUs detected at first start and given Low or WebGL2; Auto resolution stepping down when frames run slow; fewer draw calls (static shadow casters merged per lot, snapshot rendering retried in play); generated LODs for furniture and the street's houses; neighbours' houses as shells on Low; an LDR path for Low. Goal: Medium at 30 fps at 1080p on those laptops, measured; Low as fast as the trims allow. |

@@ -428,6 +428,8 @@ export class MaterialLibrary {
   /** Every PBR material whose uniforms depend on the environment intensity. */
   private readonly lit = new Set<PBRMaterial>();
   private readonly thawed = new Set<PBRMaterial>();
+  /** Thawed only for their uniforms to be uploaded again (see `setEnvironmentIntensity`). */
+  private readonly thawedUniforms = new Set<PBRMaterial>();
   private refreezeFrames = 0;
   private shadowMaterial: StandardMaterial | null = null;
   /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
@@ -457,7 +459,9 @@ export class MaterialLibrary {
     scene.onAfterRenderObservable.add(() => {
       if (this.refreezeFrames === 0 || --this.refreezeFrames > 0) return;
       for (const m of this.thawed) m.freeze();
+      for (const m of this.thawedUniforms) if (!this.thawed.has(m)) m.checkReadyOnlyOnce = true;
       this.thawed.clear();
+      this.thawedUniforms.clear();
       this.onRefrozen?.();
     });
   }
@@ -554,7 +558,10 @@ export class MaterialLibrary {
 
   /** Re-uploads a frozen material's uniforms after a property change (e.g. emissive glow). */
   touch(material: Material): void {
-    if (!(material instanceof PBRMaterial) || !material.isFrozen) return;
+    if (!(material instanceof PBRMaterial)) return;
+    // Thawed for its uniforms only: frozen again in full, its shaders checked then.
+    if (this.thawedUniforms.has(material)) this.thawed.add(material);
+    if (!material.isFrozen) return;
     material.unfreeze();
     this.thawed.add(material);
     this.refreezeFrames = 3;
@@ -624,13 +631,17 @@ export class MaterialLibrary {
   setEnvironmentIntensity(value: number): void {
     if (!visibleChange(this.scene.environmentIntensity, value)) return;
     this.scene.environmentIntensity = value;
+    // Only a uniform changes, not the shaders: a frozen material uploads its uniforms again while
+    // `isFrozen` is false, without `unfreeze` and `freeze` (each walks every mesh of the scene, for
+    // every material: milliseconds a lighting step, ten steps a second at dusk at fast speeds, and
+    // the first frozen frame after them checked every mesh's shader again).
     for (const m of this.lit) {
       if (!m.isFrozen) continue;
-      m.unfreeze();
-      this.thawed.add(m);
+      m.checkReadyOnlyOnce = false;
+      this.thawedUniforms.add(m);
     }
     // Keep them thawed for the frame that re-records the snapshot, then freeze again.
-    if (this.thawed.size) this.refreezeFrames = 3;
+    if (this.thawedUniforms.size) this.refreezeFrames = 3;
   }
 
   private create(key: string, entry: MaterialEntry, options: SurfaceOptions): PBRMaterial {
@@ -692,7 +703,7 @@ export class MaterialLibrary {
   private freezeWhenReady(mat: PBRMaterial): void {
     const textures = mat.getActiveTextures().filter((t): t is Texture => t instanceof Texture);
     Texture.WhenAllReady(textures, () => {
-      if (!this.thawed.has(mat)) mat.freeze();
+      if (!this.thawed.has(mat) && !this.thawedUniforms.has(mat)) mat.freeze();
     });
   }
 }

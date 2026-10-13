@@ -143,7 +143,9 @@ jobs:
           echo "web/dist: $size MB"
           if [ "$size" -gt 900 ]; then echo "::error::web/dist is $size MB, over the 900 MB kept below Pages' 1 GB limit"; exit 1; fi
 
-      # The wasm with its function names, to read the stack of a crash report (the site's are stripped).
+      # The wasm as wasm-bindgen made it, with its function names, before wasm-opt: it shows what a
+      # function is called, but its function numbers don't match the site's optimised, stripped wasm
+      # (release review §4, P3-06): a crash stack from the site can't be read with it as it is.
       - uses: actions/upload-artifact@v4
         with:
           name: wasm-with-names-${{ github.sha }}
