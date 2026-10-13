@@ -19,6 +19,11 @@ Run the checker after every change (see [Checking a pack](#checking-a-pack)).
 - Files are merged in that order: base, careers, then packs.
 - Keep ids unique across *all* files. Prefix ids with your pack's theme when in doubt
   (`zenTeaSet`, not `teaSet`), because another pack may want the obvious name.
+- **In a built site** (`pnpm build`, the published game) the content and the asset manifests are
+  also packed into one file, `bundle.json`, and the game reads them from there: editing a file
+  in `dist/content/` changes nothing until you rebuild, or delete `dist/bundle.json` (the game
+  then fetches the files one by one). The dev server has no bundle, and an art pack loaded with
+  `?pack=` is fetched as before.
 
 ## Merge rules
 
@@ -61,6 +66,9 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
   entries stay). A later pack patching the same key wins.
 - `effects.mood` is **added** to the trait's mood; `effects.walkSpeed` is **multiplied**.
 - Other keys are errors. Patch only your own trait, so packs don't fight.
+- A trait's `startingSkills` are the skills new residents with it start with. (Before 0.2.0 the
+  game dropped them while loading, so neither traits nor patches gave any; old saves keep the
+  skills their residents have.) An unknown skill id there is an error.
 
 ## Objects
 
@@ -890,6 +898,30 @@ strictly: one thing that doesn't fit (overlaps, faces off the lot, a wall in the
 something that doesn't turn) and the town doesn't load, so `cargo test -p sim-core --test
 public_places` loads every place on both sides of the street and checks that everything in it
 can be reached from the street.
+
+## What content is refused
+
+Since 0.2.0 the simulation refuses content that would break the game when it loads, with the
+file, the id and the problem in the message (`crates/sim-core/src/content.rs`; one test case per
+rule in `refuses_content_that_would_break_the_game`). Unknown keys are still ignored, because UI-only
+keys share these objects. The rules:
+
+| What | Must be | Why |
+|---|---|---|
+| `walkSpeed` (in the effects of traits, perks, emotions and feelings, life stages, the schedule) | a number above 0 and at most 10 | 0 left residents walking for ever, and gave infinite or NaN scores |
+| A need's `decayPerHour`; need decay and gain, skill gain and tag preference multipliers; the day rhythm's decay multipliers | numbers, 0 or more | a negative decay pushed needs past full |
+| `genders` | at most 32 | attraction is a 32-bit mask |
+| A recipe's `steps` | 1 to 255 | a cook counts steps in a byte, and more looped for ever |
+| `objectRules.resale` | 0 to 1 | above 1 buying and selling made money; below 0 selling cost money |
+| `objectRules.upgradeCost` | 0 or more | a negative cost paid the player for upgrading |
+| An object's `footprint` | at most 6 × 6 tiles | larger can't be bought, and broke lot loading |
+| Ids of an object's interactions, and of needs, emotions and feelings | unique | two with one id are ambiguous: a save reloaded the first of two interactions |
+| Friendship and romance in `bondPresets` | −100 to 100 | relationships are kept in that range |
+| Tags, animations and skills named in the day rhythm (`sleepTags`, `napTags`, …), room kinds, room dirt, cleaning, repairs (`objectRules.repair` skill and tags), accidents (`anim`, `tags`), social rules (`busyTags`, `guestTags`), cooking tag lists and activities | ones the content has | a typo used to be dropped silently and turn the feature off (nobody counted as asleep; repairs trained nothing) |
+| Times that become ticks: feelings' `hours`, interaction and social `minutes`, the commute, accident cooldowns and grace, the baby's quiet spell, cooking invitations and station waits | numbers (a value too large for a float, such as `1e39`, reads as infinity and is refused) | an infinite time overflowed the tick count |
+
+At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
+whatever the content says; a score that isn't a number is never chosen.
 
 ## Checking a pack
 
