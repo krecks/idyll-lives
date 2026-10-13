@@ -2164,6 +2164,11 @@ impl World {
         if self.rooms_version != self.structure_version {
             self.refresh_rooms();
         }
+        // Someone an order or an edit stopped (the sink they carried dishes to was moved) puts
+        // down what they carry now, not when time moves on (Build mode stands still).
+        if self.sims.iter().any(|s| s.held.is_some()) {
+            crate::cooking::settle(self);
+        }
         match snapshot {
             Some(s) => self.remember(s),
             None if !keeps_history => {
