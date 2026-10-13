@@ -868,12 +868,34 @@ F2c (P3-01), F5 (P3-06, P3-07, P3-10), L1 (the rest) and G1 (P3-11). L1 measured
 | P3-02 | A script in `index.html` starts the sky's 1.07 MB `.env` download with the page, and the renderer takes the bytes. (A `<link rel=preload>` downloaded it twice under the isolation service worker.) | f9395df | Cold menu at 10 Mbit/s: 3.44 → 3.31 s. |
 | P3-04 | The build writes `bundle.json`: content, house templates, asset manifests and the index of compressed copies, minified, in one file (3.1 MB, 308 KB gzipped). The files still ship one by one for modders, and the dev server and `?pack=` load them as before. | 16d27ef | 56 requests in three dependent waves → 1. Cold menu at 10 Mbit/s: 3.31 → 3.16 s. Parsing costs about 4 ms more. |
 | P3-05 | The isolation service worker keeps the build's hashed files (scripts, styles, wasm, fonts) in a cache of the build's own, and a new build's worker deletes the old cache. | 3404e97 | Returning after Pages' 10 minutes, each response 50 ms late, HTTP/2: menu 1.54 → 1.34 s, requests reaching the server 219 → 62. With no delay: 1.22 → 1.27 s. |
-| P3-06, P3-07 | Production builds run `wasm-opt -O3 --strip-debug --strip-producers` on both wasm files (binaryen 132.0.0, an exact-pinned devDependency; features passed explicitly; never `-tnh` or `-iit`). CI keeps the wasm with its names as an artifact for 90 days. | 73b38ab, 87d8875 | Sim wasm 2,851,080 → 2,254,731 bytes raw, 835,216 → 795,765 gzip -9, 594,890 → 580,114 brotli 11. Voice wasm 157,808 → 133,668, 63,968 → 59,254, 53,773 → 49,909. Together 620 KB smaller raw and 44 KB smaller gzipped. Speed unchanged: 110,757 vs 110,938 ticks/s (P3's V8 harness, the one interleaved pair not disturbed by other builds). `vite build` takes 60 s with wasm-opt from cold, 8–11 s cached (M3 Pro, busy with other builds). |
+| P3-06, P3-07 | Production builds run `wasm-opt -O3 --strip-debug --strip-producers` on both wasm files (binaryen 132.0.0, an exact-pinned devDependency; features passed explicitly; never `-tnh` or `-iit`). CI keeps a wasm with names as an artifact for 90 days: it is the un-optimised file (2,108 functions against 1,347 shipped), so its function numbers don't match crash stacks from the site (§4). | 73b38ab, 87d8875 | Sim wasm 2,851,080 → 2,254,731 bytes raw, 835,216 → 795,765 gzip -9, 594,890 → 580,114 brotli 11. Voice wasm 157,808 → 133,668, 63,968 → 59,254, 53,773 → 49,909. Together 620 KB smaller raw and 44 KB smaller gzipped. Speed unchanged: 110,757 vs 110,938 ticks/s (P3's V8 harness, the one interleaved pair not disturbed by other builds). `vite build` takes 60 s with wasm-opt from cold, 8–11 s cached (M3 Pro, busy with other builds). |
 | P3-09 | After a late step, at most two steps catch up; a longer backlog is dropped. | 1ffa502 | Big town at speed 5, dev server, the worker's timer hooked: blocked 300 ms, 7 steps back to back → 3; blocked 2 s, 2 → 3; normal running 20.3 steps/s in both. |
 | P3-10 | tickbench merges the content's includes, and CI runs it. | d4a5107 | A panic → 485 ns/tick with socials, 482 without (M3 Pro). |
 | P3-11 | SSAO2 and the multiple-render-target imports left the main chunk with Ultra. | 2a71891 | Not measured on its own. |
 | P3-15 | The build writes every asset manifest without its spaces; `public/` keeps them readable. | ab895d1 | Base manifest 1,464,025 → 592,947 bytes (82.9 → 66.0 KB gzipped); all 21 manifests 243 → 209 KB gzipped. |
 | P3-16 | sim-wasm and voice-wasm stop with a compile error when built for wasm32 without `simd128`. | ebc9029 | Checked with a `RUSTFLAGS` in the environment. |
+
+P3's sign-off measured 0.2.0 against the review's start: M3 Pro, Chrome for Testing 153 headed, 1920×1080 at DPR 1, two lock holds with 4cde174 and `main` (5f72a7c) alternating, on L1's Pages-like server (HTTP/2, the isolation headers, 10-minute caching, gzip, 20 ms latency) at 10 Mbit/s with a fresh profile per run, median of 3 (spreads under 0.1 s). Native timings are medians of 6 quiet runs (tickbench on 4cde174 is main's fixed copy, as the original panics).
+
+| | 4cde174 | 0.2.0 (`main`) |
+|---|---|---|
+| Sim wasm in `dist`, raw / gzip -9 / brotli 11 | 2,851,035 / 830,273 / 594,880 | 2,298,877 / 806,901 / 590,303 |
+| Voice wasm in `dist` | 157,808 / 63,450 / 53,792 | 135,997 / 59,953 / 50,807 |
+| `tickbench`, with / without socials | 486 / 489 ns per tick | 513 / 507 ns per tick |
+| `big_town_speed` (2 days), full / lower detail | 92,642 / 169,714 ticks/s | 91,035 / 164,742 ticks/s |
+| First visit, no save → menu | 3.36 s | 3.17 s |
+| Play (new game) → in game | 5.94 s | 5.98 s |
+| A save, empty cache → menu | 10.05 s | 3.14 s |
+| Continue clicked at once → in game | 0.81 s | 6.21 s (the save is still being prepared) |
+| Page start → in game, empty cache | 10.88 s | 9.35 s |
+| A save, warm cache → menu | 2.72 s | 1.37 s |
+| Page start → in game, warm cache | 3.51 s | 2.95 s |
+| Requests before the menu (a save, empty cache) | 240 | 137 |
+
+- The sim wasm grew to 2,901,413 bytes before wasm-opt, with the new fixes and content; wasm-opt strips the name and producers sections and keeps the features.
+- The sim is 2–5 % slower natively, from the new sim fixes and content. The about 20× headroom at speed 5 is unchanged in practice.
+- With an empty cache the menu comes 6.9 s sooner and page start to in game is 1.5 s faster, but a Continue clicked at once now waits for the save to be prepared (P3-01's accepted cost, with the menu's stutter in §4).
+- Also checked: a reload without the isolation headers sent none of the hashed files to the server (130 cached, 133 and 5.8 MB once in game); an environment `RUSTFLAGS` stops the build; the early sky download starts at 0.3 s instead of 1.3 s; SSAO is gone from the main chunk (1.76 MB, 512 KB gzipped). L1's choices on P3-03 and P3-08 were right.
 
 ### 3.6 Release readiness (R5)
 
