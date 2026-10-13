@@ -1,7 +1,11 @@
 # Life cycle II
 
 *Status: in 0.1.0 (built in development build 0.13; numbers like 0.13 here are those builds). Roadmap: PLAN.md section 8. Builds on 0.12
-([life-cycle.md](life-cycle.md)).*
+([life-cycle.md](life-cycle.md)). Since 0.2.0: babies are cuddled, cry for a parent at night and
+have a babysitter when everyone is out (CHANGELOG.md, 0.2.0); a child who leaves the
+crib gets a bed; newborns start at age 0; newcomers arrive grown up; and every life stage has a
+body of its own, made in code (tools/characters/README.md), rather than the scaled adult rig
+described under "Bodies".*
 
 Families grow: couples have babies or adopt, babies grow into children and teens who go to
 school, and teens grow up into the young adults of 0.12 who work, fall in love and move out. A
@@ -54,7 +58,10 @@ need's icon). Babies have no accidents.
 A baby born, adopted, moving in or starting a game in a home with no free crib gets one
 delivered to a free spot; with no room for one, they have to wait for the player to make room.
 
-When a baby becomes a child they get out of the crib.
+When a baby becomes a child they get out of the crib, beside it. If the home then has fewer bed
+places than people past the crib (also after an adoption), a household the player doesn't play
+buys the cheapest bed at the first free spot, if a week's rent is left after paying; the player's
+household gets a story event instead (`noBed`, once per child).
 
 ## School
 
