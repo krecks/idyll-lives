@@ -3833,7 +3833,14 @@ fn use_object(
             || (urgent && planned)
             || (chosen && pressing & fills == 0 && runs_out(sim, content, pressing, left, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine) || drained
+        // Practising a skill they still want to (as when choosing: at home or in a public place)
+        // goes on for its time too, until practice gets boring; stopping it as soon as the needs
+        // are full would have them back at it a moment later, over and over.
+        let practising = satisfied
+            && inter.trains_skills()
+            && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
+            && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising) || drained
     };
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {

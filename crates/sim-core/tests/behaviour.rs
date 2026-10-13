@@ -135,7 +135,6 @@ fn nobody_follows_someone_across_town_for_a_chat() {
 }
 
 #[test]
-#[ignore = "R3 proof: fails until practising doesn't stop the moment the need it fills is full"]
 fn practising_with_nothing_else_to_do_doesnt_stutter() {
     let content = r#"{
         "needs":[{"id":"fun","label":"Fun","decayPerHour":0.05}],
@@ -155,6 +154,34 @@ fn practising_with_nothing_else_to_do_doesnt_stutter() {
     }
     eprintln!("Ann started tending {starts} times in 30 minutes (skill {:.3})", w.sims[0].skills[0]);
     assert!(starts <= 2, "Ann started tending {starts} times in 30 minutes");
+}
+
+#[test]
+fn practice_lasts_its_time_while_the_skill_is_wanted() {
+    let content = r#"{
+        "needs":[{"id":"fun","label":"Fun","decayPerHour":0.05}],
+        "skills":[{"id":"gardening","label":"Gardening"}],
+        "skillRules":{"interest":0.05,"maxLevel":10},
+        "objects":[{"id":"flowerbed","name":"Flowerbed","interactions":[
+            {"id":"tend","label":"Tend","minutes":20,"effects":{"fun":0.12},"skills":{"gardening":0.3}}]}]}"#;
+    let lot = r#"{"width":12,"depth":12,"objects":[{"def":"flowerbed","x":5,"z":5,"rot":0}],"sims":[{"name":"Ann","x":5.5,"z":7.5}]}"#;
+    // Told to tend it with fun full: for its 20 minutes while she'd like to get better at it;
+    // a master gardener stops as soon as it's no fun any more (nothing left to learn).
+    for (skill, lasts) in [(0.0, 15.0), (10.0, 1.0)] {
+        let mut w = World::from_json(content, lot, 5).unwrap();
+        w.apply(sim_core::Command::SetAutonomy { enabled: false, household: None }).unwrap();
+        w.sims[0].needs[0] = 1.0;
+        w.sims[0].skills[0] = skill;
+        w.apply(sim_core::Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+        let mut using = 0;
+        for _ in 0..20 * 30 {
+            w.tick_once();
+            using += usize::from(matches!(w.sims[0].current().map(|a| &a.phase), Some(Phase::Using { .. })));
+        }
+        let minutes = using as f32 * sim_core::MINUTES_PER_TICK;
+        eprintln!("skill {skill}: tended for {minutes:.1} minutes");
+        assert!(if skill == 0.0 { minutes >= lasts } else { minutes <= lasts }, "skill {skill}: tended for {minutes:.1} minutes");
+    }
 }
 
 #[test]
