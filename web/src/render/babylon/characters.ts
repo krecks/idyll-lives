@@ -135,8 +135,12 @@ const JOG_BACK = 0.8;
 const GAITS = new Set(['walk', 'jogAlong']);
 const DEFAULT_FADE = 0.25;
 
-/** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
-const SEATS: Record<string, { h: number; fwd: number }> = {
+/**
+ * Seat surface height (m) and forward offset of the hips from the object's centre, per object def;
+ * `back`: the sitter faces the object's back (a dressing table's mirror against the wall), `fwd` still
+ * towards its front.
+ */
+const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
   sofa: { h: 0.44, fwd: -0.1 },
   armchair: { h: 0.42, fwd: -0.02 },
   bench: { h: 0.45, fwd: -0.03 },
@@ -164,7 +168,7 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   armchairLeather: { h: 0.44, fwd: -0.05 },
   armchairDesign: { h: 0.45, fwd: -0.05 },
   pouf: { h: 0.46, fwd: 0 },
-  dressingTable: { h: 0.45, fwd: -0.22 },
+  dressingTable: { h: 0.45, fwd: 0.22, back: true },
   toiletCompact: { h: 0.43, fwd: -0.13 },
   toiletSmart: { h: 0.44, fwd: -0.06 },
   bathtub: { h: 0.25, fwd: 0 },
@@ -184,10 +188,10 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   gardenChair: { h: 0.4, fwd: -0.1 },
   swingSet: { h: 0.5, fwd: 0 },
 };
-const DEFAULT_SEAT = { h: 0.45, fwd: 0 };
+const DEFAULT_SEAT: { h: number; fwd: number; back?: boolean } = { h: 0.45, fwd: 0 };
 
 /** Where a Sim sits on an object: the table above, else the content's `seat`, else the default. */
-function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: number } {
+function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: number; back?: boolean } {
   const own = def?.seat;
   return SEATS[id] ?? (own ? { h: own.height, fwd: own.forward ?? 0 } : DEFAULT_SEAT);
 }
@@ -647,7 +651,7 @@ interface PlacedObject {
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
   /** Where Sims sit on it (see `seatOf`; resized taller or shorter, the seat moves with it). */
-  seat: { h: number; fwd: number };
+  seat: { h: number; fwd: number; back?: boolean };
   /** Metres taller than its kind (the player's resizing): mattresses rise with it too. */
   lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
@@ -1197,7 +1201,7 @@ export class Characters {
       const restful = !!(SEATS[o.def] || BEDS[o.def]) || !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie');
       const lift = (o.tall ?? 0) / 100;
       const seat = seatOf(def, o.def);
-      return { def: o.def, rot: o.rot, seat: { h: seat.h + lift, fwd: seat.fwd }, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, seat: { h: seat.h + lift, fwd: seat.fwd, back: seat.back }, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     for (const b of this.blankets.values()) {
@@ -1815,6 +1819,8 @@ export class Characters {
       let faceYaw = tyaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
+      // A seat facing its object's back (`SEATS` `back`): turned round, to the dressing table's mirror.
+      if (pose === Pose.Sit && (useObj ?? this.objectAt(rig.x, rig.z))?.seat.back) faceYaw = wrapAngle(tyaw + Math.PI);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -2079,7 +2085,7 @@ export class Characters {
       const seat = obj?.seat ?? DEFAULT_SEAT;
       const sp = this.sitPelvis.get(rig.body.name)!;
       rootY = seat.h - sp.y * rig.scale;
-      rootFwd = seat.fwd - sp.z * rig.scale;
+      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale;
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';

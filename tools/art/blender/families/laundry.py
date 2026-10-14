@@ -99,7 +99,7 @@ def _drum(F, washing):
 
 
 def _machine(dryer):
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.03)      # built 3 cm into the wall (as the placeholder was); moved onto its face
     led, ring = (M.led_dryer, M.door_dryer) if dryer else (M.led, M.door)
     with G.new_parts() as still:
         _cabinet(F, led, dryer)
@@ -174,7 +174,7 @@ def _on_ladder(y):
 
 
 def towelLadder():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.03)      # its top rail on the wall face, not 3 cm into it
     top = 1.7
     with G.new_parts() as parts:
         for s in (-1, 1):
@@ -228,13 +228,13 @@ LAUNDRY = {'uses': {'laundry': 'door_open'}, 'hold': 2.5, 'loops': {'laundry': '
 
 FAMILY = G.Family(
     'laundry', M,
-    [G.Model('laundryWasher', laundryWasher, size=(0.6, 0.98, 0.65), key='model.laundryWasher', centre=(0, -0.135),
+    [G.Model('laundryWasher', laundryWasher, size=(0.6, 0.98, 0.65), key='model.laundryWasher', centre=(0, -0.105),
              motions=LAUNDRY, paint=[('body', 'Body'), ('door', 'Door'), ('panel', 'Panel')]),
-     G.Model('laundryDryer', laundryDryer, size=(0.6, 1.08, 0.65), key='model.laundryDryer', centre=(0, -0.135),
+     G.Model('laundryDryer', laundryDryer, size=(0.6, 1.08, 0.65), key='model.laundryDryer', centre=(0, -0.105),
              motions=LAUNDRY, paint=[('body', 'Body'), ('door_dryer', 'Door'), ('panel', 'Panel')]),
      G.Model('towelRail', towelRail, size=(0.73, 0.595, 0.098), key='model.towelRail', centre=(0, -0.381), floor=False,
              paint=[('chrome', 'Rail'), ('towel', 'Towels'), ('towel2', 'Hand towel')]),
-     G.Model('towelLadder', towelLadder, size=(0.52, 1.707, 0.359), key='model.towelLadder', centre=(0, -0.28),
+     G.Model('towelLadder', towelLadder, size=(0.52, 1.707, 0.359), key='model.towelLadder', centre=(0, -0.25),
              paint=[('birch', 'Ladder'), ('towel', 'Towels'), ('towel2', 'Second towel'), ('towel3', 'Third towel')]),
      G.Model('laundryBasket', laundryBasket, size=(0.54, 0.39, 0.421), key='model.laundryBasket', centre=(0, -0.2),
              paint=[('wicker', 'Basket'), ('wicker_rim', 'Rim & weave')]),

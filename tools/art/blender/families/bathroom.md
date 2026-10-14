@@ -18,6 +18,10 @@ overrides the base (`model.sink`), `catalog` and `catalog2` entries by key.
   keys it from there to scale 1. `motions` plays `water_on` for the `wash` animation tag, with no `hold`,
   so the water runs for the whole use and retracts afterwards (the `wash` tag covers both the `wash` and
   `washUp` interactions).
+- **Against the wall.** The sinks stand with their backs on the wall face (game depth -0.43): `centre=` on each
+  `Model`, where `G.settle()` centres it (they stood centred on the tile, 15–22 cm off the wall, until
+  2026-10-14). Their placeholders (`furniture.py`'s base sink, `catalog.py`, `catalog2.py`) reached 1–4 cm into
+  the wall and were moved forward onto it.
 - **Basins.** `_basin` is a `G.revolve` with thickness (an oval bowl); `_rect_basin` is a rectangular shell
   (floor and four thin walls) for the base cabinet sink, which has a rectangular worktop cut-out. The solid
   cabinet top must not sit above the basin floor, so each sink has painted "shoulders" filling from the
@@ -73,9 +77,10 @@ placeholder (`catalog.double_vanity`) has none either.
 | `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,600 | 3 | Bowl, Seat & lid (wood), Cistern |
 | `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,088 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel and flush plate) |
 
-`check_glb.py`: 0 failed. It warns that the compact and wall-hung toilets are off centre from their
-placeholders (whose backs are 2.5 and 5 cm inside the wall), and that the wall-hung one is deeper than its
-placeholder. Khronos validator: 0 errors, 0 warnings each.
+`check_glb.py`: 0 failed. The compact and wall-hung toilets' placeholders reached 2.5 and 5 cm into the wall;
+they stand on the wall face now (2026-10-14), the classic one's moved back 2 cm onto it, and the wall-hung one's
+placeholder is redrawn as the model (its seat at 0.45 m, not 0.6), so none warns. Khronos validator: 0 errors,
+0 warnings each.
 
 ## B2 — the showers
 

@@ -78,9 +78,10 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 | `model.kidsChalkboard` | 0.66 × 0.96 × 0.53 m | 916 | 3 | Frame, Board |
 | `model.kidsEasel` | 0.66 × 1.21 × 0.63 m | 1,528 | 3 | Easel |
 
-`check_glb.py`: 20 models, 0 failed. Its warnings are expected: the toy box's and the chest's placeholders draw the
-lid open (so they're taller, and centred elsewhere, than the closed models against the wall), and the high
-chair's and the tent's placeholder boxes count their splayed legs and poles unturned. Khronos validator: 0 errors,
+`check_glb.py`: 20 models, 0 failed. The toy box's and the chest's placeholders drew the lid open; they're shut
+now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
+into it, placeholders too; all stand on the wall face now. The remaining warnings are expected: the high chair's
+and the tent's placeholder boxes count their splayed legs and poles unturned. Khronos validator: 0 errors,
 0 warnings each.
 
 The ball pit's colour parts are Pit and Rim, not "Balls": the balls are five colours, and one slot would recolour a

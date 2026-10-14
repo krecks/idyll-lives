@@ -958,16 +958,16 @@ def mirrorRound():
 
 def bathCabinetTall():
     F = G.GameFrame()
-    w, d, z0 = 0.42, 0.34, -0.45
+    w, d, z0 = 0.42, 0.34, WALL
     front = z0 + d
     niche = (0.61, 0.86)        # the open shelf between the doors
     with G.new_parts() as still:
-        F.box('plinth', 0.4, 0.06, 0.3, (0, 0.03, -0.29), M.dark, bevel=0.004)
+        F.box('plinth', 0.4, 0.06, 0.3, (0, 0.03, -0.27), M.dark, bevel=0.004)
         _carcass(F, 'cabinet', w, 1.76, d, 0, 0.06, z0, M.cab)
         F.box('niche_floor', w - 0.03, 0.022, d - 0.02, (0, niche[0] + 0.011, z0 + d / 2), M.cab, bevel=0.003)
         F.box('niche_top', w - 0.03, 0.022, d - 0.02, (0, niche[1] - 0.011, z0 + d / 2), M.cab, bevel=0.003)
-        F.box('towel0', 0.3, 0.08, 0.24, (0, niche[0] + 0.065, -0.27), M.towel_blue, bevel=0.03)
-        F.box('towel1', 0.3, 0.08, 0.24, (0, niche[0] + 0.14, -0.27), M.towel_cream, bevel=0.03)
+        F.box('towel0', 0.3, 0.08, 0.24, (0, niche[0] + 0.065, -0.25), M.towel_blue, bevel=0.03)
+        F.box('towel1', 0.3, 0.08, 0.24, (0, niche[0] + 0.14, -0.25), M.towel_cream, bevel=0.03)
         # the lower door (still)
         F.box('door_low', 0.4, niche[0] - 0.08, 0.02, (0, (0.07 + niche[0]) / 2, front + 0.01), M.cab_door, bevel=0.008)
         F.box('pull_low', 0.02, 0.1, 0.02, (0.15, niche[0] - 0.1, front + 0.03), M.chrome, bevel=0.004)
@@ -989,22 +989,22 @@ SHOWER = {'uses': {'shower': 'water_on'}}
 
 FAMILY = G.Family(
     'bathroom', M,
-    [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink',
+    [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink', centre=(0, -0.121),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('metal', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal',
+     G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal', centre=(0, -0.195),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Pedestal'), ('porcelain', 'Basin & cup'), ('chrome', 'Tap')]),
-     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble',
+     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble', centre=(0, -0.149),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('porcelain', 'Basins'), ('chrome', 'Taps & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel',
+     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel', centre=(0, -0.16),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Vanity'), ('stone', 'Worktop'), ('porcelain', 'Bowl'), ('blackmetal', 'Tap'),
                     ('wood', 'Shelf & legs'), ('towel', 'Towels')]),
-     G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole',
+     G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole', centre=(0, -0.188),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Basin'), ('brass', 'Legs & tap'), ('fabric', 'Towel')]),
      G.Model('toilet', toilet, size=(0.44, 0.815, 0.676), key='model.toilet', centre=(0, -0.092),

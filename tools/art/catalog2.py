@@ -98,6 +98,11 @@ def splayed_leg(x, z, h, t, color, fin, out=0.04, y0=0.0):
     return rod([fx, y0, fz], [x, y0 + h, z], t, color, fin, segments=10)
 
 
+def forward(parts, dz):
+    """The parts moved `dz` towards the front: a thing built reaching into the wall, moved onto its face (WALL)."""
+    return [dict(q, at=[q['at'][0], q['at'][1], round(q['at'][2] + dz, 4)]) for q in parts]
+
+
 def flare(size, at, color, finish, t, **kw):
     """A pot or cup `t` times wider at the top than at the bottom, `size` measured at the bottom. Drawn as
     a lathe: tapered cylinders flaring upwards come out dark-sided."""
@@ -1091,7 +1096,7 @@ add('nightstandDrawers', nightstand(WALNUT, 'wood', drawers_n=3, open_shelf=Fals
 
 
 def chest(w, h, body, fin, n, handle, d=0.5, cols=1, legs_col=None, top_col=None):
-    z = -0.47 + d / 2
+    z = WALL + 0.01 + d / 2                   # the top (1 cm proud of the case all round) on the wall face
     leg = 0.1 if legs_col else 0.06
     p = [box([w, h - leg - 0.03, d], [0, leg + (h - leg - 0.03) / 2, z], body, fin, radius=0.012),
          box([w + 0.02, 0.03, d + 0.02], [0, h - 0.015, z], top_col or body, fin, radius=0.008)]
@@ -1110,25 +1115,25 @@ def chest(w, h, body, fin, n, handle, d=0.5, cols=1, legs_col=None, top_col=None
     return p
 
 
-add('chestOfDrawers', chest(0.86, 1.16, '#E9E2D4', 'satin', 5, BRASS, d=0.66), top=(-0.44, 0.44, -0.48, 0.2, 1.16))
-add('dresserLow', chest(1.8, 0.8, OAK, 'wood', 3, BLACKMETAL, d=0.64, cols=3, legs_col=OAKD), (2, 1), top=(-0.91, 0.91, -0.48, 0.18, 0.8))
+add('chestOfDrawers', chest(0.86, 1.16, '#E9E2D4', 'satin', 5, BRASS, d=0.61), top=(-0.44, 0.44, -0.43, 0.2, 1.16))
+add('dresserLow', chest(1.8, 0.8, OAK, 'wood', 3, BLACKMETAL, d=0.59, cols=3, legs_col=OAKD), (2, 1), top=(-0.91, 0.91, -0.43, 0.18, 0.8))
 p = [box([0.9, 2.0, 0.6], [0, 1.04, -0.16], '#F1F0EC', 'satin', radius=0.012),
      box([0.88, 0.05, 0.56], [0, 0.025, -0.17], PLINTH, 'satin', radius=0.004),
      box([0.86, 1.92, 0.02], [0, 1.04, 0.15], '#F1F0EC', 'satin', radius=0.01),
      box([0.02, 0.5, 0.03], [0.36, 1.1, 0.17], OAK, 'wood', radius=0.008),
      box([0.3, 0.24, 0.3], [-0.2, 2.16, -0.2], '#C9B79C', 'matte', radius=0.02)]
-add('wardrobeSingle', p)
+add('wardrobeSingle', forward(p, 0.03))
 ARM = '#6B4A33'
-p = [box([1.7, 1.8, 0.58], [0, 1.08, -0.17], ARM, 'wood', radius=0.012),
-     box([1.82, 0.1, 0.66], [0, 2.02, -0.16], ARM, 'wood', radius=0.014),
-     box([1.86, 0.04, 0.68], [0, 2.09, -0.16], '#5A3D2A', 'wood', radius=0.01),
-     box([1.74, 0.1, 0.6], [0, 0.17, -0.16], '#5A3D2A', 'wood', radius=0.01)]
-p += [cyl([0.08, 0.12, 0.08], [x, 0.06, z], '#5A3D2A', 'wood', taper=0.7, segments=10) for x in (-0.8, 0.8) for z in (-0.4, 0.08)]
+p = [box([1.7, 1.8, 0.58], [0, 1.08, -0.14], ARM, 'wood', radius=0.012),                   # its back on the wall face
+     box([1.82, 0.1, 0.62], [0, 2.02, -0.12], ARM, 'wood', radius=0.014),
+     box([1.86, 0.04, 0.62], [0, 2.09, -0.12], '#5A3D2A', 'wood', radius=0.01),
+     box([1.74, 0.1, 0.58], [0, 0.17, -0.14], '#5A3D2A', 'wood', radius=0.01)]
+p += [cyl([0.08, 0.12, 0.08], [x, 0.06, z], '#5A3D2A', 'wood', taper=0.7, segments=10) for x in (-0.8, 0.8) for z in (-0.37, 0.11)]
 for x in (-0.42, 0.42):
-    p += [box([0.8, 1.66, 0.025], [x, 1.08, 0.13], ARM, 'wood', radius=0.012),
-          box([0.62, 0.6, 0.012], [x, 1.42, 0.146], '#7E5A40', 'wood', radius=0.02),
-          box([0.62, 0.6, 0.012], [x, 0.72, 0.146], '#7E5A40', 'wood', radius=0.02),
-          sph([0.035, 0.035, 0.03], [x - math.copysign(0.33, x), 1.08, 0.16], BRASS, 'metal', segments=8)]
+    p += [box([0.8, 1.66, 0.025], [x, 1.08, 0.16], ARM, 'wood', radius=0.012),
+          box([0.62, 0.6, 0.012], [x, 1.42, 0.176], '#7E5A40', 'wood', radius=0.02),
+          box([0.62, 0.6, 0.012], [x, 0.72, 0.176], '#7E5A40', 'wood', radius=0.02),
+          sph([0.035, 0.035, 0.03], [x - math.copysign(0.33, x), 1.08, 0.19], BRASS, 'metal', segments=8)]
 add('armoire', p, (2, 1))
 CED = '#A0603E'
 p = [box([0.9, 0.42, 0.46], [0, 0.25, 0], CED, 'wood', radius=0.012),
@@ -1167,13 +1172,15 @@ p = [lathe([0.38, 0.4, 0.5], [0, 0.2, 0.02], PORCELAIN, 'gloss', [[0, -0.5], [0.
      box([0.44, 0.4, 0.2], [0, 0.62, -0.3], PORCELAIN, 'gloss', radius=0.03),
      box([0.47, 0.04, 0.22], [0, 0.835, -0.3], PORCELAIN, 'gloss', radius=0.015),
      box([0.06, 0.02, 0.03], [-0.15, 0.76, -0.19], CHROME, 'chrome', radius=0.006)]
-add('toiletClassic', p, seat=(0.45, -0.02))
-p = [box([0.36, 0.32, 0.54], [0, 0.42, -0.17], PORCELAIN, 'gloss', radius=0.12),
-     cyl([0.36, 0.03, 0.46], [0, 0.6, -0.12], PORCELAIN, 'gloss', segments=24),
-     box([0.6, 1.1, 0.12], [0, 0.55, -0.42], '#C9C6C0', 'matte', radius=0.01),
-     box([0.22, 0.15, 0.012], [0, 1.0, -0.355], '#2B2C2E', 'gloss', radius=0.01),
-     box([0.09, 0.12, 0.006], [-0.05, 1.0, -0.348], CHROME, 'chrome', radius=0.006),
-     box([0.09, 0.12, 0.006], [0.05, 1.0, -0.348], CHROME, 'chrome', radius=0.006)]
+add('toiletClassic', forward(p, -0.02), seat=(0.45, -0.02))
+# As the model (blender/families/bathroom.py): the boxing 12 cm deep on the wall face, the bowl hung off it,
+# the seat's top at 0.445 (content `seat` 0.45).
+p = [box([0.36, 0.3, 0.45], [0, 0.27, 0.01], PORCELAIN, 'gloss', radius=0.12),
+     cyl([0.36, 0.025, 0.42], [0, 0.4325, 0.02], PORCELAIN, 'gloss', segments=24),
+     box([0.6, 1.1, 0.12], [0, 0.55, -0.37], '#C9C6C0', 'matte', radius=0.01),
+     box([0.22, 0.15, 0.012], [0, 1.0, -0.304], '#2B2C2E', 'gloss', radius=0.01),
+     box([0.09, 0.12, 0.006], [-0.05, 1.0, -0.297], CHROME, 'chrome', radius=0.006),
+     box([0.09, 0.12, 0.006], [0.05, 1.0, -0.297], CHROME, 'chrome', radius=0.006)]
 add('toiletWallHung', p, seat=(0.45, -0.1))
 p = [flare([1.7, 0.56, 0.78], [0, 0.28, -0.04], PORCELAIN, 'gloss', 1.06, segments=36),
      cyl([1.58, 0.02, 0.66], [0, 0.5, -0.04], '#BFD9E0', 'gloss', segments=32),
@@ -1181,7 +1188,7 @@ p = [flare([1.7, 0.56, 0.78], [0, 0.28, -0.04], PORCELAIN, 'gloss', 1.06, segmen
      cyl([0.05, 0.9, 0.05], [0.9, 0.45, 0.3], CHROME, 'chrome', segments=10),
      rod([0.9, 0.88, 0.3], [0.78, 0.84, 0.22], 0.035, CHROME, 'chrome'),
      cyl([0.14, 0.02, 0.14], [0.9, 0.01, 0.3], CHROME, 'chrome')]
-add('bathtubFreestanding', p, (2, 1), seat=(0.28, 0.0))
+add('bathtubFreestanding', forward(p, 0.04), (2, 1), seat=(0.28, 0.0))      # centred, as the model: it stands free
 p = [box([0.94, 0.08, 0.94], [0, 0.04, 0], '#E8E6E1', 'matte', radius=0.01),
      box([0.94, 2.1, 0.06], [0, 1.09, -0.44], '#D7D3CC', 'matte', radius=0.01),
      box([0.06, 2.0, 0.9], [-0.44, 1.04, 0.0], '#D7D3CC', 'matte', radius=0.01),
@@ -1202,7 +1209,7 @@ p = [box([0.8, 0.52, 0.5], [0, 0.56, -0.21], '#8A5A36', 'wood', radius=0.012),
 p += [box([0.025, 0.3, 0.025], [x, 0.15, z], '#8A5A36', 'wood') for x in (-0.38, 0.38) for z in (-0.44, 0.02)]
 p += [box([0.36, 0.06, 0.24], [-0.15, 0.225, -0.22], '#F2F0EA', 'fabric', radius=0.03), box([0.36, 0.06, 0.24], [0.2, 0.225, -0.22], '#9DC6CF', 'fabric', radius=0.03),
       box([0.36, 0.2, 0.02], [-0.2, 0.56, 0.05], '#7A4E30', 'wood', radius=0.006), box([0.36, 0.2, 0.02], [0.2, 0.56, 0.05], '#7A4E30', 'wood', radius=0.006)]
-add('sinkVessel', p)
+add('sinkVessel', forward(p, 0.04))
 p = [box([0.6, 0.12, 0.46], [0, 0.82, -0.21], PORCELAIN, 'gloss', radius=0.04),
      box([0.48, 0.04, 0.32], [0, 0.865, -0.18], '#D9E2E6', 'gloss', radius=0.04),
      cyl([0.035, 0.2, 0.035], [0, 0.96, -0.4], BRASS, 'metal'), rod([0, 1.05, -0.4], [0, 1.03, -0.3], 0.025, BRASS, 'metal'),
@@ -1210,7 +1217,7 @@ p = [box([0.6, 0.12, 0.46], [0, 0.82, -0.21], PORCELAIN, 'gloss', radius=0.04),
 p += [cyl([0.03, 0.76, 0.03], [x, 0.38, 0.0], BRASS, 'metal', segments=8) for x in (-0.27, 0.27)]
 p += [rod([x, 0.76, 0.0], [x, 0.8, -0.2], 0.03, BRASS, 'metal', segments=8) for x in (-0.27, 0.27)]
 p += [box([0.4, 0.03, 0.04], [0, 0.6, 0.02], '#E4B8AE', 'fabric', radius=0.01), box([0.38, 0.4, 0.02], [0, 0.4, 0.03], '#E4B8AE', 'fabric', radius=0.01)]
-add('sinkConsole', p)
+add('sinkConsole', forward(p, 0.01))
 p = [box([0.42, 1.76, 0.34], [0, 0.94, -0.28], '#F1F0EC', 'satin', radius=0.012),
      box([0.4, 0.06, 0.3], [0, 0.03, -0.29], PLINTH, 'satin', radius=0.004),
      box([0.4, 1.0, 0.02], [0, 1.28, -0.1], '#F1F0EC', 'satin', radius=0.008),
@@ -1218,7 +1225,7 @@ p = [box([0.42, 1.76, 0.34], [0, 0.94, -0.28], '#F1F0EC', 'satin', radius=0.012)
      box([0.02, 0.12, 0.02], [0.14, 0.95, -0.08], CHROME, 'chrome', radius=0.004),
      box([0.36, 0.022, 0.3], [0, 0.66, -0.27], '#F1F0EC', 'satin', radius=0.004)]
 p += [box([0.3, 0.08, 0.24], [0, 0.71 + i * 0.07, -0.27], c, 'fabric', radius=0.03) for i, c in enumerate(('#9DC6CF', '#F2F0EA'))]
-add('bathCabinetTall', p)
+add('bathCabinetTall', forward(p, 0.02))
 p = []
 for x in (-0.24, 0.24):
     p.append(rod([x, 0, -0.1], [x, 1.7, -0.42], 0.04, BIRCH, 'wood', segments=8))
@@ -1229,7 +1236,7 @@ for i in range(5):
 for y, c in ((0.96, '#9DC6CF'), (1.29, '#F2F0EA'), (0.63, SAGE)):
     zf = -0.1 - (y / 1.7) * 0.32
     p += [box([0.4, 0.3, 0.025], [0, y - 0.13, zf + 0.025], c, 'fabric', radius=0.01), box([0.4, 0.3, 0.025], [0, y - 0.13, zf - 0.025], c, 'fabric', radius=0.01)]
-add('towelLadder', p)
+add('towelLadder', forward(p, 0.01))
 add('bathMat', [box([0.76, 0.02, 0.5], [0, 0.01, 0], '#B9CCC4', 'fabric', radius=0.009),
                 box([0.68, 0.006, 0.42], [0, 0.021, 0], '#C9DAD3', 'fabric', radius=0.003)], kind='rug')
 p = [torus([0.62, 0.04, 0.62], [0, 1.55, WALL + 0.03], BRASS, 'metal', rotate=[90, 0, 0], segments=32),
@@ -1263,16 +1270,12 @@ for i, y in enumerate((0.12, 0.4, 0.68)):
           box([0.7, 0.08, 0.015], [0, y + 0.04, zf + 0.02], [RED, '#9DC6CF', YELLOW][i], 'gloss', radius=0.004)]
     for k in range(3):
         p.append(box([0.18, 0.24, 0.02], [-0.22 + k * 0.22, y + 0.13, zf - 0.02], [TEAL, MUSTARD, RUST, SAGE, BLUE, BLUSH][(i + k * 2) % 6], 'matte', radius=0.004, rotate=[-14, 0, 0]))
-add('kidsBookshelf', p)
+add('kidsBookshelf', forward(p, 0.03))
 TOY = '#E9C46A'
 p = [box([0.8, 0.42, 0.46], [0, 0.23, -0.18], TOY, 'satin', radius=0.03),
-     box([0.82, 0.05, 0.48], [0, 0.73, -0.43], TOY, 'satin', radius=0.02, rotate=[-80, 0, 0]),
+     box([0.84, 0.09, 0.5], [0, 0.485, -0.18], TOY, 'satin', radius=0.03),                 # the lid, shut
      box([0.8, 0.06, 0.02], [0, 0.32, 0.055], RED, 'satin', radius=0.01),
-     box([0.04, 0.06, 0.04], [-0.42, 0.3, -0.18], BLUE, 'satin', radius=0.01), box([0.04, 0.06, 0.04], [0.42, 0.3, -0.18], BLUE, 'satin', radius=0.01),
-     sph([0.18, 0.18, 0.18], [-0.18, 0.47, -0.15], RED, 'gloss', segments=12),
-     box([0.12, 0.12, 0.12], [0.1, 0.46, -0.2], BLUE, 'gloss', radius=0.01, rotate=[0, 20, 10]),
-     box([0.1, 0.1, 0.1], [0.22, 0.44, -0.1], GREEN, 'gloss', radius=0.01, rotate=[0, -15, 0]),
-     sph([0.14, 0.16, 0.12], [0.0, 0.5, -0.06], '#C08A52', 'fabric', segments=10)]
+     box([0.04, 0.06, 0.04], [-0.42, 0.3, -0.18], BLUE, 'satin', radius=0.01), box([0.04, 0.06, 0.04], [0.42, 0.3, -0.18], BLUE, 'satin', radius=0.01)]
 add('toyChest', p)
 TENT = '#F2EBDD'
 p = [cone([0.92, 1.3, 0.92], [0, 0.65, -0.04], TENT, 'fabric', segments=6),
@@ -1683,18 +1686,21 @@ pts = [(-0.3, 0.06, -0.3), (-0.3, 1.0, -0.3), (-0.26, 1.55, -0.24), (-0.12, 1.85
 p += [rod(list(pts[i]), list(pts[i + 1]), 0.025, '#C9A06A', 'metal', segments=8) for i in range(len(pts) - 1)]
 p += [lathe([0.36, 0.2, 0.36], [0.22, 1.6, 0.18], '#C9A06A', 'metal', [[0.5, -0.5], [0.42, 0.2], [0.12, 0.5], [0, 0.5], [0, 0.4], [0.1, 0.4], [0.38, 0.15], [0.46, -0.5]], segments=24),
       sph([0.12, 0.08, 0.12], [0.22, 1.55, 0.18], BULB, 'gloss', segments=10)]
-add('lampFloorArc', p, light=1.5)
+add('lampFloorArc', forward(p, 0.02), light=1.5)
 p = [rod([math.cos(math.radians(a)) * 0.3, 0, math.sin(math.radians(a)) * 0.3], [0, 1.25, 0], 0.035, WALNUT, 'wood', segments=8) for a in (90, 210, 330)]
 p += [cyl([0.03, 0.08, 0.03], [0, 1.28, 0], BRASS, 'metal')] + drum_shade(1.45, 0.48, 0.32, '#E7E0D4', taper=1.0)
 add('lampFloorTripod', p, light=1.38)
 add('lampTorchiere', [cyl([0.3, 0.04, 0.3], [0, 0.02, 0], '#2B2C2E', 'metal', segments=20), cyl([0.025, 1.68, 0.025], [0, 0.88, 0], BRASS, 'metal'),
                       lathe([0.4, 0.14, 0.4], [0, 1.78, 0], '#F2EBDD', 'glass', [[0.04, -0.5], [0.3, -0.1], [0.5, 0.5], [0.46, 0.5], [0.27, -0.06], [0, -0.4]], segments=24),
                       cyl([0.05, 0.04, 0.05], [0, 1.72, 0], BRASS, 'metal')], light=1.78)
-p = [box([1.0, 0.04, 0.05], [0, CEILING - 0.02, 0], '#F2F2F0', 'satin', radius=0.01), box([0.12, 0.02, 0.12], [0, CEILING - 0.01, 0], '#F2F2F0', 'satin', radius=0.01)]
-for x, r in ((-0.36, 20), (0.0, -15), (0.36, 25)):
+p = [box([0.94, 0.04, 0.05], [0, CEILING - 0.02, 0], '#F2F2F0', 'satin', radius=0.01), box([0.12, 0.02, 0.12], [0, CEILING - 0.01, 0], '#F2F2F0', 'satin', radius=0.01)]
+# The spots aimed as the model's (blender/families/lighting.py): each head on its knuckle 0.12 m under the ceiling.
+for x, aim, turn in ((-0.34, (-0.2, -1, 0.34), [-19, 0, -11]), (0.0, (0.16, -1, -0.26), [15, 0, 9]), (0.34, (-0.26, -1, 0.42), [-23, 0, -13])):
+    n = math.sqrt(sum(c * c for c in aim))
+    head = lambda s: [round(c, 4) for c in (x + s * aim[0] / n, CEILING - 0.12 + s * aim[1] / n, s * aim[2] / n)]  # noqa: E731
     p += [cyl([0.02, 0.08, 0.02], [x, CEILING - 0.08, 0], '#2B2C2E', 'metal'),
-          cyl([0.09, 0.16, 0.09], [x, CEILING - 0.18, 0], '#2B2C2E', 'metal', rotate=[r, 0, r * 0.6], segments=14),
-          cyl([0.07, 0.01, 0.07], [x + math.sin(math.radians(r * 0.6)) * -0.08, CEILING - 0.26, math.sin(math.radians(r)) * 0.08], BULB, 'gloss', rotate=[r, 0, r * 0.6], segments=12)]
+          cyl([0.09, 0.16, 0.09], head(0.09), '#2B2C2E', 'metal', rotate=turn, segments=14),
+          cyl([0.072, 0.008, 0.072], head(0.17), BULB, 'gloss', rotate=turn, segments=12)]
 add('trackLights', p, kind='ceiling', light=2.5)
 add('paperLantern', [cyl([0.08, 0.02, 0.08], [0, CEILING - 0.01, 0], '#F2F2F0', 'satin', segments=12), cyl([0.008, 0.48, 0.008], [0, CEILING - 0.26, 0], '#F2F2F0', 'satin', segments=6),
                      sph([0.56, 0.52, 0.56], [0, CEILING - 0.75, 0], '#FBF7EE', 'fabric', segments=18)] +

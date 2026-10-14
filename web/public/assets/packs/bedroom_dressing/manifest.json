@@ -43,9 +43,9 @@
         "lotion": {
           "finish": "material.finish.gloss"
         },
-        "mirror_back": {
+        "mirror": {
           "finish": "material.finish.gloss",
-          "mirror": "back"
+          "mirror": "front"
         },
         "perfume": {
           "finish": "material.finish.gloss"

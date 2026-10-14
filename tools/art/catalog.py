@@ -64,6 +64,11 @@ def facing_back(parts):
     return out
 
 
+def forward(parts, dz):
+    """The parts moved `dz` towards the front: a thing built reaching into the wall, moved onto its face (WALL)."""
+    return [dict(q, at=[q['at'][0], q['at'][1], round(q['at'][2] + dz, 4)]) for q in parts]
+
+
 def on_plane(centre, rx, dx, dy, dz=0.0):
     """A point on a panel centred on `centre` and tilted by `rx` degrees about X (local x, y across it, z out)."""
     return OX.add(centre, OX.rot([dx, dy, dz], [rx, 0, 0]))
@@ -976,21 +981,24 @@ addp('shelvingIndustrial', p, (2, 1))
 
 
 def fireplace(stone, mantel, fin='satin', mantel_fin='wood'):
-    p = [box([1.84, 1.25, 0.42], [0, 0.625, -0.27], stone, fin, radius=0.015),          # chimney breast
-         box([1.84, 1.55, 0.3], [0, 2.025, -0.33], stone, fin, radius=0.015),           # flue up to the ceiling
-         box([1.96, 0.07, 0.52], [0, 1.27, -0.22], mantel, mantel_fin, radius=0.01),    # mantel shelf
-         box([1.96, 0.1, 0.62], [0, 0.05, -0.17], '#8E8A84', 'matte', radius=0.01),     # hearth
-         box([0.92, 0.7, 0.2], [0, 0.46, -0.155], '#2A2624', 'matte', radius=0.02),     # firebox
-         box([0.8, 0.6, 0.02], [0, 0.44, -0.05], '#1B1716', 'matte', radius=0.01)]
+    """Against the wall: a chimney breast round a dark firebox over a raised hearth bench (content `seat` 0.42),
+    as the model (families/decor.py) stands."""
+    hearth, top = 0.42, 1.08                                                             # the bench's top, the opening's
+    p = [box([0.48, 1.25, 0.4], [x, 0.625, -0.23], stone, fin, radius=0.015) for x in (-0.68, 0.68)]    # chimney breast
+    p += [box([0.9, 1.25 - top, 0.4], [0, (1.25 + top) / 2, -0.23], stone, fin, radius=0.015),
+          box([1.6, 1.55, 0.28], [0, 2.025, -0.29], stone, fin, radius=0.015),              # flue up to the ceiling
+          box([1.96, 0.07, 0.48], [0, 1.285, -0.19], mantel, mantel_fin, radius=0.01),      # mantel shelf
+          box([1.96, hearth, 0.57], [0, hearth / 2, -0.145], '#8E8A84', 'matte', radius=0.01),   # raised hearth bench
+          box([0.88, top - hearth, 0.3], [0, (top + hearth) / 2, -0.28], '#1B1716', 'matte', radius=0.01)]  # firebox
     for x, r in ((-0.18, 12), (0.12, -18), (0.0, 80)):                                   # logs
-        p.append(cyl([0.1, 0.5, 0.1], [x, 0.2, -0.12], '#6B4A33', 'bark', rotate=[0, r, 90]))
-    p += [part('blob', [0.42, 0.28, 0.16], [0, 0.34, -0.1], '#FF9A3C', 'gloss', noise=0.25),       # flames
-          part('blob', [0.26, 0.36, 0.1], [0.04, 0.42, -0.09], '#FFD27A', 'gloss', noise=0.3)]
-    p += [cyl([0.1, 0.24, 0.1], [-0.65, 1.42, -0.25], '#E8E6E1', 'gloss', taper=0.7),            # mantel things
-          box([0.3, 0.38, 0.03], [0.55, 1.5, -0.38], '#F2F0EA', 'satin', radius=0.006),
-          box([0.24, 0.3, 0.005], [0.55, 1.5, -0.364], TEAL, 'matte', radius=0.004),
-          cyl([0.06, 0.12, 0.06], [-0.4, 1.36, -0.25], CREAM, 'satin'),
-          cyl([0.06, 0.18, 0.06], [-0.3, 1.39, -0.25], CREAM, 'satin')]
+        p.append(cyl([0.1, 0.5, 0.1], [x, hearth + 0.06, -0.1], '#6B4A33', 'bark', rotate=[0, r, 90]))
+    p += [part('blob', [0.42, 0.28, 0.16], [0, hearth + 0.14, -0.09], '#FF9A3C', 'gloss', noise=0.25),       # flames
+          part('blob', [0.26, 0.36, 0.1], [0.04, hearth + 0.22, -0.08], '#FFD27A', 'gloss', noise=0.3)]
+    p += [cyl([0.1, 0.24, 0.1], [-0.65, 1.44, -0.25], '#E8E6E1', 'gloss', taper=0.7),            # mantel things
+          box([0.3, 0.38, 0.03], [0.55, 1.51, -0.13], '#F2F0EA', 'satin', radius=0.006, rotate=[-6, 0, 0]),
+          box([0.24, 0.3, 0.005], [0.55, 1.51, -0.113], TEAL, 'matte', radius=0.004, rotate=[-6, 0, 0]),
+          cyl([0.06, 0.12, 0.06], [-0.4, 1.38, -0.25], CREAM, 'satin'),
+          cyl([0.06, 0.18, 0.06], [-0.3, 1.41, -0.25], CREAM, 'satin')]
     return p
 
 
@@ -1067,13 +1075,23 @@ addp('bedBunk@minimal', bunk_bed('#F2F2F0', 'satin', '#FFFFFF', LINEN), (1, 2))
 
 
 def futon(base, mattress, cover):
-    """Low double platform: mattress top ~0.4 m, two sleepers at x = +-0.5."""
+    """Low double platform, as the model rests (blender/families/bedroom.py): folded up as a sofa, the seat's top
+    ~0.4 m, the mattress's head end leaning back 66 degrees from its fold at depth -0.2 with the pillows on it.
+    Unfolded (the model's `unfold`), two sleepers lie at x = +-0.5."""
+    lean = math.radians(66)
+
+    def up(y, z):
+        """A point of the flat mattress's head end, folded up about the fold (height 0.3, depth -0.2)."""
+        dy, dz = y - 0.3, z + 0.2
+        return [round(0.3 + dy * math.cos(lean) - dz * math.sin(lean), 4), round(-0.2 + dz * math.cos(lean) + dy * math.sin(lean), 4)]
+
     p = [box([1.96, 0.18, 1.96], [0, 0.11, 0.0], base, 'wood', radius=0.01),
-         box([1.86, 0.2, 1.86], [0, 0.3, 0.02], mattress, 'fabric', radius=0.06),
-         box([1.88, 0.06, 1.2], [0, 0.42, 0.34], cover, 'fabric', radius=0.03),
+         box([1.86, 0.2, 1.13], [0, 0.3, 0.365], mattress, 'fabric', radius=0.06),                # the seat
+         box([1.86, 0.2, 0.71], [0, *up(0.3, -0.565)], mattress, 'fabric', radius=0.06, rotate=[66, 0, 0]),   # the back
+         box([1.5, 0.06, 0.32], [0, 0.42, 0.7], cover, 'fabric', radius=0.03),                    # a quilt, folded
          box([1.96, 0.5, 0.06], [0, 0.42, -0.95], base, 'wood', radius=0.01)]                # low headboard
     for s in (-1, 1):
-        p += [cushion([0.66, 0.14, 0.36], [s * 0.45, 0.46, -0.7], '#FFFFFF'),
+        p += [cushion([0.66, 0.14, 0.36], [s * 0.45, *up(0.465, -0.71)], '#FFFFFF', rotate=[66, 0, 0]),
               box([0.02, 0.04, 1.96], [s * 0.97, 0.03, 0], base, 'wood', radius=0.005)]
     return p
 
@@ -1150,12 +1168,12 @@ def bedside_lamp(base, bfin, shade, stem, sfin, square=False, x=0.0, z=-0.26, y=
 NIGHT = {'': (OAK, 'wood', BRASS, 'metal', 'classic'), '@modern': ('#F1F0EC', 'gloss', BLACKMETAL, 'metal', 'legs'),
          '@cozy': (WALNUT, 'wood', BRASS, 'metal', 'two'), '@minimal': (BIRCH, 'wood', '#F2F2F0', 'satin', 'open')}
 for sfx, (wood, fin, knob, kfin, style) in NIGHT.items():
-    addp('nightstand' + sfx, night(wood, fin, knob, kfin, style) + [
+    addp('nightstand' + sfx, forward(night(wood, fin, knob, kfin, style) + [
         box([0.16, 0.03, 0.22], [0.1, 0.575, -0.16], TEAL, 'matte', radius=0.004, rotate=[0, -12, 0]),
-        cyl([0.08, 0.1, 0.08], [-0.12, 0.61, -0.12], '#E8E6E1', 'gloss')])
+        cyl([0.08, 0.1, 0.08], [-0.12, 0.61, -0.12], '#E8E6E1', 'gloss')], 0.035))
     lamp = {'': ('#E8E2D6', 'gloss', '#F4EBD8', BRASS, 'metal', False), '@modern': ('#F4F4F2', 'gloss', '#FAF8F3', BLACKMETAL, 'metal', True),
             '@cozy': (CLAY, 'gloss', '#EFD9B4', BRASS, 'metal', False), '@minimal': (BIRCH, 'wood', '#FAF8F3', '#F2F2F0', 'satin', True)}[sfx]
-    addp('nightstandLamp' + sfx, night(wood, fin, knob, kfin, style) + bedside_lamp(*lamp[:5], square=lamp[5]))
+    addp('nightstandLamp' + sfx, forward(night(wood, fin, knob, kfin, style) + bedside_lamp(*lamp[:5], square=lamp[5]), 0.035))
 
 
 def dresser(wood, fin, knob):
@@ -1214,7 +1232,12 @@ def dressing_table(wood, fin, seat, frame):
     return p
 
 
-add('dressingTable', placeholder(dressing_table(OAK, 'wood', BLUSH, BRASS)))
+# Turned round: the mirror against the wall, the pouf at the front (characters.ts SEATS faces the sitter to the mirror).
+p = forward(facing_back(dressing_table(OAK, 'wood', BLUSH, BRASS)), -0.005)
+for q in p:
+    if q.get('mirror'):
+        q['mirror'] = 'front'
+add('dressingTable', placeholder(p))
 add('dressingTable@modern', placeholder(dressing_table('#F1F0EC', 'gloss', '#9AA4AB', BLACKMETAL)))
 add('dressingTable@cozy', placeholder(dressing_table(WALNUT, 'wood', RUST, BRASS)))
 add('dressingTable@minimal', placeholder(dressing_table(BIRCH, 'wood', LINEN, BIRCH)))
@@ -1264,7 +1287,7 @@ p = [box([0.4, 0.4, 0.17], [0, 0.58, -0.355], PORCELAIN, 'gloss', radius=0.03), 
      box([0.36, 0.38, 0.03], [0, 0.6, -0.255], PORCELAIN, 'gloss', radius=0.014, rotate=[-6, 0, 0]),   # lid, up
      cyl([0.11, 0.1, 0.11], [0.3, 0.62, -0.4], '#FFFFFF', 'gloss', rotate=[0, 0, 90], segments=14),     # paper on its holder
      cyl([0.02, 0.14, 0.02], [0.3, 0.62, -0.42], CHROME, 'chrome', rotate=[0, 0, 90], segments=8)]
-addp('toiletCompact', p)
+addp('toiletCompact', forward(p, 0.025))
 
 
 def smart_toilet(panel, fin):
@@ -1303,7 +1326,7 @@ p = [box([1.82, 0.44, 0.86], [0, 0.22, z], PORCELAIN, 'gloss', radius=0.03),    
      sph([0.07, 0.06, 0.08], [0.2, 0.525, z + 0.05], '#F2C14E', 'gloss', segments=10),                   # duck
      sph([0.045, 0.045, 0.045], [0.2, 0.57, z + 0.08], '#F2C14E', 'gloss', segments=10),
      cone([0.025, 0.02, 0.03], [0.2, 0.565, z + 0.11], '#E9853B', 'gloss', rotate=[90, 0, 0], segments=8)]
-addp('bathtub', p, (2, 1))
+addp('bathtub', forward(p, 0.035), (2, 1))
 
 
 def clawfoot(body, outer, feet):
@@ -1382,7 +1405,7 @@ p = [lathe([0.24, 0.72, 0.2], [0, 0.36, z - 0.03], PORCELAIN, 'gloss', [[0, -0.5
      cyl([0.02, 0.03, 0.02], [0.17, 1.03, -0.41], CHROME, 'chrome', segments=8),
      cyl([0.06, 0.09, 0.06], [-0.17, 0.945, -0.41], '#F2F1EE', 'gloss', segments=12, taper=1.1),
      cyl([0.012, 0.12, 0.012], [-0.165, 1.0, -0.41], MUSTARD, 'gloss', segments=6, rotate=[0, 0, 10])]
-addp('sinkPedestal', p)
+addp('sinkPedestal', forward(p, 0.024))
 
 
 def double_vanity(cab, top, fin, tap):
@@ -1467,8 +1490,8 @@ def laundry(dryer=False):
     return p
 
 
-addp('laundryWasher', laundry())
-addp('laundryDryer', laundry(dryer=True))
+addp('laundryWasher', forward(laundry(), 0.03))
+addp('laundryDryer', forward(laundry(dryer=True), 0.03))
 
 # =============================================================================================
 # Kids
@@ -1495,9 +1518,7 @@ add('kidsBed@minimal', placeholder(kids_bed('#F2F2F0', '#FFFFFF', LINEN, BIRCH))
 
 def toy_box():
     p = [box([0.8, 0.46, 0.5], [0, 0.23, -0.18], '#F2C14E', 'satin', radius=0.03),
-         box([0.82, 0.05, 0.52], [0, 0.6, -0.36], '#E9A23B', 'satin', radius=0.02, rotate=[-60, 0, 0]),  # open lid
-         box([0.1, 0.1, 0.1], [-0.2, 0.5, -0.15], '#D9483B', 'satin', radius=0.02),
-         sph([0.16, 0.16, 0.16], [0.15, 0.52, -0.12], '#3E8EDE', 'gloss', segments=10),        # ball
+         box([0.82, 0.05, 0.52], [0, 0.485, -0.18], '#E9A23B', 'satin', radius=0.02),         # the lid, shut
          box([0.1, 0.1, 0.1], [0.32, 0.05, 0.25], '#5EC28B', 'satin', radius=0.02),             # blocks spilled
          box([0.1, 0.1, 0.1], [0.2, 0.05, 0.3], '#D9483B', 'satin', radius=0.02, rotate=[0, 30, 0]),
          box([0.1, 0.1, 0.1], [0.26, 0.15, 0.28], '#3E8EDE', 'satin', radius=0.02)]
@@ -1562,7 +1583,7 @@ def doll_house(wall, roof, trim):
     return p
 
 
-add('dollHouse', placeholder(doll_house('#F4EBD8', '#D9483B', HONEY)))
+add('dollHouse', placeholder(forward(doll_house('#F4EBD8', '#D9483B', HONEY), -0.06)))
 add('dollHouse@modern', placeholder(doll_house('#F4F4F2', '#3A3D41', OAK)))
 
 
@@ -2056,7 +2077,7 @@ for k in range(12):
     p.append(box([0.01, 0.03, 0.003], [math.sin(a) * 0.135, 1.77 + math.cos(a) * 0.135, z + 0.187], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, -k * 30]))
 p += [box([0.012, 0.08, 0.003], [-0.03, 1.79, z + 0.19], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, 40]),
       box([0.008, 0.12, 0.003], [0.03, 1.81, z + 0.192], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, -30])]
-addp('grandfatherClock', p)
+addp('grandfatherClock', forward(p, 0.04))
 
 
 def plinth(h, color, fin='matte', w=0.36):
@@ -2264,7 +2285,7 @@ def curtains(color, rod_col, w=0.86, top=2.45, bottom=1.0):
             x = s * (w / 2 - 0.04 - i * 0.055)
             p.append(cyl([0.07, h, 0.06], [x, bottom + h / 2, z + 0.08 + (i % 2) * 0.01], color, 'fabric', segments=10))
     p += [box([0.24, 0.04, 0.03], [s * (w / 2 - 0.12), bottom + h * 0.42, z + 0.12], color, 'fabric', radius=0.015) for s in (-1, 1)]
-    return placeholder(p)
+    return placeholder(forward(p, -0.05))                                                  # the panels' backs on the wall face
 
 
 add('curtains', curtains(LINEN, BLACKMETAL))

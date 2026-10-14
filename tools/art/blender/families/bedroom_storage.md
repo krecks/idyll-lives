@@ -10,11 +10,11 @@ by the existing `model.<id>` keys. They replace the primitive-part placeholders 
 
 - **Built in place.** The parts are placed in game axes with no shift (`F = G.GameFrame()`), where each
   placeholder stands, and settled with `G.settle(centre=False)` and `centre=` on each `Model`. Most stand at the
-  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several placeholders reach
+  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several placeholders reached
   3.5–7 cm into the wall (the nightstand and lamp nightstand to -0.465, the tall chest and low dresser to -0.48,
-  the armoire to -0.50); the models stop at the wall face, so `check_glb.py` warns that those five are off centre
-  from their placeholders (by 2.7–4.4 cm). The drum nightstand, hamper, chest and bench stand where their
-  placeholders do.
+  the armoire to -0.50); they stand on the wall face now too (2026-10-14; the armoire's and the chests' a little
+  shallower, as the models), and the content `surface`s of the nightstand, tall chest and low dresser start at
+  the wall face. The drum nightstand, hamper, chest and bench stand where their placeholders do.
 - **Tops are the content's `surface` heights**: nightstand, modern and lamp nightstand 0.56, drum 0.57, three-drawer
   0.60, blanket chest 0.505, dresser 0.89, low dresser 0.80, tall chest 1.16 (catalog2 `TOPS`). The bench's
   cushion top is its seat, 0.47. The lamp's bulb is at 0.935–0.97, around the content's `light.height` 0.95.
@@ -75,8 +75,8 @@ the rest (`check_glb.py` counts them as still).
 | `model.wardrobeSingle` | 0.90 × 2.28 × 0.62 m | 2,220 | 2 | Body, Handles (a box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
 
-`check_glb.py`: 0 failed; five "off centre" warnings (the wall face, above). Khronos validator: 0 errors, 0
-warnings each.
+`check_glb.py`: 0 failed (the five "off centre" warnings went with the placeholders' move). Khronos validator: 0
+errors, 0 warnings each.
 
 ## Rebuild
 

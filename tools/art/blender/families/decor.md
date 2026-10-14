@@ -12,12 +12,19 @@ Each is built where its placeholder stands (`F`, game axes):
 - **The hanging plant** hangs from the ceiling (2.8 m), centred, `floor=False`.
 - **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
   sit on the bench, the fire behind them (content `seat`: height 0.42, forward 0.02; the fire's `light.height` 0.7).
-- **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face. Their placeholders
-  reach 2–5 cm into the wall, so `check_glb.py` warns that they're off its centre (and the curtains, whose rail
-  brackets now reach the wall). Those warnings are expected.
+- **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face, and so do their
+  placeholders (moved forward 4 and 5 cm, 2026-10-14), and the curtains' (moved back 5 cm onto it, where the
+  models' rail brackets reach). The fireplace's placeholder is redrawn as the model: the chimney breast round a
+  dark firebox over the raised hearth bench, so a resident warming up sits on it if the file fails to load.
 - **The rest** stand centred on their tile, or lie flat (the rugs).
+- **Details** (2026-10-14): the ginger jar's blue sprigs are painted-on blossom sprigs (a curving stem, three leaves,
+  a five-petalled flower; `_sprig`), not V-shaped pairs that read as crosses; the cat sits on its rump with a thigh
+  bulging at either side and its hind feet tucked forward, not on one ball; the coat on the stand hangs by its
+  collar, flaring a little to the hem, its sleeves at its sides (`_coat`), not a capsule.
 
-The pictures are flat colour shapes (matte, one draw call with the frame), not textures.
+The pictures are flat colour shapes (matte, one draw call with the frame), not textures. Kept so (2026-10-14): a
+512 px painted texture would be a draw call of its own on each picture (1 to 2) and a download, for art seen
+small from the game camera, on a wall thing most houses have several of. Revisit for a close-up view.
 
 ## What moves
 

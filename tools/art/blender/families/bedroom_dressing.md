@@ -11,8 +11,7 @@ until checked in play.
 ## Shared
 
 - **Mirror glass (E6).** Each mirror's glass is one flat box (or oval) of a mirror material: `mirror`
-  (`'gloss', 'front'`) on the three mirrors, `mirror_back` (`'gloss', 'back'`) on the dressing table, whose
-  mirror faces the seat at the back. The game lays the reflection on the glass's box, across its thinnest
+  (`'gloss', 'front'`) on all four (the dressing table's faces the pouf in front of it). The game lays the reflection on the glass's box, across its thinnest
   side, so **the glass stands upright**: the placeholders of the cheval and standing mirrors lean back 6° and 8°;
   these don't (a tilted pane's box would put the reflection beside it). The dressing table's glass is an oval,
   so the game draws an oval reflection; the others are rectangles.
@@ -28,22 +27,24 @@ until checked in play.
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.mirror` | 0.80 × 1.86 × 0.56 m | 2,892 | 3 | Frame (wood) |
-| `model.dressingTable` | 0.86 × 1.53 × 0.85 m | 5,848 | 4 | Table (wood), Frame (brass) |
+| `model.dressingTable` | 0.86 × 1.53 × 0.85 m | 5,660 | 3 | Table (wood), Frame (brass) |
 | `model.mirrorWall` | 0.62 × 0.96 × 0.09 m | 1,136 | 2 | Frame (black metal) |
 | `model.mirrorFloor` | 0.56 × 1.78 × 0.45 m | 1,048 | 2 | Frame (brass) |
 
 - **`mirror`** — a cheval mirror: two turned posts on feet and a low stretcher, the swing frame between them on
   brass pivots at 0.95 m, a crest with a finial. Centred on its tile (its placeholder is 5 cm back).
-- **`dressingTable`** — where its placeholder stands (`centre=(0, -0.006)`): the pouf at the back (depth −0.22,
-  its top 0.45 m: characters.ts `SEATS` h 0.45, fwd −0.22), the table (top 0.76 m) in front of it on four
-  tapered brass legs, two drawer cases either side of the kneehole, the oval mirror on a brass stand at the far
-  edge facing back at the seat, with a wooden back. On the top: two perfume bottles and a jewellery box.
+- **`dressingTable`** — its mirror against the wall, the pouf at the front (`centre=(0, -0.003)`; turned round
+  on 2026-10-14: it stood the other way, as its placeholder, the stool against the wall and the player looking at
+  the mirror's back). The pouf at depth +0.22, its top 0.45 m (characters.ts `SEATS` h 0.45, fwd 0.22, `back`:
+  the sitter faces the object's back, to the mirror); the table (top 0.76 m) behind it on four tapered brass legs,
+  two drawer cases either side of the kneehole, the oval mirror on a brass stand at the back edge, its wooden back
+  on the wall face. On the top: two perfume bottles and a jewellery box. The script builds it as it first stood
+  and turns it round at the end (`TURN_BACK`); the placeholder (`catalog.py`) is turned the same way.
   - **The drawer.** The case on the seated resident's right (game +x: the game is left-handed) slides its drawer
     out 18 cm towards the seat in 0.8 s (`drawer_open`, `G.slide`), its tray hidden in the case at rest, a dark
     `inside` panel behind it. `motions` plays it for `getReady` and holds it 3 s, then shuts it.
-  - **Draw calls: 4** (the most allowed; `check_glb.py` warns). The still body's wood, its plain finishes, the
-    mirror glass, and the drawer (wood, with a wooden knob so it stays one). The pouf is a plain `satin`, not
-    `fabric`, to stay at 4.
+  - **Draw calls: 3.** The still body's wood, its plain finishes (the mirror glass is `gloss`), and the drawer
+    (wood, with a wooden knob so it stays one). The pouf is a plain `satin`, not `fabric`.
 - **`mirrorWall`** — on the wall layer: built in place at the placeholder's height (frame 1.0–1.9 m, ledge at
   0.97 m), its back on the wall face (depth −0.43); `G.settle(centre=False, floor=False)` and
   `G.Model(..., floor=False, centre=(0, -0.385))`. A black metal frame, the glass, and a ledge with a cup and a
@@ -52,7 +53,7 @@ until checked in play.
   clamp up from each to the frame's bottom, a rear bar and a strut to a plate on the frame's back. Where its
   placeholder stands (`centre=(0, -0.155)`: the frame 5 cm behind the middle, the strut behind it).
 
-`check_glb.py`: 0 failed. Warnings: the dressing table's 4 draw calls (above), and the wall mirror "floats
+`check_glb.py`: 0 failed. Warning: the wall mirror "floats
 93.6 cm above its origin" (it is on the wall, as it should be). Khronos validator: 0 errors, 0 warnings each.
 
 ## In the game

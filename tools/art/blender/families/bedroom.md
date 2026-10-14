@@ -41,8 +41,11 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
 | `model.bedCanopy` | 1.73 × 2.135 × 1.93 m | 4,960 | 3 | `turn_down` | walnut posts with finials, panelled headboard, linen valance and four tied curtains (still) |
 | `model.bedDaybed` | 0.96 × 0.84 × 1.96 m | 4,720 | 2 | — | white spindle back and arms, sage fitted cover, rose cushions (static) |
 
-`check_glb.py`: 0 failed; one warning, the futon's height (0.99 m, its placeholder 0.66 m: the placeholder is
-the futon flat, the model is it folded up as a sofa). Khronos validator: 0 errors, 0 warnings each.
+`check_glb.py`: 0 failed. The futon's placeholder (`catalog.py` `futon`) was the futon lying flat (0.66 m); it
+is the folded sofa now, as the model rests (2026-10-14). Khronos validator: 0 errors, 0 warnings each.
+
+The beds fill their 2-deep tiles (1.90–1.97 m long), so their headboards reach 1–5 cm past the wall face
+(−0.93), as their placeholders do; standing them on it would push their feet past the tiles. Kept.
 
 ## The futon
 
