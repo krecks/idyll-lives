@@ -297,3 +297,70 @@ Open:
 - **Testing in a shared checkout**: other sessions' edits reload the dev server's page mid-run, and once a content
   file was briefly invalid ("the game data failed to load") while one was being written. A port given up by one
   session (5293) was taken by another within minutes; pick a fresh one each run.
+
+## Kitchen (K1–K9, built and reviewed 2026-10-14)
+
+All 68 kitchen things are built (K1–K9) and sit in Validate. The review fixed what it found in the models
+(bf5291a): the floor models now stand against the wall, hob flames last the whole cook, the ovens, dishwashers
+and the microwave open onto an inside, the toast pops up, the island's drawer opens where the resident stands.
+These are what's left.
+
+### Placement
+
+- **Other families' floor models stand off the wall too.** Centred on their tiles, they stand short of where their
+  placeholders stood, against the wall. The kitchen is fixed by giving each `Model` its placeholder's `centre`,
+  which `G.settle()` now uses (`gamekit/parts.py` `CENTRE`; README trap "Against a wall, on the floor"). Measured
+  gap, model back vs placeholder back:
+  - 15–22 cm: the bathroom sinks `sink`, `vanityDouble` (15), `sinkVessel`, `sinkConsole` (20), `sinkPedestal` (22);
+  - 5–7 cm: `armoire`, `toyBox`, `toyChest`, `toiletWallHung`, `chestOfDrawers`, `dresserLow`, `fireplace`,
+    `sofaBed`, `deskCorner`;
+  - 3–4 cm: `wardrobeSingle`, `deskSimple`, `deskStanding`, `deskExecutive`, `bathtub`, `bathtubFreestanding`,
+    `nightstand`, `nightstandLamp`, `grandfatherClock`, `lampFloorArc`, `filingCabinet`.
+
+  Freestanding ones (`beanBag`, `rockingHorse`, `playTent`, the trees) can stay centred.
+- **The gate doesn't catch it.** `check_glb.py` accepts a floor model centred on its tile even when its
+  placeholder stands against the wall. A warning when the placeholder's back is at the wall face (depth ≤ −0.40)
+  and the model's is more than 2 cm in front of it would have caught every case above.
+- **Two counter depths.** The `catalog.py` counters and appliances (`counter`, `microwave`, `coffeeMachine`,
+  `breakfastCounter`, `dishwasher`) are 0.66 m deep, the `catalog2.py` ones 0.79 m: in a mixed run the fronts step
+  13 cm. One depth would mean moving their content `surface` (TOPS) with them.
+- **The placeholders reach 1–5 cm into the wall**, and the models now follow them: hidden in the wall, but a
+  wall cut away shows it.
+
+### Residents and content
+
+- **The kitchen island's stools.**
+  - The island's model has two stools built in, as its placeholder did, but breakfast there is eaten standing
+    beside them (`eat` doesn't sit at the island).
+  - A resident making a sandwich stands at a stool's slot, half in the stool.
+  - `housegen.json` also puts separate stools (`stoolCounter`, `stoolBarHigh`, `barStool`) in front of islands,
+    so a generated `kitchenIsland` likely shows doubled stools.
+  - Either seat breakfast on the built-in stools (a seat at 0.7 m), or drop them from the model and let the
+    stools be objects.
+- **The bar cart** is used from beside it, not from the front: the resident mixes at its side.
+- **"(+use)" parts waiting for a use.** Each is built as a separate part with no clip: the drawer counter's three
+  drawers, the wall cabinet's doors, the pedal bin's lid, the recycling bins' lids, and the doors of the
+  sideboard, buffet and china cabinet.
+- **`butcherBlock`'s surface is at 0.93 m**, but its top layer is at 0.945 m (from its TOPS entry): things on it
+  sink 1.5 cm.
+- **`diningChair`'s placeholder** in `catalog/manifest.json` differs from the base manifest's (a gate warning, as
+  `consoleTable`'s): copy the current one.
+
+### Clips and models
+
+- **The retro fridge's lever.** The plan wanted the chrome lever to turn 30° before the door swings. That needs a
+  clip that starts late (gamekit has no delay) and the lever as a child of the door node. For now it swings with
+  the door; the plan row says so.
+- **The hob counter (`cooktopCounter`) shows a blue gas flame on a ceramic hob**, as the plan asked. A glowing
+  ring would suit it better, but `glow` (E8) is night only. Decide.
+- **The microwave is mirrored**: its controls are on the viewer's left and its door is hinged on the right. Real
+  ones have it the other way round.
+- **Draw calls.**
+  - Six models are at the 4-draw maximum: `fridgeFrenchDoor`, `wineFridge`, `stoveGas`, `rangeCooker`,
+    `microwave`, `breakfastCounter`.
+  - Tiny textured decorations cost a draw each: `counterCorner`'s wooden spoons and `fridgeMini`'s board. Mapping
+    them to a plain finish would save one.
+- **Validate is crowded.** The kitchen alone has nine groups in it: fridges, cookers, appliances, counters,
+  kitchen storage, islands, tables, chairs and dining storage. Sign the kitchen off (16-sign-off.md) after a look
+  in play.
+- **Not checked**: all four facings of each model, the colour studio, night lighting, and catalog pictures.
