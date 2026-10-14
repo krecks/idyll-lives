@@ -842,8 +842,10 @@ class NatureWindPlugin extends MaterialPluginBase {
     const effect = subMesh.effect;
     if (!effect) return;
     const k = this.kind;
+    // A model's part grown from nothing (`windStill`, models.ts) bends but doesn't flutter: flat at rest, it stays hidden.
+    const still = (subMesh.getMesh().metadata as { windStill?: boolean } | null)?.windStill;
     effect.setFloat4('natureWind', this.state.time, this.state.strength, 0.8, 0.6);
-    effect.setFloat4('natureWindKind', k[0], k[1], k[2], k[3]);
+    effect.setFloat4('natureWindKind', k[0], still ? 0 : k[1], k[2], k[3]);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {

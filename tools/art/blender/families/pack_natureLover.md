@@ -40,8 +40,8 @@ at 0.45 m.
 **Found in the game:** a part in a textured finish (`foliage`) that is grown from nothing (`G.grow` from 0.001) never
 showed on the clips bench, WebGPU or WebGL; the same part in plain satin did, so the seedling is plain satin. Fixed
 in the renderer since: such a part takes its normals and UVs from its grown shape (`models.ts`), and the foliage
-flutter is in world metres however far a part is scaled (`nature.ts`). A grown foliage part still shows at rest as a
-thin film the flutter lifts off its flat shape, so grown parts stay plain (plan/future.md). The veggie bed's foliage
+flutter is in world metres however far a part is scaled (`nature.ts`). A grown part doesn't flutter (it stays flat and
+hidden at rest), so a foliage seedling would work now; this one stays plain satin. The veggie bed's foliage
 parts start at full size and shrink, which works.
 
 **The harvest is down into the soil, not a uniform shrink.** The lettuce has two clips (`grow` and `harvest`); the

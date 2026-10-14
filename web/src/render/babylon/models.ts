@@ -1171,6 +1171,8 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     }
     const merged = mergeByMaterial(kept, part < 0 ? name : `${name}|${file.parts[part].name}`);
     const restyled = groups.build(part < 0 ? name : `${name}|${file.parts[part].name}`);
+    // A part grown from nothing lies flat where it hides at rest: leaf flutter would lift it into view (nature.ts).
+    if (pieces.some((p) => p.part === part && p.full)) for (const mesh of restyled.meshes) mesh.metadata = { ...mesh.metadata, windStill: true };
     meshes.push(...merged, ...restyled.meshes);
     tints.push(...merged.map((m) => namedTint(m.material)), ...restyled.tints);
     parts.push(...[...merged, ...restyled.meshes].map(() => part));
