@@ -259,6 +259,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   - A lot with the object on it (`?state=<name>` from a test dump, or a bench state with objects
     added), `&hour=13` and `&hour=22`, WebGPU and `&renderer=webgl`.
   - The catalog picture (`render/preview/items.ts`, WebGL2).
+  - Its clips: `/water.html` plays every sink's `water_on` (on, running, off, in a loop; `?keys=`,
+    `?t=` to hold a time, `?colors=body:%23hex`), the way a resident washing plays it.
   - Placed turned (all four `rot`), and resized when the engine supports it.
 
 ## Optimisation and registration
