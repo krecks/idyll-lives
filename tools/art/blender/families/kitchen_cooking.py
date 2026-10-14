@@ -32,6 +32,13 @@ M = G.Palette(
     tray=('#8E9196', 'metal'),       # an oven tray
     pot=('#6E7377', 'metal'),        # a stock pot
     pan=('#4A4E52', 'satin'),        # a frying pan
+    steel=('#C9CBCC', 'metal'),      # a stainless appliance front
+    toaster=('#C05B4D', 'gloss'),    # a toaster's body
+    jug=('#DCE6EA', 'gloss'),        # a blender's jug (opaque, so it costs no extra draw call)
+    bean=('#5A3A26', 'gloss'),       # a coffee machine's bean hopper
+    cup=('#F2F1EE', 'gloss'),        # a cup
+    coffee=('#9A6B3F', 'gloss'),     # the stream of coffee
+    fruit=('#E0A33E', 'gloss'),      # a piece of fruit in the bowl
 )
 
 SECONDS = 1.4   # a door drops, a drawer slides or a knob turns in this long
@@ -273,6 +280,132 @@ def microwave():
     G.spin(turn, 'turntable', turns=1, seconds=2.0)
 
 
+# --- small appliances: a coffee machine, a breakfast counter and two dishwashers ---------------------
+
+def _counter(F, w=1.0, body=None, top=None):
+    """A base unit like the placeholder's `k_base`: a plinth, a carcass and a worktop to 0.96, with a
+    drawer over two doors on the front (the front face at depth 0.14)."""
+    body, top = body or M.cab, top or M.worktop
+    F.box('plinth', w - 0.04, 0.10, 0.56, (0, 0.05, -0.18), M.dark, bevel=0.005)
+    F.box('carcass', w - 0.004, 0.82, 0.60, (0, 0.51, -0.16), body, bevel=0.01)
+    F.box('worktop', w, 0.04, 0.66, (0, 0.94, -0.15), top, bevel=0.006)
+    F.box('drawer', w - 0.10, 0.14, 0.02, (0, 0.85, 0.155), body, bevel=0.006)
+    F.box('drawer_pull', 0.18, 0.02, 0.02, (0, 0.85, 0.175), M.chrome, bevel=0.004)
+    for s in (-1, 1):
+        F.box(f'door{s}', w / 2 - 0.06, 0.72, 0.02, (s * w / 4, 0.48, 0.155), body, bevel=0.006)
+        F.box(f'door_pull{s}', 0.02, 0.12, 0.02, (s * (w / 4 - 0.16), 0.80, 0.175), M.chrome, bevel=0.004)
+
+
+def _stream(F, name, x, top_y, z, bottom_y, material, r=0.012):
+    """A thin stream from (x, top_y, z) down to bottom_y, joined with its origin at the top and scaled
+    to nothing along its length, so it is hidden until `grow` runs the clip (the `water_on` way)."""
+    length = max(0.05, top_y - bottom_y)
+    with G.new_parts() as parts:
+        F.cyl(name, r, length, (x, (top_y + bottom_y) / 2, z), material, verts=8)
+    obj = G.join(parts, name, origin=F.at(x, top_y, z))
+    obj.scale[2] = 0.001  # hidden at rest; `grow` runs it out along its length
+    return obj
+
+
+# --- coffee machine: 1x1, a counter with an espresso machine on the worktop ----------------------------
+def coffeeMachine():
+    F = G.GameFrame(shift=0.15)
+    with G.new_parts() as still:
+        _counter(F)
+        # the machine: a body, a warming top, a group head, a drip tray, a gauge and a bean hopper
+        F.box('machine', 0.34, 0.30, 0.32, (-0.14, 1.11, -0.26), M.charcoal, bevel=0.03)
+        F.box('warming', 0.34, 0.03, 0.32, (-0.14, 1.275, -0.26), M.steel, bevel=0.008)
+        F.cyl('group', 0.04, 0.06, (-0.14, 1.19, -0.11), M.steel, verts=14)
+        F.box('spout', 0.022, 0.022, 0.022, (-0.14, 1.155, -0.11), M.steel, bevel=0.004)
+        F.box('drip', 0.30, 0.02, 0.26, (-0.14, 0.965, -0.10), M.steel, bevel=0.004)
+        F.cyl('gauge', 0.03, 0.012, (-0.06, 1.20, -0.096), M.steel, rot=(90, 0, 0), verts=14)
+        F.cone('hopper', 0.055, 0.045, 0.12, (-0.06, 1.35, -0.30), M.bean, verts=14)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the cup, on the drip tray's front edge, sliding back under the spout for `brew`
+    with G.new_parts() as parts:
+        F.cyl('cup', 0.035, 0.05, (-0.14, 1.0, 0.0), M.cup, verts=14)
+        F.box('cup_handle', 0.012, 0.03, 0.02, (-0.095, 1.005, 0.0), M.cup, bevel=0.004)
+    cup = G.join(parts, 'cup', origin=F.at(-0.14, 0.975, 0.0))
+    stream = _stream(F, 'stream', -0.14, 1.144, -0.11, 1.0, M.coffee, r=0.012)
+    G.settle()
+    G.slide(cup, 'brew', (0, 0.11, 0), seconds=0.6)
+    G.grow(stream, 'brew', seconds=0.4)
+
+
+# --- breakfast counter: 1x1, a counter with a toaster and a blender on the worktop ---------------------
+def breakfastCounter():
+    F = G.GameFrame(shift=0.15)
+    with G.new_parts() as still:
+        _counter(F)
+        # the toaster
+        F.box('toaster', 0.28, 0.18, 0.16, (0.30, 1.05, -0.30), M.toaster, bevel=0.05)
+        for s in (-1, 1):
+            F.box(f'slot{s}', 0.10, 0.012, 0.03, (0.30, 1.137, -0.30 + s * 0.035), M.dark, bevel=0.004)
+        # the blender: a base, a jug and a fruit bowl beside them
+        F.box('blender', 0.16, 0.12, 0.16, (0.0, 1.02, -0.32), M.charcoal, bevel=0.03)
+        F.cone('jug', 0.06, 0.075, 0.26, (0.0, 1.21, -0.32), M.jug, verts=16)
+        F.cyl('bowl', 0.13, 0.06, (-0.28, 0.99, 0.05), M.jug, verts=16)
+        F.sphere('fruit1', 0.04, (-0.30, 1.04, 0.02), M.fruit, segments=10, rings=8)
+        F.sphere('fruit2', 0.038, (-0.24, 1.04, 0.08), M.toaster, segments=10, rings=8)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the toaster's lever, sliding down, and its toast, popping up as it toasts
+    with G.new_parts() as parts:
+        F.box('lever', 0.02, 0.03, 0.03, (0.45, 1.06, -0.30), M.dark, bevel=0.006)
+    lever = G.join(parts, 'lever', origin=F.at(0.45, 1.06, -0.30))
+    with G.new_parts() as parts:
+        for s in (-1, 1):
+            F.box(f'toast{s}', 0.10, 0.12, 0.03, (0.30, 1.06, -0.30 + s * 0.035), M.fruit, bevel=0.01)
+    toast = G.join(parts, 'toast', origin=F.at(0.30, 1.00, -0.30))
+    # the blender's lid, lifting off for `blend`
+    with G.new_parts() as parts:
+        F.cyl('lid', 0.078, 0.03, (0.0, 1.355, -0.32), M.charcoal, verts=16)
+        F.cyl('lid_knob', 0.02, 0.02, (0.0, 1.38, -0.32), M.charcoal, verts=10)
+    lid = G.join(parts, 'lid', origin=F.at(0.0, 1.34, -0.32))
+    G.settle()
+    G.slide(lever, 'toast_down', (0, 0, -0.035), seconds=0.5)
+    G.slide(toast, 'toast_down', (0, 0, 0.08), seconds=1.2)
+    G.slide(lid, 'blend', (0, 0, 0.10), seconds=0.8)
+
+
+# --- dishwashers: a door dropping open over a sliding lower rack ---------------------------------------
+def _dishwasher(F, w, h, top_d, top_z, front, door_h, body, panel, top):
+    """A dishwasher: a tub whose door drops on its bottom hinge and whose lower rack slides out."""
+    with G.new_parts() as still:
+        F.box('plinth', w - 0.04, 0.10, top_d - 0.10, (0, 0.05, top_z - 0.03), M.dark, bevel=0.005)
+        F.box('carcass', w - 0.02, h - 0.14, top_d - 0.06, (0, h / 2 - 0.02, top_z - 0.01), body, bevel=0.012)
+        F.box('tub', w - 0.14, h - 0.24, top_d - 0.12, (0, h / 2 - 0.02, top_z - 0.02), M.dark, bevel=0.006)
+        F.box('worktop', w, 0.04, top_d, (0, h - 0.02, top_z), top, bevel=0.006)
+        F.box('strip', w - 0.10, 0.09, 0.02, (0, h - 0.12, front - 0.01), M.dark, bevel=0.004)
+        F.sphere('button', 0.012, (w / 2 - 0.14, h - 0.12, front + 0.002), M.display, segments=8, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the door, hinged on its bottom edge (its bottom at y 0.12)
+    with G.new_parts() as parts:
+        F.box('door', w - 0.10, door_h, 0.02, (0, 0.12 + door_h / 2, front), panel, bevel=0.01)
+        F.box('handle', w - 0.50, 0.02, 0.03, (0, 0.12 + door_h - 0.04, front + 0.015), M.chrome, bevel=0.006)
+    door = G.hinged(G.join(parts, 'door'), F.at(0, 0.12, front))
+    # the lower rack, sliding out to the front
+    with G.new_parts() as parts:
+        F.box('rack', w - 0.16, 0.06, top_d - 0.26, (0, 0.30, top_z - 0.01), M.tray, bevel=0.004)
+        for s in (-1, 1):
+            F.box(f'rack_side{s}', 0.02, 0.10, top_d - 0.26, (s * (w / 2 - 0.09), 0.34, top_z - 0.01), M.tray, bevel=0.003)
+    rack = G.join(parts, 'rack', origin=F.at(0, 0.30, top_z - 0.01))
+    G.settle()
+    G.swing(door, 'door_open', 85, seconds=SECONDS, axis='X')
+    G.slide(rack, 'door_open', (0, -0.30, 0), seconds=SECONDS)
+
+
+def dishwasher():
+    F = G.GameFrame(shift=0.1375)
+    _dishwasher(F, w=1.0, h=0.96, top_d=0.66, top_z=-0.15, front=0.175, door_h=0.72,
+                body=M.cab, panel=M.steel, top=M.cab)
+
+
+def dishwasherCompact():
+    F = G.GameFrame(shift=0.085)
+    _dishwasher(F, w=1.0, h=0.95, top_d=0.79, top_z=-0.085, front=0.25, door_h=0.66,
+                body=M.cab, panel=M.steel, top=M.cab)
+
+
 FAMILY = G.Family(
     'kitchen_cooking', M,
     [G.Model('stoveElectric', stoveElectric, size=(0.60, 0.98, 0.661), key='model.stoveElectric',
@@ -298,7 +431,23 @@ FAMILY = G.Family(
      G.Model('microwave', microwave, size=(1.0, 1.26, 0.66), key='model.microwave',
              # reheat opens the door and turns the plate while it heats
              motions={'uses': {'reheat': 'door_open'}, 'loops': {'reheat': 'turntable'}, 'hold': 1.2},
-             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')])],
+             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')]),
+     G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.41, 0.66), key='model.coffeeMachine',
+             # espresso slides a cup under the spout and grows a stream of coffee
+             motions={'uses': {'espresso': 'brew'}, 'hold': 2.0},
+             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Machine')]),
+     G.Model('breakfastCounter', breakfastCounter, size=(1.0, 1.37, 0.66), key='model.breakfastCounter',
+             # toast presses the lever down and pops the toast up; smoothie lifts the blender's lid
+             motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'hold': 2.0},
+             paint=[('cab', 'Counter'), ('toaster', 'Toaster'), ('charcoal', 'Blender')]),
+     G.Model('dishwasher', dishwasher, size=(1.0, 0.96, 0.685), key='model.dishwasher',
+             # dishes drops the door and slides the lower rack out, held while it is loaded
+             motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
+             paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')]),
+     G.Model('dishwasherCompact', dishwasherCompact, size=(1.0, 0.95, 0.79), key='model.dishwasherCompact',
+             # dishes, as the dishwasher
+             motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
+             paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')])],
     comment='Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load. Each cooker is a box on the floor with a hob on top '

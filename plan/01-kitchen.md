@@ -1,7 +1,8 @@
 # Kitchen
 
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
-(`families/kitchen.py`), and the six K2 cookers are done (`families/kitchen_cooking.py`).
+(`families/kitchen.py`), and the six K2 cookers and the four K3 small appliances and dishwashers are done
+(`families/kitchen_cooking.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -35,7 +36,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the flame ring grows for cook. |
 | `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat. L `turntable`: the glass plate turns while it heats (E1). |
 
-## K3. Small appliances and dishwashers (4)
+## K3. Small appliances and dishwashers (4) — **Done** (in Validate › Appliances)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
 - **Validate group:** `appliances` (Validate › Appliances)

@@ -85,6 +85,13 @@ are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `game
 while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
 microwave swings its door and turns its turntable. Their primitive-part entries stay as the fallback.
 
+The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
+`breakfastCounter.glb`, `dishwasher.glb`, `dishwasherCompact.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
+lever slides and its toast pops, and its blender lid lifts; the dishwashers drop their door and slide a rack
+out. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

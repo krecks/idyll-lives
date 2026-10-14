@@ -282,6 +282,198 @@
           "label": "Microwave"
         }
       ]
+    },
+    "model.coffeeMachine": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/coffeeMachine.glb",
+      "materials": {
+        "bean": {
+          "finish": "material.finish.gloss"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "espresso": "brew"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "charcoal",
+          "label": "Machine"
+        }
+      ]
+    },
+    "model.breakfastCounter": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/breakfastCounter.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "fruit": {
+          "finish": "material.finish.gloss"
+        },
+        "jug": {
+          "finish": "material.finish.gloss"
+        },
+        "toaster": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toast": "toast_down",
+          "smoothie": "blend"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Counter"
+        },
+        {
+          "material": "toaster",
+          "label": "Toaster"
+        },
+        {
+          "material": "charcoal",
+          "label": "Blender"
+        }
+      ]
+    },
+    "model.dishwasher": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/dishwasher.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "dishes": "door_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handle"
+        },
+        {
+          "material": "steel",
+          "label": "Panel"
+        }
+      ]
+    },
+    "model.dishwasherCompact": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/dishwasherCompact.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "dishes": "door_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handle"
+        },
+        {
+          "material": "steel",
+          "label": "Panel"
+        }
+      ]
     }
   }
 }

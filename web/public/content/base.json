@@ -3675,6 +3675,10 @@
         {
           "id": "cookers",
           "label": "Cookers"
+        },
+        {
+          "id": "appliances",
+          "label": "Appliances"
         }
       ]
     },

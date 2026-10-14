@@ -1,14 +1,17 @@
 # Kitchen cooking — notes
 
-`kitchen_cooking.py` builds the kitchen's cookers into `web/public/assets/models/kitchen_cooking/` and
-their entries in `packs/kitchen_cooking/manifest.json`: the six **K2 cookers** — the electric cooker
-(`model.stoveElectric`), the gas range (`model.stoveGas`), the oven tower (`model.wallOven`), the range
-cooker (`model.rangeCooker`), the hob counter (`model.cooktopCounter`) and the microwave counter
-(`model.microwave`). They replace the primitive-part placeholders of `catalog.py` / `catalog2.py`, which
-stay as the fallback. K3 (small appliances and dishwashers) will join them here later. Built 2026-10-14.
+`kitchen_cooking.py` builds the kitchen's cookers and small appliances into
+`web/public/assets/models/kitchen_cooking/` and their entries in `packs/kitchen_cooking/manifest.json`:
+the six **K2 cookers** — the electric cooker (`model.stoveElectric`), the gas range (`model.stoveGas`), the
+own tower (`model.wallOven`), the range cooker (`model.rangeCooker`), the hob counter (`model.cooktopCounter`)
+and the microwave counter (`model.microwave`) — and the four **K3 small appliances** — the coffee machine
+(`model.coffeeMachine`), the breakfast counter (`model.breakfastCounter`) and the two dishwashers
+(`model.dishwasher`, `model.dishwasherCompact`). They replace the primitive-part placeholders of
+`catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14.
 
-A cooker is a box on the floor with a hob on top and an oven below. The parts are placed in game axes
-(`F`, a `GameFrame` shifted back by the placeholder's depth centre, so the model is centred on its tile).
+A cooker is a box on the floor with a hob on top and an oven below; a small appliance is a counter with a
+machine on it, or a dishwasher under a worktop. The parts are placed in game axes (`F`, a `GameFrame`
+shifted back by the placeholder's depth centre, so the model is centred on its tile).
 
 ## Materials
 
@@ -32,8 +35,15 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `flame` | gloss | a gas flame ring (gloss, not emissive) |
 | `charcoal` | satin | the microwave's body |
 | `display` | gloss | the microwave's display |
-| `tray` | metal | the oven tower's tray |
+| `tray` | metal | the oven tower's tray; a dishwasher's rack |
 | `pot`, `pan` | metal / satin | the stock pot and frying pan on the gas range |
+| `steel` | metal | a stainless appliance front (a dishwasher's door) |
+| `toaster` | gloss | the breakfast counter's toaster body |
+| `jug` | gloss | the blender's jug (opaque, not `glass`, to save a draw call) |
+| `bean` | gloss | the coffee machine's bean hopper |
+| `cup` | gloss | the cup under the spout |
+| `coffee` | gloss | the coffee stream |
+| `fruit` | gloss | the breakfast counter's fruit and toast |
 
 ## Clips
 
@@ -54,8 +64,29 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 The microwave door hinges on its left edge and swings 100°; its glass turntable turns a full turn every 2 s
 while it heats. The gas range and the range cooker carry a pot and a pan on the hob; the flame lights on a
 free burner beside them. `stoveGas`, `rangeCooker` and `microwave` take 4 draw calls (the most allowed);
-the rest take 3. All match their placeholder bounds (`check_glb.py`: 6 models, 0 failed; Khronos glTF
-validator: 0 errors, 0 warnings each). The six sit in Validate › Cookers until checked in play.
+the rest take 3.
+
+## K3 — small appliances and dishwashers
+
+A dishwasher is a tub under a worktop with a door hinged along its bottom edge (built closed, drops 85°)
+and a lower rack that slides out 30 cm as the door opens; the `dishwasher` wears the kitchen's cabinet
+fronts and the `dishwasherCompact` a stainless door. The coffee machine slides its cup back under the
+spout and runs a thin coffee stream (the sinks' `_water` way: built full size, origin at the spout tip,
+scaled to nothing along its length, `grow` runs it out). The breakfast counter's toaster lever slides down
+and the toast pops up at the end of `toast_down`; its blender lid lifts for `blend` (the jug blades need
+E1).
+
+| Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
+|---|---|---|---|---|---|
+| `model.coffeeMachine` | 1.000 × 1.410 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
+| `model.breakfastCounter` | 1.000 × 1.390 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
+| `model.dishwasher` | 1.000 × 0.960 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm (dishes) |
+| `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes) |
+
+The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
+moving parts each cost one). All match their placeholder bounds (`check_glb.py`: 31 models, 0 failed;
+Khronos glTF validator: 0 errors, 0 warnings each). The ten sit in Validate › Cookers and
+Validate › Appliances until checked in play.
 
 ## Rebuild
 

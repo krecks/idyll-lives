@@ -451,7 +451,7 @@
         1
       ],
       "price": 260,
-      "category": "kitchen",
+      "category": "validate",
       "group": "appliances",
       "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours.",
       "interactions": [
@@ -484,7 +484,7 @@
         1
       ],
       "price": 240,
-      "category": "kitchen",
+      "category": "validate",
       "group": "appliances",
       "description": "A counter with a toaster and a blender: toast for a quick bite, a smoothie for a little energy.",
       "surface": {
@@ -547,7 +547,7 @@
         1
       ],
       "price": 480,
-      "category": "kitchen",
+      "category": "validate",
       "group": "appliances",
       "description": "Built in under the worktop. Loading it is a quick, satisfying chore (the tidy love it).",
       "interactions": [
