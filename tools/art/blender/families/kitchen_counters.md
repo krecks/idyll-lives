@@ -67,13 +67,13 @@ rest pose where it is.
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
 | `model.counter` | 1.000 × 0.960 × 0.660 m | 1,404 | 2 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.counterCorner` | 1.000 × 1.270 × 1.000 m | 1,520 | 3 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
-| `model.counterEnd` | 1.000 × 0.950 × 0.790 m | 1,428 | 2 | — | static |
-| `model.counterCornerOuter` | 0.810 × 1.035 × 0.790 m | 972 | 1 | — | static |
-| `model.counterDrawers` | 1.000 × 0.950 × 0.790 m | 1,188 | 1 | — | static |
-| `model.counterOpenShelf` | 1.000 × 0.950 × 0.790 m | 1,452 | 2 | — | static |
+| `model.counterCorner` | 1.000 × 1.270 × 0.930 m | 1,520 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 1,428 | 2 | — | static |
+| `model.counterCornerOuter` | 0.810 × 1.035 × 0.660 m | 972 | 1 | — | static |
+| `model.counterDrawers` | 1.000 × 0.950 × 0.660 m | 1,620 | 2 | top drawer | `drawer_open` (putting clean dishes away: `fetch` at its prep station, `hold` 1.5 s) |
+| `model.counterOpenShelf` | 1.000 × 0.950 × 0.660 m | 1,452 | 2 | — | static |
 | `model.butcherBlock` | 0.900 × 0.945 × 0.813 m | 1,512 | 3 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
-| `model.counterMarble` | 1.000 × 0.953 × 0.790 m | 1,620 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counterMarble` | 1.000 × 0.953 × 0.660 m | 1,620 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 
 ## K5 — tall and wall storage
 
@@ -92,12 +92,16 @@ which is fine on a wall. A floor thing stands where its placeholder stands, its 
 | `model.spiceRack` | 0.520 × 0.440 × 0.106 m | 2,268 | 3 | — | static |
 | `model.potRail` | 0.910 × 0.547 × 0.230 m | 1,236 | 1 | — | static |
 | `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 1,476 | 3 | — | static |
-| `model.trashCan` | 0.310 × 0.685 × 0.365 m | 540 | 1 | — | static (future: `lid_open`) |
+| `model.trashCan` | 0.310 × 0.685 × 0.365 m | 540 | 2 | lid | `lid_open` (scraping a plate in: `clean` at its bin station, `hold` 1 s) |
 | `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 972 | 1 | — | static (future: the lids lift) |
 
 ## K6 — islands and bars
 
-The freestanding islands put their cupboards on the back and overhang the worktop at the front for stools;
+The kitchen island has its cupboards and drawer at the front, where residents stand to use it, and its
+worktop overhangs the back, where housegen sets a used table's stools; it has no stools of its own (stools
+are things of their own, which residents sit on at the island) and, as the other islands, a bare top
+(housegen sets a fruit bowl, a cake stand or mugs on it). The small and long islands put their cupboards on
+the back and overhang the worktop at the front;
 the bars have a slatted guest side, a top at 1.06 and a brass foot rail. The kitchen island's drawer
 is on the stools' side, between them, since residents stand at the front (+Z) to use it: it slides out
 towards them for a sandwich (a fixed drawer front on the cupboard side matches it); everything else is
@@ -105,9 +109,9 @@ static this pass.
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.kitchenIsland` | 1.940 × 1.035 × 0.929 m | 2,972 | 3 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.islandSmall` | 0.960 × 0.970 × 0.951 m | 1,032 | 1 | — | static |
-| `model.islandLong` | 2.960 × 0.980 × 0.951 m | 1,944 | 2 | — | static |
+| `model.kitchenIsland` | 1.940 × 0.950 × 0.839 m | 1,404 | 2 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
+| `model.islandSmall` | 0.960 × 0.950 × 0.951 m | 1,032 | 1 | — | static |
+| `model.islandLong` | 2.960 × 0.950 × 0.951 m | 1,836 | 1 | — | static |
 | `model.barSegment` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 | `model.barEnd` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 
@@ -123,10 +127,12 @@ checked in play.
 ## Where it stands (review, 2026-10-14)
 
 Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
-wall), a run of counters and appliances lines up, and its top is under its content `surface`
-(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
-centred.
+not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
+appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
+2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
+their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+catalog2.py `shallow`). Islands stand free, centred.
 
 ## Rebuild
 

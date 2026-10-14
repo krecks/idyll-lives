@@ -556,14 +556,21 @@ def filingCabinet():
             G.sphere(f'leaf{k}', 0.05, at=F.at(0.12 + 0.04 * G.cosd(a), 1.16, -0.2 + 0.04 * G.sind(a)),
                      material=M.leaf, scale=(0.4, 0.12, 1.1), rot=(lean, 0, -a + 90), segments=10, rings=6)
     G.join(still, 'filingCabinet', origin=(0, 0, 0))
-    # the top drawer, still: no use opens it yet
+    # the top drawer with its box of files behind it, sliding out while a resident files papers
     with G.new_parts() as parts:
         _box('drawer', 0.42, 0.3, 0.02, (0, 0.825, front + 0.01), M.steel, bevel=0.006)
         _box('drawer_handle', 0.14, 0.02, 0.02, (0, 0.885, front + 0.03), M.chrome, bevel=0.006)
         _box('drawer_label_holder', 0.1, 0.04, 0.004, (0, 0.935, front + 0.022), M.chrome, bevel=0.001)
         _box('drawer_label', 0.085, 0.03, 0.002, (0, 0.935, front + 0.0245), M.label)
-    G.join(parts, 'drawer')
+        _box('drawer_bottom', 0.38, 0.015, 0.5, (0, 0.69, front - 0.25), M.steel, bevel=0.003)
+        for s in (-1, 1):
+            _box(f'drawer_side{s}', 0.015, 0.22, 0.5, (s * 0.19, 0.79, front - 0.25), M.steel, bevel=0.003)
+        _box('drawer_back', 0.38, 0.22, 0.015, (0, 0.79, front - 0.5), M.steel, bevel=0.003)
+        for k in range(6):
+            _box(f'file{k}', 0.34, 0.2, 0.012, (0, 0.8, front - 0.06 - k * 0.07), M.paper, bevel=0.002)
+    drawer = G.join(parts, 'drawer', origin=F.at(0, 0.825, front))
     G.settle(centre=False)
+    G.slide(drawer, 'drawer_open', (0, -0.3, 0), seconds=1.2)
     return G.meshes()
 
 
@@ -674,6 +681,7 @@ FAMILY = G.Family(
              motions={'uses': {'sit': 'swivel'}, 'hold': 0.6, 'ride': 'swivel'},
              paint=[('frame', 'Frame'), ('upholstery', 'Seat')]),
      G.Model('filingCabinet', filingCabinet, size=(0.46, 1.21, 0.64), key='model.filingCabinet', centre=(0, -0.11),
+             motions={'uses': {'file': 'drawer_open'}, 'hold': 2.0},
              paint=[('steel', 'Cabinet'), ('chrome', 'Handles')]),
      G.Model('whiteboard', whiteboard, size=(0.93, 0.647, 0.07), key='model.whiteboard', centre=(0, -0.395),
              floor=False, motions={'uses': {'plan': 'scribble'}},

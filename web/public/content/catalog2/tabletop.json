@@ -82,7 +82,7 @@
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.3,
-      "radius": 0.23,
+      "radius": 0.22,
       "description": "A little steel espresso machine with a cup under the spout. It stands on a table, counter, desk or shelf.",
       "interactions": []
     },
@@ -218,7 +218,7 @@
       "group": "tableware",
       "layer": "surface",
       "decor": 0.3,
-      "radius": 0.25,
+      "radius": 0.24,
       "description": "A plate, a side plate, cutlery and a glass. It stands on a table, counter, desk or shelf.",
       "interactions": []
     },

@@ -635,6 +635,12 @@
           "finish": "material.finish.metal"
         }
       },
+      "motions": {
+        "uses": {
+          "file": "drawer_open"
+        },
+        "hold": 2.0
+      },
       "paint": [
         {
           "material": "steel",

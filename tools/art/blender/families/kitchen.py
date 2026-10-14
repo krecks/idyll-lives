@@ -31,6 +31,7 @@ M = G.Palette(
     porcelain=('#F6F6F4', 'gloss'),  # sink basins and the farmhouse apron
     stone=('#DCDDDA', 'gloss'),      # sink worktops
     wood=('#B98A5A', 'wood'),        # the farmhouse worktop
+    board=('#B98A5A', 'satin'),      # the mini fridge's chopping board (plain: no draw call of its own)
     metal=('#8E9196', 'metal'),      # basin interiors
     dark=('#2F3236', 'satin'),       # drains
     plant=('#5C8A4A', 'satin'),      # a potted herb on the counter
@@ -231,8 +232,12 @@ def farmhouseSink():
 
 
 # --- double counter sink: two basins in a two-metre counter run ----------------------------------------
+# catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall (kitchen_counters.py COUNTER66)
+COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
+
+
 def counterSinkDouble():
-    Fk = G.GameFrame(shift=0.085)
+    Fk = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         Fk.box('plinth', 1.996, 0.1, 0.64, (0, 0.05, -0.14), M.trim, bevel=0.006)
         Fk.box('carcass', 1.996, 0.78, 0.7, (0, 0.49, -0.11), M.body, bevel=0.012)
@@ -296,7 +301,7 @@ def _fridgeMini():
         for i, x in enumerate((0.03, 0.11)):
             Fm.sphere(f'apple{i}', 0.035, (x, 0.4175, -0.05), M.produce, segments=10, rings=6)
         # a chopping board, a jar and an apple on top
-        Fm.box('board', 0.50, 0.02, 0.40, (0, 0.88, -0.02), M.wood, bevel=0.006)
+        Fm.box('board', 0.50, 0.02, 0.40, (0, 0.88, -0.02), M.board, bevel=0.006)
         Fm.cone('jar', 0.05, 0.04, 0.12, (-0.14, 0.94, -0.04), M.porcelain, verts=14)
         Fm.sphere('apple_top', 0.045, (0.12, 0.92, 0.0), M.produce, segments=10, rings=6)
     G.join(still, 'body', origin=(0, 0, 0))
@@ -438,7 +443,7 @@ def _fridgeRetro():
 
 def _wineFridge():
     """A dark glass door over a bottle grid, a stack of drawer racks beside it; the top rack slides."""
-    Fw = G.GameFrame(shift=0.0)
+    Fw = G.GameFrame(shift=0.0, depths=tuple((a + 0.085, b) for a, b in COUNTER66))   # its numbers centred
     with G.new_parts() as still:
         Fw.box('plinth', 0.996, 0.10, 0.64, (0, 0.05, -0.075), M.dark, bevel=0.004)
         Fw.box('side_left', 0.03, 0.80, 0.70, (-0.483, 0.50, -0.045), M.panel, bevel=0.006)
@@ -479,35 +484,35 @@ def _wineFridge():
 # its top under its content `surface` (catalog2.py TOPS).
 FAMILY = G.Family(
     'kitchen', M,
-    [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge', centre=(0, -0.094),
+    [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge', centre=(0, -0.069),
              # Taking food or a drink out opens the fridge door (snacks, a meal's ingredients (cook), a cold
              # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
              # The player colours the cabinet and doors, the handles, the plinth and the inside; the
              # food keeps its own colours.
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth & badge'), ('liner', 'Inside')]),
-     G.Model('fridgeMini', _fridgeMini, size=(0.60, 1.00, 0.60), key='model.fridgeMini', centre=(0, -0.16),
+     G.Model('fridgeMini', _fridgeMini, size=(0.60, 1.00, 0.60), key='model.fridgeMini', centre=(0, -0.128),
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open'}, 'hold': 3.0},
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
-     G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn', centre=(0, -0.132),
+     G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn', centre=(0, -0.099),
              # the tall door serves every use; the freezer door's clip waits for a use that takes frozen food
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
              paint=[('panel', 'Panels'), ('chrome', 'Handles')]),
-     G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor', centre=(0, -0.09),
+     G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor', centre=(0, -0.052),
              # both doors for a snack or a meal; the right door alone for a cold drink
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
              paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
      G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.103),
              motions={'uses': {use: RETRO_OPEN for use in ('fetch', 'cook', 'drink')}, 'hold': HOLD},
              paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
-     G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.79), key='model.wineFridge', centre=(0, -0.085),
+     G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.66), key='model.wineFridge', centre=(0, -0.10),
              motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
              paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),
-     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink', centre=(0, -0.145),
+     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink', centre=(0, -0.095),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.79), key='model.counterSinkDouble', centre=(0, -0.085),
+     G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.66), key='model.counterSinkDouble', centre=(0, -0.10),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinets'), ('stone', 'Worktop'), ('metal', 'Basins'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')])],

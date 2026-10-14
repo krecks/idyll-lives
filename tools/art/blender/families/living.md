@@ -31,7 +31,7 @@ sofa's 0.425 m.
 | `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 848 | 3 | Upholstery, Cushions, Legs |
 | `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 1,036 | 3 | Upholstery, Cushions, Legs |
 | `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 1,036 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalCorner` | 1.00 × 0.82 × 0.96 m | 1,412 | 3 | Upholstery, Cushions, Legs, Pillow |
+| `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 1,412 | 3 | Upholstery, Cushions, Legs, Pillow |
 | `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 1,144 | 3 | Upholstery, Cushions, Legs, Throw |
 
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and

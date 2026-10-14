@@ -28,8 +28,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 
 - **Chess table**: a black pawn is its own part and slides one square (`move`) for `chess`.
 - **Pool table**: the triangle lifts 25 cm off the fifteen racked balls (`rack_off`) for `pool` and
-  `trickShots`. The cue lies on the cloth, so the model is 1.40 m deep where the placeholder's cue stuck out to
-  1.69 m: `check_glb.py` warns of it.
+  `trickShots`. The cue lies on the cloth, as the placeholder's now does (it stuck out to 1.69 m).
 - **Foosball**: four rods; the two outer ones (one each side, by where the players stand) kick ±55° in a loop,
   `rods`. Four turning rods would be six draw calls.
 - **Dartboard**: twenty segments and the rings are one flat mesh (`_dart_face`). Three darts, one part, grow

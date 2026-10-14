@@ -53,8 +53,8 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "oak": {
-          "finish": "material.finish.wood"
+        "spoon": {
+          "finish": "material.finish.satin"
         },
         "worktop": {
           "finish": "material.finish.gloss"
@@ -179,6 +179,12 @@
         "worktop": {
           "finish": "material.finish.gloss"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "drawer_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {
@@ -680,6 +686,12 @@
           "finish": "material.finish.metal"
         }
       },
+      "motions": {
+        "uses": {
+          "clean": "lid_open"
+        },
+        "hold": 1.0
+      },
       "paint": [
         {
           "material": "steel",
@@ -740,23 +752,8 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "island": {
-          "finish": "material.finish.satin"
-        },
-        "oak": {
-          "finish": "material.finish.wood"
-        },
-        "porcelain": {
-          "finish": "material.finish.gloss"
-        },
-        "rust": {
-          "finish": "material.finish.gloss"
-        },
         "worktop": {
           "finish": "material.finish.gloss"
-        },
-        "yellow": {
-          "finish": "material.finish.satin"
         }
       },
       "motions": {
@@ -789,9 +786,6 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "porcelain": {
-          "finish": "material.finish.gloss"
-        },
         "worktop": {
           "finish": "material.finish.gloss"
         }
@@ -819,9 +813,6 @@
         },
         "metal": {
           "finish": "material.finish.metal"
-        },
-        "oak": {
-          "finish": "material.finish.wood"
         },
         "worktop": {
           "finish": "material.finish.gloss"

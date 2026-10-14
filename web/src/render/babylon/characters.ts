@@ -141,8 +141,8 @@ const DEFAULT_FADE = 0.25;
  * towards its front.
  */
 const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
-  sofa: { h: 0.44, fwd: -0.1 },
-  armchair: { h: 0.42, fwd: -0.02 },
+  sofa: { h: 0.44, fwd: -0.087 },
+  armchair: { h: 0.42, fwd: -0.013 },
   bench: { h: 0.45, fwd: -0.03 },
   toilet: { h: 0.43, fwd: -0.13 },
   // Chairs at desks and tables sit in the back half of the footprint, facing the work surface.
@@ -157,16 +157,16 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
   'hotHeaded.coolDownCushion': { h: 0.4, fwd: 0 },
   // The 0.20 catalogue (content/furniture.json).
   barStool: { h: 0.72, fwd: 0 },
-  bistroSet: { h: 0.46, fwd: -0.24 },
+  bistroSet: { h: 0.46, fwd: -0.19 },
   diningGlass: { h: 0.46, fwd: -0.22 },
   diningOak: { h: 0.46, fwd: -0.22 },
   diningChair: { h: 0.46, fwd: 0 },
-  loveseat: { h: 0.44, fwd: -0.1 },
-  sofaThree: { h: 0.44, fwd: -0.12 },
-  sofaDesign: { h: 0.42, fwd: -0.1 },
-  armchairLounge: { h: 0.42, fwd: -0.07 },
-  armchairLeather: { h: 0.44, fwd: -0.05 },
-  armchairDesign: { h: 0.45, fwd: -0.05 },
+  loveseat: { h: 0.44, fwd: -0.07 },
+  sofaThree: { h: 0.44, fwd: -0.09 },
+  sofaDesign: { h: 0.42, fwd: -0.07 },
+  armchairLounge: { h: 0.42, fwd: -0.04 },
+  armchairLeather: { h: 0.44, fwd: -0.02 },
+  armchairDesign: { h: 0.45, fwd: -0.013 },
   pouf: { h: 0.46, fwd: 0 },
   dressingTable: { h: 0.45, fwd: 0.22, back: true },
   toiletCompact: { h: 0.43, fwd: -0.13 },

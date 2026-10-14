@@ -67,7 +67,7 @@ tag covers both the `wash` and `washUp` interactions).
 | Model | Size (w × h × d) | Triangles | Draws | Note |
 |---|---|---|---|---|
 | `model.farmhouseSink` | 1.000 × 1.263 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
-| `model.counterSinkDouble` | 2.000 × 1.265 × 0.790 m | 5,496 | 3 | two inset basins, a bridge tap each |
+| `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
 Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings).
 
@@ -79,11 +79,11 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 3 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
+| `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
 | `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s, unused |
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s, unused |
 | `model.fridgeRetro` | 0.720 × 1.640 × 0.715 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
-| `model.wineFridge` | 1.000 × 0.950 × 0.790 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
+| `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
 
 The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no
 interaction takes frozen food: `check_glb.py` warns of both (as it does for `model.fridge`'s freezer).
@@ -101,7 +101,9 @@ python3 -B tools/art/blender/build.py kitchen --preview  # previews/fridge.png, 
 ## Where it stands (review, 2026-10-14)
 
 Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
-wall), a run of counters and appliances lines up, and its top is under its content `surface`
-(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
-centred.
+not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
+appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
+2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
+their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+catalog2.py `shallow`). Islands stand free, centred.

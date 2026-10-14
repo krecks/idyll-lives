@@ -635,7 +635,7 @@ def drumKit():
         _cymbal(F, 'ride', 0.18, (0.3, 1.05, 0.12), (-10, -8, 0))
         F.cyl('ride_felt', 0.012, 0.02, (0.3, 1.07, 0.12), M.seat, verts=8)
     ride = G.hinged(G.join(r, 'ride'), F.at(0.3, 1.05, 0.12))
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`: its back moved onto the wall face
     G.rock(crash, 'cymbals', 7, seconds=1.0, axis='X')
     G.rock(ride, 'cymbals', 4, seconds=1.0, axis='Y')
     return G.meshes()
@@ -946,7 +946,7 @@ def arcadeCabinet():
         G.rod('stick', F.at(*base), F.at(base[0], base[1] + 0.075, base[2]), 0.006, material=M.chrome, verts=8)
         F.sphere('stick_ball', 0.022, (base[0], base[1] + 0.09, base[2]), M.ball_red, segments=12, rings=8)
     stick = G.hinged(G.join(j, 'joystick'), F.at(*base))
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`: its back moved onto the wall face
     G.rock(stick, 'joystick', 16, seconds=0.8, axis='X')
     return G.meshes()
 
@@ -1182,7 +1182,7 @@ def telescope():
         F.box('finder_foot', 0.02, 0.04, 0.02, _on_tube(0.05, 0.08), M.chrome, rot=tube_rot, bevel=0.005)
         F.box('saddle', 0.06, 0.05, 0.1, (0, 1.12, -0.01), M.foot, rot=tube_rot, bevel=0.006)
     tube = G.hinged(G.join(t, 'tube'), F.at(*AXLE))
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`: the back leg on the wall face
     G.swing(tube, 'aim', 35, seconds=1.2, axis='X')
     return G.meshes()
 
@@ -1322,7 +1322,7 @@ def chemistrySet():
     # Hidden at rest by flattening into the bench top (on the flask's floor, it would show through the glass).
     liquid = G.join(p, 'liquid', origin=F.at(RISING[0], BENCH_TOP - 0.01, RISING[1]))
     liquid.scale[2] = 0.001
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`: its back moved onto the wall face
     G.grow(liquid, 'bubble', seconds=1.5, axis='Z')
     return G.meshes()
 
@@ -1435,7 +1435,7 @@ FAMILY = G.Family(
              centre=(0, -0.128), paint=[('electric', 'Guitar'), ('amp', 'Amp')]),
      G.Model('keyboardDigital', keyboardDigital, size=(0.9, 1.092, 0.75), key='model.keyboardDigital',
              centre=(0, 0.015), paint=[('kb_body', 'Body'), ('kb_trim', 'Trim')]),
-     G.Model('drumKit', drumKit, size=(0.978, 1.088, 0.885), key='model.drumKit', centre=(0.0076, -0.0575),
+     G.Model('drumKit', drumKit, size=(0.978, 1.088, 0.885), key='model.drumKit', centre=(0.0076, 0.0125),
              motions={'loops': {'drum': 'cymbals', 'practise': 'cymbals'}},
              paint=[('shell', 'Shells'), ('chrome', 'Hardware')]),
      G.Model('guitarAcoustic', guitarAcoustic, size=(0.36, 1.482, 0.405), key='model.guitarAcoustic',
@@ -1450,7 +1450,7 @@ FAMILY = G.Family(
      G.Model('dartboard', dartboard, size=(0.62, 0.62, 0.07), key='model.dartboard', centre=(0, -0.393), floor=False,
              motions={'uses': {'darts': 'darts'}}, paint=[('board', 'Board'), ('cabinet', 'Cabinet')]),
      G.Model('arcadeCabinet', arcadeCabinet, size=(0.672, 1.82, 0.872), key='model.arcadeCabinet',
-             centre=(0, -0.034), motions={'loops': {'arcade': 'joystick'}},
+             centre=(0, 0.006), motions={'loops': {'arcade': 'joystick'}},
              paint=[('arcade', 'Cabinet'), ('art', 'Art')]),
      G.Model('puzzleTable', puzzleTable, size=(0.865, 0.794, 0.891), key='model.puzzleTable', centre=(0.0025, 0.0155),
              motions={'uses': {'jigsaw': 'pieces'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Trim')]),
@@ -1458,12 +1458,12 @@ FAMILY = G.Family(
              motions={'uses': {'paint': 'painting'}}, paint=[('easel_wood', 'Wood'), ('easel_metal', 'Metal')]),
      G.Model('workbench', workbench, size=(1.62, 0.995, 0.665), key='model.workbench', centre=(0, -0.0975),
              motions={'uses': {'tinker': 'vice'}}, paint=[('bench_top', 'Wood'), ('bench_steel', 'Metal')]),
-     G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, -0.0041),
+     G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, 0.026),
              motions={'uses': {'stargaze': 'aim'}}, paint=[('tube', 'Tube'), ('tripod', 'Tripod')]),
      G.Model('sewingTable', sewingTable, size=(0.9, 1.08, 0.89), key='model.sewingTable', centre=(0, 0.025),
              motions={'uses': {'sew': 'presser', 'mend': 'presser'}, 'loops': {'sew': 'handwheel', 'mend': 'handwheel'}},
              paint=[('sew_table', 'Table'), ('machine', 'Machine')]),
-     G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.15),
+     G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.18),
              motions={'uses': {'experiment': 'bubble'}}, paint=[('chem_bench', 'Bench'), ('glass', 'Glassware')]),
      G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.95), key='model.potteryWheel', centre=(0, -0.005),
              motions={'uses': {'throw': 'clay'}, 'loops': {'throw': 'wheel'}},

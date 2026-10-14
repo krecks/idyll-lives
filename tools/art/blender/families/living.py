@@ -319,7 +319,7 @@ def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=Non
 
 
 def _settled(seat):
-    G.settle(centre=False)  # against the wall, as built
+    G.settle()  # on its Model's `centre`: built in the placeholder's numbers, its back moved onto the wall face
     _sink(seat)
 
 
@@ -576,7 +576,7 @@ def armchair_design():
         G.rod(f'star{i}', F.at(0, 0.08, 0), F.at(*tip), 0.016, M.alu, verts=8)
         F.cyl(f'glide{i}', 0.025, 0.02, (tip[0], 0.01, tip[2]), M.black_satin, verts=10)
     G.join_all('armchairDesign')
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`, its back on the wall face
 
 
 def armchair_wingback():
@@ -847,7 +847,7 @@ def console_table():
     for x in (-0.5, 0.0):
         F.box(f'basket{x}', 0.36, 0.14, 0.3, (x, 0.31, -0.18), M.basket, bevel=0.03, bevel_segments=3)
     G.join_all('consoleTable')
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`, its back on the wall face
 
 
 # The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
@@ -879,49 +879,49 @@ FAMILY = G.Family(
              paint=[('upholstery', 'Upholstery'), ('cushion', 'Cushions'), ('legs', 'Legs'), ('bedding', 'Bedding'),
                     ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')]),
      # L1: the sofas and sectionals, their seat cushions sinking while sat or dozed on
-     G.Model('sofa', sofa_classic, key='model.sofa', size=(1.88, 0.935, 0.817), centre=(0, -0.035),
+     G.Model('sofa', sofa_classic, key='model.sofa', size=(1.88, 0.935, 0.817), centre=(0, -0.0215),
              motions={'uses': {'relax': 'sink_in'}},
              paint=[('linen', 'Upholstery'), ('linen_cushion', 'Cushions'), ('walnut', 'Frame'), ('walnut_legs', 'Legs'),
                     ('pillow_rust', 'Pillow'), ('pillow_sage', 'Second pillow')]),
-     G.Model('loveseat', loveseat, key='model.loveseat', size=(1.84, 0.833, 0.84), centre=(0, -0.04),
+     G.Model('loveseat', loveseat, key='model.loveseat', size=(1.84, 0.833, 0.84), centre=(0, -0.01),
              motions={'uses': SOFA_USES},
              paint=[('sage', 'Upholstery'), ('sage_cushion', 'Cushions'), ('oak_legs', 'Legs'), ('pillow_cream', 'Pillow')]),
-     G.Model('sofaThree', sofa_three, key='model.sofaThree', size=(2.82, 0.87, 0.86), centre=(0, -0.03),
+     G.Model('sofaThree', sofa_three, key='model.sofaThree', size=(2.82, 0.87, 0.86), centre=(0, 0.0),
              motions={'uses': SOFA_USES},
              paint=[('stone', 'Upholstery'), ('stone_cushion', 'Cushions'), ('oak_dark_legs', 'Legs'), ('pillow_sage', 'Pillows'),
                     ('throw_sage', 'Throw')]),
-     G.Model('sofaDesign', sofa_design, key='model.sofaDesign', size=(1.87, 0.72, 0.82), centre=(0, -0.05),
+     G.Model('sofaDesign', sofa_design, key='model.sofaDesign', size=(1.87, 0.72, 0.82), centre=(0, -0.02),
              motions={'uses': SOFA_USES},
              paint=[('teal', 'Upholstery'), ('teal_cushion', 'Cushions'), ('brass', 'Frame'), ('brass_legs', 'Legs')]),
-     G.Model('sofaThreeSeat', sofa_three_seat, key='model.sofaThreeSeat', size=(2.86, 0.823, 0.88), centre=(0, -0.04),
+     G.Model('sofaThreeSeat', sofa_three_seat, key='model.sofaThreeSeat', size=(2.86, 0.823, 0.88), centre=(0, 0.01),
              motions={'uses': SOFA_USES},
              paint=[('moss', 'Upholstery'), ('moss_cushion', 'Cushions'), ('oak_legs', 'Legs'), ('pillow_cream', 'Pillow'),
                     ('pillow_mustard', 'Second pillow')]),
-     G.Model('sectionalMiddle', sectional(), key='model.sectionalMiddle', size=(1.0, 0.823, 0.88), centre=(0, -0.04),
+     G.Model('sectionalMiddle', sectional(), key='model.sectionalMiddle', size=(1.0, 0.823, 0.88), centre=(0, 0.01),
              motions={'uses': SOFA_USES}, paint=SECTIONAL),
-     G.Model('sectionalArmLeft', sectional(arms=(1,)), key='model.sectionalArmLeft', size=(1.0, 0.823, 0.88), centre=(0, -0.04),
+     G.Model('sectionalArmLeft', sectional(arms=(1,)), key='model.sectionalArmLeft', size=(1.0, 0.823, 0.88), centre=(0, 0.01),
              motions={'uses': SOFA_USES}, paint=SECTIONAL),
      G.Model('sectionalArmRight', sectional(arms=(-1,)), key='model.sectionalArmRight', size=(1.0, 0.823, 0.88),
-             centre=(0, -0.04), motions={'uses': SOFA_USES}, paint=SECTIONAL),
-     G.Model('sectionalCorner', sectional(backs=('back', 'right'), depth=0.96, z=-0.02, pillows=[(0.1, -0.1, 'pillow_mustard', -35)]),
-             key='model.sectionalCorner', size=(1.0, 0.823, 0.96), centre=(0, -0.02),
+             centre=(0, 0.01), motions={'uses': SOFA_USES}, paint=SECTIONAL),
+     G.Model('sectionalCorner', sectional(backs=('back', 'right'), depth=0.89, z=0.015, pillows=[(0.1, -0.03, 'pillow_mustard', -35)]),
+             key='model.sectionalCorner', size=(1.0, 0.823, 0.89), centre=(0, 0.015),
              motions={'uses': SOFA_USES}, paint=SECTIONAL + [('pillow_mustard', 'Pillow')]),
      G.Model('chaise', chaise, key='model.chaise', size=(0.96, 0.823, 1.9), centre=(0, 0.0),
              motions={'uses': SOFA_USES}, paint=SECTIONAL + [('throw_oat', 'Throw')]),
      # L2: the armchairs and small seats
-     G.Model('armchair', armchair_bergere, key='model.armchair', size=(0.74, 0.982, 0.797), centre=(0, -0.038),
+     G.Model('armchair', armchair_bergere, key='model.armchair', size=(0.74, 0.982, 0.797), centre=(0, -0.0315),
              motions={'uses': {'sit': 'sink_in'}},
              paint=[('linen', 'Upholstery'), ('linen_cushion', 'Cushion'), ('walnut', 'Frame'), ('walnut_legs', 'Legs'),
                     ('pillow_sage', 'Pillow')]),
-     G.Model('armchairLounge', armchair_lounge, key='model.armchairLounge', size=(0.82, 0.83, 0.84), centre=(0, -0.04),
+     G.Model('armchairLounge', armchair_lounge, key='model.armchairLounge', size=(0.82, 0.83, 0.84), centre=(0, -0.01),
              motions={'uses': {'sit': 'sink_in'}},
              paint=[('sage', 'Upholstery'), ('sage_cushion', 'Cushions'), ('oak_legs', 'Legs')]),
-     G.Model('armchairLeather', armchair_leather, key='model.armchairLeather', size=(0.73, 0.949, 0.852), centre=(0, -0.034),
+     G.Model('armchairLeather', armchair_leather, key='model.armchairLeather', size=(0.73, 0.949, 0.852), centre=(0, -0.004),
              motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
              paint=[('teak', 'Frame'), ('leather', 'Upholstery')]),
-     G.Model('armchairDesign', armchair_design, key='model.armchairDesign', size=(0.76, 0.959, 0.852), centre=(0, -0.041),
+     G.Model('armchairDesign', armchair_design, key='model.armchairDesign', size=(0.76, 0.959, 0.852), centre=(0, -0.004),
              paint=[('ply', 'Frame'), ('hide', 'Upholstery'), ('alu', 'Base')]),
-     G.Model('armchairWingback', armchair_wingback, key='model.armchairWingback', size=(0.84, 1.1, 0.8), centre=(0, -0.06),
+     G.Model('armchairWingback', armchair_wingback, key='model.armchairWingback', size=(0.84, 1.1, 0.8), centre=(0, -0.03),
              motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
              paint=[('forest', 'Upholstery'), ('forest_cushion', 'Cushion'), ('walnut_warm', 'Legs')]),
      G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.843, 0.7), centre=(0, 0.05),
@@ -954,7 +954,7 @@ FAMILY = G.Family(
              paint=[('white_gloss', 'Top'), ('oak', 'Small table'), ('black_metal', 'Legs')]),
      G.Model('sideTableRound', side_table_round, key='model.sideTableRound', size=(0.52, 0.56, 0.52),
              paint=[('stone_top', 'Top'), ('brass', 'Base')]),
-     G.Model('consoleTable', console_table, key='model.consoleTable', size=(1.8, 0.7975, 0.56), centre=(0, -0.18),
+     G.Model('consoleTable', console_table, key='model.consoleTable', size=(1.8, 0.7975, 0.56), centre=(0, -0.15),
              paint=[('oak', 'Top'), ('black_metal', 'Legs'), ('basket', 'Baskets')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '

@@ -303,7 +303,7 @@ def bistroSet():
     G.torus('cup_handle', 0.02, 0.005, at=F.at(0.175, y + 0.05, 0.24), material=M.porcelain, rot=(90, 0, 0),
             major_segments=10, minor_segments=5)
     _flowers('', -0.15, 0.1, y, h=0.12)
-    _cafe_chair('c', 0, -0.24, M.legs_black, M.seat_sage)
+    _cafe_chair('c', 0, -0.19, M.legs_black, M.seat_sage)        # its back on the wall face, as the placeholder's
     return _finish('bistroSet')
 
 
@@ -874,16 +874,17 @@ def barCart():
                                          (0.035, 0.11), (0.04, 0.16), (0.036, 0.16), (0.03, 0.12), (0, 0.1)],
                       at=F.at(x, 0.766, z), material=M.glass, segments=12)
         # a lemon dish on the top tier; an ice bucket and a basket on the lower one
-        F.cyl('dish', 0.06, 0.015, (0.05, 0.774, 0.12), M.porcelain, verts=14, bevel=0.004)
+        F.cyl('dish', 0.06, 0.015, (0.1, 0.774, -0.1), M.porcelain, verts=14, bevel=0.004)
         for i, (dx, dz) in enumerate(((0, 0), (0.035, 0.025))):
-            F.sphere(f'lemon{i}', 0.025, (0.05 + dx, 0.8, 0.12 + dz), M.lemon, scale=(1, 1, 0.85), segments=10,
+            F.sphere(f'lemon{i}', 0.025, (0.1 + dx, 0.8, -0.1 + dz), M.lemon, scale=(1, 1, 0.85), segments=10,
                      rings=6)
         G.revolve('ice_bucket', [(0, 0), (0.065, 0), (0.08, 0.15), (0.075, 0.15), (0.06, 0.012), (0, 0.012)],
                   at=F.at(0.0, 0.306, 0.0), material=M.shaker, segments=18)
         F.box('basket', 0.18, 0.1, 0.16, (0.2, 0.356, 0.05), M.basket, bevel=0.02)
     G.join(still, 'cart', origin=(0, 0, 0))
-    # the cocktail shaker, standing on the top tier: its own part, pivoting at its foot
-    sx, sz = 0.14, -0.08
+    # the cocktail shaker, standing at the front of the top tier, in the middle, before the resident who
+    # mixes from the front: its own part, pivoting at its foot, tipping towards them
+    sx, sz = 0.0, 0.1
     with G.new_parts() as shake:
         G.revolve('shaker', [(0, 0), (0.035, 0), (0.04, 0.12), (0.036, 0.13), (0.03, 0.17), (0.016, 0.2),
                              (0.012, 0.215), (0, 0.22)], at=F.at(sx, 0.766, sz), material=M.shaker, segments=16)
@@ -903,7 +904,7 @@ FAMILY = G.Family(
     [  # K7: dining tables
      G.Model('diningTable', diningTable, size=(1.62, 1.032, 0.867), centre=(0, 0.016), key='model.diningTable',
              paint=DINING_TOP),
-     G.Model('bistroSet', bistroSet, size=(0.62, 1.004, 0.962), key='model.bistroSet',
+     G.Model('bistroSet', bistroSet, size=(0.62, 1.004, 0.912), key='model.bistroSet', centre=(0, 0.024),
              paint=[('top_oak', 'Top'), ('legs_black', 'Frame'), ('seat_sage', 'Seats')]),
      G.Model('diningGlass', diningGlass, size=(1.7, 1.113, 0.913), centre=(0, 0.024), key='model.diningGlass',
              paint=[('glass', 'Top'), ('legs_chrome', 'Legs')]),
@@ -950,11 +951,11 @@ FAMILY = G.Family(
      G.Model('benchDining', benchDining, size=(1.6, 0.468, 0.36), centre=(0, 0.05), key='model.benchDining',
              paint=[('legs_oakd', 'Frame'), ('seat_oak', 'Seat')]),
      # K9: dining storage
-     G.Model('sideboard', sideboard, size=(1.82, 1.1, 0.668), centre=(0, -0.1475), key='model.sideboard',
+     G.Model('sideboard', sideboard, size=(1.82, 1.1, 0.668), centre=(0, -0.096), key='model.sideboard',
              paint=[('body_walnut', 'Body'), ('top_sideboard', 'Top'), ('brass', 'Handles')]),
-     G.Model('buffet', buffet, size=(1.88, 0.9, 0.668), centre=(0, -0.151), key='model.buffet',
+     G.Model('buffet', buffet, size=(1.88, 0.9, 0.668), centre=(0, -0.096), key='model.buffet',
              paint=[('body_sage', 'Body'), ('top_oak', 'Top'), ('brass', 'Handles')]),
-     G.Model('chinaCabinet', chinaCabinet, size=(0.98, 2.1, 0.548), centre=(0, -0.209), key='model.chinaCabinet',
+     G.Model('chinaCabinet', chinaCabinet, size=(0.98, 2.1, 0.548), centre=(0, -0.156), key='model.chinaCabinet',
              paint=[('body_china', 'Body'), ('top_china', 'Top'), ('brass', 'Handles')]),
      G.Model('barCart', barCart, size=(0.769, 1.09, 0.45), centre=(-0.017, 0), key='model.barCart',
              motions={'uses': {'mix': 'shake'}, 'hold': 1.5},

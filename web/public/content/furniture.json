@@ -497,7 +497,7 @@
         ],
         "at": [
           0,
-          -0.15
+          -0.1
         ]
       },
       "interactions": [
@@ -593,7 +593,7 @@
         ],
         "at": [
           0,
-          -0.15
+          -0.1
         ]
       },
       "interactions": [
@@ -625,7 +625,15 @@
       "description": "A deep corner unit that joins two runs of counters into an L.",
       "surface": {
         "height": 0.96,
-        "kind": "counter"
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.93
+        ],
+        "at": [
+          0,
+          0.035
+        ]
       },
       "interactions": [
         {
@@ -766,7 +774,7 @@
       "category": "validate",
       "group": "islands",
       "slots": 2,
-      "description": "A freestanding island with two stools at its front: two residents can make a snack or have breakfast here at once.",
+      "description": "A freestanding island with cupboards at the front and a worktop overhanging the back for stools: two residents can make a snack or have breakfast here at once.",
       "surface": {
         "height": 0.95,
         "kind": "counter",
@@ -776,7 +784,7 @@
         ],
         "at": [
           0,
-          -0.04
+          0.04
         ]
       },
       "interactions": [
