@@ -218,7 +218,7 @@
         1
       ],
       "price": 60,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "decor": 0.3,
       "description": "A birch ladder leaning on the wall, towels over its rungs.",
@@ -233,7 +233,7 @@
         1
       ],
       "price": 25,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "layer": "rug",
       "decor": 0.2,
@@ -265,7 +265,7 @@
         1
       ],
       "price": 30,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "description": "A wicker basket of clean washing waiting to be folded.",
       "interactions": []

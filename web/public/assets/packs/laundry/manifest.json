@@ -1,0 +1,251 @@
+{
+  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) and turn their drum (`drum_spin`) while a resident does the laundry.",
+  "version": 1,
+  "entries": {
+    "model.laundryWasher": {
+      "type": "model",
+      "url": "../../models/laundry/laundryWasher.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "door": {
+          "finish": "material.finish.satin"
+        },
+        "drum": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "paddle": {
+          "finish": "material.finish.metal"
+        },
+        "panel": {
+          "finish": "material.finish.gloss"
+        },
+        "wash_a": {
+          "finish": "material.finish.satin"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wash_c": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "laundry": "door_open"
+        },
+        "hold": 2.5,
+        "loops": {
+          "laundry": "drum_spin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "door",
+          "label": "Door"
+        },
+        {
+          "material": "panel",
+          "label": "Panel"
+        }
+      ]
+    },
+    "model.laundryDryer": {
+      "type": "model",
+      "url": "../../models/laundry/laundryDryer.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "door_dryer": {
+          "finish": "material.finish.satin"
+        },
+        "drum": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "led_dryer": {
+          "finish": "material.finish.gloss"
+        },
+        "paddle": {
+          "finish": "material.finish.metal"
+        },
+        "panel": {
+          "finish": "material.finish.gloss"
+        },
+        "wash_a": {
+          "finish": "material.finish.satin"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wash_c": {
+          "finish": "material.finish.satin"
+        },
+        "wicker_plain": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "laundry": "door_open"
+        },
+        "hold": 2.5,
+        "loops": {
+          "laundry": "drum_spin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "door_dryer",
+          "label": "Door"
+        },
+        {
+          "material": "panel",
+          "label": "Panel"
+        }
+      ]
+    },
+    "model.towelRail": {
+      "type": "model",
+      "url": "../../models/laundry/towelRail.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "towel2": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "chrome",
+          "label": "Rail"
+        },
+        {
+          "material": "towel",
+          "label": "Towels"
+        },
+        {
+          "material": "towel2",
+          "label": "Hand towel"
+        }
+      ]
+    },
+    "model.towelLadder": {
+      "type": "model",
+      "url": "../../models/laundry/towelLadder.glb",
+      "materials": {
+        "birch": {
+          "finish": "material.finish.wood"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "towel2": {
+          "finish": "material.finish.fabric"
+        },
+        "towel3": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "birch",
+          "label": "Ladder"
+        },
+        {
+          "material": "towel",
+          "label": "Towels"
+        },
+        {
+          "material": "towel2",
+          "label": "Second towel"
+        },
+        {
+          "material": "towel3",
+          "label": "Third towel"
+        }
+      ]
+    },
+    "model.laundryBasket": {
+      "type": "model",
+      "url": "../../models/laundry/laundryBasket.glb",
+      "materials": {
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "towel2": {
+          "finish": "material.finish.fabric"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.fabric"
+        },
+        "wicker_rim": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "wicker",
+          "label": "Basket"
+        },
+        {
+          "material": "wicker_rim",
+          "label": "Rim & weave"
+        }
+      ]
+    },
+    "model.bathMat": {
+      "type": "model",
+      "url": "../../models/laundry/bathMat.glb",
+      "materials": {
+        "mat": {
+          "finish": "material.finish.fabric"
+        },
+        "mat_pile": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "mat",
+          "label": "Mat"
+        },
+        {
+          "material": "mat_pile",
+          "label": "Pile"
+        }
+      ]
+    }
+  }
+}

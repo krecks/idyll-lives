@@ -3695,6 +3695,10 @@
         {
           "id": "baths",
           "label": "Baths"
+        },
+        {
+          "id": "laundry",
+          "label": "Laundry"
         }
       ]
     },

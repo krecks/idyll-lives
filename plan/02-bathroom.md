@@ -1,6 +1,6 @@
 # Bathroom
 
-The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`), the four B2 showers (`water_on`) and the three B3 baths (`tap_on`, `fill`). Water here grows the same way: a stream built at
+The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`), the four B2 showers (`water_on`) and the three B3 baths (`tap_on`, `fill`); the six B4 laundry models are done in `families/laundry.py`. Water here grows the same way: a stream built at
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
@@ -43,7 +43,7 @@ files (E6), as the double vanity did.
 | `bathtubClawfoot` Clawfoot tub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 | `bathtubFreestanding` Freestanding bath | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 
-## B4. Laundry (6)
+## B4. Laundry (6) — **Done** (in Validate › Laundry)
 
 - **Family:** `tools/art/blender/families/laundry.py`
 - **Validate group:** `laundry` (Validate › Laundry)

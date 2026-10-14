@@ -2478,7 +2478,7 @@
         1
       ],
       "price": 45,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "layer": "wall",
       "decor": 0.25,
@@ -2494,7 +2494,7 @@
         1
       ],
       "price": 520,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "description": "Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
       "interactions": [
@@ -2523,7 +2523,7 @@
         1
       ],
       "price": 420,
-      "category": "bathroom",
+      "category": "validate",
       "group": "laundry",
       "description": "Warm, fresh laundry to fold.",
       "interactions": [

@@ -43,6 +43,7 @@ class Model:
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
                  middle of its footprint (default: the middle)
+      floor      False for a thing on a wall: built at its real height, not stood on the floor
       far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
                  town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
                  joined, decimated, without what's hidden at rest), or a build function of its own; the
@@ -50,11 +51,11 @@ class Model:
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
-                 parts=None, centre=(0.0, 0.0), far=None):
+                 parts=None, centre=(0.0, 0.0), floor=True, far=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint, self.placeholder = tolerance, motions, paint, placeholder
         self.parts = parts
-        self.centre = centre
+        self.centre, self.floor = centre, floor
         self.far = far
 
 
@@ -81,7 +82,7 @@ class Family:
         reset()
         objs = model.build() or meshes()
         bpy.context.scene.frame_set(1)
-        check_size(model.size, model.tolerance, objs, name=model.id, centre=model.centre)
+        check_size(model.size, model.tolerance, objs, name=model.id, centre=model.centre, floor=model.floor)
         stats(model.id)
         return objs
 
@@ -143,7 +144,7 @@ class Family:
             reset()
             objs = model.far() or meshes()
             bpy.context.scene.frame_set(1)
-            check_size(model.size, max(model.tolerance, 0.05), objs, name=f'{model.id}.far', centre=model.centre)
+            check_size(model.size, max(model.tolerance, 0.05), objs, name=f'{model.id}.far', centre=model.centre, floor=model.floor)
             stats(f'{model.id}.far')
             return objs
         # At rest, still, without what only shows while it moves (water grown from nothing).
