@@ -4085,14 +4085,14 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if !given_up {
                         sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
                     }
-                } else if inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
+                } else if inter.close_after || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
                     // Up from a night's sleep: the toilet first, out of habit.
                     if inter.tags & content.day_rhythm.sleep_tags != 0 {
                         sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
                     }
                     // Then what sleeping or napping opened is closed again (a wall bed folded
-                    // up, a sofa bed's bed put away), unless someone is still in it: whoever
-                    // gets up last does it.
+                    // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
+                    // `close_after`), unless someone is still in it: whoever gets up last does it.
                     if let Some(close) = closing(sim, content, o, object) {
                         match sim.follow_up {
                             None => sim.follow_up = Some(close),

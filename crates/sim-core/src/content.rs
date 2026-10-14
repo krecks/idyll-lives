@@ -126,6 +126,10 @@ pub struct Interaction {
     /// so (content `leaves`): folding a wall bed down, going to sleep in it. Nothing closes an
     /// object someone else is using.
     pub leaves: Option<bool>,
+    /// Opening it is for this use only (content `closeAfter`, with `leaves`: "open"): when it
+    /// ends, the last one done closes it again, as after a night's sleep (a hot tub's cover goes
+    /// back on after a soak).
+    pub close_after: bool,
     /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
     /// `ObjectInstance::growth`).
     pub ripe: bool,
@@ -2116,6 +2120,8 @@ struct InteractionRaw {
     /// What the use leaves the object (see `Interaction::leaves`).
     #[serde(default)]
     leaves: Option<OpenState>,
+    #[serde(default)]
+    close_after: bool,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2592,9 +2598,16 @@ impl Content {
                         Some(OpenState::Closed) => Some(false),
                         _ => None,
                     },
+                    close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
                 });
+                if it.close_after
+                    && (it.leaves != Some(OpenState::Open)
+                        || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
+                {
+                    return Err(Error::new(format!("{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed")));
+                }
                 if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
                     return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
                 }

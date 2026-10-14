@@ -4685,7 +4685,8 @@
             "outdoors"
           ],
           "feeling": "home.pampered",
-          "leaves": "open"
+          "leaves": "open",
+          "closeAfter": true
         },
         {
           "id": "coverOn",

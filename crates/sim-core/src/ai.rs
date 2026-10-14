@@ -174,6 +174,7 @@ mod tests {
             eats: None,
             when: None,
             leaves: None,
+            close_after: false,
             ripe: false,
             picks: false,
         }
