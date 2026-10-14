@@ -90,6 +90,22 @@ def squash(obj, clip, scale, seconds=0.6, back=False):
     return _peak(obj, clip, (1 + end) // 2 if back else end)
 
 
+def turns(objs, clip, offset, seconds=1.0):
+    """A clip `clip` in which `objs` take turns: each in its share of `seconds` rises by `offset` (Blender x, y, z,
+    metres) and settles back, the first one first; it ends where it starts, so it loops (`motions.loops`, `idle`).
+    A dance floor's two checkerboards of tiles lifting one after the other."""
+    end = last_frame(seconds)
+    bounds = [1 + round((end - 1) * k / len(objs)) for k in range(len(objs) + 1)]
+    for obj, a, b in zip(objs, bounds, bounds[1:]):
+        for i, d in enumerate(offset):
+            if d:
+                rest = obj.location[i]
+                keys = [(1, rest), (a, rest), ((a + b) // 2, rest + d), (b, rest), (end, rest)]
+                keys = [kv for n, kv in enumerate(keys) if n == 0 or kv[0] != keys[n - 1][0]]   # one key a frame
+                _clip(obj, clip, 'location', i, keys)
+    return _peak(objs[0], clip, (bounds[0] + bounds[1]) // 2)
+
+
 def stages(obj, clip, picked, growing, planted, seconds=1.5):
     """A crop's growth clip `clip` (`motions.growth`) for `obj`: the scale of it at each growth stage,
     times its size at rest, which is ripe. A number for every axis or (x, y, z) Blender; 0.001 hides

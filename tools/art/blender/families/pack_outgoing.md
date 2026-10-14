@@ -17,8 +17,8 @@ backs on the wall's face (depth −0.43; the placeholders' backs were 2 cm into 
 | `danceFloor` | the sixteen tiles in two checkerboard parts: `tiles` (a loop, 1.2 s) lifts one set 2.5 cm and back, then the other | `dance` (`loops`) |
 | `photoWall` | a new snapshot in the board's bottom row, built full size and shrunk to nothing: `photo` grows it onto the board (0.8 s) | `reminisce` |
 
-The dance floor's table entry asks for the loop itself (`tiles`, E1), built as two parts on one clip; the keys are
-set with gamekit's `motion._clip` (frames of its own, so the two sets take turns), and it starts and ends at rest.
+The dance floor's table entry asks for the loop itself (`tiles`, E1), built as two parts on one clip with
+`G.turns` (the two sets take turns lifting), and it starts and ends at rest.
 
 **Draw calls: 3 each.** The still body takes its plain finishes and at most one textured finish, the moving parts
 the rest. So that it stays at 3:

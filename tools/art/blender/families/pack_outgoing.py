@@ -17,7 +17,6 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
-from gamekit import motion  # noqa: E402
 
 M = G.Palette(
     body=('#E8735A', 'satin'),       # coral: the bar's counter, the desk frame, the stage, the floor's frame
@@ -404,15 +403,7 @@ def danceFloor():
                     F.box(_name('tile'), TILE, 0.014, TILE, (x, TILE_Y + 0.007, z), m, bevel=0.004)
         groups.append(G.hinged(G.join(tiles, f'tiles_{"ab"[parity]}'), F.at(0, TILE_Y, 0)))
     objs = G.settle(centre=False)
-    end = motion.last_frame(1.2)
-    half = (end + 1) // 2
-    for k, part in enumerate(groups):
-        z0 = part.location[2]
-        a, b = (1, half) if k == 0 else (half, end)
-        keys = [(1, z0), (a, z0), ((a + b) // 2, z0 + LIFT), (b, z0), (end, z0)]
-        keys = [kv for n, kv in enumerate(keys) if n == 0 or kv[0] != keys[n - 1][0]]   # no two keys on one frame
-        motion._clip(part, 'tiles', 'location', 2, keys)
-    motion._peak(groups[0], 'tiles', (1 + half) // 2)
+    G.turns(groups, 'tiles', (0, 0, LIFT), seconds=1.2)
     return objs
 
 

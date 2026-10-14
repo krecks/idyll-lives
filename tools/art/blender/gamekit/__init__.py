@@ -7,7 +7,7 @@
 from .export import export_glb, materials_used, stats, write_pack
 from .family import Family, Model
 from .materials import FINISHES, Palette, mat
-from .motion import clips, grow, rock, slide, spin, squash, stages, swing
+from .motion import clips, grow, rock, slide, spin, squash, stages, swing, turns
 from .parts import check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin, settle, turn
 from .place import GameFrame
 from .preview import preview, preview_clips
