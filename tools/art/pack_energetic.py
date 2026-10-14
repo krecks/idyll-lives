@@ -64,7 +64,7 @@ p += [rod([0, 0.44, 0.72], [0, 1.0, 0.62], 0.05, WHITE, 'gloss', shape='box', t2
 E['model.energetic.spinBike'] = {'type': 'model', 'placeholder': p}
 
 # ---- Trampoline (2x2) ------------------------------------------------------------------------
-p = [torus([1.86, 0.1, 1.86], [0, 0.62, 0], '#2F8F83', 'fabric', segments=36),              # safety pad
+p = [torus([1.9, 0.07, 1.9], [0, 0.6, 0], '#2F8F83', 'fabric', segments=36),                  # safety pad (top 0.635)
      cyl([1.62, 0.02, 1.62], [0, 0.6, 0], '#4F6585', 'matte', segments=36),                     # jumping mat
      torus([1.7, 0.03, 1.7], [0, 0.585, 0], STEEL, 'metal', segments=36),                       # spring ring
      torus([1.84, 0.04, 1.84], [0, 0.56, 0], '#8A9096', 'metal', segments=36)]                   # frame
@@ -78,7 +78,7 @@ for x in (-0.12, 0.12):                                                         
     p.append(rod([x, 0.025, 0.93], [x, 0.56, 0.84], 0.03, '#8A9096', 'metal'))
 for y in (0.18, 0.38):
     p.append(box([0.26, 0.025, 0.06], [0, y, 0.91 - (y / 0.56) * 0.1], '#3A3D41', 'satin', radius=0.008))
-p += [sph([0.22, 0.22, 0.22], [0.35, 0.73, -0.2], ORANGE, 'gloss', segments=14)]               # ball
+p += [sph([0.22, 0.22, 0.22], [0.8, 0.11, 0.76], ORANGE, 'gloss', segments=14)]                # ball, on the grass
 E['model.energetic.trampoline'] = {'type': 'model', 'placeholder': p}
 
 # ---- Streetball hoop (1x1): weighted base at the back, board and rim towards the front ----------
@@ -141,12 +141,19 @@ p = [box([0.82, 0.3, 1.86], [0, 0.17, 0.0], WHITE, 'gloss', radius=0.12),       
      cushion([0.5, 0.1, 0.3], [0, 0.53, -0.7], '#ECEFF2', radius=0.045),                        # headrest
      cushion([0.24, 0.12, 0.62], [-0.13, 0.54, 0.5], TEAL, radius=0.05),                        # compression boots
      cushion([0.24, 0.12, 0.62], [0.13, 0.54, 0.5], TEAL, radius=0.05),
-     part('sphere', [0.8, 0.82, 1.0], [0, 0.42, -0.35], '#8FB9C9', 'glass', segments=20),       # tinted canopy
-     torus([0.8, 0.03, 1.0], [0, 0.42, -0.35], WHITE, 'gloss', segments=32),                      # canopy rim
+     # the tinted canopy, standing open 40 degrees about its hinge at the head end, as the model at rest: the glass
+     # in the box it fills (a turned part's box would reach past the tile), its rim turned
+     part('sphere', [0.82, 0.76, 0.85], [0, 0.8, -0.505], '#8FB9C9', 'glass', segments=20),
+     torus([0.8, 0.03, 0.9], [0, 0.709, -0.505], WHITE, 'gloss', rotate=[-40, 0, 0], segments=32),   # canopy rim
      box([0.06, 0.3, 0.3], [0.38, 0.5, 0.55], WHITE, 'gloss', radius=0.03),                     # control pod
      box([0.004, 0.16, 0.2], [0.413, 0.54, 0.55], '#1E4F7A', 'gloss', radius=0.004),
      box([0.004, 0.03, 0.12], [0.414, 0.6, 0.55], '#7FE0D8', 'gloss', radius=0.002)]
 E['model.energetic.recoveryPod'] = {'type': 'model', 'placeholder': p}
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('energetic', E, ['model.energetic.boulderingWall', 'model.energetic.contrastShower',
+                         'model.energetic.powerBlender', 'model.energetic.streetballHoop'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('energetic', E) else 0)

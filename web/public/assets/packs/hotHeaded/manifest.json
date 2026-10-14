@@ -14,7 +14,7 @@
           "at": [
             0,
             0.006,
-            0
+            0.02
           ],
           "color": "#3E4A55",
           "material": "material.finish.fabric",
@@ -30,7 +30,7 @@
           "at": [
             0,
             0.04,
-            -0.05
+            -0.03
           ],
           "color": "#7E858C",
           "material": "material.finish.metal",
@@ -46,7 +46,7 @@
           "at": [
             0,
             0.04,
-            -0.36
+            -0.34
           ],
           "color": "#7E858C",
           "material": "material.finish.metal",
@@ -62,7 +62,7 @@
           "at": [
             0,
             1.0,
-            -0.38
+            -0.36
           ],
           "color": "#AEB4BA",
           "material": "material.finish.metal",
@@ -78,7 +78,7 @@
           "at": [
             0.0,
             0.235,
-            -0.14
+            -0.12
           ],
           "color": "#AEB4BA",
           "material": "material.finish.metal",
@@ -99,7 +99,7 @@
           "at": [
             0,
             1.96,
-            -0.15
+            -0.13
           ],
           "color": "#AEB4BA",
           "material": "material.finish.metal",
@@ -115,7 +115,7 @@
           "at": [
             -0.2,
             0.17,
-            -0.32
+            -0.3
           ],
           "color": "#C8402F",
           "material": "material.finish.satin",
@@ -135,7 +135,7 @@
           "at": [
             -0.05,
             1.83,
-            0.08
+            0.1
           ],
           "color": "#D0D3D6",
           "material": "material.finish.chrome",
@@ -155,7 +155,7 @@
           "at": [
             0.2,
             0.17,
-            -0.32
+            -0.3
           ],
           "color": "#2F3236",
           "material": "material.finish.satin",
@@ -175,7 +175,7 @@
           "at": [
             0.05,
             1.83,
-            0.08
+            0.1
           ],
           "color": "#D0D3D6",
           "material": "material.finish.chrome",
@@ -195,7 +195,7 @@
           "at": [
             0.0,
             1.83,
-            0.13
+            0.15
           ],
           "color": "#D0D3D6",
           "material": "material.finish.chrome",
@@ -215,7 +215,7 @@
           "at": [
             0,
             1.7,
-            0.1
+            0.12
           ],
           "color": "#D0D3D6",
           "material": "material.finish.chrome"
@@ -230,7 +230,7 @@
           "at": [
             0,
             1.18,
-            0.1
+            0.12
           ],
           "color": "#C8402F",
           "material": "material.finish.satin"
@@ -245,7 +245,7 @@
           "at": [
             0,
             1.5,
-            0.1
+            0.12
           ],
           "color": "#2F3236",
           "material": "material.finish.satin"
@@ -260,7 +260,7 @@
           "at": [
             0,
             0.86,
-            0.1
+            0.12
           ],
           "color": "#2F3236",
           "material": "material.finish.satin"
@@ -275,7 +275,7 @@
           "at": [
             0,
             1.18,
-            0.295
+            0.315
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -291,7 +291,7 @@
           "at": [
             -0.24,
             1.18,
-            -0.3
+            -0.28
           ],
           "color": "#C8402F",
           "material": "material.finish.satin",
@@ -307,7 +307,7 @@
           "at": [
             -0.24,
             1.07,
-            -0.3
+            -0.28
           ],
           "color": "#F2F2F0",
           "material": "material.finish.satin"
@@ -322,7 +322,7 @@
           "at": [
             -0.12,
             1.18,
-            -0.3
+            -0.28
           ],
           "color": "#C8402F",
           "material": "material.finish.satin",
@@ -338,7 +338,7 @@
           "at": [
             -0.12,
             1.07,
-            -0.3
+            -0.28
           ],
           "color": "#F2F2F0",
           "material": "material.finish.satin"
@@ -353,7 +353,7 @@
           "at": [
             -0.12,
             1.32,
-            -0.33
+            -0.31
           ],
           "color": "#AEB4BA",
           "material": "material.finish.metal",
@@ -374,7 +374,7 @@
           "at": [
             -0.08,
             0.04,
-            -0.1675
+            -0.1475
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -390,7 +390,7 @@
           "at": [
             -0.08,
             0.14,
-            -0.1675
+            -0.1475
           ],
           "color": "#D2B872",
           "material": "material.finish.matte",
@@ -406,7 +406,7 @@
           "at": [
             -0.2,
             0.235,
-            -0.2175
+            -0.1975
           ],
           "color": "#F6F4EE",
           "material": "material.finish.gloss",
@@ -427,7 +427,7 @@
           "at": [
             0.02,
             0.235,
-            -0.1075
+            -0.0875
           ],
           "color": "#F6F4EE",
           "material": "material.finish.gloss",
@@ -448,7 +448,7 @@
           "at": [
             -0.06,
             0.235,
-            -0.2875
+            -0.2675
           ],
           "color": "#F6F4EE",
           "material": "material.finish.gloss",
@@ -469,7 +469,7 @@
           "at": [
             -0.38,
             0.3,
-            -0.42
+            -0.4
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -485,7 +485,7 @@
           "at": [
             -0.38,
             0.3,
-            0.085
+            0.105
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -501,7 +501,7 @@
           "at": [
             0.22,
             0.3,
-            -0.42
+            -0.4
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -517,7 +517,7 @@
           "at": [
             0.22,
             0.3,
-            0.085
+            0.105
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -533,7 +533,7 @@
           "at": [
             -0.08,
             0.1067,
-            0.104
+            0.124
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -549,7 +549,7 @@
           "at": [
             -0.08,
             0.1067,
-            -0.439
+            -0.419
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -565,7 +565,7 @@
           "at": [
             -0.399,
             0.1067,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -581,7 +581,7 @@
           "at": [
             0.239,
             0.1067,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -597,7 +597,7 @@
           "at": [
             -0.08,
             0.3,
-            0.104
+            0.124
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -613,7 +613,7 @@
           "at": [
             -0.08,
             0.3,
-            -0.439
+            -0.419
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -629,7 +629,7 @@
           "at": [
             -0.399,
             0.3,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -645,7 +645,7 @@
           "at": [
             0.239,
             0.3,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -661,7 +661,7 @@
           "at": [
             -0.08,
             0.4933,
-            0.104
+            0.124
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -677,7 +677,7 @@
           "at": [
             -0.08,
             0.4933,
-            -0.439
+            -0.419
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -693,7 +693,7 @@
           "at": [
             -0.399,
             0.4933,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -709,7 +709,7 @@
           "at": [
             0.239,
             0.4933,
-            -0.1675
+            -0.1475
           ],
           "color": "#A87547",
           "material": "material.finish.wood",
@@ -725,7 +725,7 @@
           "at": [
             -0.08,
             0.51,
-            0.119
+            0.139
           ],
           "color": "#7C5432",
           "material": "material.finish.wood",
@@ -741,7 +741,7 @@
           "at": [
             0,
             0.006,
-            0
+            0.02
           ],
           "color": "#3E4A55",
           "material": "material.finish.fabric",
@@ -757,7 +757,7 @@
           "at": [
             -0.08,
             0.26,
-            0.13
+            0.15
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -773,7 +773,7 @@
           "at": [
             -0.08,
             0.36,
-            0.13
+            0.15
           ],
           "color": "#2F3236",
           "material": "material.finish.gloss",
@@ -789,7 +789,7 @@
           "at": [
             -0.32,
             0.36,
-            0.131
+            0.151
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -805,7 +805,7 @@
           "at": [
             -0.2,
             0.36,
-            0.131
+            0.151
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -821,7 +821,7 @@
           "at": [
             -0.08,
             0.36,
-            0.131
+            0.151
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -837,7 +837,7 @@
           "at": [
             0.04,
             0.36,
-            0.131
+            0.151
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -853,7 +853,7 @@
           "at": [
             0.16,
             0.36,
-            0.131
+            0.151
           ],
           "color": "#F2B84B",
           "material": "material.finish.gloss",
@@ -869,7 +869,7 @@
           "at": [
             0.28,
             0.46,
-            0.22
+            0.24
           ],
           "color": "#CDB08A",
           "material": "material.finish.wood"
@@ -884,7 +884,7 @@
           "at": [
             0.39,
             0.2325,
-            0.22
+            0.24
           ],
           "color": "#CDB08A",
           "material": "material.finish.wood",
@@ -904,7 +904,7 @@
           "at": [
             0.225,
             0.2325,
-            0.3153
+            0.3353
           ],
           "color": "#CDB08A",
           "material": "material.finish.wood",
@@ -924,7 +924,7 @@
           "at": [
             0.225,
             0.2325,
-            0.1247
+            0.1447
           ],
           "color": "#CDB08A",
           "material": "material.finish.wood",
@@ -944,7 +944,7 @@
           "at": [
             0.28,
             0.484,
-            0.22
+            0.24
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -960,7 +960,7 @@
           "at": [
             0.288,
             0.504,
-            0.22
+            0.24
           ],
           "color": "#9CC3DB",
           "material": "material.finish.gloss",
@@ -976,7 +976,7 @@
           "at": [
             0.28,
             0.524,
-            0.22
+            0.24
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -992,7 +992,7 @@
           "at": [
             0.288,
             0.544,
-            0.22
+            0.24
           ],
           "color": "#F2D7A0",
           "material": "material.finish.gloss",
@@ -1008,7 +1008,7 @@
           "at": [
             0.28,
             0.564,
-            0.22
+            0.24
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1024,7 +1024,7 @@
           "at": [
             0.288,
             0.584,
-            0.22
+            0.24
           ],
           "color": "#C8E0C0",
           "material": "material.finish.gloss",
@@ -1040,7 +1040,7 @@
           "at": [
             0.28,
             0.604,
-            0.22
+            0.24
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1056,7 +1056,7 @@
           "at": [
             -0.3,
             0.018,
-            0.32
+            0.34
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1077,7 +1077,7 @@
           "at": [
             -0.15,
             0.018,
-            0.36
+            0.38
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1098,7 +1098,7 @@
           "at": [
             0.05,
             0.018,
-            0.38
+            0.4
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1119,7 +1119,7 @@
           "at": [
             -0.38,
             0.018,
-            0.22
+            0.24
           ],
           "color": "#F4F1EA",
           "material": "material.finish.gloss",
@@ -1140,7 +1140,7 @@
           "at": [
             -0.15,
             0.62,
-            -0.15
+            -0.13
           ],
           "color": "#2F3236",
           "material": "material.finish.satin"
@@ -1155,7 +1155,7 @@
           "at": [
             -0.15,
             0.62,
-            -0.13
+            -0.11
           ],
           "color": "#F2B84B",
           "material": "material.finish.glass",

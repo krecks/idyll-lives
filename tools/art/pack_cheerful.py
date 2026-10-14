@@ -143,5 +143,9 @@ for i, (x, y) in enumerate([(-0.6, 1.0), (-0.3, 1.18), (0.1, 0.98), (0.45, 1.15)
     p.append(box([0.05, 0.05, 0.01], [x, y, -0.865], COLS[i], 'gloss', radius=0.01, rotate=[0, 0, 30 * i]))  # confetti
 E['model.cheerful.partyBooth'] = {'type': 'model', 'placeholder': p}
 
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('cheerful', E, ['model.cheerful.jukebox', 'model.cheerful.karaokeMachine', 'model.cheerful.sunriseLamp'])
+
 if __name__ == '__main__':
     sys.exit(1 if run('cheerful', E) else 0)

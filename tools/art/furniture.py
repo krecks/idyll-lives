@@ -531,12 +531,13 @@ def whirlpool():
 def chef_stove():
     """2x1 range cooker: six burners, double oven, backsplash and a chimney hood."""
     steel, dark = STEEL, '#3A3D41'
-    p = [box([1.6, 0.86, 0.62], [0, 0.45, -0.14], steel, 'metal', radius=0.015),               # body
-         box([1.58, 0.06, 0.6], [0, 0.03, -0.14], dark, 'satin', radius=0.008),                  # kick plate, set in
-         box([1.62, 0.04, 0.62], [0, 0.9, -0.13], '#2F3236', 'satin', radius=0.01),              # hob top
-         box([1.6, 0.5, 0.03], [0, 1.17, -0.44], '#E7E5E0', 'gloss', radius=0.006),              # backsplash tiles
-         box([1.2, 0.5, 0.44], [0, 1.82, -0.23], steel, 'metal', radius=0.015),                 # hood
-         box([0.36, 0.5, 0.28], [0, 2.3, -0.3], steel, 'metal', radius=0.01)]                    # chimney
+    # (backs on the wall face, -0.43)
+    p = [box([1.6, 0.86, 0.6], [0, 0.45, -0.13], steel, 'metal', radius=0.015),                # body
+         box([1.58, 0.06, 0.58], [0, 0.03, -0.13], dark, 'satin', radius=0.008),                 # kick plate, set in
+         box([1.62, 0.04, 0.6], [0, 0.9, -0.13], '#2F3236', 'satin', radius=0.01),               # hob top
+         box([1.6, 0.5, 0.03], [0, 1.17, -0.415], '#E7E5E0', 'gloss', radius=0.006),             # backsplash tiles
+         box([1.2, 0.5, 0.42], [0, 1.82, -0.22], steel, 'metal', radius=0.015),                 # hood
+         box([0.36, 0.5, 0.26], [0, 2.3, -0.3], steel, 'metal', radius=0.01)]                    # chimney
     for i, x in enumerate((-0.5, 0.0, 0.5)):
         for z in (-0.28, 0.0):
             p += [cyl([0.2, 0.02, 0.2], [x, 0.93, z], '#1E1F22', 'satin', segments=16),         # grates
@@ -549,9 +550,9 @@ def chef_stove():
         p.append(cyl([0.05, 0.03, 0.05], [x, 0.8, 0.19], dark, 'satin', rotate=[90, 0, 0], segments=12))
     p += [lathe([0.26, 0.18, 0.26], [-0.5, 1.03, 0.0], '#B9BDC1', 'metal',
                 [[0, -0.5], [0.46, -0.5], [0.5, -0.4], [0.5, 0.5], [0.44, 0.5], [0.44, -0.38], [0, -0.38]]),  # stock pot
-          cyl([0.34, 0.03, 0.34], [0.5, 0.96, -0.28], '#2F3236', 'satin'),                        # frying pan
+          cyl([0.34, 0.03, 0.34], [0.5, 0.96, -0.26], '#2F3236', 'satin'),                        # frying pan
           rod([0.62, 0.96, -0.2], [0.82, 0.97, -0.05], 0.03, '#2F3236', 'satin', shape='box'),
-          sph([0.12, 0.06, 0.12], [0.5, 0.98, -0.28], '#E9C46A', 'satin', segments=10)]          # omelette
+          sph([0.12, 0.06, 0.12], [0.5, 0.98, -0.26], '#E9C46A', 'satin', segments=10)]          # omelette
     return p
 
 

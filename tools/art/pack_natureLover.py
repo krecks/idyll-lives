@@ -219,5 +219,9 @@ for x in (-0.6, -0.07, 0.43):                                                   
     gp += fern(x, 0.8, -0.74, TERRA, spread=0.25, green=(GREEN3, GREEN, GREEN2))
 E['model.natureLover.glasshouse'] = {'type': 'model', 'placeholder': gp}
 
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('natureLover', E, ['model.natureLover.cedarShower', 'model.natureLover.glasshouse'])
+
 if __name__ == '__main__':
     sys.exit(1 if run('natureLover', E) else 0)

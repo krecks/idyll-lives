@@ -63,9 +63,9 @@ E['model.gloomy.cello'] = {'type': 'model', 'placeholder': p}
 
 # ---- Candlelit writing desk (2x1): chair at the centre line, desk in front (near edge z 0.2) -----
 p = [box([1.5, 0.04, 0.26], [0, 0.76, 0.32], ROSEWOOD, 'wood', radius=0.012),                    # desk top
-     box([1.42, 0.1, 0.22], [0, 0.69, 0.33], WALNUT, 'wood', radius=0.008),                       # apron with drawer
-     box([0.36, 0.06, 0.012], [0.42, 0.69, 0.218], '#8A5A40', 'wood', radius=0.006),
-     sph([0.03, 0.03, 0.02], [0.42, 0.69, 0.21], BRASS, 'metal', segments=8),
+     box([1.42, 0.13, 0.02], [0, 0.675, 0.43], WALNUT, 'wood', radius=0.004),                     # apron at the far edge
+     box([0.02, 0.1, 0.2], [-0.7, 0.69, 0.32], WALNUT, 'wood', radius=0.004),                     # and the ends, so the
+     box([0.02, 0.1, 0.2], [0.7, 0.69, 0.32], WALNUT, 'wood', radius=0.004),                      # writer's hands have room
      box([1.5, 0.26, 0.05], [0, 0.92, 0.42], ROSEWOOD, 'wood', radius=0.012),                     # back gallery
      box([1.44, 0.02, 0.14], [0, 1.05, 0.38], WALNUT, 'wood', radius=0.006)]                      # shelf
 for x in (-0.7, 0.7):
@@ -155,6 +155,10 @@ p += [cushion([0.36, 0.08, 0.26], [0.2, 0.57, -0.78], '#EDE8F2', radius=0.03),  
       lathe([0.16, 0.18, 0.16], [-0.25, 0.62, -0.8], '#B7A9C6', 'gloss', VASE, segments=14)]
 p += [part('blob', [0.2, 0.22, 0.2], [-0.25, 0.8, -0.8], '#6E8F72', 'foliage', noise=0.25)]
 E['model.gloomy.soakingTub'] = {'type': 'model', 'placeholder': p}
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('gloomy', E, ['model.gloomy.recordCabinet', 'model.gloomy.soakingTub', 'model.gloomy.windowSeat'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('gloomy', E) else 0)
