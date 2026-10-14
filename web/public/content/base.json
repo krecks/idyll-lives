@@ -2727,8 +2727,8 @@
         }
       ],
       "price": 200,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "patio",
       "slots": 2
     },
     {
@@ -2879,7 +2879,8 @@
         2
       ],
       "price": 650,
-      "category": "fitness",
+      "category": "validate",
+      "group": "fitness",
       "description": "Builds Endurance.",
       "interactions": [
         {
@@ -2912,7 +2913,8 @@
         2
       ],
       "price": 480,
-      "category": "fitness",
+      "category": "validate",
+      "group": "fitness",
       "description": "Builds Strength.",
       "interactions": [
         {
@@ -3478,7 +3480,7 @@
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "objectRules": {
-    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
+    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community", "validate"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
     "maxQuality": 3,
@@ -3731,8 +3733,58 @@
           "label": "Laundry"
         },
         {
+          "id": "fitness",
+          "label": "Fitness"
+        },
+        {
+          "id": "dressing",
+          "label": "Dressing"
+        },
+        {
+          "id": "nightstands",
+          "label": "Nightstands"
+        },
+        {
+          "id": "wardrobes",
+          "label": "Wardrobes"
+        },
+        {
+          "id": "beds",
+          "label": "Beds"
+        },
+        {
           "id": "bathroom storage",
           "label": "Bathroom Storage"
+        },
+        {
+          "id": "kitchenware",
+          "label": "Kitchenware"
+        },
+        {
+          "id": "tableware",
+          "label": "Tableware"
+        },
+        {
+          "id": "books and pots",
+          "label": "Books And Pots"
+        },
+        {
+          "id": "small ornaments",
+          "label": "Small Ornaments"
+        },
+        {
+          "id": "desk and bath bits",
+          "label": "Desk And Bath Bits"
+        },
+        {
+          "id": "patio",
+          "label": "Patio",
+          "outside": true
+        },
+        {
+          "id": "loungers",
+          "label": "Loungers",
+          "outside": true
         },
         {
           "id": "wall decor",
@@ -3751,6 +3803,18 @@
           "label": "Houseplants"
         },
         {
+          "id": "baby and beds",
+          "label": "Baby And Beds"
+        },
+        {
+          "id": "toys",
+          "label": "Toys"
+        },
+        {
+          "id": "kids study",
+          "label": "Kids Study"
+        },
+        {
           "id": "ceiling lights",
           "label": "Ceiling Lights"
         },
@@ -3767,22 +3831,6 @@
           "label": "Table Lamps"
         },
         {
-          "id": "beds",
-          "label": "Beds"
-        },
-        {
-          "id": "nightstands",
-          "label": "Nightstands"
-        },
-        {
-          "id": "wardrobes",
-          "label": "Wardrobes"
-        },
-        {
-          "id": "dressing",
-          "label": "Dressing"
-        },
-        {
           "id": "desks",
           "label": "Desks"
         },
@@ -3795,47 +3843,6 @@
           "label": "Office Storage"
         },
         {
-          "id": "flowers",
-          "label": "Flowers",
-          "outside": true
-        },
-        {
-          "id": "baby and beds",
-          "label": "Baby And Beds"
-        },
-        {
-          "id": "toys",
-          "label": "Toys"
-        },
-        {
-          "id": "kids study",
-          "label": "Kids Study"
-        },
-        {
-          "id": "playground",
-          "label": "Playground",
-          "outside": true
-        },
-        {
-          "id": "shrubs",
-          "label": "Shrubs",
-          "outside": true
-        },
-        {
-          "id": "farm",
-          "label": "Farm",
-          "outside": true
-        },
-        {
-          "id": "shops",
-          "label": "Shops"
-        },
-        {
-          "id": "edibles",
-          "label": "Edibles",
-          "outside": true
-        },
-        {
           "id": "stalls",
           "label": "Stalls",
           "outside": true
@@ -3843,6 +3850,20 @@
         {
           "id": "street",
           "label": "Street",
+          "outside": true
+        },
+        {
+          "id": "playground",
+          "label": "Playground",
+          "outside": true
+        },
+        {
+          "id": "shops",
+          "label": "Shops"
+        },
+        {
+          "id": "farm",
+          "label": "Farm",
           "outside": true
         },
         {
@@ -3856,6 +3877,21 @@
         {
           "id": "crafts",
           "label": "Crafts"
+        },
+        {
+          "id": "flowers",
+          "label": "Flowers",
+          "outside": true
+        },
+        {
+          "id": "shrubs",
+          "label": "Shrubs",
+          "outside": true
+        },
+        {
+          "id": "edibles",
+          "label": "Edibles",
+          "outside": true
         },
         {
           "id": "trees",

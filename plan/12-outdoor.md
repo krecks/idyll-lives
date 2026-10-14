@@ -1,9 +1,9 @@
 # Outdoor
 
-The garden decor (gnome, bird bath, fountain, lantern, wheelbarrow, boulders) is done (`families/garden_decor.py`).
+The garden decor (gnome, bird bath, fountain, lantern, wheelbarrow, boulders) is done (`families/garden_decor.py`); the eleven OU1 patio models and the five OU2 loungers and swings are done in `families/outdoor.py` (notes: `outdoor.md`).
 Outdoor things are seen from far: watch the budget, and street-scale props wait for LOD (E7).
 
-## OU1. Patio seating and tables (11)
+## OU1. Patio seating and tables (11) — **Done** (in Validate › Patio)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `patio` (Validate › Patio)
@@ -23,7 +23,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Frame, Slats | Static | Static. |
 | `parasol` Parasol | 1x1 · floor | — | outdoor / seating | Canopy, Pole | Static | Static, open. A it stirs in the wind (E2); (+use) it folds. |
 
-## OU2. Loungers, swings and the hot tub (5)
+## OU2. Loungers, swings and the hot tub (5) — **Done** (in Validate › Loungers)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `loungers` (Validate › Loungers)

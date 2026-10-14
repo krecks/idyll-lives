@@ -8,7 +8,7 @@
 # A clip's first key (frame 1) is the rest pose: where the file has the part, and the game draws it
 # closed. Only the node's rotation, location or scale move. `swing`, `slide`, `grow` and `squash` go from
 # rest to open (the game plays them back); `spin` and `rock` come home to rest within the clip, so they
-# also serve as loops (`motions.loops`, `idle`). `G.run` exports the clips when a model has any; the
+# also serve as loops (`motions.loops`, `idle`), and `scroll` moves one repeat on, home unseen. `G.run` exports the clips when a model has any; the
 # exporter samples every frame, and the game samples the clip 30 times a second.
 import math
 
@@ -56,6 +56,18 @@ def spin(obj, clip, turns=1, seconds=1.0, axis='Z'):
     rest = obj.rotation_euler[i]
     end = last_frame(seconds)
     _clip(obj, clip, 'rotation_euler', i, [(1, rest), (end, rest + turns * 2 * math.pi)], linear=True)
+    return _peak(obj, clip, (1 + end) / 2)
+
+
+def scroll(obj, clip, offset, seconds=1.0):
+    """A clip `clip` moving `obj` by `offset` (Blender x, y, z, metres) at an even speed, as a loop: a
+    treadmill's belt slats, a conveyor. The game jumps it home at the end of each round, unseen when
+    `offset` is the pattern's repeat (one slat on) and the part's ends are hidden under covers."""
+    end = last_frame(seconds)
+    for i, d in enumerate(offset):
+        if d:
+            rest = obj.location[i]
+            _clip(obj, clip, 'location', i, [(1, rest), (end, rest + d)], linear=True)
     return _peak(obj, clip, (1 + end) / 2)
 
 

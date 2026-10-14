@@ -1,0 +1,187 @@
+{
+  "$comment": "Blender-built home gym (tools/art/blender/families/fitness.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls (`unroll`) for yoga.",
+  "version": 1,
+  "entries": {
+    "model.treadmill": {
+      "type": "model",
+      "url": "../../models/fitness/treadmill.glb",
+      "materials": {
+        "accent": {
+          "finish": "material.finish.satin"
+        },
+        "belt": {
+          "finish": "material.finish.matte"
+        },
+        "block": {
+          "finish": "material.finish.matte"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "pads": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "slat": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "run": "belt_run"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "pads",
+          "label": "Pads"
+        }
+      ]
+    },
+    "model.weightBench": {
+      "type": "model",
+      "url": "../../models/fitness/weightBench.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "pads": {
+          "finish": "material.finish.satin"
+        },
+        "plate": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "pads",
+          "label": "Pads"
+        }
+      ]
+    },
+    "model.exerciseBike": {
+      "type": "model",
+      "url": "../../models/fitness/exerciseBike.glb",
+      "materials": {
+        "accent": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "pads": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "cycle": "pedals_turn"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "pads",
+          "label": "Pads"
+        }
+      ]
+    },
+    "model.yogaMat": {
+      "type": "model",
+      "url": "../../models/fitness/yogaMat.glb",
+      "materials": {
+        "block": {
+          "finish": "material.finish.matte"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "mat": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "yoga": "unroll"
+        }
+      },
+      "paint": [
+        {
+          "material": "mat",
+          "label": "Mat"
+        }
+      ]
+    },
+    "model.dumbbells": {
+      "type": "model",
+      "url": "../../models/fitness/dumbbells.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "plate": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Rack"
+        },
+        {
+          "material": "plate",
+          "label": "Weights"
+        }
+      ]
+    }
+  }
+}

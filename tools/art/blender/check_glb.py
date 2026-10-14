@@ -128,6 +128,26 @@ def first_value(gltf, binary, accessor, last=False):
     return struct.unpack_from(f'<{n}f', binary, view.get('byteOffset', 0) + acc.get('byteOffset', 0) + at)
 
 
+def values(gltf, binary, accessor):
+    """Every element of a float accessor (a clip's keys), as tuples."""
+    acc = gltf['accessors'][accessor]
+    view = gltf['bufferViews'][acc['bufferView']]
+    n = {'SCALAR': 1, 'VEC3': 3, 'VEC4': 4}[acc['type']]
+    stride = view.get('byteStride') or 4 * n
+    at = view.get('byteOffset', 0) + acc.get('byteOffset', 0)
+    return [struct.unpack_from(f'<{n}f', binary, at + k * stride) for k in range(acc['count'])]
+
+
+def even(gltf, binary, sampler):
+    """Whether a sampler moves at an even speed (each key as far on from the last, per second)."""
+    times = [t[0] for t in values(gltf, binary, sampler['input'])]
+    keys = values(gltf, binary, sampler['output'])
+    if len(keys) < 3 or times[-1] <= times[0]:
+        return False
+    rate = [(b - a) / (times[-1] - times[0]) for a, b in zip(keys[0], keys[-1])]
+    return all(abs(k[i] - keys[0][i] - rate[i] * (t - times[0])) <= 1e-3 for k, t in zip(keys, times) for i in range(len(rate)))
+
+
 def named_finish(name):
     """A material named for its finish (`stone@matte`, `tunic@fabric#body`) maps itself to it (models.ts
     `namedFinish`; a tint slot `#body`, `#skin` or `#hair` in the name aside)."""
@@ -190,7 +210,8 @@ def check_clips(gltf, binary, entry):
         warnings.append(f'clip {name!r} plays for no use (name it in the entry\'s `motions`)')
     # A loop goes round from rest to rest: each channel ends where it starts (a turn, either sign).
     # A turn by a whole fraction of a circle (a fan's four blades a quarter round) loops if the part
-    # looks the same turned: a warning to check that.
+    # looks the same turned, and a move at an even speed (G.scroll: a belt's slats) if it looks the same
+    # moved: warnings to check that.
     for a in animations:
         if a.get('name', '') not in loops(motions):
             continue
@@ -210,7 +231,11 @@ def check_clips(gltf, binary, entry):
                     continue
             elif max(abs(x - y) for x, y in zip(first, last)) <= 1e-3:
                 continue
-            errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock)')
+            elif c['target'].get('path') == 'translation' and even(gltf, binary, a['samplers'][c['sampler']]):
+                moved = math.dist(first, last)
+                warnings.append(f'loop {a["name"]!r} ends {node} moved {moved * 100:.0f} cm from where it starts: right only if it looks the same moved (a belt\'s slats one slat on, its ends hidden)')
+                continue
+            errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock, G.scroll)')
     return errors, warnings
 
 

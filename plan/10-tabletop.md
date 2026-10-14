@@ -4,7 +4,10 @@ Small things that stand on tops (`surface` layer, 1×1). No interactions, so no 
 call and the smallest triangle budget (objects.md: 0.35 m, 1.5k/3k). If uses come later (a kettle lid, the
 laptop opening), add the clip then.
 
-## TT1. Kitchenware (11)
+All five tasks are done (2026-10-14): `families/tabletop.py` (notes: `families/tabletop.md`), in Validate. The
+kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their own, hinged for the clip to come.
+
+## TT1. Kitchenware (11) — **Done** (in Validate › Kitchenware)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `kitchenware` (Validate › Kitchenware)
@@ -24,7 +27,7 @@ laptop opening), add the clip then.
 | `spiceJars` Spice jars | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 | `cookieJar` Cookie jar | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 
-## TT2. Tableware (7)
+## TT2. Tableware (7) — **Done** (in Validate › Tableware)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `tableware` (Validate › Tableware)
@@ -40,7 +43,7 @@ laptop opening), add the clip then.
 | `wineGlasses` Wine and glasses | 1x1 · surface | — | tabletop / tableware | Body | Static | Static. |
 | `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body | Static | Static. |
 
-## TT3. Books and small plants (7)
+## TT3. Books and small plants (7) — **Done** (in Validate › Books And Pots)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `books and pots` (Validate › Books And Pots)
@@ -56,7 +59,7 @@ laptop opening), add the clip then.
 | `potCactus` Cactus | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 | `potSmall` Small potted plant | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 
-## TT4. Small ornaments (6)
+## TT4. Small ornaments (6) — **Done** (in Validate › Small Ornaments)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `small ornaments` (Validate › Small Ornaments)
@@ -65,13 +68,13 @@ laptop opening), add the clip then.
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `photoFrame` Photo frame | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
-| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body | Ambient (E2) | `hands` (E2). Until then static. |
+| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body | Ambient (E2) | `hands`: the second hand goes round once a minute. |
 | `globe` Globe | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `snowGlobe` Snow globe | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `trophy` Trophy | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `sculptureSmall` Small sculpture | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 
-## TT5. Bath, desk and toys (8)
+## TT5. Bath, desk and toys (8) — **Done** (in Validate › Desk And Bath Bits)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `desk and bath bits` (Validate › Desk And Bath Bits)

@@ -230,6 +230,7 @@ const LIE_CENTRE = 0.86;
 /** Standing surface heights (m) of exercise equipment Sims stand on. */
 const TRAMPOLINE_MAT = 0.5;
 const VIBE_PLATE = 0.12;
+const TREADMILL_BELT = 0.156;
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
@@ -2186,6 +2187,11 @@ export class Characters {
         if (tag === 'cuddle') {
           reach = rig.cuddleStep;
           reachRate = 6;
+        }
+        if (tag === 'run' && obj && rig.useDef.includes('treadmill')) {
+          // On the belt (Sims use it from the tile in front): forward to its centre, facing the console.
+          rootFwd = Math.hypot(obj.cx - rig.x, obj.cz - rig.z);
+          rootY = TREADMILL_BELT;
         }
         if (tag === 'exercise' && obj && (rig.useDef.includes('trampoline') || rig.useDef.includes('vibe'))) {
           // Up on the equipment (Sims use it from the tile in front): forward to its centre.

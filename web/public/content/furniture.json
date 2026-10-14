@@ -3453,7 +3453,8 @@
         1
       ],
       "price": 420,
-      "category": "fitness",
+      "category": "validate",
+      "group": "fitness",
       "description": "A basic upright bike: cycling builds Endurance.",
       "interactions": [
         {
@@ -3488,7 +3489,12 @@
         1
       ],
       "price": 45,
-      "category": "fitness",
+      "category": "validate",
+      "group": "fitness",
+      "seat": {
+        "height": 0.03,
+        "forward": 0.0
+      },
       "description": "A mat, a block and a bottle of water. Yoga stretches the body and calms the mind.",
       "interactions": [
         {
@@ -3496,6 +3502,7 @@
           "label": "Do yoga",
           "anim": "meditate",
           "minutes": 30,
+          "pose": "sit",
           "effects": {
             "comfort": 0.2,
             "fun": 0.1
@@ -3520,7 +3527,8 @@
         1
       ],
       "price": 160,
-      "category": "fitness",
+      "category": "validate",
+      "group": "fitness",
       "description": "Eight dumbbells on a rack: lifting builds Strength.",
       "interactions": [
         {
@@ -4380,8 +4388,8 @@
         2
       ],
       "price": 220,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "patio",
       "description": "A slatted folding table and chairs for a sunny corner.",
       "surface": {
         "height": 0.72,
@@ -4438,8 +4446,8 @@
         2
       ],
       "price": 260,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "patio",
       "slots": 2,
       "description": "A big wooden table with benches: picnics for two.",
       "surface": {
@@ -4494,8 +4502,8 @@
         1
       ],
       "price": 150,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "patio",
       "description": "A deep slatted chair with wide arms.",
       "interactions": [
         {
@@ -4524,8 +4532,8 @@
         2
       ],
       "price": 220,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "loungers",
       "outdoors": true,
       "description": "Stretch out in the sun, or doze off.",
       "interactions": [
@@ -4572,8 +4580,8 @@
         2
       ],
       "price": 240,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "loungers",
       "description": "A striped hammock on a wooden stand: swing, daydream, doze.",
       "interactions": [
         {
@@ -4618,8 +4626,8 @@
         2
       ],
       "price": 2400,
-      "category": "outdoor",
-      "group": "seating",
+      "category": "validate",
+      "group": "loungers",
       "slots": 2,
       "outdoors": true,
       "description": "A round wooden tub of hot water for two. A soak leaves residents pampered.",
@@ -4664,8 +4672,8 @@
         1
       ],
       "price": 380,
-      "category": "outdoor",
-      "group": "play",
+      "category": "validate",
+      "group": "loungers",
       "slots": 2,
       "outdoors": true,
       "description": "Two swings on a wooden frame. Children love it; grown-ups sometimes have a go.",

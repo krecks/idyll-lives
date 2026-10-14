@@ -169,10 +169,12 @@ The clips gamekit makes:
 | `G.squash(part, clip, scale, seconds, back=False)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again | a cushion sinking, a bag flattening, something hidden while held (0.001) |
 | `G.spin(part, clip, turns, seconds, axis='Z')` | whole turns at an even speed, ending at rest | wheels, platters, fans, the train |
 | `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
+| `G.scroll(part, clip, (x, y, z), seconds)` | moves by one repeat of a pattern at an even speed; the game jumps it home unseen | a treadmill's belt slats, a conveyor |
 | `G.stages(part, clip, picked, growing, planted, seconds)` | a crop's scale at each growth stage, ripe at rest | vegetables, fruit, a veggie bed |
 
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
-end where they start, so they also loop (`motions.loops`, `idle`). Keep a spin under about a turn a
+end where they start, so they also loop (`motions.loops`, `idle`). `scroll` loops too: it ends one slat on,
+so hide the part's ends under covers (the treadmill's hood and rear cap). Keep a spin under about a turn a
 second: the game blends between samples 1/30 s apart. A part that looks the same turned (a fan's four
 blades) can turn by less (a quarter) and loop.
 
@@ -191,7 +193,7 @@ How the parts work:
   - `{'uses': {'shower': [{'clip': 'door_open', 'hold': 1}, 'water_on']}}`: several clips for one use,
     each with its own `hold` (a door shut after 1 s while the water runs).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
-    round. It must end where it starts: make it with `G.rock` or `G.spin`.
+    round. It must end where it starts: make it with `G.rock` or `G.spin` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
     rocking chair's seat, a swing. Join everything they sit on into that part.
   - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
@@ -207,7 +209,8 @@ How the parts work:
   lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
   a clip that nothing plays, and fails a loop (or `idle`) that doesn't end where it starts; one that ends
-  a whole fraction of a turn round (a four-bladed fan a quarter turn) is a warning to check.
+  a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
+  a warning to check.
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
   way round, a `rock` at its furthest).
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
@@ -275,7 +278,7 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
-| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `stages` (a crop's growth); `clips` |
+| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `scroll` (one repeat on, a belt), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
