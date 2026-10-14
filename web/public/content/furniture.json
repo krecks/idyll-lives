@@ -772,7 +772,7 @@
       "category": "validate",
       "group": "islands",
       "slots": 2,
-      "description": "A freestanding island with two stools at its front: two residents can make a snack or have breakfast here at once.",
+      "description": "A freestanding island with cupboards at the front and a worktop overhanging the back for stools: two residents can make a snack or have breakfast here at once.",
       "surface": {
         "height": 0.95,
         "kind": "counter",
@@ -782,7 +782,7 @@
         ],
         "at": [
           0,
-          -0.04
+          0.04
         ]
       },
       "interactions": [

@@ -740,9 +740,6 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "island": {
-          "finish": "material.finish.satin"
-        },
         "oak": {
           "finish": "material.finish.wood"
         },
