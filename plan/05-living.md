@@ -1,9 +1,10 @@
 # Living room
 
 Seats keep their height and depth (`SEATS`); a seat that moves while sat on must keep the sitting pose believable.
-The wall bed is done (`families/living.py`, the model for anything held open).
+The wall bed is done (`families/living.py`, the model for anything held open). L1 is done (notes:
+`families/living.md`): every sofa's seat cushions are a part of their own that sinks while sat on (`sink_in`).
 
-## L1. Sofas and sectionals (11)
+## L1. Sofas and sectionals (11) — **Done** (in Validate › Sofas)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `sofas` (Validate › Sofas)

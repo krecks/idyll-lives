@@ -10,8 +10,8 @@
         1
       ],
       "price": 280,
-      "category": "living",
-      "group": "sectionals",
+      "category": "validate",
+      "group": "sofas",
       "seat": {
         "height": 0.44,
         "forward": 0.08
@@ -58,8 +58,8 @@
         1
       ],
       "price": 280,
-      "category": "living",
-      "group": "sectionals",
+      "category": "validate",
+      "group": "sofas",
       "seat": {
         "height": 0.44,
         "forward": 0.08
@@ -106,8 +106,8 @@
         1
       ],
       "price": 280,
-      "category": "living",
-      "group": "sectionals",
+      "category": "validate",
+      "group": "sofas",
       "seat": {
         "height": 0.44,
         "forward": 0.08
@@ -154,8 +154,8 @@
         1
       ],
       "price": 280,
-      "category": "living",
-      "group": "sectionals",
+      "category": "validate",
+      "group": "sofas",
       "seat": {
         "height": 0.44,
         "forward": 0.1
@@ -202,8 +202,8 @@
         2
       ],
       "price": 420,
-      "category": "living",
-      "group": "sectionals",
+      "category": "validate",
+      "group": "sofas",
       "seat": {
         "height": 0.44,
         "forward": -0.3
@@ -390,8 +390,8 @@
         1
       ],
       "price": 980,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "sofas",
       "slots": 3,
       "decor": 0.2,
       "seat": {

@@ -227,6 +227,432 @@
           "label": "Second pillow"
         }
       ]
+    },
+    "model.sofa": {
+      "type": "model",
+      "url": "../../models/living/sofa.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "linen_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_rust": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_legs": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Upholstery"
+        },
+        {
+          "material": "linen_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_rust",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Second pillow"
+        }
+      ]
+    },
+    "model.loveseat": {
+      "type": "model",
+      "url": "../../models/living/loveseat.glb",
+      "materials": {
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        },
+        "sage_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "sage",
+          "label": "Upholstery"
+        },
+        {
+          "material": "sage_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.sofaThree": {
+      "type": "model",
+      "url": "../../models/living/sofaThree.glb",
+      "materials": {
+        "oak_dark_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "stone": {
+          "finish": "material.finish.fabric"
+        },
+        "stone_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Upholstery"
+        },
+        {
+          "material": "stone_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_dark_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Pillows"
+        },
+        {
+          "material": "throw_sage",
+          "label": "Throw"
+        }
+      ]
+    },
+    "model.sofaDesign": {
+      "type": "model",
+      "url": "../../models/living/sofaDesign.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "brass_legs": {
+          "finish": "material.finish.metal"
+        },
+        "teal": {
+          "finish": "material.finish.fabric"
+        },
+        "teal_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "teal",
+          "label": "Upholstery"
+        },
+        {
+          "material": "teal_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "brass",
+          "label": "Frame"
+        },
+        {
+          "material": "brass_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sofaThreeSeat": {
+      "type": "model",
+      "url": "../../models/living/sofaThreeSeat.glb",
+      "materials": {
+        "moss": {
+          "finish": "material.finish.fabric"
+        },
+        "moss_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_mustard": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "moss",
+          "label": "Upholstery"
+        },
+        {
+          "material": "moss_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_mustard",
+          "label": "Second pillow"
+        }
+      ]
+    },
+    "model.sectionalMiddle": {
+      "type": "model",
+      "url": "../../models/living/sectionalMiddle.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalArmLeft": {
+      "type": "model",
+      "url": "../../models/living/sectionalArmLeft.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalArmRight": {
+      "type": "model",
+      "url": "../../models/living/sectionalArmRight.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalCorner": {
+      "type": "model",
+      "url": "../../models/living/sectionalCorner.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_mustard": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_mustard",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.chaise": {
+      "type": "model",
+      "url": "../../models/living/chaise.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_oat": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "throw_oat",
+          "label": "Throw"
+        }
+      ]
     }
   }
 }

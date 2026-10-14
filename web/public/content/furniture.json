@@ -1099,8 +1099,8 @@
         1
       ],
       "price": 350,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "sofas",
       "slots": 2,
       "description": "A compact two-seater sofa.",
       "interactions": [
@@ -1144,8 +1144,8 @@
         1
       ],
       "price": 900,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "sofas",
       "slots": 2,
       "description": "A long, deep sofa with soft cushions: very comfortable, and good for a doze.",
       "interactions": [
@@ -1189,8 +1189,8 @@
         1
       ],
       "price": 1500,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "sofas",
       "slots": 2,
       "decor": 0.6,
       "description": "A low, sculpted sofa that makes a room. The most comfortable seat in the house, and a pleasure to look at.",
