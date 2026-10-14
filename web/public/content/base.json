@@ -2946,7 +2946,7 @@
         1
       ],
       "price": 350,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "description": "Builds Intelligence and Perception.",
       "interactions": [
@@ -3096,7 +3096,7 @@
         1
       ],
       "price": 300,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "description": "Builds Creativity.",
       "interactions": [
@@ -3158,7 +3158,7 @@
         1
       ],
       "price": 700,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "description": "Builds Handiness — handy residents can upgrade objects.",
       "interactions": [
@@ -3190,7 +3190,7 @@
         1
       ],
       "price": 900,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "description": "Builds Perception.",
       "interactions": [
@@ -3222,7 +3222,7 @@
         1
       ],
       "price": 1400,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "description": "Builds Dexterity and Creativity.",
       "interactions": [
@@ -3820,6 +3820,18 @@
           "id": "street",
           "label": "Street",
           "outside": true
+        },
+        {
+          "id": "music",
+          "label": "Music"
+        },
+        {
+          "id": "games",
+          "label": "Games"
+        },
+        {
+          "id": "crafts",
+          "label": "Crafts"
         }
       ]
     },

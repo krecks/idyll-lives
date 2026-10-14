@@ -1,0 +1,988 @@
+{
+  "$comment": "Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and science. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The piano lifts its fallboard, the drums' cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
+  "version": 1,
+  "entries": {
+    "model.piano": {
+      "type": "model",
+      "url": "../../models/hobbies/piano.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "ebony": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "ivory": {
+          "finish": "material.finish.satin"
+        },
+        "key_gap": {
+          "finish": "material.finish.satin"
+        },
+        "piano": {
+          "finish": "material.finish.gloss"
+        },
+        "piano_trim": {
+          "finish": "material.finish.gloss"
+        },
+        "sheet": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "play": "fallboard"
+        }
+      },
+      "paint": [
+        {
+          "material": "piano",
+          "label": "Body"
+        },
+        {
+          "material": "piano_trim",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.ukulele": {
+      "type": "model",
+      "url": "../../models/hobbies/ukulele.glb",
+      "materials": {
+        "bone": {
+          "finish": "material.finish.satin"
+        },
+        "fret": {
+          "finish": "material.finish.metal"
+        },
+        "fretboard": {
+          "finish": "material.finish.satin"
+        },
+        "hole": {
+          "finish": "material.finish.matte"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "stand": {
+          "finish": "material.finish.metal"
+        },
+        "string": {
+          "finish": "material.finish.metal"
+        },
+        "uke": {
+          "finish": "material.finish.wood"
+        },
+        "uke_top": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "uke",
+          "label": "Instrument"
+        },
+        {
+          "material": "stand",
+          "label": "Stand"
+        }
+      ]
+    },
+    "model.guitarElectric": {
+      "type": "model",
+      "url": "../../models/hobbies/guitarElectric.glb",
+      "materials": {
+        "amp": {
+          "finish": "material.finish.matte"
+        },
+        "amp_trim": {
+          "finish": "material.finish.satin"
+        },
+        "black": {
+          "finish": "material.finish.gloss"
+        },
+        "bone": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "electric": {
+          "finish": "material.finish.gloss"
+        },
+        "fret": {
+          "finish": "material.finish.metal"
+        },
+        "fretboard": {
+          "finish": "material.finish.satin"
+        },
+        "grille": {
+          "finish": "material.finish.fabric"
+        },
+        "maple": {
+          "finish": "material.finish.satin"
+        },
+        "pickguard": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "stand": {
+          "finish": "material.finish.metal"
+        },
+        "string": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "electric",
+          "label": "Guitar"
+        },
+        {
+          "material": "amp",
+          "label": "Amp"
+        }
+      ]
+    },
+    "model.keyboardDigital": {
+      "type": "model",
+      "url": "../../models/hobbies/keyboardDigital.glb",
+      "materials": {
+        "ebony": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "ivory": {
+          "finish": "material.finish.satin"
+        },
+        "kb_body": {
+          "finish": "material.finish.satin"
+        },
+        "kb_seat": {
+          "finish": "material.finish.fabric"
+        },
+        "kb_trim": {
+          "finish": "material.finish.satin"
+        },
+        "key_gap": {
+          "finish": "material.finish.satin"
+        },
+        "lcd": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "sheet": {
+          "finish": "material.finish.matte"
+        },
+        "stand": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "kb_body",
+          "label": "Body"
+        },
+        {
+          "material": "kb_trim",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.drumKit": {
+      "type": "model",
+      "url": "../../models/hobbies/drumKit.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cymbal": {
+          "finish": "material.finish.metal"
+        },
+        "head": {
+          "finish": "material.finish.satin"
+        },
+        "seat": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "drum": "cymbals",
+          "practise": "cymbals"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Shells"
+        },
+        {
+          "material": "chrome",
+          "label": "Hardware"
+        }
+      ]
+    },
+    "model.guitarAcoustic": {
+      "type": "model",
+      "url": "../../models/hobbies/guitarAcoustic.glb",
+      "materials": {
+        "acoustic": {
+          "finish": "material.finish.gloss"
+        },
+        "bone": {
+          "finish": "material.finish.satin"
+        },
+        "fret": {
+          "finish": "material.finish.metal"
+        },
+        "fretboard": {
+          "finish": "material.finish.satin"
+        },
+        "hole": {
+          "finish": "material.finish.matte"
+        },
+        "neck": {
+          "finish": "material.finish.wood"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "spruce": {
+          "finish": "material.finish.gloss"
+        },
+        "stand": {
+          "finish": "material.finish.metal"
+        },
+        "string": {
+          "finish": "material.finish.metal"
+        },
+        "tortoise": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "acoustic",
+          "label": "Guitar"
+        },
+        {
+          "material": "stand",
+          "label": "Stand"
+        }
+      ]
+    },
+    "model.chessTable": {
+      "type": "model",
+      "url": "../../models/hobbies/chessTable.glb",
+      "materials": {
+        "chair_wood": {
+          "finish": "material.finish.wood"
+        },
+        "piece_dark": {
+          "finish": "material.finish.gloss"
+        },
+        "piece_light": {
+          "finish": "material.finish.gloss"
+        },
+        "seat_pad": {
+          "finish": "material.finish.satin"
+        },
+        "square_dark": {
+          "finish": "material.finish.satin"
+        },
+        "square_light": {
+          "finish": "material.finish.satin"
+        },
+        "table_wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "chess": "move"
+        }
+      },
+      "paint": [
+        {
+          "material": "table_wood",
+          "label": "Table"
+        },
+        {
+          "material": "chair_wood",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.poolTable": {
+      "type": "model",
+      "url": "../../models/hobbies/poolTable.glb",
+      "materials": {
+        "ball_black": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_green": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_maroon": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_orange": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_purple": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_white": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "cloth": {
+          "finish": "material.finish.fabric"
+        },
+        "cue": {
+          "finish": "material.finish.satin"
+        },
+        "cue_butt": {
+          "finish": "material.finish.satin"
+        },
+        "pearl": {
+          "finish": "material.finish.gloss"
+        },
+        "pocket": {
+          "finish": "material.finish.matte"
+        },
+        "pool_frame": {
+          "finish": "material.finish.gloss"
+        },
+        "rack": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pool": "rack_off",
+          "trickShots": "rack_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "pool_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "cloth",
+          "label": "Cloth"
+        }
+      ]
+    },
+    "model.foosball": {
+      "type": "model",
+      "url": "../../models/hobbies/foosball.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_white": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "field": {
+          "finish": "material.finish.matte"
+        },
+        "foos": {
+          "finish": "material.finish.satin"
+        },
+        "foos_trim": {
+          "finish": "material.finish.satin"
+        },
+        "grip": {
+          "finish": "material.finish.satin"
+        },
+        "line": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "loops": {
+          "foosball": "rods"
+        }
+      },
+      "paint": [
+        {
+          "material": "foos",
+          "label": "Table"
+        },
+        {
+          "material": "foos_trim",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.dartboard": {
+      "type": "model",
+      "url": "../../models/hobbies/dartboard.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "board": {
+          "finish": "material.finish.matte"
+        },
+        "board_light": {
+          "finish": "material.finish.matte"
+        },
+        "cabinet": {
+          "finish": "material.finish.satin"
+        },
+        "ring_green": {
+          "finish": "material.finish.matte"
+        },
+        "ring_red": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "darts": "darts"
+        }
+      },
+      "paint": [
+        {
+          "material": "board",
+          "label": "Board"
+        },
+        {
+          "material": "cabinet",
+          "label": "Cabinet"
+        }
+      ]
+    },
+    "model.arcadeCabinet": {
+      "type": "model",
+      "url": "../../models/hobbies/arcadeCabinet.glb",
+      "materials": {
+        "arcade": {
+          "finish": "material.finish.satin"
+        },
+        "art": {
+          "finish": "material.finish.gloss"
+        },
+        "art_stripe": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_green": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "bezel": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "marquee": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE08A"
+        },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#7FC4FF"
+        }
+      },
+      "motions": {
+        "loops": {
+          "arcade": "joystick"
+        }
+      },
+      "paint": [
+        {
+          "material": "arcade",
+          "label": "Cabinet"
+        },
+        {
+          "material": "art",
+          "label": "Art"
+        }
+      ]
+    },
+    "model.puzzleTable": {
+      "type": "model",
+      "url": "../../models/hobbies/puzzleTable.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.matte"
+        },
+        "card": {
+          "finish": "material.finish.matte"
+        },
+        "chair_wood": {
+          "finish": "material.finish.wood"
+        },
+        "hill": {
+          "finish": "material.finish.matte"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "puzzle_board": {
+          "finish": "material.finish.matte"
+        },
+        "sky": {
+          "finish": "material.finish.matte"
+        },
+        "sun": {
+          "finish": "material.finish.matte"
+        },
+        "table_wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "jigsaw": "pieces"
+        }
+      },
+      "paint": [
+        {
+          "material": "table_wood",
+          "label": "Table"
+        },
+        {
+          "material": "chair_wood",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.easel": {
+      "type": "model",
+      "url": "../../models/hobbies/easel.glb",
+      "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "canvas": {
+          "finish": "material.finish.matte"
+        },
+        "easel_dark": {
+          "finish": "material.finish.wood"
+        },
+        "easel_metal": {
+          "finish": "material.finish.metal"
+        },
+        "easel_wood": {
+          "finish": "material.finish.wood"
+        },
+        "foot": {
+          "finish": "material.finish.satin"
+        },
+        "fretboard": {
+          "finish": "material.finish.satin"
+        },
+        "hill": {
+          "finish": "material.finish.matte"
+        },
+        "jar": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "palette": {
+          "finish": "material.finish.satin"
+        },
+        "river": {
+          "finish": "material.finish.matte"
+        },
+        "sky": {
+          "finish": "material.finish.matte"
+        },
+        "sun": {
+          "finish": "material.finish.matte"
+        },
+        "tree": {
+          "finish": "material.finish.matte"
+        },
+        "tree_light": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "paint": "painting"
+        }
+      },
+      "paint": [
+        {
+          "material": "easel_wood",
+          "label": "Wood"
+        },
+        {
+          "material": "easel_metal",
+          "label": "Metal"
+        }
+      ]
+    },
+    "model.workbench": {
+      "type": "model",
+      "url": "../../models/hobbies/workbench.glb",
+      "materials": {
+        "bench_steel": {
+          "finish": "material.finish.metal"
+        },
+        "bench_top": {
+          "finish": "material.finish.wood"
+        },
+        "can": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "drill": {
+          "finish": "material.finish.satin"
+        },
+        "foot": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "plank": {
+          "finish": "material.finish.wood"
+        },
+        "toolbox": {
+          "finish": "material.finish.satin"
+        },
+        "toolbox_lid": {
+          "finish": "material.finish.satin"
+        },
+        "vice": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tinker": "vice"
+        }
+      },
+      "paint": [
+        {
+          "material": "bench_top",
+          "label": "Wood"
+        },
+        {
+          "material": "bench_steel",
+          "label": "Metal"
+        }
+      ]
+    },
+    "model.telescope": {
+      "type": "model",
+      "url": "../../models/hobbies/telescope.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "foot": {
+          "finish": "material.finish.satin"
+        },
+        "optic": {
+          "finish": "material.finish.gloss"
+        },
+        "tripod": {
+          "finish": "material.finish.gloss"
+        },
+        "tube": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "stargaze": "aim"
+        }
+      },
+      "paint": [
+        {
+          "material": "tube",
+          "label": "Tube"
+        },
+        {
+          "material": "tripod",
+          "label": "Tripod"
+        }
+      ]
+    },
+    "model.sewingTable": {
+      "type": "model",
+      "url": "../../models/hobbies/sewingTable.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "fabric_pink": {
+          "finish": "material.finish.satin"
+        },
+        "machine": {
+          "finish": "material.finish.gloss"
+        },
+        "machine_trim": {
+          "finish": "material.finish.satin"
+        },
+        "sew_legs": {
+          "finish": "material.finish.satin"
+        },
+        "sew_pad": {
+          "finish": "material.finish.satin"
+        },
+        "sew_table": {
+          "finish": "material.finish.satin"
+        },
+        "thread_red": {
+          "finish": "material.finish.satin"
+        },
+        "thread_teal": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sew": "presser",
+          "mend": "presser"
+        },
+        "loops": {
+          "sew": "handwheel",
+          "mend": "handwheel"
+        }
+      },
+      "paint": [
+        {
+          "material": "sew_table",
+          "label": "Table"
+        },
+        {
+          "material": "machine",
+          "label": "Machine"
+        }
+      ]
+    },
+    "model.chemistrySet": {
+      "type": "model",
+      "url": "../../models/hobbies/chemistrySet.glb",
+      "materials": {
+        "chem_bench": {
+          "finish": "material.finish.satin"
+        },
+        "chem_board": {
+          "finish": "material.finish.satin"
+        },
+        "chem_frame": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "liquid_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "liquid_green": {
+          "finish": "material.finish.gloss"
+        },
+        "liquid_orange": {
+          "finish": "material.finish.gloss"
+        },
+        "liquid_red": {
+          "finish": "material.finish.gloss"
+        },
+        "liquid_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "scope": {
+          "finish": "material.finish.satin"
+        },
+        "sheet": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "experiment": "bubble"
+        }
+      },
+      "paint": [
+        {
+          "material": "chem_bench",
+          "label": "Bench"
+        },
+        {
+          "material": "glass",
+          "label": "Glassware"
+        }
+      ]
+    },
+    "model.potteryWheel": {
+      "type": "model",
+      "url": "../../models/hobbies/potteryWheel.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "clay_slip": {
+          "finish": "material.finish.satin"
+        },
+        "drill": {
+          "finish": "material.finish.satin"
+        },
+        "foot": {
+          "finish": "material.finish.satin"
+        },
+        "pan": {
+          "finish": "material.finish.satin"
+        },
+        "stool": {
+          "finish": "material.finish.satin"
+        },
+        "wheel_body": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "throw": "clay"
+        },
+        "loops": {
+          "throw": "wheel"
+        }
+      },
+      "paint": [
+        {
+          "material": "wheel_body",
+          "label": "Wheel"
+        },
+        {
+          "material": "stool",
+          "label": "Stool"
+        }
+      ]
+    },
+    "model.craftTable": {
+      "type": "model",
+      "url": "../../models/hobbies/craftTable.glb",
+      "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "blush": {
+          "finish": "material.finish.matte"
+        },
+        "craft_metal": {
+          "finish": "material.finish.metal"
+        },
+        "craft_top": {
+          "finish": "material.finish.wood"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "pages": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "photo": {
+          "finish": "material.finish.gloss"
+        },
+        "photo_warm": {
+          "finish": "material.finish.gloss"
+        },
+        "scrapbook": {
+          "finish": "material.finish.satin"
+        },
+        "sun": {
+          "finish": "material.finish.matte"
+        },
+        "tape_blue": {
+          "finish": "material.finish.matte"
+        },
+        "tape_gold": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "scrapbook": "book_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "craft_top",
+          "label": "Wood"
+        },
+        {
+          "material": "craft_metal",
+          "label": "Metal"
+        }
+      ]
+    }
+  }
+}

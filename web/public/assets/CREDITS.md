@@ -116,6 +116,17 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The hobby models (`models/hobbies/piano.glb`, `ukulele.glb`, `guitarElectric.glb`, `keyboardDigital.glb`,
+`drumKit.glb`, `guitarAcoustic.glb`, `chessTable.glb`, `poolTable.glb`, `foosball.glb`, `dartboard.glb`,
+`arcadeCabinet.glb`, `puzzleTable.glb`, `easel.glb`, `workbench.glb`, `telescope.glb`, `sewingTable.glb`,
+`chemistrySet.glb`, `potteryWheel.glb`, `craftTable.glb`, override pack `packs/hobbies/manifest.json`) are built in
+Blender by `tools/art/blender/families/hobbies.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+piano lifts its fallboard, the drums' cymbals, the foosball rods and the arcade joystick move while played, darts,
+a painting, a jigsaw patch, a pot and a flask's liquid grow, and the chess pawn, the pool rack, the vice, the
+telescope, the sewing machine's presser and handwheel, the pottery wheel and the scrapbook's cover move while a
+resident uses them; the guitars, the ukulele and the digital piano are still. Their primitive-part entries stay as
+the fallback.
+
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
 town overview, override pack `packs/playground/manifest.json`) is built in Blender by

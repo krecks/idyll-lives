@@ -3114,7 +3114,7 @@
         1
       ],
       "price": 160,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "description": "Four strings and a cheerful sound: strumming builds Creativity; from Creativity 3 residents play so well they're in tune for hours.",
       "interactions": [
@@ -3168,7 +3168,7 @@
         1
       ],
       "price": 700,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "description": "A solid-body guitar and an amp. Practice builds Creativity and Dexterity; from Creativity 3 a jam leaves residents in tune.",
       "interactions": [
@@ -3222,7 +3222,7 @@
         1
       ],
       "price": 650,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "description": "A slim keyboard on a stand with a bench: piano practice for a smaller room and budget.",
       "interactions": [
@@ -3257,7 +3257,7 @@
         2
       ],
       "price": 1700,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "slots": 2,
       "description": "A full-size table with balls and a cue. A game for two that trains Perception and Dexterity.",
@@ -3307,7 +3307,7 @@
         1
       ],
       "price": 420,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "slots": 2,
       "description": "Spin the rods and score: quick fun for two.",
@@ -3340,7 +3340,7 @@
         1
       ],
       "price": 70,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "layer": "wall",
       "description": "A dartboard for the wall: a few throws train Perception.",
@@ -3373,7 +3373,7 @@
         1
       ],
       "price": 380,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "description": "A sewing machine on a little table: sewing builds Dexterity and Creativity, and mending is a useful chore.",
       "interactions": [
@@ -3422,7 +3422,7 @@
         1
       ],
       "price": 520,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "description": "Flasks, a microscope and a shelf of reagents: experiments train Intelligence and Perception.",
       "interactions": [

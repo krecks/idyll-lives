@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **226 are done**:
+**Where it stands (2026-10-14):** 540 objects. **245 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -26,16 +26,17 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
   D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (in Validate › Textiles);
+- the nineteen hobby models: H1 `piano`, `ukulele`, `guitarElectric`, `keyboardDigital`, `drumKit`, `guitarAcoustic` (in Validate › Music); H2 `chessTable`, `poolTable`, `foosball`, `dartboard`, `arcadeCabinet`, `puzzleTable` (Validate › Games); H3 `easel`, `workbench`, `telescope`, `sewingTable`, `chemistrySet`, `potteryWheel`, `craftTable` (Validate › Crafts);
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants);
 - the fifteen G2 flowers: `flowerbed`, `garden.tulips`, `daffodils`, `daisies`, `sunflowers`, `poppies`, `marigolds`, `pansies`, `lilies`, `lupins`, `forgetMeNots`, `cosmos`, `meadow`, `geraniums`, `flowerBox` (in Validate › Flowers);
 - the eleven G3 shrubs: `bush`, `garden.boxwood`, `topiary`, `hedge`, `hydrangea`, `roses`, `azalea`, `lavender`, `fern`, `grass`, `hosta` (in Validate › Shrubs);
 - the five G4 edibles: `garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins` (in Validate › Edibles).
 
-**314 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 47;
-- `catalog2.py`: 111;
-- the base manifest: 28;
+**295 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 39;
+- `catalog2.py`: 105;
+- the base manifest: 23;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -51,7 +52,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11, **done**), L2 Armchairs and small seats (11), L3 Coffee and side tables (9), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
 | [Office](06-office.md) | 14 | O1 Desks (8, **done**), O2 Desk chairs (3, **done**), O3 Storage and boards (3, **done**) |
 | [Fitness](07-fitness.md) | 5 | F1 Home gym (5) |
-| [Hobbies](08-hobbies.md) | 19 | H1 Music (6), H2 Games (6), H3 Crafts and science (7) |
+| [Hobbies](08-hobbies.md) | 19 | H1 Music (6, **done**), H2 Games (6, **done**), H3 Crafts and science (7, **done**) |
 | [Decor](09-decor.md) | 22 | D1 Wall art and clocks (6, **done**), D2 Ornaments (10, **done**), D3 Textiles (6, **done**) |
 | [Tabletop](10-tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7, **done**), LT2 Wall lights (3, **done**), LT3 Floor lamps (5, **done**), LT4 Table lamps (6, **done**) |

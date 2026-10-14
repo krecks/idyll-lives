@@ -1,9 +1,11 @@
 # Hobbies
 
+The nineteen hobby models are done in `families/hobbies.py` (notes: `hobbies.md`), in Validate › Music, Games and Crafts. The guitars and the ukulele are a part of their own with no clip yet: the music animation doesn't draw an instrument in the hands.
+
 Instruments a resident holds (guitars, the ukulele) hide from their stand while played if the music animation draws
 them in the hands (T0 `squash` to 0).
 
-## H1. Music (6)
+## H1. Music (6) — **Done** (in Validate › Music)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `music` (Validate › Music)
@@ -18,7 +20,7 @@ them in the hands (T0 `squash` to 0).
 | `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Loop (E1) | `cymbals`: the cymbals wobble while drummed (E1). Until then U: the hi-hat closes. |
 | `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Guitar, Stand | Use | `off_stand`. |
 
-## H2. Games (6)
+## H2. Games (6) — **Done** (in Validate › Games)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `games` (Validate › Games)
@@ -33,7 +35,7 @@ them in the hands (T0 `squash` to 0).
 | `arcadeCabinet` Arcade cabinet | 1x1 · floor | arcade:play | hobbies / games | Cabinet, Art | Loop (E1) | `joystick`: the stick waggles while played (E1). Until then static. |
 | `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Trim | Use | `pieces`: a patch of finished puzzle grows for jigsaw. |
 
-## H3. Crafts and science (7)
+## H3. Crafts and science (7) — **Done** (in Validate › Crafts)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `crafts` (Validate › Crafts)

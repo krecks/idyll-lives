@@ -10,7 +10,7 @@
         1
       ],
       "price": 900,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "seat": {
         "height": 0.52,
@@ -65,7 +65,7 @@
         1
       ],
       "price": 1100,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "decor": 0.2,
       "description": "A full-size arcade machine with a joystick and four buttons.",
@@ -97,7 +97,7 @@
         1
       ],
       "price": 600,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "seat": {
         "height": 0.45,
@@ -134,7 +134,7 @@
         1
       ],
       "price": 340,
-      "category": "hobbies",
+      "category": "validate",
       "group": "crafts",
       "seat": {
         "height": 0.48,
@@ -170,7 +170,7 @@
         1
       ],
       "price": 220,
-      "category": "hobbies",
+      "category": "validate",
       "group": "games",
       "seat": {
         "height": 0.48,
@@ -207,7 +207,7 @@
         1
       ],
       "price": 380,
-      "category": "hobbies",
+      "category": "validate",
       "group": "music",
       "description": "A warm-toned guitar on a stand: strumming builds Creativity; from Creativity 3 residents play so well they are in tune for hours.",
       "interactions": [
