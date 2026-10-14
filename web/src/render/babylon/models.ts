@@ -299,16 +299,55 @@ function placeholderTemplate(parts: PlaceholderPart[], groups: PartGroups, { mes
 }
 
 /**
- * A part's box in model space (`lo`, `hi`: corners along x, y, z), turned as `partMesh` turns it,
- * and which of its own axes lies along each model axis (-1: none; it's turned off the axes).
+ * A part's exact bounds in model space (`lo`, `hi`: along x, y, z), turned as `partMesh` turns it:
+ * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent
+ * (check_glb.py `part_box` measures the same). And which of its own axes lies along each model axis
+ * (-1: none; it's turned off the axes).
  */
 function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: number[] } {
   const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
   const m = Matrix.FromQuaternionToRef(Quaternion.FromEulerAngles(rx, ry, rz), new Matrix()).m;
-  // Model axis k gathers |R[j][k]| * size[j] from each local axis j (row j: where local axis j goes).
-  const half = [0, 1, 2].map((k) => [0, 1, 2].reduce((sum, j) => sum + Math.abs(m[j * 4 + k]) * p.size[j], 0) / 2);
-  const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(m[j * 4 + k]) > 0.999) ?? -1);
-  return { lo: p.at.map((c, k) => c - half[k]), hi: p.at.map((c, k) => c + half[k]), along };
+  // R[j][k]: model axis k of local axis j (row j: where local axis j goes).
+  const r = (j: number, k: number) => m[j * 4 + k];
+  const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(r(j, k)) > 0.999) ?? -1);
+  const [sx, sy, sz] = p.size;
+  const ellipsoid = (k: number, ax: number, ay: number, az: number) => Math.hypot(r(0, k) * ax, r(1, k) * ay, r(2, k) * az);
+  const shape = p.shape as PlaceholderPart['shape'] | 'torus' | 'lathe';
+  let lo: number[];
+  let hi: number[];
+  if (shape === 'cylinder' || shape === 'cone') {
+    // `CreateCylinder`'s rings: `segments` corners from angle 0, scaled in x and z.
+    const n = p.segments ?? (shape === 'cone' ? 16 : 20);
+    const top = shape === 'cone' ? (p.taper ?? 0) : (p.taper ?? 1);
+    const points: number[][] = [];
+    for (const [d, y] of [[1, -sy / 2], [top, sy / 2]]) {
+      for (let j = 0; j < n; j++) points.push([(d / 2) * sx * Math.cos((2 * Math.PI * j) / n), y, (d / 2) * sz * Math.sin((2 * Math.PI * j) / n)]);
+    }
+    const dot = (q: number[], k: number) => q[0] * r(0, k) + q[1] * r(1, k) + q[2] * r(2, k);
+    lo = [0, 1, 2].map((k) => Math.min(...points.map((q) => dot(q, k))));
+    hi = [0, 1, 2].map((k) => Math.max(...points.map((q) => dot(q, k))));
+  } else if (shape === 'lathe') {
+    // Each profile point (radius, y) is a ring, scaled by the size.
+    const profile = (p as PlaceholderPart & ExtraShapes).profile ?? [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]];
+    lo = [0, 1, 2].map((k) => Math.min(...profile.map(([d, y]) => r(1, k) * y * sy - d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
+    hi = [0, 1, 2].map((k) => Math.max(...profile.map(([d, y]) => r(1, k) * y * sy + d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
+  } else {
+    const half = [0, 1, 2].map((k) => {
+      if (shape === 'sphere' || shape === 'blob') return ellipsoid(k, sx / 2, sy / 2, sz / 2);
+      // `sy` tall overall, radius sx/2, then scaled to sz in z.
+      if (shape === 'capsule') return Math.abs(r(1, k)) * Math.max(0, sy / 2 - sx / 2) + ellipsoid(k, sx / 2, sx / 2, sz / 2);
+      if (shape === 'torus') {
+        // A ring (sx - sy across) swept by a tube sy thick, then scaled to sz in z.
+        const [q, ring, tube] = [sz / sx, (sx - sy) / 2, sy / 2];
+        return Math.hypot(r(0, k) * ring, r(2, k) * ring * q) + ellipsoid(k, tube, tube, tube * q);
+      }
+      // A box: model axis k gathers |R[j][k]| * size[j] from each local axis j.
+      return [0, 1, 2].reduce((sum, j) => sum + Math.abs(r(j, k)) * p.size[j], 0) / 2;
+    });
+    lo = half.map((h) => -h);
+    hi = half;
+  }
+  return { lo: p.at.map((c, k) => c + lo[k]), hi: p.at.map((c, k) => c + hi[k]), along };
 }
 
 /** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. */
@@ -356,8 +395,9 @@ class PartGroups {
   addPart(part: PlaceholderPart, lod: 0 | 1, index: number): Mesh {
     const { alpha, group } = this.finish(part.material ?? DEFAULT_FINISH);
     const mesh = partMesh(this.scene, part, lod, index, alpha);
-    this.height = Math.max(this.height, part.at[1] + part.size[1] / 2);
-    this.bottom = Math.min(this.bottom, part.at[1] - part.size[1] / 2);
+    const box = partBox(part);
+    this.height = Math.max(this.height, box.hi[1]);
+    this.bottom = Math.min(this.bottom, box.lo[1]);
     this.add(mesh, part.tint ?? null, group, part.bone ?? null);
     return mesh;
   }
