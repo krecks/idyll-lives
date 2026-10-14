@@ -577,10 +577,8 @@ def chef_stove():
 E['model.whirlpoolTub'] = placeholder(whirlpool())
 E['model.chefStove'] = placeholder(chef_stove())
 
-# Spare keys (not placed by the base content; the catalogue overrides diningChair and sideTable) and the
-# minimal shelf, in the same boxes as the library files they replaced.
-E['model.diningChair'] = placeholder(FP.painted_chair())                                  # 0.43 x 0.96 x 0.54, seat 0.46
-E['model.sideTable'] = placeholder(FP.side_table(0.55, 0.55, 0.45))                       # top 0.55
+# Spare keys (not placed by the base content) and the minimal shelf, in the same boxes as the library files
+# they replaced. The dining chair and side table are the catalogue's alone (catalog.py), as their models.
 E['model.stove'] = placeholder(FP.stove_electric())                                       # 0.5 x 0.86 x 0.65
 E['model.plantSmall'] = placeholder(FP.potted_aloe())                                     # 0.17 x 0.27
 E['model.ceilingLamp'] = placeholder(FP.pendant_globe())                                  # 0.43 globe, 0.95 drop
