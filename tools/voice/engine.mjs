@@ -35,20 +35,17 @@ ort.env.logLevel = 'error';
 
 const file = (name) => readFileSync(new URL(MODEL_DIR + name, dir));
 const json = (name) => JSON.parse(file(name).toString());
+// read-only, so every engine shares them
+const config = json('tts.json');
+const indexer = json('unicode_indexer.json');
+const styles = new Map(STYLE_IDS.map((id) => [id, parseStyle(json(`${id}.json`))]));
 
 /** An engine with the model loaded (fresh sessions). */
 export async function engine() {
   const options = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
   const sessions = {};
   for (const [k, name] of Object.entries(MODELS)) sessions[k] = await ort.InferenceSession.create(gunzipSync(file(name)), options);
-  return {
-    ort,
-    sessions,
-    config: json('tts.json'),
-    indexer: json('unicode_indexer.json'),
-    styles: new Map(STYLE_IDS.map((id) => [id, parseStyle(json(`${id}.json`))])),
-    phonemizer,
-  };
+  return { ort, sessions, config, indexer, styles, phonemizer };
 }
 
 /** 24 kHz samples of one line in a voice (`VoiceParams`). */
