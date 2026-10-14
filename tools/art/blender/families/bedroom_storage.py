@@ -276,13 +276,14 @@ def cedarChest():
         F.box('latch', 0.08, 0.06, 0.012, (0, 0.415, d / 2 + 0.006), M.brass, bevel=0.003)
         F.box('blanket', w - 2 * t - 0.02, 0.12, d - 2 * t - 0.02, (0, y0 + 0.08, 0), M.cloth3, bevel=0.03)
     G.join(still, 'cedarChest', origin=(0, 0, 0))
-    # the lid, hinged along its back edge: no use opens it yet (`lid_open`, +use)
+    # the lid, hinged along its back edge: it lifts while a resident takes out a blanket (`lid_open`)
     with G.new_parts() as parts:
         F.box('lid', 0.94, 0.045, 0.5, (0, 0.4775, 0), M.cedar, bevel=0.008)
         F.box('lid_edge', 0.96, 0.012, 0.52, (0, 0.461, 0), M.cedar2, bevel=0.004)
         F.box('lid_panel', 0.8, 0.006, 0.36, (0, 0.502, 0), M.cedar2, bevel=0.002)
-    G.hinged(G.join(parts, 'lid'), F.at(0, 0.455, -0.25))
+    lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.455, -0.25))
     G.settle(centre=False)
+    G.swing(lid, 'lid_open', -95, seconds=0.9, axis='X')
 
 
 # --- the laundry hamper: a woven basket, wider at the top, with bands; the lid a part ----------------------
@@ -531,7 +532,7 @@ FAMILY = G.Family(
      G.Model('nightstandLamp', nightstandLamp, size=(0.54, 1.08, 0.468), key=_key('nightstandLamp'),
              centre=(0, -0.1958), paint=[('oak', 'Body'), ('shade', 'Shade')]),
      G.Model('cedarChest', cedarChest, size=(0.974, 0.505, 0.52), key=_key('cedarChest'),
-             paint=[('cedar', 'Body'), ('iron', 'Handles')]),
+             motions={'uses': {'takeBlanket': 'lid_open'}, 'hold': 2.0}, paint=[('cedar', 'Body'), ('iron', 'Handles')]),
      G.Model('laundryHamper', laundryHamper, size=(0.476, 0.631, 0.476), key=_key('laundryHamper'),
              centre=(0, -0.2), paint=[('wicker', 'Hamper')]),
      G.Model('benchBedEnd', benchBedEnd, size=(1.6, 0.471, 0.42), key=_key('benchBedEnd'),

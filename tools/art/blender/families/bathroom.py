@@ -893,8 +893,9 @@ def bathtubFreestanding():
 # face (`G.settle(centre=False, floor=False)`, `floor=False` on the Model). Mirror glass is a flat piece of
 # the `mirror` material (`gloss`, `'front'`): the game reflects the room in it where the preset has live mirrors
 # (High) and draws it pale gloss elsewhere, as the placeholders' mirrors. The cabinets' doors are parts of
-# their own, hinged on their left edge but still: no use opens them yet (the plan's "(+use)"), so a swing
-# can be added without remodelling.
+# their own, hinged on their left edge. The mirror cabinet's swings open (`door_open`, the mirror with it)
+# while a resident brushes their teeth; the tall cabinet's upper door is still (no use opens it, the plan's
+# "(+use)"; a still part costs no draw call), so a swing can be added without remodelling.
 
 
 def _carcass(F, name, w, h, d, x, y0, z0, material, t=0.016):
@@ -928,8 +929,9 @@ def mirrorCabinet():
         F.box('door', w - 0.02, h - 0.02, 0.02, (0, y0 + h / 2, front + 0.01), M.cab_door, bevel=0.008)
         F.box('door_mirror', 0.48, 0.64, 0.004, (0, y0 + h / 2, front + 0.0235), M.mirror)
         F.box('door_pull', 0.012, 0.1, 0.02, (0.25, y0 + h / 2, front + 0.03), M.cab_door, bevel=0.004)
-    G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
+    door = G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
     G.settle(centre=False, floor=False)
+    G.swing(door, 'door_open', 100, seconds=0.8)
     return G.meshes()
 
 
@@ -1038,11 +1040,12 @@ FAMILY = G.Family(
      G.Model('bathtubFreestanding', bathtubFreestanding, size=(1.895, 0.919, 0.837), key='model.bathtubFreestanding',
              motions=BATH, paint=[('porcelain', 'Tub'), ('chrome', 'Taps'), ('towel', 'Towel')]),
      G.Model('mirrorCabinet', mirrorCabinet, size=(0.56, 0.77, 0.2), key='model.mirrorCabinet',
-             centre=(0, -0.33), floor=False, paint=[('cab', 'Cabinet'), ('cab_door', 'Frame')]),
+             centre=(0, -0.33), floor=False, motions={'uses': {'brushTeeth': 'door_open'}, 'hold': 1.5},
+             paint=[('cab', 'Cabinet'), ('cab_door', 'Frame')]),
      G.Model('mirrorRound', mirrorRound, size=(0.64, 0.772, 0.046), key='model.mirrorRound',
              centre=(0, -0.407), floor=False, paint=[('frame_brass', 'Frame'), ('leather', 'Strap')]),
      G.Model('bathCabinetTall', bathCabinetTall, size=(0.42, 1.82, 0.38), key='model.bathCabinetTall',
-             centre=(0, -0.26), paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
+             centre=(0, -0.24), paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

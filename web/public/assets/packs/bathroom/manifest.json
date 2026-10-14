@@ -882,6 +882,12 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "brushTeeth": "door_open"
+        },
+        "hold": 1.5
+      },
       "paint": [
         {
           "material": "cab",

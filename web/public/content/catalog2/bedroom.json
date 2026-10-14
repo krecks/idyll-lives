@@ -430,7 +430,19 @@
         ]
       },
       "description": "A cedar chest with iron straps for the foot of the bed.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "takeBlanket",
+          "label": "Take out a blanket",
+          "anim": "fetch",
+          "minutes": 3,
+          "effects": {
+            "comfort": 0.1
+          },
+          "tags": [],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "benchBedEnd",

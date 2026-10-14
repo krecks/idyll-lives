@@ -48,13 +48,16 @@ All are played for the `outfit` use (`motions.uses.outfit`):
 The dresser's placeholder has two columns of three drawers; the model has two small drawers over two wide ones,
 so "the middle drawer" is one drawer.
 
-## Parts for later (BR2, +use)
+## Lids and drawers for a use (BR2, +use)
 
-No clip yet (an unplayed clip is a gate warning), but these are nodes of their own so one can be added without
-remodelling: the three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it), the
-blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest is hollow with a folded blanket in it),
-and the hamper's lid (`lid`, hinged at its back; the basket is hollow). The game draws a node without a clip with
-the rest (`check_glb.py` counts them as still).
+The blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest is hollow with a folded blanket in
+it) lifts 95° (`lid_open`, 0.9 s, held 2 s) for the content's "Take out a blanket" (`takeBlanket`, `fetch`, 3
+minutes, comfort; not autonomous). It costs the chest a third draw call.
+
+No clip yet, as no use reads naturally for them: the three-drawer nightstand's top drawer (`drawer`, origin on the
+carcass face, box behind it) and the hamper's lid (`lid`, hinged at its back; the basket is hollow; putting washing
+in would need a laundry loop in the sim). They are nodes of their own, so a clip can be added without remodelling;
+the game draws a node without a clip with the rest (`check_glb.py` counts them as still), at no draw call.
 
 ## The models
 
@@ -65,7 +68,7 @@ the rest (`check_glb.py` counts them as still).
 | `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,396 | 2 | Body, Handles |
 | `model.nightstandDrawers` | 0.58 × 0.60 × 0.63 m | 1,032 | 1 | Body, Handles |
 | `model.nightstandLamp` | 0.54 × 1.08 × 0.47 m | 2,472 | 3 | Body, Shade (glows `#FFD9A0` at night) |
-| `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 2 | Body, Handles |
+| `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 3 | Body, Handles |
 | `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,184 | 2 | Hamper |
 | `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 1,680 | 2 | Frame, Cushion |
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 3,420 | 3 | Body, Handles (a picture, a vase and a box on top) |
