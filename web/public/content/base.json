@@ -2388,6 +2388,7 @@
       ],
       "price": 600,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "appliances"
     },
     {
@@ -2518,6 +2519,7 @@
       ],
       "price": 650,
       "category": "validate",
+      "fillsWall": true,
       "group": "showers"
     },
     {
@@ -2638,6 +2640,7 @@
       ],
       "price": 250,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves"
     },
     {

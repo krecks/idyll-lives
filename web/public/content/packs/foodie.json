@@ -35,6 +35,7 @@
       "footprint": [1, 1],
       "price": 320,
       "category": "validate",
+      "fillsWall": true,
       "group": "foodie",
       "slots": 1,
       "description": "Cured meats, aged cheese and good bread on hand: fast, slightly better bites for a few dollars each, perfect for a resident who is always peckish.",

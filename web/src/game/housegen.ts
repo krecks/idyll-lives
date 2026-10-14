@@ -167,6 +167,10 @@ export interface ObjectInfo extends Shape {
   lamp: boolean;
   /** Tiles it lights at night (content `light.tiles`; undefined: `roomRules.lampTiles`). */
   lightTiles?: number;
+  /** As tall as the wall: nothing hangs on the wall or from the ceiling over it (content `fillsWall`). */
+  fillsWall?: boolean;
+  /** Belongs over a window (content `overWindow`): only such things hang on one. */
+  overWindow?: boolean;
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -1252,7 +1256,8 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
 
 /**
  * One thing on the wall, ceiling or rug layer of room `r` (it never blocks anything): on a wall,
- * its back on wall or window edges; from the ceiling, over a free spot; a rug, in the middle of
+ * its back on wall edges (or window ones, for what goes over a window), not over furniture as tall
+ * as the wall; from the ceiling, over a free spot (not over such furniture either); a rug, in the middle of
  * the room. Never on the stairs, and its front (where the simulation checks for walls) inside the room.
  * `near`: from the ceiling, as near this tile as there's room (else near the middle).
  */
@@ -1268,6 +1273,15 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
   // Nor over the stairwell upstairs (all a hall has taken), nor over the one down to the basement.
   if (r.kind === 'hall') for (const t of f.taken) stairs.add(t);
   for (const t of f.well ?? []) stairs.add(t);
+  // Nor on the wall or from the ceiling over furniture as tall as the wall (content `fillsWall`).
+  if (layer !== 'rug') {
+    for (const o of f.objects) {
+      const thing = info(o.def);
+      if (!thing?.fillsWall) continue;
+      const [w, d] = o.rot % 2 === 0 ? thing.footprint : [thing.footprint[1], thing.footprint[0]];
+      for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
+    }
+  }
   const fits = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) {
       for (let dx = 0; dx < w; dx++) {
@@ -1285,7 +1299,9 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     return true;
   };
   if (layer === 'wall') {
-    const backed = (e: string) => f.edges.get(e) === 'wall' || f.edges.get(e) === 'window';
+    // Only what belongs over a window (content `overWindow`: curtains) hangs on one.
+    const window = !!info(def)?.overWindow;
+    const backed = (e: string) => f.edges.get(e) === 'wall' || (window && f.edges.get(e) === 'window');
     // Over a piece in the room: turned as it is, centred on it, its back on the same wall.
     for (const o of over ? f.objects.filter((o) => over.includes(o.def) && inside(r, o.x, o.z)) : []) {
       const [ow, od] = info(o.def)?.footprint ?? [1, 1];
@@ -1310,8 +1326,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x, z, Array.from({ length: d }, (_, i) => `v:${r.x}:${z + i}`)]);
       if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z, Array.from({ length: d }, (_, i) => `v:${r.x + r.w}:${z + i}`)]);
       spots.sort(() => rng() - 0.5);
-      // Curtains go over windows; everything else prefers a plain wall.
-      const window = def.startsWith('curtains');
+      // Curtains go over windows.
       spots.sort((a, b) => Number(b[2].some((e) => f.edges.get(e) === 'window') === window) - Number(a[2].some((e) => f.edges.get(e) === 'window') === window));
       for (const [x, z, backs] of spots) if (backs.every(backed) && fits(x, z, w, d, rot)) return take(x, z, w, d, rot);
     }

@@ -139,6 +139,7 @@
       "slots": 1,
       "price": 380,
       "category": "validate",
+      "fillsWall": true,
       "group": "lazy",
       "description": "Order hot food without lifting a pan: takeout costs money each time but fills residents faster than cooking and spares them the dishes.",
       "interactions": [

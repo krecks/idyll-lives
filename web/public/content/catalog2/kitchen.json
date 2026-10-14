@@ -352,6 +352,7 @@
       ],
       "price": 420,
       "category": "validate",
+      "fillsWall": true,
       "group": "kitchen storage",
       "stations": [
         "ingredients"
@@ -386,6 +387,7 @@
       ],
       "price": 900,
       "category": "validate",
+      "fillsWall": true,
       "group": "cookers",
       "stations": [
         "oven"
@@ -565,6 +567,7 @@
       ],
       "price": 1500,
       "category": "validate",
+      "fillsWall": true,
       "group": "fridges",
       "stations": [
         "ingredients"

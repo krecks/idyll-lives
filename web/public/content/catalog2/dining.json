@@ -819,6 +819,7 @@
       ],
       "price": 650,
       "category": "validate",
+      "fillsWall": true,
       "group": "dining storage",
       "decor": 0.8,
       "description": "A glazed hutch with the best plates on show over a cupboard.",

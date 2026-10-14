@@ -192,6 +192,12 @@ export interface ObjectDef {
    * it stands on another object's top (a vase on a table).
    */
   layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
+  /** On a wall: it belongs over a window (curtains, blinds); everything else on a wall needs plain wall behind it. */
+  overWindow?: boolean;
+  /** On the floor: as tall as the wall (a wardrobe, a fireplace): nothing hangs on the wall or from the ceiling over it. */
+  fillsWall?: boolean;
+  /** From the ceiling: hangs low enough to walk into (a hanging plant): it takes the floor under it. */
+  hangsLow?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
   /**

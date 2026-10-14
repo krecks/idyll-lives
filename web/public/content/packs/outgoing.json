@@ -155,6 +155,7 @@
       "footprint": [1, 1],
       "price": 120,
       "category": "validate",
+      "fillsWall": true,
       "freeRotation": true,
       "group": "outgoing",
       "slots": 1,

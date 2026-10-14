@@ -71,6 +71,7 @@
       "footprint": [1, 1],
       "price": 2400,
       "category": "validate",
+      "fillsWall": true,
       "group": "neat",
       "slots": 1,
       "description": "A ceiling rain head, steam jets and a teak bench. Cleans as well as a shower while soothing tired muscles, and leaves the resident squeaky clean: they stay fresh much longer.",

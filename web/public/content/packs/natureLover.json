@@ -185,6 +185,7 @@
       "footprint": [1, 1],
       "price": 580,
       "category": "validate",
+      "fillsWall": true,
       "freeRotation": true,
       "group": "natureLover",
       "slots": 1,

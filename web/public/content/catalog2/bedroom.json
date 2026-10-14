@@ -362,6 +362,7 @@
       ],
       "price": 240,
       "category": "validate",
+      "fillsWall": true,
       "group": "wardrobes",
       "description": "A narrow white wardrobe for a small room.",
       "interactions": [
@@ -390,6 +391,7 @@
       ],
       "price": 900,
       "category": "validate",
+      "fillsWall": true,
       "group": "wardrobes",
       "decor": 0.6,
       "description": "A grand two-door wardrobe in dark wood with a cornice and turned feet.",

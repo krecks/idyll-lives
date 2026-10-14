@@ -66,6 +66,7 @@
       ],
       "price": 1100,
       "category": "validate",
+      "fillsWall": true,
       "group": "games",
       "decor": 0.2,
       "description": "A full-size arcade machine with a joystick and four buttons.",
