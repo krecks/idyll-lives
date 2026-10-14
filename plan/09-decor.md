@@ -2,7 +2,11 @@
 
 Mostly still things. Clocks and swaying things wait for ambient clips (E2); curtains that close at night for E3.
 
-## D1. Wall art and clocks (6)
+**Status (2026-10-14): D1–D3 done**, all 22 built by `tools/art/blender/families/decor.py` (notes: `decor.md`) and in
+Validate › Wall Decor, Ornaments and Textiles. The ambient clips (E2: clock hands, pendulum) and the curtains' night
+clip (E3) are built, not left static.
+
+## D1. Wall art and clocks (6) — **done** (2026-10-14)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `wall decor` (Validate › Wall Decor)
@@ -17,7 +21,7 @@ Mostly still things. Clocks and swaying things wait for ambient clips (E2); curt
 | `wallClock` Wall clock | 1x1 · wall | — | decor / wall | Case, Face | Ambient (E2) | `hands`: the hands turn (E2; a second hand for the near view). Until then static. |
 | `wallShelf` Floating shelves | 1x1 · wall | — | decor / wall | Shelves | Static | Static. |
 
-## D2. Ornaments (10)
+## D2. Ornaments (10) — **done** (2026-10-14)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `ornaments` (Validate › Ornaments)
@@ -36,7 +40,7 @@ Mostly still things. Clocks and swaying things wait for ambient clips (E2); curt
 | `hangingPlant` Hanging plant | 1x1 · ceiling | water:water | decor / ornaments | Pot, Cord | Use | `sway`: the pot sways 5° and settles for water. |
 | `fireplace` Fireplace | 2x1 · floor | relax:relax | decor / ornaments | Surround, Mantel | Use | `flames`: the flames grow on the logs for relax (gloss; the light is the content's). |
 
-## D3. Textiles (6)
+## D3. Textiles (6) — **done** (2026-10-14)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `textiles` (Validate › Textiles)

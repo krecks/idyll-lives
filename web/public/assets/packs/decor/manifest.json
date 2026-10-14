@@ -1,0 +1,644 @@
+{
+  "$comment": "Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and rugs. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The wall clock's second hand and the grandfather clock's pendulum go round near the camera (`idle`); the clock's door opens to wind it, the hanging plant sways when watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
+  "version": 1,
+  "entries": {
+    "model.printFramed": {
+      "type": "model",
+      "url": "../../models/decor/printFramed.glb",
+      "materials": {
+        "frame_white": {
+          "finish": "material.finish.satin"
+        },
+        "mount": {
+          "finish": "material.finish.matte"
+        },
+        "olive": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_white",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.photoPrint": {
+      "type": "model",
+      "url": "../../models/decor/photoPrint.glb",
+      "materials": {
+        "frame_black": {
+          "finish": "material.finish.satin"
+        },
+        "lake": {
+          "finish": "material.finish.matte"
+        },
+        "mount": {
+          "finish": "material.finish.matte"
+        },
+        "rock": {
+          "finish": "material.finish.matte"
+        },
+        "rock_dark": {
+          "finish": "material.finish.matte"
+        },
+        "shore": {
+          "finish": "material.finish.matte"
+        },
+        "sky": {
+          "finish": "material.finish.matte"
+        },
+        "snow": {
+          "finish": "material.finish.matte"
+        },
+        "sun": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_black",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.paintingClassic": {
+      "type": "model",
+      "url": "../../models/decor/paintingClassic.glb",
+      "materials": {
+        "cloud": {
+          "finish": "material.finish.matte"
+        },
+        "cottage": {
+          "finish": "material.finish.matte"
+        },
+        "field": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.metal"
+        },
+        "gilt_dark": {
+          "finish": "material.finish.metal"
+        },
+        "haze": {
+          "finish": "material.finish.matte"
+        },
+        "hills": {
+          "finish": "material.finish.matte"
+        },
+        "roof": {
+          "finish": "material.finish.matte"
+        },
+        "tree": {
+          "finish": "material.finish.matte"
+        },
+        "trunk": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "gilt",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.canvasAbstract": {
+      "type": "model",
+      "url": "../../models/decor/canvasAbstract.glb",
+      "materials": {
+        "canvas": {
+          "finish": "material.finish.matte"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "rust": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.wallClock": {
+      "type": "model",
+      "url": "../../models/decor/wallClock.glb",
+      "materials": {
+        "clock_case": {
+          "finish": "material.finish.metal"
+        },
+        "face": {
+          "finish": "material.finish.satin"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "second": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "idle": "hands"
+      },
+      "paint": [
+        {
+          "material": "clock_case",
+          "label": "Case"
+        },
+        {
+          "material": "face",
+          "label": "Face"
+        }
+      ]
+    },
+    "model.wallShelf": {
+      "type": "model",
+      "url": "../../models/decor/wallShelf.glb",
+      "materials": {
+        "book_cream": {
+          "finish": "material.finish.satin"
+        },
+        "book_mustard": {
+          "finish": "material.finish.satin"
+        },
+        "book_navy": {
+          "finish": "material.finish.satin"
+        },
+        "book_rust": {
+          "finish": "material.finish.satin"
+        },
+        "book_teal": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "frame_white": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.grandfatherClock": {
+      "type": "model",
+      "url": "../../models/decor/grandfatherClock.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dial": {
+          "finish": "material.finish.gloss"
+        },
+        "hollow": {
+          "finish": "material.finish.matte"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_dark": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wind": "door_open"
+        },
+        "hold": 2.5,
+        "idle": "pendulum"
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Case"
+        },
+        {
+          "material": "dial",
+          "label": "Face"
+        }
+      ]
+    },
+    "model.vaseTall": {
+      "type": "model",
+      "url": "../../models/decor/vaseTall.glb",
+      "materials": {
+        "ceramic": {
+          "finish": "material.finish.satin"
+        },
+        "plume": {
+          "finish": "material.finish.foliage"
+        },
+        "twig": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "ceramic",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.urnPorcelain": {
+      "type": "model",
+      "url": "../../models/decor/urnPorcelain.glb",
+      "materials": {
+        "blue": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.vasePedestal": {
+      "type": "model",
+      "url": "../../models/decor/vasePedestal.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "vase_blue": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "vase_blue",
+          "label": "Vase"
+        },
+        {
+          "material": "stone",
+          "label": "Pedestal"
+        }
+      ]
+    },
+    "model.bustMarble": {
+      "type": "model",
+      "url": "../../models/decor/bustMarble.glb",
+      "materials": {
+        "marble": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "marble",
+          "label": "Bust"
+        },
+        {
+          "material": "stone",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.statueCat": {
+      "type": "model",
+      "url": "../../models/decor/statueCat.glb",
+      "materials": {
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "concrete_dark": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "concrete",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.statueHorse": {
+      "type": "model",
+      "url": "../../models/decor/statueHorse.glb",
+      "materials": {
+        "bronze": {
+          "finish": "material.finish.metal"
+        },
+        "bronze_dark": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "bronze",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.coatRack": {
+      "type": "model",
+      "url": "../../models/decor/coatRack.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "coat": {
+          "finish": "material.finish.fabric"
+        },
+        "hat": {
+          "finish": "material.finish.fabric"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "scarf": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hangingPlant": {
+      "type": "model",
+      "url": "../../models/decor/hangingPlant.glb",
+      "materials": {
+        "cord": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "pot_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "water": "sway"
+        },
+        "hold": 1.6
+      },
+      "paint": [
+        {
+          "material": "pot_white",
+          "label": "Pot"
+        },
+        {
+          "material": "cord",
+          "label": "Cord"
+        }
+      ]
+    },
+    "model.fireplace": {
+      "type": "model",
+      "url": "../../models/decor/fireplace.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "ember": {
+          "finish": "material.finish.gloss"
+        },
+        "firebox": {
+          "finish": "material.finish.matte"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss"
+        },
+        "frame_white": {
+          "finish": "material.finish.satin"
+        },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
+        "hearth": {
+          "finish": "material.finish.matte"
+        },
+        "log": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "picture": {
+          "finish": "material.finish.matte"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "soot": {
+          "finish": "material.finish.matte"
+        },
+        "surround": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "surround",
+          "label": "Surround"
+        },
+        {
+          "material": "oak",
+          "label": "Mantel"
+        }
+      ]
+    },
+    "model.curtains": {
+      "type": "model",
+      "url": "../../models/decor/curtains.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "night": "close"
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Fabric"
+        },
+        {
+          "material": "rail",
+          "label": "Rail"
+        }
+      ]
+    },
+    "model.curtainsLong": {
+      "type": "model",
+      "url": "../../models/decor/curtainsLong.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "night": "close"
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Fabric"
+        },
+        {
+          "material": "rail",
+          "label": "Rail"
+        }
+      ]
+    },
+    "model.rugRound": {
+      "type": "model",
+      "url": "../../models/decor/rugRound.glb",
+      "materials": {
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_border": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.rugLarge": {
+      "type": "model",
+      "url": "../../models/decor/rugLarge.glb",
+      "materials": {
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_border": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.rugRunner": {
+      "type": "model",
+      "url": "../../models/decor/rugRunner.glb",
+      "materials": {
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_border": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.rugPattern": {
+      "type": "model",
+      "url": "../../models/decor/rugPattern.glb",
+      "materials": {
+        "rug_accent": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_edge": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_ground": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_motif": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "rug_ground",
+          "label": "Rug"
+        }
+      ]
+    }
+  }
+}

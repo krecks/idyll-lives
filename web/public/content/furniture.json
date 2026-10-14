@@ -3542,8 +3542,8 @@
         1
       ],
       "price": 45,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 0.5,
       "description": "A typographic print in a white frame.",
@@ -3558,8 +3558,8 @@
         1
       ],
       "price": 90,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 0.7,
       "description": "A black-and-white city photograph.",
@@ -3574,8 +3574,8 @@
         1
       ],
       "price": 380,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 1.2,
       "description": "A landscape in oils in a gilded frame. Residents stop to admire it.",
@@ -3608,8 +3608,8 @@
         1
       ],
       "price": 260,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 1.0,
       "description": "A big canvas of bold colour blocks.",
@@ -3642,8 +3642,8 @@
         1
       ],
       "price": 60,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 0.4,
       "description": "A clean, round clock.",
@@ -3658,8 +3658,8 @@
         1
       ],
       "price": 55,
-      "category": "decor",
-      "group": "wall",
+      "category": "validate",
+      "group": "wall decor",
       "layer": "wall",
       "decor": 0.5,
       "description": "Two shelves of books, a plant and a photo.",
@@ -3674,7 +3674,7 @@
         1
       ],
       "price": 70,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "wall",
       "decor": 0.5,
@@ -3690,7 +3690,7 @@
         1
       ],
       "price": 130,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "wall",
       "decor": 0.8,
@@ -3706,7 +3706,7 @@
         2
       ],
       "price": 110,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "rug",
       "decor": 0.8,
@@ -3722,7 +3722,7 @@
         2
       ],
       "price": 220,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "rug",
       "decor": 1.2,
@@ -3738,7 +3738,7 @@
         3
       ],
       "price": 70,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "rug",
       "decor": 0.5,
@@ -3754,7 +3754,7 @@
         2
       ],
       "price": 480,
-      "category": "decor",
+      "category": "validate",
       "group": "textiles",
       "layer": "rug",
       "decor": 1.6,
@@ -3770,7 +3770,7 @@
         1
       ],
       "price": 1100,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 1.5,
       "description": "A tall clock with a pendulum. Someone has to wind it.",
@@ -3801,7 +3801,7 @@
         1
       ],
       "price": 60,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 0.5,
       "description": "A slim ceramic vase with dried stems.",
@@ -3816,7 +3816,7 @@
         1
       ],
       "price": 180,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 0.8,
       "description": "A blue-and-white porcelain jar.",
@@ -3831,7 +3831,7 @@
         1
       ],
       "price": 160,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 0.7,
       "description": "A white vase on its own plinth.",
@@ -3846,7 +3846,7 @@
         1
       ],
       "price": 700,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 1.6,
       "description": "A classical bust on a plinth. Residents stop to admire it.",
@@ -3879,7 +3879,7 @@
         1
       ],
       "price": 120,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 0.6,
       "description": "A concrete cat, indoors or out.",
@@ -3894,7 +3894,7 @@
         1
       ],
       "price": 260,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 1.0,
       "description": "A rearing porcelain horse on a wooden stand.",
@@ -3909,7 +3909,7 @@
         1
       ],
       "price": 60,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 0.3,
       "description": "Somewhere for coats and hats by the door.",
@@ -3924,7 +3924,7 @@
         1
       ],
       "price": 55,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "layer": "ceiling",
       "decor": 0.7,
@@ -3959,7 +3959,7 @@
         1
       ],
       "price": 1600,
-      "category": "decor",
+      "category": "validate",
       "group": "ornaments",
       "decor": 1.5,
       "light": {

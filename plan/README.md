@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **81 are done**:
+**Where it stands (2026-10-14):** 540 objects. **103 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -17,11 +17,14 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the six B4 laundry models: `laundryWasher`, `laundryDryer`, `towelRail`, `towelLadder`, `laundryBasket`, `bathMat` (in Validate › Laundry);
 - the three B5 storage and mirrors: `mirrorCabinet`, `mirrorRound`, `bathCabinetTall` (in Validate › Bathroom Storage);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
+- the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
+  D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
+  D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (in Validate › Textiles);
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants).
 
-**459 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 104;
+**437 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 82;
 - `catalog2.py`: 162;
 - the base manifest: 65;
 - `community.py`: 36;
@@ -40,7 +43,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Office](06-office.md) | 14 | O1 Desks (8), O2 Desk chairs (3), O3 Storage and boards (3) |
 | [Fitness](07-fitness.md) | 5 | F1 Home gym (5) |
 | [Hobbies](08-hobbies.md) | 19 | H1 Music (6), H2 Games (6), H3 Crafts and science (7) |
-| [Decor](09-decor.md) | 22 | D1 Wall art and clocks (6), D2 Ornaments (10), D3 Textiles (6) |
+| [Decor](09-decor.md) | 22 | D1 Wall art and clocks (6, **done**), D2 Ornaments (10, **done**), D3 Textiles (6, **done**) |
 | [Tabletop](10-tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
 | [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |

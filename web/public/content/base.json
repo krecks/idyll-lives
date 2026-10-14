@@ -3707,6 +3707,18 @@
         {
           "id": "bathroom storage",
           "label": "Bathroom Storage"
+        },
+        {
+          "id": "wall decor",
+          "label": "Wall Decor"
+        },
+        {
+          "id": "ornaments",
+          "label": "Ornaments"
+        },
+        {
+          "id": "textiles",
+          "label": "Textiles"
         }
       ]
     },

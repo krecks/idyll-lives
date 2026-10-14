@@ -28,7 +28,8 @@
     "packs/bathroom/manifest.json",
     "packs/kitchen_cooking/manifest.json",
     "packs/kitchen_counters/manifest.json",
-    "packs/laundry/manifest.json"
+    "packs/laundry/manifest.json",
+    "packs/decor/manifest.json"
   ],
   "entries": {
     "material.wall": {

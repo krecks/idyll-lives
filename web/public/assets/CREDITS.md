@@ -87,6 +87,12 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The decor models (`models/decor/*.glb`: the D1 wall art and clocks, D2 ornaments and D3 curtains and rugs, override
+pack `packs/decor/manifest.json`) are built in Blender by `tools/art/blender/families/decor.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go
+round near the camera, the clock's door opens to wind it, the hanging plant sways when watered, the fire burns while
+a resident warms up by it, and the curtains are drawn at night. Their primitive-part entries stay as the fallback.
+
 The bathroom mirror cabinet, round mirror and tall cabinet (`models/bathroom/mirrorCabinet.glb`, `mirrorRound.glb`,
 `bathCabinetTall.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The mirrors'
