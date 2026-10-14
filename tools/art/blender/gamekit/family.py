@@ -8,7 +8,7 @@ import bpy
 
 from . import motion
 from .export import export_glb, materials_used, stats, write_pack
-from .parts import check_size
+from .parts import check_size, join
 from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
@@ -41,14 +41,19 @@ class Model:
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
                  middle of its footprint (default: the middle)
+      far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
+                 town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
+                 joined, decimated, without what's hidden at rest), or a build function of its own; the
+                 entry's `far`. For what is placed by the hundred or seen far off: trees, street props.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
-                 parts=None, centre=(0.0, 0.0)):
+                 parts=None, centre=(0.0, 0.0), far=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint, self.placeholder = tolerance, motions, paint, placeholder
         self.parts = parts
         self.centre = centre
+        self.far = far
 
 
 class Family:
@@ -103,6 +108,9 @@ class Family:
                 preview(stem + '.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')
+                if model.far:
+                    self.make_far(model, objs)
+                    preview(stem + '.far.png')
                 continue
             clips = motion.clips(objs)
             path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips))
@@ -117,11 +125,40 @@ class Family:
                 entry['placeholder'] = model.placeholder
             if model.parts:
                 entry['parts'] = model.parts
+            if model.far:
+                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
+                entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
+                print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
         if entries and '--no-pack' not in args:
             path = write_pack(self.pack, entries, self.comment)
             print(f'[gamekit] wrote {os.path.relpath(path, ASSETS)}')
+
+    def make_far(self, model, objs):
+        """The far version of `model` (just built, its objects `objs`), in the scene: its objects."""
+        if callable(model.far):
+            reset()
+            objs = model.far() or meshes()
+            bpy.context.scene.frame_set(1)
+            check_size(model.size, max(model.tolerance, 0.05), objs, name=f'{model.id}.far', centre=model.centre)
+            stats(f'{model.id}.far')
+            return objs
+        # At rest, still, without what only shows while it moves (water grown from nothing).
+        bpy.context.scene.frame_set(1)
+        for o in objs:
+            o.animation_data_clear()
+        hidden = [o for o in objs if min(abs(k) for k in o.scale) < 0.01]
+        for o in hidden:
+            bpy.data.objects.remove(o, do_unlink=True)
+        far = join([o for o in objs if o not in hidden], f'{model.id}_far', origin=(0, 0, 0))
+        decimate = far.modifiers.new('far', 'DECIMATE')
+        decimate.ratio = model.far
+        mesh = far.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
+        mesh.calc_loop_triangles()
+        print(f'[gamekit] {model.id}.far: {len(mesh.loop_triangles)} triangles ({model.far:.0%} kept)')
+        far.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh_clear()
+        return [far]
 
     def _check_motions(self, model, clips):
         names = {name for _, name, _ in clips}

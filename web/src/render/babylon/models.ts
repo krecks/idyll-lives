@@ -114,8 +114,10 @@ export interface MirrorSurface {
 }
 
 export interface BuildOptions {
-  /** 0 = full detail, 1 = reduced tessellation for distant instances. */
+  /** 0 = full detail, 1 = reduced tessellation for distant instances (a file: its `far` version, if it has one). */
   lod?: 0 | 1;
+  /** Only seen from afar (the town overview): a file's `far` version, if it has one; a placeholder as it is. */
+  far?: boolean;
   /** Things on a top: the radius (m) of the disc they take, for the stand-in when the model is missing. */
   radius?: number;
   /** Resized by the player: drawn at this size (see `resizeParts`). */
@@ -139,10 +141,14 @@ export async function buildModel(
   options: BuildOptions = {},
 ): Promise<ModelTemplate> {
   if (entry?.url) {
-    try {
-      return await loadGltf(scene, name, entry, footprint, options.resize);
-    } catch (err) {
-      console.warn(`[render] failed to load ${entry.url}, using placeholder`, err);
+    // Far off, the far version (without moving parts); the full one if that fails.
+    const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
+    for (const url of far ? [far, entry.url] : [entry.url]) {
+      try {
+        return await loadGltf(scene, name, entry, url, footprint, options.resize);
+      } catch (err) {
+        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'placeholder'}`, err);
+      }
     }
   }
   const parts = entry?.placeholder ?? fallbackParts(footprint, options.radius);
@@ -1045,9 +1051,9 @@ function fileMaterial(lib: MaterialLibrary, material: Material | null, ov: Mater
   return copy;
 }
 
-async function loadGltf(scene: Scene, name: string, entry: ModelEntry, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
+async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: string, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
   const extras = entry as ModelEntry & ModelExtras;
-  const file = await loadFile(scene, entry.url!);
+  const file = await loadFile(scene, url);
   const fit = extras.fit;
   const s = fit ? 1 : (entry.scale ?? 1);
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];

@@ -54,6 +54,11 @@ export interface ModelEntry {
   type: 'model';
   /** glTF/GLB file. When missing or failing to load, `placeholder` is used. */
   url?: string;
+  /**
+   * Its far version (`<id>.far.glb`, about a quarter of the triangles, no moving parts), drawn
+   * where it is only seen from afar: the town overview, the far woods (`BuildOptions.far`, `lod` 1).
+   */
+  far?: string;
   scale?: number;
   /** Degrees. */
   rotationY?: number;

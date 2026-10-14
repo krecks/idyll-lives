@@ -12,7 +12,7 @@ import { withBuild, withoutBuild } from './build';
 import { bundled } from './bundle';
 import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
 
-const URL_FIELDS = ['url', 'texture'] as const;
+const URL_FIELDS = ['url', 'far', 'texture'] as const;
 
 export class AssetRegistry {
   private readonly entries = new Map<string, AssetEntry>();

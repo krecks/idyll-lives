@@ -233,7 +233,8 @@ export class TownOverview {
       let t = this.templates.get(key);
       if (!t) {
         const def = this.content.object(list[0].def);
-        t = buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1]).then((template) => {
+        // Seen from afar: a file's far version.
+        t = buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true }).then((template) => {
           for (const mesh of template.meshes) {
             mesh.layerMask = LAYER_TOWN;
             mesh.isPickable = false;

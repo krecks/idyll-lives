@@ -112,6 +112,10 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.
    - A key the manifests don't have yet needs a `placeholder`: a few primitive boxes of the model at
      rest, drawn if the file fails to load.
+   - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
+     to a quarter of the triangles, drawn where it's only seen from afar (the town overview, the far
+     woods). For what is placed by the hundred or seen far off: trees, hedges, street props, the farm's
+     buildings. `far=build_function` builds one by hand instead. `--preview` renders `<id>.far.png`.
 5. **Look**: `build.py <family> --preview`, then open `previews/<id>.png`. The preview looks at the front
    three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
 6. **Export**: `build.py <family>`.

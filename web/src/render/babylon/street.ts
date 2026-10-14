@@ -1044,7 +1044,8 @@ export class Street {
   private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1]): Promise<Mesh[]> {
     let template = this.templates.get(key);
     if (!template) {
-      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint);
+      // The overview's street (on a layer of its own) is seen from afar: files' far versions.
+      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined });
       this.templates.set(key, template);
     }
     const t = await template;

@@ -227,8 +227,35 @@ def placeholder_box(parts):
     return lo, hi
 
 
-def check(entry, finishes, path):
-    """(errors, warnings, summary) for one model entry and its file."""
+def check(entry, finishes, path, far=None):
+    """(errors, warnings, summary) for one model entry and its file (and its far version's, at `far`)."""
+    errors, warnings, info = check_file(entry, finishes, path)
+    summary = f'{info["size"] / 1024:6.1f} KB {info["tris"]:6d} tris {info["draws"]} draws {info["materials"]:2d} materials  ' \
+              + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m'
+    if info['clips']:
+        summary += f'  {info["moving"]} moving parts, {info["clips"]} clips'
+    if far:
+        # Its far version (`far`): the same model, still, with far fewer triangles.
+        try:
+            far_errors, far_warnings, far_info = check_file({k: v for k, v in entry.items() if k not in ('motions', 'paint')}, finishes, far)
+        except (OSError, ValueError, KeyError, IndexError) as err:
+            far_errors, far_warnings, far_info = [f'cannot read {far}: {err}'], [], None
+        if far_info:
+            if far_info['clips']:
+                far_errors.append('has clips: a far version stands still')
+            if far_info['tris'] > info['tris'] / 2:
+                far_warnings.append(f'{far_info["tris"]} triangles, over half the full model\'s {info["tris"]} (aim for a quarter)')
+            if any(abs(a - b) > max(0.05 * b, 0.02) for a, b in zip(far_info['dims'], info['dims'])):
+                far_warnings.append(' x '.join(f'{d:.2f}' for d in far_info['dims']) + ' m, the full model ' + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m')
+            summary += f'  (far: {far_info["tris"]} tris)'
+        errors += [f'far: {e}' for e in far_errors]
+        # (What it says of the placeholder, it says of the full model too.)
+        warnings += [f'far: {w}' for w in far_warnings if 'placeholder' not in w]
+    return errors, warnings, summary
+
+
+def check_file(entry, finishes, path):
+    """(errors, warnings, numbers) for one model entry and a file of it."""
     errors, warnings = [], []
     gltf, binary, size = read_glb(path)
     required = set(gltf.get('extensionsRequired', []))
@@ -371,10 +398,9 @@ def check(entry, finishes, path):
             errors.append(f'texture {i} is {wh[0]}x{wh[1]}, at most {TEXTURE_MAX} px a side')
         warnings.append(f'texture {i} ({img.get("name", img.get("uri", "embedded"))}): a texture of its own, prefer the game\'s finishes')
 
-    summary = f'{size / 1024:6.1f} KB {tris:6d} tris {len(groups)} draws {len(materials):2d} materials  {dims[0]:.2f} x {dims[1]:.2f} x {dims[2]:.2f} m'
-    if gltf.get('animations'):
-        summary += f'  {len(moved_nodes(gltf))} moving parts, {len(gltf["animations"])} clips'
-    return errors, warnings, summary
+    info = {'size': size, 'tris': tris, 'draws': len(groups), 'materials': len(materials), 'dims': dims,
+            'clips': len(gltf.get('animations', [])), 'moving': len(moved_nodes(gltf))}
+    return errors, warnings, info
 
 
 def main(argv):
@@ -398,8 +424,9 @@ def main(argv):
         if (keys and key not in keys) or not url.lower().endswith('.glb') or '://' in url:
             continue
         path = os.path.normpath(os.path.join(os.path.dirname(manifest), url))
+        far = os.path.normpath(os.path.join(os.path.dirname(manifest), entry['far'])) if entry.get('far') else None
         try:
-            errors, warnings, summary = check(entry, finishes, path)
+            errors, warnings, summary = check(entry, finishes, path, far)
         except (OSError, ValueError, KeyError, IndexError) as err:
             errors, warnings, summary = [f'cannot read {path}: {err}'], [], ''
         if key in stale:

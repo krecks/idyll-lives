@@ -175,14 +175,19 @@ finish it uses.
 
 ## Level of detail
 
-- **Objects** have one level of detail: the game draws them at full detail near and far, in the
-  town overview too. Hence the budgets above.
+- **Objects** are drawn at full detail wherever play shows them: the game draws only the lots
+  around the one in view. Hence the budgets above.
+- **Far versions:** a model's entry may name a second file, `"far": "../../models/<family>/<id>.far.glb"`,
+  at about a quarter of the triangles and standing still (no moving parts). It is drawn where the
+  model is only seen from afar: the town overview behind the menus (its gardens and street,
+  `BuildOptions.far`) and the far woods (`lod` 1). Placeholders there stay as they are. In gamekit,
+  `G.Model(..., far=0.25)` writes it from the model at rest (joined, decimated to that share, without
+  what only shows while it moves), or `far=build_function` builds one of its own; `check_glb.py`
+  checks it (still, the same size, at most half the triangles). Give one to what is placed by the
+  hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
 - **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance and `*.far`
-  models (100–250 triangles) for the far woods. A file ignores the reduced build (LOD 1 of a `.glb`
-  is the same mesh), and plants also need the nature shader's wind and tint. Plants and trees stay
-  primitive until the engine change below.
-- When the engine reads one, a model's far version is a second file, `<id>.far.glb`, at about a
-  quarter of the triangles (the placeholders' LOD 1 is about an eighth).
+  keys (100–250 triangles) for the far woods; a file's `far` serves as its reduced build. Plants also
+  need the nature shader's wind and tint before they come from Blender.
 
 ## Moving parts
 
@@ -378,8 +383,8 @@ work for files.
 2. ~~**Picking outline.**~~ Done: `loadGltf` returns the baked geometry's bounds.
 3. ~~**Materials left behind.**~~ Done: each file is imported once per scene (`loadFile`); builds
    copy its geometry and share its materials.
-4. **Level of detail** for files: read `<id>.far.glb` (or a second mesh) for LOD 1, as nature's
-   `*.far` keys, before plants, trees or crowded props come from Blender.
+4. ~~**Level of detail** for files.~~ Done: an entry's `far` file, `<id>.far.glb`, is what LOD 1 and
+   the town overview draw (`G.Model(far=…)` writes it).
 5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
    like placeholder parts do (`fileMirror`).
 6. **Finishes by name**, optional but it removes most of the manifest work: a material named
