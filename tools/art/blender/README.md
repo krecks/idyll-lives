@@ -96,7 +96,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
-3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`rock`
+3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
@@ -148,6 +148,22 @@ G.swing(door, 'fridge_open', -102, seconds=1.75)     # turn about its own Z (axi
 G.slide(drawer, 'drawer_open', (0, -0.3, 0), seconds=0.8)   # pull out to the front
 ```
 
+The clips gamekit makes:
+
+| Clip | Does | For |
+|---|---|---|
+| `G.swing(part, clip, degrees, seconds, axis='Z')` | turns from rest by `degrees` | doors, lids, a bed folding down |
+| `G.slide(part, clip, (x, y, z), seconds)` | moves from rest | drawers, a cover sliding off |
+| `G.grow(part, clip, seconds, axis='Z')` | scales from how it was built (small, hidden) to full size | water, flames, washing on a line |
+| `G.squash(part, clip, scale, seconds, back=False)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again | a cushion sinking, a bag flattening, something hidden while held (0.001) |
+| `G.spin(part, clip, turns, seconds, axis='Z')` | whole turns at an even speed, ending at rest | wheels, platters, fans, the train |
+| `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
+
+The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
+end where they start, so they also loop (`motions.loops`, `idle`). Keep a spin under about a turn a
+second: the game blends between samples 1/30 s apart. A part that looks the same turned (a fan's four
+blades) can turn by less (a quarter) and loop.
+
 A part that is easier to build open (a bed that folds down) is built in its open pose and `hinged`. It's
 then turned to rest with `G.turn(part, -90, 'X')` and swung open again by the opposite angle.
 
@@ -167,7 +183,10 @@ How the parts work:
   lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
   a clip that nothing plays.
-- **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png`.
+- **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
+  way round, a `rock` at its furthest).
+- **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
+  of the model as the game does.
 - **Examples.**
   - `families/kitchen.py`: two doors, played by uses.
   - `families/living.py`: a bed built open, folded to rest, and held down while open.
@@ -181,6 +200,11 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
 
 - **Gallery.** Open `/gallery.html?keys=model.<id>&cols=4` to see the model. Answer the `.glb` requests
   with 404 (`page.route`) to see its placeholder side by side.
+- **Clips bench.** Open `/clips.html?keys=model.<id>` to see every clip of the model play in turn, as the
+  game plays it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the
+  time. A button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a
+  screenshot (`&t=99`: open). `&renderer=webgl` for WebGL2, `&colors=body:%23hex` for colours. Without
+  `keys` it shows every model with `motions`.
 - **A house.** Open `/?state=wants-asking&debug` (a dump in `debug-states/`).
   - Buy the object with `__send({type: 'buy', household: 0, object: '<id>', at: [x, z, rot]})`.
     `[x, z]` is the footprint's corner, against a wall at rot 0. In that state, house 0's living room has
@@ -214,10 +238,10 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
 |---|---|
 | `scene.py` | `reset`, `meshes`, the paths (`ASSETS`, `PREVIEWS`), `cosd`/`sind`; warns off Blender 5.2 |
 | `materials.py` | `Palette` (colour + finish), `mat` (one material by hand), `FINISHES` (read from the base manifest) |
-| `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `rock` |
+| `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
-| `motion.py` | `swing`, `slide`, `clips` |
+| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |

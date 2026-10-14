@@ -39,15 +39,16 @@ def preview(path):
 
 
 def preview_clips(stem):
-    """Renders `<stem>@<clip>.png` with each clip on its own at its last key, then goes back to rest."""
+    """Renders `<stem>@<clip>.png` with each clip on its own where it is most open (its last key, or the
+    middle of a clip that comes home: `spin`, `rock`), then goes back to rest."""
     scene = bpy.context.scene
     paths = []
-    for _, clip, end in motion.clips():
+    for clip in dict.fromkeys(name for _, name, _ in motion.clips()):
         # back to rest first: a muted track leaves its part where it last put it
         motion.solo(None)
         scene.frame_set(1)
         motion.solo(clip)
-        scene.frame_set(end)
+        scene.frame_set(motion.peak(clip))
         paths.append(preview(f'{stem}@{clip}.png'))
     motion.solo(None)
     scene.frame_set(1)

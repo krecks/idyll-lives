@@ -40,7 +40,7 @@ gate below, so the review does.
   families/<family>.py`). `gamekit` warns on another version. The committed files were exported with 5.2.2 (glTF I/O
   5.2.40). A new LTS is adopted by re-exporting every family and checking the shots, in one commit.
 - **Scripts are the source.** A model is built by Python on `gamekit` (primitives, `revolve`,
-  `rock`, bevels, `join_all`), so its source is reviewable text and re-exporting is one command.
+  `boulder`, bevels, `join_all`), so its source is reviewable text and re-exporting is one command.
   A shape that can't reasonably be scripted may come from a `.blend` file next to its script,
   saved compressed and under 2 MB; the export still runs from the script, so the settings stay fixed.
 - **Folders and names:**
@@ -259,8 +259,9 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   - A lot with the object on it (`?state=<name>` from a test dump, or a bench state with objects
     added), `&hour=13` and `&hour=22`, WebGPU and `&renderer=webgl`.
   - The catalog picture (`render/preview/items.ts`, WebGL2).
-  - Its clips: `/water.html` plays every sink's `water_on` (on, running, off, in a loop; `?keys=`,
-    `?t=` to hold a time, `?colors=body:%23hex`), the way a resident washing plays it.
+  - Its clips: `/clips.html?keys=model.<id>` plays every clip of the model in turn, the way the game
+    plays it (a use's opens, holds and closes; a loop goes round); a button per clip (`&clip=`),
+    `&t=` to hold a time, `&colors=body:%23hex`, `&renderer=webgl`.
   - Placed turned (all four `rot`), and resized when the engine supports it.
 
 ## Optimisation and registration

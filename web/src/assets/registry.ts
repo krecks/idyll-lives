@@ -44,6 +44,11 @@ export class AssetRegistry {
     return this.entries.get(key)?.type === type;
   }
 
+  /** Every key with type `type` (the dev benches list models with it). */
+  keys(type: AssetType): string[] {
+    return [...this.entries].flatMap(([key, entry]) => (entry.type === type ? [key] : []));
+  }
+
   /** Icons never fail: a missing key yields a neutral placeholder so the UI stays intact. */
   icon(key: string): IconEntry {
     return this.get(key, 'icon') ?? { type: 'icon', url: FALLBACK_ICON, mode: 'mask' };

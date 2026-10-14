@@ -141,19 +141,19 @@ def wheelbarrow():
                                         (0.16, -0.16, M.flower_pink)]):
         G.sphere(f'flower{i}', 0.055, at=(x, y, 0.70), material=colour, scale=(1, 1, 0.8))
     for i, (x, y) in enumerate([(-0.10, -0.10), (0.10, 0.05), (-0.05, 0.18)]):
-        G.rock(f'leaf{i}', 0.09, at=(x, y, 0.64), material=M.leaf, scale=(1, 1, 0.5), seed=i * 1.7, noise=0.35)
+        G.boulder(f'leaf{i}', 0.09, at=(x, y, 0.64), material=M.leaf, scale=(1, 1, 0.5), seed=i * 1.7, noise=0.35)
     return G.settle([G.join_all('wheelbarrow')])
 
 
 def boulder():
-    G.rock('boulder_main', 0.40, at=(0, 0, 0), material=M.stone, scale=(1.05, 0.9, 0.62), seed=0.4)
-    G.rock('boulder_side', 0.17, at=(0.30, -0.20, 0), material=M.stone_dark, scale=(1.0, 0.8, 0.85), seed=2.1)
-    G.rock('boulder_small', 0.10, at=(-0.36, 0.20, 0), material=M.stone_warm, scale=(1.0, 0.8, 1.0), seed=4.2)
+    G.boulder('boulder_main', 0.40, at=(0, 0, 0), material=M.stone, scale=(1.05, 0.9, 0.62), seed=0.4)
+    G.boulder('boulder_side', 0.17, at=(0.30, -0.20, 0), material=M.stone_dark, scale=(1.0, 0.8, 0.85), seed=2.1)
+    G.boulder('boulder_small', 0.10, at=(-0.36, 0.20, 0), material=M.stone_warm, scale=(1.0, 0.8, 1.0), seed=4.2)
     # moss on top and a few tufts around the base
-    G.rock('moss', 0.22, at=(-0.06, -0.04, 0.41), material=M.moss, scale=(1.5, 0.75, 0.20), seed=7.3, noise=0.35)
-    G.rock('moss2', 0.13, at=(0.24, 0.14, 0.16), material=M.moss, scale=(1.3, 0.75, 0.25), seed=9.1, noise=0.4)
+    G.boulder('moss', 0.22, at=(-0.06, -0.04, 0.41), material=M.moss, scale=(1.5, 0.75, 0.20), seed=7.3, noise=0.35)
+    G.boulder('moss2', 0.13, at=(0.24, 0.14, 0.16), material=M.moss, scale=(1.3, 0.75, 0.25), seed=9.1, noise=0.4)
     for i, (x, y) in enumerate([(0.38, 0.04), (-0.40, 0.08), (0.10, 0.33), (-0.16, -0.33)]):
-        G.rock(f'tuft{i}', 0.09, at=(x, y, 0), material=M.leaf, scale=(1.6 if i > 1 else 0.7, 0.7 if i > 1 else 1.6, 0.6),
+        G.boulder(f'tuft{i}', 0.09, at=(x, y, 0), material=M.leaf, scale=(1.6 if i > 1 else 0.7, 0.7 if i > 1 else 1.6, 0.6),
                seed=i * 2.3, noise=0.45)
     return G.settle([G.join_all('boulder')])
 

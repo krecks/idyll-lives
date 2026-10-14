@@ -95,7 +95,7 @@ def revolve(name, profile, at=(0, 0, 0), material=None, segments=24, scale=(1, 1
     return obj
 
 
-def rock(name, radius, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 0),
+def boulder(name, radius, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=(0, 0, 0),
          seed=0.0, noise=0.22, subdivisions=3, smooth=True):
     """A lumpy, deterministic boulder: an icosphere displaced by value noise, bottom on z = 0."""
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdivisions, radius=radius)

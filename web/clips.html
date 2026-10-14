@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Idyll Lives sinks</title>
+    <title>Idyll Lives clips bench</title>
     <link rel="icon" href="data:," />
     <style>
       html, body { margin: 0; height: 100%; background: #9cc2e0; overflow: hidden; font: 12px system-ui, sans-serif; }
@@ -12,11 +12,13 @@
         position: absolute; left: 0; top: 0; padding: 2px 8px; border-radius: 999px;
         background: rgba(255, 255, 255, 0.85); font-weight: 600; white-space: nowrap; pointer-events: none;
       }
-      #controls { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; }
+      #controls { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
       #controls button {
         font: inherit; font-weight: 600; padding: 5px 12px; border: 0; border-radius: 999px;
         background: rgba(255, 255, 255, 0.9); cursor: pointer;
       }
+      #controls button.on { background: #2f3236; color: #fff; }
+      #controls .gap { width: 12px; }
     </style>
   </head>
   <body>
@@ -24,9 +26,10 @@
     <div id="labels"></div>
     <div id="controls">
       <button id="toggle">Pause</button>
-      <button id="on">Water on</button>
-      <button id="off">Water off</button>
+      <button id="rest">Rest</button>
+      <button id="open">Open</button>
+      <span class="gap"></span>
     </div>
-    <script type="module" src="/src/debug/water.ts"></script>
+    <script type="module" src="/src/debug/clips.ts"></script>
   </body>
 </html>
