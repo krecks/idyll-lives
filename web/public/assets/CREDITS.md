@@ -156,6 +156,18 @@ exported as `.glb` (glTF, original, CC0). Each turns the top of its duvet down (
 or naps; the futon's back folds down flat into a bed (`unfold`) and stays down until it is folded away; the daybed is
 static. Their primitive-part entries stay as the fallback.
 
+The bedroom nightstands and small storage (`models/bedroom_storage/nightstand.glb`, `nightstandModern.glb`,
+`nightstandRound.glb`, `nightstandDrawers.glb`, `nightstandLamp.glb`, `cedarChest.glb`, `laundryHamper.glb`,
+`benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are built in Blender by
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are
+static; the nightstand lamp's shade glows at night. Their primitive-part entries stay as the fallback.
+
+The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardrobe.glb`, `chestOfDrawers.glb`,
+`dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are built in Blender by
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each
+slides its middle drawer out (`drawer_open`) or swings its doors open onto a rail of clothes (`doors_open`,
+`door_open`) while a resident picks an outfit. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

@@ -198,7 +198,7 @@
         1
       ],
       "price": 95,
-      "category": "bedroom",
+      "category": "validate",
       "group": "nightstands",
       "decor": 0.15,
       "surface": {
@@ -225,7 +225,7 @@
         1
       ],
       "price": 110,
-      "category": "bedroom",
+      "category": "validate",
       "group": "nightstands",
       "decor": 0.2,
       "surface": {
@@ -252,7 +252,7 @@
         1
       ],
       "price": 130,
-      "category": "bedroom",
+      "category": "validate",
       "group": "nightstands",
       "decor": 0.2,
       "surface": {
@@ -279,8 +279,8 @@
         1
       ],
       "price": 280,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "decor": 0.2,
       "surface": {
         "height": 1.16,
@@ -320,8 +320,8 @@
         1
       ],
       "price": 360,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "decor": 0.3,
       "surface": {
         "height": 0.8,
@@ -361,8 +361,8 @@
         1
       ],
       "price": 240,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "description": "A narrow white wardrobe for a small room.",
       "interactions": [
         {
@@ -389,8 +389,8 @@
         1
       ],
       "price": 900,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "decor": 0.6,
       "description": "A grand two-door wardrobe in dark wood with a cornice and turned feet.",
       "interactions": [
@@ -418,8 +418,8 @@
         1
       ],
       "price": 220,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "nightstands",
       "decor": 0.3,
       "surface": {
         "height": 0.505,
@@ -441,8 +441,8 @@
         1
       ],
       "price": 240,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "nightstands",
       "slots": 2,
       "decor": 0.3,
       "seat": {
@@ -506,8 +506,8 @@
         1
       ],
       "price": 45,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "nightstands",
       "decor": 0.1,
       "description": "A wicker hamper with a lid.",
       "interactions": []

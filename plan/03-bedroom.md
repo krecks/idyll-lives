@@ -22,9 +22,9 @@ follow the fridge (hinge, `hold`).
 | `bedCanopy` Four-poster bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`; the canopy drapes are static. |
 | `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). |
 
-## BR2. Nightstands and small storage (8)
+## BR2. Nightstands and small storage (8) — **Done** (in Validate › Nightstands)
 
-- **Family:** `tools/art/blender/families/bedroom.py`
+- **Family:** `tools/art/blender/families/bedroom_storage.py`
 - **Validate group:** `nightstands` (Validate › Nightstands)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
@@ -39,9 +39,9 @@ follow the fridge (hinge, `hold`).
 | `laundryHamper` Laundry hamper | 1x1 · floor | — | bedroom / storage | Hamper | Static | Static. (+use) the lid lifts. |
 | `benchBedEnd` Bed-end bench | 2x1 · floor | sit:sit | bedroom / storage | Frame, Cushion | Static | Static. |
 
-## BR3. Wardrobes and drawers (6)
+## BR3. Wardrobes and drawers (6) — **Done** (in Validate › Wardrobes)
 
-- **Family:** `tools/art/blender/families/bedroom.py`
+- **Family:** `tools/art/blender/families/bedroom_storage.py`
 - **Validate group:** `wardrobes` (Validate › Wardrobes)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 

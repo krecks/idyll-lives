@@ -2038,8 +2038,8 @@
         1
       ],
       "price": 75,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "nightstands",
       "decor": 0.15,
       "description": "A bedside table with a drawer.",
       "surface": {
@@ -2065,8 +2065,8 @@
         1
       ],
       "price": 140,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "nightstands",
       "decor": 0.3,
       "light": {
         "range": 3.2,
@@ -2086,8 +2086,8 @@
         1
       ],
       "price": 300,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "decor": 0.2,
       "description": "Six drawers of clothes. Picking a good outfit makes residents more charming for a few hours.",
       "surface": {
@@ -2127,8 +2127,8 @@
         1
       ],
       "price": 420,
-      "category": "bedroom",
-      "group": "storage",
+      "category": "validate",
+      "group": "wardrobes",
       "description": "A double wardrobe. Picking a good outfit makes residents more charming for a few hours.",
       "interactions": [
         {

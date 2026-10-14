@@ -3743,6 +3743,14 @@
         {
           "id": "beds",
           "label": "Beds"
+        },
+        {
+          "id": "nightstands",
+          "label": "Nightstands"
+        },
+        {
+          "id": "wardrobes",
+          "label": "Wardrobes"
         }
       ]
     },
