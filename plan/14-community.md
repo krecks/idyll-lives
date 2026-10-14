@@ -20,9 +20,9 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Frame, Seats | Static | Static. |
 | `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Frame, Seats | Use | `move`: a pawn slides one square for chess. |
 
-## CM2. Street furniture (10)
+## CM2. Street furniture (10) — **Done** (in Validate › Street)
 
-- **Family:** `tools/art/blender/families/community.py`
+- **Family:** `tools/art/blender/families/street_furniture.py`
 - **Validate group:** `street` (Validate › Street)
 - **Placeholders to match:** `tools/art/community.py`
 

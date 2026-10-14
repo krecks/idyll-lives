@@ -40,7 +40,8 @@
     "packs/playground/manifest.json",
     "packs/farm/manifest.json",
     "packs/shops/manifest.json",
-    "packs/stalls/manifest.json"
+    "packs/stalls/manifest.json",
+    "packs/street_furniture/manifest.json"
   ],
   "entries": {
     "material.wall": {

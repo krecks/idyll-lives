@@ -145,6 +145,16 @@ lifts while a resident buys from them; a snack slides down to the snack machine'
 machine's; the machines' signs and the drinks machine's front glow at night; the market stall is static. Their
 primitive-part entries stay as the fallback.
 
+The street furniture (`models/street_furniture/streetLamp.glb`, `parkBench.glb`, `drinkingFountain.glb`,
+`litterBin.glb`, `busStop.glb`, `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
+`townStatue.glb`, each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
+is built in Blender by `tools/art/blender/families/street_furniture.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). The street lamp's lantern and the phone box's signs glow at night; the drinking fountain's arc of
+water grows while a resident drinks, the post box's slot flap swings in for a card, the phone box's door opens and
+shuts behind the caller, and the town fountain's water runs near the camera (`water_run`, ambient); the bench, the
+litter bin, the bus shelter, the notice board and the founder's statue are static. Their primitive-part entries stay
+as the fallback.
+
 The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
 `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack

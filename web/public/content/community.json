@@ -19,7 +19,7 @@
         1
       ],
       "price": 350,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "decor": 0.4,
@@ -41,7 +41,7 @@
         1
       ],
       "price": 380,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "slots": 3,
       "outdoors": true,
@@ -94,7 +94,7 @@
         1
       ],
       "price": 300,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "description": "A stone pillar with a cold-water spout, for thirsty walkers and players.",
@@ -123,7 +123,7 @@
         1
       ],
       "price": 60,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "description": "A green steel bin on a post. Keeps the park tidy.",
@@ -138,7 +138,7 @@
         1
       ],
       "price": 650,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "slots": 3,
       "outdoors": true,
@@ -186,7 +186,7 @@
         1
       ],
       "price": 220,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "decor": 0.2,
@@ -217,7 +217,7 @@
         1
       ],
       "price": 180,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "decor": 0.2,
       "description": "Lost cats, choir practice and a bake sale on Saturday: what is going on in town.",
@@ -247,7 +247,7 @@
         1
       ],
       "price": 750,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "decor": 0.4,
@@ -279,7 +279,7 @@
         3
       ],
       "price": 2600,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "slots": 4,
       "outdoors": true,
@@ -331,7 +331,7 @@
         2
       ],
       "price": 1800,
-      "category": "community",
+      "category": "validate",
       "group": "street",
       "outdoors": true,
       "decor": 1.2,

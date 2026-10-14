@@ -3815,6 +3815,11 @@
           "id": "stalls",
           "label": "Stalls",
           "outside": true
+        },
+        {
+          "id": "street",
+          "label": "Street",
+          "outside": true
         }
       ]
     },
