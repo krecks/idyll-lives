@@ -95,7 +95,7 @@ done.
 | `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza; `flames` grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop | Use | `drawer_open` for tastingMenu. |
 
-## P7. Gloomy (6)
+## P7. Gloomy (6) — **Done** (in Validate › Gloomy)
 
 - **Family:** `tools/art/blender/families/pack_gloomy.py`
 - **Validate group:** `gloomy` (Validate › Gloomy)

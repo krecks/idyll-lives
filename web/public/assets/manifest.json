@@ -31,7 +31,8 @@
     "packs/laundry/manifest.json",
     "packs/pack_bookworm/manifest.json",
     "packs/pack_example/manifest.json",
-    "packs/pack_foodie/manifest.json"
+    "packs/pack_foodie/manifest.json",
+    "packs/pack_gloomy/manifest.json"
   ],
   "entries": {
     "material.wall": {

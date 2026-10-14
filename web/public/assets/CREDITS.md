@@ -98,6 +98,12 @@ in Blender by `tools/art/blender/families/pack_foodie.py` on `gamekit` and expor
 A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door comes off for the peel as the
 fire grows, and the island's drawer pulls out. Their primitive-part entries stay as the fallback.
 
+The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `journalDesk.glb`, `rainLamp.glb`,
+`windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_gloomy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The cabinet's
+lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
+rippling pool, the window seat's cushion sinks and the tub fills. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

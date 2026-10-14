@@ -41,7 +41,8 @@
       "model": "model.gloomy.recordCabinet",
       "footprint": [1, 1],
       "price": 380,
-      "category": "living",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 1,
       "description": "A turntable on a cabinet of slow, sad records: an hour of music beats boredom, and a fresh album leaves residents pleasantly bittersweet.",
       "interactions": [
@@ -76,7 +77,8 @@
       "model": "model.gloomy.cello",
       "footprint": [1, 1],
       "price": 1100,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 1,
       "description": "A dark-varnished cello with a stool. Practice builds Dexterity; skilled players (Dexterity 4+) pour their heart into a lament and come away in Catharsis.",
       "interactions": [
@@ -114,7 +116,8 @@
       "model": "model.gloomy.journalDesk",
       "footprint": [2, 1],
       "price": 650,
-      "category": "office",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 1,
       "description": "Ink, candle and a leather journal. Journaling lifts a heavy heart (Unburdened); poetry trains Writing, and real poets (Writing 5+) find Catharsis.",
       "interactions": [
@@ -152,7 +155,8 @@
       "model": "model.gloomy.rainLamp",
       "footprint": [1, 1],
       "price": 160,
-      "category": "decor",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 1,
       "description": "A glass column of endless indoor rain; watching it is oddly soothing and a little fun.",
       "interactions": [
@@ -174,7 +178,8 @@
       "model": "model.gloomy.windowSeat",
       "footprint": [2, 1],
       "price": 650,
-      "category": "living",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 2,
       "description": "A cushioned nook under a rain-streaked window for two: comfortable brooding, or a short doze under the throw.",
       "interactions": [
@@ -206,7 +211,8 @@
       "model": "model.gloomy.soakingTub",
       "footprint": [2, 2],
       "price": 2800,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "gloomy",
       "slots": 1,
       "description": "A deep stone tub with a candle ledge. A candlelit soak cleans, comforts and cheers, and leaves residents in Deep calm: better sleep and slower boredom for hours.",
       "interactions": [
