@@ -72,3 +72,42 @@ None of them blocks the plan. Each says where it lives.
   for the lot). That's how the game draws it too, so a door can be split off early for free.
 - **Finding a model's `centre`**: wall-standing models need `centre=` to match their measured bounds to 2 mm, found
   by trial. `build.py` could print the measured centre when the size check fails, as it prints the size.
+
+## Kids (KD1–KD3, built 2026-10-14)
+
+- **Validate is crowded** (see above): the kids' tasks added three more groups (Baby And Beds, Toys, Kids Study).
+- **Placeholders drawn open.** The toy box's and the toy chest's placeholders (`catalog.py` `toyBox`,
+  `catalog2.py` `toyChest`) draw the lid open, so the fallback looks open, its picking and shadow box is taller
+  (0.84 and 0.95 m against the closed 0.51 and 0.53 m), and `check_glb.py` warns the models are off centre and
+  short. Closing the placeholders' lids would clear the warnings.
+- **`check_glb.py` measures turned placeholder parts unturned.** `placeholder_box` ignores `rotate`, so the high
+  chair's splayed legs and the play tent's poles read as wider than they are, and the gate warns the models are
+  narrower than their placeholders. Worth fixing in the gate before more splayed things (easels, tripods) come.
+- **Colour slots that differ from the plan.** The ball pit's are Pit and Rim, not "Balls": the balls are five
+  colours, and one slot would recolour a fifth of them. The kids' desk has a third slot, Chair (its chair is part of
+  the model). The bean bag's yellow tag isn't paintable.
+- **The train table's track is a ring**, not the placeholder's oval, so the train can `spin` round its middle. An
+  oval would need a path clip (not in gamekit).
+- **Things that need a use first ("+use").** The high chair's `tray` is a part of its own, with no clip: once
+  the chair gets an interaction (a meal, a baby sitting), add `G.slide(tray, …)` and `motions`. It costs a draw
+  call already.
+- **Clips that close while the use goes on.** The toy box and chest shut their lid after `hold` 2 s, as the plan
+  says, while the child plays on for up to 30 minutes; the desk's drawer shuts after 2 s too. The chalk drawing and
+  the painting vanish when the use ends (the clip plays back). Keeping a finished picture would need state in the
+  sim (like the open flag).
+- **The crib's mobile turns for the whole night.** It loops while the baby lies in the crib (`loops.lie`, 12 hours),
+  near the camera only. If that's too busy, play it for awake babies only (needs a use or tag that tells them apart).
+- **The car bed has no quilt.** It isn't in `BLANKET_BEDS`, so a sleeper lies on top of the turned-down duvet (it
+  reads as tucked in at the feet). Adding it to `BLANKET_BEDS` (characters.ts) would match the kids' bed.
+- **Kids' uses end early once the need is full** (`world.rs`, "satisfied"): a child who has just played rides the
+  rocking horse for 5 minutes, not 15, and a full-fun child stops at once. That's by design, but it makes a use's
+  clip easy to miss when checking in play.
+- **Checking in play** (for the next tasks with kids' things): `__send({type: 'adopt', household: 0, child})` makes
+  a baby (with a crib) or a child; fast-forward past school (on weekdays 8–15) and `setAutonomy` off. The household
+  strip shows an activity's label while the resident is still walking to it, and `__world()` has no positions or
+  actions, so take a few shots after the label appears and use the ones where they've arrived. Seen so in play:
+  the crib's rail down for a feed, the toy chest's lid, the doll house's front, the horse ridden, the tent's flap,
+  the train, the tower of blocks, the chalk drawing, the painting and the car bed's duvet; four facings for the toy
+  box and the rocking horse. Not caught in play (seen only on the clips bench): the toy box's lid and the desk's
+  drawer (2 s holds), the bookshelf's book and the teddy (short uses), the kids' bed's duvet (under the game's
+  quilt), and the ball pit's bounce and the bean bag's squash (too small to tell in the shots).
