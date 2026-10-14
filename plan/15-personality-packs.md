@@ -38,7 +38,7 @@ done.
 | `cheerful.sunriseLamp` Sunrise stretch lamp | 1x1 · floor | stretch:exercise | bedroom / — | Body, Trim | Use | `sunrise`: the sun disc rises in its frame for stretch. N glow (E8). |
 | `cheerful.partyBooth` Confetti party booth | 2x2 · floor | party:phone | living / — | Body, Trim | Use | `curtain`: the booth curtain swings aside for party (`hold` 1.5 s). |
 
-## P3. Couch potato (6)
+## P3. Couch potato (6) — **Done** (in Validate › Couch Potato)
 
 - **Family:** `tools/art/blender/families/pack_couchPotato.py`
 - **Validate group:** `couch potato` (Validate › Couch Potato)

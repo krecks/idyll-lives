@@ -94,6 +94,13 @@ CC0). Each moves one part while it is used: the record swings up, the microphone
 sways with its sleeper, the sun rises and the booth's curtain is drawn. Their primitive-part entries stay as the
 fallback.
 
+The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
+`snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_couchPotato.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The cinema's curtains are drawn apart, the console's disc tray slides out, the recliner reclines, the fridge
+door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
+Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

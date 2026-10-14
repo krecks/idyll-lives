@@ -3707,6 +3707,10 @@
         {
           "id": "cheerful",
           "label": "Cheerful"
+        },
+        {
+          "id": "couchPotato",
+          "label": "Couch Potato"
         }
       ]
     },
