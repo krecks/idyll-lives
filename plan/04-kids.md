@@ -3,7 +3,11 @@
 Things for babies and children. Kids' seats and beds keep their heights (`SEATS`, `BEDS`). Toys a child holds in
 the hand are drawn by the character, not the object.
 
-## KD1. Baby and kids' beds (4)
+All three tasks are done (2026-10-14): `families/kids.py` (notes: `families/kids.md`), in Validate › Baby And
+Beds, Toys and Kids Study. The crib's mobile and the high chair's tray are parts of their own; the train
+table's track is a ring, so the train can go round it.
+
+## KD1. Baby and kids' beds (4) — **Done** (in Validate › Baby And Beds)
 
 - **Family:** `tools/art/blender/families/kids.py`
 - **Validate group:** `baby and beds` (Validate › Baby And Beds)
@@ -16,7 +20,7 @@ the hand are drawn by the character, not the object.
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`; the car body is static. |
 | `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. |
 
-## KD2. Toys (10)
+## KD2. Toys (10) — **Done** (in Validate › Toys)
 
 - **Family:** `tools/art/blender/families/kids.py`
 - **Validate group:** `toys` (Validate › Toys)
@@ -35,7 +39,7 @@ the hand are drawn by the character, not the object.
 | `teddyBear` Giant teddy bear | 1x1 · floor | hug:relax | kids / — | Fur, Bow | Use | `squish`: the bear squashes a little for hug (T0 `squash`). |
 | `beanBagKids` Kids' bean bag | 1x1 · floor | flop:relax | kids / — | Bag | Use | `squash`: the bag flattens 15% while sat on (T0 `squash`). |
 
-## KD3. Kids' study and art (6)
+## KD3. Kids' study and art (6) — **Done** (in Validate › Kids Study)
 
 - **Family:** `tools/art/blender/families/kids.py`
 - **Validate group:** `kids study` (Validate › Kids Study)

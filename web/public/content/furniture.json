@@ -2552,7 +2552,8 @@
         2
       ],
       "price": 260,
-      "category": "kids",
+      "category": "validate",
+      "group": "baby and beds",
       "description": "A small bed with a guard rail and stars on the headboard.",
       "interactions": [
         {
@@ -2596,7 +2597,8 @@
         1
       ],
       "price": 80,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "Blocks, balls and odds and ends. Children love it; grown-ups rarely play on their own.",
       "interactions": [
         {
@@ -2626,7 +2628,8 @@
         1
       ],
       "price": 60,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "A soft mat with building blocks.",
       "interactions": [
         {
@@ -2657,7 +2660,8 @@
         1
       ],
       "price": 110,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "description": "A child-sized chalkboard: drawing trains Creativity.",
       "interactions": [
         {
@@ -2688,7 +2692,8 @@
         1
       ],
       "price": 240,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "A two-storey doll house with tiny furniture.",
       "interactions": [
         {
@@ -2721,7 +2726,8 @@
         1
       ],
       "price": 150,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "Giddy-up!",
       "interactions": [
         {
@@ -2749,7 +2755,8 @@
         1
       ],
       "price": 180,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "description": "A small desk and chair for homework and drawings.",
       "surface": {
         "height": 0.57,
@@ -2811,7 +2818,8 @@
         1
       ],
       "price": 45,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "decor": 0.3,
       "description": "A big, soft bear to hug.",
       "interactions": [

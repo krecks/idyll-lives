@@ -741,7 +741,8 @@
         1
       ],
       "price": 90,
-      "category": "kids",
+      "category": "validate",
+      "group": "baby and beds",
       "approach": "around",
       "seatAt": [
         "table"

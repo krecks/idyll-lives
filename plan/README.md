@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **180 are done**:
+**Where it stands (2026-10-14):** 540 objects. **200 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -20,6 +20,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the nine BR1 beds: `bed`, `bedSingle`, `bedBunk`, `bedFuton`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedDaybed` (in Validate › Beds);
 - the eight BR2 nightstands and small storage: `nightstand`, `nightstandModern`, `nightstandRound`, `nightstandDrawers`, `nightstandLamp`, `cedarChest`, `laundryHamper`, `benchBedEnd` (in Validate › Nightstands), and the six BR3 wardrobes and drawers: `dresser`, `wardrobe`, `chestOfDrawers`, `dresserLow`, `wardrobeSingle`, `armoire` (in Validate › Wardrobes);
 - the four BR4 mirrors and the dressing table: `mirror`, `dressingTable`, `mirrorWall`, `mirrorFloor` (in Validate › Dressing);
+- the twenty kids' things: KD1 `crib`, `kidsBed`, `kidsBedCar`, `highChair` (in Validate › Baby And Beds); KD2 `toyBox`, `toyChest`, `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids` (Validate › Toys); KD3 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel` (Validate › Kids Study);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
 - the fourteen office models: O1 `deskSimple`, `deskCorner`, `deskStanding`, `deskExecutive`, `computerDesk`, `deskWriting`, `deskLaptop`, `computerGaming` (in Validate › Desks); O2 `chairExecutive`, `chairTask`, `officeChair` (Validate › Office Chairs); O3 `filingCabinet`, `whiteboard`, `corkboard` (Validate › Office Storage);
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
@@ -29,10 +30,10 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants);
 - the fifteen G2 flowers: `flowerbed`, `garden.tulips`, `daffodils`, `daisies`, `sunflowers`, `poppies`, `marigolds`, `pansies`, `lilies`, `lupins`, `forgetMeNots`, `cosmos`, `meadow`, `geraniums`, `flowerBox` (in Validate › Flowers).
 
-**360 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 58;
-- `catalog2.py`: 128;
-- the base manifest: 46;
+**340 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 50;
+- `catalog2.py`: 117;
+- the base manifest: 45;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -44,7 +45,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8, **done**), BR3 Wardrobes and drawers (6, **done**), BR4 Dressing and mirrors (4, **done**) |
-| [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4), KD2 Toys (10), KD3 Kids' study and art (6) |
+| [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4, **done**), KD2 Toys (10, **done**), KD3 Kids' study and art (6, **done**) |
 | [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11), L2 Armchairs and small seats (11), L3 Coffee and side tables (9), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
 | [Office](06-office.md) | 14 | O1 Desks (8, **done**), O2 Desk chairs (3, **done**), O3 Storage and boards (3, **done**) |
 | [Fitness](07-fitness.md) | 5 | F1 Home gym (5) |

@@ -99,6 +99,16 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
+`dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
+`kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack
+`packs/kids/manifest.json`) are built in Blender by `tools/art/blender/families/kids.py` on `gamekit` and exported as
+`.glb` (glTF, original, CC0). The crib lowers its front rail for feeding, changing and cuddles and turns its mobile
+over a sleeping baby; the beds turn their duvet down; the boxes, the chest and the doll house open; the horse rocks
+its rider, the train goes round its track, the ball pit's balls bob; the tent's flap rolls up, a tower of blocks,
+a chalk drawing and a painting appear, a picture book tips out, and the teddy and the bean bag squash. Their
+primitive-part entries stay as the fallback.
+
 The lamps (`models/lighting/*.glb`: the seven ceiling lights, three wall lights, five floor lamps and six table
 lamps, override pack `packs/lighting/manifest.json`) are built in Blender by `tools/art/blender/families/lighting.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night; the ceiling fan's blades turn

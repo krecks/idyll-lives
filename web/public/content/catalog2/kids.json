@@ -10,7 +10,8 @@
         1
       ],
       "price": 90,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "surface": {
         "height": 0.5,
         "kind": "low",
@@ -31,7 +32,8 @@
         1
       ],
       "price": 40,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "approach": "around",
       "seatAt": [
         "low"
@@ -104,7 +106,8 @@
         1
       ],
       "price": 120,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "decor": 0.2,
       "description": "Three slanted shelves with the covers facing out.",
       "interactions": [
@@ -137,7 +140,8 @@
         1
       ],
       "price": 110,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "A yellow chest with its lid open: balls, blocks and a bear.",
       "interactions": [
         {
@@ -167,7 +171,8 @@
         1
       ],
       "price": 130,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "decor": 0.3,
       "description": "A canvas teepee with bunting and a soft mat inside.",
       "interactions": [
@@ -200,7 +205,8 @@
         1
       ],
       "price": 95,
-      "category": "kids",
+      "category": "validate",
+      "group": "kids study",
       "description": "A double-sided easel with paper and pots of paint.",
       "interactions": [
         {
@@ -231,7 +237,8 @@
         1
       ],
       "price": 260,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "slots": 2,
       "description": "A low green table with a wooden track, a train and little trees. Two can play.",
       "interactions": [
@@ -263,7 +270,8 @@
         1
       ],
       "price": 180,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "description": "A round pit full of coloured balls.",
       "interactions": [
         {
@@ -291,7 +299,8 @@
         1
       ],
       "price": 60,
-      "category": "kids",
+      "category": "validate",
+      "group": "toys",
       "seat": {
         "height": 0.24,
         "forward": 0.05
@@ -323,7 +332,8 @@
         2
       ],
       "price": 420,
-      "category": "kids",
+      "category": "validate",
+      "group": "baby and beds",
       "decor": 0.3,
       "description": "A bright red race car to sleep in, wheels and all.",
       "interactions": [
