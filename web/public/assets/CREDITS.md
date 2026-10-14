@@ -166,6 +166,25 @@ The energetic pack models (`models/pack_energetic/boulderingWall.glb`, `spinBike
 they are used, the hoop's net sways, the blender's lid lifts, the shower's rain grows and the recovery pod's canopy
 lowers; the bouldering wall is still. Their primitive-part entries stay as the fallback.
 
+The hot-headed pack models (`models/pack_hotHeaded/heavyBag.glb`, `smashBin.glb`, `thunderDrums.glb`,
+`coolDownCushion.glb`, `grudgeJournal.glb`, `coldPlunge.glb`, override pack `packs/pack_hotHeaded/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_hotHeaded.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). Each moves while it is used: the bag swings, the crate's lid flips up, the cymbals rock, the zafu
+sinks, the desk drawer slides out and the plunge cover rolls back. Their primitive-part entries stay as the fallback.
+
+The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
+`welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. Their primitive-part entries stay as the
+fallback.
+
+The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
+plate's deck shakes and the tablet tilts up. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

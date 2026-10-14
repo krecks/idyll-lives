@@ -110,7 +110,7 @@ done.
 | `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
-## P8. Hot-headed (6)
+## P8. Hot-headed (6) — **Done** (in Validate › Hot Headed)
 
 - **Family:** `tools/art/blender/families/pack_hotHeaded.py`
 - **Validate group:** `hot headed` (Validate › Hot Headed)
@@ -125,7 +125,7 @@ done.
 | `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. |
 | `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the cover slides off for plunge. |
 
-## P9. Kind (6)
+## P9. Kind (6) — **Done** (in Validate › Kind)
 
 - **Family:** `tools/art/blender/families/pack_kind.py`
 - **Validate group:** `kind` (Validate › Kind)
@@ -140,7 +140,7 @@ done.
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. |
 
-## P10. Lazy (6)
+## P10. Lazy (6) — **Done** (in Validate › Lazy)
 
 - **Family:** `tools/art/blender/families/pack_lazy.py`
 - **Validate group:** `lazy` (Validate › Lazy)

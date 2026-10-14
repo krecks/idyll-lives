@@ -3751,6 +3751,18 @@
         {
           "id": "energetic",
           "label": "Energetic"
+        },
+        {
+          "id": "hotHeaded",
+          "label": "Hot Headed"
+        },
+        {
+          "id": "kind",
+          "label": "Kind"
+        },
+        {
+          "id": "lazy",
+          "label": "Lazy"
         }
       ]
     },

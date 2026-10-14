@@ -41,7 +41,10 @@
     "packs/pack_neat/manifest.json",
     "packs/pack_cheerful/manifest.json",
     "packs/pack_couchPotato/manifest.json",
-    "packs/pack_energetic/manifest.json"
+    "packs/pack_energetic/manifest.json",
+    "packs/pack_hotHeaded/manifest.json",
+    "packs/pack_kind/manifest.json",
+    "packs/pack_lazy/manifest.json"
   ],
   "entries": {
     "material.wall": {

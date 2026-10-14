@@ -1,0 +1,326 @@
+{
+  "$comment": "Blender-built lazy pack models (tools/art/blender/families/pack_lazy.py). Replaces the primitive-part placeholders of packs/lazy by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bed's head rises, the pod's hood swings over, the quilt lifts, a locker door opens, the plate shakes and the tablet tilts up.",
+  "version": 1,
+  "entries": {
+    "model.lazy.snoozecloudBed": {
+      "type": "model",
+      "url": "../../models/pack_lazy/snoozecloudBed.glb",
+      "materials": {
+        "birch": {
+          "finish": "material.finish.satin"
+        },
+        "blush": {
+          "finish": "material.finish.fabric"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "cloud": {
+          "finish": "material.finish.satin"
+        },
+        "lilac": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "throw": {
+          "finish": "material.finish.fabric"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleepIn": "head_up"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "upholstery",
+          "label": "Upholstery"
+        },
+        {
+          "material": "throw",
+          "label": "Throw"
+        }
+      ]
+    },
+    "model.lazy.napPod": {
+      "type": "model",
+      "url": "../../models/pack_lazy/napPod.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.fabric"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "hood": {
+          "finish": "material.finish.fabric"
+        },
+        "seat": {
+          "finish": "material.finish.fabric"
+        },
+        "shag": {
+          "finish": "material.finish.fabric"
+        },
+        "shell": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "powerNap": "hood",
+          "curlUp": "hood"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Body"
+        },
+        {
+          "material": "seat",
+          "label": "Upholstery"
+        },
+        {
+          "material": "hood",
+          "label": "Hood"
+        }
+      ]
+    },
+    "model.lazy.quiltTable": {
+      "type": "model",
+      "url": "../../models/pack_lazy/quiltTable.glb",
+      "materials": {
+        "biscuit": {
+          "finish": "material.finish.satin"
+        },
+        "heater": {
+          "finish": "material.finish.satin"
+        },
+        "lilac": {
+          "finish": "material.finish.fabric"
+        },
+        "mandarin": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "pouf": {
+          "finish": "material.finish.fabric"
+        },
+        "pouf_top": {
+          "finish": "material.finish.fabric"
+        },
+        "quilt": {
+          "finish": "material.finish.fabric"
+        },
+        "quilt_band": {
+          "finish": "material.finish.fabric"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tuckIn": "quilt",
+          "doze": "quilt"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        },
+        {
+          "material": "quilt",
+          "label": "Upholstery"
+        },
+        {
+          "material": "pouf",
+          "label": "Poufs"
+        }
+      ]
+    },
+    "model.lazy.deliveryLocker": {
+      "type": "model",
+      "url": "../../models/pack_lazy/deliveryLocker.glb",
+      "materials": {
+        "accent": {
+          "finish": "material.finish.satin"
+        },
+        "bag": {
+          "finish": "material.finish.matte"
+        },
+        "bag_logo": {
+          "finish": "material.finish.matte"
+        },
+        "bezel": {
+          "finish": "material.finish.satin"
+        },
+        "cubby": {
+          "finish": "material.finish.satin"
+        },
+        "door": {
+          "finish": "material.finish.satin"
+        },
+        "kraft": {
+          "finish": "material.finish.matte"
+        },
+        "led_green": {
+          "finish": "material.finish.gloss"
+        },
+        "locker": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tape": {
+          "finish": "material.finish.matte"
+        },
+        "white": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "takeout": "door_open",
+          "noodles": "door_open"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "locker",
+          "label": "Body"
+        },
+        {
+          "material": "door",
+          "label": "Doors"
+        },
+        {
+          "material": "accent",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.lazy.vibePlate": {
+      "type": "model",
+      "url": "../../models/pack_lazy/vibePlate.glb",
+      "materials": {
+        "bezel": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "lime": {
+          "finish": "material.finish.satin"
+        },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
+        "pad_inner": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "readout": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "shake": "shake"
+        }
+      },
+      "paint": [
+        {
+          "material": "plate",
+          "label": "Body"
+        },
+        {
+          "material": "lime",
+          "label": "Trim"
+        },
+        {
+          "material": "pad",
+          "label": "Deck"
+        }
+      ]
+    },
+    "model.lazy.smartHub": {
+      "type": "model",
+      "url": "../../models/pack_lazy/smartHub.glb",
+      "materials": {
+        "app_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "bezel": {
+          "finish": "material.finish.satin"
+        },
+        "led_green": {
+          "finish": "material.finish.gloss"
+        },
+        "ring": {
+          "finish": "material.finish.gloss"
+        },
+        "screen_light": {
+          "finish": "material.finish.gloss"
+        },
+        "speaker": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "program": "screen_up",
+          "story": "screen_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "wood",
+          "label": "Body"
+        },
+        {
+          "material": "speaker",
+          "label": "Speaker"
+        }
+      ]
+    }
+  }
+}
