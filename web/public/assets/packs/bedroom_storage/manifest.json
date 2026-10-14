@@ -193,6 +193,12 @@
           "finish": "material.finish.metal"
         }
       },
+      "motions": {
+        "uses": {
+          "takeBlanket": "lid_open"
+        },
+        "hold": 2.0
+      },
       "paint": [
         {
           "material": "cedar",

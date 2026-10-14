@@ -228,8 +228,11 @@ def _arc(r, a0, a1, n, cx=0.0, cy=0.0):
              cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
 
 
-def _place():
-    """Stands the model on the floor where it was built (over its placeholder) and prints its centre."""
+def _place(forward=0.0):
+    """Stands the model on the floor where it was built (over its placeholder) and prints its centre;
+    `forward` (game depth, m) moves it towards the front first: its back onto the wall face."""
+    for o in G.meshes():
+        o.location.y -= forward
     lo, hi = G.measure()
     print(f'[kids] centre (game x, depth) {-(lo[0] + hi[0]) / 2:.4f}, {-(lo[1] + hi[1]) / 2:.4f}')
     G.settle(centre=False)
@@ -582,7 +585,7 @@ def dollHouse():
                      segments=8, rings=6)
         F.box('step', 0.16, 0.02, 0.012, (-0.2, 0.035, 0.057), M.house_trim, bevel=0.003)
     front = G.hinged(G.join(parts, 'front_wall'), F.at(-0.38, 0.37, 0.04))
-    _place()
+    _place(forward=-0.05)
     G.swing(front, 'front_open', 120, seconds=1.0)
     return G.meshes()
 
@@ -975,7 +978,7 @@ def kidsBookshelf():
     still = [o for o in G.meshes() if o not in out[0]]
     _still('body', still)
     book = G.hinged(G.join(out[0], 'book'), F.at(*out[1]))
-    _place()
+    _place(forward=0.03)
     G.swing(book, 'book_out', 20, seconds=0.6, axis='X')
     return G.meshes()
 
@@ -1074,7 +1077,7 @@ def kidsEasel():
 
 # --- the family --------------------------------------------------------------------------------------------
 TURN_DOWN = {'uses': {'sleep': 'turn_down', 'nap': 'turn_down'}}
-LID = {'uses': {'play': 'lid_open'}, 'hold': 2}
+LID = {'uses': {'play': 'lid_open'}}   # open while the child plays (the toys are out), shut when they're done
 
 FAMILY = G.Family(
     'kids', M,
@@ -1082,7 +1085,8 @@ FAMILY = G.Family(
         # KD1
         G.Model('crib', crib, size=(1.86, 1.008, 0.94), key='model.crib', centre=(-0.02, 0.0),
                 motions={'uses': {'feed': 'side_down', 'change': 'side_down', 'cuddle': 'side_down'},
-                         'loops': {'lie': 'mobile'}},
+                         # the mobile turns for an awake baby, while someone plays with them; not all night
+                         'loops': {'play': 'mobile'}},
                 paint=[('crib', 'Frame'), ('crib_bedding', 'Bedding'), ('mobile', 'Mobile')]),
         G.Model('kidsBed', kidsBed, size=(0.97, 0.764, 1.93), key='model.kidsBed', centre=(0.005, -0.015),
                 motions=TURN_DOWN, paint=[('kids_frame', 'Frame'), ('kids_bedding', 'Bedding')]),
@@ -1095,7 +1099,7 @@ FAMILY = G.Family(
                 motions=LID, paint=[('toybox', 'Body'), ('toybox_lid', 'Trim')]),
         G.Model('toyChest', toyChest, size=(0.846, 0.534, 0.513), key='model.toyChest', centre=(0.0, -0.1735),
                 motions=LID, paint=[('chest', 'Body'), ('chest_trim', 'Trim')]),
-        G.Model('dollHouse', dollHouse, size=(0.84, 0.908, 0.456), key='model.dollHouse', centre=(0.0, -0.152),
+        G.Model('dollHouse', dollHouse, size=(0.84, 0.908, 0.456), key='model.dollHouse', centre=(0.0, -0.202),
                 motions={'uses': {'dolls': 'front_open'}}, paint=[('house', 'Walls'), ('roof', 'Roof')]),
         G.Model('rockingHorse', rockingHorse, size=(0.289, 0.825, 0.877), key='model.rockingHorse', centre=(0.0, 0.0426),
                 motions={'loops': {'ride': 'rock'}, 'ride': 'rock'}, paint=[('horse', 'Body'), ('saddle', 'Trim')]),
@@ -1119,7 +1123,7 @@ FAMILY = G.Family(
                 paint=[('ktable', 'Frame'), ('ktable_top', 'Top')]),
         G.Model('kidsChair', kidsChair, size=(0.32, 0.57, 0.323), key='model.kidsChair', centre=(0.0, 0.0386),
                 paint=[('kchair', 'Frame'), ('kchair_seat', 'Top')]),
-        G.Model('kidsBookshelf', kidsBookshelf, size=(0.77, 0.925, 0.4), key='model.kidsBookshelf', centre=(0.0, -0.26),
+        G.Model('kidsBookshelf', kidsBookshelf, size=(0.77, 0.925, 0.4), key='model.kidsBookshelf', centre=(0.0, -0.23),
                 motions={'uses': {'read': 'book_out'}}, paint=[('kshelf', 'Frame'), ('kshelf_top', 'Top')]),
         G.Model('kidsChalkboard', kidsChalkboard, size=(0.66, 0.956, 0.528), key='model.kidsChalkboard',
                 centre=(0.0, 0.0259), motions={'uses': {'draw': 'drawing'}},

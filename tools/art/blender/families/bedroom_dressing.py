@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bpy  # noqa: E402
 import gamekit as G  # noqa: E402
 from gamekit.shapes import _recalc_normals  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 M = G.Palette(
     # the cheval mirror
@@ -29,7 +30,6 @@ M = G.Palette(
     # the dressing table
     table=('#CDB08A', 'wood'),          # top, drawer cases, drawers (the main colour part)
     table_frame=('#B8925A', 'metal'),   # legs, the mirror's ring and stand
-    mirror_back=('#DCE6EA', 'gloss', 'back'),   # its mirror faces the seat, at the back (-z)
     pouf=('#E4B8AE', 'satin'),          # the pouf (plain, not fabric: a draw call saved for the drawer)
     inside=('#3A332C', 'satin'),        # the dark behind an open drawer
     perfume=('#E8B4C0', 'gloss'),
@@ -144,8 +144,9 @@ def mirror():
 
 
 # --- the dressing table: 1x1, a kneehole table on brass legs, an oval mirror, a pouf -------------------
-# Where its placeholder stands: the pouf at the back (depth -0.22, the seat 0.45 high: characters.ts
-# SEATS), the table in front of it, the mirror at its far edge facing back at the seat (`mirror_back`).
+# Its mirror against the wall, the pouf at the front (depth +0.22, the seat 0.45 high: characters.ts SEATS,
+# `back`: the sitter faces the mirror). The numbers below are as it was first built, facing the wall (the
+# pouf at -0.22, the mirror at its far edge facing back at it); `dressingTable` turns it round at the end.
 
 TOP_Y = 0.76            # the table top's surface
 CASE_Y0 = 0.585         # the drawer cases' bottom
@@ -155,6 +156,7 @@ DRAWER_X = 0.26         # the drawer that opens: on the seated resident's right 
 DRAWER_OUT = 0.18
 DRAWER_SECONDS = 0.8
 DRAWER_HOLD = 3.0
+TURN_BACK = 0.01        # turned round, moved back (Blender +y) to put the mirror's back on the wall face
 
 
 def _drawer_front(name, x):
@@ -184,7 +186,7 @@ def dressingTable():
                 F.cyl(f'shoe{x}{z}', 0.012, 0.012, (x, 0.006, z), M.table_frame, verts=12)
         # the oval mirror on a brass stand at the far edge, facing the seat
         _loop('ring', _ellipse(0.29, 0.35), 0.035, 0.03, (0, OVAL_Y, OVAL_Z), M.table_frame)
-        _oval('glass', 0.545, 0.665, 0.003, (0, OVAL_Y, OVAL_Z - 0.0055), M.mirror_back)
+        _oval('glass', 0.545, 0.665, 0.003, (0, OVAL_Y, OVAL_Z - 0.0055), M.mirror)
         _oval('back', 0.56, 0.68, 0.008, (0, OVAL_Y, OVAL_Z + 0.005), M.table)
         F.box('stand_base', 0.70, 0.014, 0.05, (0, TOP_Y + 0.007, OVAL_Z), M.table_frame, bevel=0.004)
         for s in (-1, 1):
@@ -213,7 +215,7 @@ def dressingTable():
             a = math.radians(45 + 90 * k)
             F.cone(f'pouf_foot{k}', 0.01, 0.016, 0.045, (0.14 * math.cos(a), 0.0225, -0.22 + 0.14 * math.sin(a)),
                    M.table_frame, verts=10)
-    G.join(body, 'body', origin=(0, 0, 0))
+    body = G.join(body, 'body', origin=(0, 0, 0))
 
     # the right drawer: its front and the tray behind it, hidden in the case at rest
     with G.new_parts() as parts:
@@ -226,9 +228,16 @@ def dressingTable():
         F.box('drawer_back', 0.24, 0.08, 0.01, (DRAWER_X, y - 0.005, tray_z1 - 0.005), M.table, bevel=0.002)
     drawer = G.join(parts, 'drawer', origin=F.at(DRAWER_X, y, CASE_Z0))
 
+    # Built facing the wall (as the placeholder was), then turned round about the footprint's middle: the
+    # mirror's back on the wall face, the pouf at the front, where the resident sits facing the mirror.
+    half = Matrix.Rotation(math.pi, 4, 'Z')
+    for o in (body, drawer):
+        o.data.transform(half)
+        o.data.update()
+        o.location = half @ o.location + Vector((0, TURN_BACK, 0))
     objs = G.settle(centre=False)
-    # out to the seat: the game's -z, Blender's +y
-    G.slide(drawer, 'drawer_open', (0, DRAWER_OUT, 0), seconds=DRAWER_SECONDS)
+    # out to the seat: the game's +z, Blender's -y
+    G.slide(drawer, 'drawer_open', (0, -DRAWER_OUT, 0), seconds=DRAWER_SECONDS)
     return objs
 
 
@@ -297,7 +306,7 @@ FAMILY = G.Family(
     'bedroom_dressing', M,
     [G.Model('mirror', mirror, size=(0.80, 1.856, 0.56), key='model.mirror', paint=[('frame', 'Frame')]),
      G.Model('dressingTable', dressingTable, size=(0.86, 1.533, 0.858), key='model.dressingTable',
-             centre=(0, -0.006),
+             centre=(0, -0.003),
              # getReady (the `wash` tag) slides the right drawer out to the seat, and back after a while
              motions={'uses': {'getReady': 'drawer_open'}, 'hold': DRAWER_HOLD},
              paint=[('table', 'Table'), ('table_frame', 'Frame')]),

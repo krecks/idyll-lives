@@ -2051,7 +2051,7 @@
         ],
         "at": [
           0,
-          -0.24
+          -0.205
         ]
       },
       "interactions": []
@@ -2467,7 +2467,21 @@
       "layer": "wall",
       "decor": 0.2,
       "description": "A mirrored cabinet for above the basin.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 4,
+          "effects": {
+            "hygiene": 0.05
+          },
+          "tags": [
+            "hygiene"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "towelRail",
@@ -4029,7 +4043,7 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 2.1,
+        "height": 1.9,
         "tiles": 16
       },
       "description": "A frosted globe on a long cord.",
