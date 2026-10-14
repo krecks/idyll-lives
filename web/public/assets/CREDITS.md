@@ -100,6 +100,12 @@ CC0). Each moves while it is used: the oven door drops, a coin drops into the ja
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. Their primitive-part entries stay as the
 fallback.
 
+The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
+plate's deck shakes and the tablet tilts up. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

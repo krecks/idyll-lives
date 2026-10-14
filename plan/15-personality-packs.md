@@ -140,7 +140,7 @@ done.
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. |
 
-## P10. Lazy (6)
+## P10. Lazy (6) — **Done** (in Validate › Lazy)
 
 - **Family:** `tools/art/blender/families/pack_lazy.py`
 - **Validate group:** `lazy` (Validate › Lazy)
