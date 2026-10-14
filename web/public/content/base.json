@@ -3810,6 +3810,11 @@
           "id": "edibles",
           "label": "Edibles",
           "outside": true
+        },
+        {
+          "id": "stalls",
+          "label": "Stalls",
+          "outside": true
         }
       ]
     },

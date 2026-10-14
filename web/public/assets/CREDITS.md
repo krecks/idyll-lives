@@ -137,6 +137,14 @@ as `.glb` (glTF, original, CC0). The till's cash drawer slides out while a resid
 back glass door slides aside for a pastry; the grocery shelves, the café table and the bentwood café chair are static.
 Their primitive-part entries stay as the fallback.
 
+The food stalls and vending machines (`models/stalls/iceCreamCart.glb`, `hotDogStand.glb`, `vendingSnack.glb`,
+`vendingDrink.glb`, `marketStall.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/stalls/manifest.json`) are built in Blender by `tools/art/blender/families/stalls.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0). The ice cream cart's freezer lid slides open and the hot dog stand's hot-plate lid
+lifts while a resident buys from them; a snack slides down to the snack machine's tray and a can drops to the drinks
+machine's; the machines' signs and the drinks machine's front glow at night; the market stall is static. Their
+primitive-part entries stay as the fallback.
+
 The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
 `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack

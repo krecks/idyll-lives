@@ -39,9 +39,9 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Body | Ambient (E2) | the water runs (E2). Until then static jets, as the garden fountain. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Body | Static | Static. |
 
-## CM3. Food stalls and vending (5)
+## CM3. Food stalls and vending (5) — **Done** (in Validate › Stalls)
 
-- **Family:** `tools/art/blender/families/community.py`
+- **Family:** `tools/art/blender/families/stalls.py`
 - **Validate group:** `stalls` (Validate › Stalls)
 - **Placeholders to match:** `tools/art/community.py`
 

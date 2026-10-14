@@ -650,8 +650,8 @@
         1
       ],
       "price": 900,
-      "category": "community",
-      "group": "food",
+      "category": "validate",
+      "group": "stalls",
       "outdoors": true,
       "decor": 0.4,
       "description": "A striped parasol over a freezer full of cones. Four dollars a scoop.",
@@ -683,8 +683,8 @@
         1
       ],
       "price": 1100,
-      "category": "community",
-      "group": "food",
+      "category": "validate",
+      "group": "stalls",
       "outdoors": true,
       "decor": 0.3,
       "description": "A steaming cart under an awning: hot dogs with everything for six dollars.",
@@ -715,8 +715,8 @@
         1
       ],
       "price": 800,
-      "category": "community",
-      "group": "food",
+      "category": "validate",
+      "group": "stalls",
       "description": "Crisps, chocolate and biscuits behind glass, four dollars each.",
       "interactions": [
         {
@@ -744,8 +744,8 @@
         1
       ],
       "price": 800,
-      "category": "community",
-      "group": "food",
+      "category": "validate",
+      "group": "stalls",
       "description": "Cold cans and bottles, lit up at night.",
       "interactions": [
         {
@@ -774,8 +774,8 @@
         1
       ],
       "price": 700,
-      "category": "community",
-      "group": "food",
+      "category": "validate",
+      "group": "stalls",
       "slots": 2,
       "outdoors": true,
       "decor": 0.4,
