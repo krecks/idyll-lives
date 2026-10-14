@@ -440,8 +440,8 @@
         1
       ],
       "price": 650,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "seat": {
         "height": 0.44,
         "forward": 0.0
@@ -489,8 +489,8 @@
         1
       ],
       "price": 340,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.3,
       "seat": {
         "height": 0.48,
@@ -542,8 +542,8 @@
         1
       ],
       "price": 90,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "seat": {
         "height": 0.3,
         "forward": 0.05
@@ -576,8 +576,8 @@
         1
       ],
       "price": 110,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.2,
       "seat": {
         "height": 0.45,
@@ -609,8 +609,8 @@
         1
       ],
       "price": 35,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.2,
       "seat": {
         "height": 0.14,
@@ -642,8 +642,8 @@
         1
       ],
       "price": 560,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.4,
       "seat": {
         "height": 0.44,

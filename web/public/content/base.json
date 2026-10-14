@@ -2664,8 +2664,8 @@
         }
       ],
       "price": 300,
-      "category": "living",
-      "group": "seating"
+      "category": "validate",
+      "group": "armchairs"
     },
     {
       "id": "plant",
@@ -3669,6 +3669,10 @@
         {
           "id": "sofas",
           "label": "Sofas"
+        },
+        {
+          "id": "armchairs",
+          "label": "Armchairs"
         },
         {
           "id": "fridges",

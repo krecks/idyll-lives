@@ -1236,8 +1236,8 @@
         1
       ],
       "price": 180,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "description": "A simple upholstered armchair.",
       "interactions": [
         {
@@ -1264,8 +1264,8 @@
         1
       ],
       "price": 520,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.3,
       "description": "Leather cushions on a solid wooden frame.",
       "interactions": [
@@ -1310,8 +1310,8 @@
         1
       ],
       "price": 1200,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "decor": 0.8,
       "description": "A mid-century swivel chair in leather and bent wood. Sinking into it leaves residents feeling at home.",
       "interactions": [
@@ -1357,8 +1357,8 @@
         1
       ],
       "price": 90,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "armchairs",
       "description": "A footstool that doubles as a seat.",
       "interactions": [
         {

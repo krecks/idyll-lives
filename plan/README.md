@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **257 are done**:
+**Where it stands (2026-10-14):** 540 objects. **268 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -22,6 +22,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the four BR4 mirrors and the dressing table: `mirror`, `dressingTable`, `mirrorWall`, `mirrorFloor` (in Validate › Dressing);
 - the twenty kids' things: KD1 `crib`, `kidsBed`, `kidsBedCar`, `highChair` (in Validate › Baby And Beds); KD2 `toyBox`, `toyChest`, `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids` (Validate › Toys); KD3 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel` (Validate › Kids Study);
 - the `wallBed`, and the eleven L1 sofas and sectionals: `sofa`, `loveseat`, `sofaThree`, `sofaDesign`, `sofaThreeSeat`, `sofaBed`, `sectionalMiddle`, `sectionalArmLeft`, `sectionalArmRight`, `sectionalCorner`, `chaise` (in Validate › Sofas);
+- the eleven L2 armchairs and small seats: `armchair`, `armchairLounge`, `armchairLeather`, `armchairDesign`, `armchairWingback`, `recliner`, `rockingChair`, `pouf`, `ottoman`, `floorCushion`, `beanBag` (in Validate › Armchairs);
 - the fourteen office models: O1 `deskSimple`, `deskCorner`, `deskStanding`, `deskExecutive`, `computerDesk`, `deskWriting`, `deskLaptop`, `computerGaming` (in Validate › Desks); O2 `chairExecutive`, `chairTask`, `officeChair` (Validate › Office Chairs); O3 `filingCabinet`, `whiteboard`, `corkboard` (Validate › Office Storage);
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
@@ -34,10 +35,10 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the five G4 edibles: `garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins` (in Validate › Edibles);
 - the twelve G5 trees: `tree`, `pine`, `garden.maple`, `birch`, `cherry`, `apple`, `japaneseMaple`, `magnolia`, `willow`, `spruce`, `cypress`, `lemonTree` (in Validate › Trees).
 
-**283 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 39;
-- `catalog2.py`: 105;
-- the base manifest: 11;
+**272 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 35;
+- `catalog2.py`: 99;
+- the base manifest: 10;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -50,7 +51,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8, **done**), BR3 Wardrobes and drawers (6, **done**), BR4 Dressing and mirrors (4, **done**) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4, **done**), KD2 Toys (10, **done**), KD3 Kids' study and art (6, **done**) |
-| [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11, **done**), L2 Armchairs and small seats (11), L3 Coffee and side tables (9), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
+| [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11, **done**), L2 Armchairs and small seats (11, **done**), L3 Coffee and side tables (9), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
 | [Office](06-office.md) | 14 | O1 Desks (8, **done**), O2 Desk chairs (3, **done**), O3 Storage and boards (3, **done**) |
 | [Fitness](07-fitness.md) | 5 | F1 Home gym (5) |
 | [Hobbies](08-hobbies.md) | 19 | H1 Music (6, **done**), H2 Games (6, **done**), H3 Crafts and science (7, **done**) |

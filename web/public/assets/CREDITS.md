@@ -95,6 +95,12 @@ The sofas and sectionals (`models/living/sofa.glb`, `loveseat.glb`, `sofaThree.g
 `.glb` (glTF, original, CC0). Their seat cushions sink in while they're sat or dozed on (`sink_in`). Their
 primitive-part entries stay as the fallback.
 
+The armchairs and small seats (`models/living/armchair.glb`, `armchairLounge.glb`, `armchairLeather.glb`,
+`armchairDesign.glb`, `armchairWingback.glb`, `recliner.glb`, `rockingChair.glb`, `pouf.glb`, `ottoman.glb`,
+`floorCushion.glb`, `beanBag.glb`, same pack) are built the same way (glTF, original, CC0). Their seats sink in, the
+recliner tips back with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
+the designer lounge chair is still. Their primitive-part entries stay as the fallback.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a

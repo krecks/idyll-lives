@@ -2,7 +2,9 @@
 
 Seats keep their height and depth (`SEATS`); a seat that moves while sat on must keep the sitting pose believable.
 The wall bed is done (`families/living.py`, the model for anything held open). L1 is done (notes:
-`families/living.md`): every sofa's seat cushions are a part of their own that sinks while sat on (`sink_in`).
+`families/living.md`): every sofa's seat cushions are a part of their own that sinks while sat on (`sink_in`). L2
+is done too: the recliner's seat and back tip back with the resident riding them, the rocking chair rocks (E1)
+with its rider.
 
 ## L1. Sofas and sectionals (11) — **Done** (in Validate › Sofas)
 
@@ -24,7 +26,7 @@ The wall bed is done (`families/living.py`, the model for anything held open). L
 | `sectionalCorner` Sectional: corner | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `chaise` Sectional: chaise | 1x2 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 
-## L2. Armchairs and small seats (11)
+## L2. Armchairs and small seats (11) — **Done** (in Validate › Armchairs)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `armchairs` (Validate › Armchairs)

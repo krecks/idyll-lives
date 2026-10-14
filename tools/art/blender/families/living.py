@@ -1,5 +1,6 @@
 # The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json), a
-# sofa bed (`model.sofaBed`, content `sofaBed`), and the L1 sofas and sectionals (notes: living.md).
+# sofa bed (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals and the L2 armchairs and small
+# seats (notes: living.md).
 #
 # A cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands folded up
 # in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at the
@@ -18,6 +19,7 @@
 #
 # The sofas and sectionals copy their placeholders (catalog.py, catalog2.py, furniture_prims.py), where
 # they stand. Their seat cushions are a part of their own that sinks 2 cm while sat or dozed on (`sink_in`).
+# The armchairs too, but for the recliner (it reclines), the rocking chair (it rocks) and the bean bag.
 #
 # Run:  python3 -B tools/art/blender/build.py living [--only sofaBed] [--preview]
 import math
@@ -73,6 +75,29 @@ M = G.Palette(
     greige_cushion=('#A9A49A', 'fabric'),
     espresso_legs=('#3B302A', 'wood'),
     throw_oat=('#D9CFC0', 'fabric'),
+    # L2, the armchairs and small seats
+    forest=('#2F5A4E', 'fabric'),        # the wingback
+    forest_cushion=('#2F5A4E', 'fabric'),
+    walnut_warm=('#7A5234', 'wood'),     # the wingback's, the pouf's and the ottoman's legs
+    tan=('#7A5A44', 'fabric'),           # the recliner
+    tan_cushion=('#7A5A44', 'fabric'),
+    black_satin=('#2B2C2E', 'satin'),    # the designer lounge chair's glides
+    leather=('#2B2826', 'satin'),        # the leather armchair's cushions
+    teak=('#9A6B45', 'wood'),            # and its open frame
+    ply=('#6B4630', 'wood'),             # the designer lounge chair's shells
+    hide=('#5A3A2A', 'satin'),           # its cushions
+    alu=('#C9CBCC', 'metal'),            # its swivel base
+    rocker=('#8A5A36', 'wood'),          # the rocking chair
+    rocker_cushion=('#C9B79C', 'fabric'),
+    pouf_leather=('#3A2E2A', 'satin'),   # the leather pouf
+    pouf_button=('#2A201D', 'satin'),
+    navy=('#3E5470', 'fabric'),          # the tufted ottoman
+    navy_button=('#2E3F56', 'fabric'),
+    mustard=('#D6A64A', 'fabric'),       # the floor cushion
+    mustard_piping=('#C9963D', 'fabric'),
+    mustard_button=('#B5853A', 'fabric'),
+    bag=('#C25B3E', 'fabric'),           # the bean bag
+    bag_seat=('#B5523A', 'fabric'),
 )
 
 F = G.GameFrame()
@@ -232,10 +257,11 @@ def _pillow(name, x, y, z, mat, turn=0, w=0.4, h=0.36):
     _cushion(name, w, h, 0.12, (x, y, z), mat, rot=(-13, 0, -turn))
 
 
-def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=None, pillows=()):
+def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=None, pillows=(), extra=None):
     """A sofa or a sectional's module `w` wide (catalog2.py `sofa_run`): a base, arms on the `arms` sides
     (-1 at -x), back rests along the back and/or a side ('left' at -x, 'right' at +x), seat and back
-    cushions, pillows (x, depth, palette name, turn) and tapered legs. Returns the seat."""
+    cushions, pillows (x, depth, palette name, turn) and tapered legs; `extra()` adds to the still part.
+    Returns the seat."""
     z0, z1 = z - depth / 2, z + depth / 2
     sx0, sx1, sz0 = -w / 2, w / 2, z0
     sides = [(-1 if b == 'left' else 1) for b in backs if b in ('left', 'right')]
@@ -264,6 +290,8 @@ def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=Non
         for lx in (-w / 2 + 0.06, w / 2 - 0.06):
             for lz in (z0 + 0.06, z1 - 0.06):
                 _taper_leg(f'leg{lx}{lz}', lx, lz, 0.1, legs)
+        if extra:
+            extra()
     G.join(still, 'sofa', origin=(0, 0, 0))
 
     def cushions():
@@ -331,20 +359,20 @@ def _cabriole(name, x, z, h, mat, sx, sz):
     F.sphere(f'{name}_foot', 0.026, (x + sx * 0.4, 0.026, z + sz * 0.4), mat, segments=10, rings=6)
 
 
-def _box_sofa(up, cush, legs, w, pillows=()):
-    """The loveseat (catalog.py `sofa`, box arms): a base on tapered legs, box arms, a back, two seat and
-    two back cushions, `w` wide and 0.84 deep; pillows (x, material, turn) against the back."""
+def _box_sofa(up, cush, legs, w, pillows=(), n=2):
+    """The loveseat and the lounge chair (catalog.py `sofa`, box arms): a base on tapered legs, box arms, a
+    back, `n` seat and back cushions, `w` wide and 0.84 deep; pillows (x, material, turn) against the back."""
     z, depth, back_h = -0.04, 0.84, 0.82
     z0, z1 = z - depth / 2, z + depth / 2
     aw, bt = 0.17, 0.2
     sx0, sx1, sz0 = -w / 2 + aw, w / 2 - aw, z0 + bt
-    cw = (sx1 - sx0) / 2
+    cw = (sx1 - sx0) / n
     with G.new_parts() as still:
         F.box('base', w, 0.22, depth, (0, 0.21, z), up, bevel=0.04)
         F.box('back', w, back_h - 0.38, bt, (0, (back_h - 0.08 + 0.3) / 2, z0 + bt / 2), up, bevel=0.06, bevel_segments=3)
         for s in (-1, 1):
             F.box(f'arm{s}', aw, 0.52, depth, (s * (w / 2 - aw / 2), 0.36, z), up, bevel=0.07, bevel_segments=3)
-        for i in range(2):
+        for i in range(n):
             _cushion(f'back_cushion{i}', cw - 0.025, back_h - 0.44, 0.16, (sx0 + cw * (i + 0.5), (back_h + 0.44) / 2 + 0.01, sz0 + 0.07),
                      cush, rot=(-9, 0, 0))
         for i, (px, mat, turn) in enumerate(pillows):
@@ -355,7 +383,7 @@ def _box_sofa(up, cush, legs, w, pillows=()):
     G.join(still, 'sofa', origin=(0, 0, 0))
 
     def cushions():
-        for i in range(2):
+        for i in range(n):
             _cushion(f'seat{i}', cw - 0.015, 0.13, z1 - sz0 - 0.02, (sx0 + cw * (i + 0.5), 0.385, (sz0 + z1) / 2 + 0.005), cush)
         return 0.45
     return _seat(cushions, 0.32, (sz0 + z1) / 2)
@@ -445,6 +473,222 @@ def chaise():
     _settled(_seat(cushions, 0.32, 0.1))
 
 
+# L2, the armchairs and small seats. Built as the sofas are; the seats sink in (`sink_in`) but for the
+# recliner (`recline`), the rocking chair (`rock`), the bean bag (`squash`) and the designer chair (still).
+def armchair_bergere():
+    """The armchair (furniture_prims.py `armchair_bergere`): an arched back in channels inside a walnut
+    frame, padded arms on open walnut supports, cabriole legs; its seat cushion sinks in."""
+    zb = -0.445
+
+    def top(u):
+        return 0.68 + 0.26 * math.sqrt(max(0.0, 1 - ((u - 0.5) / 0.56) ** 2))
+    with G.new_parts() as still:
+        F.box('deck', 0.66, 0.16, 0.715, (0, 0.26, -0.058), M.linen, bevel=0.05, bevel_segments=3)
+        F.box('apron', 0.68, 0.05, 0.035, (0, 0.17, 0.3), M.walnut, bevel=0.012)
+        for i in range(6):
+            u = (i + 0.5) / 6
+            h = top(u) - 0.3
+            _cushion(f'channel{i}', 0.11, h, 0.12, (-0.3 + 0.6 * u, 0.3 + h / 2, -0.33), M.linen, rot=(-10, 0, 0))
+        pts = [(-0.34, 0.42, zb + 0.055)] + [(-0.34 + 0.68 * i / 12, top(i / 12) + 0.025, zb + 0.06) for i in range(13)] \
+            + [(0.34, 0.42, zb + 0.055)]
+        for i in range(len(pts) - 1):
+            G.rod(f'frame{i}', F.at(*pts[i]), F.at(*pts[i + 1]), 0.0175, M.walnut, verts=8)
+        for s in (-1, 1):
+            ax = s * 0.32
+            _cushion(f'arm_pad{s}', 0.1, 0.06, 0.605, (ax, 0.625, -0.022), M.linen)
+            F.box(f'arm_rail{s}', 0.06, 0.03, 0.685, (ax, 0.585, -0.003), M.walnut, bevel=0.012)
+            F.sphere(f'arm_scroll{s}', 0.032, (ax, 0.59, 0.33), M.walnut, scale=(1.1, 0.95, 0.8), segments=12, rings=8)
+            G.rod(f'arm_post{s}', F.at(ax, 0.3, 0.32), F.at(ax, 0.58, 0.3), 0.0225, M.walnut, verts=10)
+            F.box(f'side{s}', 0.05, 0.25, 0.545, (ax, 0.45, -0.052), M.linen, bevel=0.02)
+        _pillow('pillow', 0, 0.6, -0.245, M.pillow_sage, w=0.34, h=0.3)
+        for x in (-0.31, 0.31):
+            for z, dz in ((0.3, 1), (-0.385, -1)):
+                _cabriole(f'leg{x}{z}', x, z, 0.18, M.walnut_legs, 0.02 * (1 if x > 0 else -1), 0.02 * dz)
+    G.join(still, 'chair', origin=(0, 0, 0))
+
+    def cushions():
+        _cushion('seat', 0.58, 0.1, 0.575, (0, 0.37, 0.013), M.linen_cushion)
+        return 0.42
+    _settled(_seat(cushions, 0.32, 0.013))
+
+
+def armchair_lounge():
+    _settled(_box_sofa(M.sage, M.sage_cushion, M.oak_legs, 0.82, n=1))
+
+
+def armchair_leather():
+    """The leather armchair (catalog.py): black leather cushions in an open teak frame, the front legs
+    running up into the arms."""
+    with G.new_parts() as still:
+        _cushion('back_cushion', 0.58, 0.5, 0.12, (0, 0.69, -0.3), M.leather, rot=(-14, 0, 0))
+        F.box('front_rail', 0.64, 0.05, 0.04, (0, 0.3, 0.34), M.teak, bevel=0.01)
+        F.box('back_rail', 0.6, 0.04, 0.04, (0, 0.3, -0.33), M.teak, bevel=0.01)
+        F.box('top_rail', 0.66, 0.05, 0.04, (0, 0.92, -0.435), M.teak, bevel=0.012)
+        for s in (-1, 1):
+            x = s * 0.33
+            G.rod(f'front_leg{s}', F.at(x, 0, 0.37), F.at(x, 0.62, 0.32), 0.0225, M.teak, verts=10)
+            G.rod(f'back_leg{s}', F.at(x, 0, -0.38), F.at(x, 0.3, -0.33), 0.0225, M.teak, verts=10)
+            G.rod(f'back_post{s}', F.at(x, 0.3, -0.33), F.at(x, 0.94, -0.44), 0.02, M.teak, verts=10)
+            F.box(f'arm{s}', 0.07, 0.035, 0.64, (x, 0.635, -0.01), M.teak, bevel=0.012)
+            F.box(f'side_rail{s}', 0.04, 0.05, 0.68, (x, 0.3, 0.0), M.teak, bevel=0.01)
+    G.join(still, 'chair', origin=(0, 0, 0))
+
+    def cushions():
+        _cushion('seat', 0.58, 0.12, 0.6, (0, 0.38, 0.03), M.leather)
+        return 0.44
+    _settled(_seat(cushions, 0.32, 0.03))
+
+
+def armchair_design():
+    """The designer lounge chair (catalog.py): walnut shells with leather cushions on a five-star swivel
+    base. Still."""
+    F.cyl('column', 0.04, 0.2, (0, 0.17, 0.0), M.alu, verts=16)
+    F.box('seat_shell', 0.66, 0.04, 0.6, (0, 0.32, 0.02), M.ply, rot=(-5, 0, 0), bevel=0.015)
+    _cushion('seat', 0.62, 0.1, 0.58, (0, 0.39, 0.03), M.hide, rot=(-5, 0, 0))
+    F.box('back_shell', 0.66, 0.42, 0.04, (0, 0.6, -0.36), M.ply, rot=(-18, 0, 0), bevel=0.015)
+    _cushion('back', 0.6, 0.38, 0.11, (0, 0.62, -0.3), M.hide, rot=(-18, 0, 0))
+    F.box('head_shell', 0.6, 0.2, 0.04, (0, 0.86, -0.43), M.ply, rot=(-12, 0, 0), bevel=0.015)
+    _cushion('head', 0.56, 0.17, 0.1, (0, 0.86, -0.38), M.hide, rot=(-12, 0, 0))
+    for s in (-1, 1):
+        _cushion(f'arm_pad{s}', 0.08, 0.05, 0.4, (s * 0.34, 0.57, -0.02), M.hide)
+        G.rod(f'arm_front{s}', F.at(s * 0.31, 0.34, 0.08), F.at(s * 0.34, 0.54, 0.02), 0.0125, M.alu, verts=8)
+        G.rod(f'arm_back{s}', F.at(s * 0.31, 0.4, -0.26), F.at(s * 0.34, 0.54, -0.18), 0.0125, M.alu, verts=8)
+    for i in range(5):
+        a = math.radians(i * 72 + 90)
+        tip = (math.cos(a) * 0.36, 0.03, math.sin(a) * 0.36)
+        G.rod(f'star{i}', F.at(0, 0.08, 0), F.at(*tip), 0.016, M.alu, verts=8)
+        F.cyl(f'glide{i}', 0.025, 0.02, (tip[0], 0.01, tip[2]), M.black_satin, verts=10)
+    G.join_all('armchairDesign')
+    G.settle(centre=False)
+
+
+def armchair_wingback():
+    """The wingback armchair (catalog2.py): a sofa_run seat with arms, wings either side of a tall back."""
+    def wings():
+        for s in (-1, 1):
+            F.box(f'wing{s}', 0.16, 0.4, 0.3, (s * 0.34, 0.86, -0.3), M.forest, bevel=0.06, bevel_segments=3)
+        F.box('head', 0.84, 0.3, 0.18, (0, 0.95, -0.37), M.forest, bevel=0.07, bevel_segments=3)
+    _settled(_run(M.forest, M.forest_cushion, M.walnut_warm, 0.84, arms=(-1, 1), depth=0.8, z=-0.06, extra=wings))
+
+
+# The recliner: its seat and back tip back 25° about the sitter's hips (`recline`), carrying them (`ride`),
+# and its footrest swings up 80° from the front of the base (`footrest_up`), for relax and doze.
+RC_Z0, RC_Z1 = -0.42, 0.28   # the base, back to front (inside the footprint, clear of the wall when tipped)
+RC_HIPS = (0.44, 0.0)       # (height, depth): content seat 0.44, forward 0
+
+
+def recliner():
+    w, aw = 0.92, 0.17
+    mid = (RC_Z0 + RC_Z1) / 2
+    with G.new_parts() as still:
+        F.box('base', w, 0.3, RC_Z1 - RC_Z0, (0, 0.17, mid), M.tan, bevel=0.04)   # skirted to the floor
+        F.box('plinth', w - 0.04, 0.02, RC_Z1 - RC_Z0 - 0.04, (0, 0.01, mid), M.tan)
+        for s in (-1, 1):
+            F.box(f'arm{s}', aw, 0.3, RC_Z1 - RC_Z0, (s * (w / 2 - aw / 2), 0.47, mid), M.tan, bevel=0.07, bevel_segments=3)
+    G.join(still, 'chair', origin=(0, 0, 0))
+    sw = w - 2 * aw
+    with G.new_parts() as body:   # the seat cushion and the back, which tip together
+        _cushion('seat', sw - 0.02, 0.13, RC_Z1 - RC_Z0 - 0.22, (0, 0.385, (RC_Z0 + 0.2 + RC_Z1) / 2), M.tan_cushion)
+        F.box('back', w - 2 * aw + 0.02, 0.5, 0.18, (0, 0.57, RC_Z0 + 0.1), M.tan, bevel=0.06, bevel_segments=3)
+        _cushion('back_cushion', sw - 0.03, 0.42, 0.16, (0, 0.63, RC_Z0 + 0.25), M.tan_cushion, rot=(-9, 0, 0))
+    seat = G.join(body, 'seat', origin=F.at(0, *RC_HIPS))
+    # the footrest, built up (open), hinged at the front of the base
+    hinge = (0.3, RC_Z1 - 0.09)   # folded down, its padded face stands 2 cm proud of the base's front
+    with G.new_parts() as foot:
+        _cushion('footrest', sw - 0.04, 0.11, 0.26, (0, hinge[0] + 0.03, hinge[1] + 0.14), M.tan_cushion)
+    footrest = G.hinged(G.join(foot, 'footrest'), F.at(0, *hinge))
+    G.turn(footrest, 90, 'X')   # folded down flat against the front of the base at rest
+    G.settle(centre=False)
+    G.swing(seat, 'recline', -25, seconds=1.0, axis='X')
+    G.swing(footrest, 'footrest_up', -80, seconds=1.0, axis='X')
+
+
+# The rocking chair rocks ±6° on its rockers (`rock`, a loop while sat in), the sitter with it (`ride`). It
+# turns about the rockers' centre of curvature (1 m radius), so the rockers roll on the floor.
+RK_R, RK_Z = 1.0, 0.05
+
+
+def rocking_chair():
+    with G.new_parts() as chair:
+        F.box('seat_board', 0.5, 0.04, 0.46, (0, 0.44, 0.04), M.rocker, bevel=0.012)
+        _cushion('seat_cushion', 0.44, 0.05, 0.4, (0, 0.48, 0.05), M.rocker_cushion)
+        for x in (-0.22, 0.22):
+            pts = [(x, RK_R + 0.025 - RK_R * math.cos(math.radians(a)), RK_Z + RK_R * math.sin(math.radians(a)))
+                   for a in [-26 + i * 52 / 8 for i in range(9)]]
+            for i in range(8):   # a flat bent strip, 3 cm thick and 4.5 cm deep
+                (_, h0, d0), (_, h1, d1) = pts[i], pts[i + 1]
+                F.box(f'rocker{x}{i}', 0.03, 0.045, math.hypot(d1 - d0, h1 - h0) + 0.006, (x, (h0 + h1) / 2, (d0 + d1) / 2),
+                      M.rocker, rot=(math.degrees(math.atan2(-(h1 - h0), d1 - d0)), 0, 0))
+            G.rod(f'front_leg{x}', F.at(x, 0.06, 0.26), F.at(x, 0.44, 0.22), 0.0175, M.rocker, verts=8)
+            G.rod(f'back_leg{x}', F.at(x, 0.06, -0.18), F.at(x * 1.05, 1.02, -0.3), 0.0175, M.rocker, verts=8)
+            F.box(f'arm{x}', 0.05, 0.03, 0.42, (x * 1.08, 0.66, 0.02), M.rocker, bevel=0.01)
+            G.rod(f'arm_post{x}', F.at(x * 1.08, 0.44, 0.2), F.at(x * 1.08, 0.66, 0.2), 0.015, M.rocker, verts=8)
+        for i in range(6):
+            xx = -0.15 + i * 0.06
+            G.rod(f'spindle{i}', F.at(xx, 0.46, -0.17), F.at(xx, 0.98, -0.28), 0.01, M.rocker, verts=8)
+        F.box('crest', 0.48, 0.07, 0.04, (0, 1.0, -0.29), M.rocker, rot=(-12, 0, 0), bevel=0.015)
+    chair = G.join(chair, 'chair', origin=F.at(0, RK_R + 0.025, RK_Z))
+    G.settle(centre=False)
+    G.rock(chair, 'rock', 6, seconds=1.4, axis='X')
+
+
+def pouf():
+    """The leather pouf (catalog.py): buttoned dark leather on short legs; the buttoned top sinks in."""
+    with G.new_parts() as still:
+        _cushion('body', 0.72, 0.34, 0.5, (0, 0.26, 0), M.pouf_leather)
+        for x in (-0.3, 0.3):
+            for z in (-0.19, 0.19):
+                _taper_leg(f'leg{x}{z}', x, z, 0.09, M.walnut_warm)
+    G.join(still, 'pouf', origin=(0, 0, 0))
+
+    def cushions():
+        _cushion('top', 0.7, 0.05, 0.48, (0, 0.435, 0), M.pouf_leather)
+        for x in (-0.2, 0.0, 0.2):
+            for z in (-0.1, 0.1):
+                F.sphere(f'button{x}{z}', 0.015, (x, 0.46, z), M.pouf_button, scale=(1, 1, 0.65), segments=8, rings=6)
+        return 0.46
+    _settled(_seat(cushions, 0.41, 0))
+
+
+def ottoman():
+    """The tufted ottoman (catalog2.py): a navy drum on little walnut feet, its buttoned top sinking in."""
+    with G.new_parts() as still:
+        F.cyl('drum', 0.31, 0.36, (0, 0.22, 0), M.navy, verts=32, bevel=0.03, bevel_segments=3)
+        for x, z in ((-0.2, -0.2), (0.2, -0.2), (-0.2, 0.2), (0.2, 0.2)):
+            F.cyl(f'foot{x}{z}', 0.025, 0.04, (x, 0.02, z), M.walnut_warm, verts=12)
+    G.join(still, 'ottoman', origin=(0, 0, 0))
+
+    def cushions():
+        F.cyl('top', 0.3, 0.06, (0, 0.41, 0), M.navy, verts=32, bevel=0.025, bevel_segments=3)
+        for a in range(0, 360, 60):
+            r = math.radians(a)
+            F.sphere(f'button{a}', 0.0125, (math.cos(r) * 0.15, 0.44, math.sin(r) * 0.15), M.navy_button, scale=(1, 1, 0.8), segments=8, rings=6)
+        return 0.44
+    _settled(_seat(cushions, 0.38, 0))
+
+
+def floor_cushion():
+    """The floor cushion (catalog2.py): a round mustard cushion with piping and a button; all of it sinks."""
+    def cushions():
+        F.cyl('cushion', 0.31, 0.12, (0, 0.06, 0), M.mustard, verts=32, bevel=0.04, bevel_segments=3)
+        G.torus('piping', 0.285, 0.025, at=F.at(0, 0.1, 0), material=M.mustard_piping, major_segments=32, minor_segments=8)
+        F.sphere('button', 0.02, (0, 0.125, 0), M.mustard_button, scale=(1, 1, 0.7), segments=10, rings=6)
+        return 0.145
+    _settled(_seat(cushions, 0.0, 0))
+
+
+def bean_bag():
+    """The bean bag (catalog2.py): a slumped bag with a raised back and a dent to sit in; it flattens 15 %
+    when flopped into (`squash`)."""
+    with G.new_parts() as parts:
+        F.sphere('bag', 0.42, (0, 0.23, 0.02), M.bag, scale=(1, 1, 0.46 / 0.84), segments=28, rings=16)
+        F.sphere('back', 0.36, (0, 0.42, -0.2), M.bag, scale=(1, 0.4 / 0.72, 0.56 / 0.72), rot=(-12, 0, 0), segments=24, rings=14)
+        F.sphere('dent', 0.25, (0, 0.42, 0.05), M.bag_seat, scale=(1, 0.4 / 0.5, 0.12 / 0.5), segments=20, rings=10)
+    bag = G.join(parts, 'bag', origin=F.at(0, 0, 0.02))
+    G.settle(centre=False)
+    G.squash(bag, 'squash', (1.06, 1.06, 0.85), seconds=0.6)
+
+
 # The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
 _D, _MID = CAB_FRONT - BACK, (BACK + CAB_FRONT) / 2
 PLACEHOLDER = [
@@ -502,7 +746,37 @@ FAMILY = G.Family(
              key='model.sectionalCorner', size=(1.0, 0.823, 0.96), centre=(0, -0.02),
              motions={'uses': SOFA_USES}, paint=SECTIONAL + [('pillow_mustard', 'Pillow')]),
      G.Model('chaise', chaise, key='model.chaise', size=(0.96, 0.823, 1.9), centre=(0, 0.0),
-             motions={'uses': SOFA_USES}, paint=SECTIONAL + [('throw_oat', 'Throw')])],
+             motions={'uses': SOFA_USES}, paint=SECTIONAL + [('throw_oat', 'Throw')]),
+     # L2: the armchairs and small seats
+     G.Model('armchair', armchair_bergere, key='model.armchair', size=(0.74, 0.982, 0.797), centre=(0, -0.038),
+             motions={'uses': {'sit': 'sink_in'}},
+             paint=[('linen', 'Upholstery'), ('linen_cushion', 'Cushion'), ('walnut', 'Frame'), ('walnut_legs', 'Legs'),
+                    ('pillow_sage', 'Pillow')]),
+     G.Model('armchairLounge', armchair_lounge, key='model.armchairLounge', size=(0.82, 0.83, 0.84), centre=(0, -0.04),
+             motions={'uses': {'sit': 'sink_in'}},
+             paint=[('sage', 'Upholstery'), ('sage_cushion', 'Cushions'), ('oak_legs', 'Legs')]),
+     G.Model('armchairLeather', armchair_leather, key='model.armchairLeather', size=(0.73, 0.949, 0.852), centre=(0, -0.034),
+             motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
+             paint=[('teak', 'Frame'), ('leather', 'Upholstery')]),
+     G.Model('armchairDesign', armchair_design, key='model.armchairDesign', size=(0.76, 0.959, 0.852), centre=(0, -0.041),
+             paint=[('ply', 'Frame'), ('hide', 'Upholstery'), ('alu', 'Base')]),
+     G.Model('armchairWingback', armchair_wingback, key='model.armchairWingback', size=(0.84, 1.1, 0.8), centre=(0, -0.06),
+             motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
+             paint=[('forest', 'Upholstery'), ('forest_cushion', 'Cushion'), ('walnut_warm', 'Legs')]),
+     G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.843, 0.7), centre=(0, -0.07),
+             motions={'uses': {'relax': ['recline', 'footrest_up'], 'doze': ['recline', 'footrest_up']}, 'ride': 'recline'},
+             paint=[('tan', 'Upholstery'), ('tan_cushion', 'Cushions & footrest')]),
+     G.Model('rockingChair', rocking_chair, key='model.rockingChair', size=(0.525, 1.033, 0.9), centre=(0, 0.05),
+             motions={'loops': {'relax': 'rock', 'read': 'rock'}, 'ride': 'rock'},
+             paint=[('rocker', 'Wood'), ('rocker_cushion', 'Cushion')]),
+     G.Model('pouf', pouf, key='model.pouf', size=(0.72, 0.47, 0.5), motions={'uses': {'sit': 'sink_in'}},
+             paint=[('pouf_leather', 'Leather'), ('pouf_button', 'Buttons'), ('walnut_warm', 'Legs')]),
+     G.Model('ottoman', ottoman, key='model.ottoman', size=(0.62, 0.45, 0.62), motions={'uses': {'sit': 'sink_in'}},
+             paint=[('navy', 'Upholstery'), ('navy_button', 'Buttons'), ('walnut_warm', 'Feet')]),
+     G.Model('floorCushion', floor_cushion, key='model.floorCushion', size=(0.62, 0.139, 0.62), motions={'uses': {'sit': 'sink_in'}},
+             paint=[('mustard', 'Cushion'), ('mustard_piping', 'Piping'), ('mustard_button', 'Button')]),
+     G.Model('beanBag', bean_bag, key='model.beanBag', size=(0.84, 0.696, 0.844), centre=(0, 0.018), motions={'uses': {'flop': 'squash'}},
+             paint=[('bag', 'Bag'), ('bag_seat', 'Seat')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
             'game\'s finishes so a model costs one draw call per finish group.',

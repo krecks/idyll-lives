@@ -653,6 +653,376 @@
           "label": "Throw"
         }
       ]
+    },
+    "model.armchair": {
+      "type": "model",
+      "url": "../../models/living/armchair.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "linen_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_legs": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Upholstery"
+        },
+        {
+          "material": "linen_cushion",
+          "label": "Cushion"
+        },
+        {
+          "material": "walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.armchairLounge": {
+      "type": "model",
+      "url": "../../models/living/armchairLounge.glb",
+      "materials": {
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        },
+        "sage_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "sage",
+          "label": "Upholstery"
+        },
+        {
+          "material": "sage_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.armchairLeather": {
+      "type": "model",
+      "url": "../../models/living/armchairLeather.glb",
+      "materials": {
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "teak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in",
+          "read": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "teak",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Upholstery"
+        }
+      ]
+    },
+    "model.armchairDesign": {
+      "type": "model",
+      "url": "../../models/living/armchairDesign.glb",
+      "materials": {
+        "alu": {
+          "finish": "material.finish.metal"
+        },
+        "black_satin": {
+          "finish": "material.finish.satin"
+        },
+        "hide": {
+          "finish": "material.finish.satin"
+        },
+        "ply": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "ply",
+          "label": "Frame"
+        },
+        {
+          "material": "hide",
+          "label": "Upholstery"
+        },
+        {
+          "material": "alu",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.armchairWingback": {
+      "type": "model",
+      "url": "../../models/living/armchairWingback.glb",
+      "materials": {
+        "forest": {
+          "finish": "material.finish.fabric"
+        },
+        "forest_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in",
+          "read": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "forest",
+          "label": "Upholstery"
+        },
+        {
+          "material": "forest_cushion",
+          "label": "Cushion"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.recliner": {
+      "type": "model",
+      "url": "../../models/living/recliner.glb",
+      "materials": {
+        "tan": {
+          "finish": "material.finish.fabric"
+        },
+        "tan_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": [
+            "recline",
+            "footrest_up"
+          ],
+          "doze": [
+            "recline",
+            "footrest_up"
+          ]
+        },
+        "ride": "recline"
+      },
+      "paint": [
+        {
+          "material": "tan",
+          "label": "Upholstery"
+        },
+        {
+          "material": "tan_cushion",
+          "label": "Cushions & footrest"
+        }
+      ]
+    },
+    "model.rockingChair": {
+      "type": "model",
+      "url": "../../models/living/rockingChair.glb",
+      "materials": {
+        "rocker": {
+          "finish": "material.finish.wood"
+        },
+        "rocker_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "loops": {
+          "relax": "rock",
+          "read": "rock"
+        },
+        "ride": "rock"
+      },
+      "paint": [
+        {
+          "material": "rocker",
+          "label": "Wood"
+        },
+        {
+          "material": "rocker_cushion",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.pouf": {
+      "type": "model",
+      "url": "../../models/living/pouf.glb",
+      "materials": {
+        "pouf_button": {
+          "finish": "material.finish.satin"
+        },
+        "pouf_leather": {
+          "finish": "material.finish.satin"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "pouf_leather",
+          "label": "Leather"
+        },
+        {
+          "material": "pouf_button",
+          "label": "Buttons"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.ottoman": {
+      "type": "model",
+      "url": "../../models/living/ottoman.glb",
+      "materials": {
+        "navy": {
+          "finish": "material.finish.fabric"
+        },
+        "navy_button": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "navy",
+          "label": "Upholstery"
+        },
+        {
+          "material": "navy_button",
+          "label": "Buttons"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Feet"
+        }
+      ]
+    },
+    "model.floorCushion": {
+      "type": "model",
+      "url": "../../models/living/floorCushion.glb",
+      "materials": {
+        "mustard": {
+          "finish": "material.finish.fabric"
+        },
+        "mustard_button": {
+          "finish": "material.finish.fabric"
+        },
+        "mustard_piping": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "mustard",
+          "label": "Cushion"
+        },
+        {
+          "material": "mustard_piping",
+          "label": "Piping"
+        },
+        {
+          "material": "mustard_button",
+          "label": "Button"
+        }
+      ]
+    },
+    "model.beanBag": {
+      "type": "model",
+      "url": "../../models/living/beanBag.glb",
+      "materials": {
+        "bag": {
+          "finish": "material.finish.fabric"
+        },
+        "bag_seat": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "flop": "squash"
+        }
+      },
+      "paint": [
+        {
+          "material": "bag",
+          "label": "Bag"
+        },
+        {
+          "material": "bag_seat",
+          "label": "Seat"
+        }
+      ]
     }
   }
 }
