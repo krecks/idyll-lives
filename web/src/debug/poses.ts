@@ -70,6 +70,8 @@ interface Station {
   baby?: boolean | 'asleep';
   /** Only the baby: no grown-up at the crib. */
   alone?: boolean;
+  /** A second Sim (a woman) does the same in the object's second slot (two in a double bed). */
+  pair?: boolean;
   /** The station's Sim's height and build (appearance; 1 = average). */
   height?: number;
   build?: number;
@@ -98,11 +100,13 @@ const STATIONS: Station[] = [
   { label: 'talk to plant', def: 'garden.monstera', tag: 'talk', female: true },
   // Lying
   { label: 'sleep', def: 'bed', tag: 'sleep', pose: P.Lie },
+  { label: 'sleep two', def: 'bedDouble', tag: 'sleep', pose: P.Lie, pair: true },
   { label: 'nap hammock', def: 'natureLover.gardenHammock', tag: 'nap', pose: P.Lie, female: true },
   { label: 'swing hammock', def: 'cheerful.rainbowHammock', tag: 'relax', pose: P.Lie },
   { label: 'bench press', def: 'weightBench', tag: 'lift', pose: P.Lie },
   { label: 'hammock', def: 'hammock', tag: 'relax', pose: P.Lie, female: true },
   { label: 'car bed', def: 'kidsBedCar', tag: 'sleep', pose: P.Lie, stage: 'child' },
+  { label: 'kids bed', def: 'kidsBed', tag: 'sleep', pose: P.Lie, stage: 'child' },
   // The baby's crib: on their own (asleep, and awake), feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
   { label: 'baby asleep in crib', def: 'crib', baby: 'asleep', alone: true },
   { label: 'baby awake in crib', def: 'crib', baby: true, alone: true },
@@ -269,7 +273,7 @@ interface DefRaw {
 }
 const PACKS = ['bookworm', 'cheerful', 'couchPotato', 'energetic', 'foodie', 'gloomy', 'hotHeaded', 'kind', 'lazy', 'loner', 'natureLover', 'neat', 'outgoing', 'romantic', 'slob'];
 const files = await Promise.all(
-  ['base', 'furniture', 'garden', 'catalog2/living', 'catalog2/hobbies', 'catalog2/kids', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
+  ['base', 'furniture', 'garden', 'catalog2/living', 'catalog2/hobbies', 'catalog2/kids', 'catalog2/bedroom', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
     fetch(`${base}content/${f}.json`)
       .then((r) => r.json() as Promise<{ objects?: DefRaw[]; animations?: string[] }>)
       .catch(() => ({ objects: [] as DefRaw[], animations: undefined as string[] | undefined })),
@@ -307,6 +311,8 @@ interface Actor {
   inside?: boolean;
   /** The baby lying in the station's crib. */
   baby?: boolean;
+  /** The station's second Sim (`Station.pair`). */
+  second?: boolean;
 }
 const objects: ObjectPlacement[] = [];
 const actors: Actor[] = [];
@@ -364,6 +370,7 @@ await Promise.all(
       const inside = def?.interactions?.some((it) => it.inside) ?? false;
       if (!s.alone) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
       if (s.baby) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
+      if (s.pair) actors.push({ station: n, x: slotX + w / slots, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, second: true });
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
@@ -379,7 +386,7 @@ actors.sort((a, b) => a.station - b.station);
 // Stations load in any order: row i is actor i after sorting (a station's own actors keep their order).
 const actorSims = actors.map((a, i) => {
   const s = stations[a.station];
-  return a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female, s.stage, s.height, s.build);
+  return a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female || !!a.second, s.stage, s.height, s.build);
 });
 for (let i = 0; i < actors.length; i++) {
   const a = actors[i];

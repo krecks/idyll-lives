@@ -259,6 +259,11 @@ interface Bed {
 const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
 const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed']);
+/**
+ * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
+ * and moved this much towards its middle, so they overlap by four times it over the middle.
+ */
+const BLANKET_MEET = 0.06;
 /** Lying: height of the back above the feet line, and how far the feet reach past the slot centre (body scale 1). */
 const LIE_BACK = 0.1;
 const LIE_CENTRE = 0.86;
@@ -277,7 +282,8 @@ function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 const LIE_ENTRY = 0.55;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 function lieCentre(rig: SimRig): number {
-  return (rig.body.stage === 'baby' ? rig.body.height * 0.5 : LIE_CENTRE) * rig.scale;
+  // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
+  return (rig.body.stage === 'baby' ? rig.body.height * 0.5 : LIE_CENTRE - (rig.body.height / rig.size) * (1 - rig.size)) * rig.scale;
 }
 function lieBack(rig: SimRig): number {
   return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK) * rig.scale;
@@ -601,6 +607,8 @@ interface SimRig {
   scale: number;
   /** Head size relative to the body (children's heads are bigger). */
   head: number;
+  /** Its body's height as a share of its family's base body's (a child's body shaped for its stage: under 1). */
+  size: number;
   /** How much they stoop (elders), 0..1. */
   stoop: number;
   /** Build (girth across the torso and limbs; 1 = as modelled). */
@@ -1205,10 +1213,11 @@ export class Characters {
       const build = clampBuild(s.appearance?.build);
       const head = shaped ? 1 : (s.appearance?.stageHead ?? 1);
       const stoop = s.appearance?.stageStoop ?? 0;
+      const size = body.height / base.height;
       const who = `${s.name}|${s.generation ?? 0}|${s.gender}|${stage ?? ''}|${body.name}|${outfitId}`;
       const old = kept[s.id];
       // The same rig carries on (pyjamas: `asleep` is worked out again, and the outfit for it written, when next posed).
-      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, head, stoop, build, asleep: false }) : {
+      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, size, head, stoop, build, asleep: false }) : {
         id: s.id,
         who,
         floorY: 0,
@@ -1217,6 +1226,7 @@ export class Characters {
         head,
         stoop,
         build,
+        size,
         seed: hash(s.id + 17),
         visible: false,
         x: 0,
@@ -1376,6 +1386,7 @@ export class Characters {
         head: 1,
         stoop: 0,
         build: 1,
+        size: 1,
         cur: player(),
         prev: player(),
         upper: player(),
@@ -3428,35 +3439,40 @@ export class Characters {
     const z = rig.fromBed ? rig.lieZ : rig.z;
     // Bed extent across the Sim (slot width) and the distance to its foot end.
     const across = Math.abs(fz) * (bed.maxX - bed.minX) + Math.abs(fx) * (bed.maxZ - bed.minZ);
-    const slot = across >= 1.8 ? 0.86 : Math.min(across - 0.08, 1.0);
+    // Two to a wide bed: each quilt half the bed and a little more, moved a little towards its middle, so the
+    // two meet over it (the one lifted a hair over the other) with no strip of the bed's own cover between.
+    const wide = across >= 1.8;
+    const slot = wide ? across / 2 + BLANKET_MEET * 2 : Math.min(across - 0.08, 1.0);
+    const side = wide ? Math.sign((x - bed.cx) * fz - (z - bed.cz) * fx) * BLANKET_MEET : 0;
     const tx = fx > 1e-3 ? (bed.maxX - x) / fx : fx < -1e-3 ? (bed.minX - x) / fx : Infinity;
     const tz = fz > 1e-3 ? (bed.maxZ - z) / fz : fz < -1e-3 ? (bed.minZ - z) / fz : Infinity;
     const foot = Math.min(tx, tz) - 0.05;
+    // A body smaller than the one the quilt was made for (a child's, shaped for its life stage): the quilt
+    // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
+    const zs = s * rig.size;
+    const z0 = lieCentre(rig) - LIE_CENTRE * zs;
     // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale).
-    blanket.ext[i] = clamp(foot / s - blanket.footZ, -0.22, 1.2);
-    const sz = 1;
+    blanket.ext[i] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
     const c = smooth(rig.cover);
     const sx = (slot / BLANKET_WIDTH) * (0.9 + 0.1 * c);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
-    // Rows: x axis, y axis, z axis, translation (Babylon row-vector layout). z scaling keeps the chest line.
-    const zs = s * sz;
-    const z0 = blanket.topZ * s * (1 - sz);
+    // Rows: x axis, y axis, z axis, translation (Babylon row-vector layout).
     m[o] = fz * sx;
     m[o + 1] = 0;
     m[o + 2] = -fx * sx;
     m[o + 3] = 0;
     m[o + 4] = 0;
-    m[o + 5] = s * c;
+    m[o + 5] = zs * c;
     m[o + 6] = 0;
     m[o + 7] = 0;
     m[o + 8] = fx * zs;
     m[o + 9] = 0;
     m[o + 10] = fz * zs;
     m[o + 11] = 0;
-    m[o + 12] = x + fx * z0;
+    m[o + 12] = x - fz * side + fx * z0;
     m[o + 13] = rig.bedH + lift;
-    m[o + 14] = z + fz * z0;
+    m[o + 14] = z + fx * side + fz * z0;
     m[o + 15] = 1;
   }
 
