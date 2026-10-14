@@ -13,7 +13,7 @@
 #   seesaw         the plank with its seats and handles rocks ±12° about the axle (`seesaw`, a loop; riders ride)
 #   springRider    the horse rocks ±10° on top of its spring (`rock`, a loop; the rider rides)
 #   merryGoRound   the platform turns once in 3.5 s (`spin`, a loop; the riders ride round with it)
-#   basketballHoop the net sways and stretches after a shot (`swish`, held 0.6 s)
+#   basketballHoop the net sways and stretches after each shot (`swish`, 1.4 s into the use, then every 3.2 s)
 #   parkChessTable a white pawn slides one square on (`move`)
 #
 # Run:  python3 -B tools/art/blender/build.py playground [--only seesaw] [--preview]
@@ -557,7 +557,8 @@ def parkChessTableFar():
 SEESAW = {'loops': {'seesaw': 'seesaw'}, 'ride': 'seesaw'}
 SPRING = {'loops': {'ride': 'rock'}, 'ride': 'rock'}
 MERRY = {'loops': {'spin': 'spin'}, 'ride': 'spin'}
-HOOP = {'uses': {'shoot': 'swish'}, 'hold': 0.6}
+# The net swishes after each shot: the first 1.4 s into the use, then every 3.2 s while it lasts.
+HOOP = {'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}}
 CHESS = {'uses': {'chess': 'move'}}
 
 FAMILY = G.Family(

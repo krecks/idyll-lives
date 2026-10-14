@@ -526,7 +526,7 @@ FAMILY = G.Family(
              centre=(0, 0.002), motions={'loops': {'bounce': 'bounce'}},
              paint=[('tramp_frame', 'Frame'), ('tramp_pad', 'Pads'), ('tramp_mat', 'Mat')]),
      G.Model('streetballHoop', streetballHoop, size=(0.86, 2.833, 0.886), key='model.energetic.streetballHoop',
-             centre=(0, 0.013), motions={'uses': {'shoot': 'swish'}},
+             centre=(0, 0.013), motions={'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}},
              paint=[('hoop_pole', 'Frame'), ('pad_red', 'Pads'), ('hoop_base', 'Base')]),
      G.Model('powerBlender', powerBlender, size=(0.82, 1.32, 0.63), key='model.energetic.powerBlender',
              centre=(0, -0.115), motions={'uses': {'blend': 'lid'}, 'hold': 1.0},

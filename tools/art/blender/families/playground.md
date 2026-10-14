@@ -28,8 +28,8 @@ things, seen from far: every model has a far version (`far=0.25`; the chess tabl
   whole turn at a believable speed.
 - **Basketball hoop**: a post on a ballast base at the back of its tile, a backboard and the rim at 2.94 m. The net
   (`net`, a diamond mesh of thin strands, `fabric`) is its own part hung from the rim: `swish` sways it 9° and
-  stretches it 18 % down and back in 0.6 s, played by `shoot` with `hold` 0.6 s (so it plays forward, then back: two
-  sways). `motions`: `{'uses': {'shoot': 'swish'}, 'hold': 0.6}`.
+  stretches it 18 % down and back in 0.6 s, from rest to rest, after each shot: 1.4 s into `shoot`, then every
+  3.2 s while it lasts. `motions`: `{'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}}`.
 - **Park chess table**: a stone table in the front half with the board inlaid (5 cm squares), and two stone stools
   behind it where the content seats its players side by side (x = ±0.25 m, 27 cm back, 0.47 m up), facing the board.
   A game is under way; one white pawn (`pawn`) slides one square on, away from the players (`move`, 0.6 s), for the

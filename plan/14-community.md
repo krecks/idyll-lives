@@ -16,7 +16,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). Until then U: tips to one side and holds. |
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Frame, Seats | Loop (E1) | `rock` on its spring (E1). Until then U: leans forward 10°. |
 | `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Frame, Seats | Loop (E1) | `spin` while ridden (E1). Until then static. |
-| `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Seats | Use | `swish`: the net sways after a shot (`hold` 0.6 s). |
+| `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Seats | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
 | `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Frame, Seats | Static | Static. |
 | `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Frame, Seats | Use | `move`: a pawn slides one square for chess. |
 
