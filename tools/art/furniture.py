@@ -455,7 +455,7 @@ def weight_bench(pad='#3E6E73', frame='#5C6168'):
     return p
 
 
-E['model.weightBench'] = placeholder(weight_bench())
+E['model.weightBench'] = placeholder(shift(weight_bench(), dz=0.02))   # its rack's back on the wall's face, as the model's
 
 # ---- lighter recolours of the gym/hobby placeholders (black bodies read as holes) -------------
 E['model.treadmill'] = placeholder(recolor(OX.M['model.treadmill'], {

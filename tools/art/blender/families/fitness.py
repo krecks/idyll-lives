@@ -105,7 +105,7 @@ BAR = (0, 1.02, -0.72)   # the bar's middle on the J-hooks
 
 
 def weightBench():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.02)   # 2 cm forward of its placeholder: the rack's back on the wall's face
     with G.new_parts() as parts:
         F.box('pad', 0.3, 0.09, 1.22, (0, 0.455, -0.12), M.pads, bevel=0.03)
         F.box('board', 0.27, 0.02, 1.18, (0, 0.4, -0.12), M.dark, bevel=0.005)
@@ -268,7 +268,7 @@ FAMILY = G.Family(
     'fitness', M,
     [G.Model('treadmill', treadmill, size=(0.794, 1.439, 1.85), key='model.treadmill', centre=(0.032, -0.005),
              motions={'loops': {'run': 'belt_run'}}, paint=FRAME_PADS),
-     G.Model('weightBench', weightBench, size=(0.9, 1.2, 1.849), key='model.weightBench', centre=(0, -0.026),
+     G.Model('weightBench', weightBench, size=(0.9, 1.2, 1.849), key='model.weightBench', centre=(0, -0.006),
              motions={'uses': {'lift': 'bar_off'}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
      G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
