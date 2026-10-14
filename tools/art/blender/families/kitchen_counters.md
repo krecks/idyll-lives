@@ -1,25 +1,22 @@
 # Kitchen counters — notes
 
-`kitchen_counters.py` builds the kitchen's **K4 base counters** into
-`web/public/assets/models/kitchen_counters/` and their entries in `packs/kitchen_counters/manifest.json`:
-the plain counter (`model.counter`), the corner counter (`model.counterCorner`), the counter end with
-shelves (`model.counterEnd`), the outer corner counter (`model.counterCornerOuter`), the drawer counter
-(`model.counterDrawers`), the open-shelf counter (`model.counterOpenShelf`), the butcher block
-(`model.butcherBlock`) and the marble counter (`model.counterMarble`). They replace the primitive-part
-placeholders of `catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14.
+`kitchen_counters.py` builds the kitchen's **K4 base counters** and **K5 tall and wall storage** into
+`web/public/assets/models/kitchen_counters/` and their entries in `packs/kitchen_counters/manifest.json`.
 
-A base counter is a plinth, a carcass and a worktop; the front carries a drawer over two doors (the plain,
-corner and marble counters), one door, four drawers, or nothing (the open shelves). Two worktop heights are
-in play: **0.96 m** for the catalogue counters (`_unit66`) and **0.95 m** for the catalog2 ones
-(`_unit79`), matching each content entry's `surface`. The parts are placed in game axes (`F`, a
-`GameFrame` shifted back by the placeholder's depth centre, so the model is centred on its tile).
+K4 (2026-10-14): the plain counter (`model.counter`), the corner counter (`model.counterCorner`), the
+counter end with shelves (`model.counterEnd`), the outer corner counter (`model.counterCornerOuter`), the
+drawer counter (`model.counterDrawers`), the open-shelf counter (`model.counterOpenShelf`), the butcher
+block (`model.butcherBlock`) and the marble counter (`model.counterMarble`).
+
+K5 (2026-10-14): the pantry cupboard (`model.pantry`), the tall larder (`model.pantryTall`), the wall
+cabinets (`model.wallCabinet`, `model.wallCabinetGlass`, `model.wallCabinetCorner`), the cooker hood
+(`model.rangeHood`), the spice rack (`model.spiceRack`), the pot rail (`model.potRail`), the kitchen wall
+shelves (`model.kitchenShelfWall`), the pedal bin (`model.trashCan`) and the recycling bins
+(`model.recyclingBins`).
+
+They replace the primitive-part placeholders of `catalog.py` / `catalog2.py`, which stay as the fallback.
 
 ## Materials
-
-Each model maps its materials onto the game's finishes, so it costs one draw call per finish group. A
-textured finish (`wood`, `fabric`) is a group of its own, so the butcher block keeps its wood on the still
-body only — the knife drawer's front is a plain `wood2` satin, and the basket a satin tan — to stay within
-the draw budget.
 
 | Material | Finish | Used for |
 |---|---|---|
@@ -31,26 +28,38 @@ the draw budget.
 | `navy` | satin | the marble counter's painted carcass |
 | `marble` | gloss | the marble worktop |
 | `vein` | gloss | a vein through the marble |
-| `brass` | metal | the marble counter's handles |
+| `brass` | metal | the marble counter's handles, the larder's |
 | `block`, `block2` | wood | the butcher block's top and its top layer |
 | `leg` | wood | the block's legs and shelf |
 | `wood2` | satin | the block's knife-drawer front (plain, so it draws with the body) |
-| `basket` | satin | the block's basket |
-| `metal` | metal | the block's dark drawer handle |
+| `basket` | satin | the block's basket, a larder basket |
+| `metal` | metal | the block's dark drawer handle, the pot rail |
 | `porcelain` | gloss | plates, a bowl, a jar, a box |
-| `cream` | gloss | a cream jar |
-| `rust` | gloss | a terracotta tin |
-| `teal`, `sage` | gloss | pots |
-| `yellow` | satin | a lemon |
-| `soil` | matte | the dark back of an open shelf |
+| `steel` | metal | the cooker hood, the pedal bin |
+| `trim` | satin | the hood's front trim |
+| `bulb` | gloss | a strip light (under a wall cabinet, in the hood) |
+| `copper` | metal | the pot rail's pans and pot |
+| `glass` | glass | a glazed door, a jar; the wall cabinet's glazed doors |
+| `back` | satin | the glazed cabinet's pale back panel |
+| `leaf` | satin | a pot plant's foliage |
+| `oakd` | wood | the brackets under the kitchen wall shelves |
+| `bin1`, `bin2`, `bin3` | satin | the recycling bins (blue, green, yellow) |
+| `lid` | satin | a bin's dark lid and handle |
+| `soil` | matte | a plant pot's soil |
+
+A transparent finish (`glass`) and a textured finish (`wood`, `foliage`) are each their own draw group.
+The glazed cabinet keeps its carcass and doors `cab` and only the panes `glass`, so it draws in two
+groups; the still bodies of the textured things (oak shelves, a basket) are kept to one group each.
 
 ## Clips
 
-A drawer is built as its own object with its origin on its front face; the model is settled and the clip
-keyed after (`settle()` must come before `slide()`). Four counters slide their top drawer out 25 cm for a
-sandwich (`drawer_open`); the rest are static. `counterDrawers` is static in this pass — its four drawers
-sliding out in turn would be a second clip (E1). `counterOpenShelf` has no handles, so its `paint` is
-Cabinet/Worktop only.
+Every moving part is its own object with its origin on the hinge (or the front face for a slide); each
+clip is one NLA track named for the pack's `motions`. Frame 1 is the rest pose. A door that a resident
+opens swings out 100° (`DOOR_SECONDS` 1.6 s, `DOOR_HOLD` 2.5 s); a drawer slides out 25 cm
+(`SECONDS` 1.4 s, `HOLD` 1.5 s). `G.settle()` runs before `G.swing()`/`G.slide()`, since a clip keys the
+rest pose where it is.
+
+## K4 — base counters
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
@@ -63,8 +72,29 @@ Cabinet/Worktop only.
 | `model.butcherBlock` | 0.900 × 0.945 × 0.813 m | 1,512 | 3 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 | `model.counterMarble` | 1.000 × 0.953 × 0.790 m | 1,620 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 
+## K5 — tall and wall storage
+
+A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and
+`settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check_glb` reports it as floating,
+which is fine on a wall. A floor thing stands and is centred as usual.
+
+| Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
+|---|---|---|---|---|---|
+| `model.pantry` | 0.940 × 2.270 × 0.630 m | 2,592 | 3 | two doors | `doors_open` 1.6 s (snack, `hold` 2.5 s) |
+| `model.pantryTall` | 0.960 × 2.390 × 0.700 m | 3,024 | 3 | two doors | `doors_open` (snack, `hold` 2.5 s) |
+| `model.wallCabinet` | 0.980 × 0.740 × 0.379 m | 1,080 | 1 | — | static (future: the doors swing up) |
+| `model.wallCabinetGlass` | 0.960 × 0.720 × 0.406 m | 2,460 | 2 | — | static; glass doors |
+| `model.wallCabinetCorner` | 0.960 × 0.723 × 0.406 m | 1,292 | 2 | — | static |
+| `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 648 | 1 | — | static |
+| `model.spiceRack` | 0.520 × 0.440 × 0.106 m | 2,268 | 3 | — | static |
+| `model.potRail` | 0.910 × 0.547 × 0.230 m | 1,236 | 1 | — | static |
+| `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 1,476 | 3 | — | static |
+| `model.trashCan` | 0.310 × 0.685 × 0.365 m | 540 | 1 | — | static (future: `lid_open`) |
+| `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 972 | 1 | — | static (future: the lids lift) |
+
 All match their placeholder bounds (`check_glb.py`: 0 failed; Khronos glTF validator: 0 errors,
-0 warnings each). The eight sit in Validate › Counters until checked in play.
+0 warnings each). The eight K4 counters sit in Validate › Counters, the eleven K5 things in
+Validate › Kitchen Storage, until checked in play.
 
 ## Rebuild
 

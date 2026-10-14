@@ -124,7 +124,13 @@ The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner
 `tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original,
 CC0). The plain, corner, marble and butcher-block counters slide their top (or knife) drawer out 25 cm
 while a resident makes a sandwich; the others are static base units with doors, drawers or open shelves.
-Their primitive-part entries stay as the fallback.
+The kitchen tall and wall storage (`models/kitchen_counters/pantry.glb`, `pantryTall.glb`, `wallCabinet.glb`,
+`wallCabinetGlass.glb`, `wallCabinetCorner.glb`, `rangeHood.glb`, `spiceRack.glb`, `potRail.glb`,
+`kitchenShelfWall.glb`, `trashCan.glb`, `recyclingBins.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The pantry and the tall larder swing both doors open 100° while a resident fetches a snack; the wall
+cabinets, cooker hood, spice rack, pot rail and wall shelves are static, and the pedal and recycling bins
+are static this pass. Their primitive-part entries stay as the fallback.
 
 ## Generated art (original, CC0)
 

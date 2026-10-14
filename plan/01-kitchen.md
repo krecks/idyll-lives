@@ -2,7 +2,8 @@
 
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
 (`families/kitchen.py`), the six K2 cookers and the four K3 small appliances and dishwashers are done
-(`families/kitchen_cooking.py`), and the eight K4 base counters are done (`families/kitchen_counters.py`).
+(`families/kitchen_cooking.py`), and the eight K4 base counters and the eleven K5 tall and wall storage
+things are done (`families/kitchen_counters.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -66,7 +67,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
-## K5. Tall and wall storage (11)
+## K5. Tall and wall storage (11) — **Done** (in Validate › Kitchen Storage)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
 - **Validate group:** `kitchen storage` (Validate › Kitchen Storage)

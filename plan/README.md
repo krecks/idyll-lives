@@ -4,24 +4,26 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **60 are done**:
+**Where it stands (2026-10-14):** 540 objects. **81 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
 - the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (in Validate › Appliances);
 - the eight K4 base counters: `counter`, `counterCorner`, `counterEnd`, `counterCornerOuter`, `counterDrawers`, `counterOpenShelf`, `butcherBlock`, `counterMarble` (in Validate › Counters);
+- the eleven K5 tall and wall storage: `pantry`, `pantryTall`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `rangeHood`, `spiceRack`, `potRail`, `kitchenShelfWall`, `trashCan`, `recyclingBins` (in Validate › Kitchen Storage);
 - the five B1 toilets: `toilet`, `toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung` (in Validate › Toilets);
 - the four B2 showers: `shower`, `showerStall`, `showerWalkIn`, `showerRain` (in Validate › Showers);
 - the three B3 baths: `bathtub`, `bathtubClawfoot`, `bathtubFreestanding` (in Validate › Baths);
 - the six B4 laundry models: `laundryWasher`, `laundryDryer`, `towelRail`, `towelLadder`, `laundryBasket`, `bathMat` (in Validate › Laundry);
 - the three B5 storage and mirrors: `mirrorCabinet`, `mirrorRound`, `bathCabinetTall` (in Validate › Bathroom Storage);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
-- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`.
+- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
+- the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants).
 
-**480 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 107;
-- `catalog2.py`: 170;
-- the base manifest: 75;
+**459 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 104;
+- `catalog2.py`: 162;
+- the base manifest: 65;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -30,7 +32,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | Category | Items | Tasks |
 |---|---|---|
 | [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
-| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
+| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9), BR2 Nightstands and small storage (8), BR3 Wardrobes and drawers (6), BR4 Dressing and mirrors (4) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4), KD2 Toys (10), KD3 Kids' study and art (6) |
@@ -42,7 +44,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Tabletop](10-tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
 | [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |
-| [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |
+| [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10, **done**), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |
 | [Community and farm](14-community.md) | 36 | CM1 Playground (8), CM2 Street furniture (10), CM3 Food stalls and vending (5), CM4 Shops and café (5), CM5 Farm (8) |
 | [Personality packs](15-personality-packs.md) | 94 | P1–P16: one task per pack (bookworm … slob, and the example pack) |
 | [Sign-off](16-sign-off.md) | — | Back from Validate, per task and per category; done means |
@@ -132,7 +134,7 @@ Residents sitting or lying on a moving seat ride it with `ride` (a rocking chair
 The engine and tools tasks (T0, E1–E8, C1) are done, so every kind of clip can be built now.
 
 1. The most-seen categories first:
-   - Kitchen K1–K4;
+   - Kitchen K1–K5;
    - Bathroom B1–B4;
    - Bedroom BR1, BR3;
    - Living L1 (the sofa bed is done), L2, L4, L5;
@@ -140,7 +142,7 @@ The engine and tools tasks (T0, E1–E8, C1) are done, so every kind of clip can
 2. Office, Kids, Fitness, Hobbies, Decor, Lighting, Outdoor.
 3. The personality packs (P1–P16), one pack per task.
 4. Garden plants and trees, and the street and community props, each with a far version (`G.Model(far=…)`, E7).
-   Plants also need the nature shader's wind and tint before they come from Blender. Tabletop at any point
+   A plant's parts on `foliage` and `bark` take the nature shader's wind and tint as the placeholders' do (G1). Tabletop at any point
    (small and quick).
 5. The ambient and night clips on items already built (the sinks, the fridge, the garden decor), where they fit.
 

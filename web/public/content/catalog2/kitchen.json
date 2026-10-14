@@ -351,8 +351,8 @@
         1
       ],
       "price": 420,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "stations": [
         "ingredients"
       ],
@@ -796,8 +796,8 @@
         1
       ],
       "price": 25,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "description": "A stainless steel pedal bin. Leftovers are scraped in here when the dishes are cleared away.",
       "stations": [
         "bin"
@@ -813,8 +813,8 @@
         1
       ],
       "price": 60,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "description": "Three bins side by side: paper, glass and plastic.",
       "interactions": []
     },
@@ -827,8 +827,8 @@
         1
       ],
       "price": 140,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.35,
       "description": "Wall cupboards with glass doors, glasses and plates on show.",
@@ -843,8 +843,8 @@
         1
       ],
       "price": 110,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.3,
       "description": "A wall cupboard that finishes a run with open shelves on its end.",
@@ -859,8 +859,8 @@
         1
       ],
       "price": 45,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.3,
       "description": "Three rows of little jars on the wall.",
@@ -875,8 +875,8 @@
         1
       ],
       "price": 70,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.35,
       "description": "A black rail with copper pans and ladles hanging from it.",
@@ -891,8 +891,8 @@
         1
       ],
       "price": 60,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.4,
       "description": "Two oak shelves with jars, plates and a pot of herbs.",

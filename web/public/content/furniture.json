@@ -695,8 +695,8 @@
         1
       ],
       "price": 340,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "description": "A tall cupboard stocked with crackers, fruit and jars: a snack without opening the fridge.",
       "interactions": [
         {
@@ -726,8 +726,8 @@
         1
       ],
       "price": 90,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.25,
       "description": "Two-door cabinets that hang on the wall above the worktop. They make a kitchen look finished.",
@@ -742,8 +742,8 @@
         1
       ],
       "price": 160,
-      "category": "kitchen",
-      "group": "counters",
+      "category": "validate",
+      "group": "kitchen storage",
       "layer": "wall",
       "decor": 0.15,
       "description": "A chimney hood for the wall above the stove.",

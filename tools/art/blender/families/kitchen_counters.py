@@ -41,10 +41,24 @@ M = G.Palette(
     sage=('#B9C9C4', 'gloss'),       # a sage pot
     yellow=('#F2C14E', 'satin'),     # a lemon
     soil=('#3B2E24', 'matte'),       # the dark back of an open shelf
+    oakd=('#8A5A38', 'wood'),        # a darker wood: the brackets under a wall shelf
+    steel=('#B9BDC1', 'metal'),      # a cooker hood, a bin: brushed stainless
+    trim=('#3A3D41', 'satin'),       # dark trim, keys and a hood's filter
+    bulb=('#FFF1CF', 'gloss'),       # a strip light or a hood lamp
+    copper=('#B87333', 'metal'),     # copper pans on the pot rail
+    glass=('#DCE6EA', 'glass'),      # glazed doors, jars and glasses
+    back=('#C9D6DA', 'satin'),       # a cabinet's back, seen through its glass
+    leaf=('#5E8F4E', 'satin'),       # a pot plant's leaves (plain: foliage is a draw call of its own)
+    bin1=('#3E7CC2', 'satin'),       # recycling bins: blue, green and yellow
+    bin2=('#4E9A5A', 'satin'),
+    bin3=('#E3B23C', 'satin'),
+    lid=('#2F3236', 'satin'),        # a bin's lid
 )
 
 SECONDS = 1.4   # a drawer slides in this long
 HOLD = 1.5      # seconds it stays open once a use starts
+DOOR_SECONDS = 1.6   # a cupboard door swings in this long
+DOOR_HOLD = 2.5      # seconds a pantry's doors stay open once a use starts
 
 
 def _handle_v(F, name, x, y, z, material=None):
@@ -244,6 +258,258 @@ def counterMarble():
     G.slide(drawer, 'drawer_open', (0, -0.25, 0), seconds=SECONDS)
 
 
+# === K5: tall and wall storage =========================================================================
+# Tall larders (`pantry`, `pantryTall`), wall cabinets (`wallCabinet`, `wallCabinetGlass`,
+# `wallCabinetCorner`), a cooker hood (`rangeHood`), a spice rack, a pot rail, a wall shelf
+# (`kitchenShelfWall`), a pedal bin (`trashCan`) and recycling bins. The two larders' doors swing open
+# (`doors_open`); everything else stands still this pass. A wall thing sits on the wall face (z = WALL)
+# at its real height: `floor=False`, centred in x and depth.
+
+WALL = -0.43   # the back face of a wall thing, in game depth (catalog.py WALL, docs/design/objects.md)
+
+
+def _case(F, w, h, d, x, y, zback, material, back=None, t=0.02, p='case'):
+    """An open case: a back at depth `zback`, two sides, a top and a bottom, open at the front."""
+    F.box(f'{p}_back', w, h, t, (x, y, zback + t / 2), back or material, bevel=0.004)
+    for s in (-1, 1):
+        F.box(f'{p}_side{s}', t, h, d, (x + s * (w / 2 - t / 2), y, zback + d / 2), material, bevel=0.004)
+    F.box(f'{p}_top', w - 2 * t, t, d, (x, y + h / 2 - t / 2, zback + d / 2), material, bevel=0.004)
+    F.box(f'{p}_bottom', w - 2 * t, t, d, (x, y - h / 2 + t / 2, zback + d / 2), material, bevel=0.004)
+
+
+def _shelf(F, name, w, y, zback, d, material=None):
+    """A shelf across a case, from the back face `zback`."""
+    F.box(name, w, 0.02, d, (0, y, zback + d / 2), material or M.worktop, bevel=0.003)
+
+
+def _jar(F, name, x, y, z, colour, h=0.13, r=0.045, lid=True, lidmat=None, verts=10):
+    """A glass jar with its contents, standing on `y` at depth `z`."""
+    F.cyl(f'{name}_glass', r, h, (x, y + h / 2, z), M.glass, verts=verts)
+    F.cyl(f'{name}_in', r * 0.8, h * 0.6, (x, y + h * 0.44, z), colour, verts=verts)
+    if lid:
+        F.cyl(f'{name}_lid', r * 1.1, 0.016, (x, y + h + 0.008, z), lidmat or M.chrome, verts=verts)
+
+
+def _basket(F, name, w, h, d, x, y, z, material=None):
+    """A woven basket with a rim, sitting on `y`."""
+    material = material or M.basket
+    F.box(name, w, h, d, (x, y + h / 2, z), material, bevel=0.03)
+    F.box(f'{name}_rim', w + 0.02, 0.02, d + 0.02, (x, y + h, z), material, bevel=0.006)
+
+
+def _tin(F, name, x, y, z, colour, w=0.16, h=0.16, d=0.14):
+    """A tin or box of food on a shelf."""
+    F.box(name, w, h, d, (x, y + h / 2, z), colour, bevel=0.02)
+
+
+# --- the larder: 1x1, a tall cupboard with two doors that swing open for a snack -----------------------
+def pantry():
+    F = G.GameFrame(shift=0.141)
+    with G.new_parts() as still:
+        _case(F, 0.92, 1.92, 0.6, 0, 1.06, -0.46, M.cab)
+        F.box('plinth', 0.88, 0.1, 0.56, (0, 0.05, -0.18), M.dark, bevel=0.004)
+        F.box('cornice', 0.94, 0.04, 0.62, (0, 2.04, -0.15), M.cab, bevel=0.008)
+        for i, y in enumerate((0.5, 0.88, 1.26, 1.64)):
+            _shelf(F, f'shelf{i}', 0.86, y, -0.44, 0.56)
+        for i, (x, y, c) in enumerate(((-0.24, 0.52, M.rust), (0.0, 0.52, M.cream), (0.24, 0.52, M.teal),
+                                       (-0.2, 0.9, M.porcelain), (0.16, 0.9, M.yellow),
+                                       (-0.22, 1.28, M.sage), (0.1, 1.28, M.porcelain))):
+            _tin(F, f'tin{i}', x, y, -0.15, c)
+        _basket(F, 'basket', 0.36, 0.2, 0.3, -0.2, 2.06, -0.2)
+    G.join(still, 'body', origin=(0, 0, 0))
+    doors = []
+    for s in (-1, 1):
+        with G.new_parts() as parts:
+            F.box(f'door{s}_front', 0.456, 1.88, 0.02, (s * 0.228, 1.06, 0.14), M.cab, bevel=0.008)
+            _handle_v(F, f'door{s}_pull', s * 0.06, 1.05, 0.158)
+        doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.456, 1.06, 0.14)))
+    G.settle()
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+
+
+# --- the tall larder: 1x1, two doors over two drawers, a basket on top ---------------------------------
+def pantryTall():
+    F = G.GameFrame(shift=0.104)
+    with G.new_parts() as still:
+        _case(F, 0.92, 2.06, 0.66, 0, 1.08, -0.45, M.cab)
+        F.box('plinth', 0.9, 0.1, 0.6, (0, 0.05, -0.14), M.dark, bevel=0.004)
+        F.box('cornice', 0.96, 0.05, 0.7, (0, 2.135, -0.11), M.cab, bevel=0.01)
+        for i, y in enumerate((0.24, 0.48)):
+            F.box(f'drawer{i}', 0.9, 0.22, 0.02, (0, y, 0.21), M.cab, bevel=0.008)
+            _handle_h(F, f'drawer{i}_pull', 0, y + 0.06, 0.228, 0.3, M.brass)
+        for i, y in enumerate((0.74, 1.12, 1.5, 1.88)):
+            _shelf(F, f'shelf{i}', 0.86, y, -0.43, 0.62)
+        for i, (x, y, c) in enumerate(((-0.24, 0.76, M.porcelain), (0.0, 0.76, M.rust), (0.24, 0.76, M.sage),
+                                       (-0.2, 1.14, M.cream), (0.16, 1.14, M.teal),
+                                       (-0.22, 1.52, M.yellow), (0.1, 1.52, M.porcelain))):
+            _tin(F, f'tin{i}', x, y, -0.14, c)
+        _basket(F, 'basket', 0.3, 0.22, 0.26, -0.22, 2.16, -0.16)
+    G.join(still, 'body', origin=(0, 0, 0))
+    doors = []
+    for s in (-1, 1):
+        with G.new_parts() as parts:
+            F.box(f'door{s}_front', 0.45, 1.44, 0.02, (s * 0.228, 1.34, 0.21), M.cab, bevel=0.008)
+            _handle_v(F, f'door{s}_pull', s * 0.06, 0.72, 0.228, M.brass)
+        doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.453, 1.34, 0.21)))
+    G.settle()
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+
+
+# --- the wall cabinet: 1x1, two doors with pulls under it and a strip light ----------------------------
+def wallCabinet():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        _case(F, 0.98, 0.72, 0.34, 0, 1.81, WALL, M.cab)
+        for s in (-1, 1):
+            F.box(f'door{s}', 0.484, 0.7, 0.02, (s * 0.245, 1.81, WALL + 0.35), M.cab, bevel=0.008)
+            _handle_v(F, f'door{s}_pull', s * 0.06, 1.5, WALL + 0.368)
+        F.box('light', 0.9, 0.012, 0.03, (0, 1.444, WALL + 0.07), M.bulb, bevel=0.004)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the glazed wall cabinet: 1x1, glass doors showing glasses and plates ------------------------------
+def wallCabinetGlass():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        _case(F, 0.96, 0.72, 0.36, 0, 1.81, WALL, M.cab, back=M.back)
+        for i, y in enumerate((1.47, 1.84)):
+            _shelf(F, f'shelf{i}', 0.9, y, WALL, 0.32)
+        for i, x in enumerate((-0.36, -0.2, -0.04)):
+            F.cyl(f'glass{i}', 0.035, 0.12, (x, 1.54, WALL + 0.17), M.glass, verts=10)
+        for i in range(5):
+            F.cyl(f'plate{i}', 0.1, 0.012, (0.24, 1.852 + i * 0.016, WALL + 0.17), M.porcelain, verts=16)
+        for s in (-1, 1):
+            cx = s * 0.24
+            F.box(f'door{s}_l', 0.045, 0.7, 0.02, (cx - 0.2075, 1.81, WALL + 0.37), M.cab, bevel=0.004)
+            F.box(f'door{s}_r', 0.045, 0.7, 0.02, (cx + 0.2075, 1.81, WALL + 0.37), M.cab, bevel=0.004)
+            F.box(f'door{s}_b', 0.46, 0.045, 0.02, (cx, 1.4825, WALL + 0.37), M.cab, bevel=0.004)
+            F.box(f'door{s}_t', 0.46, 0.045, 0.02, (cx, 2.1375, WALL + 0.37), M.cab, bevel=0.004)
+            F.box(f'door{s}_glass', 0.37, 0.61, 0.012, (cx, 1.81, WALL + 0.365), M.glass, bevel=0.002)
+            _handle_v(F, f'door{s}_pull', s * 0.04, 1.6, WALL + 0.395)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the corner wall cabinet: 1x1, a door on one side and open shelves on the other -------------------
+def wallCabinetCorner():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        _case(F, 0.6, 0.72, 0.36, -0.18, 1.81, WALL, M.cab)
+        F.box('door', 0.58, 0.7, 0.02, (-0.18, 1.81, WALL + 0.37), M.cab, bevel=0.008)
+        _handle_v(F, 'door_pull', 0.06, 1.6, WALL + 0.395)
+        for i, y in enumerate((1.46, 1.81, 2.15)):
+            F.box(f'end_shelf{i}', 0.36, 0.025, 0.34, (0.3, y, WALL + 0.17), M.oak, bevel=0.006)
+        F.box('end_panel', 0.03, 0.72, 0.36, (0.46, 1.81, WALL + 0.18), M.oak, bevel=0.006)
+        F.cone('pot', 0.05, 0.04, 0.14, (0.24, 1.53, WALL + 0.16), M.sage, verts=14)
+        F.cyl('bowl', 0.07, 0.05, (0.3, 1.86, WALL + 0.14), M.porcelain, verts=14)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the cooker hood: 1x1, a canopy and a chimney with a lamp and a filter ------------------------------
+def rangeHood():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        F.box('flue', 0.3, 0.58, 0.3, (0, 1.96, -0.28), M.steel, bevel=0.008)
+        F.box('canopy', 0.9, 0.12, 0.5, (0, 1.61, -0.18), M.steel, bevel=0.01)
+        F.box('trim', 0.9, 0.025, 0.02, (0, 1.58, 0.075), M.trim, bevel=0.004)
+        F.box('filter', 0.84, 0.012, 0.44, (0, 1.548, -0.18), M.dark, bevel=0.002)
+        F.box('light', 0.5, 0.008, 0.04, (0, 1.542, -0.06), M.bulb, bevel=0.002)
+        F.box('keys', 0.16, 0.03, 0.01, (0.28, 1.63, 0.072), M.dark, bevel=0.002)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the spice rack: 1x1 wall, three rails of little jars ---------------------------------------------
+def spiceRack():
+    F = G.GameFrame(shift=0.0)
+    colours = (M.rust, M.teal, M.sage, M.cream, M.yellow, M.porcelain)
+    with G.new_parts() as still:
+        F.box('board', 0.52, 0.44, 0.02, (0, 1.52, WALL + 0.01), M.oak, bevel=0.004)
+        for i, y in enumerate((1.33, 1.47, 1.61)):
+            F.box(f'shelf{i}', 0.5, 0.015, 0.09, (0, y, WALL + 0.055), M.oak, bevel=0.003)
+            F.box(f'rail{i}', 0.5, 0.012, 0.012, (0, y + 0.06, WALL + 0.1), M.brass, bevel=0.003)
+            for j in range(6):
+                _jar(F, f'jar{i}{j}', -0.2 + j * 0.08, y + 0.0075, WALL + 0.055,
+                     colours[(i + j) % 6], h=0.075, r=0.024, lidmat=M.dark, verts=8)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the pot rail: 1x1 wall, a rail of hooks with pans, a pot and ladles -------------------------------
+def potRail():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        F.cyl('rail', 0.02, 0.9, (0, 1.6, WALL + 0.08), M.metal, rot=(0, 90, 0), verts=12)
+        for s in (-1, 1):
+            F.box(f'bracket{s}', 0.03, 0.03, 0.1, (s * 0.44, 1.6, WALL + 0.04), M.metal, bevel=0.006)
+        for x, kind in ((-0.32, 'pan'), (-0.12, 'ladle'), (0.06, 'pot'), (0.28, 'pan'), (0.4, 'ladle')):
+            G.torus(f'hook{x}', 0.035, 0.007, at=F.at(x, 1.585, WALL + 0.08), material=M.metal,
+                    rot=(0, 90, 0), major_segments=8, minor_segments=6)
+            if kind == 'pan':
+                F.cyl(f'handle{x}', 0.012, 0.22, (x, 1.43, WALL + 0.08), M.metal, verts=8)
+                F.cyl(f'pan{x}', 0.13, 0.04, (x, 1.21, WALL + 0.06), M.copper, rot=(90, 0, 0), verts=18)
+            elif kind == 'pot':
+                F.cyl(f'handle{x}', 0.012, 0.1, (x, 1.5, WALL + 0.08), M.metal, verts=8)
+                F.cyl(f'pot{x}', 0.1, 0.16, (x, 1.37, WALL + 0.12), M.copper, verts=16)
+            else:
+                F.cyl(f'handle{x}', 0.012, 0.3, (x, 1.42, WALL + 0.08), M.steel, verts=8)
+                F.sphere(f'bowl{x}', 0.05, (x, 1.27, WALL + 0.09), M.steel, scale=(1, 1, 0.7), segments=8, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the wall shelf: 1x1 wall, two shelves of jars, plates, pots and a plant ---------------------------
+def kitchenShelfWall():
+    F = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        for i, y in enumerate((1.4, 1.75)):
+            F.box(f'shelf{i}', 0.9, 0.03, 0.24, (0, y, WALL + 0.12), M.oak, bevel=0.004)
+        for s in (-1, 1):
+            F.box(f'bracket{s}', 0.03, 0.12, 0.2, (s * 0.36, 1.35, WALL + 0.1), M.oakd, bevel=0.004)
+        _jar(F, 'jar0', -0.32, 1.415, WALL + 0.12, M.yellow, h=0.13, r=0.045)
+        _jar(F, 'jar1', -0.2, 1.415, WALL + 0.12, M.porcelain, h=0.16, r=0.045)
+        _jar(F, 'jar2', -0.08, 1.415, WALL + 0.12, M.rust, h=0.13, r=0.045)
+        for i in range(4):
+            F.cyl(f'plate{i}', 0.11, 0.012, (0.22, 1.425 + i * 0.014, WALL + 0.12), M.porcelain, verts=16)
+        F.cyl('pot0', 0.05, 0.1, (-0.25, 1.815, WALL + 0.12), M.teal, verts=14)
+        F.cyl('pot1', 0.05, 0.1, (-0.12, 1.815, WALL + 0.12), M.cream, verts=14)
+        F.cone('plant_pot', 0.06, 0.05, 0.1, (0.25, 1.815, WALL + 0.12), M.porcelain, verts=14)
+        F.cyl('soil', 0.052, 0.012, (0.25, 1.868, WALL + 0.12), M.soil, verts=12)
+        F.sphere('leaf0', 0.09, (0.25, 1.97, WALL + 0.12), M.leaf, scale=(1, 1, 0.85), segments=10, rings=7)
+        F.sphere('leaf1', 0.055, (0.19, 1.95, WALL + 0.14), M.leaf, segments=8, rings=6)
+        F.sphere('leaf2', 0.05, (0.31, 1.94, WALL + 0.1), M.leaf, segments=8, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle(centre=False, floor=False)
+
+
+# --- the pedal bin: 1x1, a stainless drum with a domed lid and a pedal (static) -----------------------
+def trashCan():
+    F = G.GameFrame(shift=0.172)
+    with G.new_parts() as still:
+        F.cyl('drum', 0.15, 0.6, (0, 0.32, -0.2), M.steel, verts=20)
+        F.cyl('base', 0.15, 0.02, (0, 0.01, -0.2), M.dark, verts=20)
+        F.sphere('lid', 0.155, (0, 0.62, -0.2), M.lid, scale=(1, 1, 0.42), segments=20, rings=8)
+        F.box('pedal', 0.1, 0.03, 0.08, (0, 0.03, -0.03), M.dark, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+
+# --- the recycling bins: 1x1, three coloured bins with lids (static) ----------------------------------
+def recyclingBins():
+    F = G.GameFrame(shift=0.212)
+    with G.new_parts() as still:
+        for i, (x, c) in enumerate(((-0.31, M.bin1), (0.0, M.bin2), (0.31, M.bin3))):
+            F.box(f'body{i}', 0.29, 0.62, 0.42, (x, 0.31, -0.22), c, bevel=0.03)
+            F.box(f'lid{i}', 0.3, 0.04, 0.44, (x, 0.64, -0.22), c, bevel=0.015)
+            F.box(f'handle{i}', 0.14, 0.03, 0.03, (x, 0.6, 0.0), M.lid, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+
 FAMILY = G.Family(
     'kitchen_counters', M,
     [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter',
@@ -269,7 +535,41 @@ FAMILY = G.Family(
      G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.79), key='model.counterMarble',
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
-             paint=[('navy', 'Cabinet'), ('marble', 'Marble top'), ('brass', 'Handles')])],
+             paint=[('navy', 'Cabinet'), ('marble', 'Marble top'), ('brass', 'Handles')]),
+     # K5: tall and wall storage
+     G.Model('pantry', pantry, size=(0.94, 2.27, 0.63), key='model.pantry',
+             # snack fetches from the larder: both doors swing open
+             motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
+             paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
+     G.Model('pantryTall', pantryTall, size=(0.96, 2.38, 0.71), key='model.pantryTall',
+             # snack, as the larder
+             motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
+             paint=[('cab', 'Cabinet'), ('brass', 'Handles')]),
+     G.Model('wallCabinet', wallCabinet, size=(0.98, 0.732, 0.379), key='model.wallCabinet',
+             centre=(0, -0.2405), floor=False,
+             paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
+     G.Model('wallCabinetGlass', wallCabinetGlass, size=(0.96, 0.72, 0.406), key='model.wallCabinetGlass',
+             centre=(0, -0.227), floor=False,
+             paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
+     G.Model('wallCabinetCorner', wallCabinetCorner, size=(0.96, 0.722, 0.406), key='model.wallCabinetCorner',
+             centre=(0, -0.227), floor=False,
+             paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
+     G.Model('rangeHood', rangeHood, size=(0.9, 0.712, 0.515), key='model.rangeHood',
+             centre=(0, -0.1725), floor=False,
+             paint=[('steel', 'Hood'), ('trim', 'Trim')]),
+     G.Model('spiceRack', spiceRack, size=(0.52, 0.44, 0.106), key='model.spiceRack',
+             centre=(0, -0.377), floor=False,
+             paint=[('oak', 'Rack')]),
+     G.Model('potRail', potRail, size=(0.91, 0.545, 0.23), key='model.potRail',
+             centre=(0, -0.325), floor=False,
+             paint=[('metal', 'Rail'), ('copper', 'Pots')]),
+     G.Model('kitchenShelfWall', kitchenShelfWall, size=(0.9, 0.76, 0.24), key='model.kitchenShelfWall',
+             centre=(0, -0.31), floor=False,
+             paint=[('oak', 'Shelves'), ('oakd', 'Brackets')]),
+     G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan',
+             paint=[('steel', 'Bin'), ('lid', 'Lid')]),
+     G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins',
+             paint=[('bin1', 'Bins'), ('bin2', 'Bins'), ('bin3', 'Bins'), ('lid', 'Handles')])],
     comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). '
             'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The '
             'placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a '
