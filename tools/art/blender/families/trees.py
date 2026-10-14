@@ -7,7 +7,7 @@
 # conifers stacked cones. Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints.
 # Trees stand on every lot and by the thousand in the woods, so each costs what its placeholder does, and each has a
 # far version (`far_of`: the same build at low detail, a third of the clumps), which the far woods and the town
-# overview draw in place of the `*.far` placeholder keys.
+# overview draw.
 #
 # Run:  python3 -B tools/art/blender/build.py trees [--only oak] [--preview]
 import math

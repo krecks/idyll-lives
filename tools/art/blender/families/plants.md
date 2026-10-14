@@ -90,7 +90,7 @@ flowers here are set so each model is within 10 % of them, but for the geraniums
 ## Far versions
 
 Every outdoor model (G2, G3) has a far version, `<id>.far.glb`, drawn in the town overview and the far woods: the
-same build function run with `LOW` set (`far_of`), so every shape is the same but coarser (leaves with half the
+same build function run with `LOW` set (`far_of`, now gamekit's `G.far_of`, `gamekit/far.py`), so every shape is the same but coarser (leaves with half the
 rows, three-sided stems open at their ends, lumps and cups with fewer segments, smaller stars) and its moving part
 joined in, still; boxes lose their bevels, sprigs keep one leaf, flower faces three petals and no middle, cups
 three sides, mounds twelve. Where it leaves things out it still draws every random number the full build draws, so
@@ -102,6 +102,9 @@ the floor and lost thin parts. Every far version comes to 30–49 % of its model
 `model.bush` and `model.garden.boxwood`, `topiaryCone`, `hedge`, `hydrangea`, `rosebush`, `azalea`, `lavender`,
 `fern`, `grass`, `hosta`. The bush, hydrangea, roses, lavender and boxwood also dress every lot's border, and the
 bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they cost what their placeholders do.
+The lot dressing's other two placeholders, `model.bush.small` (also in the woods) and `model.bush.flowering`, and
+the streets' and hedged lots' `model.hedge` are built here too (`bushSmall`, `bushFlowering`, `streetHedge`: the
+shrub, the shrub with pink blossom, the garden hedge's block without its sprigs), each one draw call on `foliage`.
 
 - **Shrubs** (`shrub`): a dark core lump and clumps round it, lighter on top; flowers (`dots`) spread over the upper
   part of an ellipsoid round the crown.
@@ -131,9 +134,12 @@ Khronos validator: 0 errors, 0 warnings on every new file.
 ## The edibles (G4)
 
 `model.garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins`. The four crops (content `grows`) are three
-parts each: the still bed, the leaves (`plants`) and the crop (`crop`), both scaling about the middle of the bed in
-one growth clip, `grow` (`motions.growth`, `G.stages`): ripe at rest; picked, the crop gone; growing, the leaves at
-0.85 across and 0.6 high; planted, 0.6 and 0.25 (seedlings). There is no harvest clip: harvesting moves a crop to its
+parts each: the still bed, the leaves (`plants`) and the crop (`crop`), in one growth clip, `grow`
+(`motions.growth`, `G.stages`): ripe at rest; picked, the crop gone; growing, the leaves 0.8 high and sunk a tenth
+of their height into the soil; planted, half high and sunk a third (`SINK`), so what shows is each plant's top, small,
+where the plant stands (scaled about the bed's middle, as first built, the seedlings drew together there). The
+vegetable patch's plants are its crop: picked, they are under the soil and the bed is bare (`harvested`); its
+lettuces, the lowest, show from growing on. There is no harvest clip: harvesting moves a crop to its
 picked stage, and the game plays the clip on from ripe, so the crop goes while the resident picks (seen in play:
 the tomatoes picked autonomously, stage 2 to 3, the plants left without fruit). The herb planter doesn't grow; its
 basil shrinks away for `pickHerbs` (`harvest`). The bed is the colour part ("Bed"): the boards of the raised bed and

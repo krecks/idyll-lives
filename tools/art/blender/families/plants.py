@@ -57,24 +57,9 @@ BASE = dict(
 M = G.Palette(**BASE)
 
 
-# Building a far version (`far_of`): every shape with fewer segments and no moving part.
-LOW = [False]
-
-
-def low(full, reduced):
-    """`full` detail, or `reduced` while a far version is being built."""
-    return reduced if LOW[0] else full
-
-
-def far_of(build):
-    """A model's far version (`Model(far=...)`): the same build at low detail, all one still part."""
-    def far():
-        LOW[0] = True
-        try:
-            return build()
-        finally:
-            LOW[0] = False
-    return far
+# Building a far version (gamekit's `far_of`): every shape with fewer segments (`low`) and no moving part
+# (`LOW[0]`, gamekit's flag, set while it builds).
+from gamekit.far import LOW, far_of, low  # noqa: E402,F401  (trees.py imports them from here too)
 
 
 def palette(**colours):
@@ -883,6 +868,32 @@ def bush():
     return G.settle([G.join_all('bush')])
 
 
+def bush_small():
+    """Small shrub: the round shrub's smaller, darker cousin (the lot borders and the woods' undergrowth)."""
+    P = palette()
+    rng = random.Random(32)
+    shrub(P, rng, 5, 0.86, 0.72, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'leaf')], name='bush_small')
+    return G.settle([G.join_all('bushSmall')])
+
+
+def bush_flowering():
+    """Flowering shrub: the round shrub dotted with pink blossom (the lot borders)."""
+    P = palette(blossom='#F08CBC', blossom2='#F8B4D4', blossom3='#FFF0F6', blossom4='#E870A8')
+    rng = random.Random(33)
+    shrub(P, rng, 5, 1.22, 1.03, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')], name='bush_flowering')
+    dots(rng, 14, (0, 0, 0.55), (0.59, 0.59, 0.48), 0.17, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'blossom',
+         band=(-0.2, 0.95), out=0.94)
+    return G.settle([G.join_all('bushFlowering')])
+
+
+def street_hedge():
+    """Clipped hedge segment of the streets and hedged lots: the garden hedge's block, still (rows overlap,
+    street.ts spaces them about 1.05 m apart)."""
+    P = palette(leaf=SHRUB[1], leaf_light=SHRUB[2], stem=SHRUB[3])
+    hedge_block(P, 1.5, 0.915, 0.85)                     # 1.55 x 1.0 x 0.85 m over all, as its placeholder
+    return G.settle([G.join_all('hedge')])
+
+
 def boxwood():
     """Boxwood ball: a clipped dark-green ball; a few shaggy sprigs on top, which a trim takes off."""
     P = palette(leaf='#3E6B33', leaf_dark='#365F2D', leaf_light='#4C7A3A')
@@ -1038,15 +1049,21 @@ def hosta():
 
 # ---- edibles (G4) ------------------------------------------------------------------------------------
 # A crop's leaves and its crop are two moving parts with one growth clip, `grow` (`motions.growth`, G.stages): ripe
-# at rest; picked, the crop gone; growing, the leaves smaller and no crop; planted, seedlings. Both parts scale about
-# the middle of the bed, the leaves more in height than across, so seedlings stay near where the plants grow.
+# at rest; picked, the crop gone; growing, the leaves lower and no crop; planted, seedlings. The leaves are one part
+# (one draw call), so rather than shrink about the bed's middle (which drew the seedlings together there) they
+# flatten in height only and sink into the soil (`SINK`, shares of their height): what shows is each plant's top,
+# small, where the plant stands.
 
-PLANTS = dict(picked=1, growing=(0.85, 0.85, 0.6), planted=(0.6, 0.6, 0.25))
+PLANTS = dict(picked=1, growing=(1, 1, 0.8), planted=(1, 1, 0.5))
+SINK = (0, 0.1, 0.32)
+# A bed whose crop is the plants themselves (lettuces, cabbages, carrots): picked, they are gone under the soil.
+HARVESTED = dict(picked=(1, 1, 0.5), sink=0.6)
 CROP = dict(picked=0.001, growing=0.001, planted=0.001)
 
 
-def _crop(still, origin, leaves, crop):
-    """The still part, and the leaves and crop `leaves()` and `crop()` make as the growth clip's two parts."""
+def _crop(still, origin, leaves, crop, harvested=False):
+    """The still part, and the leaves and crop `leaves()` and `crop()` make as the growth clip's two parts.
+    `harvested`: picking takes the plants too (a vegetable patch), not only their crop (tomatoes)."""
     if LOW[0]:                                                         # a far version: all one still part, ripe
         leaves()
         crop()
@@ -1058,7 +1075,13 @@ def _crop(still, origin, leaves, crop):
         crop()
     fruit = G.join(parts, 'crop', origin=origin)
     G.settle([still, plants, fruit])
-    G.stages(plants, 'grow', **PLANTS)
+    height = G.measure([plants])[1][2] - plants.location[2]           # the plants' top over their origin
+    sink = [s * height for s in SINK]
+    stages = dict(PLANTS)
+    if harvested:
+        stages['picked'] = HARVESTED['picked']
+        sink[0] = HARVESTED['sink'] * height
+    G.stages(plants, 'grow', **stages, sink=sink)
     G.stages(fruit, 'grow', **CROP)
     return [still, plants, fruit]
 
@@ -1097,7 +1120,7 @@ def veg_patch():
             lump(f'heart{k}', 0.07, (x, y, top + 0.06), P.bloom, scale=(1, 1, 0.85), noise=0.1, seed=k + 6)
         for k, (x, y) in enumerate(spots[2]):                          # carrot shoulders
             G.cone(f'carrot{k}', 0.022, 0.016, 0.03, at=(x, y, top + 0.01), material=P.bloom4, verts=low(8, 5))
-    return _crop(still, (0, 0, top), leaves, crop)
+    return _crop(still, (0, 0, top), leaves, crop, harvested=True)          # picked, the bed is bare
 
 
 def tomatoes():
@@ -1249,6 +1272,10 @@ FAMILY = G.Family(
      G.Model('flowerBox', flower_box, size=(0.945, 0.732, 0.505), key='model.garden.flowerBox', tolerance=TOLERANCE, far=far_of(flower_box), paint=[('body', 'Box')]),
      # G3: shrubs (they dress every lot)
      G.Model('bush', bush, size=(1.043, 0.91, 1.095), key='model.bush', tolerance=TOLERANCE, far=far_of(bush)),
+     G.Model('bushSmall', bush_small, size=(0.832, 0.707, 0.782), key='model.bush.small', tolerance=TOLERANCE, far=far_of(bush_small)),
+     G.Model('bushFlowering', bush_flowering, size=(1.208, 1.016, 1.268), key='model.bush.flowering', tolerance=TOLERANCE,
+             far=far_of(bush_flowering)),
+     G.Model('streetHedge', street_hedge, size=(1.547, 1.019, 0.85), key='model.hedge', tolerance=TOLERANCE, far=far_of(street_hedge)),
      G.Model('boxwood', boxwood, size=(0.696, 0.752, 0.722), key='model.garden.boxwood', tolerance=TOLERANCE, far=far_of(boxwood),
              motions={'uses': {'trim': 'trim'}}),
      G.Model('topiaryCone', topiary_cone, size=(0.643, 1.805, 0.66), key='model.garden.topiaryCone', tolerance=TOLERANCE, far=far_of(topiary_cone),
