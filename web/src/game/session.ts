@@ -324,6 +324,8 @@ export async function startSession(
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
+  /** The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy` holds). */
+  let autonomy: boolean | null = null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -1403,7 +1405,7 @@ export async function startSession(
         fpsCap: s.fpsCap,
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
-      bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
+      if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
       if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
       if (s.autosaveMinutes !== autosaveMinutes) {
