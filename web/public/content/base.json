@@ -3707,6 +3707,10 @@
         {
           "id": "hotHeaded",
           "label": "Hot Headed"
+        },
+        {
+          "id": "kind",
+          "label": "Kind"
         }
       ]
     },

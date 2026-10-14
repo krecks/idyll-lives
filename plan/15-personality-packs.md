@@ -125,7 +125,7 @@ done.
 | `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. |
 | `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the cover slides off for plunge. |
 
-## P9. Kind (6)
+## P9. Kind (6) — **Done** (in Validate › Kind)
 
 - **Family:** `tools/art/blender/families/pack_kind.py`
 - **Validate group:** `kind` (Validate › Kind)

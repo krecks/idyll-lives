@@ -90,7 +90,8 @@
         1
       ],
       "price": 950,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "kind",
       "slots": 1,
       "description": "A roomy counter and oven for baking pies and treats to share; better bakers feed the family better, and Cooking 4+ bakes leave residents glowing and extra charming.",
       "interactions": [
@@ -149,7 +150,8 @@
         1
       ],
       "price": 60,
-      "category": "decor",
+      "category": "validate",
+      "group": "kind",
       "slots": 1,
       "description": "A glass jar on a little stand for spare change to good causes; each gift costs a few dollars and leaves a warm heart that makes friendly chats go better.",
       "interactions": [
@@ -182,7 +184,8 @@
         1
       ],
       "price": 420,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "kind",
       "slots": 1,
       "description": "A cushioned rocking chair with a yarn basket for knitting gifts; trains Dexterity, and at Dexterity 3+ each finished piece inspires the knitter.",
       "interactions": [
@@ -237,7 +240,8 @@
         1
       ],
       "price": 700,
-      "category": "living",
+      "category": "validate",
+      "group": "kind",
       "slots": 2,
       "description": "A low table with two cushions and an always-warm teapot where two residents share tea and talk; charming hosts (Charisma 2+) come away warm-hearted.",
       "interactions": [
@@ -277,7 +281,8 @@
         1
       ],
       "price": 140,
-      "category": "outdoor",
+      "category": "validate",
+      "group": "kind",
       "slots": 1,
       "description": "A post-mounted feeder and bird bath; filling it with seed is a small daily kindness, and watching the visitors sharpens Perception.",
       "interactions": [
@@ -334,7 +339,8 @@
         1
       ],
       "price": 2600,
-      "category": "living",
+      "category": "validate",
+      "group": "kind",
       "slots": 2,
       "description": "A deep, quilt-draped settee with its own warm glow, made for two; curling up here comforts, connects and leaves residents cosy enough to sleep better for hours.",
       "interactions": [
