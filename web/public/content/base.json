@@ -2490,7 +2490,7 @@
         }
       ],
       "price": 300,
-      "category": "bathroom",
+      "category": "validate",
       "group": "toilets"
     },
     {
@@ -3683,6 +3683,10 @@
         {
           "id": "counters",
           "label": "Counters"
+        },
+        {
+          "id": "toilets",
+          "label": "Toilets"
         }
       ]
     },

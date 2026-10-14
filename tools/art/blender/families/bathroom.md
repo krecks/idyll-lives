@@ -1,6 +1,6 @@
 # Bathroom — notes
 
-`bathroom.py` builds the five bathroom sinks into `web/public/assets/models/bathroom/` and their entries
+`bathroom.py` builds the five bathroom sinks and the five toilets (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
 (`sinkConsole.glb`). They replace the primitive-part placeholders in `catalog.py` / `catalog2.py`, which
@@ -42,9 +42,44 @@ It had two (frames in the file, the glass as primitive `parts`). They were taken
 player chooses the mirror they hang above it (the wall mirror, the mirror cabinet), as for any sink. Its
 placeholder (`catalog.double_vanity`) has none either.
 
+## B1 — the toilets
+
+`model.toilet` (`toilet.glb`), `model.toiletCompact`, `model.toiletSmart`, `model.toiletClassic` and
+`model.toiletWallHung`, built 2026-10-14. They sit in Validate › Toilets until checked in play.
+
+- **Against the wall, not centred.** The game sits a resident at the footprint's middle plus the seat's
+  `fwd` (characters.ts `SEATS`, else the content's `seat`), so each toilet is built where its placeholder
+  stands: the cistern (or the boxed-in cistern) on the wall face at game depth -0.43,
+  `G.settle(centre=False)`, and `centre=` on its `Model`. The bowl's middle is 8–16 cm in front of the hips.
+- **Seat heights.** The seat's top is the seat height: 0.43 m (`toilet`, `toiletCompact`), 0.44 m
+  (`toiletSmart`), 0.445 m (`toiletWallHung`) and 0.45 m (`toiletClassic`). The wall-hung placeholder has its
+  seat at 0.6 m; the model follows the content (0.45 m).
+- **Shapes.** The bowl is an oval revolve with thickness (`_bowl`), its inside down to a water disc; a foot
+  on the floor (`_foot`), or a wall-hung bowl on an oval porcelain block (`_column`) into the panel. The
+  seat is a flattened torus, the lid a bevelled oval disc.
+- **The lid** is the one moving part (`lid`), hinged across its back edge, on its underside; `lid_up`
+  swings it 100° about X in 0.6 s, to lean on the cistern (the hinge is 8.6–9.5 cm in front of it so the
+  lid just meets it). The smart toilet's lid is level with its seat housing (the bidet unit) and hinged on
+  its top edge, so it lifts over the housing; it rises slower, 0.8 s. Only the lid lifts: the resident sits
+  on the seat. `motions` plays `lid_up` for the `toilet` animation tag until the use ends.
+- **The classic toilet** is close-coupled with a wooden seat and lid, as its content and placeholder say
+  (not a high cistern and chain).
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.toilet` | 0.44 × 0.82 × 0.68 m | 3,364 | 2 | Bowl, Seat & lid, Cistern |
+| `model.toiletCompact` | 0.59 × 0.81 × 0.63 m | 3,532 | 2 | Bowl, Seat & lid, Cistern (a slim cistern, a push button, a roll on the wall) |
+| `model.toiletSmart` | 0.90 × 1.20 × 0.71 m | 3,232 | 2 | Bowl, Seat & lid, Cistern (the panel, with a display, a remote and a roll) |
+| `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,600 | 3 | Bowl, Seat & lid (wood), Cistern |
+| `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,088 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel and flush plate) |
+
+`check_glb.py`: 0 failed. It warns that the compact and wall-hung toilets are off centre from their
+placeholders (whose backs are 2.5 and 5 cm inside the wall), and that the wall-hung one is deeper than its
+placeholder. Khronos validator: 0 errors, 0 warnings each.
+
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py bathroom            # the five .glb, the pack, check_glb
+python3 -B tools/art/blender/build.py bathroom            # every .glb, the pack, check_glb
 python3 -B tools/art/blender/build.py bathroom --preview  # previews/sink.png, sink@water_on.png, …
 ```

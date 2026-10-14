@@ -10,7 +10,7 @@
         1
       ],
       "price": 260,
-      "category": "bathroom",
+      "category": "validate",
       "group": "toilets",
       "seat": {
         "height": 0.45,
@@ -43,7 +43,7 @@
         1
       ],
       "price": 600,
-      "category": "bathroom",
+      "category": "validate",
       "group": "toilets",
       "decor": 0.2,
       "seat": {

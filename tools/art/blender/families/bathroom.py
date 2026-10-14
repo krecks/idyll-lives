@@ -1,10 +1,12 @@
 # The bathroom sinks: the base sink (`model.sink`), the pedestal (`model.sinkPedestal`), the double
 # vanity (`model.vanityDouble`), the vessel sink (`model.sinkVessel`) and the console sink
 # (`model.sinkConsole`), over their primitive-part placeholders (`catalog.py`, `furniture_prims.py`),
-# which stay the fallback. Notes: bathroom.md.
+# which stay the fallback; and the five toilets (`model.toilet`, `model.toiletCompact`, `model.toiletSmart`,
+# `model.toiletClassic`, `model.toiletWallHung`). Notes: bathroom.md.
 #
 # Each sink is one still body (cabinet / basin / pedestal / legs) plus one moving part: a stream of
 # water (`water`) that grows from the tap's spout into the basin while a resident washes (`motions`).
+# Each toilet is one still body plus its lid, which lifts while a resident uses it.
 # Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py bathroom [--preview]
@@ -30,6 +32,15 @@ M = G.Palette(
     dark=('#2F3236', 'satin'),       # drains and seals
     teal=('#4E8A7A', 'gloss'),       # soap and cup accents
     water=('#9EC9DD', 'gloss'),      # the stream from the tap
+    # the toilets
+    seat=('#EFEFEC', 'gloss'),       # a toilet's seat and lid
+    seat_wood=('#8A5A36', 'wood'),   # the classic toilet's wooden seat and lid
+    cistern=('#F6F6F4', 'gloss'),    # a cistern on the bowl
+    panel=('#E4E3DF', 'satin'),      # the smart toilet's boxed-in cistern
+    boxing=('#C9C6C0', 'matte'),     # the wall-hung toilet's boxed-in cistern
+    screen=('#2A2C30', 'gloss'),     # flush plates and the smart toilet's display
+    led=('#5EC28B', 'gloss'),        # the smart toilet's ready light
+    paper=('#FBFBF8', 'matte'),      # toilet rolls
 )
 
 # The parts the player may colour, the biggest first (the cabinet, vanity, pedestal, console basin or
@@ -243,6 +254,196 @@ def sinkConsole():
     return G.meshes()
 
 
+# --- the toilets: a bowl, a seat and a cistern; the lid lifts while a resident uses it ----------------------
+# Built where the placeholder stands, the cistern against the wall face (game depth -0.43), not centred:
+# the game sits the resident at the footprint's middle (characters.ts SEATS, the content's `seat`), so the
+# bowl must stay where the seat is. The seat's top is the seat height. The lid is the moving part, hinged
+# at its back edge; `lid_up` lifts it 100° to lean on the cistern (or over the smart seat's housing).
+WALL = -0.43
+
+
+def _bowl(F, zb, base_y, rim, r, ratio, water_y):
+    """An oval bowl, `r` wide (half) and `ratio` times that deep: a revolve with thickness, so its inside
+    faces up from the rim down to the water."""
+    h = rim - base_y
+    profile = [(0, base_y), (r * 0.5, base_y), (r * 0.78, base_y + h * 0.3), (r * 0.95, base_y + h * 0.7),
+               (r, rim - 0.015), (r - 0.006, rim), (r - 0.03, rim), (r - 0.045, rim - 0.025),
+               (r * 0.62, rim - h * 0.45), (r * 0.36, water_y + 0.01), (r * 0.3, water_y), (0, water_y)]
+    G.revolve('bowl', profile, at=F.at(0, 0, zb), material=M.porcelain, segments=36, scale=(1, ratio, 1))
+    G.cylinder('bowl_water', r * 0.36, 0.004, at=F.at(0, water_y + 0.006, zb), material=M.water, verts=24,
+               scale=(1, ratio, 1))
+
+
+def _foot(F, z, top, r, ratio, flare=1.0):
+    """The bowl's foot on the floor, up into the bowl's underside (`flare` widens its plinth)."""
+    G.revolve('foot', [(0, 0), (r * flare, 0), (r * flare, 0.015), (r * (0.9 + 0.06 * flare), 0.04),
+                       (r * 0.82, top * 0.5), (r * 0.88, top * 0.85), (r * 1.1, top), (0, top)],
+              at=F.at(0, 0, z), material=M.porcelain, segments=32, scale=(1, ratio, 1))
+
+
+def _column(F, name, y0, y1, z0, z1, w=0.26):
+    """The porcelain behind the bowl (the deck a cistern stands on, a wall-hung bowl's fixing): an oval
+    column from game depth `z0` to `z1`, `w` wide, rounded on its edges."""
+    d = z1 - z0
+    G.cylinder(name, w / 2, y1 - y0, at=F.at(0, (y0 + y1) / 2, (z0 + z1) / 2), material=M.porcelain,
+               scale=(1, d / w, 1), verts=28, bevel=0.03, bevel_segments=3)
+
+
+def _seat(F, zb, y, r, ratio, material, t=0.024):
+    """The seat ring on the rim, from `y` up `t`, its outside `r` (half) wide."""
+    m = 0.034
+    ring = G.torus('seat', r - m, m, at=F.at(0, y + t / 2, zb), material=material, major_segments=36,
+                   minor_segments=10)
+    ring.scale = (1, ratio, t / (2 * m))
+
+
+def _lid(F, zb, y, r, ratio, material, t=0.02, pivot='bottom'):
+    """The lid over the seat, from `y` up `t`, hinged across its back edge: on its underside, or on its top
+    (`pivot='top'`, where it lifts over a housing behind it). Returns it, ready to swing about X."""
+    with G.new_parts() as parts:
+        G.cylinder('lid', r, t, at=F.at(0, y + t / 2, zb), material=material, scale=(1, ratio, 1), verts=36,
+                   bevel=0.008)
+    lid = G.join(parts, 'lid')
+    return G.hinged(lid, F.at(0, y + (t if pivot == 'top' else 0), zb - r * ratio))
+
+
+def _hinges(F, z, y, material, x=0.09):
+    """The seat's two hinge posts on the bowl's back deck."""
+    for s in (-1, 1):
+        F.cyl(f'hinge{s}', 0.014, 0.03, (s * x, y + 0.008, z), material, rot=(0, 90, 0), verts=10)
+
+
+def _roll(F, x, y, z, side=1):
+    """A toilet roll on a chrome arm out from the wall (or the panel) at game depth `z`; `side` is the
+    end the arm comes from (the roll runs along x)."""
+    F.box('roll_plate', 0.012, 0.05, 0.03, (x - side * 0.06, y, z + 0.015), M.chrome, bevel=0.004)
+    G.rod('roll_arm', F.at(x - side * 0.06, y, z + 0.02), F.at(x - side * 0.06, y, z + 0.065), 0.006,
+          material=M.chrome, verts=8)
+    G.rod('roll_rod', F.at(x - side * 0.06, y, z + 0.065), F.at(x + side * 0.055, y, z + 0.065), 0.006,
+          material=M.chrome, verts=8)
+    F.cyl('roll', 0.055, 0.1, (x, y, z + 0.065), M.paper, rot=(0, 90, 0), verts=16)
+    F.cyl('roll_core', 0.02, 0.102, (x, y, z + 0.065), M.dark, rot=(0, 90, 0), verts=10)
+
+
+def _close_coupled(F, zb, rim, r, ratio, cz, cw, ch, seat_material, foot_flare=1.0):
+    """The bowl on its foot, the back deck from the bowl to the wall, the seat, and a cistern `cw` wide,
+    `ch` tall, from the wall to game depth `cz`, standing on the deck."""
+    _foot(F, zb - 0.06, 0.2, 0.115, 1.3, flare=foot_flare)
+    _bowl(F, zb, 0.17, rim, r, ratio, water_y=0.27)
+    back = zb - r * ratio                       # the seat's back edge, where the lid hinges
+    _column(F, 'deck', 0.16, rim, WALL, back + 0.04)
+    _seat(F, zb, rim, r - 0.002, ratio, seat_material)
+    _hinges(F, back + 0.012, rim, M.chrome)
+    F.box('cistern', cw, ch, cz - WALL, (0, rim + ch / 2, (WALL + cz) / 2), M.cistern, bevel=0.03)
+
+
+def toilet():
+    F = G.GameFrame()
+    r, ratio, rim = 0.18, 1.2, 0.405           # the seat's top at 0.43 m (SEATS)
+    zb = -0.186 + r * ratio                    # the lid hinges 9.4 cm in front of the cistern
+    with G.new_parts() as still:
+        _close_coupled(F, zb, rim, r, ratio, -0.28, 0.42, 0.38, M.seat)
+        F.box('cistern_lid', 0.44, 0.03, 0.155, (0, rim + 0.395, WALL + 0.0775), M.cistern, bevel=0.012)
+        F.cyl('lever_boss', 0.018, 0.012, (-0.13, 0.72, -0.274), M.chrome, rot=(90, 0, 0), verts=12)
+        F.box('lever', 0.075, 0.014, 0.012, (-0.1, 0.72, -0.266), M.chrome, bevel=0.005)
+    G.join(still, 'body', origin=(0, 0, 0))
+    lid = _lid(F, zb, rim + 0.024, r, ratio, M.seat)
+    G.settle(centre=False)
+    G.swing(lid, 'lid_up', -100, seconds=0.6, axis='X')
+    return G.meshes()
+
+
+def toiletCompact():
+    F = G.GameFrame()
+    r, ratio, rim = 0.17, 1.22, 0.405
+    zb = -0.214 + r * ratio                    # a slim cistern, the lid hinged 8.6 cm in front of it
+    with G.new_parts() as still:
+        _close_coupled(F, zb, rim, r, ratio, -0.30, 0.4, 0.37, M.seat)
+        F.box('cistern_lid', 0.41, 0.025, 0.13, (0, rim + 0.382, WALL + 0.065), M.cistern, bevel=0.01)
+        F.cyl('button', 0.032, 0.012, (0, rim + 0.398, -0.365), M.chrome, verts=16)
+        _roll(F, 0.33, 0.62, WALL)
+    G.join(still, 'body', origin=(0, 0, 0))
+    lid = _lid(F, zb, rim + 0.024, r, ratio, M.seat)
+    G.settle(centre=False)
+    G.swing(lid, 'lid_up', -100, seconds=0.6, axis='X')
+    return G.meshes()
+
+
+def toiletClassic():
+    F = G.GameFrame()
+    r, ratio, rim = 0.18, 1.2, 0.425           # the wooden seat's top at 0.45 m (content `seat`)
+    zb = -0.15 + r * ratio
+    with G.new_parts() as still:
+        _close_coupled(F, zb, rim, r, ratio, -0.25, 0.44, 0.4, M.seat_wood, foot_flare=1.25)
+        # a moulded two-step lid and a lever with a ball end
+        F.box('cistern_lid', 0.47, 0.03, 0.185, (0, rim + 0.415, WALL + 0.0925), M.cistern, bevel=0.01)
+        F.box('cistern_cap', 0.43, 0.02, 0.15, (0, rim + 0.44, WALL + 0.075), M.cistern, bevel=0.008)
+        F.box('cistern_band', 0.445, 0.03, 0.005, (0, rim + 0.06, -0.248), M.cistern, bevel=0.002)
+        F.cyl('lever_boss', 0.022, 0.014, (-0.15, 0.76, -0.243), M.chrome, rot=(90, 0, 0), verts=12)
+        G.rod('lever', F.at(-0.15, 0.76, -0.236), F.at(-0.07, 0.745, -0.236), 0.007, material=M.chrome, verts=8)
+        F.sphere('lever_end', 0.014, (-0.065, 0.745, -0.236), M.chrome, segments=10, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    lid = _lid(F, zb, rim + 0.024, r, ratio, M.seat_wood)
+    G.settle(centre=False)
+    G.swing(lid, 'lid_up', -100, seconds=0.6, axis='X')
+    return G.meshes()
+
+
+def _wall_hung(F, zb, rim, r, ratio, panel_z):
+    """A bowl off the floor, fixed to the boxed-in cistern at `panel_z` by a block behind it."""
+    _bowl(F, zb, 0.21, rim, r, ratio, water_y=0.3)
+    _column(F, 'neck', 0.25, rim - 0.004, panel_z - 0.02, zb - r * ratio * 0.45)
+
+
+def toiletSmart():
+    F = G.GameFrame()
+    r, ratio, rim = 0.19, 1.22, 0.41           # the seat's top at 0.44 m (SEATS)
+    panel_z = -0.28
+    housing = -0.18                            # the seat's housing (the bidet) from the panel to here
+    zb = housing + r * ratio
+    with G.new_parts() as still:
+        F.box('panel', 0.9, 1.2, panel_z - WALL, (0, 0.6, (WALL + panel_z) / 2), M.panel, bevel=0.01)
+        F.box('display', 0.2, 0.12, 0.012, (0, 1.0, panel_z + 0.006), M.screen, bevel=0.004)
+        F.sphere('ready', 0.008, (0.06, 0.98, panel_z + 0.013), M.led, segments=8, rings=5)
+        F.box('remote', 0.06, 0.15, 0.024, (0.34, 0.72, panel_z + 0.012), M.screen, bevel=0.008)
+        _roll(F, -0.34, 0.8, panel_z, side=-1)
+        _wall_hung(F, zb, rim, r, ratio, panel_z)
+        _seat(F, zb, rim, r - 0.002, ratio, M.seat, t=0.03)
+        F.box('housing', 0.4, 0.055, housing - panel_z + 0.01, (0, rim + 0.0275, (panel_z + housing) / 2 - 0.005),
+              M.seat, bevel=0.02)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the lid is level with the housing's top and hinged on its front edge, so it lifts over it
+    lid = _lid(F, zb, rim + 0.03, r, ratio, M.seat, t=0.025, pivot='top')
+    G.settle(centre=False)
+    G.swing(lid, 'lid_up', -100, seconds=0.8, axis='X')
+    return G.meshes()
+
+
+def toiletWallHung():
+    F = G.GameFrame()
+    r, ratio, rim = 0.18, 1.25, 0.42           # the seat's top at 0.445 m (content `seat` 0.45)
+    panel_z = -0.31
+    zb = panel_z + 0.095 + r * ratio
+    with G.new_parts() as still:
+        F.box('panel', 0.6, 1.1, panel_z - WALL, (0, 0.55, (WALL + panel_z) / 2), M.boxing, bevel=0.01)
+        F.box('flush_plate', 0.22, 0.15, 0.012, (0, 1.0, panel_z + 0.006), M.screen, bevel=0.005)
+        for s in (-1, 1):
+            F.box(f'flush{s}', 0.09, 0.12, 0.008, (s * 0.05, 1.0, panel_z + 0.014), M.chrome, bevel=0.004)
+        _wall_hung(F, zb, rim, r, ratio, panel_z)
+        back = zb - r * ratio
+        F.box('deck', 0.24, 0.03, back - panel_z + 0.02, (0, rim - 0.015, (panel_z + back) / 2), M.porcelain,
+              bevel=0.012)
+        _seat(F, zb, rim, r - 0.002, ratio, M.seat)
+        _hinges(F, back + 0.012, rim, M.chrome)
+    G.join(still, 'body', origin=(0, 0, 0))
+    lid = _lid(F, zb, rim + 0.024, r, ratio, M.seat)
+    G.settle(centre=False)
+    G.swing(lid, 'lid_up', -100, seconds=0.6, axis='X')
+    return G.meshes()
+
+
+TOILET = {'uses': {'toilet': 'lid_up'}}
+
 FAMILY = G.Family(
     'bathroom', M,
     [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink',
@@ -262,7 +463,20 @@ FAMILY = G.Family(
                     ('wood', 'Shelf & legs'), ('towel', 'Towels')]),
      G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole',
              motions={'uses': {'wash': 'water_on'}},
-             paint=[('body', 'Basin'), ('brass', 'Legs & tap'), ('fabric', 'Towel')])],
+             paint=[('body', 'Basin'), ('brass', 'Legs & tap'), ('fabric', 'Towel')]),
+     G.Model('toilet', toilet, size=(0.44, 0.815, 0.676), key='model.toilet', centre=(0, -0.092),
+             motions=TOILET, paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('cistern', 'Cistern')]),
+     G.Model('toiletCompact', toiletCompact, size=(0.59, 0.809, 0.631), key='model.toiletCompact',
+             centre=(0.09, -0.1145), motions=TOILET,
+             paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('cistern', 'Cistern')]),
+     G.Model('toiletSmart', toiletSmart, size=(0.9, 1.2, 0.714), key='model.toiletSmart', centre=(0, -0.073),
+             motions=TOILET, paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('panel', 'Cistern')]),
+     G.Model('toiletClassic', toiletClassic, size=(0.47, 0.875, 0.712), key='model.toiletClassic',
+             centre=(0, -0.074), motions=TOILET,
+             paint=[('porcelain', 'Bowl'), ('seat_wood', 'Seat & lid'), ('cistern', 'Cistern')]),
+     G.Model('toiletWallHung', toiletWallHung, size=(0.6, 1.1, 0.665), key='model.toiletWallHung',
+             centre=(0, -0.0975), motions=TOILET,
+             paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('boxing', 'Cistern')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

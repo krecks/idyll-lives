@@ -262,6 +262,227 @@
           "label": "Towel"
         }
       ]
+    },
+    "model.toilet": {
+      "type": "model",
+      "url": "../../models/bathroom/toilet.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletCompact": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletCompact.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletSmart": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletSmart.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "panel": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "panel",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletClassic": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletClassic.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat_wood": {
+          "finish": "material.finish.wood"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat_wood",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletWallHung": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletWallHung.glb",
+      "materials": {
+        "boxing": {
+          "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "boxing",
+          "label": "Cistern"
+        }
+      ]
     }
   }
 }

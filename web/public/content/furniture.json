@@ -2220,7 +2220,7 @@
         1
       ],
       "price": 150,
-      "category": "bathroom",
+      "category": "validate",
       "group": "toilets",
       "wearPerUse": 0.01,
       "description": "A basic toilet. Cheap, but it wears out faster.",
@@ -2250,7 +2250,7 @@
         1
       ],
       "price": 1100,
-      "category": "bathroom",
+      "category": "validate",
       "group": "toilets",
       "decor": 0.2,
       "description": "A wall-hung toilet with a warm seat and a bidet: a little fresher and comfier every time.",

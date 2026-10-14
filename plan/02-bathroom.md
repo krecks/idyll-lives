@@ -1,10 +1,10 @@
 # Bathroom
 
-The seven sinks are done (`families/bathroom.py`, `water_on`). Water here grows the same way: a stream built at
+The seven sinks are done (`families/bathroom.py`, `water_on`), and the five B1 toilets (`lid_up`). Water here grows the same way: a stream built at
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
-## B1. Toilets (5)
+## B1. Toilets (5) — **Done** (in Validate › Toilets)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `toilets` (Validate › Toilets)
@@ -15,7 +15,7 @@ files (E6), as the double vanity did.
 | `toilet` Toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`: the lid swings up 100° as the use starts and down as it ends. |
 | `toiletCompact` Compact toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`. |
 | `toiletSmart` Smart toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`: lid and seat rise on their own (slower, 0.8 s). |
-| `toiletClassic` Classic toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`; the high cistern and chain are static. |
+| `toiletClassic` Classic toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`; the close-coupled cistern (the content and placeholder: no high cistern and chain) and wooden seat are static. |
 | `toiletWallHung` Wall-hung toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`. |
 
 ## B2. Showers (4)
