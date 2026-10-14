@@ -364,3 +364,10 @@ These are what's left.
   kitchen storage, islands, tables, chairs and dining storage. Sign the kitchen off (16-sign-off.md) after a look
   in play.
 - **Not checked**: all four facings of each model, the colour studio, night lighting, and catalog pictures.
+
+## Simulation speed (checked 2026-10-14)
+
+- **`Relationships::partner_of`'s `debug_assert` is kept.** It re-scans the row on every call in test builds, but
+  timing the whole sim-core suite with and without it showed no difference (about 18 s either way; towns are ~60
+  Sims). It catches `.partners` changed through `get_mut` instead of `set_partners`. `Sim::refresh_buffs`' extra
+  walks over `feelings` (a few entries) aren't worth a change either.

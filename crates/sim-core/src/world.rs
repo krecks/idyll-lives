@@ -3376,7 +3376,6 @@ fn pick_autonomous(
         let attracted = other
             .gender_ix
             .is_none_or(|g| sim.attraction & (1 << g) != 0);
-        // Partner lookups scan everyone: only when a goal asks for it.
         let single = !sim.planner.goals.is_empty() && ctx.rels.partner_of(j).is_none();
         let grown_ups = ctx.briefs[me].adult && other.adult;
         // A guest keeps the hosts company, even with nothing in particular to talk about.
