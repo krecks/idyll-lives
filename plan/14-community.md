@@ -53,9 +53,9 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body, Awning | Use | `drop`: a can drops to the tray for drink. |
 | `marketStall` Market stall | 2x1 · floor | browse:look fruit:eat | community / food | Body, Awning | Static | Static. |
 
-## CM4. Shops and café (5)
+## CM4. Shops and café (5) — **Done** (in Validate › Shops)
 
-- **Family:** `tools/art/blender/families/community.py`
+- **Family:** `tools/art/blender/families/shops.py`
 - **Validate group:** `shops` (Validate › Shops)
 - **Placeholders to match:** `tools/art/community.py`
 

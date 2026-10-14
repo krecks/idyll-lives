@@ -820,7 +820,7 @@
         1
       ],
       "price": 600,
-      "category": "community",
+      "category": "validate",
       "group": "shops",
       "slots": 2,
       "decor": 0.3,
@@ -851,7 +851,7 @@
         1
       ],
       "price": 900,
-      "category": "community",
+      "category": "validate",
       "group": "shops",
       "slots": 2,
       "decor": 0.4,
@@ -882,7 +882,7 @@
         1
       ],
       "price": 450,
-      "category": "community",
+      "category": "validate",
       "group": "shops",
       "slots": 2,
       "decor": 0.2,
@@ -924,7 +924,7 @@
         1
       ],
       "price": 220,
-      "category": "community",
+      "category": "validate",
       "group": "shops",
       "decor": 0.3,
       "surface": {
@@ -947,7 +947,7 @@
         1
       ],
       "price": 160,
-      "category": "community",
+      "category": "validate",
       "group": "shops",
       "approach": "around",
       "seatAt": [

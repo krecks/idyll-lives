@@ -125,6 +125,13 @@ built in Blender by `tools/art/blender/families/farm.py` on `gamekit` and export
 The scarecrow sways slowly on its post near the camera (`sway`, ambient); the coop's pop-hole hatch is a part of its
 own for a later use; the rest are static. Their primitive-part entries stay as the fallback.
 
+The shop fittings and café furniture (`models/shops/shopCounter.glb`, `bakeryCase.glb`, `groceryShelf.glb`,
+`cafeTable.glb`, `cafeChair.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/shops/manifest.json`) are built in Blender by `tools/art/blender/families/shops.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0). The till's cash drawer slides out while a resident buys a treat and the bakery case's
+back glass door slides aside for a pastry; the grocery shelves, the café table and the bentwood café chair are static.
+Their primitive-part entries stay as the fallback.
+
 The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
 `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack

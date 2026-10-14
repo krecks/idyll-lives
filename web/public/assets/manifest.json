@@ -38,7 +38,8 @@
     "packs/office/manifest.json",
     "packs/kids/manifest.json",
     "packs/playground/manifest.json",
-    "packs/farm/manifest.json"
+    "packs/farm/manifest.json",
+    "packs/shops/manifest.json"
   ],
   "entries": {
     "material.wall": {

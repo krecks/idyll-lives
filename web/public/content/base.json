@@ -3801,6 +3801,10 @@
           "id": "farm",
           "label": "Farm",
           "outside": true
+        },
+        {
+          "id": "shops",
+          "label": "Shops"
         }
       ]
     },
