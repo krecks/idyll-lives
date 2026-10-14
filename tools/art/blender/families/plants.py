@@ -1,5 +1,5 @@
 # The garden's plants: G1, the houseplants (`model.plant` and `model.garden.monstera`, `fiddleFig`, `snakePlant`,
-# `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), G2 the flowers and G3 the shrubs (below), over the
+# `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), G2 the flowers, G3 the shrubs and G4 the edibles (below), over the
 # primitive-part placeholders of `furniture.py` and `nature.py`, which stay the fallback. The outdoor ones each have
 # a far version: the same build at low detail (`far_of`).
 #
@@ -1029,6 +1029,183 @@ def hosta():
     return G.settle([G.join_all('hosta')])
 
 
+# ---- edibles (G4) ------------------------------------------------------------------------------------
+# A crop's leaves and its crop are two moving parts with one growth clip, `grow` (`motions.growth`, G.stages): ripe
+# at rest; picked, the crop gone; growing, the leaves smaller and no crop; planted, seedlings. Both parts scale about
+# the middle of the bed, the leaves more in height than across, so seedlings stay near where the plants grow.
+
+PLANTS = dict(picked=1, growing=(0.85, 0.85, 0.6), planted=(0.6, 0.6, 0.25))
+CROP = dict(picked=0.001, growing=0.001, planted=0.001)
+
+
+def _crop(still, origin, leaves, crop):
+    """The still part, and the leaves and crop `leaves()` and `crop()` make as the growth clip's two parts."""
+    if LOW[0]:                                                         # a far version: all one still part, ripe
+        leaves()
+        crop()
+        return G.settle([G.join_all(still.name)])
+    with G.new_parts() as parts:
+        leaves()
+    plants = G.join(parts, 'plants', origin=origin)
+    with G.new_parts() as parts:
+        crop()
+    fruit = G.join(parts, 'crop', origin=origin)
+    G.settle([still, plants, fruit])
+    G.stages(plants, 'grow', **PLANTS)
+    G.stages(fruit, 'grow', **CROP)
+    return [still, plants, fruit]
+
+
+def raised_bed(P, w, d, h):
+    """A raised bed of boards (`body`, the part the player colours) full of soil: returns the soil's height."""
+    for y in (-d / 2 + 0.03, d / 2 - 0.03):
+        G.cube(f'board{y}', (w, 0.06, h), at=(0, y, h / 2), material=P.body, bevel=0.01)
+    for x in (-w / 2 + 0.03, w / 2 - 0.03):
+        G.cube(f'board_end{x}', (0.06, d - 0.12, h), at=(x, 0, h / 2), material=P.body, bevel=0.01)
+    G.cube('soil', (w - 0.1, d - 0.1, 0.03), at=(0, 0, h - 0.015), material=P.soil)
+    return h
+
+
+def veg_patch():
+    """Vegetable patch: a raised bed of lettuces, cabbages and carrots, grown from seedlings to ripe."""
+    P = palette(body='#8A6446', leaf='#9CC45A', leaf_light='#8AB44E', leaf_dark='#7EA48A', stem='#5E9A3A',
+                bloom='#A8C8A0', bloom4='#E8782A')
+    rng = random.Random(81)
+    top = raised_bed(P, 0.92, 0.92, 0.18)
+    still = G.join_all('vegPatch')
+    spots = [[(x + rng.uniform(-0.03, 0.03), y + rng.uniform(-0.03, 0.03)) for y in (0.27, 0.0, -0.27)] for x in (-0.28, 0.0, 0.28)]
+    tops = [[(rng.uniform(0.22, 0.28), j * 120 + rng.uniform(0, 40)) for j in range(3)] for _ in range(3)]
+
+    def leaves():
+        for k, (x, y) in enumerate(spots[0]):                          # lettuces
+            lump(f'lettuce{k}', 0.1, (x, y, top - 0.01), [P.leaf, P.leaf_light][k % 2], scale=(1, 1, 0.65), noise=0.35, seed=k)
+        for k, (x, y) in enumerate(spots[1]):                          # cabbages' outer leaves
+            lump(f'cabbage{k}', 0.12, (x, y, top - 0.01), P.leaf_dark, scale=(1, 1, 0.8), noise=0.2, seed=k + 3)
+        for k, (x, y) in enumerate(spots[2]):                          # carrot tops
+            for j, (length, yaw) in enumerate(tops[k]):
+                blade(f'carrot_top{k}_{j}', (x, y, top), yaw, 70 - j * 8, length, 0.045, P.stem, droop=0.3)
+
+    def crop():
+        for k, (x, y) in enumerate(spots[1]):                          # cabbage hearts
+            lump(f'heart{k}', 0.07, (x, y, top + 0.06), P.bloom, scale=(1, 1, 0.85), noise=0.1, seed=k + 6)
+        for k, (x, y) in enumerate(spots[2]):                          # carrot shoulders
+            G.cone(f'carrot{k}', 0.022, 0.016, 0.03, at=(x, y, top + 0.01), material=P.bloom4, verts=low(8, 5))
+    return _crop(still, (0, 0, top), leaves, crop)
+
+
+def tomatoes():
+    """Tomato plants: three plants tied to canes on a soil mound, hung with red, orange and green tomatoes."""
+    P = palette(leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', flesh='#C9A86A',
+                bloom='#D63A2A', bloom2='#E04A30', bloom3='#C8302A', bloom4='#E8902E', flesh_light='#8DB04A')
+    rng = random.Random(82)
+    top = mound(P, r=0.4)
+    canes = [(0.2, 0.15), (-0.2, 0.12), (0.0, -0.2)]
+    for i, (x, y) in enumerate(canes):
+        G.cylinder(f'cane{i}', 0.012, 1.18, at=(x, y, 0.6), material=P.flesh, verts=low(6, 4))
+    still = G.join_all('tomatoes')
+    clumps_at = [[(x + rng.uniform(-0.06, 0.06), y + rng.uniform(-0.06, 0.06), 0.14 + k * 0.24 + rng.uniform(-0.04, 0.04))
+                  for k in range(4)] for x, y in canes]
+    fruit_at = []
+    for i in range(15):
+        x, y = rng.choice(canes)
+        a = rng.uniform(0, math.tau)
+        fruit_at.append((x + 0.13 * math.cos(a), y + 0.13 * math.sin(a), rng.uniform(0.2, 0.92)))
+
+    def leaves():
+        for i, cane in enumerate(clumps_at):
+            for k, at in enumerate(cane):
+                lump(f'leaves{i}_{k}', 0.14, at, [P.leaf, P.leaf_dark, P.leaf_light, P.stem][(k + 1) % 4], scale=(1, 1, 0.75),
+                     noise=0.35, seed=i * 4 + k)
+
+    def crop():
+        cols = [P.bloom, P.bloom2, P.bloom3, P.bloom4, P.flesh_light]
+        for i, at in enumerate(fruit_at):
+            lump(f'tomato{i}', 0.035, at, cols[i % 5], noise=0.05, segments=8, rings=5)
+    return _crop(still, (0, 0, top), leaves, crop)
+
+
+def strawberries():
+    """Strawberry bed: a bed of straw, leafy crowns, white flowers and red berries tucked in."""
+    P = palette(bed='#D8C27A', leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', bloom='#D8263A',
+                bloom5='#F6F4EE', centre='#F2C12E', stalk='#4A7A36')
+    rng = random.Random(83)
+    G.revolve('bed', [(0, 0), (0.44, 0), (0.42, 0.02), (0.3, 0.045), (0, 0.05)], material=P.bed, segments=low(20, 16))
+    still = G.join_all('strawberries')
+    crowns = spiral(7, 0.32, rng)
+    berries = spiral(16, 0.4, rng)
+    flowers = spiral(4, 0.3, rng)
+
+    def leaves():
+        for i, (x, y, a) in enumerate(crowns):
+            for j in range(3):
+                leaf(f'crown{i}_{j}', (x, y, 0.04), a + j * 120, 45, 0.14, 0.11, [P.leaf, P.leaf_dark, P.leaf_light][(i + j) % 3],
+                     shape='heart', droop=0.3, fold=0.3, rows=4, ring=4)
+
+    def crop():
+        for i, (x, y, a) in enumerate(berries):
+            G.cone(f'berry{i}', 0.006, 0.024, 0.05, at=(x, y, 0.07), material=P.bloom, verts=low(6, 4))
+        for i, (x, y, a) in enumerate(flowers):
+            stem(f'flower_stem{i}', (x, y, 0.04), (x, y, 0.2), P.stalk, r=0.003)   # plain, as the berries
+            star(f'flower{i}', (x, y, 0.2), 0.022, 5, P.bloom5, 0, 10, inner=0.8, cup=0.1)
+            dome(f'eye{i}', (x, y, 0.2), 0.008, 0.005, P.centre)
+    return _crop(still, (0, 0, 0.05), leaves, crop)
+
+
+def herbs():
+    """Herb planter: a planter on legs of basil, rosemary, chives and sage; a resident picking herbs takes a few
+    sprigs of basil."""
+    P = palette(body='#8A6446', leaf='#6AAE3E', leaf_dark='#5E9E38', leaf_light='#8EA088', stem='#3E5E3A',
+                blossom='#4E8A3A', bloom='#B88AD0')
+    rng = random.Random(84)
+    G.cube('box', (0.84, 0.46, 0.22), at=(0, 0, 0.62), material=P.body, bevel=0.01)
+    for x in (-0.38, 0.38):
+        for y in (-0.19, 0.19):
+            G.cube(f'leg{x}{y}', (0.055, 0.055, 0.52), at=(x, y, 0.26), material=P.body, bevel=0.006)
+    G.cube('soil', (0.78, 0.4, 0.02), at=(0, 0, 0.725), material=P.soil)
+    lump('basil2', 0.08, (-0.25, -0.1, 0.72), P.leaf_dark, scale=(1, 1, 0.75), noise=0.35, seed=1)
+    for i in range(7):                                                                            # rosemary
+        blade(f'rosemary{i}', (-0.06 + rng.uniform(-0.05, 0.05), rng.uniform(-0.1, 0.1), 0.72), rng.uniform(0, 360),
+              rng.uniform(72, 90), rng.uniform(0.2, 0.28), 0.03, P.stem, droop=0.1)
+    for i in range(6):                                                                            # chives, some in flower
+        base = (0.14 + rng.uniform(-0.04, 0.04), rng.uniform(-0.1, 0.1), 0.72)
+        h = rng.uniform(0.2, 0.26)
+        blade(f'chive{i}', base, rng.uniform(0, 360), rng.uniform(78, 90), h, 0.018, P.blossom, droop=0.05)
+        if i % 2 == 0:
+            lump(f'chive_flower{i}', 0.02, (base[0], base[1], base[2] + h - 0.01), P.bloom, noise=0.2, segments=6, rings=4)
+    lump('sage', 0.1, (0.31, 0.04, 0.72), P.leaf_light, scale=(1, 1, 0.65), noise=0.3, seed=3)   # sage
+    lump('sage2', 0.07, (0.3, -0.12, 0.72), P.leaf_light, scale=(1, 1, 0.7), noise=0.3, seed=4)
+    still = G.join_all('herbs')
+    at = (-0.29, 0.05, 0.72)
+    return _with_part('sprigs', still, lambda: lump('basil', 0.1, at, P.leaf, scale=(1, 1, 0.75), noise=0.35, seed=2), at, 'harvest')
+
+
+def pumpkins():
+    """Pumpkin patch: a patch of soil, big rough leaves and three pumpkins, grown from seedlings to ripe."""
+    P = palette(bed='#6A4C38', leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', bloom='#E8822A',
+                stalk='#5E6A2E')
+    rng = random.Random(85)
+    G.revolve('bed', [(0, 0), (0.46, 0), (0.42, 0.02), (0.3, 0.035), (0, 0.04)], material=P.bed, segments=low(20, 16),
+              scale=(1.1, 1.0, 1))
+    still = G.join_all('pumpkins')
+    spots = []
+    for i in range(9):
+        a = i / 9 * 360 + rng.uniform(-15, 15)
+        rr = rng.uniform(0.12, 0.34)
+        spots.append((polar(rr, a, 0.03), a, rng.uniform(5, 20)))
+
+    def leaves():
+        for i, (base, a, tilt) in enumerate(spots):
+            leaf(f'leaf{i}', base, a, tilt, 0.24, 0.26, [P.leaf, P.leaf_dark, P.leaf_light, P.stem][i % 4], shape='heart',
+                 droop=0.2, fold=0.35, thick=0.012, rows=5, ring=5)
+
+    def crop():
+        for i, (x, y, r) in enumerate([(0.18, -0.12, 0.17), (-0.2, 0.05, 0.14), (-0.02, 0.3, 0.11)]):
+            G.revolve(f'pumpkin{i}', [(0, 0), (r * 0.55, 0.004), (r * 0.92, r * 0.25), (r, r * 0.6), (r * 0.8, r * 1.05), (r * 0.3, r * 1.2),
+                                      (0, r * 1.12)], at=(x, y, 0.02), material=P.bloom, segments=low(14, 8))
+            tube(f'stalk{i}', [(x, y, 0.02 + r * 1.1), (x + 0.01, y, 0.02 + r * 1.1 + 0.06)], 0.014, 0.01, P.stalk, verts=5)
+    return _crop(still, (0, 0, 0.04), leaves, crop)
+
+
 # (width, height, depth) as measured; each within 10 % of its placeholder's bounds (check_glb warns beyond).
 TOLERANCE = 0.03
 BED = [('bed', 'Bed')]
@@ -1081,13 +1258,25 @@ FAMILY = G.Family(
              paint=[('bloom', 'Flowers')], motions={'uses': {'cut': 'cut'}}),
      G.Model('fern', garden_fern, size=(0.793, 0.478, 0.932), key='model.garden.fern', tolerance=TOLERANCE, far=far_of(garden_fern)),
      G.Model('grass', ornamental_grass, size=(1.218, 1.21, 1.28), key='model.garden.grass', tolerance=TOLERANCE, far=far_of(ornamental_grass)),
-     G.Model('hosta', hosta, size=(0.621, 0.842, 0.675), key='model.garden.hosta', tolerance=TOLERANCE, far=far_of(hosta))],
-    comment='Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers and G3 shrubs. '
+     G.Model('hosta', hosta, size=(0.621, 0.842, 0.675), key='model.garden.hosta', tolerance=TOLERANCE, far=far_of(hosta)),
+     # G4: edibles
+     G.Model('vegPatch', veg_patch, size=(0.92, 0.398, 0.92), key='model.garden.vegPatch', tolerance=TOLERANCE, far=far_of(veg_patch),
+             paint=[('body', 'Bed')], motions={'growth': 'grow'}),
+     G.Model('tomatoes', tomatoes, size=(0.8, 1.19, 0.8), key='model.garden.tomatoes', tolerance=TOLERANCE, far=far_of(tomatoes),
+             paint=BED, motions={'growth': 'grow'}),
+     G.Model('strawberries', strawberries, size=(0.88, 0.21, 0.88), key='model.garden.strawberries', tolerance=TOLERANCE,
+             far=far_of(strawberries), paint=BED, motions={'growth': 'grow'}),
+     G.Model('herbs', herbs, size=(0.84, 1.01, 0.46), key='model.garden.herbs', tolerance=TOLERANCE, far=far_of(herbs),
+             paint=[('body', 'Bed')], motions={'uses': {'pickHerbs': 'harvest'}}),
+     G.Model('pumpkins', pumpkins, size=(1.112, 0.269, 0.947), key='model.garden.pumpkins', tolerance=TOLERANCE, far=far_of(pumpkins),
+             paint=BED, motions={'growth': 'grow'})],
+    comment='Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. '
             'Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest\'s '
             'packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` '
             'finish, so the nature shader sways and tints them as it does the placeholders\'. The outdoor ones have a far '
             'version (`far`). Clips: the bonsai\'s sprig and the clipped shrubs\' sprigs shrink away while they are '
-            'trimmed, a rose and lavender stems while they are cut, a meadow flower while it is picked.'
+            'trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the '
+            'crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).'
 )
 
 if __name__ == '__main__':

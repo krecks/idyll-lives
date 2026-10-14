@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built potted plants (tools/art/blender/families/plants.py): the G1 houseplants. Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them as it does the placeholders'; the pot is `body`, the part the player colours. The bonsai's stray sprig shrinks away while a resident prunes it.",
+  "$comment": "Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them as it does the placeholders'. The outdoor ones have a far version (`far`). Clips: the bonsai's sprig and the clipped shrubs' sprigs shrink away while they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).",
   "version": 1,
   "entries": {
     "model.plant": {
@@ -1191,6 +1191,214 @@
         }
       },
       "far": "../../models/plants/hosta.far.glb"
+    },
+    "model.garden.vegPatch": {
+      "type": "model",
+      "url": "../../models/plants/vegPatch.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/vegPatch.far.glb"
+    },
+    "model.garden.tomatoes": {
+      "type": "model",
+      "url": "../../models/plants/tomatoes.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/tomatoes.far.glb"
+    },
+    "model.garden.strawberries": {
+      "type": "model",
+      "url": "../../models/plants/strawberries.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/strawberries.far.glb"
+    },
+    "model.garden.herbs": {
+      "type": "model",
+      "url": "../../models/plants/herbs.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pickHerbs": "harvest"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/herbs.far.glb"
+    },
+    "model.garden.pumpkins": {
+      "type": "model",
+      "url": "../../models/plants/pumpkins.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/pumpkins.far.glb"
     }
   }
 }

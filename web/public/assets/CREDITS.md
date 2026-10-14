@@ -65,6 +65,11 @@ also original and CC0, each with a far version (`<id>.far.glb`), as are the flow
 shrubs' stray sprigs off, a prune cuts a rose and a cut a few lavender stems. Their primitive-part entries stay as
 the fallback.
 
+The edibles (`models/plants/vegPatch.glb`, `tomatoes.glb`, `strawberries.glb`, `herbs.glb`, `pumpkins.glb`, each
+with its far version, in the same pack) are built by the same script, also original and CC0. The four crops grow
+from seedlings to ripe and lose their crop when harvested (`grow`); the herb planter's basil shrinks while herbs are
+picked. Their primitive-part entries stay as the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.

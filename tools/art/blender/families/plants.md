@@ -5,7 +5,7 @@
 trio, succulent bowl, fern on a stand, parlour palm, orchid and bonsai (`model.garden.*`). They replace the
 primitive-part placeholders of `furniture.py` and `nature.py`, which stay as the fallback. Built 2026-10-14; they
 sit in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
-Flowers), then the G3 shrubs (Validate › Shrubs); the edibles (G4) come into this family next.
+Flowers), then the G3 shrubs (Validate › Shrubs) and the G4 edibles (Validate › Edibles).
 
 ## How a plant is made
 
@@ -127,6 +127,27 @@ bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they co
 `check_glb.py`: the family's 36 models, 0 failed. Warnings: far versions over half (boxwood, topiary, hedge and
 eight flower beds), the grass 13 % wider and the hydrangea 13 % lower than their placeholders' bounds. Khronos
 validator: 0 errors, 0 warnings on every new file.
+
+## The edibles (G4)
+
+`model.garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins`. The four crops (content `grows`) are three
+parts each: the still bed, the leaves (`plants`) and the crop (`crop`), both scaling about the middle of the bed in
+one growth clip, `grow` (`motions.growth`, `G.stages`): ripe at rest; picked, the crop gone; growing, the leaves at
+0.85 across and 0.6 high; planted, 0.6 and 0.25 (seedlings). There is no harvest clip: harvesting moves a crop to its
+picked stage, and the game plays the clip on from ripe, so the crop goes while the resident picks (seen in play:
+the tomatoes picked autonomously, stage 2 to 3, the plants left without fruit). The herb planter doesn't grow; its
+basil shrinks away for `pickHerbs` (`harvest`). The bed is the colour part ("Bed"): the boards of the raised bed and
+the planter (plain, to stay within three draw calls), the soil mound, straw or patch of the others.
+
+| Model | Size (w × h × d) | Triangles | Far | Draws |
+|---|---|---|---|---|
+| `model.garden.vegPatch` | 0.92 × 0.40 × 0.92 m | 1,590 | 924 | 3 |
+| `model.garden.tomatoes` | 0.80 × 1.19 × 0.80 m | 2,380 | 956 | 3 |
+| `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 1,456 | 788 | 3 |
+| `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,294 | 924 | 3 |
+| `model.garden.pumpkins` | 1.11 × 0.27 × 0.95 m | 1,174 | 542 | 3 |
+
+`check_glb.py`: 5 models, 0 failed (far versions over half for three). Khronos validator: 0 errors, 0 warnings.
 
 ## Rebuild
 

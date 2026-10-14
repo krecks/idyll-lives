@@ -17,6 +17,10 @@ The eleven G3 shrubs are done too. They dress every lot (`natureDecor`) and the 
 their placeholders do; they, the flowers and the edibles each have a far version, the same build at low detail
 (`far_of`). Only the topiary has a pot; the flowering shrubs colour their flowers instead, the others nothing.
 
+The five G4 edibles are done: the four crops have a growth clip only (`grow`, G.stages: their leaves and their
+crop as two parts), no harvest clip; harvesting moves them to the picked stage, so the crop goes as the clip plays
+on, and grows back over the days. The herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
+
 ## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
@@ -80,7 +84,7 @@ their placeholders do; they, the flowers and the edibles each have a far version
 | `garden.grass` Ornamental grass | 1x1 · floor | — | garden / shrubs | Pot | Static | Static. |
 | `garden.hosta` Hosta | 1x1 · floor | water:water | garden / shrubs | Pot | Static | Static. |
 
-## G4. Edibles (5)
+## G4. Edibles (5) — **Done** (in Validate › Edibles)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `edibles` (Validate › Edibles)

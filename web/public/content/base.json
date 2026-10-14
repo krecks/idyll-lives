@@ -3805,6 +3805,11 @@
         {
           "id": "shops",
           "label": "Shops"
+        },
+        {
+          "id": "edibles",
+          "label": "Edibles",
+          "outside": true
         }
       ]
     },
