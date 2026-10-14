@@ -3699,6 +3699,10 @@
           "label": "Kitchen Storage"
         },
         {
+          "id": "islands",
+          "label": "Islands & Bars"
+        },
+        {
           "id": "toilets",
           "label": "Toilets"
         },

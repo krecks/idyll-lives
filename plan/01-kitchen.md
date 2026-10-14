@@ -2,8 +2,8 @@
 
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
 (`families/kitchen.py`), the six K2 cookers and the four K3 small appliances and dishwashers are done
-(`families/kitchen_cooking.py`), and the eight K4 base counters and the eleven K5 tall and wall storage
-things are done (`families/kitchen_counters.py`).
+(`families/kitchen_cooking.py`), and the eight K4 base counters, the eleven K5 tall and wall storage
+things and the five K6 islands and bars are done (`families/kitchen_counters.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -87,10 +87,10 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Static | Static. (+use) `lid_open`: the pedal lid lifts 70° (a "throw away" use). |
 | `recyclingBins` Recycling bins | 1x1 · floor | — | kitchen / counters | Bins, Lids | Static | Static. (+use) the lids lift. |
 
-## K6. Islands and bars (5)
+## K6. Islands and bars (5) — **Done** (in Validate › Islands & Bars)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
-- **Validate group:** `islands` (Validate › Islands)
+- **Validate group:** `islands` (Validate › Islands & Bars)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |

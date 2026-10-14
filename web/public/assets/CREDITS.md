@@ -250,6 +250,12 @@ The pantry and the tall larder swing both doors open 100° while a resident fetc
 cabinets, cooker hood, spice rack, pot rail and wall shelves are static, and the pedal and recycling bins
 are static this pass. Their primitive-part entries stay as the fallback.
 
+The kitchen islands and bars (`models/kitchen_counters/kitchenIsland.glb`, `islandSmall.glb`,
+`islandLong.glb`, `barSegment.glb`, `barEnd.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The kitchen island slides a drawer out between its stools while a resident makes a sandwich; the small and
+long islands and the bars are static. Their primitive-part entries stay as the fallback.
+
 The bedroom beds (`models/bedroom/bed.glb`, `bedSingle.glb`, `bedBunk.glb`, `bedFuton.glb`, `bedKing.glb`,
 `bedDouble.glb`, `bedQueenUpholstered.glb`, `bedCanopy.glb`, `bedDaybed.glb`, override pack
 `packs/bedroom/manifest.json`) are built in Blender by `tools/art/blender/families/bedroom.py` on `gamekit` and

@@ -1,6 +1,6 @@
 # Kitchen counters — notes
 
-`kitchen_counters.py` builds the kitchen's **K4 base counters** and **K5 tall and wall storage** into
+`kitchen_counters.py` builds the kitchen's **K4 base counters**, **K5 tall and wall storage** and **K6 islands and bars** into
 `web/public/assets/models/kitchen_counters/` and their entries in `packs/kitchen_counters/manifest.json`.
 
 K4 (2026-10-14): the plain counter (`model.counter`), the corner counter (`model.counterCorner`), the
@@ -13,6 +13,9 @@ cabinets (`model.wallCabinet`, `model.wallCabinetGlass`, `model.wallCabinetCorne
 (`model.rangeHood`), the spice rack (`model.spiceRack`), the pot rail (`model.potRail`), the kitchen wall
 shelves (`model.kitchenShelfWall`), the pedal bin (`model.trashCan`) and the recycling bins
 (`model.recyclingBins`).
+
+K6 (2026-10-14): the kitchen island (`model.kitchenIsland`), the small island (`model.islandSmall`), the long
+island (`model.islandLong`), the bar counter (`model.barSegment`) and the bar end (`model.barEnd`).
 
 They replace the primitive-part placeholders of `catalog.py` / `catalog2.py`, which stay as the fallback.
 
@@ -92,9 +95,26 @@ which is fine on a wall. A floor thing stands and is centred as usual.
 | `model.trashCan` | 0.310 × 0.685 × 0.365 m | 540 | 1 | — | static (future: `lid_open`) |
 | `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 972 | 1 | — | static (future: the lids lift) |
 
+## K6 — islands and bars
+
+The freestanding islands put their cupboards on the back and overhang the worktop at the front for stools;
+the bars have a slatted guest side, a top at 1.06 and a brass foot rail. The kitchen island's drawer
+is on the stools' side, between them, since residents stand at the front (+Z) to use it: it slides out
+towards them for a sandwich (a fixed drawer front on the cupboard side matches it); everything else is
+static this pass.
+
+| Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
+|---|---|---|---|---|---|
+| `model.kitchenIsland` | 1.940 × 1.035 × 0.929 m | 2,972 | 3 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
+| `model.islandSmall` | 0.960 × 0.970 × 0.951 m | 1,032 | 1 | — | static |
+| `model.islandLong` | 2.960 × 0.980 × 0.951 m | 1,944 | 2 | — | static |
+| `model.barSegment` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
+| `model.barEnd` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
+
 All match their placeholder bounds (`check_glb.py`: 0 failed; Khronos glTF validator: 0 errors,
 0 warnings each). The eight K4 counters sit in Validate › Counters, the eleven K5 things in
-Validate › Kitchen Storage, until checked in play.
+Validate › Kitchen Storage and the five K6 islands and bars in Validate › Islands & Bars, until
+checked in play.
 
 ## Rebuild
 

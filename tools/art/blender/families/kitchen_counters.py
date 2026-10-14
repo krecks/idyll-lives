@@ -53,6 +53,8 @@ M = G.Palette(
     bin2=('#4E9A5A', 'satin'),
     bin3=('#E3B23C', 'satin'),
     lid=('#2F3236', 'satin'),        # a bin's lid
+    walnut=('#7A5234', 'satin'),     # a bar's body and slats
+    island=('#9DAF8C', 'satin'),     # the kitchen island's sage stool seats
 )
 
 SECONDS = 1.4   # a drawer slides in this long
@@ -510,6 +512,102 @@ def recyclingBins():
     G.settle()
 
 
+# --- K6: islands and bars ---------------------------------------------------------------------------
+# A freestanding island: cupboards on the back (-Z), a worktop overhanging the front (+Z) for stools.
+def _island(F, w, body=None, top=None, handles=None):
+    """A freestanding island unit as catalog2's `island_unit`: worktop to 0.95, cupboards on the back."""
+    body, top, handles = body or M.cab, top or M.worktop, handles or M.chrome
+    F.box('carcass', w - 0.16, 0.82, 0.58, (0, 0.51, -0.16), body, bevel=0.012)
+    F.box('plinth', w - 0.2, 0.10, 0.52, (0, 0.05, -0.16), M.dark, bevel=0.004)
+    F.box('worktop', w - 0.04, 0.05, 0.94, (0, 0.925, 0), top, bevel=0.012)
+    n = max(1, round((w - 0.16) / 0.46))
+    dw = (w - 0.18) / n
+    for i in range(n):
+        x = -(w - 0.18) / 2 + dw * (i + 0.5)
+        F.box(f'door{i}', dw - 0.02, 0.72, 0.02, (x, 0.5, -0.455), body, bevel=0.008)
+        _handle_h(F, f'door{i}_pull', x, 0.78, -0.47, 0.14, handles)
+    for s in (-1, 1):
+        F.box(f'end{s}', 0.04, 0.92, 0.6, (s * (w - 0.16) / 2, 0.46, -0.15), body, bevel=0.008)
+
+# --- the kitchen island: 2x1, two stools at the front, a drawer for a sandwich -----------------------
+def kitchenIsland():
+    F = G.GameFrame(shift=0.46)
+    with G.new_parts() as still:
+        F.box('carcass', 1.84, 0.86, 0.56, (0, 0.47, -0.16), M.cab, bevel=0.014)
+        F.box('plinth', 1.82, 0.08, 0.54, (0, 0.04, -0.16), M.dark, bevel=0.004)
+        F.box('worktop', 1.94, 0.05, 0.82, (0, 0.925, -0.04), M.worktop, bevel=0.01)
+        for s in (-1, 1):                                       # two doors on the working side (-Z)
+            F.box(f'door{s}', 0.86, 0.6, 0.02, (s * 0.47, 0.35, -0.44), M.cab, bevel=0.008)
+            _handle_h(F, f'door{s}_pull', s * 0.47, 0.6, -0.458, 0.14)
+        F.box('drawer_back', 0.9, 0.17, 0.02, (0, 0.77, -0.44), M.cab, bevel=0.008)   # a fixed front
+        _handle_h(F, 'drawer_back_pull', 0, 0.77, -0.458, 0.3)
+        for s in (-1, 1):                                       # two stools at the front (+Z)
+            x = s * 0.5
+            F.cyl(f'seat{s}', 0.18, 0.05, (x, 0.7, 0.28), M.island, verts=16)
+            F.cyl(f'leg{s}', 0.025, 0.66, (x, 0.36, 0.28), M.chrome, verts=12)
+            G.torus(f'ring{s}', 0.14, 0.01, at=F.at(x, 0.26, 0.28), material=M.chrome,
+                    major_segments=24, minor_segments=6)
+            F.cyl(f'foot{s}', 0.16, 0.02, (x, 0.01, 0.28), M.chrome, verts=16)
+        F.cyl('bowl', 0.15, 0.02, (-0.45, 0.96, -0.1), M.porcelain, verts=16)   # a fruit bowl
+        F.sphere('fruit1', 0.04, (-0.48, 1.0, -0.1), M.yellow, scale=(1, 1, 0.875), segments=10, rings=8)
+        F.sphere('fruit2', 0.04, (-0.42, 1.0, -0.06), M.rust, scale=(1, 1, 0.875), segments=10, rings=8)
+        F.box('board', 0.4, 0.03, 0.28, (0.4, 0.965, -0.2), M.oak, bevel=0.01)   # a chopping board
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the drawer is on the stools' side, between them: residents stand at the front (+Z) to use it
+    drawer = _drawer(F, 'drawer', 0.56, 0.77, 0.13, M.cab, handle_w=0.3)
+    G.settle()
+    # sandwich (not breakfast: residents sit at the island) slides the drawer out to the front
+    G.slide(drawer, 'drawer_open', (0, -0.25, 0), seconds=SECONDS)
+
+# --- the small island: 1x1, cupboards on the back and a bowl on top (static) -------------------------
+def islandSmall():
+    F = G.GameFrame(shift=0.47)
+    with G.new_parts() as still:
+        _island(F, 1.0, handles=M.brass)
+        F.cyl('bowl', 0.13, 0.02, (-0.18, 0.96, -0.12), M.porcelain, verts=16)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+# --- the long island: 3x1, six cupboards on the back and a chopping board (static) -------------------
+def islandLong():
+    F = G.GameFrame(shift=0.47)
+    with G.new_parts() as still:
+        _island(F, 3.0, handles=M.metal)
+        F.box('board', 0.42, 0.03, 0.28, (0.9, 0.965, -0.24), M.oak, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+# --- a bar: a slatted body, a top to 1.06 overhanging the front (+Z) and a foot rail (static) ---------
+def _bar(F, bw, bx, end=False, body=None, top=None, rail=None):
+    """A bar as catalog2's `bar`: a slatted body, a top at 1.06 overhanging the front (+Z), a foot rail."""
+    body, top, rail = body or M.walnut, top or M.oak, rail or M.brass
+    F.box('body', bw, 0.98, 0.5, (bx, 0.49, -0.12), body, bevel=0.01)
+    F.box('top', 1.0, 0.06, 0.88, (0, 1.03, -0.04), top, bevel=0.012)
+    F.box('ledge', bw, 0.04, 0.26, (bx, 0.92, -0.36), top, bevel=0.006)
+    n = int(bw / 0.1)
+    for i in range(n):
+        F.box(f'slat{i}', bw / n - 0.012, 0.92, 0.02, (-0.5 + bw / n * (i + 0.5), 0.47, 0.135), body, bevel=0.004)
+    F.cyl('rail', 0.02, bw, (bx, 0.2, 0.26), rail, rot=(0, 90, 0), verts=10)
+    for x in (-0.38, -0.5 + bw - 0.12):
+        F.box(f'bracket{x}', 0.03, 0.06, 0.12, (x, 0.2, 0.2), rail, bevel=0.006)
+    if end:
+        F.box('waterfall', 0.06, 1.0, 0.88, (0.47, 0.5, -0.04), top, bevel=0.008)
+
+def barSegment():
+    F = G.GameFrame(shift=0.40)
+    with G.new_parts() as still:
+        _bar(F, 1.0, 0.0)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+def barEnd():
+    F = G.GameFrame(shift=0.40)
+    with G.new_parts() as still:
+        _bar(F, 0.92, -0.04, end=True)
+    G.join(still, 'body', origin=(0, 0, 0))
+    G.settle()
+
+
 FAMILY = G.Family(
     'kitchen_counters', M,
     [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter',
@@ -569,13 +667,29 @@ FAMILY = G.Family(
      G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan',
              paint=[('steel', 'Bin'), ('lid', 'Lid')]),
      G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins',
-             paint=[('bin1', 'Bins'), ('bin2', 'Bins'), ('bin3', 'Bins'), ('lid', 'Handles')])],
+             paint=[('bin1', 'Bins'), ('bin2', 'Bins'), ('bin3', 'Bins'), ('lid', 'Handles')]),
+     # K6: islands and bars
+     G.Model('kitchenIsland', kitchenIsland, size=(1.94, 1.035, 0.92), key='model.kitchenIsland',
+             # sandwich (not breakfast: residents sit at the island) slides the drawer out
+             motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
+             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
+     G.Model('islandSmall', islandSmall, size=(0.96, 0.97, 0.951), key='model.islandSmall',
+             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
+     G.Model('islandLong', islandLong, size=(2.96, 0.98, 0.951), key='model.islandLong',
+             paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
+     G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment',
+             paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
+     G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd',
+             paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')])],
     comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). '
             'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The '
             'placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a '
             'carcass and a worktop (to 0.96 or 0.95): the plain, corner and marble counters carry a '
             'drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a '
-            'sandwich, as does the butcher block\'s knife drawer.',
+            'sandwich, as does the butcher block\'s knife drawer. The tall and wall storage (K5) adds a '
+            'larder whose doors swing open for a snack; the islands and bars (K6) add freestanding '
+            'islands with a worktop overhanging the front for stools, and slatted bars with a top at '
+            '1.06, the kitchen island sliding a drawer out between its stools for a sandwich.',
 )
 
 if __name__ == '__main__':

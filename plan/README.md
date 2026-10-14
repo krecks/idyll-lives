@@ -4,13 +4,14 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **277 are done**:
+**Where it stands (2026-10-14):** 540 objects. **282 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
 - the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (in Validate › Appliances);
 - the eight K4 base counters: `counter`, `counterCorner`, `counterEnd`, `counterCornerOuter`, `counterDrawers`, `counterOpenShelf`, `butcherBlock`, `counterMarble` (in Validate › Counters);
 - the eleven K5 tall and wall storage: `pantry`, `pantryTall`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `rangeHood`, `spiceRack`, `potRail`, `kitchenShelfWall`, `trashCan`, `recyclingBins` (in Validate › Kitchen Storage);
+- the five K6 islands and bars: `kitchenIsland`, `islandSmall`, `islandLong`, `barSegment`, `barEnd` (in Validate › Islands & Bars);
 - the five B1 toilets: `toilet`, `toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung` (in Validate › Toilets);
 - the four B2 showers: `shower`, `showerStall`, `showerWalkIn`, `showerRain` (in Validate › Showers);
 - the three B3 baths: `bathtub`, `bathtubClawfoot`, `bathtubFreestanding` (in Validate › Baths);
@@ -36,9 +37,9 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the five G4 edibles: `garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins` (in Validate › Edibles);
 - the twelve G5 trees: `tree`, `pine`, `garden.maple`, `birch`, `cherry`, `apple`, `japaneseMaple`, `magnolia`, `willow`, `spruce`, `cypress`, `lemonTree` (in Validate › Trees).
 
-**263 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 31;
-- `catalog2.py`: 94;
+**258 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 30;
+- `catalog2.py`: 90;
 - the base manifest: 10;
 - `community.py`: 36;
 - the personality packs: 92.
@@ -48,7 +49,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | Category | Items | Tasks |
 |---|---|---|
 | [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
-| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
+| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5, **done**), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8, **done**), BR3 Wardrobes and drawers (6, **done**), BR4 Dressing and mirrors (4, **done**) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4, **done**), KD2 Toys (10, **done**), KD3 Kids' study and art (6, **done**) |

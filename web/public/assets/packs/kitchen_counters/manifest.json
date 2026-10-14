@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a carcass and a worktop (to 0.96 or 0.95): the plain, corner and marble counters carry a drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a sandwich, as does the butcher block's knife drawer.",
+  "$comment": "Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a carcass and a worktop (to 0.96 or 0.95): the plain, corner and marble counters carry a drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a sandwich, as does the butcher block's knife drawer. The tall and wall storage (K5) adds a larder whose doors swing open for a snack; the islands and bars (K6) add freestanding islands with a worktop overhanging the front for stools, and slatted bars with a top at 1.06, the kitchen island sliding a drawer out between its stools for a sandwich.",
   "version": 1,
   "entries": {
     "model.counter": {
@@ -724,6 +724,167 @@
         {
           "material": "lid",
           "label": "Handles"
+        }
+      ]
+    },
+    "model.kitchenIsland": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/kitchenIsland.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "island": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "rust": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": "drawer_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.islandSmall": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/islandSmall.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.islandLong": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/islandLong.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.barSegment": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/barSegment.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Cabinet"
+        },
+        {
+          "material": "oak",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.barEnd": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/barEnd.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Cabinet"
+        },
+        {
+          "material": "oak",
+          "label": "Worktop"
         }
       ]
     }
