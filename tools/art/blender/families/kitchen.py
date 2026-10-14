@@ -57,6 +57,9 @@ FRIDGE_ANGLE = -102
 # Seconds (the residents' animation time) a door stays opening or open once a use starts: it opens in
 # 1.75 s, stays open while they reach in, then closes.
 HOLD = 3.5
+# The retro fridge: its lever turns out first, then the door swings (`delay`) while the lever springs back.
+LEVER_SECONDS = 0.3
+RETRO_OPEN = [{'clip': 'lever', 'hold': 0.4}, {'clip': 'fridge_open', 'delay': LEVER_SECONDS}]
 
 
 def _bar(name, x, y0, y1, z, t=0.022, stand=0.03, frame=F):
@@ -417,14 +420,19 @@ def _fridgeRetro():
         for i, x in enumerate((-0.18, -0.09, 0.0)):
             Fr.sphere(f'apple{i}', 0.036, (x, 0.786, -0.08), M.produce, segments=10, rings=6)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the rounded door, hinged on its left edge, with a chrome lever and a top handle
+    # the rounded door, hinged on its left edge, with a top handle
     with G.new_parts() as parts:
         Fr.box('door', 0.68, 1.50, 0.04, (0, 0.84, 0.30), M.mint, bevel=0.06)
         Fr.box('seam', 0.68, 0.012, 0.02, (0, 1.18, 0.325), M.mint2, bevel=0.004)
-        Fr.box('handle', 0.06, 0.24, 0.05, (0.27, 1.0, 0.34), M.chrome, bevel=0.02)
         Fr.box('top_handle', 0.18, 0.05, 0.012, (0, 1.5, 0.325), M.chrome, bevel=0.01)
     door = G.hinged(G.join(parts, 'door'), Fr.at(-0.36, 0.84, 0.30))
+    # the chrome lever on the door, pivoting on its top: pulled out first, it unlatches the door
+    with G.new_parts() as parts:
+        Fr.box('handle', 0.06, 0.24, 0.05, (0.27, 1.0, 0.34), M.chrome, bevel=0.02)
+    lever = G.hinged(G.join(parts, 'lever'), Fr.at(0.27, 1.12, 0.33))
     G.settle()
+    G.attach(lever, door)
+    G.swing(lever, 'lever', -30, seconds=LEVER_SECONDS, axis='X')   # its foot out to the front
     G.swing(door, 'fridge_open', 100, seconds=DOOR_SECONDS)
 
 
@@ -490,7 +498,7 @@ FAMILY = G.Family(
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
              paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
      G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.103),
-             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             motions={'uses': {use: RETRO_OPEN for use in ('fetch', 'cook', 'drink')}, 'hold': HOLD},
              paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
      G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.79), key='model.wineFridge', centre=(0, -0.085),
              motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},

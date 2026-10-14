@@ -30,16 +30,15 @@ small from the game camera, on a wall thing most houses have several of. Revisit
 
 | Model | Clip | Kind | What |
 |---|---|---|---|
-| `wallClock` | `hands` | ambient (`idle`) | the red second hand goes round clockwise, one turn in 60 s (a clock's minute, so longer than the usual 1 s); the hour and minute hands stay at ten past ten |
-| `grandfatherClock` | `door_open` | use `wind`, `hold` 2.5 s | the trunk door (a walnut frame round an open window) swings 100° on its left hinge |
-| | `pendulum` | ambient (`idle`) | the pendulum swings 7° each way, 2 s a swing (`G.rock`) |
+| `wallClock`, `grandfatherClock` | `hour_hand`, `minute_hand` | `clock` (`at` 610) | the hands tell the game's time: each clip turns its hand once round clockwise (`G.spin`, 12 s), and the game holds it where the time has it (ten past ten at rest, the catalogue picture). No second hand: at normal speed a game minute is a real second |
 | `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`G.swing`, eased) and, played back after the hold, home: one sway (it was a `G.rock`, which played back swung twice) |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`G.grow`) for the whole use; the light is the content's |
 | `curtains`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`G.squash` in x, about the rail end) |
 
-The grandfather clock takes **4 draw calls** (the most allowed): its walnut body with its plain parts (2), the door
-(wood only, 1) and the brass pendulum (1). Its door has no glass so that it doesn't need a fifth. The curtains' tabs
-are their own fabric, so the moving panels cost one draw call each.
+The grandfather clock takes **4 draw calls** (the most allowed): its walnut body with its plain parts (2) and the
+two hands. Its trunk door and pendulum are still (they were the `door_open` use clip for `wind` and an ambient
+`pendulum`); a satin body (1 draw) would give one back for the pendulum, at the cost of the wood grain. The curtains'
+tabs are their own fabric, so the moving panels cost one draw call each.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

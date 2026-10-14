@@ -18,7 +18,7 @@ clip (E3) are built, not left static.
 | `photoPrint` Photo print | 1x1 · wall | — | decor / wall | Frame | Static | Static. |
 | `paintingClassic` Oil painting | 1x1 · wall | admire:look | decor / wall | Frame | Static | Static. |
 | `canvasAbstract` Abstract canvas | 2x1 · wall | admire:look | decor / wall | Frame | Static | Static. |
-| `wallClock` Wall clock | 1x1 · wall | — | decor / wall | Case, Face | Ambient (E2) | `hands`: the hands turn (E2; a second hand for the near view). Until then static. |
+| `wallClock` Wall clock | 1x1 · wall | — | decor / wall | Case, Face | Ambient (E2) | `hour_hand`, `minute_hand`: the hands tell the game's time (`motions.clock`); no second hand (a game minute is a real second). |
 | `wallShelf` Floating shelves | 1x1 · wall | — | decor / wall | Shelves | Static | Static. |
 
 ## D2. Ornaments (10) — **done** (2026-10-14)
@@ -29,7 +29,7 @@ clip (E3) are built, not left static.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Use | `wind`: the case door swings open for wind and shuts. A the pendulum swings (E2). |
+| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Use | `hour_hand`, `minute_hand`: the hands tell the game's time (`motions.clock`). The case door and the pendulum are still, to stay within 4 draws (decor.md). |
 | `vaseTall` Tall vase | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `urnPorcelain` Porcelain urn | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `vasePedestal` Vase on a pedestal | 1x1 · floor | — | decor / ornaments | Vase, Pedestal | Static | Static. |

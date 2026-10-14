@@ -49,6 +49,9 @@
       "motions": {
         "uses": {
           "dance": "record"
+        },
+        "loops": {
+          "dance": "spin"
         }
       },
       "paint": [

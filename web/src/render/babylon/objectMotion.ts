@@ -1,15 +1,19 @@
 /**
  * Placed objects' moving parts (a fridge's doors): the clips of their models (`ModelMotion`)
  * played while residents use them, as the model entry's `motions` say. A use that starts opens
- * its clips; each plays back after its `hold` seconds or when the use ends. A loop (`loops`: a
+ * its clips (each `delay` seconds in, if it says; only the one for the resident's slot, if it
+ * says); each plays back after its `hold` seconds or when the use ends, or, with `every`, plays from
+ * rest to rest again every so many seconds while the use lasts. A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
  * whoever is asleep. A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time, but only within `ambientRange` of the camera (none on Low), without the
- * shadows being redrawn for it. Each instance's parts draw from buffers of their own
- * (`MovingTarget`), written only while something moves.
+ * shadows being redrawn for it. A clock's hands (`clock`) show the game's time, set each game
+ * minute (each five on Low) within `CLOCK_RANGE` of the camera or the ambient range. A part moved by
+ * several clips at once takes all their poses (`partPose`: a record spinning as it swings up). Each
+ * instance's parts draw from buffers of their own (`MovingTarget`), written only while something moves.
  *
  * Time is the residents' animation time: it stops while the game is paused and runs faster
  * (up to 2.5 times) at higher speeds, as in `characters.ts`.
@@ -18,8 +22,9 @@
 import { writeMoving, type PopTarget } from './buildFx';
 import { Matrix, type Mesh, type Vector3 } from './core';
 import { GAME_RATE, QUIET_SPEED } from './characters';
-import { clipPose, type ModelClip, type ModelMotion, type Motions } from './models';
+import { partPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
+import type { ObjectPlacement } from '../../core/protocol';
 
 /** A placed object with moving parts. */
 export interface MovingObject {
@@ -33,7 +38,17 @@ export interface MovingObject {
   open?: boolean;
   /** A crop's growth stage (the placement's `growth`: 0 planted, 1 growing, 2 ripe, 3 picked). */
   stage?: number;
+  /** The slot (content `slots`, from 0) of a resident standing, sitting or lying at `x`, `z` (the snapshot's), for clips with a `slot`. */
+  slotOf?: (x: number, z: number) => number;
 }
+
+/** Metres from the camera within which clocks show the time, at least (Low has no ambient range). */
+const CLOCK_RANGE = 30;
+/** Game minutes between the clocks' hands being set: on Medium and High, and on Low. */
+const CLOCK_STEP = 1;
+const CLOCK_STEP_LOW = 5;
+/** Frames between looks at clocks that came into range while the time stood still. */
+const CLOCK_LOOK = 30;
 
 /**
  * Where a crop's growth clip stands (shares of it) for each stage, planted to picked: ripe at
@@ -52,16 +67,28 @@ interface ClipState {
   use: string;
   /** Animation time it plays back from (Infinity: when the use ends). */
   until: number;
-  /** Opens and closes (a use's, or held open), goes round while used (`loops`), or goes round always (`idle`). */
-  kind: 'use' | 'loop' | 'idle' | 'growth';
+  /** Animation time it starts opening (its `delay` after the use starts), or its next round (`every`). */
+  start: number;
+  /** Seconds between its rounds (`repeat`). */
+  every?: number;
+  /**
+   * Opens and closes (a use's, or held open), goes round while used (`loops`), plays from rest to rest
+   * every so often while used (`repeat`), goes round always (`idle`), or is held where a crop's stage
+   * (`growth`) or the game's time (`clock`) has it.
+   */
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock';
 }
 
 /** A clip a use wants this frame. */
 interface Wanted {
   /** The use (resident, action, interaction). */
   use: string;
-  /** Seconds it stays open after the use starts (undefined: while it lasts). */
+  /** Seconds it stays open after it starts (undefined: while it lasts). */
   hold?: number;
+  /** Seconds after the use starts that it starts. */
+  delay?: number;
+  /** Seconds between its rounds, if it repeats. */
+  every?: number;
   kind: 'use' | 'loop';
 }
 
@@ -81,6 +108,13 @@ export class ObjectMotion {
   private readonly wanted = new Map<number, Map<string, Wanted>>();
   /** Metres from the camera within which ambient clips play (0: none; the quality's `ambientRange`). */
   private ambientRange = 0;
+  /** The objects with clock hands, and the step of the game's time each shows (absent: to be set). */
+  private clocks: MovingObject[] = [];
+  private readonly clockShown = new Map<number, number>();
+  private clockStep = -1;
+  private clockFrames = 0;
+  /** The game's minute of the day, as the last frame had it. */
+  private minute = 0;
 
   /** Night (the lamps are lit): `motions.night` clips are held open. Null until the lighting first says. */
   private night: boolean | null = null;
@@ -116,14 +150,27 @@ export class ObjectMotion {
       if (growth) {
         let clips = this.states.get(o.id);
         if (!clips) this.states.set(o.id, (clips = new Map()));
-        clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, kind: 'growth' });
+        clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, start: 0, kind: 'growth' });
       }
       for (const name of this.held(o)) {
         const clip = o.motion.clips.get(name);
         if (!clip) continue;
         let clips = this.states.get(o.id);
         if (!clips) this.states.set(o.id, (clips = new Map()));
-        if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, kind: 'use' });
+        if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, start: 0, kind: 'use' });
+      }
+    }
+    // Clocks: their hands are set by the next frame (`setClocks`).
+    this.clocks = objects.filter((o) => o.motions.clock);
+    this.clockShown.clear();
+    this.clockStep = -1;
+    for (const o of this.clocks) {
+      let clips = this.states.get(o.id);
+      for (const name of [o.motions.clock!.hour, o.motions.clock!.minute]) {
+        const clip = name === undefined ? undefined : o.motion.clips.get(name);
+        if (!clip) continue;
+        if (!clips) this.states.set(o.id, (clips = new Map()));
+        if (!clips.has(name!)) clips.set(name!, { clip, time: 0, use: '', until: Infinity, start: 0, kind: 'clock' });
       }
     }
     for (const [id, clips] of this.states) {
@@ -140,6 +187,8 @@ export class ObjectMotion {
   clear(): void {
     this.objects.clear();
     this.states.clear();
+    this.clocks = [];
+    this.clockShown.clear();
     this.night = null;
   }
 
@@ -163,6 +212,7 @@ export class ObjectMotion {
     const { curr, layout, now } = frame;
     let dt = this.lastNow ? Math.min(Math.max((now - this.lastNow) / 1000, 0), 0.1) : 0;
     this.lastNow = now;
+    this.minute = curr[layout.header.minute] ?? 0;
     if (!this.objects.size) return { moved: false, ambient: false };
     const speed = curr[layout.header.speed] | 0;
     const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
@@ -186,13 +236,13 @@ export class ObjectMotion {
       if (!clips) continue;
       for (const name of held) {
         const clip = o.motion.clips.get(name);
-        if (clip && !clips.has(name)) clips.set(name, { clip, time: 0, use: '', until: Infinity, kind: 'use' });
+        if (clip && !clips.has(name)) clips.set(name, { clip, time: 0, use: '', until: Infinity, start: 0, kind: 'use' });
       }
       // The first lighting of a world: night clips as it is, without playing.
       const snap = this.snapNight && o.motions.night !== undefined ? o.motions.night : undefined;
-      if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, kind: 'growth' });
+      if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, start: 0, kind: 'growth' });
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
-      if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, kind: 'idle' });
+      if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, start: 0, kind: 'idle' });
       let changed = false;
       let drifted = false;
       for (const [name, want] of wanted ?? []) {
@@ -200,13 +250,16 @@ export class ObjectMotion {
         if (!clip) continue;
         const state = clips.get(name);
         if (state?.use === want.use) continue;
-        // A new use: open (again), or go round.
-        const until = want.hold === undefined ? Infinity : this.clock + want.hold;
-        if (state) Object.assign(state, { use: want.use, until, kind: want.kind });
-        else clips.set(name, { clip, time: 0, use: want.use, until, kind: want.kind });
+        // A new use: open (again, from its delay on), go round, or start its rounds.
+        const start = this.clock + (want.delay ?? 0);
+        const until = want.hold === undefined ? Infinity : start + want.hold;
+        const kind = want.every ? 'repeat' : want.kind;
+        if (state) Object.assign(state, { use: want.use, until, start, every: want.every, kind });
+        else clips.set(name, { clip, time: 0, use: want.use, until, start, every: want.every, kind });
       }
       for (const [name, state] of clips) {
         const d = state.clip.duration;
+        if (state.kind === 'clock') continue;
         if (state.kind === 'idle') {
           // Round and round near the camera; at rest further off.
           if (name !== idle) {
@@ -230,6 +283,23 @@ export class ObjectMotion {
         const using = state.use !== '' && wanted?.get(name)?.use === state.use;
         // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
         if (!using && !wanted?.has(name)) state.use = '';
+        if (state.kind === 'repeat') {
+          // From rest to rest each round, the first its `delay` into the use, then every `every`
+          // seconds; once not used, it finishes its round.
+          if (!state.time) {
+            if (!using) {
+              clips.delete(name);
+              continue;
+            }
+            if (!dt || this.clock < state.start) continue;
+            state.start = Math.max(state.start + (state.every ?? d), this.clock);
+          }
+          const time = state.time + dt;
+          state.time = time >= d ? 0 : time;
+          changed = true;
+          if (!state.time && !using) clips.delete(name);
+          continue;
+        }
         if (state.kind === 'loop' && !held.includes(name)) {
           // Round and round while used; once not, on to the end of the round and stop there (at
           // rest: a loop ends where it starts). One that never got going stops where it is.
@@ -243,7 +313,7 @@ export class ObjectMotion {
           state.time = time;
           continue;
         }
-        const open = held.includes(name) || (using && this.clock < state.until);
+        const open = held.includes(name) || (using && this.clock >= state.start && this.clock < state.until);
         const step = name === snap ? d : dt;
         const time = Math.min(Math.max(state.time + (open ? step : -step), 0), d);
         if (time !== state.time) changed = true;
@@ -259,6 +329,7 @@ export class ObjectMotion {
       if (!clips.size) this.states.delete(id);
     }
     this.snapNight = false;
+    if (this.clocks.length && this.setClocks(eye, written)) ambient = true;
     // Each buffer written goes up once, however many of its instances moved.
     for (const mesh of written) {
       if (mesh.isDisposed()) continue;
@@ -279,9 +350,10 @@ export class ObjectMotion {
   ride(id: number): Matrix | null {
     const o = this.objects.get(id);
     const name = o?.motions.ride;
-    const state = name ? this.states.get(id)?.get(name) : undefined;
+    const clips = this.states.get(id);
+    const state = name ? clips?.get(name) : undefined;
     const part = state?.clip.tracks[0]?.part;
-    if (!o || !state || part === undefined || !clipPose(state.clip, part, state.time, this.rideTmp)) return null;
+    if (!o || !state || part === undefined || !partPose([...clips!.values()], part, this.rideTmp)) return null;
     Matrix.FromArrayToRef(o.target.matrices, o.target.index * 16, this.placed);
     this.placed.invertToRef(this.rideOut);
     this.rideOut.multiplyToRef(Matrix.FromArrayToRef(this.rideTmp, 0, this.posed), this.rideOut);
@@ -324,7 +396,12 @@ export class ObjectMotion {
       if (!clips && !loop) continue;
       const use = `${curr[o + k.id]}:${act}:${interaction}`;
       const wanted = this.wanted.get(id) ?? new Map<string, Wanted>();
-      for (const { clip, hold } of clips ?? []) wanted.set(clip, { use, hold, kind: 'use' });
+      let slot: number | undefined;
+      for (const { clip, hold, delay, every, slot: only } of clips ?? []) {
+        // A clip for one slot (a bunk's duvet): only for the resident there.
+        if (only !== undefined && only !== (slot ??= object.slotOf?.(curr[o + k.x], curr[o + k.z]) ?? 0)) continue;
+        wanted.set(clip, { use, hold, delay, every, kind: 'use' });
+      }
       if (loop) wanted.set(loop, { use, kind: 'loop' });
       this.wanted.set(id, wanted);
     }
@@ -334,13 +411,55 @@ export class ObjectMotion {
   private pose(o: MovingObject, clips: Map<string, ClipState>, written?: Set<Mesh>): void {
     const moving = o.target.moving!;
     const n = moving.parts.length;
-    for (let part = 0; part < n; part++) {
-      let posed = false;
-      for (const state of clips.values()) posed = clipPose(state.clip, part, state.time, moving.poses, part * 16) || posed;
-      if (!posed) identity(moving.poses, part * 16);
-    }
+    const playing = [...clips.values()];
+    for (let part = 0; part < n; part++) if (!partPose(playing, part, moving.poses, part * 16)) identity(moving.poses, part * 16);
     writeMoving(o.target, written);
   }
+
+  /**
+   * Sets the hands of the clocks near `eye` that show another time than the game's (to the game
+   * minute; to five on Low), including those come near while it stood still (looked for every
+   * `CLOCK_LOOK` frames). True if any moved; `written` takes their meshes.
+   */
+  private setClocks(eye: Vector3, written: Set<Mesh>): boolean {
+    const step = this.ambientRange > 0 ? CLOCK_STEP : CLOCK_STEP_LOW;
+    const shown = Math.floor(this.minute / step);
+    const look = ++this.clockFrames >= CLOCK_LOOK;
+    if (look) this.clockFrames = 0;
+    else if (shown === this.clockStep) return false;
+    this.clockStep = shown;
+    const range = Math.max(this.ambientRange, CLOCK_RANGE);
+    const minute = shown * step;
+    let moved = false;
+    for (const o of this.clocks) {
+      const clips = this.states.get(o.id);
+      if (!clips || this.clockShown.get(o.id) === shown || this.distance2(o, eye) > range * range) continue;
+      const { hour, minute: hand, at = 0 } = o.motions.clock!;
+      for (const [name, period] of [[hour, 720], [hand, 60]] as const) {
+        const state = name === undefined ? undefined : clips.get(name);
+        if (state?.kind === 'clock') state.time = (((((minute - at) / period) % 1) + 1) % 1) * state.clip.duration;
+      }
+      this.clockShown.set(o.id, shown);
+      this.pose(o, clips, written);
+      moved = true;
+    }
+    return moved;
+  }
+}
+
+/**
+ * Which of `o`'s slots (content `slots`, from 0) a resident at `x`, `z` is in, as sim-core's
+ * `slot_position` spreads them along the object's width (a bunk's two a hair apart, the upper one right).
+ */
+export function slotOf(o: ObjectPlacement, def: { slots?: number; bunk?: boolean } | undefined): (x: number, z: number) => number {
+  const n = Math.max(1, def?.slots ?? 1);
+  const yaw = (o.rot * Math.PI) / 2;
+  const width = o.size ? o.size[0] / 100 : o.rot % 2 ? o.d : o.w;
+  const spread = def?.bunk ? 0.04 : width / n;
+  return (x, z) => {
+    const across = (x - o.x - o.w / 2) * Math.cos(yaw) - (z - o.z - o.d / 2) * Math.sin(yaw);
+    return Math.min(n - 1, Math.max(0, Math.round(across / spread + (n - 1) / 2)));
+  };
 }
 
 /** Poses for `parts` moving parts, all at rest. */

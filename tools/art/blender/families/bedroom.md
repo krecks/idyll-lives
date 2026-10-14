@@ -33,7 +33,7 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
 |---|---|---|---|---|---|
 | `model.bed` | 1.90 × 1.13 × 1.90 m | 2,540 | 3 | `turn_down` | upholstered linen base, four-channel headboard, teak legs, sage runner |
 | `model.bedSingle` | 0.96 × 0.95 × 1.94 m | 2,776 | 3 | `turn_down` | oak posts, five-slat headboard, low footboard |
-| `model.bedBunk` | 0.96 × 1.90 × 1.92 m | 4,072 | 3 | `turn_down` (lower bunk) | oak; the ladder (right, at the foot) and the upper duvet are still |
+| `model.bedBunk` | 0.96 × 1.90 × 1.92 m | 4,260 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1) | oak; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw |
 | `model.bedFuton` | 1.96 × 0.995 × 1.97 m | 3,112 | 3 | `unfold` (held open) | ash slatted platform, low headboard; the back leans up at rest |
 | `model.bedKing` | 1.98 × 1.40 × 1.94 m | 3,360 | 3 | `turn_down` | tall five-channel headboard with wings, sage runner |
 | `model.bedDouble` | 1.62 × 0.95 × 1.92 m | 2,964 | 3 | `turn_down` | oak frame, eight teak slats, blue duvet |

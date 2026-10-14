@@ -27,6 +27,20 @@ def last_frame(seconds):
     return max(2, round(seconds * fps()))
 
 
+def attach(obj, parent):
+    """Puts moving part `obj` inside moving part `parent`, where it is: it goes with `parent`'s clips and
+    plays its own on top (a fridge's lever turning on its door, a record spinning as it swings up). Call it
+    after `G.settle` (which moves every part on its own) and before the clips; both stay their own parts,
+    so `obj` still costs its own draw. Its own clips turn it about its own origin, in `parent`'s frame."""
+    bpy.context.view_layer.update()
+    world = obj.matrix_world.copy()
+    obj.parent = parent
+    obj.matrix_parent_inverse.identity()
+    obj.matrix_world = world   # (its basis now in `parent`'s frame)
+    bpy.context.view_layer.update()
+    return obj
+
+
 def swing(obj, clip, degrees, seconds=1.0, axis='Z'):
     """A clip `clip` turning `obj` about its own `axis` ('X', 'Y' or 'Z', Blender) by `degrees` from
     rest. A door hinged on its right edge (seen from the front) opens with a negative angle about Z."""

@@ -164,24 +164,60 @@ def named_finish(name):
     return {'finish': f'material.finish.{tail}'} if head and at and tail.isalpha() and tail.islower() else None
 
 
+def uses(motions):
+    """[(use, {clip, hold, delay, every, slot})] for each clip an entry's `motions.uses` plays (a clip,
+    {clip, ...} or a list of them)."""
+    return [(use, u if isinstance(u, dict) else {'clip': u})
+            for use, value in (motions.get('uses') or {}).items() for u in (value if isinstance(value, list) else [value])]
+
+
 def played(motions):
-    """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
-    `loops`, `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users)."""
+    """{clip: what plays it} for an entry's `motions`: `uses`, `loops`, `open`, `idle`, `night`, `growth`,
+    `ride` (the clip whose part carries its users) and `clock` (`hour`, `minute`: hands set by the time)."""
     out = {}
-    for use, value in (motions.get('uses') or {}).items():
-        for u in value if isinstance(value, list) else [value]:
-            out.setdefault(u['clip'] if isinstance(u, dict) else u, f'use {use!r}')
+    for use, u in uses(motions):
+        out.setdefault(u['clip'], f'use {use!r}')
     for use, clip in (motions.get('loops') or {}).items():
         out.setdefault(clip, f'loop {use!r}')
     for kind in ('open', 'idle', 'night', 'growth', 'ride'):
         if motions.get(kind):
             out.setdefault(motions[kind], kind)
+    for hand in ('hour', 'minute'):
+        if (motions.get('clock') or {}).get(hand):
+            out.setdefault(motions['clock'][hand], f'clock {hand}')
     return out
 
 
 def loops(motions):
-    """The clips of `motions` that go round (and so must end where they start)."""
-    return set((motions.get('loops') or {}).values()) | ({motions['idle']} if motions.get('idle') else set())
+    """The clips of `motions` that go round, or from rest to rest (and so must end where they start): loops,
+    `idle`, a use's clip that repeats (`every`) and a clock's hands (a whole turn)."""
+    clock = motions.get('clock') or {}
+    return (set((motions.get('loops') or {}).values()) | ({motions['idle']} if motions.get('idle') else set())
+            | {u['clip'] for _, u in uses(motions) if u.get('every')} | {clock[h] for h in ('hour', 'minute') if clock.get(h)})
+
+
+def motions_errors(motions):
+    """What's wrong with the fields of an entry's `motions` (objectMotion.ts): a use's `delay` and `hold` are
+    seconds (0 or more), `every` more than 0, `slot` a slot number; `clock` names its hands' clips."""
+    errors = []
+    for use, u in uses(motions):
+        for key in ('hold', 'delay'):
+            if key in u and not (isinstance(u[key], (int, float)) and u[key] >= 0):
+                errors.append(f'`motions.uses` {use!r}: {key} {u[key]!r} is no number of seconds')
+        if 'every' in u and not (isinstance(u['every'], (int, float)) and u['every'] > 0):
+            errors.append(f'`motions.uses` {use!r}: every {u["every"]!r} is no number of seconds above 0')
+        if 'slot' in u and not (isinstance(u['slot'], int) and not isinstance(u['slot'], bool) and u['slot'] >= 0):
+            errors.append(f'`motions.uses` {use!r}: slot {u["slot"]!r} is no slot (0, 1, ...)')
+        unknown = set(u) - {'clip', 'hold', 'delay', 'every', 'slot'}
+        if unknown:
+            errors.append(f'`motions.uses` {use!r}: unknown {", ".join(sorted(unknown))}')
+    clock = motions.get('clock')
+    if clock is not None:
+        if not isinstance(clock, dict) or not (clock.get('hour') or clock.get('minute')) or set(clock) - {'hour', 'minute', 'at'}:
+            errors.append('`motions.clock` names its hands\' clips: {"hour", "minute", "at"}')
+        elif 'at' in clock and not isinstance(clock['at'], (int, float)):
+            errors.append(f'`motions.clock.at` {clock["at"]!r} is no time (minutes past twelve)')
+    return errors
 
 
 def check_clips(gltf, binary, entry):
@@ -201,16 +237,10 @@ def check_clips(gltf, binary, entry):
             at_rest = nodes[node].get(path, rest[path])
             if first is None or any(abs(first[k] - at_rest[k]) > 1e-3 for k in range(len(at_rest))):
                 errors.append(f'clip {name!r} starts {nodes[node].get("name", node)} away from where the file has it (the first key is the rest pose)')
-    moved = moved_nodes(gltf)
-    parents = {c: i for i, n in enumerate(nodes) for c in n.get('children', [])}
-    for i in sorted(moved):
-        p = parents.get(i)
-        while p is not None and p not in moved:
-            p = parents.get(p)
-        if p is not None:
-            warnings.append(f'{nodes[i].get("name", i)} moves inside {nodes[p].get("name", p)}, which moves too: the game moves it with its own clip only')
+    # (A part inside one that moves, a lever on a door, moves with it and by its own clips too.)
     names = {a.get('name', '') for a in animations}
     motions = entry.get('motions') or {}
+    errors += motions_errors(motions)
     plays = played(motions)
     for clip, by in sorted(plays.items()):
         if clip not in names:

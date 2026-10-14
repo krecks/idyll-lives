@@ -121,8 +121,26 @@
       },
       "motions": {
         "uses": {
-          "sleep": "turn_down",
-          "nap": "turn_down"
+          "sleep": [
+            {
+              "clip": "turn_down",
+              "slot": 0
+            },
+            {
+              "clip": "turn_down_upper",
+              "slot": 1
+            }
+          ],
+          "nap": [
+            {
+              "clip": "turn_down",
+              "slot": 0
+            },
+            {
+              "clip": "turn_down_upper",
+              "slot": 1
+            }
+          ]
         }
       },
       "paint": [

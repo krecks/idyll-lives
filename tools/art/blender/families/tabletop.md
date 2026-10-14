@@ -33,7 +33,8 @@ added without remodelling (two draw calls until then):
 
 ## The alarm clock
 
-`tableClock` stands at ten past ten; its red second hand is its own part, turning about the face's middle once a
-minute: `hands`, `G.spin(hand, 'hands', 1, seconds=60, axis='Y')`, played as an ambient loop (`motions.idle`), so it
-goes round near the camera and not on Low. A positive turn about Blender +Y is clockwise seen from the front (checked on
-the clips bench: at `&t=15` it points to three).
+`tableClock` tells the game's time: its hour and minute hands are parts of their own, each turning about the face's
+middle once round, `G.spin(hand, '<name>_hand', 1, seconds=12, axis='Y')`, and the game holds each where the time has
+it (`motions.clock`, `at` 610: ten past ten at rest, the catalogue picture), on every preset. A positive turn about
+Blender +Y is clockwise seen from the front. The red second hand is gone (a game minute is a real second at normal
+speed); its red hub stays on the face. Three draws: the body and the two hands.

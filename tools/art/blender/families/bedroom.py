@@ -208,12 +208,16 @@ def bedBunk():
     for i, y in enumerate((0.32, 0.62, 0.92, 1.22)):
         G.rod(f'rung{i}', F.at(0.465, y, 0.42), F.at(0.465, y, 0.86), 0.016, M.frame_oak, verts=8)
     z_top, z_foot = -0.28, 0.875
-    # the upper bunk's duvet is still: whole
-    _duvet(UPPER, 0.42, z_top, z_foot, 0.12, M.bedding_teal)
-    F.box('upper_sheet', 0.872, FLAP + 0.008, 0.13, (0, UPPER + DUVET - FLAP / 2, z_top + 0.055), M.sheet,
-          bevel=0.022, bevel_segments=3)
+    # Each bunk's duvet turns down for the one who sleeps in it (`slot`: the lower bunk is 0, the upper 1).
+    z_fold_upper = _bedding(UPPER, 0.42, z_top, z_foot, 0.12, M.bedding_teal)
     z_fold = _bedding(LOWER, 0.42, z_top, z_foot, 0.12, M.bedding_teal)
-    _finish('bedBunk', (LOWER, 0.42, z_top, z_fold, M.bedding_teal))
+    G.join(G.meshes(), 'bedBunk', origin=(0, 0, 0))
+    lower = _flap(LOWER, 0.42, z_top, z_fold, M.bedding_teal)
+    upper = _flap(UPPER, 0.42, z_top, z_fold_upper, M.bedding_teal)
+    upper.name = 'duvet_flap_upper'
+    _settle()
+    G.swing(lower, 'turn_down', 180, seconds=SECONDS, axis='X')
+    G.swing(upper, 'turn_down_upper', 180, seconds=SECONDS, axis='X')
 
 
 # ---------------------------------------------------------------- the futon
@@ -401,6 +405,9 @@ def _paint(frame, headboard, bedding):
 
 
 TURN_DOWN = {'uses': {'sleep': 'turn_down', 'nap': 'turn_down'}}
+# The bunk turns down the duvet of the bunk slept in: the lower one's for slot 0, the upper one's for slot 1.
+BUNKS = [{'clip': 'turn_down', 'slot': 0}, {'clip': 'turn_down_upper', 'slot': 1}]
+BUNK_TURN_DOWN = {'uses': {'sleep': BUNKS, 'nap': BUNKS}}
 
 FAMILY = G.Family(
     'bedroom', M,
@@ -408,7 +415,7 @@ FAMILY = G.Family(
              paint=_paint('frame_linen', 'headboard_linen', 'bedding_cream')),
      G.Model('bedSingle', bedSingle, size=(0.96, 0.95, 1.94), key='model.bedSingle', motions=TURN_DOWN,
              paint=_paint('frame_oak', 'headboard_oak', 'bedding_sage')),
-     G.Model('bedBunk', bedBunk, size=(0.96, 1.9, 1.92), key='model.bedBunk', motions=TURN_DOWN,
+     G.Model('bedBunk', bedBunk, size=(0.96, 1.9, 1.92), key='model.bedBunk', motions=BUNK_TURN_DOWN,
              paint=_paint('frame_oak', 'headboard_oak', 'bedding_teal')),
      # Down while the futon is open (the sim's `open`), from the moment a use that opens it starts.
      G.Model('bedFuton', bedFuton, size=(1.96, 0.995, 1.96), key='model.bedFuton',

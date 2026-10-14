@@ -4,12 +4,16 @@
  * setting up a game. Built with the game's own `buildModel` and `clipPose`. Not part of the build.
  *
  * How each clip plays follows the model entry's `motions`:
- * - a use's clip (`uses`, `open`, `night`, and clips nothing plays): at rest, opening, held open,
- *   closing again (played backwards);
+ * - a use's clip (`uses`, `open`, `night`, and clips nothing plays): at rest (and its `delay`), opening,
+ *   held open, closing again (played backwards);
+ * - a use's clip that repeats (`every`): at rest (and its `delay`), then from rest to rest twice, `every`
+ *   seconds apart;
  * - a loop (`loops`): at rest, then round after round, stopping at rest;
  * - the ambient clip (`idle`): round after round, always, alongside the others;
+ * - a clock's hands (`clock`): always, an hour of the game's time a second;
  * - the growth clip (`growth`): each stage in turn (planted, growing, ripe, picked), moving on to the
  *   next at the clip's pace, as the game does (`GROWTH_TIMES`).
+ * A part moved by several clips at once takes all their poses, as in the game (`partPose`).
  *
  * URL: `?keys=model.fridge,model.sink` (which models; default every model whose entry has `motions`),
  * `?clip=water_on` (only that clip), `?t=0.2` (hold every clip at that time, for screenshots),
@@ -41,12 +45,12 @@ import type { ModelEntry } from '../assets/types';
 import type { PartColors } from '../core/protocol';
 import { compressedTextureFeatures } from '../render/babylon/loaders';
 import { MaterialLibrary } from '../render/babylon/materials';
-import { buildModel, clipPose, painted, type ModelClip, type ModelTemplate } from '../render/babylon/models';
+import { buildModel, painted, partPose, type ModelClip, type ModelTemplate } from '../render/babylon/models';
 import { installNature } from '../render/babylon/nature';
 import { GROWTH_TIMES } from '../render/babylon/objectMotion';
 
 /** How a clip plays (see the file header). */
-type Kind = 'use' | 'loop' | 'idle' | 'growth';
+type Kind = 'use' | 'repeat' | 'loop' | 'idle' | 'growth' | 'clock';
 
 /** Seconds at rest before a clip plays, held open (a use), and running (a loop's rounds, at least two). */
 const REST = 0.9;
@@ -100,21 +104,30 @@ function colorsParam(): PartColors | undefined {
 
 /** The entry's `motions` as written (read loosely: a bench shows what's there). */
 interface RawMotions {
-  uses?: Record<string, string | { clip: string }>;
+  uses?: Record<string, RawUse | RawUse[]>;
   open?: string;
   loops?: Record<string, string>;
   idle?: string;
   night?: string;
   growth?: string;
+  clock?: { hour?: string; minute?: string; at?: number };
 }
+type RawUse = string | { clip: string; delay?: number; every?: number };
 
-/** How each clip the entry names plays; clips it doesn't name play as a use's. */
-function kinds(entry: ModelEntry | undefined): Map<string, Kind> {
+/** How each clip the entry names plays (and a use's `delay` and `every`); clips it doesn't name play as a use's. */
+function kinds(entry: ModelEntry | undefined): Map<string, { kind: Kind; delay?: number; every?: number; period?: number; at?: number }> {
   const m = (entry as { motions?: RawMotions } | undefined)?.motions ?? {};
-  const out = new Map<string, Kind>();
-  for (const clip of Object.values(m.loops ?? {})) out.set(clip, 'loop');
-  if (m.idle) out.set(m.idle, 'idle');
-  if (m.growth) out.set(m.growth, 'growth');
+  const out = new Map<string, { kind: Kind; delay?: number; every?: number; period?: number; at?: number }>();
+  for (const value of Object.values(m.uses ?? {})) {
+    for (const u of Array.isArray(value) ? value : [value]) {
+      if (typeof u !== 'string' && (u.delay || u.every)) out.set(u.clip, { kind: u.every ? 'repeat' : 'use', delay: u.delay, every: u.every });
+    }
+  }
+  for (const clip of Object.values(m.loops ?? {})) out.set(clip, { kind: 'loop' });
+  if (m.idle) out.set(m.idle, { kind: 'idle' });
+  if (m.growth) out.set(m.growth, { kind: 'growth' });
+  if (m.clock?.hour) out.set(m.clock.hour, { kind: 'clock', period: 720, at: m.clock.at });
+  if (m.clock?.minute) out.set(m.clock.minute, { kind: 'clock', period: 60, at: m.clock.at });
   return out;
 }
 
@@ -126,6 +139,12 @@ interface Shown {
   name: string;
   kind: Kind;
   clip: ModelClip;
+  /** A use's seconds before it starts, and between its rounds (`repeat`). */
+  delay?: number;
+  every?: number;
+  /** A clock hand's game minutes a turn (720, 60), and the time its rest shows. */
+  period?: number;
+  at?: number;
 }
 
 interface Bench {
@@ -145,7 +164,7 @@ for (const key of keys) {
   const entry = assets.get(key, 'model');
   const template = await buildModel(scene, key, painted(entry, colors), [1, 1]);
   const of = kinds(entry);
-  const clips = [...(template.motion?.clips ?? [])].map(([name, clip]) => ({ name, kind: of.get(name) ?? 'use', clip }));
+  const clips = [...(template.motion?.clips ?? [])].map(([name, clip]) => ({ name, kind: 'use' as Kind, ...of.get(name), clip }));
   const label = document.createElement('span');
   label.textContent = key.replace(/^model\./, '');
   if (params.get('labels') === '0') label.hidden = true;
@@ -189,15 +208,16 @@ ground.material = gm;
 ground.receiveShadows = true;
 
 /** Seconds one clip's turn takes. */
-function turnLength({ kind, clip }: Shown): number {
+function turnLength({ kind, clip, delay = 0, every = 0 }: Shown): number {
   const d = clip.duration;
+  if (kind === 'repeat') return REST + delay + every + Math.max(d, every);
   if (kind === 'loop') return REST + d * Math.max(2, Math.ceil(RUNNING / Math.max(d, 1e-3)));
   if (kind === 'growth') return GROWTH_TIMES.length * STAGE;
-  return REST + d + HOLD + d;
+  return REST + delay + d + HOLD + d;
 }
 
 /** How far into its clip a turn is at `t` seconds into it. */
-function clipTime({ kind, clip }: Shown, t: number): number {
+function clipTime({ kind, clip, delay = 0, every = 0 }: Shown, t: number): number {
   const d = clip.duration;
   if (kind === 'growth') {
     const n = GROWTH_TIMES.length;
@@ -206,8 +226,9 @@ function clipTime({ kind, clip }: Shown, t: number): number {
     const to = GROWTH_TIMES[stage] * d;
     return from + Math.sign(to - from) * Math.min(Math.abs(to - from), t - stage * STAGE);
   }
-  if (t < REST) return 0;
-  t -= REST;
+  if (t < REST + delay) return 0;
+  t -= REST + delay;
+  if (kind === 'repeat') return t % Math.max(every, d) < d ? t % Math.max(every, d) : 0;
   if (kind === 'loop') return d > 0 ? t % d : 0;
   if (t < d) return t;
   if (t < d + HOLD) return d;
@@ -228,7 +249,9 @@ function times(b: Bench, seconds: number): { at: Map<string, number>; turn: stri
     return { at, turn: playing.length === 1 ? playing[0].name : null };
   }
   for (const c of playing) if (c.kind === 'idle') at.set(c.name, c.clip.duration > 0 ? seconds % c.clip.duration : 0);
-  const turns = playing.filter((c) => c.kind !== 'idle');
+  // An hour of the game's time a second.
+  for (const c of playing) if (c.kind === 'clock') at.set(c.name, (((((seconds * 60 - (c.at ?? 0)) / c.period!) % 1) + 1) % 1) * c.clip.duration);
+  const turns = playing.filter((c) => c.kind !== 'idle' && c.kind !== 'clock');
   const cycle = turns.reduce((sum, c) => sum + turnLength(c), 0);
   let t = cycle > 0 ? seconds % cycle : 0;
   for (const c of turns) {
@@ -242,7 +265,6 @@ function times(b: Bench, seconds: number): { at: Map<string, number>; turn: stri
   return { at, turn: null };
 }
 
-const pose = new Float32Array(16);
 const posed = new Float32Array(16);
 /** Poses every model at `seconds` into the bench. */
 function poseAll(seconds: number): void {
@@ -252,17 +274,9 @@ function poseAll(seconds: number): void {
     const place = Matrix.Translation(b.x, 0, b.z);
     for (let i = 0; i < template.meshes.length; i++) {
       const part = template.motion ? template.motion.parts[i] : -1;
-      // As the game: each clip that moves the part poses it, the later ones over the earlier.
-      let moved = false;
-      if (part >= 0) {
-        for (const c of b.clips) {
-          const t = at.get(c.name);
-          if (t !== undefined && clipPose(c.clip, part, t, pose)) {
-            posed.set(pose);
-            moved = true;
-          }
-        }
-      }
+      // As the game: every clip that moves the part poses it, together (`partPose`).
+      const playing = b.clips.flatMap((c) => (at.has(c.name) ? [{ clip: c.clip, time: at.get(c.name)! }] : []));
+      const moved = part >= 0 && partPose(playing, part, posed);
       const m = moved ? Matrix.FromArray(posed).multiply(place) : place;
       template.meshes[i].thinInstanceSetBuffer('matrix', m.asArray() as unknown as Float32Array, 16, true);
     }
