@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built farm (tools/art/blender/families/farm.py, plan/14-community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken coop (its pop-hole hatch a part of its own). Each has a far version (`far`, E7) for the town overview. Replaces the primitive-part placeholders of tools/art/community.py by key; the placeholder is kept as a fallback if a file fails to load.",
+  "$comment": "Blender-built farm (tools/art/blender/families/farm.py, plan/14-community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken coop (its pop-hole hatch shut at night, `close`). Each has a far version (`far`, E7) for the town overview. Replaces the primitive-part placeholders of tools/art/community.py by key; the placeholder is kept as a fallback if a file fails to load.",
   "version": 1,
   "entries": {
     "model.farm.barn": {
@@ -244,6 +244,9 @@
         "coop_trim": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "night": "close"
       },
       "paint": [
         {

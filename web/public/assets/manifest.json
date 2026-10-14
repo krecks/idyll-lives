@@ -24211,12 +24211,12 @@
           "size": [
             1.58,
             0.06,
-            0.59
+            0.58
           ],
           "at": [
             0,
             0.03,
-            -0.135
+            -0.13
           ],
           "color": "#3A3D41",
           "material": "material.finish.satin",
@@ -24227,12 +24227,12 @@
           "size": [
             1.62,
             0.04,
-            0.61
+            0.6
           ],
           "at": [
             0,
             0.9,
-            -0.125
+            -0.13
           ],
           "color": "#2F3236",
           "material": "material.finish.satin",
@@ -24275,12 +24275,12 @@
           "size": [
             0.36,
             0.5,
-            0.27
+            0.26
           ],
           "at": [
             0,
             2.3,
-            -0.295
+            -0.3
           ],
           "color": "#C3C7CB",
           "material": "material.finish.metal",
@@ -24790,7 +24790,7 @@
           "at": [
             0.5,
             0.98,
-            -0.28
+            -0.26
           ],
           "color": "#E9C46A",
           "material": "material.finish.satin",

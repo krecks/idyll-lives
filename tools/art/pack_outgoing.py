@@ -253,5 +253,9 @@ def main(path):
     sys.exit(1 if bad else 0)
 
 
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('outgoing', E, ['model.outgoing.karaokeStage', 'model.outgoing.partyBar', 'model.outgoing.photoWall'])
+
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else f'pack_{TRAIT}.json')

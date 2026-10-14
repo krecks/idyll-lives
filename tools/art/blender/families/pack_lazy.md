@@ -26,9 +26,11 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
   its middle), on the head section: held up for the whole nap it covers their heads. Raised for 2 s it shows as they
   lie down and settles flat for the nap. The two accent cushions stand at the bed's outer corners, clear of the heads.
 - `shake` is 0.25 s long, not about 1 s: one slow rock a second reads as tilting, not vibrating.
-- The nap pod keeps inside its 1x1 footprint (0.88 × 0.94 m); its placeholder overhangs it front and back (1.15 m
-  deep), hence `check_glb`'s one warning (z size 0.94 m against 1.15 m). The egg is 1.42 m tall with its hood, so a
-  sitter's head (about 1.3 m) is inside it.
+- The nap pod keeps inside its 1x1 footprint (0.88 × 0.91 m), its hood's back on the wall face (centred on its
+  `Model` `centre`; its rug 3 cm further in than first built, so it stays on the tile). The egg is 1.42 m tall with
+  its hood, so a sitter's head (about 1.3 m) is inside it. Its placeholder draws the egg, the hood folded back on
+  top and the rug as the model has them (it overhung the tile at 1.15 m deep, and stood 3 cm into the wall).
+- The quilt table stands on the wall face too (`centre`), as do their placeholders (`pack_shapes.to_wall`).
 - Colour parts: the plan's "Body, Upholstery" fit the bed, the pod and the quilt table. The locker, the plate and the
   hub have no upholstery: they offer Body with Doors and Trim, Trim and Deck, and Speaker.
 
@@ -44,7 +46,7 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 4,772 | 3 | Body, Upholstery (the mattress), Throw |
-| `model.lazy.napPod` | 0.88 × 1.42 × 0.94 m | 4,308 | 3 | Body (the egg), Upholstery (the cushions), Hood |
+| `model.lazy.napPod` | 0.88 × 1.42 × 0.91 m | 4,308 | 3 | Body (the egg), Upholstery (the cushions), Hood |
 | `model.lazy.quiltTable` | 1.74 × 0.74 × 0.89 m | 3,032 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
 | `model.lazy.deliveryLocker` | 0.86 × 1.96 × 0.81 m | 3,104 | 2 | Body, Doors, Trim |
 | `model.lazy.vibePlate` | 0.67 × 1.16 × 0.76 m | 1,380 | 2 | Body, Trim, Deck |

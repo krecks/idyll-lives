@@ -210,7 +210,7 @@ def cinemaWall():
         with G.new_parts() as cur:
             _pleats(F, name, s * 0.01, s * 0.78, 0.9, 1.42, zc - 0.012, 8, 0.016, M.curtain)
         parts.append(G.hinged(G.join(cur, name), F.at(s * 0.78, 1.42, zc - 0.012)))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     for cur in parts:
         G.squash(cur, 'curtains', (0.22, 1, 1), seconds=1.2)
     return objs
@@ -248,7 +248,7 @@ def gameConsole():
         F.box('tray', 0.13, 0.008, 0.09, (0, 0.67, 0.385), M.dark, bevel=0.002)
         F.cyl('tray_disc', 0.04, 0.003, (0, 0.6755, 0.385), M.disc, verts=24)
     tray = G.join(tray, 'tray')
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.slide(tray, 'tray', (0, 0.09, 0), seconds=0.6)     # 9 cm towards the players (-Z game)
     return objs
 
@@ -439,7 +439,7 @@ def lavaLamp():
             F.sphere(_name('drift'), r, (tx + 0.022 * G.cosd(a), y, tz + 0.022 * G.sind(a)), M.wax, scale=(1, 1, 1.3),
                      segments=10, rings=6)
     drift = G.hinged(G.join(drift, 'drift'), F.at(tx, y0, tz))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.slide(rise, 'blobs', (0, 0, 0.14), seconds=2.5)
     G.spin(drift, 'drift', 1, seconds=8.0)
     return objs
@@ -448,10 +448,10 @@ def lavaLamp():
 FAMILY = G.Family(
     'pack_couchPotato', M,
     [G.Model('cinemaWall', cinemaWall, size=(1.88, 1.52, 0.91), key='model.couchPotato.cinemaWall',
-             centre=(0, -0.005), motions={'uses': {'marathon': 'curtains', 'channelSurf': 'curtains'}},
+             centre=(0, 0.025), motions={'uses': {'marathon': 'curtains', 'channelSurf': 'curtains'}},
              paint=[('cinema_frame', 'Body'), ('leather', 'Upholstery'), ('curtain', 'Curtains')]),
      G.Model('gameConsole', gameConsole, size=(0.89, 1.34, 0.9), key='model.couchPotato.gameConsole',
-             centre=(0, 0), motions={'uses': {'play': 'tray', 'speedrun': 'tray'}, 'hold': 1.5},
+             centre=(0, 0.02), motions={'uses': {'play': 'tray', 'speedrun': 'tray'}, 'hold': 1.5},
              paint=[('console', 'Body'), ('gamer', 'Upholstery'), ('mustard', 'Cushion')]),
      G.Model('recliner', recliner, size=(0.94, 0.949, 0.76), key='model.couchPotato.recliner',
              centre=(-0.01, -0.02), motions={'uses': {'recline': 'recline', 'doze': 'recline'}, 'ride': 'recline'},
@@ -463,7 +463,7 @@ FAMILY = G.Family(
              centre=(0.032, 0.01), motions={'uses': {'workout': 'board'}},
              paint=[('fit_stand', 'Body'), ('fit_mat', 'Mat'), ('board', 'Board')]),
      G.Model('lavaLamp', lavaLamp, size=(0.85, 1.15, 0.89), key='model.couchPotato.lavaLamp',
-             centre=(0.005, -0.005), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
+             centre=(0.005, 0.015), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
              paint=[('lamp_metal', 'Body'), ('pouf', 'Upholstery'), ('vessel', 'Glass')])],
     comment='Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). Replaces the '
             'primitive-part placeholders of packs/couchPotato by key; the placeholder is kept as a fallback if a file '

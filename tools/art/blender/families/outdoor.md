@@ -28,8 +28,9 @@ Built 2026-10-14; they sit in Validate › Patio until signed off (back to Outdo
 - **Outdoor bar** (`outdoorBar`): a teak body with twenty front slats, a lighter counter at 1.06 m (the content's
   bar top), a back shelf and a steel foot rail (Body, Counter, Foot rail).
 - **Parasol** (`parasol`): a weighted base and pole, an octagonal canopy on eight ribs and struts, with a valance.
-  The canopy is its own part, hinged on the pole at 1.3 m: `stir` rocks it 1.2° in 2.4 s, an ambient clip
-  (`idle`), so it moves in the wind near the camera (not on Low).
+  The canopy is its own part, hinged on the pole at 1.3 m: `stir` rocks it 3° in 2.4 s, an ambient clip
+  (`idle`), so it moves in the wind near the camera (not on Low). At first 1.2°: from the game camera the rim moved
+  a pixel or two between the stir's ends, too little to notice; at 3° it moves 3–4 px and the shading shifts.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

@@ -6,6 +6,9 @@ primitive-part placeholders (`tools/art/pack_energetic.py`, in `packs/energetic`
 2026-10-14; they sit in Validate › Energetic until checked in play.
 
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+The contrast shower stood 2 cm into the wall; it is centred on its `Model` `centre` now (`G.settle()`), its back on
+the wall face at −0.43 and its front 3 cm short of the tile's. The placeholders of the wall-standing ones (`tools/art/pack_energetic.py`, `pack_shapes.to_wall`) stand with their backs
+on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 The contrast shower fills its tile with its own tiled walls, as the bathroom family's showers do.
 
 | Model | Moving part and clip | Played by |

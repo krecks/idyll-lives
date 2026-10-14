@@ -7,7 +7,9 @@ Validate › Neat until checked in play.
 
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 keeping its footprint, its wall side (backs on the wall face at depth −0.43; the placeholders' were at −0.455) and
-the desk chair's seat at 0.45 m.
+the desk chair's seat at 0.45 m. The entry console and the rain shower tower stood 2 cm into the wall; they are
+centred on their `Model` `centre` now (`G.settle()`), backs on the face. The placeholders of the wall-standing ones (`tools/art/pack_neat.py`, `pack_shapes.to_wall`) stand with their backs
+on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|

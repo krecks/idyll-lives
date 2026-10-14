@@ -150,7 +150,7 @@
           "finish": "material.finish.satin"
         },
         "mirror": {
-          "finish": "material.finish.glass",
+          "finish": "material.finish.gloss",
           "mirror": "front"
         },
         "perfume_a": {

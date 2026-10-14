@@ -650,6 +650,7 @@ CX = 0.75                    # half its width
 CY0, CEAVE, CRIDGE = 0.55, 1.45, 1.78
 CRZ = (CF + CB) / 2          # the ridge's depth
 HATCH = (0.17, 0.6, 0.95)    # the pop hole: half its width, its bottom and top
+HATCH_UP = 0.32              # how far the hatch stands up its runners by day, the hole open
 
 
 def _coop_roof_line():
@@ -706,15 +707,17 @@ def coop():
         _strut('nest_lid', (CB - 0.17, 1.08), (CB + 0.01, 1.16), 0.035, -0.48, 0.48, M.coop_roof, axis='x')
         F.box('nest_latch', 0.06, 0.04, 0.02, (0, 1.0, CB - 0.15), M.coop_trim)
     G.join(body, 'coop', origin=(0, 0, 0))
-    # the pop-hole hatch: its own part, so a use can slide it up (or swing it) without remodelling. Its origin
-    # is the middle of its top edge.
+    # the pop-hole hatch: its own part, its origin the middle of its top edge. By day it stands up in its runners,
+    # the hole open for the hens; at night `close` slides it down over the hole (`motions.night`).
     with G.new_parts() as hatch_parts:
         hw, h0, h1 = HATCH
         F.box('hatch', 2 * hw + 0.02, h1 - h0 + 0.02, 0.025, (0, (h0 + h1) / 2, CF + 0.03), M.coop_trim, bevel=0.005)
         F.box('hatch_brace', 2 * hw - 0.04, 0.03, 0.012, (0, (h0 + h1) / 2, CF + 0.048), M.coop_trim)
         G.sphere('hatch_knob', 0.016, at=F.at(0, h0 + 0.06, CF + 0.055), material=M.coop_dark, segments=8, rings=5)
-    G.join(hatch_parts, 'hatch', origin=F.at(0, h1 + 0.01, CF + 0.03))
+    hatch = G.join(hatch_parts, 'hatch', origin=F.at(0, h1 + 0.01, CF + 0.03))
+    hatch.location.z += HATCH_UP
     G.settle()
+    G.slide(hatch, 'close', (0, 0, -HATCH_UP), seconds=1.0)
     return G.meshes()
 
 
@@ -738,11 +741,11 @@ FAMILY = G.Family(
              paint=[('shirt', 'Shirt'), ('trousers', 'Trousers'), ('hat', 'Hat')]),
      G.Model('trough', trough, size=(1.84, 0.655, 0.74), tolerance=TOLERANCE, far=trough_far,
              paint=[('trough', 'Paint')]),
-     G.Model('coop', coop, size=(1.74, 1.88, 1.97), tolerance=TOLERANCE, far=0.25,
+     G.Model('coop', coop, size=(1.74, 1.88, 1.97), tolerance=TOLERANCE, far=0.25, motions={'night': 'close'},
              paint=[('coop', 'Paint'), ('coop_roof', 'Roof'), ('coop_trim', 'Trim')])],
     comment='Blender-built farm (tools/art/blender/families/farm.py, plan/14-community.md CM5): the red barn, the '
             'grain silo, the little tractor, the round hay bale, the stack of hay bales, the scarecrow (an ambient '
-            'sway), the water trough and the chicken coop (its pop-hole hatch a part of its own). Each has a far '
+            'sway), the water trough and the chicken coop (its pop-hole hatch shut at night, `close`). Each has a far '
             'version (`far`, E7) for the town overview. Replaces the primitive-part placeholders of '
             'tools/art/community.py by key; the placeholder is kept as a fallback if a file fails to load.',
 )

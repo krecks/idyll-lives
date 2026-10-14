@@ -71,8 +71,8 @@ sw += [box([0.48, 0.24, 0.2], [0.02, 0.86, 0.35], RIG, 'satin', radius=0.02),   
        box([0.07, 0.05, 0.004], [0.14, 0.81, 0.24], '#F4EFE2', 'gloss', radius=0.004)]       # meter
 for x in (-0.15, -0.09, -0.03, 0.03):
     sw.append(cyl([0.03, 0.02, 0.03], [x, 0.8, 0.238], '#3A3D41', 'satin', rotate=[90, 0, 0]))
-sw += [rod([0.22, 0.98, 0.42], [0.3, 1.75, 0.42], 0.012, CHROME, 'chrome'),               # antenna
-       sph([0.025, 0.025, 0.025], [0.3, 1.76, 0.42], CHROME, 'chrome', segments=6),
+sw += [rod([0.2, 0.98, 0.42], [0.2, 1.3, 0.42], 0.012, CHROME, 'chrome'),                 # antenna, down (as the model at rest)
+       sph([0.025, 0.025, 0.025], [0.2, 1.31, 0.42], CHROME, 'chrome', segments=6),
        cyl([0.1, 0.02, 0.1], [-0.3, 0.75, 0.28], '#3A3D41', 'satin'),                    # desk mic
        rod([-0.3, 0.76, 0.28], [-0.28, 0.9, 0.27], 0.015, CHROME, 'chrome'),
        part('capsule', [0.05, 0.1, 0.05], [-0.27, 0.95, 0.26], '#C9CCD0', 'metal'),
@@ -213,6 +213,10 @@ def main(path):
     print(f'{len(E)} entries -> {path}; {bad} issue(s)')
     sys.exit(1 if bad else 0)
 
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('loner', E, ['model.loner.bonsaiBench', 'model.loner.deliveryHatch', 'model.loner.quietPod'])
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else f'pack_{TRAIT}.json')

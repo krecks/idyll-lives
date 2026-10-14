@@ -373,7 +373,8 @@ def parasol():
             _rod(f'strut{k}', (0.03 * ca, 1.78, 0.03 * sa), (0.6 * ca, 2.165, 0.6 * sa), 0.005, M.pole, verts=6)
     canopy = G.hinged(G.join(top, 'canopy'), F.at(0, 1.3, 0))
     G.settle(centre=False)
-    G.rock(canopy, 'stir', 1.2, seconds=2.4, axis='X')
+    # 3°: at 1.2° the rim moved a pixel or two from the game camera, too little to notice
+    G.rock(canopy, 'stir', 3, seconds=2.4, axis='X')
     return G.meshes()
 
 

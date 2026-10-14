@@ -370,7 +370,9 @@ def phoneBooth():
         F.box('door_handle', 0.025, 0.14, 0.03, (DOOR_W / 2 - 0.07, 1.15, FACE + 0.04), M.chrome, bevel=0.008)
     door = G.hinged(G.join(door, 'door'), F.at(-DOOR_W / 2, 1.0, FACE))
     G.settle()
-    G.swing(door, 'door_open', 100, seconds=0.8)      # out to the front, about its hinge
+    # In, about its hinge, to lie along the left side: out to the front, it swept through the caller, who
+    # stands on the tile in front.
+    G.swing(door, 'door_open', -90, seconds=0.8)
     return G.meshes()
 
 

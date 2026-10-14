@@ -20,13 +20,14 @@ Seats keep the placeholder's: the diners and the writer at 0.45 on the footprint
 
 The gramophone's "L the platter spins (E1)" is built: the platter is a second moving part, and the model still
 takes 3 draws because nothing in it is textured. The vanity's mirror (E6) is mirror glass (`mirror`, `front`), a
-flat oval on the still body.
+flat oval on the still body, `gloss` as every file mirror: see-through `glass` showed the rose-gold back through it
+on Medium and Low, where nothing reflects.
 
 **Draw calls: 3 each.** The still body takes its plain finishes and at most one textured finish (or the glass),
 the moving parts the rest:
 - the table: the chairs' velvet, the cloth and the runner are `fabric`; the table top under the cloth is plain;
 - the tub: the towels are `fabric`; the water and petals are one moving part (gloss and satin);
-- the vanity: the mirror takes the extra draw, so the pouf is plain satin velvet;
+- the vanity: 2 (the mirror is plain gloss now), its pouf plain satin velvet;
 - the gramophone: all plain (the cabinet is satin wood colours), for the two moving parts;
 - the bureau: the chair's velvet is `fabric`;
 - the arbour: all plain, for the swing and the bloom: its leaves are satin, lumpy `G.boulder`s, and the swing's

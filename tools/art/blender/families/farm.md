@@ -53,10 +53,10 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
 - **Scarecrow**: `sway`, ambient (`motions: {'idle': 'sway'}`). The whole scarecrow is one node, its origin at the
   foot of the post. `G.rock` tips it 2.5° to each side about Blender Y over 3 s (a slow sway is longer than 1 s;
   `check_glb.py` doesn't mind) and ends where it starts.
-- **Coop**: static, but the pop-hole hatch is its own node (`hatch`, in `coop_trim`), its origin the middle of
-  its top edge, in front of a dark pop hole between two runners. A use can later slide it up the runners
-  (`G.slide`) or swing it up (`G.swing`, axis X) without remodelling. Unanimated, the gate counts it in the body's
-  plain group: 2 draw calls now, 3 once it has a clip.
+- **Coop** (`close`, `night`): the pop-hole hatch is its own node (`hatch`, in `coop_trim`), its origin the middle
+  of its top edge. By day it stands 32 cm up its runners, the dark pop hole open for the hens; from dusk to dawn
+  `close` slides it down over the hole (1 s), as a keeper shuts the hens in. The coop has no use, so the night is
+  what moves it; a use (feeding the hens) could play it too. It costs a draw: 3 now.
 - The rest are static, each one node.
 
 ## Colour parts
@@ -84,7 +84,7 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 | `model.farm.hayStack` | 1.89 × 0.92 × 0.90 m | 468 | 92 | 2 |
 | `model.farm.scarecrow` | 0.99 × 2.13 × 0.54 m | 2,290 | 570 | 3 (post wood, clothes fabric, plain) |
 | `model.farm.trough` | 1.84 × 0.66 × 0.74 m | 1,012 | 208 | 1 |
-| `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 760 | 170 | 2 (walls wood + plain; 3 once the hatch has a clip) |
+| `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 760 | 168 | 3 (walls wood + plain, the hatch) |
 
 `check_glb.py`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for all 16 files (the
 models and their far versions).

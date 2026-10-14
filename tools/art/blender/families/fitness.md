@@ -16,12 +16,17 @@ belt facing the console: `characters.ts` moves them forward from the tile in fro
 top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
 - **The slats** (`slats`): 15 strips across the belt, 10 cm apart. `belt_run` moves them one slat back (towards
-  the rear) in 0.5 s at an even speed (`G.scroll`), a loop for the whole run (`loops: {run: belt_run}`). The game
+  the rear) in 0.25 s at an even speed (`G.scroll`, 0.4 m/s), a loop for the whole run (`loops: {run: belt_run}`).
+  That is slower than a jog, but faster would blur: at the fastest game speed (2.5×) the slats already move a third
+  of their pitch a frame at 30 frames a second (it was 0.2 m/s, which read as a belt creeping along). The game
   jumps the loop home at the end of each round; the slats then stand where their neighbours were, and the first
   and last are under the motor hood and the rear roller cap, so it doesn't show. `check_glb.py` warns that the
   loop ends 10 cm from where it starts: right for a belt.
 
 ## The exercise bike
+
+(The bike and the yoga mat stand with their backs on the wall face, -0.43, on their `Model` `centre`; they and
+their placeholders (`catalog.py`) reached 2 cm into the wall.)
 
 An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (content `seat`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
@@ -41,8 +46,8 @@ use: `uses: {yoga: unroll}`, back when the yoga ends) moves two parts together:
   and shrinks onto the floor (`G.squash` to 0.12), leaving a curled front edge.
 
 The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. `check_glb.py` warns that
-it is off centre and shallower than its placeholder (the flat mat with a roll): picking and the shadow follow the
-placeholder, which is the unrolled mat's tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
+it is off centre and shallower than its placeholder (the flat mat with a roll): only the fallback follows the
+placeholder; picking follows the rolled mat as drawn, and the shadow the tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
 cross-legged on the unrolled mat.
 
 ## The weights

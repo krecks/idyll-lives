@@ -35,8 +35,9 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
   grows it out of the mouth in 0.35 s. It is `spray`, gloss, never emissive. Played back when the drink ends.
 - **Post box** (`flap`, use `post`, `hold` 1 s): the slot's flap, hinged on its top edge in a housing proud of the
   pillar, swings 65° in (its bottom edge to the back) over a dark opening, in 0.5 s.
-- **Phone box** (`door_open`, use `call`, `hold` 1.5 s): the door swings 100° out to the front in 0.8 s and shuts
-  while the call goes on. The resident stands on the tile in front, as for every use; the door passes beside them.
+- **Phone box** (`door_open`, use `call`, `hold` 1.5 s): the door swings 90° in, to lie along the left side, in
+  0.8 s and shuts while the call goes on. The resident stands on the tile in front, as for every use: swung out (as
+  first built, 100°), the door swept through them. Inside it clears the phone's shelf. Seen in play.
 - **Town fountain** (`water_run`, `idle`): the water runs all the time near the camera (not on Low). Two parts move
   in one clip of 1.2 s, each a `G.squash(..., back=True)` pulse that ends where it starts: the jet on the top knob
   rises to 1.3 times its height and falls back, and the splashes where the eight streams land in the basin bob up

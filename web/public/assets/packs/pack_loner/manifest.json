@@ -225,6 +225,9 @@
       "motions": {
         "uses": {
           "shape": "trim"
+        },
+        "loops": {
+          "tend": "mist"
         }
       },
       "paint": [

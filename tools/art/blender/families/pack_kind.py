@@ -451,7 +451,7 @@ def songbirdFeeder():
         _bird(F, 0.02, 0.71, 0.1, M.bird_grey, M.bird_pink, -80)
     birds = G.join(birds, 'birds', origin=F.at(px, HOUSE_Y, pz))
     birds.scale = (0.001, 0.001, 0.001)
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(roof, 'lid_open', -70, seconds=0.7, axis='X')
     for axis in 'XYZ':
         G.grow(birds, 'bird', seconds=1.0, axis=axis)
@@ -522,7 +522,7 @@ FAMILY = G.Family(
              motions={'uses': {'shareTea': 'pour'}, 'hold': 1.5},
              paint=[('table', 'Body'), ('pouf', 'Fabric'), ('pouf_rose', 'Second pouf'), ('rug', 'Rug')]),
      G.Model('songbirdFeeder', songbirdFeeder, size=(0.901, 1.698, 0.884), key='model.kind.songbirdFeeder',
-             centre=(0, -0.002), motions={'uses': {'refill': 'lid_open', 'watchBirds': 'bird'}},
+             centre=(0, 0.012), motions={'uses': {'refill': 'lid_open', 'watchBirds': 'bird'}},
              paint=[('feeder', 'Body'), ('sack', 'Fabric'), ('roof', 'Roof')]),
      G.Model('hearthSettee', hearthSettee, size=(1.9, 0.945, 0.828), key='model.kind.hearthSettee',
              centre=(0, -0.016), motions={'uses': {'curlUp': 'sink_in', 'quiltNap': 'sink_in'}},

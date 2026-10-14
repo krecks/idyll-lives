@@ -256,5 +256,10 @@ def bedside_stack():
 E['model.bookworm.bedsideStack'] = bedside_stack(); FOOT['model.bookworm.bedsideStack'] = (1, 1)
 
 
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('bookworm', E, ['model.bookworm.bedsideStack', 'model.bookworm.libraryWall', 'model.bookworm.readingNook',
+                        'model.bookworm.teaTrolley'])
+
 if __name__ == '__main__':
     sys.exit(1 if run('bookworm', sys.argv[1] if len(sys.argv) > 1 else None, E, FOOT) else 0)

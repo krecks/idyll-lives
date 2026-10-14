@@ -102,12 +102,12 @@ def deli_pantry():
     for x in (-0.405, 0.0, 0.405):                                                                  # open shelf stiles
         p.append(box([0.03, 0.86, 0.03], [x, 1.47, 0.0], BODY, 'satin', radius=0.006))
     p.append(box([0.84, 0.05, 0.03], [0, 1.88, 0.0], BODY, 'satin', radius=0.006))
-    # counter: board with cheese wedge + bread
-    p += [box([0.4, 0.02, 0.24], [0.08, 0.97, 0.04], OAKD, 'wood', radius=0.006),
-          part('cone', [0.12, 0.07, 0.12], [0.0, 1.015, 0.04], '#F0C75E', 'satin', segments=3, rotate=[0, 30, 0]),
-          part('capsule', [0.08, 0.18, 0.08], [0.17, 1.02, 0.05], '#C8964F', 'matte', rotate=[0, 70, 90]),
-          sph([0.05, 0.05, 0.05], [-0.3, 1.0, 0.05], '#B33A32', 'gloss', segments=8),           # tomatoes
-          sph([0.05, 0.05, 0.05], [-0.25, 1.0, 0.08], '#C9483B', 'gloss', segments=8)]
+    # counter: board with cheese wedge + bread (on the counter, as the model's: not over its edge)
+    p += [box([0.4, 0.02, 0.24], [0.08, 0.97, -0.01], OAKD, 'wood', radius=0.006),
+          part('cone', [0.12, 0.07, 0.12], [0.0, 1.015, -0.01], '#F0C75E', 'satin', segments=3, rotate=[0, 30, 0]),
+          part('capsule', [0.08, 0.18, 0.08], [0.17, 1.02, 0.0], '#C8964F', 'matte', rotate=[0, 70, 90]),
+          sph([0.05, 0.05, 0.05], [-0.3, 1.0, 0.0], '#B33A32', 'gloss', segments=8),            # tomatoes
+          sph([0.05, 0.05, 0.05], [-0.25, 1.0, 0.03], '#C9483B', 'gloss', segments=8)]
     return placeholder(p)
 
 
@@ -237,32 +237,38 @@ E['model.foodie.pizzaOven'] = pizza_oven(); FOOT['model.foodie.pizzaOven'] = (2,
 # ---- chefsIsland (2x1): marble island across the front with knee space, two stools ------------
 def chefs_island():
     CAB, MARBLE = '#5F9095', '#F1EEEA'
-    p = [box([1.86, 0.05, 0.44], [0, 0.805, 0.22], MARBLE, 'gloss', radius=0.012)]            # marble top (near edge z 0.0)
-    for x in (-0.79, 0.79):                                                                        # end cabinets
-        p += [box([0.26, 0.76, 0.42], [x, 0.4, 0.22], CAB, 'satin', radius=0.01),
-              box([0.22, 0.2, 0.012], [x, 0.62, 0.007], CAB, 'satin', radius=0.006),
-              box([0.22, 0.44, 0.012], [x, 0.27, 0.007], CAB, 'satin', radius=0.006),
-              box([0.08, 0.012, 0.016], [x, 0.66, -0.004], BRASS, 'metal', radius=0.005),
-              box([0.08, 0.012, 0.016], [x, 0.44, -0.004], BRASS, 'metal', radius=0.005)]
-    p += [box([1.32, 0.7, 0.03], [0, 0.42, 0.42], CAB, 'satin', radius=0.008),                 # front panel (room side)
-          box([1.32, 0.06, 0.32], [0, 0.73, 0.27], CAB, 'satin', radius=0.006),                # apron
-          box([1.34, 0.03, 0.03], [0, 0.12, 0.44], BRASS, 'metal', radius=0.008),              # foot rail
-          box([0.5, 0.008, 0.3], [0, 0.833, 0.24], '#22262B', 'gloss', radius=0.006)]          # induction hob
+    # As the model: the top at 0.9 (content `surface.height`), drawers on the cook's side (z 0.43), and under the
+    # drawer bank the sitters' knee space open right through.
+    p = [box([1.86, 0.04, 0.46], [0, 0.88, 0.225], MARBLE, 'gloss', radius=0.01)]                # marble top (0.9)
+    for x in (-0.8, 0.8):                                                                          # end cabinets
+        p += [box([0.26, 0.78, 0.43], [x, 0.47, 0.215], CAB, 'satin', radius=0.008),
+              box([0.22, 0.16, 0.014], [x, 0.75, 0.437], CAB, 'satin', radius=0.005),
+              box([0.22, 0.54, 0.014], [x, 0.37, 0.437], CAB, 'satin', radius=0.005),
+              box([0.09, 0.012, 0.016], [x, 0.79, 0.447], BRASS, 'metal', radius=0.005),
+              box([0.09, 0.012, 0.016], [x, 0.6, 0.447], BRASS, 'metal', radius=0.005)]
+    p += [box([1.34, 0.16, 0.02], [0, 0.8, 0.3], CAB, 'satin', radius=0.004),                   # drawer bank
+          box([1.34, 0.02, 0.13], [0, 0.73, 0.365], CAB, 'satin', radius=0.004)]
+    for x in (-0.45, 0.0, 0.45):
+        p += [box([0.42, 0.13, 0.014], [x, 0.8, 0.437], CAB, 'satin', radius=0.005),
+              box([0.12, 0.012, 0.016], [x, 0.8, 0.447], BRASS, 'metal', radius=0.005)]
+    p += [rod([-0.67, 0.18, 0.08], [0.67, 0.18, 0.08], 0.024, BRASS, 'metal'),                   # foot rail (sitters' side)
+          box([0.5, 0.008, 0.28], [0, 0.904, 0.27], '#22262B', 'gloss', radius=0.003)]          # induction hob
     for dx in (-0.12, 0.12):
-        p.append(torus([0.16, 0.004, 0.16], [dx, 0.838, 0.24], '#C9483B', 'gloss', segments=20))  # hob rings
-    p += [cyl([0.22, 0.09, 0.22], [-0.12, 0.88, 0.24], COPPER, 'metal', segments=20),          # copper pan
-          rod([-0.23, 0.9, 0.24], [-0.42, 0.91, 0.24], 0.018, '#5A3A26', 'wood'),
-          lathe([0.26, 0.2, 0.26], [0.12, 0.93, 0.26], '#E9E3D8', 'gloss',                     # stock pot
+        p.append(torus([0.16, 0.004, 0.16], [dx, 0.909, 0.27], '#C9483B', 'gloss', segments=20))  # hob rings
+    p += [cyl([0.22, 0.05, 0.22], [-0.12, 0.933, 0.27], COPPER, 'metal', segments=20),          # copper pan
+          rod([-0.23, 0.94, 0.27], [-0.4, 0.95, 0.3], 0.018, '#5A3A26', 'wood'),
+          lathe([0.24, 0.2, 0.24], [0.12, 1.008, 0.27], '#E9E3D8', 'gloss',                     # stock pot
                 [[0, -0.5], [0.46, -0.5], [0.5, -0.4], [0.5, 0.45], [0.47, 0.5], [0, 0.5]], segments=20),
-          box([0.36, 0.02, 0.22], [0.58, 0.84, 0.2], OAK, 'wood', radius=0.008),               # chopping board
-          sph([0.08, 0.07, 0.08], [0.52, 0.88, 0.2], '#C9483B', 'gloss', segments=8),           # tomato
-          part('capsule', [0.04, 0.16, 0.04], [0.65, 0.865, 0.18], '#E2832E', 'satin', rotate=[0, 40, 90]),  # carrot
-          sph([0.12, 0.1, 0.12], [0.66, 0.89, 0.27], BASIL, 'foliage', segments=8),
-          box([0.16, 0.006, 0.03], [0.5, 0.853, 0.27], CHROME, 'chrome', radius=0.003),         # knife
-          box([0.24, 0.12, 0.012], [-0.58, 0.9, 0.36], '#F4EFE2', 'matte', radius=0.004, rotate=[-20, 0, 0]),  # menu card
-          lathe([0.2, 0.08, 0.2], [-0.58, 0.87, 0.16], '#F6F3EA', 'gloss',                     # tasting plate
-                [[0, -0.5], [0.5, -0.4], [0.5, -0.3], [0.2, -0.3], [0, -0.3]], segments=20),
-          sph([0.06, 0.03, 0.06], [-0.58, 0.87, 0.16], '#B33A32', 'satin', segments=8)]
+          box([0.34, 0.02, 0.22], [0.62, 0.91, 0.3], OAK, 'wood', radius=0.008),               # chopping board
+          sph([0.07, 0.07, 0.07], [0.56, 0.95, 0.3], '#C9483B', 'gloss', segments=8),           # tomato
+          part('capsule', [0.036, 0.144, 0.036], [0.66, 0.94, 0.27], '#E2832E', 'satin', rotate=[0, 40, 90]),  # carrot
+          sph([0.12, 0.1, 0.12], [0.72, 0.96, 0.33], BASIL, 'foliage', segments=8),
+          box([0.16, 0.006, 0.025], [0.6, 0.923, 0.37], CHROME, 'chrome', radius=0.003),        # knife
+          box([0.14, 0.18, 0.006], [0, 0.98, 0.06], '#F4EFE2', 'matte', radius=0.002, rotate=[-12, 0, 0])]  # menu card
+    for x in (-0.5, 0.5):                                                                          # tasting plates
+        p += [lathe([0.22, 0.016, 0.22], [x, 0.908, 0.11], '#F6F3EA', 'gloss',
+                    [[0, -0.5], [0.32, -0.5], [0.5, 0.25], [0.48, 0.5], [0, -0.1]], segments=20),
+              sph([0.06, 0.03, 0.06], [x - 0.02, 0.92, 0.11], '#B33A32', 'satin', segments=8)]
     for x in (-0.5, 0.5):                                                                          # bar stools (seat 0.45)
         p += [cushion([0.38, 0.06, 0.36], [x, 0.43, -0.12], '#C9A46E', radius=0.025),
               lathe([0.34, 0.03, 0.32], [x, 0.39, -0.12], OAK, 'wood', [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]], segments=20),
@@ -306,6 +312,11 @@ def run(trait, out=None, entries=None, foot=None):
     print(f'{len(E_)} entries -> {out}; {bad} issue(s)')
     return bad
 
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('foodie', E, ['model.foodie.deliPantry', 'model.foodie.espressoBar', 'model.foodie.herbGarden',
+                      'model.foodie.pizzaOven'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('foodie', sys.argv[1] if len(sys.argv) > 1 else None) else 0)

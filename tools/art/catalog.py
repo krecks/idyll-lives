@@ -1905,7 +1905,7 @@ add('chemistrySet', placeholder(shift(chemistry('#E4E3DF', BLACKMETAL), dz=-0.03
 # Fitness
 # =============================================================================================
 def exercise_bike(frame, accent):
-    p = [box([0.16, 0.06, 0.9], [0, 0.03, 0.0], frame, 'satin', radius=0.02),
+    p = [box([0.16, 0.06, 0.88], [0, 0.03, 0.01], frame, 'satin', radius=0.02),   # its back on the wall face, as the model
          box([0.5, 0.05, 0.08], [0, 0.03, -0.38], frame, 'satin', radius=0.02),
          box([0.5, 0.05, 0.08], [0, 0.03, 0.38], frame, 'satin', radius=0.02),
          cyl([0.42, 0.06, 0.42], [0, 0.3, 0.22], '#3A3D41', 'metal', rotate=[0, 0, 90], segments=24),   # flywheel
@@ -1927,10 +1927,11 @@ add('exerciseBike', placeholder(exercise_bike('#D8D9D7', '#3C8DBF')))
 
 
 def yoga_mat(color):
-    p = [box([0.62, 0.012, 0.9], [0, 0.006, 0.0], color, 'fabric', radius=0.004),
-         cyl([0.14, 0.62, 0.14], [0, 0.07, -0.38], color, 'fabric', rotate=[0, 0, 90]),       # rolled end
-         box([0.24, 0.12, 0.14], [0.36, 0.06, -0.3], '#E8E2D6', 'fabric', radius=0.04),        # block
-         cyl([0.07, 0.24, 0.07], [-0.36, 0.12, -0.3], '#9DC6CF', 'gloss')]                     # bottle
+    # (its back on the wall face, as the model's)
+    p = [box([0.62, 0.012, 0.88], [0, 0.006, 0.01], color, 'fabric', radius=0.004),
+         cyl([0.14, 0.62, 0.14], [0, 0.07, -0.36], color, 'fabric', rotate=[0, 0, 90]),       # rolled end
+         box([0.24, 0.12, 0.14], [0.36, 0.06, -0.28], '#E8E2D6', 'fabric', radius=0.04),       # block
+         cyl([0.07, 0.24, 0.07], [-0.36, 0.12, -0.28], '#9DC6CF', 'gloss')]                    # bottle
     return p
 
 

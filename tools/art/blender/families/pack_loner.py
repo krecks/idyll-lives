@@ -147,7 +147,7 @@ def quietPod():
                   bevel=0.03, bevel_segments=2)
         F.box('hood_lip', 0.84, 0.05, 0.05, (0, HOOD[0] + r, HOOD[1] + 0.01), M.shell, bevel=0.022, bevel_segments=2)
     hood = G.hinged(G.join(hood, 'hood'), F.at(0, *HOOD))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(hood, 'shell', 40, seconds=0.9, axis='X')
     return objs
 
@@ -334,6 +334,7 @@ def bonsaiBench():
     twig = G.hinged(G.join(twig, 'twig'), F.at(*TWIG))
     objs = G.settle(centre=False)
     G.squash(twig, 'trim', 0.001, seconds=0.7)
+    G.rock(twig, 'mist', 10, seconds=1.2, axis='Y')   # nodding under the mister while it is misted and fed
     return objs
 
 
@@ -455,7 +456,7 @@ def deliveryHatch():
 FAMILY = G.Family(
     'pack_loner', M,
     [G.Model('quietPod', quietPod, size=(0.84, 1.539, 0.769), key='model.loner.quietPod',
-             centre=(0, -0.074),
+             centre=(0, -0.0455),
              motions={'uses': {'retreat': 'shell', 'read': 'shell'}},
              paint=[('shell', 'Body'), ('oak', 'Wood'), ('cushion', 'Cushions')]),
      G.Model('shortwaveRadio', shortwaveRadio, size=(0.84, 1.325, 0.682), key='model.loner.shortwaveRadio',
@@ -468,7 +469,7 @@ FAMILY = G.Family(
              paint=[('body', 'Body'), ('wood', 'Wood')]),
      G.Model('bonsaiBench', bonsaiBench, size=(0.86, 1.31, 0.75), key='model.loner.bonsaiBench',
              centre=(0, -0.055),
-             motions={'uses': {'shape': 'trim'}},
+             motions={'uses': {'shape': 'trim'}, 'loops': {'tend': 'mist'}},
              paint=[('body', 'Body'), ('teak', 'Wood'), ('glaze', 'Pot')]),
      G.Model('soloSauna', soloSauna, size=(0.94, 2.085, 1.435), key='model.loner.soloSauna',
              centre=(0, -0.222),
