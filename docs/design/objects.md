@@ -215,6 +215,13 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "loops": { "relax": "rocking", "read": "rocking" } }
   ```
+- **Ambient:** `idle` names a clip that goes round all the time, used or not (a ceiling fan, clock
+  hands, a fountain's water), from rest to rest like a loop. It plays only within the quality's
+  `ambientRange` of the camera (40 m on Medium, 60 on High) and not at all on Low, where it stays at
+  rest; the sun's shadows aren't redrawn for it. Make it something that looks fine at rest.
+  ```json
+  "motions": { "idle": "blades_turn" }
+  ```
 - **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
   `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip
   held open while it is: the wall bed stays down after *Fold down* or a night's sleep until *Fold up*
@@ -226,8 +233,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```
 - **Cost:** each part is drawn on its own (one draw per finish group within it, and again in the sun's
   shadow map): the fridge takes 3 draws, 1 for the cabinet and 1 per door. Count parts in the 1–3.
-  While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn; nothing
-  is done while all are still.
+  While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn (not for
+  ambient clips); nothing is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
 - **Not yet:** the freezer door, which no use
   opens (no interaction takes frozen food), and tiles that free up while an object is closed (a folded

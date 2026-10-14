@@ -129,21 +129,22 @@ def first_value(gltf, binary, accessor, last=False):
 
 def played(motions):
     """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
-    `loops`, `open`."""
+    `loops`, `open`, `idle`."""
     out = {}
     for use, value in (motions.get('uses') or {}).items():
         for u in value if isinstance(value, list) else [value]:
             out.setdefault(u['clip'] if isinstance(u, dict) else u, f'use {use!r}')
     for use, clip in (motions.get('loops') or {}).items():
         out.setdefault(clip, f'loop {use!r}')
-    if motions.get('open'):
-        out.setdefault(motions['open'], 'open')
+    for kind in ('open', 'idle'):
+        if motions.get(kind):
+            out.setdefault(motions[kind], kind)
     return out
 
 
 def loops(motions):
     """The clips of `motions` that go round (and so must end where they start)."""
-    return set((motions.get('loops') or {}).values())
+    return set((motions.get('loops') or {}).values()) | ({motions['idle']} if motions.get('idle') else set())
 
 
 def check_clips(gltf, binary, entry):
@@ -180,6 +181,8 @@ def check_clips(gltf, binary, entry):
     for name in sorted(names - set(plays)):
         warnings.append(f'clip {name!r} plays for no use (name it in the entry\'s `motions`)')
     # A loop goes round from rest to rest: each channel ends where it starts (a turn, either sign).
+    # A turn by a whole fraction of a circle (a fan's four blades a quarter round) loops if the part
+    # looks the same turned: a warning to check that.
     for a in animations:
         if a.get('name', '') not in loops(motions):
             continue
@@ -188,11 +191,18 @@ def check_clips(gltf, binary, entry):
             first, last = first_value(gltf, binary, out), first_value(gltf, binary, out, last=True)
             if first is None or last is None:
                 continue
-            gap = min(max(abs(x - y) for x, y in zip(first, last)), max(abs(x + y) for x, y in zip(first, last))) \
-                if c['target'].get('path') == 'rotation' else max(abs(x - y) for x, y in zip(first, last))
-            if gap > 1e-3:
-                node = nodes[c['target']['node']].get('name', c['target']['node'])
-                errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock)')
+            node = nodes[c['target']['node']].get('name', c['target']['node'])
+            if c['target'].get('path') == 'rotation':
+                turned = math.degrees(2 * math.acos(min(1.0, abs(sum(x * y for x, y in zip(first, last))))))
+                if turned < 0.1:
+                    continue
+                n = round(360 / turned)
+                if 2 <= n <= 12 and abs(turned * n - 360) < 0.5:
+                    warnings.append(f'loop {a["name"]!r} ends {node} turned {turned:.0f}° from where it starts: right only if it looks the same turned (1/{n} of a circle)')
+                    continue
+            elif max(abs(x - y) for x, y in zip(first, last)) <= 1e-3:
+                continue
+            errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock)')
     return errors, warnings
 
 

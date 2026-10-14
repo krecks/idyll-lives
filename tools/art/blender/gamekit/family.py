@@ -30,7 +30,8 @@ class Model:
                            seconds or its own (absent: when the use ends);
                    'hold': seconds;
                    'loops': {use: clip} going round while the use lasts (G.spin, G.rock);
-                   'open': clip held open while the object is open (content `leaves`)
+                   'open': clip held open while the object is open (content `leaves`);
+                   'idle': clip going round all the time near the camera (G.spin, G.rock)
       paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part
                  first (the one the game's quick colour row paints), e.g. [('body', 'Cabinet'),
                  ('stone', 'Worktop')]; a bare material name is its own label

@@ -4,7 +4,9 @@
  * its clips; each plays back after its `hold` seconds or when the use ends. A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
- * open as long as it stays so. Each instance's parts draw from buffers of their own
+ * open as long as it stays so. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
+ * round all the time, but only within `ambientRange` of the camera (none on Low), without the
+ * shadows being redrawn for it. Each instance's parts draw from buffers of their own
  * (`MovingTarget`), written only while something moves.
  *
  * Time is the residents' animation time: it stops while the game is paused and runs faster
@@ -12,7 +14,7 @@
  */
 
 import { writeMoving, type PopTarget } from './buildFx';
-import type { Mesh } from './core';
+import type { Mesh, Vector3 } from './core';
 import { GAME_RATE, QUIET_SPEED } from './characters';
 import { clipPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
@@ -38,8 +40,8 @@ interface ClipState {
   use: string;
   /** Animation time it plays back from (Infinity: when the use ends). */
   until: number;
-  /** Goes round while used (`loops`), rather than opening and closing. */
-  loop: boolean;
+  /** Opens and closes (a use's, or held open), goes round while used (`loops`), or goes round always (`idle`). */
+  kind: 'use' | 'loop' | 'idle';
 }
 
 /** A clip a use wants this frame. */
@@ -48,7 +50,13 @@ interface Wanted {
   use: string;
   /** Seconds it stays open after the use starts (undefined: while it lasts). */
   hold?: number;
-  loop: boolean;
+  kind: 'use' | 'loop';
+}
+
+/** What `update` moved: parts that a use moves (bounds and shadows follow), or only ambient ones (neither does). */
+export interface Moved {
+  moved: boolean;
+  ambient: boolean;
 }
 
 export class ObjectMotion {
@@ -59,6 +67,13 @@ export class ObjectMotion {
   private lastNow = 0;
   /** Uses this frame: by object id, the clips wanted by clip name. */
   private readonly wanted = new Map<number, Map<string, Wanted>>();
+  /** Metres from the camera within which ambient clips play (0: none; the quality's `ambientRange`). */
+  private ambientRange = 0;
+
+  /** Ambient clips play within `range` metres of the camera (0: nowhere, all at rest). */
+  setAmbientRange(range: number): void {
+    this.ambientRange = range;
+  }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
   set(objects: MovingObject[]): void {
@@ -73,7 +88,7 @@ export class ObjectMotion {
       if (!name || !clip || before.has(o.id)) continue;
       let clips = this.states.get(o.id);
       if (!clips) this.states.set(o.id, (clips = new Map()));
-      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, loop: false });
+      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, kind: 'use' });
     }
     for (const [id, clips] of this.states) {
       const o = this.objects.get(id)!;
@@ -91,12 +106,12 @@ export class ObjectMotion {
     this.states.clear();
   }
 
-  /** Plays this frame's clips. True if something moved (its meshes' bounds and shadows need refreshing). */
-  update(frame: FrameState, actionTags: readonly string[]): boolean {
+  /** Plays this frame's clips, the ambient ones near `eye` (the camera). */
+  update(frame: FrameState, actionTags: readonly string[], eye: Vector3): Moved {
     const { curr, layout, now } = frame;
     let dt = this.lastNow ? Math.min(Math.max((now - this.lastNow) / 1000, 0), 0.1) : 0;
     this.lastNow = now;
-    if (!this.objects.size) return false;
+    if (!this.objects.size) return { moved: false, ambient: false };
     const speed = curr[layout.header.speed] | 0;
     const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
     const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
@@ -106,15 +121,22 @@ export class ObjectMotion {
 
     this.findUses(frame, actionTags);
     const moved = new Set<Mesh>();
+    const written = new Set<Mesh>();
+    let ambient = false;
+    const reach = this.ambientRange * this.ambientRange;
     for (const [id, o] of this.objects) {
       const wanted = this.wanted.get(id);
       const held = o.open ? o.motions.open : undefined;
+      const idle = o.motions.idle !== undefined && reach > 0 && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
       let clips = this.states.get(id);
-      if ((wanted || held) && !clips) this.states.set(id, (clips = new Map()));
+      if ((wanted || held || idle) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
       const heldClip = held ? o.motion.clips.get(held) : undefined;
-      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity, loop: false });
+      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity, kind: 'use' });
+      const idleClip = idle ? o.motion.clips.get(idle) : undefined;
+      if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, kind: 'idle' });
       let changed = false;
+      let drifted = false;
       for (const [name, want] of wanted ?? []) {
         const clip = o.motion.clips.get(name);
         if (!clip) continue;
@@ -122,15 +144,26 @@ export class ObjectMotion {
         if (state?.use === want.use) continue;
         // A new use: open (again), or go round.
         const until = want.hold === undefined ? Infinity : this.clock + want.hold;
-        if (state) Object.assign(state, { use: want.use, until, loop: want.loop });
-        else clips.set(name, { clip, time: 0, use: want.use, until, loop: want.loop });
+        if (state) Object.assign(state, { use: want.use, until, kind: want.kind });
+        else clips.set(name, { clip, time: 0, use: want.use, until, kind: want.kind });
       }
       for (const [name, state] of clips) {
+        const d = state.clip.duration;
+        if (state.kind === 'idle') {
+          // Round and round near the camera; at rest further off.
+          if (name !== idle) {
+            clips.delete(name);
+            drifted = true;
+          } else if (dt && d > 0) {
+            state.time = (state.time + dt) % d;
+            drifted = true;
+          }
+          continue;
+        }
         const using = state.use !== '' && wanted?.get(name)?.use === state.use;
         // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
         if (!using && !wanted?.has(name)) state.use = '';
-        const d = state.clip.duration;
-        if (state.loop && name !== held) {
+        if (state.kind === 'loop' && name !== held) {
           // Round and round while used; once not, on to the end of the round and stop there (at
           // rest: a loop ends where it starts). One that never got going stops where it is.
           if (!using && (state.time === 0 || state.time + dt >= d)) {
@@ -150,15 +183,30 @@ export class ObjectMotion {
         // Closed again after its `hold`, it stays so (kept) until the use ends; a new use opens it again.
         if (!time && !open && !using) clips.delete(name);
       }
-      if (changed) {
-        this.pose(o, clips);
-        for (const part of o.target.moving!.parts) for (const mesh of part.meshes) moved.add(mesh);
+      if (changed || drifted) {
+        this.pose(o, clips, written);
+        if (changed) for (const part of o.target.moving!.parts) for (const mesh of part.meshes) moved.add(mesh);
+        else ambient = true;
       }
       if (!clips.size) this.states.delete(id);
     }
-    // Culled by where the parts are now (an open door reaches out of the closed model's box).
+    // Each buffer written goes up once, however many of its instances moved.
+    for (const mesh of written) {
+      if (mesh.isDisposed()) continue;
+      mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
+      mesh.thinInstanceBufferUpdated('matrix');
+    }
+    // Culled by where the parts are now (an open door reaches out of the closed model's box). Ambient
+    // clips stay about where they are at rest (a fan's blades, water in its basin): not worth it.
     for (const mesh of moved) if (!mesh.isDisposed()) mesh.thinInstanceRefreshBoundingInfo(false);
-    return moved.size > 0;
+    return { moved: moved.size > 0, ambient };
+  }
+
+  /** Squared distance (m) from `eye` to where `o` stands. */
+  private distance2(o: MovingObject, eye: Vector3): number {
+    const m = o.target.matrices;
+    const k = o.target.index * 16;
+    return (m[k + 12] - eye.x) ** 2 + (m[k + 13] - eye.y) ** 2 + (m[k + 14] - eye.z) ** 2;
   }
 
   /** Which objects residents use this frame, and the clip each use plays. */
@@ -186,14 +234,14 @@ export class ObjectMotion {
       if (!clips && !loop) continue;
       const use = `${curr[o + k.id]}:${act}:${interaction}`;
       const wanted = this.wanted.get(id) ?? new Map<string, Wanted>();
-      for (const { clip, hold } of clips ?? []) wanted.set(clip, { use, hold, loop: false });
-      if (loop) wanted.set(loop, { use, loop: true });
+      for (const { clip, hold } of clips ?? []) wanted.set(clip, { use, hold, kind: 'use' });
+      if (loop) wanted.set(loop, { use, kind: 'loop' });
       this.wanted.set(id, wanted);
     }
   }
 
-  /** Writes an object's parts where its clips have them (at rest where none does). */
-  private pose(o: MovingObject, clips: Map<string, ClipState>): void {
+  /** Writes an object's parts where its clips have them (at rest where none does); `written` takes the meshes whose buffers changed (else they go up now). */
+  private pose(o: MovingObject, clips: Map<string, ClipState>, written?: Set<Mesh>): void {
     const moving = o.target.moving!;
     const n = moving.parts.length;
     for (let part = 0; part < n; part++) {
@@ -201,7 +249,7 @@ export class ObjectMotion {
       for (const state of clips.values()) posed = clipPose(state.clip, part, state.time, moving.poses, part * 16) || posed;
       if (!posed) identity(moving.poses, part * 16);
     }
-    writeMoving(o.target);
+    writeMoving(o.target, written);
   }
 }
 

@@ -180,13 +180,16 @@ How the parts work:
     each with its own `hold` (a door shut after 1 s while the water runs).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock` or `G.spin`.
+  - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
+    on the Low preset. It too ends where it starts.
   - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.
 - **Timing.** A clip starts when the use starts, once the resident has arrived (a bed folds down as they
   lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
-  a clip that nothing plays, and fails a loop that doesn't end where it starts.
+  a clip that nothing plays, and fails a loop (or `idle`) that doesn't end where it starts; one that ends
+  a whole fraction of a turn round (a four-bladed fan a quarter turn) is a warning to check.
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
   way round, a `rock` at its furthest).
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip

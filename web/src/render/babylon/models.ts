@@ -732,6 +732,7 @@ interface MotionsEntry {
   hold?: number;
   open?: string;
   loops?: Record<string, string>;
+  idle?: string;
 }
 
 /** When a model's clips play: while residents use the object, and while it's open. */
@@ -750,6 +751,8 @@ export interface Motions {
   loops: Record<string, string>;
   /** The clip held open while the object is open (a wall bed folded down; the sim's `open`, set by `leaves`). */
   open?: string;
+  /** The clip that goes round all the time, near the camera (a ceiling fan, a fountain's water; `ambientRange`). */
+  idle?: string;
 }
 
 export interface UseClip {
@@ -785,7 +788,7 @@ export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
     Object.entries(m.uses ?? {}).map(([use, value]) => [use, (Array.isArray(value) ? value : [value]).map((u) => (typeof u === 'string' ? { clip: u, hold: m.hold } : { clip: u.clip, hold: u.hold ?? m.hold }))]),
   );
   const loops = m.loops ?? {};
-  return Object.keys(uses).length || Object.keys(loops).length || m.open ? { uses, loops, open: m.open } : undefined;
+  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle ? { uses, loops, open: m.open, idle: m.idle } : undefined;
 }
 
 interface MaterialOverride {

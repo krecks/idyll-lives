@@ -63,6 +63,13 @@ export interface QualitySettings {
   landscapeShadows: boolean;
   /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
   snapshotRendering: boolean;
+  /**
+   * Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a
+   * fountain's water: model `motions.idle`); 0: none, all at rest. Each moving thing rewrites its
+   * model's part buffers every frame (one upload per model, not per thing); shadows aren't redrawn
+   * for them. Not measured yet.
+   */
+  ambientRange: number;
 }
 
 /** What the renderer is built with: a preset's knobs, and which preset (the F3 overlay shows it). */
@@ -71,9 +78,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true, ambientRange: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 40 },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 60 },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

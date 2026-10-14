@@ -36,8 +36,12 @@ export interface MovingTarget {
   poses: Float32Array;
 }
 
-/** Writes an instance's moving parts after its matrix: each part's pose, then the instance's placement. */
-export function writeMoving(target: PopTarget): void {
+/**
+ * Writes an instance's moving parts after its matrix: each part's pose, then the instance's
+ * placement. The buffers go up now, or, given `updated`, their meshes go in it for the caller to
+ * send up once (many instances of one model moving in a frame).
+ */
+export function writeMoving(target: PopTarget, updated?: Set<Mesh>): void {
   const moving = target.moving;
   if (!moving) return;
   const o = target.index * 16;
@@ -47,6 +51,10 @@ export function writeMoving(target: PopTarget): void {
     mPose.multiplyToRef(mBase, mPose);
     mPose.copyToArray(matrices, o);
     for (const mesh of meshes) {
+      if (updated) {
+        updated.add(mesh);
+        continue;
+      }
       if (mesh.isDisposed()) continue;
       mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
       mesh.thinInstanceBufferUpdated('matrix');

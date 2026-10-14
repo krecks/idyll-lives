@@ -606,6 +606,7 @@ export class BabylonRenderer implements Renderer {
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
     this.mirrors = new Mirrors(scene, this.diag.has('nomirrors') ? 0 : this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    this.motion.setAmbientRange(this.quality.ambientRange);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
     window.addEventListener('resize', this.onResize);
@@ -833,11 +834,11 @@ export class BabylonRenderer implements Renderer {
     this.simCount = count;
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
-    // Doors that open while residents use what they're on.
-    if (this.motion.update(frame, layout.actions ?? [])) {
-      this.sunShadows.moved();
-      this.resetSnapshot();
-    }
+    // Doors that open while residents use what they're on, and ambient clips near the camera (the
+    // sun's shadows aren't redrawn for those).
+    const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
+    if (motion.moved) this.sunShadows.moved();
+    if (motion.moved || motion.ambient) this.resetSnapshot();
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
     this.mirrors.update(this.camera);
