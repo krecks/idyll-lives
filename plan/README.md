@@ -57,7 +57,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7, **done**), LT2 Wall lights (3, **done**), LT3 Floor lamps (5, **done**), LT4 Table lamps (6, **done**) |
 | [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |
 | [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10, **done**), G2 Flowers (15, **done**), G3 Shrubs (11, **done**), G4 Edibles (5, **done**), G5 Trees (12) |
-| [Community and farm](14-community.md) | 36 | CM1 Playground (8), CM2 Street furniture (10), CM3 Food stalls and vending (5), CM4 Shops and café (5), CM5 Farm (8) |
+| [Community and farm](14-community.md) | 36 | CM1 Playground (8, **done**), CM2 Street furniture (10, **done**), CM3 Food stalls and vending (5, **done**), CM4 Shops and café (5, **done**), CM5 Farm (8, **done**) |
 | [Personality packs](15-personality-packs.md) | 94 | P1–P16: one task per pack (bookworm … slob, and the example pack) |
 | [Sign-off](16-sign-off.md) | — | Back from Validate, per task and per category; done means |
 
