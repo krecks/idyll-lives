@@ -466,7 +466,7 @@ def bedsideStack():
         F.box('cover', 0.2, 0.006, 0.15, (0.1, top + 0.033, -0.15), M.book_a)
         F.box('cover_title', 0.08, 0.002, 0.03, (0.1, top + 0.037, -0.15), M.book_d)
     cover = G.hinged(G.join(cover, 'cover'), F.at(0.2, top + 0.033, -0.15))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(cover, 'book_up', 170, seconds=0.8, axis='Y')
     return objs
 
@@ -489,7 +489,7 @@ FAMILY = G.Family(
              centre=(0, -0.005), motions={'uses': {'readByFire': 'flames', 'readAloud': 'flames'}},
              paint=[('walnut', 'Wood'), ('velvet', 'Fabric'), ('rug', 'Rug')]),
      G.Model('bedsideStack', bedsideStack, size=(0.846, 0.931, 0.74), key='model.bookworm.bedsideStack',
-             centre=(0.023, -0.092), motions={'uses': {'chapter': 'book_up'}},
+             centre=(0.023, -0.06), motions={'uses': {'chapter': 'book_up'}},
              paint=[('body', 'Wood'), ('shade', 'Fabric'), ('panel', 'Drawers')])],
     comment='Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Replaces the '
             'primitive-part placeholders of packs/bookworm by key; the placeholder is kept as a fallback if a file '

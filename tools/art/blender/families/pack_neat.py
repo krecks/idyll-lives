@@ -274,7 +274,7 @@ def rainShowerTower():
                       material=M.water, verts=4)
     rain = G.join(rain, 'water', origin=F.at(0, HEAD_Y, 0))
     rain.scale[2] = 0.001
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.6)
     return objs
 
@@ -433,7 +433,7 @@ def entryConsole():
                 major_segments=10, minor_segments=4)
         F.box('key', 0.05, 0.004, 0.012, (dx + 0.01, dy + 0.034, FZ - 0.1), M.brass)
     drawer = G.join(drawer, 'drawer')
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.slide(drawer, 'tray', (0, -0.2, 0), seconds=0.6)
     return objs
 
@@ -449,7 +449,7 @@ FAMILY = G.Family(
              motions={'uses': {'laundry': 'door_open', 'fold': 'door_open'}},
              paint=[('body', 'Body'), ('appliance', 'Washer & dryer')]),
      G.Model('rainShowerTower', rainShowerTower, size=(0.9, 2.18, 0.9), key='model.neat.rainShowerTower',
-             motions={'uses': {'steamShower': 'water_on'}},
+             centre=(0, 0.02), motions={'uses': {'steamShower': 'water_on'}},
              paint=[('tile', 'Body'), ('teak', 'Bench')]),
      G.Model('organizerDesk', organizerDesk, size=(1.6, 1.25, 0.827), key='model.neat.organizerDesk',
              centre=(0, 0.039),
@@ -459,7 +459,7 @@ FAMILY = G.Family(
              motions={'uses': {'program': 'vacuum_out'}, 'hold': 2},
              paint=[('appliance', 'Body'), ('teal', 'Trim'), ('rug', 'Rug')]),
      G.Model('entryConsole', entryConsole, size=(0.87, 1.769, 0.336), key='model.neat.entryConsole',
-             centre=(-0.005, -0.28),
+             centre=(-0.005, -0.262),
              motions={'uses': {'tidy': 'tray'}},
              paint=[('body', 'Body'), ('birch', 'Wood')])],
     comment='Blender-built neat pack models (tools/art/blender/families/pack_neat.py). Replaces the primitive-part '

@@ -468,7 +468,7 @@ def contrastShower():
                       verts=6, smooth=False)
     rain = G.join(rain, 'water', origin=F.at(hx, hy, hz))
     rain.scale[2] = 0.001
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.5)
     return objs
 
@@ -532,7 +532,7 @@ FAMILY = G.Family(
              centre=(0, -0.115), motions={'uses': {'blend': 'lid'}, 'hold': 1.0},
              paint=[('blend_cab', 'Frame'), ('blend_door', 'Doors'), ('motor', 'Blender')]),
      G.Model('contrastShower', contrastShower, size=(0.9, 2.15, 0.9), key='model.energetic.contrastShower',
-             centre=(0, 0), motions={'uses': {'rinse': 'water_on'}},
+             centre=(0, 0.02), motions={'uses': {'rinse': 'water_on'}},
              paint=[('shower_frame', 'Frame'), ('tile', 'Tiles'), ('shower_mat', 'Mat')]),
      G.Model('recoveryPod', recoveryPod, size=(0.859, 1.175, 1.86), key='model.energetic.recoveryPod',
              centre=(0, 0), motions={'uses': {'recover': 'canopy'}},

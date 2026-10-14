@@ -7,7 +7,9 @@ primitive-part placeholders (`tools/art/pack_bookworm.py`, in `packs/bookworm`) 
 
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 with one moving part. Pack families write to a pack of their own (`pack_<trait>`), keyed `model.<trait>.<id>`, so
-the trait's pack keeps its placeholders.
+the trait's pack keeps its placeholders. The bedside stack stood 3 cm into the wall; it is centred on its `Model`
+`centre` now (`G.settle()`), its back on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_bookworm.py`, `pack_shapes.to_wall`) stand with their backs
+on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|

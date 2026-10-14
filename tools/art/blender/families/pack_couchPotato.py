@@ -210,7 +210,7 @@ def cinemaWall():
         with G.new_parts() as cur:
             _pleats(F, name, s * 0.01, s * 0.78, 0.9, 1.42, zc - 0.012, 8, 0.016, M.curtain)
         parts.append(G.hinged(G.join(cur, name), F.at(s * 0.78, 1.42, zc - 0.012)))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     for cur in parts:
         G.squash(cur, 'curtains', (0.22, 1, 1), seconds=1.2)
     return objs
@@ -248,7 +248,7 @@ def gameConsole():
         F.box('tray', 0.13, 0.008, 0.09, (0, 0.67, 0.385), M.dark, bevel=0.002)
         F.cyl('tray_disc', 0.04, 0.003, (0, 0.6755, 0.385), M.disc, verts=24)
     tray = G.join(tray, 'tray')
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.slide(tray, 'tray', (0, 0.09, 0), seconds=0.6)     # 9 cm towards the players (-Z game)
     return objs
 
@@ -448,10 +448,10 @@ def lavaLamp():
 FAMILY = G.Family(
     'pack_couchPotato', M,
     [G.Model('cinemaWall', cinemaWall, size=(1.88, 1.52, 0.91), key='model.couchPotato.cinemaWall',
-             centre=(0, -0.005), motions={'uses': {'marathon': 'curtains', 'channelSurf': 'curtains'}},
+             centre=(0, 0.025), motions={'uses': {'marathon': 'curtains', 'channelSurf': 'curtains'}},
              paint=[('cinema_frame', 'Body'), ('leather', 'Upholstery'), ('curtain', 'Curtains')]),
      G.Model('gameConsole', gameConsole, size=(0.89, 1.34, 0.9), key='model.couchPotato.gameConsole',
-             centre=(0, 0), motions={'uses': {'play': 'tray', 'speedrun': 'tray'}, 'hold': 1.5},
+             centre=(0, 0.02), motions={'uses': {'play': 'tray', 'speedrun': 'tray'}, 'hold': 1.5},
              paint=[('console', 'Body'), ('gamer', 'Upholstery'), ('mustard', 'Cushion')]),
      G.Model('recliner', recliner, size=(0.94, 0.949, 0.76), key='model.couchPotato.recliner',
              centre=(-0.01, -0.02), motions={'uses': {'recline': 'recline', 'doze': 'recline'}, 'ride': 'recline'},

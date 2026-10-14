@@ -6,6 +6,9 @@ their entries in `packs/pack_couchPotato/manifest.json`, an override pack listed
 `packs/couchPotato`) stay as the fallback. Built 2026-10-14; they sit in Validate › Couch Potato until checked in play.
 
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+The cinema wall and the game console stood 2–3 cm into the wall; they are centred on their `Model` `centre` now
+(`G.settle()`), their backs on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_couchPotato.py`, `pack_shapes.to_wall`) stand with their backs
+on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 As on the placeholders, the screens the residents watch (the cinema's, the console's) stand at the front edge facing
 the seats, their oak backs to the room: their curtains and tray show from behind and from above.
 
