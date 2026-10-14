@@ -19,8 +19,9 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 The light is the content's `light`; the model only shows where it comes from. `_bulb` (and `_near_light`)
 asserts each bulb within 25 cm of the content's `light.height`, read from `base.json`, `furniture.json` and
-`catalog2/lighting.json`, so a remodel can't drift away from it. Most are within 8 cm; the pendant's light
-(2.1 m) sits at the top of its dome, 20 cm above the bulb, as the placeholder had it.
+`catalog2/lighting.json`, so a remodel can't drift away from it. Most are within 8 cm. The pendant's light was
+at the top of its dome (2.1 m, as the placeholder had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
+2026-10-14), a little brighter on the floor and a little darker on the ceiling.
 
 ## Night glow
 

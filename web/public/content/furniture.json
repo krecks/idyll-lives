@@ -4028,7 +4028,7 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 2.1,
+        "height": 1.9,
         "tiles": 16
       },
       "description": "A frosted globe on a long cord.",
