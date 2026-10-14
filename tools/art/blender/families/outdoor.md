@@ -61,7 +61,10 @@ Built 2026-10-14; in Validate › Loungers until signed off (back to Outdoor ›
   sunbathe and doze, so the lying resident (`BEDS` 0.35 m) lies along it; it rises again after.
 - **Hammock** (`hammock`): a wooden stand; the sling (a sagging striped mesh, spreader bars, ropes, a pillow) is
   hinged on the line through the hooks (1.1 m). `sway` rocks it ±8° in 2 s, a loop for swing and doze, and the
-  resident rides it (`ride`).
+  resident rides it (`ride`). They lie in the sling's dip (`characters.ts` `BEDS.hammock.sling`, its heights
+  from `_sling`: 0.6 m in the middle, 0.86 at the spreader bars ±0.66, the pillow 0.5 towards the head), the
+  head raised onto the pillow, knees up and the feet inside the spreader bar. A changed sling needs those numbers
+  changed too; the two pack hammocks have theirs.
 - **Porch swing** (`porchSwing`): an A-frame; the slatted seat with arms, cushion and chains swings from the beam,
   `swing` ±10° in 2 s while sat in, ridden. Chains are plain satin, so the seat stays one draw call.
 - **Swing set** (`swingSet`): a round-timber A-frame; both seats and their chains are one part, `swing` ±20° in

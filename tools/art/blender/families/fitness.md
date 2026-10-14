@@ -23,10 +23,12 @@ top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
 ## The exercise bike
 
-An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (`SEATS`), the
+An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (content `seat`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
 once in 1.2 s (`G.spin`), a loop while cycled (`loops: {cycle: pedals_turn}`). The pedals are round, so they look
-the same at any angle. The rider's legs don't pedal (the `exercise` sitting pose).
+the same at any angle. The rider pedals: content `"seat": {"height": 0.76, "forward": -0.12, "pedals": {"height":
+0.3, "forward": 0.04, "crank": 0.16}}` puts each foot on its pedal, in time with `pedals_turn` (the right one at
+the bottom at rest; `characters.ts` `pedal`).
 
 ## The yoga mat
 

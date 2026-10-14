@@ -3448,6 +3448,15 @@
       "id": "exerciseBike",
       "name": "Exercise bike",
       "model": "model.exerciseBike",
+      "seat": {
+        "height": 0.76,
+        "forward": -0.12,
+        "pedals": {
+          "height": 0.3,
+          "forward": 0.04,
+          "crank": 0.16
+        }
+      },
       "footprint": [
         1,
         1

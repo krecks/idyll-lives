@@ -177,7 +177,6 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   officeChair: { h: 0.47, fwd: -0.04 },
   keyboardDigital: { h: 0.45, fwd: -0.2 },
   sewingTable: { h: 0.46, fwd: -0.22 },
-  exerciseBike: { h: 0.76, fwd: -0.12 },
   patioSet: { h: 0.44, fwd: -0.62 },
   picnicTable: { h: 0.4, fwd: -0.68 },
   gardenChair: { h: 0.4, fwd: -0.1 },
@@ -211,7 +210,7 @@ interface Seat {
  * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa. `across`: lain on
  * along its width, head to its left (a hammock slung side to side on a wide footprint).
  */
-const BEDS: Record<string, { h: number; fwd?: number; across?: boolean }> = {
+const BEDS: Record<string, Bed> = {
   bed: { h: 0.58 },
   crib: { h: 0.56 },
   weightBench: { h: 0.5 },
@@ -225,9 +224,10 @@ const BEDS: Record<string, { h: number; fwd?: number; across?: boolean }> = {
   bedKing: { h: 0.59 },
   kidsBed: { h: 0.44 },
   sunLounger: { h: 0.35 },
-  hammock: { h: 0.62 },
-  'cheerful.rainbowHammock': { h: 0.5, across: true },
-  'natureLover.gardenHammock': { h: 0.5, across: true },
+  // Hammocks: lain in the sagging sling (`Bed.sling`, from their models' builds).
+  hammock: { h: 0.62, sling: { low: 0.6, end: 0.86, half: 0.66, head: 0.5 } },
+  'cheerful.rainbowHammock': { h: 0.5, across: true, sling: { low: 0.49, end: 0.86, half: 0.755, head: 0.52 } },
+  'natureLover.gardenHammock': { h: 0.5, across: true, sling: { low: 0.475, end: 0.86, half: 0.72, head: 0.54 } },
   wallBed: { h: 0.46 },
   // The oak double, the upholstered queen and the four-poster (their mattress tops), and the daybed.
   bedDouble: { h: 0.52 },
@@ -237,7 +237,20 @@ const BEDS: Record<string, { h: number; fwd?: number; across?: boolean }> = {
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
   sofaBed: { h: 0.42, fwd: 0.6 },
 };
-const DEFAULT_BED: { h: number; fwd?: number; across?: boolean } = { h: 0.5 };
+const DEFAULT_BED: Bed = { h: 0.5 };
+/** What residents lie on (`BEDS`). */
+interface Bed {
+  h: number;
+  fwd?: number;
+  across?: boolean;
+  /**
+   * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
+   * ends (`end`, `half` each way, at the spreader bars; a parabola between), and how far towards the head
+   * end the pillow is. The sleeper lies in it (`inSling`): hips in the dip, head raised onto the
+   * pillow, knees up and the feet inside the spreader bar.
+   */
+  sling?: { low: number; end: number; half: number; head: number };
+}
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk. */
 const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
@@ -245,6 +258,17 @@ const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBun
 /** Lying: height of the back above the feet line, and how far the feet reach past the slot centre (body scale 1). */
 const LIE_BACK = 0.1;
 const LIE_CENTRE = 0.86;
+/**
+ * In a hammock (`Bed.sling`): the pillow's thickness (m), the ankles' height over the sling (m, body
+ * scale 1), how far inside the spreader bar they stay (m), the most the upper body rises (rad), how far
+ * the back lies above the sling's top (m, its thickness), and how far the head's joint lies short of the
+ * pillow's middle (m: the back of the head on it).
+ */
+const SLING = { pillow: 0.07, ankle: 0.07, feet: 0.12, lift: 0.7, back: 0.02, crown: 0.08 };
+/** A sling's top `d` m from its middle along the sleeper (a parabola from `low` to `end` at the bars). */
+function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
+  return sling.low + (sling.end - sling.low) * Math.min(1, (d / sling.half) ** 2);
+}
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
@@ -276,6 +300,13 @@ const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean
  */
 const CRADLE = { forward: 0.08, lift: -0.03, tilt: 0.22, roll: -0.55 };
 
+/**
+ * Pedalling (`Characters.pedal`): a turn's length (s) when the object's loop isn't playing (the bike's
+ * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).
+ */
+const PEDAL = { turn: 1.2, ankle: [0.08, -0.09] as const };
+/** Legs out along a seat (`Characters.legsOut`): the ankles this far below the hips' joints (m, body scale 1). */
+const LEGS_OUT_DROP = 0.04;
 /** A use sequence of the idle alone. */
 const IDLE_ONLY: readonly string[] = ['idle'];
 /** Seated objects whose activity uses the hands on a desk / keys. */
@@ -563,6 +594,11 @@ interface SimRig {
   /** Def of the object in use ('' = none), for activity layers that depend on it, and the object. */
   useDef: string;
   useObj: PlacedObject | null;
+  /** The snapshot's id of the object in use (-1: none). */
+  useId: number;
+  /** Lying in a hammock's sling (`inSling`), or null; the upper body's rise in it (rad). */
+  sling: Bed['sling'] | null;
+  slingLift: number;
   tagKnown: boolean;
   cur: Player;
   prev: Player;
@@ -649,6 +685,28 @@ interface SimRig {
   speechStart: number;
   speechSeg: number;
 }
+
+/**
+ * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
+ * the thigh's and the calf's lengths and their directions (rad from straight down towards the front).
+ */
+interface LegSide {
+  hy: number;
+  hz: number;
+  l1: number;
+  l2: number;
+  t0: number;
+  c0: number;
+}
+interface LegFit {
+  l: LegSide;
+  r: LegSide;
+  /** The spine's base (spine_01) and the head's joint: height and depth. */
+  spine: readonly [number, number];
+  head: readonly [number, number];
+}
+/** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise) and lying (in a hammock). */
+const LEG_CLIPS = ['sit', 'sitHands', 'lie'] as const;
 
 /** Pelvis offset of the seated clip for one body (scale 1). */
 interface SeatFit {
@@ -811,6 +869,13 @@ export class Characters {
   private clock = 0;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
+  /** Per body, then clip (`LEG_CLIPS`): where its legs are in the clip, for placing the feet (`legTo`). */
+  private readonly legFits = new Map<string, Map<string, LegFit>>();
+  /** Where a moving object's loop has got to (0..1 of a round; a bike's pedals), null while none plays. */
+  private loopOf: ((objectId: number) => number | null) | null = null;
+  /** Scratch: a leg's thigh and calf rotations from `legTo`, and the root's height and forward offset from `inSling`. */
+  private readonly legAdd = new Float32Array(2);
+  private readonly slingAt = new Float32Array(2);
   /** `?debug`: force a clip on every Sim (`__characters.force = 'sit'`). */
   force: string | null = null;
   /** `?debug`: keep the standing stance layers on a forced clip (as the clip looks in game). */
@@ -926,7 +991,10 @@ export class Characters {
       const m = /^(index|middle|ring|pinky|thumb|fingers)_0(\d)/.exec(n);
       if (m) this.fingerMask[b] = FINGER_OPEN[m[1]] * (JOINT_OPEN[Number(m[2]) - 1] ?? 1);
     });
-    for (const body of set.bodies.values()) this.sitPelvis.set(body.name, this.measureSit(body));
+    for (const body of set.bodies.values()) {
+      this.sitPelvis.set(body.name, this.measureSit(body));
+      this.legFits.set(body.name, this.measureLegs(body));
+    }
     const lying = [...set.bodies.values()].map((body) => ({
       body,
       ...this.lyingPose(body),
@@ -1055,7 +1123,10 @@ export class Characters {
         const stage = s.appearance?.stage;
         if (stage && stage !== base.stage) {
           const b = await loadStage(set, base, stage).catch((err) => (console.warn(`[render] ${base.name}.${stage} unavailable`, err), null));
-          if (b && !this.sitPelvis.has(b.name)) this.sitPelvis.set(b.name, this.measureSit(b));
+          if (b && !this.sitPelvis.has(b.name)) {
+            this.sitPelvis.set(b.name, this.measureSit(b));
+            this.legFits.set(b.name, this.measureLegs(b));
+          }
         }
       }),
     );
@@ -1124,6 +1195,9 @@ export class Characters {
         tag: '',
         useDef: '',
         useObj: null,
+        useId: -1,
+        sling: null,
+        slingLift: 0,
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -1875,6 +1949,7 @@ export class Characters {
       const carry = item ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
 
       // Activity → clip.
+      rig.useId = usingId;
       this.choose(rig, i, pose, moving, social, role, outcome, partnerRig, time, dt * animRate, useObj, tag, carry, dt, appeared);
       rig.lastPose = pose;
 
@@ -2089,6 +2164,10 @@ export class Characters {
         rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
         rate = 0.3;
+        // In a hammock: down in the sling's dip, the head up on the pillow (`inSling`).
+        const at = bed.sling ? this.inSling(rig, bed.sling, obj?.lift ?? 0, rootFwd) : null;
+        rig.sling = at ? bed.sling! : null;
+        if (at) [rootY, rootFwd] = at;
         fade = rig.cur.key === 'sitDown' ? 0.9 : 0.45;
         // (Where it lies, for getting up: by then the Sim has already moved off the bed.)
         rig.lieX = rig.x;
@@ -2356,6 +2435,11 @@ export class Characters {
     this.rideOf = rideOf;
   }
 
+  /** How far round an object's loop is (`ObjectMotion.loopPhase`: the bike's pedals the feet follow). */
+  setLoop(loopOf: ((objectId: number) => number | null) | null): void {
+    this.loopOf = loopOf;
+  }
+
   private start(rig: SimRig, key: string, fade: number, rate: number, repeat: boolean, rootY: number, rootFwd: number, pitch: number): void {
     const clip = this.clip(key);
     // The fading-out player continues from the current blend.
@@ -2535,10 +2619,11 @@ export class Characters {
       // (The clip breathes, with the hands on the belly.) The head turns slowly to one side, each
       // Sim its own way (asleep: deeper, less movement).
       const asleep = rig.tag === 'sleep' || rig.tag === 'nap';
-      const headTurn = (rig.seed - 0.5) * 0.7 * (asleep ? 1 : 1.5);
+      const headTurn = (rig.seed - 0.5) * 0.7 * (asleep ? 1 : 1.5) * (rig.sling ? 0.5 : 1);
       addRotation(add, B.Head, 0, 1, 0, headTurn + Math.sin(time * 0.2 + rig.seed * 8) * 0.02);
+      if (rig.sling) this.slingPose(rig, rig.sling);
       // Subtle leg adjustment for more natural lying.
-      if (!asleep) {
+      else if (!asleep) {
         const legShift = Math.sin(time * 0.25 + rig.seed * 7) * 0.03;
         addRotation(add, B.thigh_l, 1, 0, 0, legShift);
         addRotation(add, B.thigh_r, 1, 0, 0, -legShift);
@@ -2561,15 +2646,20 @@ export class Characters {
     const key = rig.cur.key;
     const seed = rig.seed * 6;
     if (pose === Pose.Sit && key !== 'sitDown') {
+      const seat = rig.useObj?.seat;
+      if (seat?.pedals) this.pedal(rig, seat.pedals);
+      else if (seat?.legsOut) this.legsOut(rig);
       switch (rig.tag) {
         case 'relax':
         case 'nap':
         case 'watch':
-          // Sinking back into the seat, legs stretched out a little, arms on the armrests.
+          // Sinking back into the seat, legs stretched out a little (or all the way, `legsOut`), arms on the armrests.
           addRotation(add, B.spine_01, 1, 0, 0, -0.14);
           addRotation(add, B.Head, 1, 0, 0, 0.1);
-          addRotation(add, B.calf_l, 1, 0, 0, -0.35);
-          addRotation(add, B.calf_r, 1, 0, 0, -0.3);
+          if (!seat?.legsOut) {
+            addRotation(add, B.calf_l, 1, 0, 0, -0.35);
+            addRotation(add, B.calf_r, 1, 0, 0, -0.3);
+          }
           addRotation(add, B.upperarm_l, 0, 0, 1, -0.18);
           addRotation(add, B.upperarm_r, 0, 0, 1, 0.18);
           break;
@@ -2708,6 +2798,54 @@ export class Characters {
           addRotation(add, B.Head, 1, 0, 0, -0.2 * up);
         }
         break;
+    }
+  }
+
+  /**
+   * Pedalling (content `seat.pedals`): each foot on its pedal, the ball of the foot on it, in time with
+   * the object's loop (the bike's `pedals_turn`; without one playing, at its pace from the use's start).
+   */
+  private pedal(rig: SimRig, pedals: NonNullable<Seat['pedals']>): void {
+    const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
+    const obj = rig.useObj;
+    if (!fits || !obj) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    // The axle ahead of the Sim (the object's middle, then the pedals' offset from it).
+    const ahead = (obj.cx - rig.x) * Math.sin(rig.yaw) + (obj.cz - rig.z) * Math.cos(rig.yaw) + pedals.fwd;
+    const phase = (rig.useId >= 0 ? this.loopOf?.(rig.useId) : null) ?? (rig.actTime / PEDAL.turn) % 1;
+    for (const [fit, thigh, calf, foot, half] of [
+      [fits.l, B.thigh_l, B.calf_l, B.foot_l, 0.5],
+      [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0],
+    ] as const) {
+      // Round from the bottom (the right pedal's at rest) to the back, the top and the front.
+      const a = (phase + half) * Math.PI * 2;
+      const y = pedals.h - pedals.crank * Math.cos(a) + PEDAL.ankle[0] * s;
+      const z = ahead - pedals.crank * Math.sin(a) + PEDAL.ankle[1] * s;
+      const turn = this.legTo(fit, (y - rig.cur.rootY) / s, (z - rig.cur.rootFwd) / s);
+      addRotation(this.add, thigh, 1, 0, 0, turn[0] * w);
+      addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
+      // The foot stays about as level as in the clip, its toes dipping as the pedal goes down.
+      addRotation(this.add, foot, 1, 0, 0, (-(turn[0] + turn[1]) * 0.75 + 0.15 * Math.sin(a)) * w);
+    }
+  }
+
+  /** Legs out along the seat (content `seat.legs`: a chaise): nearly straight, the heels on it, the toes up. */
+  private legsOut(rig: SimRig): void {
+    const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
+    if (!fits) return;
+    const B = this.set!.bone;
+    const w = smooth(rig.w);
+    for (const [fit, thigh, calf, foot, bend] of [
+      [fits.l, B.thigh_l, B.calf_l, B.foot_l, 0.96],
+      [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0.93],
+    ] as const) {
+      // The ankles a heel's height above the seat, the hips' joints being higher (`seatDrop`).
+      const turn = this.legTo(fit, fit.hy - LEGS_OUT_DROP, fit.hz + (fit.l1 + fit.l2) * bend);
+      addRotation(this.add, thigh, 1, 0, 0, turn[0] * w);
+      addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
+      addRotation(this.add, foot, 1, 0, 0, -(turn[0] + turn[1]) * 0.25 * w);
     }
   }
 
@@ -3164,6 +3302,113 @@ export class Characters {
       base += n;
     }
     return { positions: out, chestZ, feetZ };
+  }
+
+  /** Where each leg is in the clips whose feet are placed (`LEG_CLIPS`), at their start (body space, scale 1). */
+  private measureLegs(body: BodyData): Map<string, LegFit> {
+    const set = this.set!;
+    const B = set.bone;
+    const tmp = new Float32Array(set.bones.length * 16);
+    const head = new Float32Array(3);
+    const t = this.scratch.worldT;
+    const fits = new Map<string, LegFit>();
+    for (const key of LEG_CLIPS) {
+      const clip = set.clips.get(key);
+      if (!clip) continue;
+      sampleClip(set, clip, 0, this.qA, this.pA);
+      resetAdditive(this.add);
+      skin(set, body, this.qA, this.pA, this.add, { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, scale: 1 }, this.scratch, tmp, 0, head);
+      const side = (thigh: number, calf: number, foot: number) => {
+        const [hy, hz, ky, kz, ay, az] = [t[thigh * 3 + 1], t[thigh * 3 + 2], t[calf * 3 + 1], t[calf * 3 + 2], t[foot * 3 + 1], t[foot * 3 + 2]];
+        return { hy, hz, l1: Math.hypot(ky - hy, kz - hz), l2: Math.hypot(ay - ky, az - kz), t0: Math.atan2(kz - hz, hy - ky), c0: Math.atan2(az - kz, ky - ay) };
+      };
+      fits.set(key, {
+        l: side(B.thigh_l, B.calf_l, B.foot_l),
+        r: side(B.thigh_r, B.calf_r, B.foot_r),
+        spine: [t[B.spine_01 * 3 + 1], t[B.spine_01 * 3 + 2]],
+        head: [t[B.Head * 3 + 1], t[B.Head * 3 + 2]],
+      });
+    }
+    return fits;
+  }
+
+  /**
+   * Turns a leg (`fit`, its clip's) so its ankle reaches (`y`, `z`) (body space, scale 1; the knee bent
+   * forward, out of reach straightened towards it): the thigh's and calf's rotations about x into
+   * `legAdd`, added to the clip's (see `addRotation`: a positive x rotation swings a limb from +z
+   * towards -y).
+   */
+  private legTo(fit: LegSide, y: number, z: number): Float32Array {
+    const { hy, hz, l1, l2 } = fit;
+    const r = clamp(Math.hypot(y - hy, z - hz), Math.abs(l1 - l2) + 0.01, l1 + l2 - 0.002);
+    // Direction angles from straight down (-y) towards the front (+z).
+    const d = Math.atan2(z - hz, hy - y);
+    const thigh = d + Math.acos(clamp((l1 * l1 + r * r - l2 * l2) / (2 * l1 * r), -1, 1));
+    const calf = d - Math.acos(clamp((l2 * l2 + r * r - l1 * l1) / (2 * l2 * r), -1, 1));
+    this.legAdd[0] = fit.t0 - thigh;
+    this.legAdd[1] = fit.c0 - calf - this.legAdd[0];
+    return this.legAdd;
+  }
+
+  /**
+   * Lying in a hammock's sling (`Bed.sling`; root `fwd0` as on a bed): the root's height and forward
+   * offset that put the hips down in the dip with the back on the sling and, the upper body raised by
+   * `rig.slingLift` (rad, about the spine's base), the head on the pillow. Null without the body's fit.
+   */
+  private inSling(rig: SimRig, sling: NonNullable<Bed['sling']>, lift: number, fwd0: number): Float32Array | null {
+    const fit = this.legFits.get(rig.body.name)?.get('lie');
+    if (!fit) return null;
+    const s = rig.scale;
+    const dy = (fit.head[0] - fit.spine[0]) * s;
+    const dz = (fit.head[1] - fit.spine[1]) * s;
+    const reach = Math.hypot(dy, dz);
+    const lean = Math.atan2(dz, dy);
+    // The head as far above the pillow as above a mattress.
+    const want = slingTop(sling, SLING.crown - sling.head) + lift + lieBack(rig) + fit.head[1] * s + SLING.pillow;
+    const out = this.slingAt;
+    let fwd = fwd0;
+    for (let k = 0; k < 3; k++) {
+      // Along the sling (from its middle towards the feet): the spine's base, which the root follows down.
+      const base = fwd - fit.spine[0] * s;
+      out[0] = slingTop(sling, base) + lift + lieBack(rig) + SLING.back;
+      const rise = clamp(Math.asin(clamp((want - out[0] - fit.spine[1] * s) / reach, -1, 1)) - lean, 0, SLING.lift);
+      rig.slingLift = rise;
+      // Moved along so the head, raised, is over the pillow.
+      fwd += SLING.crown - sling.head - (base - (dy * Math.cos(rise) - dz * Math.sin(rise)));
+    }
+    out[1] = fwd;
+    return out;
+  }
+
+  /**
+   * The pose in a hammock's sling (`inSling`): the back curved up from the hips to the raised head, the
+   * knees up and the heels on the sling inside the spreader bar.
+   */
+  private slingPose(rig: SimRig, sling: NonNullable<Bed['sling']>): void {
+    const fits = this.legFits.get(rig.body.name)?.get('lie');
+    if (!fits) return;
+    const B = this.set!.bone;
+    const add = this.add;
+    const w = smooth(rig.w);
+    const rise = rig.slingLift * w;
+    addRotation(add, B.spine_01, 1, 0, 0, rise * 0.5);
+    addRotation(add, B.spine_02, 1, 0, 0, rise * 0.3);
+    addRotation(add, B.spine_03, 1, 0, 0, rise * 0.2);
+    const s = rig.scale;
+    const lift = rig.bed?.lift ?? 0;
+    const { rootY, rootFwd } = rig.cur;
+    for (const [fit, thigh, calf, foot, short] of [
+      [fits.l, B.thigh_l, B.calf_l, B.foot_l, 0],
+      [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0.05],
+    ] as const) {
+      // Along the sling: the hip, and the ankle as far as the leg reaches, short of the spreader bar.
+      const hip = rootFwd - fit.hy * s;
+      const at = Math.min(sling.half - SLING.feet - short, hip + (fit.l1 + fit.l2) * s * 0.97);
+      const turn = this.legTo(fit, (rootFwd - at) / s, (slingTop(sling, at) + lift + SLING.ankle * s - rootY) / s);
+      addRotation(add, thigh, 1, 0, 0, turn[0] * w);
+      addRotation(add, calf, 1, 0, 0, turn[1] * w);
+      addRotation(add, foot, 1, 0, 0, -(turn[0] + turn[1]) * 0.4 * w);
+    }
   }
 
   /** Pelvis height / forward offset of the seated and lying poses (body space, scale 1). */
