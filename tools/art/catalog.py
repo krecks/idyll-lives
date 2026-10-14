@@ -19,7 +19,7 @@ import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import objects_extra as OX                                          # noqa: E402
 from objects_extra import box, cyl, cone, sph, rod, part            # noqa: E402
-from furniture import (placeholder, cushion, lathe, torus, office_chair,  # noqa: E402
+from furniture import (placeholder, shift, cushion, lathe, torus, office_chair,  # noqa: E402
                        OAK, OAKD, BIRCH, HONEY, WALNUT, BLACKMETAL, STEEL,
                        CHROME, BRASS, TEAL, COGNAC, MUSTARD, SAGE, RUST, CREAM, SCREEN)
 import catalog2 as C2                                               # noqa: E402
@@ -109,10 +109,10 @@ p = [box([0.6, 0.82, 0.56], [0, 0.43, -0.18], '#F3F3F1', 'gloss', radius=0.03),
      box([0.018, 0.24, 0.03], [0.24, 0.48, 0.125], CHROME, 'chrome', radius=0.008),
      box([0.12, 0.012, 0.03], [0.2, 0.765, 0.125], CHROME, 'chrome', radius=0.006),
      box([0.36, 0.04, 0.012], [0, 0.06, 0.1], '#C9CBCC', 'satin', radius=0.004),                         # vent
-     box([0.5, 0.02, 0.4], [0, 0.87, -0.12], OAK, 'wood', radius=0.006),                                 # board on top
+     box([0.5, 0.02, 0.4], [0, 0.87, -0.12], OAK, 'satin', radius=0.006),                                # board on top
      cyl([0.1, 0.12, 0.1], [-0.14, 0.94, -0.14], '#E9E6E0', 'gloss', taper=0.8),                         # jar
      sph([0.09, 0.08, 0.09], [0.12, 0.92, -0.1], '#D9483B', 'satin', segments=8)]                        # apple
-addp('fridgeMini', p)
+addp('fridgeMini', shift(p, dz=0.03))                  # its back on the wall face (WALL)
 
 
 def builtin_fridge(cab, cfin, door, dfin, handle, hfin):
@@ -130,7 +130,7 @@ def builtin_fridge(cab, cfin, door, dfin, handle, hfin):
     return p
 
 
-addp('fridgeBuiltIn', builtin_fridge('#EDEBE6', 'satin', '#E2DFD8', 'satin', CHROME, 'chrome'))
+addp('fridgeBuiltIn', shift(builtin_fridge('#EDEBE6', 'satin', '#E2DFD8', 'satin', CHROME, 'chrome'), dz=0.03))
 addp('fridgeBuiltIn@modern', builtin_fridge('#F4F4F2', 'gloss', OAK, 'wood', BLACKMETAL, 'metal'))
 addp('fridgeBuiltIn@cozy', builtin_fridge(SAGE, 'satin', '#8FA27E', 'satin', BRASS, 'metal'))
 addp('fridgeBuiltIn@minimal', builtin_fridge(BIRCH, 'wood', '#F2F1EE', 'satin', '#C9C6BE', 'satin'))
@@ -164,7 +164,7 @@ def gas_range(body, fin='satin', steel=STEEL, knob='#3A3D41'):
     return p
 
 
-addp('stoveGas', gas_range('#EDEBE6'))
+addp('stoveGas', shift(gas_range('#EDEBE6'), dz=0.04))
 addp('stoveGas@modern', gas_range('#F4F4F2', 'gloss', knob=BLACKMETAL))
 addp('stoveGas@cozy', gas_range('#C9B79C', steel='#D8C9A6', knob=WALNUT))
 addp('stoveGas@minimal', gas_range(BIRCH, 'wood', knob='#E8E6E1'))
@@ -185,7 +185,7 @@ for x, z, r in ((-0.14, -0.3, 0.2), (0.14, -0.3, 0.16), (-0.14, -0.04, 0.16), (0
 for i in range(4):
     p.append(cyl([0.04, 0.025, 0.04], [-0.18 + i * 0.12, 0.95, -0.355], CHROME, 'chrome', rotate=[90, 0, 0], segments=12))
 p.append(sph([0.015, 0.015, 0.01], [0.24, 0.86, 0.155], '#E9853B', 'gloss', segments=6))
-addp('stoveElectric', p)
+addp('stoveElectric', shift(p, dz=0.03))
 
 
 class Kit:
@@ -249,12 +249,12 @@ def counter(s):
 
 def corner_counter(s):
     """A deep corner unit (fills its tile, for the corner of an L): doors at the front, a worktop over all."""
-    p = [box([1.0, 0.82, 0.96], [0, 0.51, -0.02], s.body, s.bfin, radius=0.012),
-         box([0.96, 0.1, 0.92], [0, 0.05, -0.04], PLINTH, 'satin', radius=0.006),
-         box([1.0, 0.04, 1.0], [0, 0.94, 0.0], s.top, s.tfin, radius=0.006)]
+    p = [box([1.0, 0.82, 0.89], [0, 0.51, 0.015], s.body, s.bfin, radius=0.012),             # its back on the wall face
+         box([0.96, 0.1, 0.85], [0, 0.05, -0.005], PLINTH, 'satin', radius=0.006),
+         box([1.0, 0.04, 0.93], [0, 0.94, 0.035], s.top, s.tfin, radius=0.006)]
     p += front(s, -0.245, 0.49, 0.12, 0.9, 0.46, side=1) + front(s, 0.245, 0.49, 0.12, 0.9, 0.46, side=-1)
     p += [cyl([0.14, 0.18, 0.14], [-0.3, 1.05, -0.3], '#E8E6E1', 'gloss', taper=0.85),            # utensil pot
-          cyl([0.02, 0.2, 0.02], [-0.32, 1.17, -0.3], OAK, 'wood'), cyl([0.02, 0.2, 0.02], [-0.28, 1.16, -0.31], OAK, 'wood')]
+          cyl([0.02, 0.2, 0.02], [-0.32, 1.17, -0.3], OAK, 'satin'), cyl([0.02, 0.2, 0.02], [-0.28, 1.16, -0.31], OAK, 'satin')]
     return p
 
 
@@ -279,14 +279,14 @@ def pantry(s):
 
 
 def microwave_counter(s):
-    x, z = 0.18, -0.24
+    x, z = -0.18, -0.24                 # -x is the viewer's right: the controls there, the door hinged on the left
     p = counter(s)
     p += [box([0.5, 0.3, 0.36], [x, 1.11, z], CHARCOAL, 'satin', radius=0.02),
-          box([0.36, 0.26, 0.014], [x - 0.06, 1.11, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
-          box([0.28, 0.17, 0.006], [x - 0.07, 1.11, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
-          box([0.1, 0.24, 0.01], [x + 0.19, 1.11, z + 0.183], '#22252A', 'satin', radius=0.006),
-          box([0.06, 0.02, 0.006], [x + 0.19, 1.2, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
-    p += [box([0.03, 0.02, 0.006], [x + 0.175 + (i % 2) * 0.035, 1.15 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
+          box([0.36, 0.26, 0.014], [x + 0.06, 1.11, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
+          box([0.28, 0.17, 0.006], [x + 0.07, 1.11, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
+          box([0.1, 0.24, 0.01], [x - 0.19, 1.11, z + 0.183], '#22252A', 'satin', radius=0.006),
+          box([0.06, 0.02, 0.006], [x - 0.19, 1.2, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
+    p += [box([0.03, 0.02, 0.006], [x - 0.175 - (i % 2) * 0.035, 1.15 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
     return p
 
 
@@ -322,20 +322,20 @@ def breakfast_counter(s, toaster):
     return p
 
 
-for sfx, s in KITCHEN.items():
-    addp('counter' + sfx, counter(s))
+for sfx, s in KITCHEN.items():                    # the base units' backs on the wall face (WALL)
+    addp('counter' + sfx, shift(counter(s), dz=0.05))
     add('counterCorner' + sfx, placeholder(corner_counter(s)))
     addp('wallCabinet' + sfx, wall_cabinet(s))
-    addp('pantry' + sfx, pantry(s))
-    addp('microwave' + sfx, microwave_counter(s))
-    addp('coffeeMachine' + sfx, coffee_counter(s))
-    addp('breakfastCounter' + sfx, breakfast_counter(s, {'': CREAM, '@modern': '#F4F4F2', '@cozy': RUST, '@minimal': '#F2F1EE'}[sfx]))
+    addp('pantry' + sfx, shift(pantry(s), dz=0.03))
+    addp('microwave' + sfx, shift(microwave_counter(s), dz=0.05))
+    addp('coffeeMachine' + sfx, shift(coffee_counter(s), dz=0.05))
+    addp('breakfastCounter' + sfx, shift(breakfast_counter(s, {'': CREAM, '@modern': '#F4F4F2', '@cozy': RUST, '@minimal': '#F2F1EE'}[sfx]), dz=0.05))
 
 
 
 
 def dishwasher(body, panel, fin='satin', handle=CHROME, top=OAK, top_fin='wood'):
-    return placeholder([
+    return placeholder(shift([                                                                   # its back on the wall face
         box([0.98, 0.84, 0.58], [0, 0.48, -0.13], body, fin, radius=0.012),
         box([0.98, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),               # plinth
         box([0.9, 0.72, 0.02], [0, 0.48, 0.165], panel, 'metal' if fin == 'metal' else fin, radius=0.012),  # door
@@ -343,7 +343,7 @@ def dishwasher(body, panel, fin='satin', handle=CHROME, top=OAK, top_fin='wood')
         box([0.5, 0.02, 0.03], [0, 0.8, 0.19], handle, 'chrome' if handle == CHROME else 'metal', radius=0.008),
         sph([0.025, 0.025, 0.012], [0.32, 0.89, 0.177], '#5EC28B', 'gloss', segments=6),
         box([1.0, 0.04, 0.66], [0, 0.94, -0.15], top, top_fin, radius=0.006),
-    ])
+    ], dz=0.05))
 
 
 add('dishwasher', dishwasher('#EDEBE6', STEEL, 'satin', CHROME, '#E8E6E1', 'gloss'))
@@ -353,7 +353,7 @@ add('dishwasher@minimal', dishwasher('#F2F2F0', BIRCH, 'satin', '#F2F2F0', '#F2F
 
 
 def farmhouse_sink(cab, top=OAK, top_fin='wood', tap=CHROME):
-    return placeholder([
+    return placeholder(shift([                                                                   # its back on the wall face
         box([0.98, 0.84, 0.58], [0, 0.48, -0.13], cab, 'satin', radius=0.012),
         box([0.96, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),
         box([0.4, 0.62, 0.02], [-0.22, 0.42, 0.165], cab, 'satin', radius=0.01),                    # doors
@@ -368,7 +368,7 @@ def farmhouse_sink(cab, top=OAK, top_fin='wood', tap=CHROME):
         cyl([0.05, 0.03, 0.05], [0.12, 0.975, -0.4], tap, 'chrome'),
         box([0.2, 0.1, 0.06], [0.36, 1.01, -0.36], '#E8E6E1', 'gloss', radius=0.02),                # soap dish
         cyl([0.06, 0.16, 0.06], [-0.36, 1.04, -0.38], TEAL, 'gloss', taper=0.8),
-    ])
+    ], dz=0.05))
 
 
 add('farmhouseSink', farmhouse_sink('#EDEBE6'))

@@ -53,8 +53,8 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "oak": {
-          "finish": "material.finish.wood"
+        "spoon": {
+          "finish": "material.finish.satin"
         },
         "worktop": {
           "finish": "material.finish.gloss"

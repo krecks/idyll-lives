@@ -8,7 +8,10 @@
 # with a `sandwich` use slide their top drawer out 25 cm. The parts are placed in game axes (`F`): the
 # placeholder's depths are shifted back by the placeholder's depth centre, so the model is centred on
 # its tile (see GameFrame). Two worktop heights are in play: 0.96 (the catalogue counters, `_unit66`)
-# and 0.95 (the catalog2 ones, `_unit79`), matching the content's `surface`.
+# and 0.95 (the catalog2 ones, `_unit79`), matching the content's `surface`. There is one depth, the
+# catalogue's 0.66: the catalog2 counters keep their placeholder's old 0.79-deep numbers and are drawn
+# 0.66 deep through `COUNTER66` (as catalog2.py `shallow`), so the fronts of a mixed run line up. Every
+# back stands on the wall face (-0.43).
 #
 # Run:  python3 -B tools/art/blender/build.py kitchen_counters [--preview]
 import os
@@ -32,6 +35,7 @@ M = G.Palette(
     block2=('#C99A68', 'wood'),      # the top layer of the block
     leg=('#9C6B43', 'wood'),         # the block's legs and shelf
     wood2=('#8A5A38', 'satin'),      # the knife drawer's front (plain, so it draws with the body's group)
+    spoon=('#CDB08A', 'satin'),      # the corner counter's wooden spoons (plain: no draw call of their own)
     basket=('#C9A979', 'satin'),     # a basket
     metal=('#2B2C2E', 'metal'),      # a dark metal handle
     porcelain=('#F5F3EE', 'gloss'),  # plates, a bowl, a jar
@@ -61,6 +65,9 @@ SECONDS = 1.4   # a drawer slides in this long
 HOLD = 1.5      # seconds it stays open once a use starts
 DOOR_SECONDS = 1.6   # a cupboard door swings in this long
 DOOR_HOLD = 2.5      # seconds a pantry's doors stay open once a use starts
+# catalog2's 0.79-deep counter numbers (worktop -0.48..0.31, carcass -0.46..0.24) as drawn: 0.66 deep, the
+# worktop -0.43..0.23 and the carcass -0.41..0.19 (catalog2.py COUNTER66; gamekit GameFrame `depths`)
+COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
 
 
 def _handle_v(F, name, x, y, z, material=None):
@@ -126,14 +133,14 @@ def counter():
 def counterCorner():
     F = G.GameFrame(shift=0.0)
     with G.new_parts() as still:
-        F.box('carcass', 1.0, 0.82, 0.96, (0, 0.51, -0.02), M.cab, bevel=0.012)
-        F.box('plinth', 0.96, 0.10, 0.92, (0, 0.05, -0.04), M.dark, bevel=0.006)
-        F.box('worktop', 1.0, 0.04, 1.0, (0, 0.94, 0.0), M.worktop, bevel=0.006)
+        F.box('carcass', 1.0, 0.82, 0.89, (0, 0.51, 0.015), M.cab, bevel=0.012)       # its back on the wall face
+        F.box('plinth', 0.96, 0.10, 0.85, (0, 0.05, -0.005), M.dark, bevel=0.006)
+        F.box('worktop', 1.0, 0.04, 0.93, (0, 0.94, 0.035), M.worktop, bevel=0.006)
         _doors(F, w=1.0, front=0.47, y0=0.12, y1=0.72, hy=0.62)
         # a utensil pot and two wooden spoons on the worktop
         F.cone('pot', 0.07, 0.0595, 0.18, (-0.3, 1.05, -0.3), M.worktop, verts=16)
-        F.cyl('spoon1', 0.010, 0.20, (-0.32, 1.17, -0.30), M.oak, verts=8)
-        F.cyl('spoon2', 0.010, 0.20, (-0.28, 1.16, -0.31), M.oak, verts=8)
+        F.cyl('spoon1', 0.010, 0.20, (-0.32, 1.17, -0.30), M.spoon, verts=8)
+        F.cyl('spoon2', 0.010, 0.20, (-0.28, 1.16, -0.31), M.spoon, verts=8)
     G.join(still, 'body', origin=(0, 0, 0))
     drawer = _drawer(F, 'drawer', w=0.974, y=0.815, z=0.47, material=M.cab)
     G.settle()
@@ -142,7 +149,7 @@ def counterCorner():
 
 # --- the counter end: 1x1, a unit with one door and an open end unit of two shelves -------------------
 def counterEnd():
-    F = G.GameFrame(shift=0.085)
+    F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         _unit79(F, w=0.84, x=-0.08)
         F.box('door', 0.808, 0.74, 0.02, (-0.08, 0.49, 0.25), M.cab, bevel=0.008)
@@ -165,7 +172,7 @@ def counterEnd():
 
 # --- the outer corner counter: 1x1, a short unit with a side panel, a plate and a lemon ---------------
 def counterCornerOuter():
-    F = G.GameFrame(shift=0.085)
+    F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         F.box('carcass', 0.74, 0.8, 0.7, (-0.13, 0.5, -0.11), M.cab, bevel=0.01)
         F.box('plinth', 0.70, 0.10, 0.64, (-0.15, 0.05, -0.14), M.dark, bevel=0.004)
@@ -184,7 +191,7 @@ def counterCornerOuter():
 
 # --- the drawer counter: 1x1, four deep drawers under the worktop (static) ----------------------------
 def counterDrawers():
-    F = G.GameFrame(shift=0.085)
+    F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         _unit79(F, w=1.0)
         for i, y in enumerate((0.2125, 0.3975, 0.5825, 0.7675)):
@@ -196,7 +203,7 @@ def counterDrawers():
 
 # --- the open-shelf counter: 1x1, an open carcass with two shelves of plates and pots (static) --------
 def counterOpenShelf():
-    F = G.GameFrame(shift=0.085)
+    F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         F.box('plinth', 0.996, 0.10, 0.64, (0, 0.05, -0.14), M.dark, bevel=0.004)
         F.box('worktop', 1.0, 0.05, 0.79, (0, 0.925, -0.085), M.worktop, bevel=0.008)
@@ -244,7 +251,7 @@ def butcherBlock():
 
 # --- the marble counter: 1x1, a navy unit with a marble top and brass handles, a drawer for sandwich --
 def counterMarble():
-    F = G.GameFrame(shift=0.085)
+    F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         _unit79(F, w=1.0, body=M.navy, top=M.marble)
         _doors(F, w=1.0, front=0.25, y0=0.12, y1=0.72, body=M.navy, hm=M.brass, hx=0.05, hy=0.62)
@@ -609,36 +616,36 @@ def barEnd():
 # its top under its content `surface` (catalog2.py TOPS).
 FAMILY = G.Family(
     'kitchen_counters', M,
-    [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter', centre=(0, -0.15),
+    [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter', centre=(0, -0.10),
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterCorner', counterCorner, size=(1.0, 1.27, 1.0), key='model.counterCorner',
+     G.Model('counterCorner', counterCorner, size=(1.0, 1.27, 0.93), key='model.counterCorner', centre=(0, 0.035),
              # sandwich, as the counter
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterEnd', counterEnd, size=(1.0, 0.95, 0.79), key='model.counterEnd', centre=(0, -0.085),
+     G.Model('counterEnd', counterEnd, size=(1.0, 0.95, 0.66), key='model.counterEnd', centre=(0, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterCornerOuter', counterCornerOuter, size=(0.81, 1.035, 0.79), key='model.counterCornerOuter', centre=(-0.095, -0.085),
+     G.Model('counterCornerOuter', counterCornerOuter, size=(0.81, 1.035, 0.66), key='model.counterCornerOuter', centre=(-0.095, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterDrawers', counterDrawers, size=(1.0, 0.95, 0.79), key='model.counterDrawers', centre=(0, -0.085),
+     G.Model('counterDrawers', counterDrawers, size=(1.0, 0.95, 0.66), key='model.counterDrawers', centre=(0, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterOpenShelf', counterOpenShelf, size=(1.0, 0.95, 0.79), key='model.counterOpenShelf', centre=(0, -0.085),
+     G.Model('counterOpenShelf', counterOpenShelf, size=(1.0, 0.95, 0.66), key='model.counterOpenShelf', centre=(0, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('butcherBlock', butcherBlock, size=(0.9, 0.945, 0.813), key='model.butcherBlock',
              # sandwich slides the knife drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('leg', 'Base'), ('block', 'Block top')]),
-     G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.79), key='model.counterMarble', centre=(0, -0.085),
+     G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.66), key='model.counterMarble', centre=(0, -0.10),
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('navy', 'Cabinet'), ('marble', 'Marble top'), ('brass', 'Handles')]),
      # K5: tall and wall storage
-     G.Model('pantry', pantry, size=(0.94, 2.27, 0.63), key='model.pantry', centre=(0, -0.141),
+     G.Model('pantry', pantry, size=(0.94, 2.27, 0.63), key='model.pantry', centre=(0, -0.115),
              # snack fetches from the larder: both doors swing open
              motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
-     G.Model('pantryTall', pantryTall, size=(0.96, 2.38, 0.71), key='model.pantryTall', centre=(0, -0.104),
+     G.Model('pantryTall', pantryTall, size=(0.96, 2.38, 0.71), key='model.pantryTall', centre=(0, -0.08),
              # snack, as the larder
              motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('cab', 'Cabinet'), ('brass', 'Handles')]),
@@ -676,9 +683,9 @@ FAMILY = G.Family(
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('islandLong', islandLong, size=(2.96, 0.98, 0.951), key='model.islandLong',
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, -0.045),
+     G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
-     G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd', centre=(0, -0.045),
+     G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')])],
     comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). '
             'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The '

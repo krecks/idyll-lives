@@ -73,11 +73,30 @@ def shift(parts, dx=0.0, dy=0.0, dz=0.0, when=lambda p: True):
         out.append(q)
     return out
 
+def to_wall(parts, wall=-0.43):
+    """Parts reaching past the wall face (depth `wall`: -0.43 in a 1-deep footprint) cut back to it, for a
+    placeholder whose model stands on the face: a box (unturned, or turned only about its depth) loses what
+    is behind the face, anything else (and a thin box wholly behind it) moves forward onto it."""
+    out = []
+    for p in parts:
+        q = json.loads(json.dumps(p))
+        r = p.get('rotate', [0, 0, 0])
+        lo = OX.bounds(dict(p, shape='cylinder') if p['shape'] in ('lathe', 'torus') else p)[0][2]
+        front = p['at'][2] + p['size'][2] / 2
+        if lo < wall - 0.0005:
+            if p['shape'] == 'box' and not (r[0] or r[1]) and front > wall + 0.01:
+                q['size'][2], q['at'][2] = round(front - wall, 4), round((front + wall) / 2, 4)
+                if q.get('radius'): q['radius'] = round(min(q['radius'], q['size'][2] * 0.45), 4)
+            else:
+                q['at'][2] = round(q['at'][2] + wall - lo, 4)
+        out.append(q)
+    return out
+
 
 # =============================================================================================
 # Fridge (1x1): back on the wall
 # =============================================================================================
-E['model.fridge'] = placeholder(FP.fridge_classic(0.74, 1.8, 0.67))                     # white, freezer on top, chrome bars
+E['model.fridge'] = placeholder(shift(FP.fridge_classic(0.74, 1.8, 0.67), dz=0.025))    # white, freezer on top, chrome bars; its back on the wall face
 E['model.fridge@modern'] = placeholder(FP.fridge_side_by_side(0.88, 1.84, 0.69, steel=STEEL))
 E['model.fridge@cozy'] = placeholder(OX.M['model.fridge@cozy'])
 E['model.fridge@minimal'] = placeholder(FP.fridge_classic(                               # handleless white, birch pulls, freezer drawer below
@@ -118,7 +137,7 @@ E['model.shower@minimal'] = placeholder(FP.shower_round())                      
 # =============================================================================================
 # Sofa (2x1, 2 seats at x = +-0.5): seat ~0.44 m
 # =============================================================================================
-E['model.sofa'] = placeholder(FP.sofa_classic())                                         # camel back, walnut show-wood, cabriole legs
+E['model.sofa'] = placeholder(to_wall(FP.sofa_classic()))                                # camel back, walnut show-wood, cabriole legs
 E['model.sofa@modern'] = placeholder(recolor(OX.M['model.sofa@modern'], {
     '#3A3C40': '#B9BCBE', '#46494E': '#C9CBCC', '#8A8F96': TEAL, '#B0B4BA': COGNAC,
     '#D0D3D6': (BLACKMETAL, 'metal')}))
@@ -171,7 +190,7 @@ E['model.bookshelf@cozy'] = placeholder(OX.M['model.bookshelf@cozy'])
 # =============================================================================================
 # Armchair (1x1): one seat at the centre
 # =============================================================================================
-E['model.armchair'] = placeholder(FP.armchair_bergere())                                 # matches the sofa: bergere in a walnut frame
+E['model.armchair'] = placeholder(to_wall(FP.armchair_bergere()))                        # matches the sofa: bergere in a walnut frame
 E['model.armchair@modern'] = placeholder(recolor(OX.M['model.armchair@modern'], {
     '#1E1F22': ('#BFC2C4', 'fabric'), '#2A2B2E': ('#D2D4D5', 'fabric'), '#6B7079': COGNAC}))
 E['model.armchair@cozy'] = placeholder(OX.M['model.armchair@cozy'])
@@ -284,7 +303,7 @@ def computer_desk(top=OAK, legs=BLACKMETAL, ped=WHITE, chair='#5F6E7A', top_fin=
     return p
 
 
-E['model.computerDesk'] = placeholder(computer_desk())
+E['model.computerDesk'] = placeholder(to_wall(computer_desk()))
 E['model.computerDesk@modern'] = placeholder(computer_desk(top='#F1F0EC', top_fin='gloss', ped=OAK, chair='#8E979E'))
 E['model.computerDesk@cozy'] = placeholder(computer_desk(top=HONEY, legs=WALNUT, leg_fin='wood', ped=CREAM, chair=RUST, lamp='#2F6B4F'))
 E['model.computerDesk@minimal'] = placeholder(computer_desk(top=BIRCH, legs='#F2F2F0', leg_fin='satin', ped='#F2F2F0', chair='#E6E2DA', lamp='#F2F2F0'))
@@ -470,7 +489,7 @@ def workbench():
     return p
 
 
-E['model.workbench'] = placeholder(workbench())
+E['model.workbench'] = placeholder(to_wall(workbench()))
 
 # =============================================================================================
 # Floor lamp (1x1) variants (the base model is the brass lamp from objects_extra)

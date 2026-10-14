@@ -202,11 +202,11 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "flame": {
-          "finish": "material.finish.gloss"
-        },
         "grate": {
           "finish": "material.finish.satin"
+        },
+        "heat": {
+          "finish": "material.finish.gloss"
         },
         "hob": {
           "finish": "material.finish.gloss"

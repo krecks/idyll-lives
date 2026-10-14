@@ -496,7 +496,7 @@
         ],
         "at": [
           0,
-          -0.15
+          -0.1
         ]
       },
       "interactions": [
@@ -592,7 +592,7 @@
         ],
         "at": [
           0,
-          -0.15
+          -0.1
         ]
       },
       "interactions": [
@@ -624,7 +624,15 @@
       "description": "A deep corner unit that joins two runs of counters into an L.",
       "surface": {
         "height": 0.96,
-        "kind": "counter"
+        "kind": "counter",
+        "size": [
+          1.0,
+          0.93
+        ],
+        "at": [
+          0,
+          0.035
+        ]
       },
       "interactions": [
         {

@@ -200,6 +200,9 @@
       "type": "model",
       "url": "../../models/kitchen/fridgeMini.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "body": {
           "finish": "material.finish.gloss"
         },
@@ -223,9 +226,6 @@
         },
         "trim": {
           "finish": "material.finish.satin"
-        },
-        "wood": {
-          "finish": "material.finish.wood"
         }
       },
       "motions": {

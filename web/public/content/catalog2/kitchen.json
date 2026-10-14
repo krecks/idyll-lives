@@ -17,11 +17,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -46,11 +46,11 @@
         "kind": "counter",
         "size": [
           0.81,
-          0.79
+          0.66
         ],
         "at": [
           -0.095,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -75,11 +75,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -104,11 +104,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -130,7 +130,7 @@
       "group": "counters",
       "decor": 0.2,
       "surface": {
-        "height": 0.93,
+        "height": 0.945,
         "kind": "counter",
         "size": [
           0.9,
@@ -170,11 +170,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -259,7 +259,7 @@
         ],
         "at": [
           0.0,
-          -0.04
+          0.02
         ]
       },
       "description": "A tall counter with a slatted front and a brass foot rail. Line a few up and pull up bar stools.",
@@ -285,7 +285,7 @@
         ],
         "at": [
           0.0,
-          -0.04
+          0.02
         ]
       },
       "description": "The end of a bar, finished with a solid wooden side.",
@@ -523,11 +523,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -718,11 +718,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "description": "An under-counter wine cooler behind a smoked glass door, drawers beside it.",
@@ -759,11 +759,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
