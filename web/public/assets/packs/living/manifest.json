@@ -170,6 +170,63 @@
           "material": "material.finish.metal"
         }
       ]
+    },
+    "model.sofaBed": {
+      "type": "model",
+      "url": "../../models/living/sofaBed.glb",
+      "materials": {
+        "bedding": {
+          "finish": "material.finish.fabric"
+        },
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "legs": {
+          "finish": "material.finish.metal"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_rose": {
+          "finish": "material.finish.fabric"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "doze": "bed_out",
+          "pullOut": "bed_out"
+        },
+        "open": "bed_out"
+      },
+      "paint": [
+        {
+          "material": "upholstery",
+          "label": "Upholstery"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "legs",
+          "label": "Legs"
+        },
+        {
+          "material": "bedding",
+          "label": "Bedding"
+        },
+        {
+          "material": "pillow_rose",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Second pillow"
+        }
+      ]
     }
   }
 }

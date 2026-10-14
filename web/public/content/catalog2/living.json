@@ -250,8 +250,8 @@
         1
       ],
       "price": 620,
-      "category": "living",
-      "group": "seating",
+      "category": "validate",
+      "group": "sofas",
       "slots": 2,
       "seat": {
         "height": 0.44,

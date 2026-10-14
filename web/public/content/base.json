@@ -3663,6 +3663,10 @@
         {
           "id": "sinks",
           "label": "Sinks"
+        },
+        {
+          "id": "sofas",
+          "label": "Sofas"
         }
       ]
     },

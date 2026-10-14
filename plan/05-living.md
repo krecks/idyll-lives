@@ -16,7 +16,7 @@ The wall bed is done (`families/living.py`, the model for anything held open).
 | `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
-| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Held open | `bed_out`: the mattress unfolds forward from under the seat while slept in (needs C1: sleep and nap with `leaves`, fold uses, as the wall bed; `BEDS` height). |
+| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Held open | **Done** (in Validate › Sofas): `bed_out`, the mattress pulls out forward from under the seat while dozed on or pulled out; `BEDS` height 0.44 and `fwd` 0.6 (head on the seat). |
 | `sectionalMiddle` Sectional: middle seat | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmLeft` Sectional: left arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmRight` Sectional: right arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |

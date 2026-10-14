@@ -1,4 +1,5 @@
-# The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json).
+# The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json) and a
+# sofa bed (`model.sofaBed`, content `sofaBed`).
 #
 # A cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands folded up
 # in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at the
@@ -9,7 +10,13 @@
 # Built in game coordinates (`F`: x, height, depth; front +depth), the bed in its down pose, then
 # turned up to rest.
 #
-# Run:  python3 -B tools/art/blender/build.py living [--preview]
+# The sofa bed is a boxy two-seater against the wall (its placeholder's size), whose mattress, folded
+# away inside the base under the seat at rest, pulls out forward over the seat and onto the floor in front
+# (`bed_out`), held out while the object is open (dozing on it, "Pull out the bed"; "Fold the bed away").
+# Sleepers lie with their heads on the seat and the rest on the mattress (characters.ts BEDS['sofaBed']:
+# its top and how far forward).
+#
+# Run:  python3 -B tools/art/blender/build.py living [--only sofaBed] [--preview]
 import os
 import sys
 
@@ -29,6 +36,13 @@ M = G.Palette(
     book_b=('#3F5E73', 'satin'),
     book_c=('#C9A65A', 'satin'),
     book_d=('#5D7A54', 'satin'),
+    # the sofa bed
+    upholstery=('#6F7F8C', 'fabric'),   # its body: arms, back and base; the main part the player colours
+    cushion=('#7A8A97', 'fabric'),      # the seat and back cushions
+    legs=('#2B2C2E', 'metal'),
+    pillow_rose=('#E4B8AE', 'fabric'),
+    pillow_cream=('#EFE5D3', 'fabric'),
+    bedding=('#F2EFEA', 'fabric'),      # the pulled-out mattress, made up
 )
 
 F = G.GameFrame()
@@ -116,7 +130,46 @@ def wall_bed():
     G.swing(bed, 'bed_down', 90, seconds=SECONDS, axis='X')
 
 
-# The model folded, as the placeholder draws it (the fallback when the file fails to load).
+# The sofa bed: 2 x 1 tiles, its back on the wall's face (depth -0.43), 1.86 m wide like its placeholder.
+SB_BACK, SB_FRONT, SB_W = -0.43, 0.40, 1.86
+SB_SEAT = 0.45          # the seat cushion's top (content seat height 0.44)
+SB_MATTRESS = 0.44      # the pulled-out mattress's top: characters.ts BEDS['sofaBed'].h
+SB_HEAD, SB_FOOT = -0.26, 1.52  # the mattress out, head end (under the back cushion) to foot end
+SB_TUCKED = 0.2         # its share of its length at rest: tucked into the base under the seat, its leg too
+
+
+def sofa_bed():
+    with G.new_parts() as still:
+        mid = (SB_BACK + SB_FRONT) / 2
+        depth = SB_FRONT - SB_BACK
+        F.box('base', SB_W - 0.04, 0.22, depth, (0, 0.21, mid), M.upholstery, bevel=0.03)
+        F.box('back', SB_W, 0.5, 0.18, (0, 0.57, SB_BACK + 0.09), M.upholstery, bevel=0.05)
+        for s in (-1, 1):
+            F.box(f'arm{s}', 0.17, 0.32, depth, (s * (SB_W - 0.17) / 2, 0.46, mid), M.upholstery, bevel=0.06)
+        F.box('seat', 1.5, 0.13, 0.64, (0, SB_SEAT - 0.065, SB_FRONT - 0.33), M.cushion, bevel=0.05, bevel_segments=3)
+        F.box('seat_seam', 0.006, 0.12, 0.6, (0, SB_SEAT - 0.06, SB_FRONT - 0.33), M.upholstery)
+        F.box('back_cushion', 1.49, 0.4, 0.15, (0, 0.63, SB_BACK + 0.24), M.cushion, rot=(-9, 0, 0), bevel=0.06, bevel_segments=3)
+        F.box('pillow_l', 0.4, 0.34, 0.11, (-0.55, 0.64, SB_BACK + 0.36), M.pillow_rose, rot=(-12, 0, -10), bevel=0.05, bevel_segments=3)
+        F.box('pillow_r', 0.4, 0.34, 0.11, (0.55, 0.64, SB_BACK + 0.36), M.pillow_cream, rot=(-12, 0, 10), bevel=0.05, bevel_segments=3)
+        for x in (-0.86, 0.86):
+            for z in (SB_BACK + 0.06, SB_FRONT - 0.06):
+                F.cyl(f'leg{x}{z}', 0.022, 0.1, (x, 0.05, z), M.legs)
+    G.join(still, 'sofa', origin=(0, 0, 0))
+    # The mattress, built out: made up, on a thin frame, a folding leg at its foot (upholstered like the
+    # sofa: one finish, one draw call); its origin at its head end.
+    length = SB_FOOT - SB_HEAD
+    with G.new_parts() as bed:
+        F.box('mattress', 1.44, 0.1, length, (0, SB_MATTRESS - 0.05, (SB_HEAD + SB_FOOT) / 2), M.bedding, bevel=0.03, bevel_segments=3)
+        F.box('bed_frame', 1.48, 0.03, length, (0, SB_MATTRESS - 0.115, (SB_HEAD + SB_FOOT) / 2), M.upholstery)
+        F.box('bed_leg', 1.4, SB_MATTRESS - 0.13, 0.025, (0, (SB_MATTRESS - 0.13) / 2, SB_FOOT - 0.06), M.upholstery)
+    mattress = G.join(bed, 'bed', origin=F.at(0, SB_MATTRESS - 0.13, SB_HEAD))
+    # Folded away at rest: its length shortened into the base, under the seat (Blender y is the depth).
+    mattress.scale = (1, SB_TUCKED, 1)
+    G.settle(centre=False)  # against the wall, as built
+    G.grow(mattress, 'bed_out', seconds=1.2, axis='Y')
+
+
+# The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
 _D, _MID = CAB_FRONT - BACK, (BACK + CAB_FRONT) / 2
 PLACEHOLDER = [
     {'shape': 'box', 'size': [1.66, 2.17, _D], 'at': [0, 1.085, _MID], 'color': '#E9E4DA', 'material': 'material.finish.satin'},
@@ -136,7 +189,12 @@ FAMILY = G.Family(
              # The books keep their own colours.
              paint=[('body', 'Cabinet'), ('frame', 'Bed frame'), ('mattress', 'Mattress'), ('pillow', 'Pillows'),
                     ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')],
-             placeholder=PLACEHOLDER)],
+             placeholder=PLACEHOLDER),
+     G.Model('sofaBed', sofa_bed, key='model.sofaBed', size=(1.86, 0.83, 0.83), centre=(0, -0.015),
+             # Out while the sofa bed is open, from the moment a use that opens it starts.
+             motions={'uses': {'doze': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
+             paint=[('upholstery', 'Upholstery'), ('cushion', 'Cushions'), ('legs', 'Legs'), ('bedding', 'Bedding'),
+                    ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
             'game\'s finishes so a model costs one draw call per finish group.',

@@ -55,6 +55,10 @@ The fold-down wall bed (`models/living/wallBed.glb`, pack `packs/living/manifest
 `tools/art/blender/families/living.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A new object:
 its pack entry carries a simple primitive-part placeholder as the fallback.
 
+The sofa bed (`models/living/sofaBed.glb`, same pack) is built in Blender by `tools/art/blender/families/living.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0), with a `bed_out` clip (the mattress pulling out) held
+while it's open. Its primitive-part entry stays as the fallback.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a

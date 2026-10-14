@@ -4,14 +4,14 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **15 are done**:
+**Where it stands (2026-10-14):** 540 objects. **16 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
-- the `fridge` and the `wallBed`;
+- the `fridge`, the `wallBed` and the `sofaBed` (in Validate › Sofas);
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`.
 
-**525 are to do.** All of them still draw primitive parts:
+**524 are to do.** All of them still draw primitive parts:
 - `tools/art/catalog.py`: 127;
-- `catalog2.py`: 193;
+- `catalog2.py`: 192;
 - the base manifest: 77;
 - `community.py`: 36;
 - the personality packs: 92.
