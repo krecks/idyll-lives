@@ -3739,6 +3739,18 @@
         {
           "id": "neat",
           "label": "Neat"
+        },
+        {
+          "id": "cheerful",
+          "label": "Cheerful"
+        },
+        {
+          "id": "couchPotato",
+          "label": "Couch Potato"
+        },
+        {
+          "id": "energetic",
+          "label": "Energetic"
         }
       ]
     },

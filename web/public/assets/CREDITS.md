@@ -145,6 +145,27 @@ CC0). Each moves one part while it is used: the mop leaves its dock, the washer'
 slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their primitive-part
 entries stay as the fallback.
 
+The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
+`rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_cheerful.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
+sways with its sleeper, the sun rises and the booth's curtain is drawn. Their primitive-part entries stay as the
+fallback.
+
+The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
+`snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_couchPotato.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The cinema's curtains are drawn apart, the console's disc tray slides out, the recliner reclines, the fridge
+door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
+Their primitive-part entries stay as the fallback.
+
+The energetic pack models (`models/pack_energetic/boulderingWall.glb`, `spinBike.glb`, `trampoline.glb`,
+`streetballHoop.glb`, `powerBlender.glb`, `contrastShower.glb`, `recoveryPod.glb`, override pack
+`packs/pack_energetic/manifest.json`) are built in Blender by `tools/art/blender/families/pack_energetic.py` on
+`gamekit` and exported as `.glb` (glTF, original, CC0). The bike's cranks turn and the trampoline's mat dips while
+they are used, the hoop's net sways, the blender's lid lifts, the shower's rain grows and the recovery pod's canopy
+lowers; the bouldering wall is still. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

@@ -23,7 +23,7 @@ done.
 | `bookworm.firesideLounge` Fireside reading lounge | 2x2 · floor | readByFire:read readAloud:read | living / — | Wood, Fabric | Use | `flames`: the fire grows in the grate for readByFire and readAloud. |
 | `bookworm.bedsideStack` Bedside book stack | 1x1 · floor | chapter:read | bedroom / — | Wood, Fabric | Use | `book_up`: the top book lifts and opens for chapter. |
 
-## P2. Cheerful (6)
+## P2. Cheerful (6) — **Done** (in Validate › Cheerful)
 
 - **Family:** `tools/art/blender/families/pack_cheerful.py`
 - **Validate group:** `cheerful` (Validate › Cheerful)
@@ -38,7 +38,7 @@ done.
 | `cheerful.sunriseLamp` Sunrise stretch lamp | 1x1 · floor | stretch:exercise | bedroom / — | Body, Trim | Use | `sunrise`: the sun disc rises in its frame for stretch. N glow (E8). |
 | `cheerful.partyBooth` Confetti party booth | 2x2 · floor | party:phone | living / — | Body, Trim | Use | `curtain`: the booth curtain swings aside for party (`hold` 1.5 s). |
 
-## P3. Couch potato (6)
+## P3. Couch potato (6) — **Done** (in Validate › Couch Potato)
 
 - **Family:** `tools/art/blender/families/pack_couchPotato.py`
 - **Validate group:** `couch potato` (Validate › Couch Potato)
@@ -53,7 +53,7 @@ done.
 | `couchPotato.fitnessGame` Living-room workout game | 1x1 · floor | workout:exercise | fitness / — | Body, Upholstery | Use | `board`: the balance board tilts 10° for workout. |
 | `couchPotato.lavaLamp` Lava glow lamp | 1x1 · floor | zoneOut:relax | decor / — | Body, Upholstery | Use | `blobs`: the wax blobs rise slowly for zoneOut. A drifting blobs (E2). |
 
-## P4. Energetic (7)
+## P4. Energetic (7) — **Done** (in Validate › Energetic)
 
 - **Family:** `tools/art/blender/families/pack_energetic.py`
 - **Validate group:** `energetic` (Validate › Energetic)

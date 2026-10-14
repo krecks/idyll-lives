@@ -7,7 +7,8 @@
       "model": "model.energetic.boulderingWall",
       "footprint": [2, 1],
       "price": 1100,
-      "category": "fitness",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A slightly overhanging plywood wall studded with colourful holds over a thick crash mat. Builds Strength and Dexterity.",
       "interactions": [
@@ -30,7 +31,8 @@
       "model": "model.energetic.spinBike",
       "footprint": [1, 2],
       "price": 1250,
-      "category": "fitness",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A heavy-flywheel bike with a route screen. Builds Endurance; the fitter the rider, the more fun the ride, and riders with Endurance 4+ finish on an Endorphin rush.",
       "interactions": [
@@ -57,7 +59,8 @@
       "outdoors": true,
       "footprint": [2, 2],
       "price": 480,
-      "category": "outdoor",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A springy backyard trampoline: pure fun for restless residents, with a little Endurance and Dexterity on the side.",
       "interactions": [
@@ -81,7 +84,8 @@
       "outdoors": true,
       "footprint": [1, 1],
       "price": 340,
-      "category": "outdoor",
+      "category": "validate",
+      "group": "energetic",
       "slots": 2,
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",
       "interactions": [
@@ -104,7 +108,8 @@
       "model": "model.energetic.powerBlender",
       "footprint": [1, 1],
       "price": 320,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A counter with a high-speed blender and a fruit bowl for quick smoothies ($4 of fruit each). Better cooks blend better; Cooking 3+ leaves residents Fuelled up.",
       "interactions": [
@@ -131,7 +136,8 @@
       "model": "model.energetic.contrastShower",
       "footprint": [1, 1],
       "price": 1050,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A wide rain head that alternates hot and cold. Rinses off a workout faster than a normal shower and leaves residents Refreshed.",
       "interactions": [
@@ -155,7 +161,8 @@
       "model": "model.energetic.recoveryPod",
       "footprint": [1, 2],
       "price": 3200,
-      "category": "fitness",
+      "category": "validate",
+      "group": "energetic",
       "slots": 1,
       "description": "A padded lounger under a tinted canopy with compression and cool air ($8 running cost a session). Restores comfort and a little energy, and leaves residents Fully recovered: they sleep deeper and train harder for hours.",
       "interactions": [

@@ -38,7 +38,10 @@
     "packs/pack_gloomy/manifest.json",
     "packs/pack_loner/manifest.json",
     "packs/pack_natureLover/manifest.json",
-    "packs/pack_neat/manifest.json"
+    "packs/pack_neat/manifest.json",
+    "packs/pack_cheerful/manifest.json",
+    "packs/pack_couchPotato/manifest.json",
+    "packs/pack_energetic/manifest.json"
   ],
   "entries": {
     "material.wall": {
