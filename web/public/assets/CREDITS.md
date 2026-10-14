@@ -87,6 +87,11 @@ built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` a
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
 drops, the teapot pours, the fire grows and the top book opens. Their primitive-part entries stay as the fallback.
 
+The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
+`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
+cooks; the tub fills and bubbles while residents soak. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

@@ -69,7 +69,7 @@ done.
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Pads | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
-## P5. Example pack (2)
+## P5. Example pack (2) — **Done** (in Validate › Example)
 
 - **Family:** `tools/art/blender/families/pack_example.py`
 - **Validate group:** `example` (Validate › Example)
