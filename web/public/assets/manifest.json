@@ -16621,6 +16621,10 @@
       "type": "icon",
       "url": "icons/folder.svg"
     },
+    "icon.category.validate": {
+      "type": "icon",
+      "url": "icons/magnifier.svg"
+    },
     "icon.category.kitchen": {
       "type": "icon",
       "url": "icons/chef.svg"

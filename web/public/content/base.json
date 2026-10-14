@@ -2417,7 +2417,7 @@
         }
       ],
       "price": 180,
-      "category": "bathroom",
+      "category": "validate",
       "group": "sinks"
     },
     {
@@ -3655,6 +3655,17 @@
     {"id": "transom", "label": "Transom", "panes": "transom", "sill": 0.6, "head": 2.3, "inset": 0.1, "shutters": false, "price": 170}
   ],
   "buyCategories": [
+    {
+      "id": "validate",
+      "label": "Validate",
+      "icon": "icon.category.validate",
+      "groups": [
+        {
+          "id": "sinks",
+          "label": "Sinks"
+        }
+      ]
+    },
     {
       "id": "kitchen",
       "label": "Kitchen",
