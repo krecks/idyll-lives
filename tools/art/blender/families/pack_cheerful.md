@@ -11,7 +11,7 @@ sling) are meshes made from points in the family (`_slab`, `_ring`, `_pleats`, `
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s) | `dance` |
+| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s); its label (with a coral stripe) is a part inside it (`G.attach`): `spin` turns it at 33⅓ a minute, a loop | `dance` |
 | `karaokeMachine` | the stand's upper tube, boom and microphone: `mic_up` raises them 25 cm out of the lower tube (0.8 s) | `sing` |
 | `mocktailCart` | the cocktail shaker, hinged on its foot's edge: `shake` tips it 35° over the pink drink (0.6 s) | `mix` |
 | `rainbowHammock` | the sling with its spreader bars, ropes, hooks and pillow, pivoting on the hooks: `sway` rocks it 5° each way (2.4 s), a loop; `ride: sway` | `swing`, `doze` (loops) |
@@ -33,16 +33,15 @@ moving part one more:
 does not: a glow on it showed its outline through the hills while it is set, so it is plain.
 
 Deviations from the plan:
-- the jukebox's L spin (E1) is not built: the record that swings up would need a second part on the same
-  pivot to spin (a node takes one clip's pose at a time), and a separate spinning record would not be the
-  one shown;
+- the jukebox's L spin (E1): the record's label spins (a part inside the record, so it swings up with it); the
+  vinyl itself looks the same turned. The label costs a fourth draw (the most allowed);
 - the booth's curtain is drawn aside (gathered towards the back panel along its rail) rather than swung on a
   hinge: swung, it would sweep through the backrest or out past the footprint;
 - the hammock's throw is left out (it read as a blob on the cupped sling).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 4,312 | 3 | Body, Trim |
+| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 4,324 | 4 | Body, Trim |
 | `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 3,684 | 3 | Body, Trim, Rug |
 | `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,852 | 3 | Body, Trim, Frame |
 | `model.cheerful.rainbowHammock` | 1.88 × 1.09 × 0.70 m | 2,736 | 3 | Body, Trim, Pillow |

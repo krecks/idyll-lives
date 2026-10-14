@@ -230,11 +230,17 @@ def jukebox():
     zr = -0.17 + 0.13
     with G.new_parts() as rec:
         F.cyl('record', 0.13, 0.008, (0, 0.937, -0.17), M.vinyl, verts=32)
-        F.cyl('record_label', 0.045, 0.01, (0, 0.937, -0.17), M.label, verts=16)
         G.torus('record_groove', 0.095, 0.004, at=F.at(0, 0.941, -0.17), material=M.vinyl, major_segments=28, minor_segments=4)
     rec = G.hinged(G.join(rec, 'record'), F.at(0, 0.937, zr))
+    # Its label, a part inside it: `spin` turns it (and a coral stripe across it, to see it turn) while the record plays.
+    with G.new_parts() as lab:
+        F.cyl('record_label', 0.045, 0.01, (0, 0.937, -0.17), M.label, verts=16)
+        F.box('label_stripe', 0.012, 0.0125, 0.07, (0, 0.937, -0.17), M.coral)
+    lab = G.hinged(G.join(lab, 'record_label'), F.at(0, 0.937, -0.17))
     objs = G.settle(centre=False)
+    G.attach(lab, rec)
     G.swing(rec, 'record', 90, seconds=0.8, axis='X')
+    G.spin(lab, 'spin', turns=-1, seconds=1.8, axis='Z')   # 33 1/3 a minute
     return objs
 
 
@@ -593,7 +599,7 @@ def partyBooth():
 FAMILY = G.Family(
     'pack_cheerful', M,
     [G.Model('jukebox', jukebox, size=(0.75, 1.43, 0.495), key='model.cheerful.jukebox',
-             centre=(0, -0.183), motions={'uses': {'dance': 'record'}},
+             centre=(0, -0.183), motions={'uses': {'dance': 'record'}, 'loops': {'dance': 'spin'}},
              paint=[('cherry', 'Body'), ('amber', 'Trim')]),
      G.Model('karaokeMachine', karaokeMachine, size=(0.76, 1.763, 0.851), key='model.cheerful.karaokeMachine',
              centre=(-0.06, -0.005), motions={'uses': {'sing': 'mic_up'}},

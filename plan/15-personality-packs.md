@@ -31,7 +31,7 @@ are done (2026-10-14); what is left is in `future.md`.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `cheerful.jukebox` Sunburst jukebox | 1x1 · floor | dance:dance | living / — | Body, Trim | Use | `record`: a record swings up into place for dance. L it spins (E1). |
+| `cheerful.jukebox` Sunburst jukebox | 1x1 · floor | dance:dance | living / — | Body, Trim | Use | `record`: a record swings up into place for dance, and `spin` turns its label (a part inside it) while the dance lasts. |
 | `cheerful.karaokeMachine` Spotlight karaoke machine | 1x1 · floor | sing:sing | hobbies / — | Body, Trim | Use | `mic_up`: the microphone rises on its stand for sing. |
 | `cheerful.mocktailCart` Fizz & sunshine mocktail cart | 1x1 · floor | mix:drink | kitchen / — | Body, Trim | Use | `shake`: the shaker tips for mix. |
 | `cheerful.rainbowHammock` Rainbow hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Body, Trim | Loop (E1) | `sway` (E1). Until then static. |
@@ -64,7 +64,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `energetic.boulderingWall` Home bouldering wall | 2x1 · floor | climb:exercise | fitness / — | Frame, Pads | Static | Static (the holds are the shape). |
 | `energetic.spinBike` Interactive spin bike | 1x2 · floor | ride:exercise | fitness / — | Frame, Pads | Loop (E1) | `pedals` (E1). Until then static. |
 | `energetic.trampoline` Rebound trampoline | 2x2 · floor | bounce:exercise | outdoor / — | Frame, Pads | Loop (E1) | `bounce`: the mat dips while bounced on (E1). Until then U: dips once. |
-| `energetic.streetballHoop` Streetball hoop | 1x1 · floor | shoot:exercise | outdoor / — | Frame, Pads | Use | `swish`: the net sways after a shot. |
+| `energetic.streetballHoop` Streetball hoop | 1x1 · floor | shoot:exercise | outdoor / — | Frame, Pads | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
 | `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Pads | Use | `lid`: the jug lid lifts and settles for blend. L blades (E1). |
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Pads | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
