@@ -390,9 +390,36 @@
       },
       "motions": {
         "uses": {
-          "fetch": "fridge_open",
-          "cook": "fridge_open",
-          "drink": "fridge_open"
+          "fetch": [
+            {
+              "clip": "lever",
+              "hold": 0.4
+            },
+            {
+              "clip": "fridge_open",
+              "delay": 0.3
+            }
+          ],
+          "cook": [
+            {
+              "clip": "lever",
+              "hold": 0.4
+            },
+            {
+              "clip": "fridge_open",
+              "delay": 0.3
+            }
+          ],
+          "drink": [
+            {
+              "clip": "lever",
+              "hold": 0.4
+            },
+            {
+              "clip": "fridge_open",
+              "delay": 0.3
+            }
+          ]
         },
         "hold": 3.5
       },
