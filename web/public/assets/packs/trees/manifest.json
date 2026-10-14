@@ -1,0 +1,372 @@
+{
+  "$comment": "Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods' oaks, maples, birches, pines and spruces, and the potted lemon tree. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints. Each has a far version (`far`), which the far woods and the town overview draw. Clips: an apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.",
+  "version": 1,
+  "entries": {
+    "model.tree": {
+      "type": "model",
+      "url": "../../models/trees/oak.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/oak.far.glb"
+    },
+    "model.tree.maple": {
+      "type": "model",
+      "url": "../../models/trees/maple.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/maple.far.glb"
+    },
+    "model.tree.birch": {
+      "type": "model",
+      "url": "../../models/trees/birch.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "birch_bark": {
+          "finish": "material.finish.matte"
+        },
+        "birch_mark": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/birch.far.glb"
+    },
+    "model.tree.blossom": {
+      "type": "model",
+      "url": "../../models/trees/cherry.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "green": {
+          "finish": "material.finish.foliage"
+        },
+        "green2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/cherry.far.glb"
+    },
+    "model.tree.fruit": {
+      "type": "model",
+      "url": "../../models/trees/apple.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "fruit": {
+          "finish": "material.finish.satin"
+        },
+        "fruit2": {
+          "finish": "material.finish.satin"
+        },
+        "fruit3": {
+          "finish": "material.finish.satin"
+        },
+        "fruit4": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pick": "pick"
+        }
+      },
+      "far": "../../models/trees/apple.far.glb"
+    },
+    "model.tree.japaneseMaple": {
+      "type": "model",
+      "url": "../../models/trees/japaneseMaple.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shape": "trim"
+        }
+      },
+      "far": "../../models/trees/japaneseMaple.far.glb"
+    },
+    "model.tree.magnolia": {
+      "type": "model",
+      "url": "../../models/trees/magnolia.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "fruit": {
+          "finish": "material.finish.satin"
+        },
+        "fruit2": {
+          "finish": "material.finish.satin"
+        },
+        "fruit3": {
+          "finish": "material.finish.satin"
+        },
+        "green": {
+          "finish": "material.finish.foliage"
+        },
+        "green2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/magnolia.far.glb"
+    },
+    "model.tree.willow": {
+      "type": "model",
+      "url": "../../models/trees/willow.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf5": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/willow.far.glb"
+    },
+    "model.pine": {
+      "type": "model",
+      "url": "../../models/trees/pine.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/pine.far.glb"
+    },
+    "model.spruce": {
+      "type": "model",
+      "url": "../../models/trees/spruce.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/spruce.far.glb"
+    },
+    "model.cypress": {
+      "type": "model",
+      "url": "../../models/trees/cypress.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/trees/cypress.far.glb"
+    },
+    "model.garden.lemonTree": {
+      "type": "model",
+      "url": "../../models/trees/lemonTree.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "fruit": {
+          "finish": "material.finish.satin"
+        },
+        "fruit2": {
+          "finish": "material.finish.satin"
+        },
+        "fruit3": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf2": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf4": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pick": "pick"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ],
+      "far": "../../models/trees/lemonTree.far.glb"
+    }
+  }
+}

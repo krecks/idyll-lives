@@ -42,7 +42,8 @@
     "packs/shops/manifest.json",
     "packs/stalls/manifest.json",
     "packs/street_furniture/manifest.json",
-    "packs/hobbies/manifest.json"
+    "packs/hobbies/manifest.json",
+    "packs/trees/manifest.json"
   ],
   "entries": {
     "material.wall": {

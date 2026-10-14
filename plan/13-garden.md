@@ -21,6 +21,10 @@ The five G4 edibles are done: the four crops have a growth clip only (`grow`, G.
 crop as two parts), no harvest clip; harvesting moves them to the picked stage, so the crop goes as the clip plays
 on, and grows back over the days. The herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 
+The twelve G5 trees are done (`families/trees.py`, notes in `families/trees.md`), each with a far version. The far
+woods drew the `*.far` placeholder keys whatever the model; they now draw a file's own far version when it has
+one (`nature.ts` `forests`), so the woods and the town match.
+
 ## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
@@ -98,7 +102,7 @@ on, and grows back over the days. The herb planter, which doesn't grow, has `har
 | `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs shrink away for pickHerbs. |
 | `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
 
-## G5. Trees (12)
+## G5. Trees (12) — **Done** (in Validate › Trees)
 
 - **Family:** `tools/art/blender/families/trees.py`
 - **Validate group:** `trees` (Validate › Trees)

@@ -70,6 +70,13 @@ with its far version, in the same pack) are built by the same script, also origi
 from seedlings to ripe and lose their crop when harvested (`grow`); the herb planter's basil shrinks while herbs are
 picked. Their primitive-part entries stay as the fallback.
 
+The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `apple.glb`, `japaneseMaple.glb`,
+`magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
+override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
+versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.
+Their primitive-part entries stay as the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.

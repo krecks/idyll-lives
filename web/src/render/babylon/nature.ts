@@ -423,7 +423,7 @@ export class Landscape {
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
    * near the town are the full models and cast shadows; further ones use the `*.far` models (a few
-   * blobs each, built at the low level of detail), which don't.
+   * blobs each, built at the low level of detail), or a file's own far version, which don't.
    */
   private async forests(scene: Scene, assets: AssetRegistry): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -472,7 +472,8 @@ export class Landscape {
           new Vector3(x, this.heightAt(x, z) - 0.05, z),
         );
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
-        const key = !close && assets.has(`${kind}.far`, 'model') ? `${kind}.far` : kind;
+        // A file with a far version of its own draws that (the low level of detail); placeholders their `*.far` key.
+        const key = !close && !assets.get(kind, 'model')?.far && assets.has(`${kind}.far`, 'model') ? `${kind}.far` : kind;
         const bucket = close ? near : far;
         bucket.set(key, [...(bucket.get(key) ?? []), m]);
       }
