@@ -2270,8 +2270,14 @@ export class Characters {
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
     }
-    for (const p of this.props.values()) {
-      if (p) for (const mesh of p.meshes) mesh.thinInstanceBufferUpdated('matrix');
+    // (A prop nobody holds or works with isn't drawn: no draw call for its empty instances.)
+    for (const [key, p] of this.props) {
+      if (!p) continue;
+      const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
+      for (const mesh of p.meshes) {
+        mesh.isVisible = used;
+        if (used) mesh.thinInstanceBufferUpdated('matrix');
+      }
     }
     this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;
