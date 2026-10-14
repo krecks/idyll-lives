@@ -153,7 +153,7 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   'hotHeaded.coolDownCushion': { h: 0.4, fwd: 0 },
   // The 0.20 catalogue (content/furniture.json).
   barStool: { h: 0.72, fwd: 0 },
-  bistroSet: { h: 0.46, fwd: -0.24 },
+  bistroSet: { h: 0.46, fwd: -0.19 },
   diningGlass: { h: 0.46, fwd: -0.22 },
   diningOak: { h: 0.46, fwd: -0.22 },
   diningChair: { h: 0.46, fwd: 0 },

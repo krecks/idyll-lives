@@ -303,7 +303,7 @@ def bistroSet():
     G.torus('cup_handle', 0.02, 0.005, at=F.at(0.175, y + 0.05, 0.24), material=M.porcelain, rot=(90, 0, 0),
             major_segments=10, minor_segments=5)
     _flowers('', -0.15, 0.1, y, h=0.12)
-    _cafe_chair('c', 0, -0.24, M.legs_black, M.seat_sage)
+    _cafe_chair('c', 0, -0.19, M.legs_black, M.seat_sage)        # its back on the wall face, as the placeholder's
     return _finish('bistroSet')
 
 
@@ -903,7 +903,7 @@ FAMILY = G.Family(
     [  # K7: dining tables
      G.Model('diningTable', diningTable, size=(1.62, 1.032, 0.867), centre=(0, 0.016), key='model.diningTable',
              paint=DINING_TOP),
-     G.Model('bistroSet', bistroSet, size=(0.62, 1.004, 0.962), key='model.bistroSet',
+     G.Model('bistroSet', bistroSet, size=(0.62, 1.004, 0.912), key='model.bistroSet', centre=(0, 0.024),
              paint=[('top_oak', 'Top'), ('legs_black', 'Frame'), ('seat_sage', 'Seats')]),
      G.Model('diningGlass', diningGlass, size=(1.7, 1.113, 0.913), centre=(0, 0.024), key='model.diningGlass',
              paint=[('glass', 'Top'), ('legs_chrome', 'Legs')]),

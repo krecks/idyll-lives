@@ -575,7 +575,7 @@ def chef_stove():
 
 
 E['model.whirlpoolTub'] = placeholder(whirlpool())
-E['model.chefStove'] = placeholder(chef_stove())
+E['model.chefStove'] = placeholder(to_wall(chef_stove()))
 
 # Spare keys (not placed by the base content) and the minimal shelf, in the same boxes as the library files
 # they replaced. The dining chair and side table are the catalogue's alone (catalog.py), as their models.

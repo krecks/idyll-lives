@@ -1182,7 +1182,7 @@ def telescope():
         F.box('finder_foot', 0.02, 0.04, 0.02, _on_tube(0.05, 0.08), M.chrome, rot=tube_rot, bevel=0.005)
         F.box('saddle', 0.06, 0.05, 0.1, (0, 1.12, -0.01), M.foot, rot=tube_rot, bevel=0.006)
     tube = G.hinged(G.join(t, 'tube'), F.at(*AXLE))
-    G.settle(centre=False)
+    G.settle()  # on its Model's `centre`: the back leg on the wall face
     G.swing(tube, 'aim', 35, seconds=1.2, axis='X')
     return G.meshes()
 
@@ -1458,7 +1458,7 @@ FAMILY = G.Family(
              motions={'uses': {'paint': 'painting'}}, paint=[('easel_wood', 'Wood'), ('easel_metal', 'Metal')]),
      G.Model('workbench', workbench, size=(1.62, 0.995, 0.665), key='model.workbench', centre=(0, -0.0975),
              motions={'uses': {'tinker': 'vice'}}, paint=[('bench_top', 'Wood'), ('bench_steel', 'Metal')]),
-     G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, -0.0041),
+     G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, 0.026),
              motions={'uses': {'stargaze': 'aim'}}, paint=[('tube', 'Tube'), ('tripod', 'Tripod')]),
      G.Model('sewingTable', sewingTable, size=(0.9, 1.08, 0.89), key='model.sewingTable', centre=(0, 0.025),
              motions={'uses': {'sew': 'presser', 'mend': 'presser'}, 'loops': {'sew': 'handwheel', 'mend': 'handwheel'}},
