@@ -710,7 +710,7 @@ pub fn reload(w: &World, content: &str) -> World {
     same("the households", homes(w), homes(&loaded));
     // (Loading puts what stands on tops in last, so the order, and the ids, can change.)
     let things = |w: &World| {
-        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits())).collect();
+        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits(), o.open)).collect();
         list.sort();
         list
     };

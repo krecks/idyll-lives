@@ -177,8 +177,9 @@ finish it uses.
 ## Moving parts
 
 A door, a lid or a drawer that moves while residents use the object: one node per moving part in
-the file, moved by a clip of its own. The fridge's doors (`families/kitchen.py`) and the template's lid
-and drawer (`families/_template.py`) are the examples; `G.hinged`, `G.swing` and `G.slide` do the work.
+the file, moved by a clip of its own. The fridge's doors (`families/kitchen.py`), the wall bed that folds
+down for a whole sleep (`families/living.py`) and the template's lid and drawer (`families/_template.py`)
+are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 
 - **One node per part, its origin on the hinge** (or where a drawer slides from), named for what it
   is (`door_fridge`). What moves with it is joined into it or parented to it (the handle). The rest
@@ -195,13 +196,23 @@ and drawer (`families/_template.py`) are the examples; `G.hinged`, `G.swing` and
   ```json
   "motions": { "uses": { "fetch": "fridge_open", "drink": "fridge_open" }, "hold": 3.5 }
   ```
+- **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
+  `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip
+  held open while it is: the wall bed stays down after *Fold down* or a night's sleep until *Fold up*
+  (or the last one up in the morning) folds it. Put the uses that open it in `uses` too, so the clip
+  starts with the use rather than when the house is redrawn. An open object is clicked by its whole
+  tiles (its drawn outline is the closed one).
+  ```json
+  "motions": { "uses": { "sleep": "bed_down", "nap": "bed_down", "foldDown": "bed_down" }, "open": "bed_down" }
+  ```
 - **Cost:** each part is drawn on its own (one draw per finish group within it, and again in the sun's
   shadow map): the fridge takes 3 draws, 1 for the cabinet and 1 per door. Count parts in the 1–3.
   While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn; nothing
   is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
-- **Not yet:** clips that play without a resident (a fountain's water, a fan), and the freezer door,
-  which no use opens (no interaction takes frozen food).
+- **Not yet:** clips that play on their own (a fountain's water, a fan), the freezer door, which no use
+  opens (no interaction takes frozen food), and tiles that free up while an object is closed (a folded
+  wall bed still takes all its tiles).
 
 ## Export settings
 

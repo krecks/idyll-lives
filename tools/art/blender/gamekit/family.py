@@ -21,14 +21,19 @@ class Model:
                  floor and centred on its footprint; it may return its objects (default: every mesh)
       size       (width, height, depth) in game metres, asserted within `tolerance` (fraction, or 3)
       key        the manifest key it draws for (default model.<family>.<id>)
-      motions    the pack entry's `motions` for its clips: {'uses': {use: clip}, 'hold': seconds}
+      motions    the pack entry's `motions` for its clips: {'uses': {use: clip}, 'hold': seconds,
+                 'open': clip held open while the object is open (content `leaves`)}
       paint      the materials a player's colour goes on (the pack's `paint`)
       placeholder  primitive parts for a key the manifests don't have yet (the fallback)
+      centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
+                 middle of its footprint (default: the middle)
     """
 
-    def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None):
+    def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
+                 centre=(0.0, 0.0)):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint, self.placeholder = tolerance, motions, paint, placeholder
+        self.centre = centre
 
 
 class Family:
@@ -54,7 +59,7 @@ class Family:
         reset()
         objs = model.build() or meshes()
         bpy.context.scene.frame_set(1)
-        check_size(model.size, model.tolerance, objs, name=model.id)
+        check_size(model.size, model.tolerance, objs, name=model.id, centre=model.centre)
         stats(model.id)
         return objs
 
@@ -103,6 +108,7 @@ class Family:
 
     def _check_motions(self, model, clips):
         names = {name for _, name, _ in clips}
-        uses = (model.motions or {}).get('uses', {})
-        missing = sorted(set(uses.values()) - names)
+        motions = model.motions or {}
+        played = set(motions.get('uses', {}).values()) | ({motions['open']} if motions.get('open') else set())
+        missing = sorted(played - names)
         assert not missing, f'{model.id}: `motions` plays {", ".join(missing)}, which it has no clip for'

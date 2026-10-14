@@ -38,7 +38,8 @@
 //! grows one on the end if the content allows it, so nothing already built moves); 23 = the seed
 //! the game started from (`seed`, for bug reports; absent: 0, unknown); 24 = objects have a colour
 //! the player chose (`objects[].color`, `#rrggbb`; absent: as made) instead of a style (older
-//! files' object and household `style` is ignored). Older files load. Saves
+//! files' object and household `style` is ignored); 25 = objects can be open (`objects[].open`: a
+//! wall bed folded down; absent: closed). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -56,7 +57,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 24;
+pub const SAVE_VERSION: u32 = 25;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -265,6 +266,9 @@ pub struct ObjectSave {
     /// Centimetres taller (negative: shorter) than its kind (absent before v20: 0).
     #[serde(default, skip_serializing_if = "is_level")]
     pub tall: i16,
+    /// Open (a wall bed folded down; absent before v25, or closed).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub open: bool,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -621,6 +625,7 @@ impl World {
                 wear: finite(o.wear, 0.0),
                 size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
                 tall: o.tall,
+                open: o.open,
             })
             .collect();
         let sims = self
@@ -987,6 +992,7 @@ impl World {
                 world.objects[id as usize].turn = turn;
                 world.objects[id as usize].offset = offset;
                 world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
+                world.objects[id as usize].open = o.open;
                 object_ids.insert(i as u32, id);
             }
         }

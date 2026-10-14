@@ -721,12 +721,14 @@ interface ModelExtras {
   motions?: Motions;
 }
 
-/** When a model's clips play: while residents use the object. */
+/** When a model's clips play: while residents use the object, and while it's open. */
 export interface Motions {
   /** The clip a use plays, by the interaction's id or, failing that, its animation tag (`fetch`, `drink`). */
   uses: Record<string, string>;
   /** Seconds after a use starts that the clip plays back (a door that closes again); absent: when the use ends. */
   hold?: number;
+  /** The clip held open while the object is open (a wall bed folded down; the sim's `open`, set by `leaves`). */
+  open?: string;
 }
 
 /**
@@ -744,7 +746,7 @@ export function painted(entry: ModelEntry | undefined, color: string | undefined
 /** A model entry's `motions`, if it has any. */
 export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   const motions = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
-  return motions && Object.keys(motions.uses ?? {}).length ? motions : undefined;
+  return motions && (Object.keys(motions.uses ?? {}).length || motions.open) ? { ...motions, uses: motions.uses ?? {} } : undefined;
 }
 
 interface MaterialOverride {

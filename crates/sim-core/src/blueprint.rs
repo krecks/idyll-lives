@@ -623,6 +623,7 @@ impl World {
                 placed.turn = o.turn;
                 placed.offset = o.offset;
                 placed.wear = o.wear;
+                placed.open = o.open;
             }
             // Food and dishes in the room move with it.
             let room: Vec<(i32, i32)> = tiles.iter().copied().collect();

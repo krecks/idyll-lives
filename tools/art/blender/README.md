@@ -1,17 +1,47 @@
 # Blender models
 
-The game's objects are built here: Python scripts that build each model in Blender 5.2 LTS and export
-it as glTF (`.glb`), with its moving parts and its entry in an asset pack. The rules (sizes, budgets,
+The game's objects are built here. Python scripts build each model in Blender 5.2 LTS and export it as
+glTF (`.glb`), with its moving parts and its entry in an asset pack. This page is the guide for people
+and AI agents alike: the folder, the steps, the checks and the traps. The rules (sizes, budgets,
 finishes, moving parts, what to look at) are in [docs/design/objects.md](../../../docs/design/objects.md).
-This page covers the folder and the steps.
+The content fields are in [docs/content-packs.md](../../../docs/content-packs.md).
 
 ```
 build.py          the runner (plain python3): runs Blender on a family, then the gate
 check_glb.py      the gate (plain python3): every .glb the manifests use, against its entry
 gamekit/          the toolkit every family imports as G
-families/         one script per family of models; _template.py is the one to copy
+families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
+                  bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
 previews/         renders from --preview (ignored by git)
 ```
+
+## Working as an agent: the loop
+
+1. **Read** this page and the family script closest to what you're making. Then read objects.md's
+   sections for what you touch.
+2. **Find the facts the game already has.** For an object that exists:
+   - its content entry (`grep -rn '"id": "<id>"' web/public/content`);
+   - its placeholder (the manifest entry `model.<id>`), whose size you must match.
+
+   For a new object, decide the footprint first; it fixes where the game puts residents (below).
+3. **Build and look.** Run `build.py <family> --preview`, then open the PNGs in `previews/` (you can read
+   images). Iterate until it looks right from the front and each clip looks right open.
+4. **Export.** Run `build.py <family>`, which exports, writes the pack and runs `check_glb.py`. It must
+   say `0 failed`; read every warning.
+5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
+   the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
+6. **Wire it in** outside this folder when the object is new (below). Run
+   `cargo test -p sim-core --test shipped_content`, and `cargo test -p sim-core` if you touched the sim.
+7. **Look in the game.** Start your own dev server and drive it headless (below). Check WebGPU and
+   `&renderer=webgl`, at rest and with each clip playing.
+8. **Finish up.**
+   - Add a line to `web/public/assets/CREDITS.md`.
+   - Commit only the `.glb` files you meant to change. Re-exports aren't byte-for-byte repeatable, so
+     `git checkout` the rest.
+   - Never commit `previews/`.
+
+Done means: the gate passes, the validator is clean, the tests pass, and you've seen it right in the
+game. Report what you checked, and anything you didn't.
 
 ## Commands
 
@@ -19,42 +49,92 @@ previews/         renders from --preview (ignored by git)
 python3 -B tools/art/blender/build.py kitchen                  # build, export, register, check
 python3 -B tools/art/blender/build.py kitchen --only fridge    # one model
 python3 -B tools/art/blender/build.py garden_decor --preview   # previews/<id>.png (+ <id>@<clip>.png), no export
-python3 -B tools/art/blender/build.py --all                    # every family
+python3 -B tools/art/blender/build.py --all                    # every family (not _template)
+python3 -B tools/art/blender/build.py _template --preview      # the template only previews
 python3 -I -B tools/art/blender/check_glb.py [model.fridge …]  # the gate alone
 ```
 
-`build.py` finds Blender in `$BLENDER`, then `/Applications/Blender.app`, then `PATH`. It exits 1 if a build
-or the gate fails.
+`build.py` finds Blender in `$BLENDER`, then `/Applications/Blender.app`, then `PATH`. It prints the
+`[gamekit]` lines (sizes, triangles, what was built) and, when a build fails, the Python traceback. It
+exits 1 if a build or the gate fails. Run Blender only through it (or with `--background
+--factory-startup --python-exit-code 1`), so the export settings stay fixed and errors aren't swallowed.
 
-Exports aren't byte-for-byte repeatable: Blender writes the same triangles in a different order each run.
-Commit only the models you meant to change, and `git checkout` the others.
+## Coordinates, cheat sheet
+
+| | Game | Blender (in a family script) |
+|---|---|---|
+| Axes | x right, y up, z towards the front | x left, y towards the back, z up |
+| A point | (x, height, depth) | (−x, −depth, height) |
+| Front | +z | −y |
+| Origin | middle of the footprint, on the floor | the same: `G.settle()` puts it there |
+
+- **Game coordinates.** `G.GameFrame(shift)` takes game numbers as they are (`F.box(name, w, h, d, (x, y, z), M.colour)`).
+  Use it to copy a placeholder's parts or content heights. `shift` moves every depth back, for a
+  placeholder built against the back of its tile.
+- **Footprint.** `[w, d]` in whole 1 m tiles, before turning. A 2 × 3 object runs from −1 to +1 across and
+  −1.5 to +1.5 deep.
+- **Against a wall.** Its back is on the wall's face, 7 cm into the tile: at depth −0.43 in a 1-deep
+  footprint, −1.43 in a 3-deep one. Built on the tile's edge, it sits inside the wall.
+- **Residents** stand on the tile in front of the footprint to use it.
+  - Sitting and lying, they are moved to the footprint's middle (slots spread across the width).
+  - Lying, the head is about 0.84 m behind that middle and the feet 0.86 m in front, whatever the
+    footprint.
+  - A bed's mattress is wherever its footprint's middle is. Its height is the renderer's
+    `characters.ts` `BEDS` table (default 0.5 m), not the model's.
 
 ## A new object
 
 1. **Copy** `families/_template.py` to `families/<family>.py`, or add a model to an existing family.
-   Families group what belongs together (`kitchen`, `garden_decor`). A family's models go to
-   `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`.
+   Families group what belongs together. A family's models go to
+   `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`; the build
+   writes both, so never edit a pack by hand.
 2. **Palette.** One material per colour, named for what it is, with its finish:
    `M = G.Palette(body=('#F3F3F1', 'gloss'), handle=('#D0D3D6', 'chrome'))`.
    - The names become the material names in the file.
    - The finishes become the pack's `materials`, so they're declared only once.
-   - Each finish is one of the base manifest's `material.finish.*`.
-3. **Build** in a function, in metres, front −Y, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/
-   `revolve`/`rock`. To copy numbers from a placeholder, use `G.GameFrame(shift)`: it takes game
-   coordinates (x, height, depth) as they are. End with:
+   - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
+     (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
+   - Name the parts the player may colour `body`, and list them in `paint`.
+3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`rock`
+   (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
-   - then `G.settle()`, which stands it on the floor, centred.
-4. **Declare it** in the family: `G.Model('<id>', build, size=(w, h, d), key='model.<id>', paint=['body'])`.
-   - `size` is asserted after the build: the real size, never stretched.
-   - `key` is only needed when it isn't `model.<family>.<id>`.
-   - A key the manifests don't have yet needs a `placeholder`: a few primitive parts, the fallback.
-5. **Look**: `build.py <family> --preview`, then open `previews/<id>.png`.
-6. **Export**: `build.py <family>`. It writes the `.glb` files and the pack, then runs `check_glb.py`.
-   Then run the Khronos validator and check in the game, as in objects.md's "Validation".
-7. Add the object to `web/public/assets/CREDITS.md`, and update `families/<family>.md` if the family has notes.
+   - then `G.settle()`, which stands it on the floor, centred, by moving it, never scaling.
 
-## A moving part (door, lid, drawer)
+   A model that stands off the middle of its footprint (the wall bed, at the back of its 2 × 3 tiles) is
+   built in place and uses `G.settle(centre=False)`, with `centre=(x, depth)` on its `Model`.
+4. **Declare it**: `G.Model('<id>', build, size=(w, h, d), key='model.<id>', paint=['body'])`.
+   - `size` is asserted after the build, within 2 % (`tolerance`). It's the real size, never stretched.
+     Take it from the placeholder, or from the `[gamekit]` line once the model is right.
+   - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.
+   - A key the manifests don't have yet needs a `placeholder`: a few primitive boxes of the model at
+     rest, drawn if the file fails to load.
+5. **Look**: `build.py <family> --preview`, then open `previews/<id>.png`. The preview looks at the front
+   three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
+6. **Export**: `build.py <family>`.
+
+### Wiring a new object into the game
+
+- **Content.** Add an entry to a content file (`web/public/content/catalog2/<room>.json` for the catalogs).
+  - Fields: `id`, `name`, `model`, `footprint`, `price`, `category`, `group` (a group of that category in
+    `base.json` `buyCategories`), `slots`, `description`, `interactions`.
+  - Each interaction needs an `anim` (one of `base.json` `animations`).
+  - Copy an object like it (`bedDouble`, `sofaBed`).
+- **Room kind.** Rooms are typed by their objects' interaction tags, the first matching `roomKinds` entry
+  winning. Anything with a `sleep` tag makes its room a bedroom. Only `nap`, as on the sofa bed, leaves a
+  living room a living room.
+- **Opening and closing.** For something that opens and stays open (the wall bed), use the interaction
+  fields `when` and `leaves`, and the model's `motions.open` (below).
+- **Renderer tables** (`web/src/render/babylon/characters.ts`), keyed by object id:
+  - `BEDS`: mattress-top height, for anything residents lie on;
+  - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
+- **Tests.**
+  - `cargo test -p sim-core --test shipped_content` checks every object's model is in the manifests,
+    every interaction has an animation, and the categories and groups exist.
+  - Changed the sim? Run `cargo test -p sim-core`, then `npm run wasm` in `web/` before testing in the
+    browser.
+
+## A moving part (door, lid, drawer, fold-down bed)
 
 ```python
 with G.new_parts() as parts:                         # everything made in the block
@@ -62,22 +142,70 @@ with G.new_parts() as parts:                         # everything made in the bl
     _handle(...)
 door = G.hinged(G.join(parts, 'door_fridge'), F.at(0.364, 0.643, 0.195))   # origin on the hinge
 ...
-G.settle()                                           # before the clips
+G.settle()                                           # before the clips: they key the rest pose
 G.swing(door, 'fridge_open', -102, seconds=1.75)     # turn about its own Z (axis='X' for a lid)
 G.slide(drawer, 'drawer_open', (0, -0.3, 0), seconds=0.8)   # pull out to the front
 ```
 
-The parts work like this:
+A part that is easier to build open (a bed that folds down) is built in its open pose and `hinged`. It's
+then turned to rest with `G.turn(part, -90, 'X')` and swung open again by the opposite angle.
+
+How the parts work:
 - **Nodes.** Each moving part is its own node, named for what it is. The still part is one more node,
-  joined with `origin=(0, 0, 0)`.
+  joined with `origin=(0, 0, 0)`. Each part costs a draw call (plus one per textured finish in it).
 - **Clips.** A clip is an NLA track. Its first key (frame 1) is the rest pose, which is where the game
-  draws the part closed.
-- **Uses.** The model's `motions` says which use plays which clip, and for how long:
-  `motions={'uses': {'fetch': 'fridge_open'}, 'hold': 3.5}`.
-- **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns
-  of a clip that no use plays.
+  draws the part closed. Angles turn about the part's own axis: about Z, negative opens a door hinged on
+  its right; about X, negative lifts a lid's front.
+- **When they play** is the model's `motions`:
+  - `{'uses': {'fetch': 'fridge_open'}, 'hold': 3.5}`: a use, by interaction id or animation tag, plays
+    a clip for `hold` seconds (absent: until the use ends).
+  - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
+    interactions with `leaves`; content `when` offers them).
+  - Also list the uses that open it in `uses`, so the clip starts with the use.
+- **Timing.** A clip starts when the use starts, once the resident has arrived (a bed folds down as they
+  lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
+- **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
+  a clip that nothing plays.
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png`.
-- **Examples.** `families/kitchen.py` has two doors. `families/_template.py` has a lid and a drawer.
+- **Examples.**
+  - `families/kitchen.py`: two doors, played by uses.
+  - `families/living.py`: a bed built open, folded to rest, and held down while open.
+  - `families/_template.py`: a lid and a drawer.
+
+## Checking in the game (headless)
+
+Start your own dev server from your checkout: `cd web && npx vite --port <free port> --strictPort`. Never
+reuse one that's already running. Then drive Playwright headless with full Chrome for Testing (it uses
+the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quiet.mjs`):
+
+- **Gallery.** Open `/gallery.html?keys=model.<id>&cols=4` to see the model. Answer the `.glb` requests
+  with 404 (`page.route`) to see its placeholder side by side.
+- **A house.** Open `/?state=wants-asking&debug` (a dump in `debug-states/`).
+  - Buy the object with `__send({type: 'buy', household: 0, object: '<id>', at: [x, z, rot]})`.
+    `[x, z]` is the footprint's corner, against a wall at rot 0. In that state, house 0's living room has
+    free wall at `[23, 14, 0]`.
+  - Find it with `__world().objects`.
+  - Use it with `__send({type: 'use', sim: 0, object: <id>, interaction: <index>})`.
+  - `{type: 'setSpeed', speed: 0..5}` pauses or speeds up time.
+  - Click the object to see its pie menu.
+  - `Escape` closes a menu, but opens the pause menu when none is open.
+- **Renderers.** Add `&renderer=webgl` to check WebGL2 as well as WebGPU.
+
+## Traps (each of these happened)
+
+- **Wall face.** A model built on the tile's back edge sits inside the house wall. Wall faces are 7 cm in.
+- **Settle first.** Call `settle()` before `swing`/`slide`: clips key the rest pose where it is. It
+  refuses after.
+- **Size check.** It counts everything at rest: knobs, handles, a folded bed's foot rail. Set `size` from
+  the measured `[gamekit]` line once the model looks right.
+- **Off-centre models.** These need `centre=` on the `Model`. Otherwise the size check fails.
+- **Clicking.** An object is clicked by its drawn outline at rest. An object held open is clicked by its
+  whole tiles.
+- **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
+- **Room kind.** A `sleep` interaction turns a living room into a bedroom.
+- **Exports.** They differ on every run, so commit only what you meant to change.
+- **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `build.py`
+  passes it.
 
 ## The toolkit (`gamekit/`)
 
@@ -87,11 +215,8 @@ The parts work like this:
 | `materials.py` | `Palette` (colour + finish), `mat` (one material by hand), `FINISHES` (read from the base manifest) |
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `rock` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`) |
-| `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
+| `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | `swing`, `slide`, `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
-
-Run Blender from scripts only (`--background --factory-startup`, as `build.py` does), so the export settings
-stay fixed.

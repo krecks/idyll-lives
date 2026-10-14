@@ -338,6 +338,8 @@ export interface ObjectPlacement {
   sellValue: number | null;
   /** Wear 0..1 (broken at 1). */
   wear?: number;
+  /** Open (a wall bed folded down): set by interactions that open or close it (`leaves`). */
+  open?: boolean;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }

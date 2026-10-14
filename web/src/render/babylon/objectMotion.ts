@@ -1,8 +1,10 @@
 /**
  * Placed objects' moving parts (a fridge's doors): the clips of their models (`ModelMotion`)
  * played while residents use them, as the model entry's `motions` say. A use that starts opens
- * the clip; it plays back after `hold` seconds or when the use ends. Each instance's parts draw
- * from buffers of their own (`MovingTarget`), written only while something moves.
+ * the clip; it plays back after `hold` seconds or when the use ends. An object that is open (the
+ * sim's `open`: a wall bed folded down) holds its `motions.open` clip open as long as it stays so.
+ * Each instance's parts draw from buffers of their own (`MovingTarget`), written only while
+ * something moves.
  *
  * Time is the residents' animation time: it stops while the game is paused and runs faster
  * (up to 2.5 times) at higher speeds, as in `characters.ts`.
@@ -22,6 +24,8 @@ export interface MovingObject {
   motions: Motions;
   /** Its definition's interaction ids, by the snapshot's `interaction` index. */
   interactions: readonly string[];
+  /** Open (the placement's `open`): its `motions.open` clip is held open. */
+  open?: boolean;
 }
 
 /** A clip of one object: how far it has played, and what plays it. */
@@ -46,8 +50,19 @@ export class ObjectMotion {
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
   set(objects: MovingObject[]): void {
+    const before = this.objects;
     this.objects = new Map(objects.map((o) => [o.id, o]));
     for (const id of [...this.states.keys()]) if (!this.objects.has(id)) this.states.delete(id);
+    // What is open when first seen (a game loaded, a lot looked at) is shown open, without the
+    // opening; what opens later (`update`) opens on screen.
+    for (const o of objects) {
+      const name = o.open ? o.motions.open : undefined;
+      const clip = name ? o.motion.clips.get(name) : undefined;
+      if (!name || !clip || before.has(o.id)) continue;
+      let clips = this.states.get(o.id);
+      if (!clips) this.states.set(o.id, (clips = new Map()));
+      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity });
+    }
     for (const [id, clips] of this.states) {
       const o = this.objects.get(id)!;
       for (const [name, state] of [...clips]) {
@@ -81,9 +96,12 @@ export class ObjectMotion {
     const moved = new Set<Mesh>();
     for (const [id, o] of this.objects) {
       const wanted = this.wanted.get(id);
+      const held = o.open ? o.motions.open : undefined;
       let clips = this.states.get(id);
-      if (wanted && !clips) this.states.set(id, (clips = new Map()));
+      if ((wanted || held) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
+      const heldClip = held ? o.motion.clips.get(held) : undefined;
+      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity });
       let changed = false;
       for (const [name, use] of wanted ?? []) {
         const clip = o.motion.clips.get(name);
@@ -96,7 +114,8 @@ export class ObjectMotion {
         else clips.set(name, { clip, time: 0, use, until });
       }
       for (const [name, state] of clips) {
-        const open = (wanted?.get(name) ?? '') === state.use && this.clock < state.until;
+        // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
+        const open = name === held || (state.use !== '' && wanted?.get(name) === state.use && this.clock < state.until);
         if (!open && !wanted?.has(name)) state.use = '';
         const time = Math.min(Math.max(state.time + (open ? dt : -dt), 0), state.clip.duration);
         if (time !== state.time) changed = true;

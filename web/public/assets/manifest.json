@@ -23,7 +23,8 @@
     "packs/hotHeaded/manifest.json",
     "packs/kind/manifest.json",
     "packs/gardenDecor/manifest.json",
-    "packs/kitchen/manifest.json"
+    "packs/kitchen/manifest.json",
+    "packs/living/manifest.json"
   ],
   "entries": {
     "material.wall": {

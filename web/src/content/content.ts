@@ -57,6 +57,10 @@ export interface InteractionDef {
    * `items` id) at a table if there is one, for `eat.minutes`.
    */
   eat?: { item: string; minutes: number };
+  /** Only offered while the object is open or closed (a wall bed's "Fold up" while it's down). */
+  when?: 'open' | 'closed';
+  /** Opens or closes the object as the use starts, and leaves it so (sleeping in a wall bed folds it down). */
+  leaves?: 'open' | 'closed';
   /** A tag: what follows when it finishes (toilets: `handwash`, washing hands at a sink). */
   after?: string;
 }

@@ -1,6 +1,7 @@
 # Assembling a model from its parts: joining them into one mesh (or one per moving part), putting a
 # moving part's origin on its hinge, standing the model on the floor and checking its size.
 import contextlib
+import math
 
 import bpy
 from mathutils import Matrix, Vector
@@ -67,6 +68,15 @@ def hinged(obj, pivot):
     return set_origin(obj, pivot)
 
 
+def turn(obj, degrees, axis='X'):
+    """Turns `obj` about its own origin by `degrees` and bakes the turn into its mesh, so the object is
+    unrotated. For a part built in its open pose: build it open, `hinged` it, `turn` it to rest (closed),
+    then `swing` it back open by the opposite angle."""
+    obj.data.transform(Matrix.Rotation(math.radians(degrees), 4, axis))
+    obj.data.update()
+    return obj
+
+
 def measure(objs=None):
     """(lo, hi): the Blender world bounds of `objs` (default: every mesh), modifiers included."""
     objs = objs if objs is not None else meshes()
@@ -89,35 +99,42 @@ def game_size(objs=None):
     return hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1]
 
 
-def settle(objs=None):
-    """Stands the model on the floor (lowest point at z = 0), centred on the footprint in x and y, by
-    moving it (never scaling). Call it before adding clips: they key the rest pose where it is. A moving
-    part moves whole, its hinge with it; the rest move their meshes, keeping their origins."""
+def settle(objs=None, centre=True):
+    """Stands the model on the floor (lowest point at z = 0) and centres it on the footprint in x and y,
+    by moving it (never scaling). `centre=False` only stands it on the floor: for a model built in place
+    off the footprint's centre (a wall bed at the back of its tiles). Call it before adding clips: they
+    key the rest pose where it is. A moving part moves whole, its hinge with it."""
     objs = objs if objs is not None else meshes()
     if any(o.animation_data and o.animation_data.nla_tracks for o in objs):
         raise RuntimeError('settle() before swing()/slide(): a clip keys the rest pose where it is')
     lo, hi = measure(objs)
-    shift = Vector((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]))
+    if centre:
+        shift = Vector((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]))
+    else:
+        shift = Vector((0, 0, -lo[2]))
     for o in objs:
         o.location += shift
     return objs
 
 
-def check_size(size, tolerance=0.02, objs=None, name='model'):
+def check_size(size, tolerance=0.02, objs=None, name='model', centre=(0.0, 0.0)):
     """
     Asserts the model is `size` (game width, height, depth, metres) within `tolerance` (a fraction, or
-    one per axis), centred on its footprint and on the floor. Returns the measured size.
+    one per axis), on the floor, and centred on its footprint, or on `centre` (game x, depth) for a model
+    that stands off the middle of its tiles. Returns the measured size.
     """
     lo, hi = measure(objs)
     got = game_size(objs)
     tol = tolerance if isinstance(tolerance, (tuple, list)) else (tolerance,) * 3
     for axis, g, want, t in zip(('width', 'height', 'depth'), got, size, tol):
         assert abs(g - want) <= t * want, f'{name}: {axis} {g:.3f} m, want {want:.3f} m (±{t * 100:.0f} %)'
+    want = (-centre[0], -centre[1])  # game (x, depth) in Blender x, y
     for i, axis in enumerate('xy'):
-        c = (lo[i] + hi[i]) / 2
-        assert abs(c) <= 0.002, f'{name}: off centre in Blender {axis} by {c * 100:.1f} cm (G.settle)'
+        c = (lo[i] + hi[i]) / 2 - want[i]
+        assert abs(c) <= 0.002, f'{name}: off its centre in Blender {axis} by {c * 100:.1f} cm (G.settle)'
     assert abs(lo[2]) <= 0.002, f'{name}: bottom {lo[2] * 100:.1f} cm off the floor (G.settle)'
-    print(f'[gamekit] {name} {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), centred, on the floor')
+    where = 'centred' if centre == (0.0, 0.0) else f'centred on game ({centre[0]:g}, {centre[1]:g})'
+    print(f'[gamekit] {name} {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), {where}, on the floor')
     return got
 
 

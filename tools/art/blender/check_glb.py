@@ -152,7 +152,10 @@ def check_clips(gltf, binary, entry):
         if p is not None:
             warnings.append(f'{nodes[i].get("name", i)} moves inside {nodes[p].get("name", p)}, which moves too: the game moves it with its own clip only')
     names = {a.get('name', '') for a in animations}
-    uses = (entry.get('motions') or {}).get('uses', {})
+    motions = entry.get('motions') or {}
+    uses = dict(motions.get('uses', {}))
+    if motions.get('open'):
+        uses['(open)'] = motions['open']
     for use, clip in sorted(uses.items()):
         if clip not in names:
             errors.append(f'`motions` plays {clip!r} for {use!r}, which is no clip of the file')
@@ -265,14 +268,16 @@ def check(entry, finishes, path):
     lo, hi = [v * scale for v in lo], [v * scale for v in hi]
     dims = [hi[k] - lo[k] for k in range(3)]
     if not entry.get('fit') and not entry.get('offset'):
+        # Centred on the footprint, or where its placeholder is (a wall bed at the back of its tiles).
+        plo, phi = placeholder_box(entry['placeholder']) if entry.get('placeholder') else ([0] * 3, [0] * 3)
         if lo[1] < -0.005:
             errors.append(f'reaches {-lo[1] * 100:.1f} cm below the floor (origin on the floor, y = 0)')
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
         for k, axis in ((0, 'x'), (2, 'z')):
             c = (lo[k] + hi[k]) / 2
-            if abs(c) > 0.02:
-                warnings.append(f'off centre by {c * 100:.1f} cm in {axis} (origin at the footprint centre)')
+            if abs(c) > 0.02 and abs(c - (plo[k] + phi[k]) / 2) > 0.02:
+                warnings.append(f'off centre by {c * 100:.1f} cm in {axis} (origin at the footprint centre, or its placeholder\'s)')
     if entry.get('placeholder') and not entry.get('fit'):
         plo, phi = placeholder_box(entry['placeholder'])
         for k, axis in enumerate('xyz'):

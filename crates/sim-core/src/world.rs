@@ -114,6 +114,9 @@ pub struct ObjectInstance {
     pub value: i64,
     /// Wear from use, 0..1; at 1 it is broken until repaired.
     pub wear: f32,
+    /// Open (a wall bed folded down, a door or lid open): set by the interactions that open or
+    /// close it (`Interaction::leaves`), and what some are offered for (`Interaction::when`).
+    pub open: bool,
 }
 
 /// Something that happened while a resident stepped, for the story (applied after the step).
@@ -129,6 +132,12 @@ impl ObjectInstance {
     /// Worn out: its interactions don't work until it is repaired.
     pub fn broken(&self) -> bool {
         self.wear >= 1.0
+    }
+
+    /// Whether its state lets resident `me` do `inter` now: open or closed as the interaction
+    /// wants (`when`), and nothing closed on someone else using it (or on their way to).
+    pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
+        inter.when.is_none_or(|w| w == self.open) && (inter.leaves != Some(false) || self.users().all(|u| u == me))
     }
 
     pub fn users(&self) -> impl Iterator<Item = u32> + '_ {
@@ -513,6 +522,9 @@ pub struct Sim {
     pub(crate) conceived: Option<u32>,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
+    /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
+    /// changed (applied after the step).
+    pub(crate) reshaped: bool,
     /// When they last woke someone crying (a baby), or were woken by a crying baby (a
     /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
     pub(crate) night_woken: u64,
@@ -1288,6 +1300,7 @@ impl World {
             color: None,
             value: 0,
             wear: 0.0,
+            open: false,
         };
         let name = &self.content.objects[def].id;
         let layer = self.content.objects[def].layer;
@@ -1554,6 +1567,7 @@ impl World {
             job_search_from: 0,
             planner: Default::default(),
             mess: None,
+            reshaped: false,
             care_out: None,
             night_woken: 0,
             conceived: None,
@@ -1884,6 +1898,10 @@ impl World {
                 for (n, g) in gains.iter().enumerate() {
                     b.needs[n] = (b.needs[n] + g).min(1.0);
                 }
+            }
+            if std::mem::take(&mut self.sims[i].reshaped) {
+                // An object opened or closed: how it looks changes.
+                self.structure_version = self.structure_version.wrapping_add(1);
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
@@ -2431,6 +2449,14 @@ impl World {
                         "the {} is broken — repair it first",
                         self.content.objects[obj.def].name
                     )));
+                }
+                if !obj.allows(inter, sim) {
+                    let name = self.content.objects[obj.def].name.to_lowercase();
+                    return Err(Error::new(match inter.when {
+                        Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
+                        Some(w) if w != obj.open => format!("the {name} is closed"),
+                        _ => format!("someone is using the {name}"),
+                    }));
                 }
                 if inter.needs_table && crate::surface::faced_table(&self.content, &self.objects, &self.nav(), object).is_none() {
                     return Err(Error::new(format!(
@@ -3166,7 +3192,7 @@ fn pick_autonomous(
             // a baby in it, the more the baby needs it.
             let mut care = 0.0;
             // Dining at a table only with a table to dine at.
-            if inter.baby || (inter.needs_table && !at_table) {
+            if inter.baby || (inter.needs_table && !at_table) || !obj.allows(inter, sim.id) {
                 continue;
             }
             // Costing a need about to run out, or planned with one it doesn't fill: it would stop
@@ -3609,6 +3635,9 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {
                 return;
             }
+            if !obj.allows(inter, sim.id) {
+                return;
+            }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
             let tags = inter.tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
@@ -3955,6 +3984,14 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
                     // Up: the toilet first, out of habit.
                     sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
+                    // Then what sleeping opened is closed again (a wall bed folded up), unless
+                    // someone is still in it: whoever gets up last does it.
+                    if let Some(close) = closing(sim, content, o, object) {
+                        match sim.follow_up {
+                            None => sim.follow_up = Some(close),
+                            Some(_) => sim.queue.push_front(close),
+                        }
+                    }
                 }
             }
         }
@@ -4081,11 +4118,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         interaction,
     }) = sim.current.as_ref().map(|a| a.task.kind)
     {
-        if objects[object as usize].broken() {
+        // Nor is something opened that someone opened on the way, or closed on someone in it.
+        let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+        if objects[object as usize].broken() || !objects[object as usize].allows(inter, sim.id) {
             end_activity(sim, content, objects);
             return;
         }
-        let cost = content.objects[objects[object as usize].def].interactions[interaction].cost;
+        let cost = inter.cost;
         let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
         if !affordable(cost, funds) {
             end_activity(sim, content, objects);
@@ -4159,6 +4198,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             }
             sim.pose = inter.pose;
             act.phase = Phase::Using { elapsed: 0.0 };
+            // Opened or closed as the use starts (a wall bed folds down as they lie down).
+            if let Some(open) = inter.leaves
+                && objects[object as usize].open != open
+            {
+                objects[object as usize].open = open;
+                sim.reshaped = true;
+            }
         }
     }
 }
@@ -4346,6 +4392,17 @@ fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &cra
 /// What follows using `object` when its interaction has an `after` (`tags`): the nearest
 /// working object on the same plot with an interaction of those tags, one they may use and can
 /// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
+/// Closing `o` again after sleeping in it, if sleeping opened it (`Interaction::leaves`): its
+/// interaction that closes it, if `sim` may do it now. A routine, like washing hands.
+fn closing(sim: &Sim, content: &Content, o: &ObjectInstance, object: u32) -> Option<Task> {
+    if !o.open {
+        return None;
+    }
+    let interactions = &content.objects[o.def].interactions;
+    let interaction = interactions.iter().position(|i| i.leaves == Some(false) && o.allows(i, sim.id))?;
+    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
+}
+
 fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags: TagMask) -> Option<Task> {
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
     nearest(sim, ctx, objects, plot, Some(object), |i| i.tags & tags != 0 && !i.baby && i.recipe.is_none())
@@ -4376,7 +4433,7 @@ fn nearest(
         .filter(|o| Some(o.id) != except && ctx.object_plot[o.id as usize] == plot)
         .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
         .filter_map(|o| {
-            let i = content.objects[o.def].interactions.iter().position(&fits)?;
+            let i = content.objects[o.def].interactions.iter().position(|i| fits(i) && o.allows(i, sim.id))?;
             let (fx, fz) = approach(o);
             Some((ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos), o.id, i))
         })

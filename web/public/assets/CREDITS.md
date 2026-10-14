@@ -51,6 +51,10 @@ The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/ma
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.
 
+The fold-down wall bed (`models/living/wallBed.glb`, pack `packs/living/manifest.json`) is built in Blender by
+`tools/art/blender/families/living.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A new object:
+its pack entry carries a simple primitive-part placeholder as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

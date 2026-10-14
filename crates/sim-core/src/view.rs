@@ -1414,6 +1414,9 @@ struct ObjectView<'a> {
     lift: Option<f32>,
     /// Wear 0..1 (broken at 1).
     wear: f32,
+    /// Open (a wall bed folded down): see `ObjectInstance::open`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    open: bool,
     w: i32,
     d: i32,
     quality: u8,
@@ -1632,6 +1635,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 tall: o.tall,
                 lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
+                open: o.open,
                 w,
                 d,
                 quality: o.quality,

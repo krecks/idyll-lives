@@ -172,6 +172,8 @@ mod tests {
             care: [0.0; MAX_NEEDS],
             after: 0,
             eats: None,
+            when: None,
+            leaves: None,
         }
     }
 

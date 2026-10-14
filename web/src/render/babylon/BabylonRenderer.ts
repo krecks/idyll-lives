@@ -3140,10 +3140,10 @@ export class BabylonRenderer implements Renderer {
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
         // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
         // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
-        // never past its tiles.
+        // never past its tiles; something held open (a wall bed folded down) by its whole tiles.
         let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
         let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
-        const shape = template.outline;
+        const shape = o.open && motions?.open ? undefined : template.outline;
         if (layer !== 'surface' && shape) {
           const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
           const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
@@ -3173,7 +3173,7 @@ export class BabylonRenderer implements Renderer {
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           pop: { meshes: template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
-        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id) });
+        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open });
         if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
       });
       // At rest, the parts are where the body is.

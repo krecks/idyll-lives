@@ -119,6 +119,13 @@ pub struct Interaction {
     /// `Content::recipes`, a hidden recipe made for it): `minutes` is the fetching, and what
     /// it gives (its `total_gain`) comes from eating, at a table if there is one.
     pub eats: Option<usize>,
+    /// Only offered while the object is open (`Some(true)`) or closed (`Some(false)`) (content
+    /// `when`: "open" / "closed"; see `ObjectInstance::open`).
+    pub when: Option<bool>,
+    /// Opens (`Some(true)`) or closes (`Some(false)`) the object as the use starts, and leaves it
+    /// so (content `leaves`): folding a wall bed down, going to sleep in it. Nothing closes an
+    /// object someone else is using.
+    pub leaves: Option<bool>,
 }
 
 impl Interaction {
@@ -2053,6 +2060,20 @@ struct InteractionRaw {
     /// Food to eat sitting down once fetched (see `Interaction::eats`).
     #[serde(default)]
     eat: Option<EatRaw>,
+    /// Only offered while the object is so (see `Interaction::when`).
+    #[serde(default)]
+    when: Option<OpenState>,
+    /// What the use leaves the object (see `Interaction::leaves`).
+    #[serde(default)]
+    leaves: Option<OpenState>,
+}
+
+/// An object's state for `when` and `leaves` (see `ObjectInstance::open`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OpenState {
+    Open,
+    Closed,
 }
 
 /// An interaction's `eat`: the item handed over and how long eating it takes.
@@ -2508,6 +2529,8 @@ impl Content {
                     recipe,
                     after,
                     eats,
+                    when: it.when.map(|s| s == OpenState::Open),
+                    leaves: it.leaves.map(|s| s == OpenState::Open),
                 });
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
