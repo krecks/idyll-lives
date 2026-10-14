@@ -14,10 +14,11 @@ import { BENCH } from '../debug/benchFlags';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
+import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
-import type { Renderer, WallMode } from '../render/types';
+import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { services, type GameControls } from '../ui/services';
@@ -766,6 +767,33 @@ export async function startSession(
   // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
   if (params.has('debug')) {
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
+    // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
+    // `__addFunds(amount)`: money for the player's household.
+    // `__camera(pose?)`: the camera's pose, and with a (partial) pose, puts it there and stops the
+    // camera watching on its own. `__controls.follow(id, view?)` also sets the radius, beta, alpha
+    // or target height (`y`) it follows with.
+    const placeCamera = (pose: Partial<CameraPose> & { y?: number }) => {
+      takeBack();
+      const now = renderer.cameraPose();
+      const target = pose.target ?? [now.target[0], pose.y ?? now.target[1], now.target[2]];
+      renderer.setCameraPose({ ...now, ...pose, target });
+    };
+    Object.assign(window, {
+      __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
+      __content: content,
+      __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
+      __camera: (pose?: Partial<CameraPose> & { y?: number }) => {
+        if (pose) placeCamera(pose);
+        return renderer.cameraPose();
+      },
+      __controls: Object.assign(Object.create(controls) as GameControls, {
+        follow(id: number | null, view?: Partial<Omit<CameraPose, 'target'>> & { y?: number }) {
+          controls.follow(id);
+          if (view) placeCamera(view);
+        },
+      }),
+    });
     // `__crash(what)`: fails on purpose, to see how the game copes. 'panic': the simulation panics;
     // 'throw': an error its worker doesn't catch; 'hang': its worker hangs; 'render': every frame fails.
     Object.assign(window, { __crash: (what: 'panic' | 'throw' | 'hang' | 'render') => (what === 'render' ? (failFrames = true) : bridge.debugCrash(what)) });

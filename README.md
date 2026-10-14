@@ -96,7 +96,7 @@ URL options:
 | `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
 | `?hour=13` | Holds the lighting at that hour |
 | `?diag=noshadows,nonature,…` | Leaves features out of the picture to measure what they cost; `freeze` stops time for screenshots |
-| `?debug` | Console helpers: `__controls`, `__world()`, `__send(command)`, `__showPlot(i)`, `__characters`, and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
+| `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
 | `?seed=42` | The random seed of a new game |
 | `?pack=packs/my-art/manifest.json` | Loads an extra asset pack (can be repeated) |
 | `?snapshot=0` | Turns off WebGPU snapshot rendering (the menus' town) |

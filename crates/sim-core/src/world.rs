@@ -2355,6 +2355,7 @@ impl World {
             Command::SetSpeed { .. }
                 | Command::SetLifespan { .. }
                 | Command::SetPlayerMoves { .. }
+                | Command::AddFunds { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -2493,6 +2494,10 @@ impl World {
             }
             Command::SetLifespan { lifespan } => self.lifespan = lifespan,
             Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
+            Command::AddFunds { household, amount } => {
+                let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
+                h.funds = (h.funds + amount).max(0);
+            }
             Command::Adopt { household, child } => {
                 crate::lifecycle::adopt(self, household, child)?;
             }

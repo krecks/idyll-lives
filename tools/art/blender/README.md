@@ -223,27 +223,50 @@ How the parts work:
 
 ## Checking in the game (headless)
 
-Start your own dev server from your checkout: `cd web && npx vite --port <free port> --strictPort`. Never
-reuse one that's already running. Then drive Playwright headless with full Chrome for Testing (it uses
-the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quiet.mjs`):
+`tools/bench/check.mjs` takes the usual pictures in one go, headless on the real GPU and at 1 % volume,
+with its own dev server on a port you give it (options and the rules for ports and scratch folders in
+[tools/bench/README.md](../../bench/README.md)). Pictures go to `bench-results/check-<time>/` or `--out`:
 
-- **Gallery.** Open `/gallery.html?keys=model.<id>&cols=4` to see the model. Answer the `.glb` requests
-  with 404 (`page.route`) to see its placeholder side by side.
-- **Clips bench.** Open `/clips.html?keys=model.<id>` to see every clip of the model play in turn, as the
-  game plays it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the
-  time. A button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a
-  screenshot (`&t=99`: open). `&renderer=webgl` for WebGL2, `&colors=body:%23hex` for colours. Without
-  `keys` it shows every model with `motions`.
-- **A house.** Open `/?state=wants-asking&debug` (a dump in `debug-states/`).
-  - Buy the object with `__send({type: 'buy', household: 0, object: '<id>', at: [x, z, rot]})`.
-    `[x, z]` is the footprint's corner, against a wall at rot 0. In that state, house 0's living room has
-    free wall at `[23, 14, 0]`.
-  - Find it with `__world().objects`.
-  - Use it with `__send({type: 'use', sim: 0, object: <id>, interaction: <index>})`.
-  - In `wants-asking` the resident doesn't take a `use` (the status stays "Taking a moment"; most likely its
-    needs are full, and residents with full needs skip uses). Use a copy of the dump with the needs lowered, as the bathroom tasks did, and turn
-    autonomy off first (`{type: 'setAutonomy', enabled: false, household: 0}`).
+```sh
+node tools/bench/check.mjs gallery --port 5227 --keys model.<id> --placeholder   # model | placeholder, side by side
+node tools/bench/check.mjs clips --port 5227 --keys model.<id> --times 0,0.3,0.6,1,99
+node tools/bench/check.mjs play --port 5227 --object <id> --at 23,14,0 --use <interaction> --shots 6
+```
+
+Add `--renderer webgl` for WebGL2 and `--quality low` for the Low preset. By hand, or for what the script
+doesn't do, start your own dev server from your checkout (`cd web && npx vite --port <free port> --strictPort`,
+never one that's already running) and drive Playwright headless with full Chrome for Testing, at 1 % volume
+(`page.addInitScript(quiet)` from `tools/bench/quiet.mjs`):
+
+- **Gallery.** `/gallery.html?keys=model.<id>&cols=4` shows the models from the front right, as close as
+  frames them, at their middle height (so things on a wall are in view). `&alpha=…&beta=…&radius=…` and
+  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera. Answer the `.glb` requests
+  with 404 (`page.route`) to see the placeholders.
+- **Clips bench.** `/clips.html?keys=model.<id>` plays every clip of the model in turn, as the game plays
+  it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the time. A
+  button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a
+  screenshot (`&t=99`: open). `&renderer=webgl` for WebGL2, `&colors=body:%23hex` for colours, `&target=`
+  as in the gallery (things that all hang on a wall are aimed at by default). Without `keys` it shows
+  every model with `motions`.
+- **A house.** Open `/?state=bathroom-check&debug`: the house with resident 0 at home, doing nothing,
+  needs at 0.8 (a use that fills a need lasts), plenty of money. `needy-check` has low needs and free
+  will on, `office-night` is the same house at 21:30, `town-things` a town lot with every community
+  thing (`__showPlot(1)`). Make them with `DUMP_STATES=1 cargo test -p sim-core --test check_states`
+  (`debug-states/`, gitignored; `tools/bench/README.md` says more).
+  - Wait until `__sims()` answers and the strip shows "House 0" (not "Drawing portraits…").
+  - Turn free will off: `__send({type: 'setAutonomy', enabled: false, household: 0})` (the game's own
+    Free will setting is applied as the page opens, over the state's).
+  - Buy with `__send({type: 'buy', household: 0, object: '<id>', at: [x, z, rot]})`. `[x, z]` is the
+    footprint's corner, against a wall at rot 0. The living room has free wall at `[23, 14, rot]` and
+    `[24, 17, rot]`. Find it with `__world().objects`. Out of money: `__addFunds(100000)`.
+  - Use it with `__send({type: 'use', sim: 0, object: <id>, interaction: <index>})` (the ids:
+    `__content.object('<id>').interactions`).
+  - Wait for the use, don't time it: `__sims()[0]` has `object`, `def`, `interaction`, `using` (at it, not
+    walking), `pose` (`stand`/`sit`/`lie`), `action`, `x`, `z` and `needs`.
   - See a clip play with `__renderer.motion.states.get(<id>)` (each clip's name, time and kind).
+  - Frame it: `__controls.follow(0, {radius: 6, beta: 0.9, y: 1.4})` follows the resident from that
+    distance, angle and height; `__camera({alpha, beta, radius, target: [x, y, z]})` puts the camera
+    anywhere (`__camera()` reads it). Either stops the camera watching on its own.
   - `{type: 'setSpeed', speed: 0..5}` pauses or speeds up time.
   - Click the object to see its pie menu.
   - `Escape` closes a menu, but opens the pause menu when none is open.

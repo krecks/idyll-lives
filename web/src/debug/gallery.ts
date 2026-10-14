@@ -4,8 +4,11 @@
  * starting a game. Not part of the build.
  *
  * URL: `?keys=model.tree,model.pine` (default: every `model.tree*`, `model.garden.*` and nature key),
- * `?filter=garden` (keys containing it), `?cols=6`, `?gap=5`, `?alpha=-1.2&beta=1.1&radius=30`,
- * `?labels=0`, `?pack=…` like the game.
+ * `?filter=garden` (keys containing it), `?cols=6`, `?gap=5`, `?labels=0`, `?pack=…` like the game.
+ * The camera looks at the models' fronts from the front right (a three-quarter view) and from as
+ * close as frames them all, at their middle height (things on a wall included); `?alpha=0.6&beta=1.1&radius=6`
+ * and `?target=1.4` (a height) or `?target=x,y,z` (a point) change that. (`alpha=1.571` is straight
+ * from the front, `-1.571` from the back.)
  */
 
 import {
@@ -62,8 +65,12 @@ const filter = params.get('filter');
 const keys = params.get('keys')?.split(',') ?? Object.keys(manifest.entries).filter((k) => manifest.entries[k].type === 'model' && (filter ? k.includes(filter) : /^model\.(tree|pine|bush|hedge|garden|flowers|flowerbed|plant)/.test(k)) && !k.endsWith('.far'));
 
 const cols = Number(params.get('cols')) || Math.ceil(Math.sqrt(keys.length));
-const gap = Number(params.get('gap')) || 4;
 const rows = Math.ceil(keys.length / cols);
+const templates = await Promise.all(keys.map((key) => buildModel(scene, key, assets.get(key, 'model'), [1, 1])));
+const outlines = templates.map((t) => t.outline ?? { minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 });
+// Spots the widest model's size apart, plus a metre (small things close together).
+const widest = Math.max(...outlines.map((o) => Math.max(o.maxX - o.minX, o.maxZ - o.minZ)));
+const gap = Number(params.get('gap')) || Math.max(1.5, widest + 1);
 const ground = MeshBuilder.CreateGround('ground', { width: cols * gap + 8, height: rows * gap + 8 }, scene);
 const gm = new PBRMaterial('ground', scene);
 gm.albedoColor = Color3.FromHexString('#6F9A3E').toLinearSpace();
@@ -74,26 +81,42 @@ ground.receiveShadows = true;
 
 const labels = document.getElementById('labels')!;
 const spots: { key: string; at: Vector3; el: HTMLSpanElement }[] = [];
-await Promise.all(
-  keys.map(async (key, i) => {
-    const x = (i % cols - (cols - 1) / 2) * gap;
-    const z = -(Math.floor(i / cols) - (rows - 1) / 2) * gap;
-    const template = await buildModel(scene, key, assets.get(key, 'model'), [1, 1]);
-    for (const mesh of template.meshes) {
-      mesh.thinInstanceSetBuffer('matrix', Matrix.Translation(x, 0, z).asArray() as unknown as Float32Array, 16, true);
-      mesh.receiveShadows = true;
-      shadows.addShadowCaster(mesh);
-    }
-    if (params.get('labels') !== '0') {
-      const el = document.createElement('span');
-      el.textContent = key.replace(/^model\./, '');
-      labels.append(el);
-      spots.push({ key, at: new Vector3(x, 0, z - gap * 0.38), el });
-    }
-  }),
-);
+/** What the models take up (m): x and z round their spots, y from the lowest bottom to the highest top. */
+const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+keys.forEach((key, i) => {
+  const x = (i % cols - (cols - 1) / 2) * gap;
+  const z = -(Math.floor(i / cols) - (rows - 1) / 2) * gap;
+  const template = templates[i];
+  const out = outlines[i];
+  const bottom = Math.min(template.bottom ?? 0, template.height);
+  box.minX = Math.min(box.minX, x + out.minX);
+  box.maxX = Math.max(box.maxX, x + out.maxX);
+  box.minZ = Math.min(box.minZ, z + out.minZ);
+  box.maxZ = Math.max(box.maxZ, z + out.maxZ);
+  box.minY = Math.min(box.minY, bottom);
+  box.maxY = Math.max(box.maxY, template.height);
+  for (const mesh of template.meshes) {
+    mesh.thinInstanceSetBuffer('matrix', Matrix.Translation(x, 0, z).asArray() as unknown as Float32Array, 16, true);
+    mesh.receiveShadows = true;
+    shadows.addShadowCaster(mesh);
+  }
+  if (params.get('labels') !== '0') {
+    const el = document.createElement('span');
+    el.textContent = key.replace(/^model\./, '');
+    labels.append(el);
+    spots.push({ key, at: new Vector3(x, 0, z + Math.min(gap * 0.38, out.maxZ + 0.15)), el });
+  }
+});
 
-const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? -Math.PI / 2), Number(params.get('beta') ?? 1.05), Number(params.get('radius')) || Math.max(cols, rows) * gap * 1.05, Vector3.Zero(), scene);
+// Fronts face +z: from the front, a little to the right, at the models' middle height; as close
+// as keeps the sphere round them all in view (a single cup from about 1 m, a bed from about 5).
+const centre = new Vector3((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2, (box.minZ + box.maxZ) / 2);
+const target = params.get('target')?.split(',').map(Number);
+if (target?.length === 1) centre.y = target[0];
+else if (target?.length === 3) centre.set(target[0], target[1], target[2]);
+const reach = Math.max(0.3, Math.hypot(box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ) / 2);
+const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? Math.PI / 2 - 0.6), Number(params.get('beta') ?? 1.15), 1, centre, scene);
+camera.radius = Number(params.get('radius')) || (reach / Math.sin(camera.fov / 2)) * 1.1;
 camera.attachControl(canvas, true);
 camera.minZ = 0.1;
 camera.wheelPrecision = 20;

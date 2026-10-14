@@ -91,6 +91,12 @@ pub enum Command {
         object: u32,
         on: bool,
     },
+    /// Adds `amount` to a household's funds (a negative one takes money away, down to 0). For
+    /// tests and long checks in the browser (`?debug`'s `__addFunds`); no menu sends it.
+    AddFunds {
+        household: u32,
+        amount: i64,
+    },
     /// Queue an interaction on an object for a Sim.
     Use {
         sim: u32,
