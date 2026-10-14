@@ -466,7 +466,7 @@ def _put(obj, at, yaw=0.0, tilt=0.0, lift=0.0):
 def star(name, at, r, n, material, yaw=0.0, tilt=0.0, inner=0.5, depth=0.008, cup=0.2):
     """A flower's face: a thin star of `n` petals, `r` across its radius, the petals lifted by `cup` (a fraction
     of their reach), facing up and leaning `tilt` degrees towards `yaw`."""
-    n = low(n, max(4, (n + 1) // 2))
+    n = low(n, max(3, n // 3))
     top, bottom = [], []
     for k in range(2 * n):
         rr = r if k % 2 == 0 else r * inner
@@ -485,14 +485,16 @@ def star(name, at, r, n, material, yaw=0.0, tilt=0.0, inner=0.5, depth=0.008, cu
 
 
 def dome(name, at, r, h, material, yaw=0.0, tilt=0.0, lift=0.004):
-    """A flower's centre: a low dome on its face."""
+    """A flower's centre: a low dome on its face (none on a far version: too small to see)."""
+    if LOW[0]:
+        return None
     G.sphere(name, 1.0, material=material, segments=low(6, 4), rings=3, scale=(r, r, h))
     return _put(bpy.context.object, at, yaw, tilt, lift)
 
 
 def cupped(name, profile, at, material, yaw=0.0, tilt=0.0, segments=6):
     """A bloom turned from `profile` [(r, z)] (a tulip, a poppy, a lily's trumpet), leaning `tilt` towards `yaw`."""
-    return _put(G.revolve(name, profile, material=material, segments=low(segments, max(4, segments - 2))), at, yaw, tilt)
+    return _put(G.revolve(name, profile, material=material, segments=low(segments, 3)), at, yaw, tilt)
 
 
 def lump(name, r, at, material, scale=(1, 1, 1), seed=0.0, noise=0.25, segments=10, rings=6):
@@ -524,7 +526,7 @@ def spiral(n, radius, rng, jitter=0.25):
 
 def mound(P, r=0.42, h=0.07):
     """A bed's low soil mound (`bed`, the part the player colours): returns its top."""
-    G.revolve('bed', [(0, 0), (r, 0), (r * 0.93, h * 0.4), (r * 0.65, h * 0.85), (0, h)], material=P.bed, segments=low(20, 16))
+    G.revolve('bed', [(0, 0), (r, 0), (r * 0.93, h * 0.4), (r * 0.65, h * 0.85), (0, h)], material=P.bed, segments=low(20, 12))
     return h
 
 
@@ -672,8 +674,10 @@ def lilies():
         tip = Vector((x * 1.15, y * 1.15, h))
         tube(f'stem{i}', [(x, y, top - 0.01), tip], 0.007, 0.006, P.stem, verts=4)
         for k in range(3):
-            t = 0.25 + k * 0.2
-            blade(f'leaf{i}_{k}', Vector((x, y, 0)).lerp(tip, t), rng.uniform(0, 360), 35, 0.2, 0.035, P.leaf, droop=0.25)
+            t, yaw = 0.25 + k * 0.2, rng.uniform(0, 360)
+            if LOW[0] and k == 1:                                      # a far version: two leaves a stem
+                continue
+            blade(f'leaf{i}_{k}', Vector((x, y, 0)).lerp(tip, t), yaw, 35, 0.2, 0.035, P.leaf, droop=0.25)
         for k in range(2):
             yaw = a + (k * 2 - 1) * 50 + rng.uniform(-15, 15)
             cupped(f'lily{i}_{k}', trumpet, tip - Vector((0, 0, 0.03 * k)), cols[i % 3], yaw, 55, segments=6)
@@ -774,10 +778,10 @@ def flower_box():
     """Flower box: a white wooden box on legs, full of leaves and bright flowers, a few trailing over the front."""
     P = palette(body='#ECE9E1', bloom='#E85A9A', bloom2='#F2C14E', bloom3='#9A5AC8', bloom5='#F4F0F2')
     rng = random.Random(64)
-    G.cube('box', (0.9, 0.42, 0.26), at=(0, 0.03, 0.45), material=P.body, bevel=0.01)
+    G.cube('box', (0.9, 0.42, 0.26), at=(0, 0.03, 0.45), material=P.body, bevel=low(0.01, 0))
     for x in (-0.4, 0.4):
         for y in (-0.14, 0.2):
-            G.cube(f'leg{x}{y}', (0.055, 0.055, 0.34), at=(x, y, 0.17), material=P.body, bevel=0.006)
+            G.cube(f'leg{x}{y}', (0.055, 0.055, 0.34), at=(x, y, 0.17), material=P.body, bevel=low(0.006, 0))
     G.cube('soil', (0.84, 0.36, 0.02), at=(0, 0.03, 0.575), material=P.soil)
     for i in range(6):
         x = -0.36 + i * 0.144
@@ -798,9 +802,9 @@ def flowerbed():
     P = palette(wood='#8A6446', bloom='#E8873A', bloom2='#8E6BBF', bloom3='#F0EDE6', bloom4='#D9483B', bloom5='#F2C14E')
     rng = random.Random(65)
     for y in (-0.44, 0.44):
-        G.cube(f'side{y}', (0.94, 0.06, 0.24), at=(0, y, 0.12), material=P.wood, bevel=0.008)
+        G.cube(f'side{y}', (0.94, 0.06, 0.24), at=(0, y, 0.12), material=P.wood, bevel=low(0.008, 0))
     for x in (-0.44, 0.44):
-        G.cube(f'end{x}', (0.06, 0.82, 0.24), at=(x, 0, 0.12), material=P.wood, bevel=0.008)
+        G.cube(f'end{x}', (0.06, 0.82, 0.24), at=(x, 0, 0.12), material=P.wood, bevel=low(0.008, 0))
     G.cube('soil', (0.84, 0.84, 0.03), at=(0, 0, 0.215), material=P.soil)
     clumps(P, rng, 8, 0.32, 0.22, 0.16, 0.3, [P.leaf, P.leaf_dark, P.leaf_light])
     cols = [P.bloom, P.bloom2, P.bloom3, P.bloom4, P.bloom5, P.bloom3]
@@ -851,7 +855,10 @@ def sprigs(name, P, centre, spread, n=5, length=0.09):
         a = i / n * 360 + rng.uniform(-20, 20)
         base = Vector(centre) + Vector(polar(spread * rng.uniform(0.3, 1.0), a, 0))
         for k in range(3):
-            leaf(f'{name}{i}_{k}', base, a + (k - 1) * 70, rng.uniform(45, 75), length * rng.uniform(0.8, 1.2), length * 0.45,
+            tilt, size = rng.uniform(45, 75), length * rng.uniform(0.8, 1.2)
+            if LOW[0] and k:                                           # a far version: one leaf a sprig
+                continue
+            leaf(f'{name}{i}_{k}', base, a + (k - 1) * 70, tilt, size, length * 0.45,
                  [P.leaf_light, P.leaf][k % 2], shape='lance', droop=0.2, fold=0.2, rows=2, ring=3)
 
 
@@ -919,7 +926,7 @@ def hydrangea():
     P = palette(blossom='#9CB8F4', blossom2='#B8A6F0', blossom3='#8CA8EC', blossom4='#D4BCF4')
     rng = random.Random(72)
     shrub(P, rng, 5, 1.0, 0.82, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
-    dots(rng, 11, (0, 0, 0.46), (0.48, 0.48, 0.38), 0.28, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'mophead')
+    dots(rng, 11, (0, 0, 0.52), (0.48, 0.48, 0.42), 0.28, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'mophead')
     return G.settle([G.join_all('hydrangea')])
 
 
@@ -1059,9 +1066,9 @@ def _crop(still, origin, leaves, crop):
 def raised_bed(P, w, d, h):
     """A raised bed of boards (`body`, the part the player colours) full of soil: returns the soil's height."""
     for y in (-d / 2 + 0.03, d / 2 - 0.03):
-        G.cube(f'board{y}', (w, 0.06, h), at=(0, y, h / 2), material=P.body, bevel=0.01)
+        G.cube(f'board{y}', (w, 0.06, h), at=(0, y, h / 2), material=P.body, bevel=low(0.01, 0))
     for x in (-w / 2 + 0.03, w / 2 - 0.03):
-        G.cube(f'board_end{x}', (0.06, d - 0.12, h), at=(x, 0, h / 2), material=P.body, bevel=0.01)
+        G.cube(f'board_end{x}', (0.06, d - 0.12, h), at=(x, 0, h / 2), material=P.body, bevel=low(0.01, 0))
     G.cube('soil', (w - 0.1, d - 0.1, 0.03), at=(0, 0, h - 0.015), material=P.soil)
     return h
 
@@ -1157,10 +1164,10 @@ def herbs():
     P = palette(body='#8A6446', leaf='#6AAE3E', leaf_dark='#5E9E38', leaf_light='#8EA088', stem='#3E5E3A',
                 blossom='#4E8A3A', bloom='#B88AD0')
     rng = random.Random(84)
-    G.cube('box', (0.84, 0.46, 0.22), at=(0, 0, 0.62), material=P.body, bevel=0.01)
+    G.cube('box', (0.84, 0.46, 0.22), at=(0, 0, 0.62), material=P.body, bevel=low(0.01, 0))
     for x in (-0.38, 0.38):
         for y in (-0.19, 0.19):
-            G.cube(f'leg{x}{y}', (0.055, 0.055, 0.52), at=(x, y, 0.26), material=P.body, bevel=0.006)
+            G.cube(f'leg{x}{y}', (0.055, 0.055, 0.52), at=(x, y, 0.26), material=P.body, bevel=low(0.006, 0))
     G.cube('soil', (0.78, 0.4, 0.02), at=(0, 0, 0.725), material=P.soil)
     lump('basil2', 0.08, (-0.25, -0.1, 0.72), P.leaf_dark, scale=(1, 1, 0.75), noise=0.35, seed=1)
     for i in range(7):                                                                            # rosemary
@@ -1248,7 +1255,7 @@ FAMILY = G.Family(
              paint=[('body', 'Pot')], motions={'uses': {'trim': 'trim'}}),
      G.Model('hedge', garden_hedge, size=(1.546, 1.167, 0.92), key='model.garden.hedge', tolerance=TOLERANCE, far=far_of(garden_hedge),
              motions={'uses': {'trim': 'trim'}}),
-     G.Model('hydrangea', hydrangea, size=(1.196, 0.861, 1.182), key='model.garden.hydrangea', tolerance=TOLERANCE, far=far_of(hydrangea),
+     G.Model('hydrangea', hydrangea, size=(1.196, 0.957, 1.182), key='model.garden.hydrangea', tolerance=TOLERANCE, far=far_of(hydrangea),
              paint=[('blossom', 'Flowers')]),
      G.Model('rosebush', rosebush, size=(0.925, 0.861, 0.951), key='model.garden.rosebush', tolerance=TOLERANCE, far=far_of(rosebush),
              paint=[('bloom', 'Roses')], motions={'uses': {'prune': 'cut'}}),

@@ -20,9 +20,9 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 
 ## Far versions and the woods
 
-Each tree has a far version (`far_of`): every third clump of each crown, round a smooth core as big as the whole
-crown, on coarser shapes. It keeps the tree's size (within 10 %, the trees' `TOLERANCE`) at 10–40 % of its
-triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` placeholder keys whatever the model; they
+Each tree has a far version (`far_of`): every third clump of each crown, round a smooth core spanning all the full
+crown's clumps (their random numbers drawn as in the full build, so the core is measured, not guessed); conifers
+pointed cones of eight sides. It keeps the tree's size within 5 % at 18–40 % of its triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` placeholder keys whatever the model; they
 now draw a file's own far version when it has one, so the woods match the town. The town overview draws them too.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
@@ -32,18 +32,17 @@ now draw a file's own far version when it has one, so the woods match the town. 
 | `model.tree.birch` | 3.45 × 8.18 × 3.29 m | 1,196 | 322 | 3 |
 | `model.tree.blossom` | 5.25 × 5.45 × 5.14 m | 1,360 | 286 | 2 |
 | `model.tree.fruit` | 4.47 × 5.57 × 4.38 m | 1,760 | 412 | 4 |
-| `model.tree.japaneseMaple` | 3.89 × 3.72 × 4.02 m | 1,752 | 568 | 3 |
+| `model.tree.japaneseMaple` | 3.89 × 3.72 × 4.02 m | 1,752 | 424 | 3 |
 | `model.tree.magnolia` | 4.10 × 4.95 × 3.81 m | 1,864 | 436 | 3 |
 | `model.tree.willow` | 4.48 × 6.10 × 4.66 m | 1,544 | 340 | 2 |
-| `model.pine` | 6.03 × 8.85 × 6.03 m | 328 | 158 | 2 |
-| `model.spruce` | 5.60 × 10.20 × 5.57 m | 416 | 142 | 2 |
+| `model.pine` | 6.03 × 8.85 × 6.03 m | 328 | 122 | 2 |
+| `model.spruce` | 5.60 × 10.20 × 5.57 m | 416 | 148 | 2 |
 | `model.cypress` | 2.12 × 7.95 × 2.05 m | 1,496 | 370 | 2 |
-| `model.garden.lemonTree` | 1.29 × 2.37 × 1.34 m | 1,736 | 554 | 4 |
+| `model.garden.lemonTree` | 1.29 × 2.37 × 1.34 m | 1,736 | 698 | 4 |
 
 `check_glb.py`: 12 models, 0 failed. Warnings: four draw calls (apple, lemon tree); sizes under the placeholders'
 bounds for the oak, maple, pine, spruce and cypress (those bounds count each turned blob's or cone's whole box: the
-spruce's read 7.8 m for cones 5.4 m across); far versions up to 8 % off. Khronos validator: 0 errors, 0 warnings on
-all 24 files.
+spruce's read 7.8 m for cones 5.4 m across). Khronos validator: 0 errors, 0 warnings on all 24 files.
 
 ## Rebuild
 

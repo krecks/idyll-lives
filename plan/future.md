@@ -207,3 +207,54 @@ None of them blocks the plan. Each says where it lives.
   session's server.
 - **Validate holds about 47 groups**, against the plan's "about three at a time". Signing tasks off
   (16-sign-off.md) would make the catalog usable again.
+
+## Garden plants and trees (G1–G5, built 2026-10-14)
+
+`families/plants.py` (houseplants, flowers, shrubs, edibles) and `families/trees.py`; notes in `plants.md` and
+`trees.md`. Fixed after the build: far versions over half their model's triangles (13) or more than 5 % off its size
+(4), and the hydrangea's mopheads too low. Left to decide:
+
+- **Performance isn't measured.** Shrubs dress every lot and trees stand by the thousand in the woods, all as thin
+  instances. The models cost about what their placeholders did (a shrub 600–2,300 triangles, a tree 1,100–1,900,
+  conifers 330–420), and the far woods now draw the files' far versions (120–700 triangles) where they drew the
+  `*.far` placeholder keys (100–250). Run the render bench (`tools/bench/render.mjs`, `orbit-day`, Low and Medium)
+  against the commit before G3, on the Intel HD 620 target if possible.
+- **The far woods change** is in `nature.ts` `forests`: a model with a far file of its own draws that, not its
+  `*.far` key. The `*.far` placeholder keys of the Blender trees (`model.tree.far`, `model.pine.far` …) are now
+  unused except as fallbacks' fallbacks; remove them from `nature.py` at sign-off, or keep them for when a file
+  fails to load.
+- **Placeholder bounds overestimate turned round parts.** `check_glb.py` `placeholder_box`, like `models.ts`
+  `partBox`, takes the box of each turned part's box, so a cone turned about its own axis counts its box's diagonal:
+  the spruce's placeholder reads 7.8 m across for cones 5.4 m wide. That gives size warnings for the spruce, pine,
+  cypress, oak, maple, palm, grass, geraniums and succulents, and a picking box and shadow bigger than the fallback
+  draws. An exact box for round shapes (an ellipsoid's or a cylinder's, from the rotation) in both would clear them.
+- **Four draw calls** on the bonsai, the apple tree and the lemon tree: the still part takes three (plain, bark or
+  wood, foliage) and the moving part (a sprig, an apple, a lemon) one more. Making the bonsai's table and trunk plain,
+  or dropping the clips, would bring them to three; kept, as within "at most 4".
+- **Crops' growth stages** (`G.stages`) scale the leaves and the crop about the middle of the bed, so seedlings
+  (planted) cluster towards the middle, most visibly on the pumpkins and strawberries. One node a plant would cost a
+  draw call each. A stage clip that moves as well as scales (seedlings sunk into the soil instead of shrunk), or a
+  gamekit `stages` that keys location too, would keep each plant in place.
+- **A picked vegetable patch keeps its lettuces.** Its leaves stay at full size when picked (the `PLANTS` stages),
+  and lettuces and cabbages are leaves; only the cabbage hearts and carrots go. Put the lettuces in the crop part if
+  a harvested patch should look harvested.
+- **A crop bought new is ripe** (no `growth` in the sim means ripe), so a resident harvests it straight away, as one
+  did in play. Content or the sim could start a bought crop planted.
+- **Colour parts differ from the plan's "Pot or box".** Mound beds colour their soil ("Bed") and, where the petals
+  are one colour, the petals; shrubs without a pot colour their flowers (hydrangea, azalea, lavender, roses); the
+  meadow and the trees have none, the lemon tree its pot. Decide at sign-off whether flowers should be colourable
+  everywhere (several beds have mixed colours, which a single colour would flatten).
+- **Houseplants have no far version**: they stand indoors, and the town overview draws gardens and streets. A
+  houseplant put out in the garden is drawn whole there.
+- **The lot dressing still mixes in placeholders**: `natureDecor` picks `model.bush.small`, `model.bush.flowering`
+  and the street's `model.hedge`, which the plan doesn't cover, next to the Blender bush, hydrangea, roses, lavender
+  and boxwood. Build them in `plants.py` (the `shrub` and `hedge_block` helpers make them) or point them at the
+  Blender shrubs.
+- **Wind and tint.** The leaves sway in the wind (checked: two frames 1.5 s apart differ over the fern and not over
+  the cacti). The per-instance tint on thin instances, the other half of the nature shader, wasn't checked apart.
+- **Far versions by hand, not by decimation.** gamekit's `far=0.25` decimates; on small, separate parts (flowers,
+  leaves, lumps) it pushed vertices below the floor and shrank thin parts, failing the size check. `plants.py`'s
+  `far_of` / `low` (the same build at low detail, drawing every random number the full build draws) worked for all
+  43 outdoor plants and trees; it could move into gamekit for other families' far versions (street props, the farm).
+- **Testing crops.** A crop's stages can be seen without waiting game days: write a state with `objects[].growth`
+  set (−0.5 picked, 0.05 planted, 0.75 growing, 1 ripe) into `debug-states/` and open it with `?state=`.

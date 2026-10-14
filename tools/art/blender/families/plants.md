@@ -92,9 +92,10 @@ flowers here are set so each model is within 10 % of them, but for the geraniums
 Every outdoor model (G2, G3) has a far version, `<id>.far.glb`, drawn in the town overview and the far woods: the
 same build function run with `LOW` set (`far_of`), so every shape is the same but coarser (leaves with half the
 rows, three-sided stems open at their ends, lumps and cups with fewer segments, smaller stars) and its moving part
-joined in, still. It keeps the model's size exactly; a decimated copy (`far=0.25`) dipped below the floor and lost
-thin parts. Shrubs come to a third of their triangles or less; the flower beds, all small flowers, to about 55–65 %
-(`check_glb` warns: aim for a quarter).
+joined in, still; boxes lose their bevels, sprigs keep one leaf, flower faces three petals and no middle, cups
+three sides, mounds twelve. Where it leaves things out it still draws every random number the full build draws, so
+what's left stands where it did. It keeps the model's size (within 5 %); a decimated copy (`far=0.25`) dipped below
+the floor and lost thin parts. Every far version comes to 30–49 % of its model's triangles.
 
 ## The shrubs (G3)
 
@@ -113,20 +114,19 @@ bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they co
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
 | `model.bush` | 1.04 × 0.91 × 1.10 m | 700 | 252 | 1 |
-| `model.garden.boxwood` | 0.70 × 0.75 × 0.72 m | 604 | 316 | 2 |
-| `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 728 | 434 | 3 |
-| `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 660 | 372 | 2 |
-| `model.garden.hydrangea` | 1.20 × 0.86 × 1.18 m | 1,404 | 516 | 1 |
+| `model.garden.boxwood` | 0.70 × 0.75 × 0.72 m | 604 | 196 | 2 |
+| `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 728 | 338 | 3 |
+| `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 660 | 204 | 2 |
+| `model.garden.hydrangea` | 1.20 × 0.96 × 1.18 m | 1,404 | 516 | 1 |
 | `model.garden.rosebush` | 0.93 × 0.86 × 0.95 m | 1,394 | 636 | 3 |
-| `model.garden.azalea` | 1.24 × 1.01 × 1.24 m | 2,260 | 948 | 2 |
+| `model.garden.azalea` | 1.24 × 1.01 × 1.24 m | 2,260 | 828 | 2 |
 | `model.garden.lavender` | 0.61 × 0.87 × 0.63 m | 872 | 264 | 3 |
 | `model.garden.fern` | 0.79 × 0.48 × 0.93 m | 1,288 | 576 | 1 |
 | `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,120 | 480 | 2 |
 | `model.garden.hosta` | 0.62 × 0.84 × 0.68 m | 676 | 234 | 2 |
 
-`check_glb.py`: the family's 36 models, 0 failed. Warnings: far versions over half (boxwood, topiary, hedge and
-eight flower beds), the grass 13 % wider and the hydrangea 13 % lower than their placeholders' bounds. Khronos
-validator: 0 errors, 0 warnings on every new file.
+`check_glb.py`: the family's 36 models, 0 failed. Warnings: the grass 13 % wider than its placeholder's bounds.
+Khronos validator: 0 errors, 0 warnings on every new file.
 
 ## The edibles (G4)
 
@@ -141,13 +141,14 @@ the planter (plain, to stay within three draw calls), the soil mound, straw or p
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| `model.garden.vegPatch` | 0.92 × 0.40 × 0.92 m | 1,590 | 924 | 3 |
-| `model.garden.tomatoes` | 0.80 × 1.19 × 0.80 m | 2,380 | 956 | 3 |
-| `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 1,456 | 788 | 3 |
-| `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,294 | 924 | 3 |
+| `model.garden.vegPatch` | 0.92 × 0.40 × 0.92 m | 1,590 | 540 | 3 |
+| `model.garden.tomatoes` | 0.80 × 1.19 × 0.80 m | 2,380 | 924 | 3 |
+| `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 1,456 | 692 | 3 |
+| `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,294 | 444 | 3 |
 | `model.garden.pumpkins` | 1.11 × 0.27 × 0.95 m | 1,174 | 542 | 3 |
 
-`check_glb.py`: 5 models, 0 failed (far versions over half for three). Khronos validator: 0 errors, 0 warnings.
+`check_glb.py`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Each stage checked in
+play from a state with all four crops at each (picked, planted, growing, ripe).
 
 ## Rebuild
 

@@ -64,15 +64,14 @@ def shades(P, n=5):
 def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0.3, bottom=-0.45, core=0.0):
     """Leaf clumps over an ellipsoid crown (centre `c`, radii `r`): `n` lumps about `size` x the mean radius,
     `spread` x the radius out from the centre, lighter towards the top; `core` adds a dark filling lump. A far
-    version has every third clump round a smooth core as big as the whole crown, so it keeps its size."""
+    version has every third clump round a smooth core spanning all the full crown's clumps, so it keeps its size."""
     m = sum(r) / 3
     cx, cy, cz = c
-    if LOW[0]:
-        fill = 0.45 if n > 3 else 0.12                                 # a few clumps don't fill their crown
-        reach = [r[i] * spread + size * m * fill for i in range(3)]    # how far the clumps reach, about
-        lump(f'{name}_core', reach[0] * 0.95, (cx, cy, cz - reach[2] * 0.95), cols[0], scale=(1, reach[1] / reach[0], reach[2] / reach[0]),
-             noise=0.0, seed=rng.random() * 9, segments=14, rings=7)          # smooth, 8 x 4 (its equator kept)
-        core = 0
+    full_core = core
+    far, core = LOW[0], (0 if LOW[0] else core)
+    if far:
+        seed = rng.random() * 9 if full_core else 0.0                  # drawn where the full crown draws its core's
+        lo, hi = [math.inf] * 3, [-math.inf] * 3
     if core:
         lump(f'{name}_core', r[0] * core, (cx, cy, cz - r[2] * core), cols[0], scale=(1, r[1] / r[0], r[2] / r[0]),
              noise=noise * 0.8, seed=rng.random() * 9, segments=10, rings=6)
@@ -87,11 +86,20 @@ def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0
         z = cz + r[2] * t * k
         light = (t - bottom) / (1 - bottom)
         col = cols[max(0, min(len(cols) - 1, round(light * (len(cols) - 1) + rng.uniform(-0.6, 0.6))))]
-        sx, sy, seed = rng.uniform(0.9, 1.15), rng.uniform(0.9, 1.15), i * 1.7 + rng.random()
-        if LOW[0] and i % 3:                                           # a far version: every third clump
-            continue
-        lump(f'{name}{i}', s, (cx + r[0] * ring * math.cos(a) * k, cy + r[1] * ring * math.sin(a) * k, z - s * squash),
-             col, scale=(sx, sy, squash), noise=noise, seed=seed, segments=8, rings=5)
+        sx, sy, clump_seed = rng.uniform(0.9, 1.15), rng.uniform(0.9, 1.15), i * 1.7 + rng.random()
+        at = (cx + r[0] * ring * math.cos(a) * k, cy + r[1] * ring * math.sin(a) * k, z)
+        if far:                                                        # the clumps' reach, for the core
+            half = (s * sx, s * sy, s * squash)
+            lo = [min(lo[j], at[j] - half[j]) for j in range(3)]
+            hi = [max(hi[j], at[j] + half[j]) for j in range(3)]
+            if i % 3:                                                  # every third clump
+                continue
+        lump(f'{name}{i}', s, (at[0], at[1], z - s * squash), col, scale=(sx, sy, squash), noise=noise, seed=clump_seed,
+             segments=8, rings=5)
+    if far:
+        rx, ry, rz = ((hi[j] - lo[j]) / 2 for j in range(3))
+        lump(f'{name}_core', rx, ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), cols[0], scale=(1, ry / rx, rz / rx),
+             noise=0.0, seed=seed, segments=14, rings=7)               # smooth, 8 x 4 (its equator kept)
 
 
 def trunk(P, h, d, material=None, taper=0.62, flare=True, verts=9):
@@ -254,9 +262,9 @@ def conifer(rng, tiers, base_d, z0, step, h, cols, top_d=0.5, tilt=4.0, offset=0
         t = i / max(1, tiers - 1)
         d = base_d + (top_d - base_d) * t ** 0.9
         hh = h * (1 - 0.35 * t)
-        G.cone(f'tier{i}', d / 2 * rng.uniform(0.94, 1.06), 0.03, hh,
+        G.cone(f'tier{i}', d / 2 * rng.uniform(0.94, 1.06), low(0.03, 0.0), hh,
                at=(rng.uniform(-offset, offset), rng.uniform(-offset, offset), z0 + i * step + hh / 2),
-               material=cols[(i + rng.randint(0, 1)) % len(cols)], verts=low(verts, 6),
+               material=cols[(i + rng.randint(0, 1)) % len(cols)], verts=low(verts, 8),
                rot=(rng.uniform(-tilt, tilt), rng.uniform(-tilt, tilt), rng.uniform(0, 360)))
 
 
@@ -275,7 +283,7 @@ def spruce():
     P = palette(['#3A5E52', '#446A5C', '#4E7666', '#5A8270'], bark='#8E7A6A')
     rng = random.Random(20)
     trunk(P, 1.2, 0.36, flare=False, verts=7)
-    conifer(rng, low(9, 6), 5.4, 0.35, low(0.98, 1.47), 1.85, shades(P, 4), top_d=0.7, tilt=3, offset=0.08)
+    conifer(rng, 9, 5.4, 0.35, 0.98, 1.85, shades(P, 4), top_d=0.7, tilt=3, offset=0.08)
     G.cone('tip', 0.21, 0.02, 1.2, at=(0, 0, 9.6), material=P.leaf4, verts=low(8, 5))
     return G.settle([G.join_all('spruce')])
 
@@ -309,7 +317,7 @@ def lemon_tree():
     top = pot(P, 0.3, 0.5, r_bottom=0.22, rim=0.016)
     tube('trunk', [(0, 0, top - 0.02), (0.04, 0.02, 1.45)], 0.035, 0.02, P.bark, verts=6)
     crown('crown', rng, (0, 0, 1.85), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
-    dots(rng, low(12, 6), (0, 0, 1.85), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
+    dots(rng, 12, (0, 0, 1.85), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
          out=0.92, flat=1.25, segments=low(6, 5), rings=low(4, 3))
     still = G.join_all('lemonTree')
     at = (0.1, -0.6, 1.62)
