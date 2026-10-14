@@ -188,7 +188,7 @@ E['model.couchPotato.lavaLamp'] = lava_lamp(); FOOT['model.couchPotato.lavaLamp'
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
 to_wall('couchPotato', E, ['model.couchPotato.cinemaWall', 'model.couchPotato.fitnessGame',
-                           'model.couchPotato.gameConsole'])
+                           'model.couchPotato.gameConsole', 'model.couchPotato.lavaLamp'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('couchPotato', sys.argv[1] if len(sys.argv) > 1 else None, E, FOOT) else 0)

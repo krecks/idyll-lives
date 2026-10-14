@@ -1171,12 +1171,12 @@
           "size": [
             1.9,
             0.07,
-            1.9
+            1.8848
           ],
           "at": [
             0,
             0.6,
-            0
+            0.0124
           ],
           "color": "#2F8F83",
           "material": "material.finish.fabric",
@@ -1187,12 +1187,12 @@
           "size": [
             1.62,
             0.02,
-            1.62
+            1.607
           ],
           "at": [
             0,
             0.6,
-            0
+            0.0124
           ],
           "color": "#4F6585",
           "material": "material.finish.matte",
@@ -1203,12 +1203,12 @@
           "size": [
             1.7,
             0.03,
-            1.7
+            1.6864
           ],
           "at": [
             0,
             0.585,
-            0
+            0.0124
           ],
           "color": "#C3C7CB",
           "material": "material.finish.metal",
@@ -1219,12 +1219,12 @@
           "size": [
             1.84,
             0.04,
-            1.84
+            1.8253
           ],
           "at": [
             0,
             0.56,
-            0
+            0.0124
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1233,14 +1233,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.04,
-            0.5403,
-            0.04
+            0.0397,
+            0.5402,
+            0.0398
           ],
           "at": [
             0.7522,
             0.29,
-            0.4343
+            0.4432
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1253,14 +1253,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0348,
+            0.4515,
             0.035
           ],
           "at": [
             0.5991,
             0.03,
-            0.5991
+            0.6067
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1274,13 +1274,13 @@
           "shape": "cylinder",
           "size": [
             0.04,
-            0.5403,
-            0.04
+            0.5402,
+            0.0397
           ],
           "at": [
             0.0,
             0.29,
-            0.8686
+            0.8741
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1293,14 +1293,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0347,
+            0.4532,
             0.035
           ],
           "at": [
             -0.2193,
             0.03,
-            0.8184
+            0.8243
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1313,14 +1313,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.04,
-            0.5403,
-            0.04
+            0.0397,
+            0.5402,
+            0.0398
           ],
           "at": [
             -0.7522,
             0.29,
-            0.4343
+            0.4432
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1333,14 +1333,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0349,
+            0.4506,
             0.035
           ],
           "at": [
             -0.8184,
             0.03,
-            0.2193
+            0.23
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1353,14 +1353,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.04,
-            0.5403,
-            0.04
+            0.0397,
+            0.5402,
+            0.0398
           ],
           "at": [
             -0.7522,
             0.29,
-            -0.4343
+            -0.4184
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1373,14 +1373,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0348,
+            0.4515,
             0.035
           ],
           "at": [
             -0.5991,
             0.03,
-            -0.5991
+            -0.5819
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1394,13 +1394,13 @@
           "shape": "cylinder",
           "size": [
             0.04,
-            0.5403,
-            0.04
+            0.5402,
+            0.0397
           ],
           "at": [
             -0.0,
             0.29,
-            -0.8686
+            -0.8493
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1413,14 +1413,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0347,
+            0.4532,
             0.035
           ],
           "at": [
             0.2193,
             0.03,
-            -0.8184
+            -0.7995
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1433,14 +1433,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.04,
-            0.5403,
-            0.04
+            0.0397,
+            0.5402,
+            0.0398
           ],
           "at": [
             0.7522,
             0.29,
-            -0.4343
+            -0.4184
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1453,14 +1453,14 @@
         {
           "shape": "cylinder",
           "size": [
-            0.035,
-            0.4541,
+            0.0349,
+            0.4506,
             0.035
           ],
           "at": [
             0.8184,
             0.03,
-            -0.2193
+            -0.2051
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1474,13 +1474,13 @@
           "shape": "cylinder",
           "size": [
             0.03,
-            0.5425,
-            0.03
+            0.5418,
+            0.0298
           ],
           "at": [
             -0.12,
             0.2925,
-            0.885
+            0.8903
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1494,13 +1494,13 @@
           "shape": "cylinder",
           "size": [
             0.03,
-            0.5425,
-            0.03
+            0.5418,
+            0.0298
           ],
           "at": [
             0.12,
             0.2925,
-            0.885
+            0.8903
           ],
           "color": "#8A9096",
           "material": "material.finish.metal",
@@ -1515,12 +1515,12 @@
           "size": [
             0.26,
             0.025,
-            0.06
+            0.0595
           ],
           "at": [
             0,
             0.18,
-            0.8779
+            0.8833
           ],
           "color": "#3A3D41",
           "material": "material.finish.satin",
@@ -1531,12 +1531,12 @@
           "size": [
             0.26,
             0.025,
-            0.06
+            0.0595
           ],
           "at": [
             0,
             0.38,
-            0.8421
+            0.8478
           ],
           "color": "#3A3D41",
           "material": "material.finish.satin",
@@ -1547,12 +1547,12 @@
           "size": [
             0.22,
             0.22,
-            0.22
+            0.2182
           ],
           "at": [
             0.8,
             0.11,
-            0.76
+            0.7663
           ],
           "color": "#E8692E",
           "material": "material.finish.gloss",

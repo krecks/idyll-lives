@@ -221,7 +221,8 @@ E['model.natureLover.glasshouse'] = {'type': 'model', 'placeholder': gp}
 
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
-to_wall('natureLover', E, ['model.natureLover.cedarShower', 'model.natureLover.glasshouse'])
+to_wall('natureLover', E, ['model.natureLover.cedarShower', 'model.natureLover.glasshouse',
+                           'model.natureLover.veggieBed'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('natureLover', E) else 0)

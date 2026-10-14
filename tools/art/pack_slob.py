@@ -209,7 +209,8 @@ E['model.slob.gamingRecliner'] = gaming_recliner(); FOOT['model.slob.gamingRecli
 
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
-to_wall('slob', E, ['model.slob.arcadeCabinet', 'model.slob.gamingRecliner', 'model.slob.spritzStation'])
+to_wall('slob', E, ['model.slob.arcadeCabinet', 'model.slob.gamingRecliner', 'model.slob.spritzStation',
+                    'model.slob.microwaveCart'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('slob', sys.argv[1] if len(sys.argv) > 1 else None, E, FOOT) else 0)

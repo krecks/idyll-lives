@@ -223,7 +223,7 @@ def main(path):
 
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
-to_wall('kind', E, ['model.kind.neighbourlyOven'])
+to_wall('kind', E, ['model.kind.neighbourlyOven', 'model.kind.songbirdFeeder'])
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else f'pack_{TRAIT}.json')

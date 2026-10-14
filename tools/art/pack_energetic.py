@@ -153,7 +153,8 @@ E['model.energetic.recoveryPod'] = {'type': 'model', 'placeholder': p}
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
 to_wall('energetic', E, ['model.energetic.boulderingWall', 'model.energetic.contrastShower',
-                         'model.energetic.powerBlender', 'model.energetic.streetballHoop'])
+                         'model.energetic.powerBlender', 'model.energetic.streetballHoop',
+                         'model.energetic.trampoline'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('energetic', E) else 0)

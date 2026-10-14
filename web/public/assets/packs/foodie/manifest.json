@@ -1648,7 +1648,7 @@
           "at": [
             0.08,
             0.97,
-            0.06
+            0.01
           ],
           "color": "#B08E66",
           "material": "material.finish.wood",
@@ -1664,7 +1664,7 @@
           "at": [
             0.0,
             1.015,
-            0.06
+            0.01
           ],
           "color": "#F0C75E",
           "material": "material.finish.satin",
@@ -1685,7 +1685,7 @@
           "at": [
             0.17,
             1.02,
-            0.07
+            0.02
           ],
           "color": "#C8964F",
           "material": "material.finish.matte",
@@ -1705,7 +1705,7 @@
           "at": [
             -0.3,
             1.0,
-            0.07
+            0.02
           ],
           "color": "#B33A32",
           "material": "material.finish.gloss",
@@ -1721,7 +1721,7 @@
           "at": [
             -0.25,
             1.0,
-            0.1
+            0.05
           ],
           "color": "#C9483B",
           "material": "material.finish.gloss",

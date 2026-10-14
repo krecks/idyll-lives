@@ -2971,7 +2971,7 @@
           "at": [
             0.15,
             0.47,
-            -0.0
+            -0.05
           ],
           "color": "#A7A9B4",
           "material": "material.finish.fabric",
@@ -2992,7 +2992,7 @@
           "at": [
             0.52,
             0.32,
-            0.08
+            0.03
           ],
           "color": "#A7A9B4",
           "material": "material.finish.fabric",

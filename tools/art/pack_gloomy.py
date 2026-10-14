@@ -132,8 +132,8 @@ for i in range(10):                                                             
     p.append(sph([0.025, 0.035, 0.008], [x, y, -0.355], '#E3F0F8', 'gloss', segments=6))
 p += [cushion([0.5, 0.36, 0.14], [-0.62, 0.62, -0.28], SLATE, rotate=[-10, 0, 8], radius=0.06),    # pillows
       cushion([0.44, 0.32, 0.12], [0.66, 0.6, -0.28], '#C9B37E', rotate=[-10, 0, -6], radius=0.05),
-      cushion([0.7, 0.04, 0.5], [0.15, 0.47, -0.02], '#A7A9B4', rotate=[0, 12, 0], radius=0.015),  # throw
-      box([0.04, 0.24, 0.5], [0.52, 0.32, 0.06], '#A7A9B4', 'fabric', radius=0.015, rotate=[0, 12, 0]),
+      cushion([0.7, 0.04, 0.5], [0.15, 0.47, -0.07], '#A7A9B4', rotate=[0, 12, 0], radius=0.015),  # throw
+      box([0.04, 0.24, 0.5], [0.52, 0.32, 0.01], '#A7A9B4', 'fabric', radius=0.015, rotate=[0, 12, 0]),
       box([0.16, 0.03, 0.22], [-0.2, 0.47, 0.05], PLUM, 'matte', radius=0.006, rotate=[0, -20, 0]),   # book
       cyl([0.08, 0.09, 0.08], [0.82, 0.78, -0.38], '#E8E4EC', 'gloss')]                             # mug on the sill
 p += candle(-0.8, 0.75, -0.37, h=0.12) + candle(-0.72, 0.75, -0.38, h=0.08)

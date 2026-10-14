@@ -102,12 +102,12 @@ def deli_pantry():
     for x in (-0.405, 0.0, 0.405):                                                                  # open shelf stiles
         p.append(box([0.03, 0.86, 0.03], [x, 1.47, 0.0], BODY, 'satin', radius=0.006))
     p.append(box([0.84, 0.05, 0.03], [0, 1.88, 0.0], BODY, 'satin', radius=0.006))
-    # counter: board with cheese wedge + bread
-    p += [box([0.4, 0.02, 0.24], [0.08, 0.97, 0.04], OAKD, 'wood', radius=0.006),
-          part('cone', [0.12, 0.07, 0.12], [0.0, 1.015, 0.04], '#F0C75E', 'satin', segments=3, rotate=[0, 30, 0]),
-          part('capsule', [0.08, 0.18, 0.08], [0.17, 1.02, 0.05], '#C8964F', 'matte', rotate=[0, 70, 90]),
-          sph([0.05, 0.05, 0.05], [-0.3, 1.0, 0.05], '#B33A32', 'gloss', segments=8),           # tomatoes
-          sph([0.05, 0.05, 0.05], [-0.25, 1.0, 0.08], '#C9483B', 'gloss', segments=8)]
+    # counter: board with cheese wedge + bread (on the counter, as the model's: not over its edge)
+    p += [box([0.4, 0.02, 0.24], [0.08, 0.97, -0.01], OAKD, 'wood', radius=0.006),
+          part('cone', [0.12, 0.07, 0.12], [0.0, 1.015, -0.01], '#F0C75E', 'satin', segments=3, rotate=[0, 30, 0]),
+          part('capsule', [0.08, 0.18, 0.08], [0.17, 1.02, 0.0], '#C8964F', 'matte', rotate=[0, 70, 90]),
+          sph([0.05, 0.05, 0.05], [-0.3, 1.0, 0.0], '#B33A32', 'gloss', segments=8),            # tomatoes
+          sph([0.05, 0.05, 0.05], [-0.25, 1.0, 0.03], '#C9483B', 'gloss', segments=8)]
     return placeholder(p)
 
 
