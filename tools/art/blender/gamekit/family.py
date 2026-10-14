@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from check_glb import played  # noqa: E402  (the gate's reading of `motions`, shared)
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
-FAR_FEET = 0.05
+FAR_FEET = 0.01
 
 
 class Model:
