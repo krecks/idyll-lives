@@ -3,7 +3,9 @@
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
 (`families/kitchen.py`), the six K2 cookers and the four K3 small appliances and dishwashers are done
 (`families/kitchen_cooking.py`), and the eight K4 base counters, the eleven K5 tall and wall storage
-things and the five K6 islands and bars are done (`families/kitchen_counters.py`).
+things and the five K6 islands and bars are done (`families/kitchen_counters.py`). The thirteen K7 dining
+tables, the twelve K8 chairs and stools and the four K9 dining storage things are done (`families/dining.py`),
+so the whole kitchen is built.
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -101,7 +103,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 | `barEnd` Bar end | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 
-## K7. Dining tables (13)
+## K7. Dining tables (13) — **Done** (in Validate › Tables)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `tables` (Validate › Tables)
@@ -123,7 +125,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBarHigh` High café table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 
-## K8. Chairs and stools (12)
+## K8. Chairs and stools (12) — **Done** (in Validate › Chairs)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `chairs` (Validate › Chairs)
@@ -144,7 +146,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
 | `benchDining` Dining bench | 2x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
 
-## K9. Dining storage (4)
+## K9. Dining storage (4) — **Done** (in Validate › Dining Storage)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `dining storage` (Validate › Dining Storage)

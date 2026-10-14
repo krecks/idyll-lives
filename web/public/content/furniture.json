@@ -812,8 +812,8 @@
         1
       ],
       "price": 80,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "description": "A tall stool for the counter or the island.",
       "approach": "around",
       "seatAt": [
@@ -860,8 +860,8 @@
         1
       ],
       "price": 160,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "description": "A little round table with one chair: the cheapest place to sit down for breakfast or a coffee.",
       "surface": {
         "height": 0.75,
@@ -917,8 +917,8 @@
         1
       ],
       "price": 700,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "slots": 2,
       "decor": 0.3,
       "description": "A glass-topped table for two with chairs: breakfast and coffee in style.",
@@ -976,8 +976,8 @@
         1
       ],
       "price": 1100,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "slots": 2,
       "decor": 0.5,
       "description": "A solid oak table set for four. Lingering over a long meal here is the best part of the day.",
@@ -1051,8 +1051,8 @@
         1
       ],
       "price": 60,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "description": "A simple chair: extra seating anywhere.",
       "approach": "around",
       "seatAt": [

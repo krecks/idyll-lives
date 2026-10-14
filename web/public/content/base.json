@@ -3256,8 +3256,8 @@
         1
       ],
       "price": 350,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "slots": 2,
       "surface": {
         "height": 0.765,
@@ -3701,6 +3701,18 @@
         {
           "id": "islands",
           "label": "Islands & Bars"
+        },
+        {
+          "id": "tables",
+          "label": "Tables"
+        },
+        {
+          "id": "chairs",
+          "label": "Chairs"
+        },
+        {
+          "id": "dining storage",
+          "label": "Dining Storage"
         },
         {
           "id": "toilets",

@@ -256,6 +256,26 @@ The kitchen islands and bars (`models/kitchen_counters/kitchenIsland.glb`, `isla
 The kitchen island slides a drawer out between its stools while a resident makes a sandwich; the small and
 long islands and the bars are static. Their primitive-part entries stay as the fallback.
 
+The dining tables (`models/dining/diningTable.glb`, `bistroSet.glb`, `diningGlass.glb`, `diningOak.glb`,
+`tableSquare2.glb`, `tableBistroRound.glb`, `tableDining4.glb`, `tableDining6.glb`, `tableBanquet8.glb`,
+`tableRound4.glb`, `tableSquare8.glb`, `tableFarmhouse6.glb`, `tableBarHigh.glb`, override pack
+`packs/dining/manifest.json`) are built in Blender by `tools/art/blender/families/dining.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). They are static; the four sets keep the chairs residents sit on.
+Their primitive-part entries stay as the fallback.
+
+The dining chairs and stools (`models/dining/barStool.glb`, `stoolCounter.glb`, `stoolBarHigh.glb`,
+`diningChair.glb`, `chairWood.glb`, `chairUpholstered.glb`, `chairModern.glb`, `chairWindsor.glb`,
+`chairBentwood.glb`, `chairFolding.glb`, `chairArm.glb`, `benchDining.glb`, same pack) are built in Blender by
+`tools/art/blender/families/dining.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The three
+stools' seats swivel 20° and back as a resident sits or drinks, carrying them; the chairs and the bench are
+static. Their primitive-part entries stay as the fallback.
+
+The dining storage (`models/dining/sideboard.glb`, `buffet.glb`, `chinaCabinet.glb`, `barCart.glb`, same
+pack) is built in Blender by `tools/art/blender/families/dining.py` on `gamekit` and exported as `.glb`
+(glTF, original, CC0). The bar cart's cocktail shaker lifts and tips while a resident mixes a drink; the
+sideboard, buffet and china cabinet are static (their doors are parts of their own, for a later use). Their
+primitive-part entries stay as the fallback.
+
 The bedroom beds (`models/bedroom/bed.glb`, `bedSingle.glb`, `bedBunk.glb`, `bedFuton.glb`, `bedKing.glb`,
 `bedDouble.glb`, `bedQueenUpholstered.glb`, `bedCanopy.glb`, `bedDaybed.glb`, override pack
 `packs/bedroom/manifest.json`) are built in Blender by `tools/art/blender/families/bedroom.py` on `gamekit` and

@@ -10,8 +10,8 @@
         1
       ],
       "price": 120,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "surface": {
         "height": 0.75,
         "kind": "table",
@@ -32,8 +32,8 @@
         1
       ],
       "price": 90,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "surface": {
         "height": 0.75,
         "kind": "table",
@@ -54,8 +54,8 @@
         1
       ],
       "price": 260,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.2,
       "surface": {
         "height": 0.75,
@@ -77,8 +77,8 @@
         1
       ],
       "price": 420,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -100,8 +100,8 @@
         1
       ],
       "price": 620,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -123,8 +123,8 @@
         2
       ],
       "price": 340,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -146,8 +146,8 @@
         2
       ],
       "price": 560,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -169,8 +169,8 @@
         1
       ],
       "price": 520,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "decor": 0.4,
       "surface": {
         "height": 0.75,
@@ -192,8 +192,8 @@
         1
       ],
       "price": 150,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "tables",
       "surface": {
         "height": 1.06,
         "kind": "bar",
@@ -214,8 +214,8 @@
         1
       ],
       "price": 55,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "table"
@@ -266,8 +266,8 @@
         1
       ],
       "price": 120,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -319,8 +319,8 @@
         1
       ],
       "price": 90,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "table"
@@ -371,8 +371,8 @@
         1
       ],
       "price": 110,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -424,8 +424,8 @@
         1
       ],
       "price": 85,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "decor": 0.1,
       "approach": "around",
       "seatAt": [
@@ -477,8 +477,8 @@
         1
       ],
       "price": 30,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "table"
@@ -529,8 +529,8 @@
         1
       ],
       "price": 160,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -582,8 +582,8 @@
         1
       ],
       "price": 140,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "slots": 2,
       "approach": "around",
       "seatAt": [
@@ -635,8 +635,8 @@
         1
       ],
       "price": 70,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "counter",
@@ -688,8 +688,8 @@
         1
       ],
       "price": 95,
-      "category": "kitchen",
-      "group": "dining",
+      "category": "validate",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "bar",
@@ -763,8 +763,8 @@
         1
       ],
       "price": 380,
-      "category": "kitchen",
-      "group": "cabinets",
+      "category": "validate",
+      "group": "dining storage",
       "decor": 0.4,
       "surface": {
         "height": 0.8,
@@ -790,8 +790,8 @@
         1
       ],
       "price": 520,
-      "category": "kitchen",
-      "group": "cabinets",
+      "category": "validate",
+      "group": "dining storage",
       "decor": 0.5,
       "surface": {
         "height": 0.9,
@@ -817,8 +817,8 @@
         1
       ],
       "price": 650,
-      "category": "kitchen",
-      "group": "cabinets",
+      "category": "validate",
+      "group": "dining storage",
       "decor": 0.8,
       "description": "A glazed hutch with the best plates on show over a cupboard.",
       "interactions": []
@@ -832,8 +832,8 @@
         1
       ],
       "price": 180,
-      "category": "kitchen",
-      "group": "cabinets",
+      "category": "validate",
+      "group": "dining storage",
       "decor": 0.4,
       "description": "Two glass tiers on brass castors with bottles and glasses.",
       "interactions": [

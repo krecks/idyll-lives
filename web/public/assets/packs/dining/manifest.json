@@ -1,0 +1,879 @@
+{
+  "$comment": "Blender-built dining tables, chairs, stools and storage (tools/art/blender/families/dining.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Table tops stand at the content's surface heights and seats where the game seats residents; the stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail shaker lifts and tips while a drink is mixed (`shake`).",
+  "version": 1,
+  "entries": {
+    "model.diningTable": {
+      "type": "model",
+      "url": "../../models/dining/diningTable.glb",
+      "materials": {
+        "bloom_red": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_white": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "cutlery": {
+          "finish": "material.finish.satin"
+        },
+        "food": {
+          "finish": "material.finish.gloss"
+        },
+        "legs_oakd": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "runner": {
+          "finish": "material.finish.fabric"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        },
+        "tumbler": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "legs_oakd",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.bistroSet": {
+      "type": "model",
+      "url": "../../models/dining/bistroSet.glb",
+      "materials": {
+        "bloom_red": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_white": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "legs_black": {
+          "finish": "material.finish.metal"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "legs_black",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_sage",
+          "label": "Seats"
+        }
+      ]
+    },
+    "model.diningGlass": {
+      "type": "model",
+      "url": "../../models/dining/diningGlass.glb",
+      "materials": {
+        "bloom_red": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_white": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "chair_dark": {
+          "finish": "material.finish.metal"
+        },
+        "cutlery": {
+          "finish": "material.finish.satin"
+        },
+        "food": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "legs_chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat_grey": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "tumbler": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "glass",
+          "label": "Top"
+        },
+        {
+          "material": "legs_chrome",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.diningOak": {
+      "type": "model",
+      "url": "../../models/dining/diningOak.glb",
+      "materials": {
+        "bloom_red": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_white": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "cutlery": {
+          "finish": "material.finish.satin"
+        },
+        "food": {
+          "finish": "material.finish.gloss"
+        },
+        "legs_oakd": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "runner": {
+          "finish": "material.finish.fabric"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        },
+        "tumbler": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "legs_oakd",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableSquare2": {
+      "type": "model",
+      "url": "../../models/dining/tableSquare2.glb",
+      "materials": {
+        "legs_oakd": {
+          "finish": "material.finish.wood"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "legs_oakd",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableBistroRound": {
+      "type": "model",
+      "url": "../../models/dining/tableBistroRound.glb",
+      "materials": {
+        "legs_black": {
+          "finish": "material.finish.metal"
+        },
+        "top_white": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_white",
+          "label": "Top"
+        },
+        {
+          "material": "legs_black",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableDining4": {
+      "type": "model",
+      "url": "../../models/dining/tableDining4.glb",
+      "materials": {
+        "legs_oak": {
+          "finish": "material.finish.wood"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "legs_oak",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableDining6": {
+      "type": "model",
+      "url": "../../models/dining/tableDining6.glb",
+      "materials": {
+        "legs_walnut": {
+          "finish": "material.finish.wood"
+        },
+        "top_walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_walnut",
+          "label": "Top"
+        },
+        {
+          "material": "legs_walnut",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableBanquet8": {
+      "type": "model",
+      "url": "../../models/dining/tableBanquet8.glb",
+      "materials": {
+        "legs_banquet": {
+          "finish": "material.finish.wood"
+        },
+        "top_banquet": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_banquet",
+          "label": "Top"
+        },
+        {
+          "material": "legs_banquet",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableRound4": {
+      "type": "model",
+      "url": "../../models/dining/tableRound4.glb",
+      "materials": {
+        "legs_birch": {
+          "finish": "material.finish.wood"
+        },
+        "top_birch": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_birch",
+          "label": "Top"
+        },
+        {
+          "material": "legs_birch",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableSquare8": {
+      "type": "model",
+      "url": "../../models/dining/tableSquare8.glb",
+      "materials": {
+        "legs_black": {
+          "finish": "material.finish.metal"
+        },
+        "top_white_satin": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_white_satin",
+          "label": "Top"
+        },
+        {
+          "material": "legs_black",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableFarmhouse6": {
+      "type": "model",
+      "url": "../../models/dining/tableFarmhouse6.glb",
+      "materials": {
+        "groove": {
+          "finish": "material.finish.wood"
+        },
+        "legs_farm": {
+          "finish": "material.finish.wood"
+        },
+        "top_farm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_farm",
+          "label": "Top"
+        },
+        {
+          "material": "legs_farm",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.tableBarHigh": {
+      "type": "model",
+      "url": "../../models/dining/tableBarHigh.glb",
+      "materials": {
+        "legs_black": {
+          "finish": "material.finish.metal"
+        },
+        "top_black": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "top_black",
+          "label": "Top"
+        },
+        {
+          "material": "legs_black",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.barStool": {
+      "type": "model",
+      "url": "../../models/dining/barStool.glb",
+      "materials": {
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel",
+          "drink": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_sage",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.stoolCounter": {
+      "type": "model",
+      "url": "../../models/dining/stoolCounter.glb",
+      "materials": {
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel",
+          "drink": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_sage",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.stoolBarHigh": {
+      "type": "model",
+      "url": "../../models/dining/stoolBarHigh.glb",
+      "materials": {
+        "cap": {
+          "finish": "material.finish.satin"
+        },
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "legs_black": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel",
+          "drink": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "legs_black",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.diningChair": {
+      "type": "model",
+      "url": "../../models/dining/diningChair.glb",
+      "materials": {
+        "frame_cream": {
+          "finish": "material.finish.satin"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_cream",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_sage",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairWood": {
+      "type": "model",
+      "url": "../../models/dining/chairWood.glb",
+      "materials": {
+        "frame_honey": {
+          "finish": "material.finish.wood"
+        },
+        "seat_honey": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_honey",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_honey",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairUpholstered": {
+      "type": "model",
+      "url": "../../models/dining/chairUpholstered.glb",
+      "materials": {
+        "legs_walnut": {
+          "finish": "material.finish.wood"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "legs_walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "upholstery",
+          "label": "Upholstery"
+        }
+      ]
+    },
+    "model.chairModern": {
+      "type": "model",
+      "url": "../../models/dining/chairModern.glb",
+      "materials": {
+        "legs_black": {
+          "finish": "material.finish.metal"
+        },
+        "shell": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "legs_black",
+          "label": "Frame"
+        },
+        {
+          "material": "shell",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairWindsor": {
+      "type": "model",
+      "url": "../../models/dining/chairWindsor.glb",
+      "materials": {
+        "frame_windsor": {
+          "finish": "material.finish.wood"
+        },
+        "seat_windsor": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_windsor",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_windsor",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairBentwood": {
+      "type": "model",
+      "url": "../../models/dining/chairBentwood.glb",
+      "materials": {
+        "frame_bent": {
+          "finish": "material.finish.wood"
+        },
+        "seat_bent": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_bent",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_bent",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairFolding": {
+      "type": "model",
+      "url": "../../models/dining/chairFolding.glb",
+      "materials": {
+        "cap": {
+          "finish": "material.finish.satin"
+        },
+        "frame_steel": {
+          "finish": "material.finish.metal"
+        },
+        "seat_teal": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_steel",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_teal",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairArm": {
+      "type": "model",
+      "url": "../../models/dining/chairArm.glb",
+      "materials": {
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "seat_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_sage",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.benchDining": {
+      "type": "model",
+      "url": "../../models/dining/benchDining.glb",
+      "materials": {
+        "legs_oakd": {
+          "finish": "material.finish.wood"
+        },
+        "seat_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "legs_oakd",
+          "label": "Frame"
+        },
+        {
+          "material": "seat_oak",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.sideboard": {
+      "type": "model",
+      "url": "../../models/dining/sideboard.glb",
+      "materials": {
+        "body_walnut": {
+          "finish": "material.finish.wood"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cream": {
+          "finish": "material.finish.gloss"
+        },
+        "flute": {
+          "finish": "material.finish.wood"
+        },
+        "top_sideboard": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body_walnut",
+          "label": "Body"
+        },
+        {
+          "material": "top_sideboard",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.buffet": {
+      "type": "model",
+      "url": "../../models/dining/buffet.glb",
+      "materials": {
+        "body_sage": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "legs_oak": {
+          "finish": "material.finish.wood"
+        },
+        "top_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body_sage",
+          "label": "Body"
+        },
+        {
+          "material": "top_oak",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.chinaCabinet": {
+      "type": "model",
+      "url": "../../models/dining/chinaCabinet.glb",
+      "materials": {
+        "back_blue": {
+          "finish": "material.finish.satin"
+        },
+        "body_china": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "plate_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "top_china": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body_china",
+          "label": "Body"
+        },
+        {
+          "material": "top_china",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.barCart": {
+      "type": "model",
+      "url": "../../models/dining/barCart.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_amber": {
+          "finish": "material.finish.glass"
+        },
+        "bottle_green": {
+          "finish": "material.finish.glass"
+        },
+        "bottle_red": {
+          "finish": "material.finish.glass"
+        },
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "frame_brass": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "lemon": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "shaker": {
+          "finish": "material.finish.chrome"
+        },
+        "tray": {
+          "finish": "material.finish.glass"
+        }
+      },
+      "motions": {
+        "uses": {
+          "mix": "shake"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "frame_brass",
+          "label": "Frame"
+        },
+        {
+          "material": "tray",
+          "label": "Trays"
+        }
+      ]
+    }
+  }
+}
