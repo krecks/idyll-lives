@@ -135,8 +135,12 @@ const JOG_BACK = 0.8;
 const GAITS = new Set(['walk', 'jogAlong']);
 const DEFAULT_FADE = 0.25;
 
-/** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
-const SEATS: Record<string, { h: number; fwd: number }> = {
+/**
+ * Seat surface height (m) and forward offset of the hips from the object's centre, per object def;
+ * `back`: the sitter faces the object's back (a dressing table's mirror against the wall), `fwd` still
+ * towards its front.
+ */
+const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
   sofa: { h: 0.44, fwd: -0.1 },
   armchair: { h: 0.42, fwd: -0.02 },
   bench: { h: 0.45, fwd: -0.03 },
@@ -163,7 +167,7 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   armchairLeather: { h: 0.44, fwd: -0.05 },
   armchairDesign: { h: 0.45, fwd: -0.05 },
   pouf: { h: 0.46, fwd: 0 },
-  dressingTable: { h: 0.45, fwd: -0.22 },
+  dressingTable: { h: 0.45, fwd: 0.22, back: true },
   toiletCompact: { h: 0.43, fwd: -0.13 },
   toiletSmart: { h: 0.44, fwd: -0.06 },
   bathtub: { h: 0.25, fwd: 0 },
@@ -198,7 +202,7 @@ function seatOf(def: ObjectDef | undefined, id: string): Seat {
 interface Seat {
   h: number;
   fwd: number;
-  /** Facing the object's back (a pianist at an upright against the wall). */
+  /** Facing the object's back (a dressing table's mirror against the wall, a pianist at an upright); `fwd` is still towards its front. */
   back?: boolean;
   /** Legs stretched out along the seat (a chaise). */
   legsOut?: boolean;
@@ -2090,7 +2094,8 @@ export class Characters {
       let faceYaw = tyaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
-      // A seat facing the object's back (content `seat.facing`): turned round, facing into it.
+      // A seat facing the object's back (`SEATS` `back`, content `seat.facing`): turned round, facing into it (a
+      // dressing table's mirror, an upright piano).
       else if (pose === Pose.Sit && (useObj ?? this.objectAt(rig.x, rig.z))?.seat.back) faceYaw = wrapAngle(tyaw + Math.PI);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;

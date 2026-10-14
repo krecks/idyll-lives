@@ -20,7 +20,7 @@
         "height": 0.42,
         "tiles": 6
       },
-      "radius": 0.23,
+      "radius": 0.17,
       "description": "A blue ceramic lamp with a linen drum shade. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -43,7 +43,7 @@
         "height": 0.4,
         "tiles": 6
       },
-      "radius": 0.29,
+      "radius": 0.15,
       "description": "A white block lamp with a square shade. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -89,7 +89,7 @@
         "height": 0.22,
         "tiles": 4
       },
-      "radius": 0.21,
+      "radius": 0.15,
       "description": "A little dome lamp in coral. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -112,7 +112,7 @@
         "height": 0.15,
         "tiles": 3
       },
-      "radius": 0.18,
+      "radius": 0.12,
       "description": "A black metal lantern with a candle inside. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },

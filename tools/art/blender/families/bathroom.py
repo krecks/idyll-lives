@@ -893,8 +893,9 @@ def bathtubFreestanding():
 # face (`G.settle(centre=False, floor=False)`, `floor=False` on the Model). Mirror glass is a flat piece of
 # the `mirror` material (`gloss`, `'front'`): the game reflects the room in it where the preset has live mirrors
 # (High) and draws it pale gloss elsewhere, as the placeholders' mirrors. The cabinets' doors are parts of
-# their own, hinged on their left edge but still: no use opens them yet (the plan's "(+use)"), so a swing
-# can be added without remodelling.
+# their own, hinged on their left edge. The mirror cabinet's swings open (`door_open`, the mirror with it)
+# while a resident brushes their teeth; the tall cabinet's upper door is still (no use opens it, the plan's
+# "(+use)"; a still part costs no draw call), so a swing can be added without remodelling.
 
 
 def _carcass(F, name, w, h, d, x, y0, z0, material, t=0.016):
@@ -928,8 +929,9 @@ def mirrorCabinet():
         F.box('door', w - 0.02, h - 0.02, 0.02, (0, y0 + h / 2, front + 0.01), M.cab_door, bevel=0.008)
         F.box('door_mirror', 0.48, 0.64, 0.004, (0, y0 + h / 2, front + 0.0235), M.mirror)
         F.box('door_pull', 0.012, 0.1, 0.02, (0.25, y0 + h / 2, front + 0.03), M.cab_door, bevel=0.004)
-    G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
+    door = G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
     G.settle(centre=False, floor=False)
+    G.swing(door, 'door_open', 100, seconds=0.8)
     return G.meshes()
 
 
@@ -958,16 +960,16 @@ def mirrorRound():
 
 def bathCabinetTall():
     F = G.GameFrame()
-    w, d, z0 = 0.42, 0.34, -0.45
+    w, d, z0 = 0.42, 0.34, WALL
     front = z0 + d
     niche = (0.61, 0.86)        # the open shelf between the doors
     with G.new_parts() as still:
-        F.box('plinth', 0.4, 0.06, 0.3, (0, 0.03, -0.29), M.dark, bevel=0.004)
+        F.box('plinth', 0.4, 0.06, 0.3, (0, 0.03, -0.27), M.dark, bevel=0.004)
         _carcass(F, 'cabinet', w, 1.76, d, 0, 0.06, z0, M.cab)
         F.box('niche_floor', w - 0.03, 0.022, d - 0.02, (0, niche[0] + 0.011, z0 + d / 2), M.cab, bevel=0.003)
         F.box('niche_top', w - 0.03, 0.022, d - 0.02, (0, niche[1] - 0.011, z0 + d / 2), M.cab, bevel=0.003)
-        F.box('towel0', 0.3, 0.08, 0.24, (0, niche[0] + 0.065, -0.27), M.towel_blue, bevel=0.03)
-        F.box('towel1', 0.3, 0.08, 0.24, (0, niche[0] + 0.14, -0.27), M.towel_cream, bevel=0.03)
+        F.box('towel0', 0.3, 0.08, 0.24, (0, niche[0] + 0.065, -0.25), M.towel_blue, bevel=0.03)
+        F.box('towel1', 0.3, 0.08, 0.24, (0, niche[0] + 0.14, -0.25), M.towel_cream, bevel=0.03)
         # the lower door (still)
         F.box('door_low', 0.4, niche[0] - 0.08, 0.02, (0, (0.07 + niche[0]) / 2, front + 0.01), M.cab_door, bevel=0.008)
         F.box('pull_low', 0.02, 0.1, 0.02, (0.15, niche[0] - 0.1, front + 0.03), M.chrome, bevel=0.004)
@@ -989,22 +991,22 @@ SHOWER = {'uses': {'shower': 'water_on'}}
 
 FAMILY = G.Family(
     'bathroom', M,
-    [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink',
+    [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink', centre=(0, -0.121),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('metal', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal',
+     G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal', centre=(0, -0.195),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Pedestal'), ('porcelain', 'Basin & cup'), ('chrome', 'Tap')]),
-     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble',
+     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble', centre=(0, -0.149),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('porcelain', 'Basins'), ('chrome', 'Taps & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel',
+     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel', centre=(0, -0.16),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Vanity'), ('stone', 'Worktop'), ('porcelain', 'Bowl'), ('blackmetal', 'Tap'),
                     ('wood', 'Shelf & legs'), ('towel', 'Towels')]),
-     G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole',
+     G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole', centre=(0, -0.188),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Basin'), ('brass', 'Legs & tap'), ('fabric', 'Towel')]),
      G.Model('toilet', toilet, size=(0.44, 0.815, 0.676), key='model.toilet', centre=(0, -0.092),
@@ -1038,11 +1040,12 @@ FAMILY = G.Family(
      G.Model('bathtubFreestanding', bathtubFreestanding, size=(1.895, 0.919, 0.837), key='model.bathtubFreestanding',
              motions=BATH, paint=[('porcelain', 'Tub'), ('chrome', 'Taps'), ('towel', 'Towel')]),
      G.Model('mirrorCabinet', mirrorCabinet, size=(0.56, 0.77, 0.2), key='model.mirrorCabinet',
-             centre=(0, -0.33), floor=False, paint=[('cab', 'Cabinet'), ('cab_door', 'Frame')]),
+             centre=(0, -0.33), floor=False, motions={'uses': {'brushTeeth': 'door_open'}, 'hold': 1.5},
+             paint=[('cab', 'Cabinet'), ('cab_door', 'Frame')]),
      G.Model('mirrorRound', mirrorRound, size=(0.64, 0.772, 0.046), key='model.mirrorRound',
              centre=(0, -0.407), floor=False, paint=[('frame_brass', 'Frame'), ('leather', 'Strap')]),
      G.Model('bathCabinetTall', bathCabinetTall, size=(0.42, 1.82, 0.38), key='model.bathCabinetTall',
-             centre=(0, -0.26), paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
+             centre=(0, -0.24), paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

@@ -8,7 +8,10 @@ of `catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14; t
 until checked in play.
 
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
-`Model`): the machines, the ladder and the basket against the wall, the mat flat and centred.
+`Model`): the machines, the ladder and the basket against the wall, the mat flat and centred. The washer, the
+dryer and the towel ladder were built 3 cm into the wall, as their placeholders; they and the placeholders stand
+on the wall face now (`G.GameFrame(shift=0.03)`, 2026-10-14). The machines keep 4 draw calls (cabinet, door ring,
+door glass, drum): an opaque window would save one, but then the drum can't be seen turning.
 
 ## The washer and the dryer
 

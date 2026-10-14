@@ -430,6 +430,45 @@ def vaseTall():
     return G.meshes()
 
 
+JAR_SIDE = [(0.15, 0.17), (0.27, 0.18), (0.39, 0.16)]   # the ginger jar's radius at heights (its profile)
+
+
+def _jar_radius(y):
+    for (y0, r0), (y1, r1) in zip(JAR_SIDE, JAR_SIDE[1:]):
+        if y <= y1:
+            return r0 + (r1 - r0) * (y - y0) / (y1 - y0)
+    return JAR_SIDE[-1][1]
+
+
+def _sprig(k, a0):
+    """A sprig of blossom painted on the jar's side: a curving stem, three leaves along it and a five-petalled
+    flower at its tip, each a thin shape lying on the porcelain."""
+    pts = []
+    for i in range(5):
+        t = i / 4
+        y = 0.17 + 0.15 * t
+        a = a0 + 0.3 * t + 0.08 * math.sin(math.pi * t)
+        r = _jar_radius(y) + 0.002
+        pts.append(((math.cos(a) * r, math.sin(a) * r, y), a))
+    for i in range(4):
+        G.rod(f'stem{k}_{i}', pts[i][0], pts[i + 1][0], 0.0035, material=M.blue, verts=4)
+
+    def on_side(p, a, along, up):
+        """A point `along` the jar's turn and `up` from `p`, on its side."""
+        return (p[0] - math.sin(a) * along, p[1] + math.cos(a) * along, p[2] + up)
+
+    for i, side in ((1, 1), (2, -1), (3, 1)):   # each leaf from the stem, tipped 50 degrees off it
+        p, a = pts[i]
+        tilt = math.radians(side * 50)
+        G.sphere(f'leaf{k}_{i}', 0.5, at=on_side(p, a, -math.sin(tilt) * 0.02, math.cos(tilt) * 0.02), material=M.blue,
+                 scale=(0.006, 0.014, 0.04), rot=(side * 50, 0, math.degrees(a)), segments=6, rings=4)
+    p, a = pts[4]
+    for j in range(5):
+        b = math.radians(j * 72 + 90)
+        G.sphere(f'petal{k}_{j}', 0.5, at=on_side(p, a, math.cos(b) * 0.011, math.sin(b) * 0.011), material=M.blue,
+                 scale=(0.006, 0.013, 0.013), rot=(0, 0, math.degrees(a)), segments=6, rings=3)
+
+
 def urnPorcelain():
     """A porcelain ginger jar, white with blue bands and sprigs, and its lid."""
     with G.new_parts():
@@ -441,12 +480,7 @@ def urnPorcelain():
         for k, (y, r) in enumerate(((0.012, 0.11), (0.39, 0.16), (0.5, 0.104))):
             G.torus(f'band{k}', r, 0.007, at=(0, 0, y), material=M.blue, major_segments=32, minor_segments=6)
         for k in range(5):
-            a = math.radians(k * 72 + 20)
-            for j, (y, rr, s) in enumerate(((0.22, 0.177, 0.06), (0.3, 0.175, 0.04))):
-                aa = a + j * 0.4
-                for tilt in (-35, 35):   # a sprig: two leaves in a V
-                    G.sphere(f'sprig{k}_{j}_{tilt}', 0.5, at=(math.cos(aa) * rr, math.sin(aa) * rr, y), material=M.blue,
-                             scale=(0.01, s * 0.45, s * 1.5), rot=(tilt, 0, math.degrees(aa)), segments=8, rings=5)
+            _sprig(k, math.radians(k * 72 + 20))
     G.join_all('urnPorcelain')
     G.settle()
     return G.meshes()
@@ -501,7 +535,13 @@ def bustMarble():
 def statueCat():
     """A concrete cat sitting up, its tail curled round its front paws."""
     with G.new_parts():
-        G.sphere('haunch', 0.5, at=(0, 0.05, 0.13), material=M.concrete, scale=(0.28, 0.3, 0.26), segments=20, rings=12)
+        # sitting: the rump, a thigh bulging at either side and the hind feet tucked forward by the front paws
+        G.sphere('rump', 0.5, at=(0, 0.07, 0.12), material=M.concrete, scale=(0.22, 0.26, 0.23), segments=20, rings=12)
+        for s in (-1, 1):
+            G.sphere(f'thigh{s}', 0.5, at=(s * 0.085, 0.03, 0.1), material=M.concrete, scale=(0.11, 0.22, 0.17),
+                     rot=(-20, 0, 0), segments=16, rings=10)
+            G.sphere(f'hind_foot{s}', 0.5, at=(s * 0.1, -0.08, 0.018), material=M.concrete, scale=(0.055, 0.1, 0.036),
+                     segments=10, rings=6)
         G.sphere('chest', 0.5, at=(0, -0.04, 0.26), material=M.concrete, scale=(0.19, 0.18, 0.32), rot=(-12, 0, 0), segments=18, rings=12)
         G.sphere('head', 0.5, at=(0, -0.07, 0.46), material=M.concrete, scale=(0.19, 0.17, 0.16), segments=18, rings=12)
         G.sphere('muzzle', 0.5, at=(0, -0.145, 0.43), material=M.concrete, scale=(0.08, 0.05, 0.05), segments=12, rings=8)
@@ -542,6 +582,27 @@ def statueHorse():
     return G.meshes()
 
 
+COAT_AT, COAT_HEM, COAT_TURN = (0.1, 0.07), 0.97, 30   # where the coat hangs (game x, depth), its hem's height, its turn
+
+
+def _coat(F):
+    """A coat hung by its collar: a body flaring a little to the hem, sleeves hanging at its sides, a collar."""
+    c, turn = F.at(COAT_AT[0], 0, COAT_AT[1]), math.radians(COAT_TURN)
+
+    def at(x, y, h):
+        """A point in the coat's own frame (Blender x across it, y through it, h up from the hem)."""
+        return (c[0] + x * math.cos(turn) - y * math.sin(turn), c[1] + x * math.sin(turn) + y * math.cos(turn), COAT_HEM + h)
+
+    G.revolve('coat', [(0, 0), (0.125, 0), (0.13, 0.015), (0.12, 0.1), (0.108, 0.3), (0.112, 0.45), (0.105, 0.53),
+                       (0.075, 0.585), (0.035, 0.6), (0, 0.6)],
+              at=at(0, 0, 0), material=M.coat, segments=20, scale=(1, 0.45, 1), rot=(0, 0, COAT_TURN))
+    G.sphere('coat_collar', 0.5, at=at(0, 0, 0.585), material=M.coat, scale=(0.13, 0.075, 0.05), rot=(0, 0, COAT_TURN),
+             segments=12, rings=6)
+    for s in (-1, 1):
+        G.rod(f'sleeve{s}', at(s * 0.1, -0.005, 0.53), at(s * 0.12, -0.02, 0.14), 0.026, material=M.coat, verts=10)
+        G.sphere(f'cuff{s}', 0.028, at=at(s * 0.12, -0.02, 0.14), material=M.coat, scale=(1, 1, 0.6), segments=10, rings=6)
+
+
 def coatRack():
     """A turned oak coat stand on four splayed feet, brass hooks, a coat, a scarf and a hat."""
     F = G.GameFrame()
@@ -560,10 +621,7 @@ def coatRack():
             G.rod(f'hook{k}', F.at(0, y, 0), tip, 0.006, material=M.brass, verts=6)
             G.sphere(f'hook_tip{k}', 0.012, at=tip, material=M.brass, segments=8, rings=4)
         # a coat hanging from a hook on the right-front, a scarf on the left, a hat on the top hook
-        G.sphere('coat', 0.5, at=F.at(0.1, 1.28, 0.07), material=M.coat, scale=(0.24, 0.12, 0.62), rot=(0, 0, 30),
-                 segments=16, rings=10)
-        G.sphere('coat_shoulder', 0.5, at=F.at(0.08, 1.56, 0.06), material=M.coat, scale=(0.2, 0.1, 0.1), rot=(0, 0, 30),
-                 segments=12, rings=8)
+        _coat(F)
         F.box('scarf', 0.07, 0.56, 0.018, (-0.1, 1.27, -0.07), M.scarf, rot=(4, 0, -40), bevel=0.006)
         F.cyl('hat_brim', 0.12, 0.012, (-0.09, 1.69, -0.06), M.hat, verts=20)
         F.cone('hat_crown', 0.075, 0.062, 0.09, (-0.09, 1.74, -0.06), M.hat, verts=18)
@@ -602,7 +660,9 @@ def hangingPlant():
                      scale=(0.05, 0.05, length), segments=8, rings=8)
     plant = G.hinged(G.join(parts, 'plant'), F.at(0, CEILING, 0))
     G.settle(floor=False)
-    G.rock(plant, 'sway', 5, seconds=1.6, axis='X')
+    # one sway as it's watered: out (eased) and, played back after the hold, home; a rock (out, past rest and
+    # home) played back would swing it twice
+    G.swing(plant, 'sway', 5, seconds=0.8, axis='X')
     return G.meshes()
 
 
@@ -818,9 +878,9 @@ FAMILY = G.Family(
      G.Model('statueCat', statueCat, size=(0.311, 0.598, 0.41), key='model.statueCat', paint=[('concrete', 'Body')]),
      G.Model('statueHorse', statueHorse, size=(0.46, 1.41, 0.44), key='model.statueHorse',
              paint=[('bronze', 'Body')]),
-     G.Model('coatRack', coatRack, size=(0.417, 1.788, 0.343), key='model.coatRack', paint=[('oak', 'Body')]),
+     G.Model('coatRack', coatRack, size=(0.431, 1.788, 0.355), key='model.coatRack', paint=[('oak', 'Body')]),
      G.Model('hangingPlant', hangingPlant, size=(0.46, 1.83, 0.46), key='model.hangingPlant', floor=False,
-             motions={'uses': {'water': 'sway'}, 'hold': 1.6}, paint=[('pot_white', 'Pot'), ('cord', 'Cord')]),
+             motions={'uses': {'water': 'sway'}, 'hold': 0.8}, paint=[('pot_white', 'Pot'), ('cord', 'Cord')]),
      G.Model('fireplace', fireplace, size=(1.96, 2.8, 0.57), key='model.fireplace', centre=(0, -0.145),
              motions={'uses': {'relax': 'flames'}}, paint=[('surround', 'Surround'), ('oak', 'Mantel')]),
      # D3. Textiles

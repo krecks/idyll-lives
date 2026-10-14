@@ -20,6 +20,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'assets'))
 PREVIEW = os.path.join(HERE, 'previews')
+CONTENT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'content'))
 
 # Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 # placeholders' median and 90th percentile in each class, so a model from Blender costs what the
@@ -32,6 +33,12 @@ EXTENSIONS = {'KHR_materials_emissive_strength', 'KHR_mesh_quantization', 'KHR_t
               'KHR_texture_basisu', 'EXT_meshopt_compression', 'KHR_materials_ior', 'KHR_materials_specular'}
 # Largest texture side (px).
 TEXTURE_MAX = 1024
+# The wall's face lies this far into a footprint's back tile (m): a wall-standing thing's back is there.
+WALL = 0.07
+# A house's floor is drawn 1 cm up: a flat part on the floor must reach this high (m) to show over it.
+FLOOR_TOP = 0.012
+# A use's clip longer than this (s) reads as slow ("about 1 s"); loops and ambient clips keep their own pace.
+USE_CLIP = 3.0
 
 
 def manifests(path):
@@ -77,12 +84,14 @@ def image_size(blob):
     return None
 
 
-def node_matrices(gltf):
-    """(mesh, world matrix (column-major 4x4 list), moving part) per mesh node, for the default scene.
-    The moving part is the nearest node above it (or itself) that an animation moves, or None."""
-    def local(n):
+def node_matrices(gltf, pose=None):
+    """(mesh, world matrix (column-major 4x4 list), moving part, node) per mesh node, for the default scene.
+    The moving part is the nearest node above it (or itself) that an animation moves, or None. `pose`
+    ({node: {'scale': …}}) puts nodes elsewhere than at rest (a part grown, `grown`)."""
+    def local(n, i):
         if 'matrix' in n:
             return n['matrix']
+        n = {**n, **(pose or {}).get(i, {})}
         tx, ty, tz = n.get('translation', [0, 0, 0])
         qx, qy, qz, qw = n.get('rotation', [0, 0, 0, 1])
         sx, sy, sz = n.get('scale', [1, 1, 1])
@@ -101,10 +110,10 @@ def node_matrices(gltf):
     moved = moved_nodes(gltf)
 
     def walk(i, parent, part):
-        m = mul(parent, local(nodes[i]))
+        m = mul(parent, local(nodes[i], i))
         part = i if i in moved else part
         if 'mesh' in nodes[i]:
-            out.append((nodes[i]['mesh'], m, part))
+            out.append((nodes[i]['mesh'], m, part, i))
         for c in nodes[i].get('children', []):
             walk(c, m, part)
     for i in scene.get('nodes', []):
@@ -208,6 +217,15 @@ def check_clips(gltf, binary, entry):
             errors.append(f'`motions` plays {clip!r} ({by}), which is no clip of the file')
     for name in sorted(names - set(plays)):
         warnings.append(f'clip {name!r} plays for no use (name it in the entry\'s `motions`)')
+    # A use's clip plays as the use starts: one much longer than about 1 s reads as slow. Loops, ambient,
+    # night, open and growth clips keep their own pace (a merry-go-round's round, a clock's minute).
+    uses = {c for c, by in plays.items() if by.startswith('use ')} - loops(motions)
+    for a in animations:
+        if a.get('name', '') in uses:
+            length = max((first_value(gltf, binary, s['input'], last=True) or (0,))[0] for s in a['samplers'])
+            if length > USE_CLIP:
+                warnings.append(f'clip {a["name"]!r} takes {length:.1f} s, played by a use: keep a use\'s clip about 1 s '
+                                f'(over {USE_CLIP:g} s, a loop or an ambient clip instead)')
     # A loop goes round from rest to rest: each channel ends where it starts (a turn, either sign).
     # A turn by a whole fraction of a circle (a fan's four blades a quarter round) loops if the part
     # looks the same turned, and a move at an even speed (G.scroll: a belt's slats) if it looks the same
@@ -239,34 +257,271 @@ def check_clips(gltf, binary, entry):
     return errors, warnings
 
 
+def part_turn(p):
+    """A placeholder part's turn as rows (row j: where its own axis j goes), as models.ts `partBox` turns it:
+    Babylon's Quaternion.FromEulerAngles(x, y, z), yaw y, pitch x, roll z."""
+    rx, ry, rz = (math.radians(a) for a in p.get('rotate', [0, 0, 0]))
+    cy, sy_, cp, sp, cr, sr = math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2), math.cos(rz / 2), math.sin(rz / 2)
+    x = cy * sp * cr + sy_ * cp * sr
+    y = sy_ * cp * cr - cy * sp * sr
+    z = cy * cp * sr - sy_ * sp * cr
+    w = cy * cp * cr + sy_ * sp * sr
+    return [[1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (z * x - y * w)],
+            [2 * (x * y - z * w), 1 - 2 * (z * z + x * x), 2 * (y * z + x * w)],
+            [2 * (z * x + y * w), 2 * (y * z - x * w), 1 - 2 * (y * y + x * x)]]
+
+
+def part_box(p):
+    """A placeholder part's exact bounds (lo, hi) in game axes, turned (models.ts `partBox`, which this
+    must match): a box by its corners, a cylinder or cone by its rings' corners (its segments), a sphere,
+    blob, capsule, torus or lathe by the round shape's own extent."""
+    m = part_turn(p)
+    sx, sy, sz = p['size']
+    shape = p.get('shape', 'box')
+    def ellipsoid(k, rx, ry, rz):
+        return math.sqrt((m[0][k] * rx) ** 2 + (m[1][k] * ry) ** 2 + (m[2][k] * rz) ** 2)
+    if shape in ('cylinder', 'cone'):
+        # Babylon's CreateCylinder: rings of `segments` corners from angle 0, scaled in x and z.
+        n = p.get('segments') or (16 if shape == 'cone' else 20)
+        top = p.get('taper', 0 if shape == 'cone' else 1)
+        points = [((r / 2) * sx * math.cos(2 * math.pi * j / n), y, (r / 2) * sz * math.sin(2 * math.pi * j / n))
+                  for r, y in ((1, -sy / 2), (top, sy / 2)) for j in range(n)]
+        lo = [min(sum(q[j] * m[j][k] for j in range(3)) for q in points) for k in range(3)]
+        hi = [max(sum(q[j] * m[j][k] for j in range(3)) for q in points) for k in range(3)]
+        return [p['at'][k] + lo[k] for k in range(3)], [p['at'][k] + hi[k] for k in range(3)]
+    if shape in ('sphere', 'blob'):
+        half = [ellipsoid(k, sx / 2, sy / 2, sz / 2) for k in range(3)]
+    elif shape == 'capsule':
+        # Babylon's CreateCapsule: `sy` tall overall, radius sx/2, then scaled to sz in z.
+        half = [abs(m[1][k]) * max(0.0, sy / 2 - sx / 2) + ellipsoid(k, sx / 2, sx / 2, sz / 2) for k in range(3)]
+    elif shape == 'torus':
+        # A ring (sx - sy across) swept by a tube sy thick, then scaled to sz in z.
+        q, ring, tube = sz / sx, (sx - sy) / 2, sy / 2
+        half = [math.hypot(m[0][k] * ring, m[2][k] * ring * q) + ellipsoid(k, tube, tube, tube * q) for k in range(3)]
+    elif shape == 'lathe':
+        # Each profile point (radius, y) is a ring, scaled by the size.
+        profile = p.get('profile') or [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]]
+        lo = [min(m[1][k] * y * sy - r * math.hypot(m[0][k] * sx, m[2][k] * sz) for r, y in profile) for k in range(3)]
+        hi = [max(m[1][k] * y * sy + r * math.hypot(m[0][k] * sx, m[2][k] * sz) for r, y in profile) for k in range(3)]
+        return [p['at'][k] + lo[k] for k in range(3)], [p['at'][k] + hi[k] for k in range(3)]
+    else:
+        half = [sum(abs(m[j][k]) * p['size'][j] for j in range(3)) / 2 for k in range(3)]
+    return [p['at'][k] - half[k] for k in range(3)], [p['at'][k] + half[k] for k in range(3)]
+
+
 def placeholder_box(parts):
-    """The placeholder's bounds (lo, hi) in game axes, from its parts' boxes as models.ts `partBox`."""
+    """The placeholder's bounds (lo, hi) in game axes, from its parts' exact turned bounds (`part_box`)."""
     lo, hi = [math.inf] * 3, [-math.inf] * 3
     for p in parts:
-        rx, ry, rz = (math.radians(a) for a in p.get('rotate', [0, 0, 0]))
-        # Babylon's Quaternion.FromEulerAngles(x, y, z): yaw y, pitch x, roll z; matrix rows are the turned axes.
-        cy, sy_, cp, sp, cr, sr = math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2), math.cos(rz / 2), math.sin(rz / 2)
-        x = cy * sp * cr + sy_ * cp * sr
-        y = sy_ * cp * cr - cy * sp * sr
-        z = cy * cp * sr - sy_ * sp * cr
-        w = cy * cp * cr + sy_ * sp * sr
-        m = [[1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (z * x - y * w)],
-             [2 * (x * y - z * w), 1 - 2 * (z * z + x * x), 2 * (y * z + x * w)],
-             [2 * (z * x + y * w), 2 * (y * z - x * w), 1 - 2 * (y * y + x * x)]]
-        for k in range(3):
-            half = sum(abs(m[j][k]) * p['size'][j] for j in range(3)) / 2
-            lo[k] = min(lo[k], p['at'][k] - half)
-            hi[k] = max(hi[k], p['at'][k] + half)
+        plo, phi = part_box(p)
+        lo = [min(lo[k], plo[k]) for k in range(3)]
+        hi = [max(hi[k], phi[k]) for k in range(3)]
     return lo, hi
+
+
+def content_objects():
+    """{model key: {'footprint', 'layer', 'outside'}} for the content's objects (web/public/content), for
+    the wall checks: where the wall's face is (a footprint's back, `WALL` in) and what stands against one."""
+    found, categories = {}, {}
+    for root, _dirs, files in os.walk(CONTENT):
+        for name in sorted(files):
+            if not name.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(root, name)) as f:
+                    data = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            for c in data.get('buyCategories') or []:
+                categories[c.get('id')] = c
+            for o in data.get('objects') or []:
+                if isinstance(o, dict) and o.get('model'):
+                    found.setdefault(o['model'], o)
+    out = {}
+    for key, o in found.items():
+        c = categories.get(o.get('category'), {})
+        group = next((g for g in c.get('groups') or [] if g.get('id') == o.get('group')), {})
+        out[key] = {'footprint': o.get('footprint', [1, 1]), 'layer': o.get('layer', 'floor'),
+                    'outside': group.get('outside', c.get('outside', False))}
+    return out
+
+
+def accessor(gltf, binary, index):
+    """Every element of an accessor (floats, or integers read as the spec says: normalised if flagged),
+    as tuples; None if it can't be read here (compressed, sparse)."""
+    acc = gltf['accessors'][index]
+    if 'bufferView' not in acc or acc.get('sparse'):
+        return None
+    view = gltf['bufferViews'][acc['bufferView']]
+    if view.get('extensions'):
+        return None
+    n = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}[acc['type']]
+    fmt, size, top = {5126: ('f', 4, None), 5120: ('b', 1, 127), 5121: ('B', 1, 255), 5122: ('h', 2, 32767),
+                      5123: ('H', 2, 65535), 5125: ('I', 4, None)}[acc['componentType']]
+    stride = view.get('byteStride') or size * n
+    at = view.get('byteOffset', 0) + acc.get('byteOffset', 0)
+    out = [struct.unpack_from(f'<{n}{fmt}', binary, at + k * stride) for k in range(acc['count'])]
+    if acc.get('normalized') and top:
+        out = [tuple(max(v / top, -1.0) for v in e) for e in out]
+    return out
+
+
+def grown(gltf, binary, held=()):
+    """{node: {'scale': …}}: the parts a clip scales up from rest (G.grow: darts, a pot thrown, water), at
+    their largest key, so what is only small or flattened at rest is measured as it shows. Not by the clips
+    `held` names (`open`, `night`: a state of its own, a sofa bed pulled out; the placeholder is at rest)."""
+    nodes, out = gltf.get('nodes', []), {}
+    for a in gltf.get('animations', []):
+        if a.get('name') in held:
+            continue
+        for c in a['channels']:
+            node = c['target'].get('node')
+            if c['target'].get('path') != 'scale' or node is None:
+                continue
+            rest = nodes[node].get('scale', [1, 1, 1])
+            best = max(values(gltf, binary, a['samplers'][c['sampler']]['output']), key=lambda k: sum(abs(v) for v in k))
+            if any(abs(b) > 1.5 * abs(r) + 1e-6 for b, r in zip(best, rest)):
+                if node not in out or sum(map(abs, best)) > sum(map(abs, out[node]['scale'])):
+                    out[node] = {'scale': list(best)}
+    return out
+
+
+def bounds(gltf, pose=None):
+    """(lo, hi, {part: (lo, hi)}): the file's bounds in game axes (glTF x -> game -x, Babylon's loader),
+    from each primitive's box through its node, and each moving part's (None: the still body)."""
+    accessors = gltf.get('accessors', [])
+    lo, hi, parts = [math.inf] * 3, [-math.inf] * 3, {}
+    for mesh_index, m, part, _node in node_matrices(gltf, pose):
+        plo, phi = parts.setdefault(part, ([math.inf] * 3, [-math.inf] * 3))
+        for prim in gltf['meshes'][mesh_index]['primitives']:
+            pos = accessors[prim['attributes']['POSITION']]
+            for cx in (pos['min'][0], pos['max'][0]):
+                for cy in (pos['min'][1], pos['max'][1]):
+                    for cz in (pos['min'][2], pos['max'][2]):
+                        q = [-(m[0] * cx + m[4] * cy + m[8] * cz + m[12]), m[1] * cx + m[5] * cy + m[9] * cz + m[13],
+                             m[2] * cx + m[6] * cy + m[10] * cz + m[14]]
+                        for k in range(3):
+                            lo[k], hi[k] = min(lo[k], q[k]), max(hi[k], q[k])
+                            plo[k], phi[k] = min(plo[k], q[k]), max(phi[k], q[k])
+    return lo, hi, parts
+
+
+def flattened_in_view(gltf, binary, opaque):
+    """[(part, share of it in view)] for the parts flattened to nothing at rest (a node scaled under 0.01
+    along an axis, G.grow from 0.001): it still shows as a flat shape, if it's 3 cm across or more, where its
+    flattened plane isn't inside something opaque (`opaque(material index)`), as the dartboard's flights did as crosses on its face. Each
+    of its points is looked from along the flattened axis both ways: inside a solid, the nearest face either
+    way is one leaving it (its normal, from the winding, pointing on)."""
+    nodes = gltf.get('nodes', [])
+    moved = moved_nodes(gltf)
+    flat = {i: min(range(3), key=lambda k: abs(nodes[i].get('scale', [1, 1, 1])[k])) for i in moved
+            if 'mesh' in nodes[i] and min(abs(v) for v in nodes[i].get('scale', [1, 1, 1])) < 0.01}
+    if not flat:
+        return []
+    placed = node_matrices(gltf)
+    def apply(m, v):
+        return [m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13],
+                m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14]]
+    def det(m):
+        return (m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]))
+    # Every opaque triangle of the model at rest: (a, edge1, edge2, normal), with the node it belongs to.
+    tris = []
+    for mesh_index, m, _part, node in placed:
+        sign = 1 if det(m) >= 0 else -1
+        for prim in gltf['meshes'][mesh_index]['primitives']:
+            if prim.get('mode', 4) != 4 or not opaque(prim.get('material')):
+                continue
+            pos = accessor(gltf, binary, prim['attributes']['POSITION'])
+            idx = accessor(gltf, binary, prim['indices']) if 'indices' in prim else [(k,) for k in range(len(pos or []))]
+            if pos is None or idx is None:
+                return []
+            world = [apply(m, v) for v in pos]
+            for k in range(0, len(idx) - 2, 3):
+                a, b, c = world[idx[k][0]], world[idx[k + 1][0]], world[idx[k + 2][0]]
+                e1 = [b[j] - a[j] for j in range(3)]
+                e2 = [c[j] - a[j] for j in range(3)]
+                nrm = [sign * (e1[1] * e2[2] - e1[2] * e2[1]), sign * (e1[2] * e2[0] - e1[0] * e2[2]), sign * (e1[0] * e2[1] - e1[1] * e2[0])]
+                tris.append((node, a, e1, e2, nrm))
+    def cast(p, d, faces):
+        """The nearest face each way along d from p (Möller-Trumbore): {1: …, -1: …}, each (distance, whether
+        it is a face leaving a solid that way)."""
+        near = {1: (math.inf, False), -1: (math.inf, False)}
+        for _n, a, e1, e2, nrm in faces:
+            h = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]]
+            det_ = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2]
+            if abs(det_) < 1e-12:
+                continue
+            s = [p[j] - a[j] for j in range(3)]
+            u = (s[0] * h[0] + s[1] * h[1] + s[2] * h[2]) / det_
+            if u < 0 or u > 1:
+                continue
+            q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]]
+            v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) / det_
+            if v < 0 or u + v > 1:
+                continue
+            t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det_
+            way = 1 if t > 0 else -1
+            if 1e-4 < abs(t) < near[way][0]:
+                near[way] = (abs(t), (nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2]) * way > 0)
+        return near
+
+    out = []
+    for node, axis in sorted(flat.items()):
+        m = next(mm for _mi, mm, _p, n in placed if n == node)
+        d = m[axis * 4:axis * 4 + 3]
+        length = math.sqrt(sum(v * v for v in d)) or 1
+        d = [v / length for v in d]
+        points = []
+        for prim in gltf['meshes'][nodes[node]['mesh']]['primitives']:
+            pos = accessor(gltf, binary, prim['attributes']['POSITION'])
+            if pos is None:
+                return out
+            points += [apply(m, v) for v in pos]
+        if not points:
+            continue
+        # Its flat shape's two sides (across its plane, along its own main lines): one under 3 cm across, or
+        # a sliver under 1 cm (a stream's end, a painting's edge before it spreads), hardly shows.
+        u = [0, 1, 0] if abs(d[1]) < 0.9 else [1, 0, 0]
+        u = [u[k] - d[k] * sum(u[j] * d[j] for j in range(3)) for k in range(3)]
+        u = [v / math.sqrt(sum(w * w for w in u)) for v in u]
+        w = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]]
+        flat2 = [(sum(q[k] * u[k] for k in range(3)), sum(q[k] * w[k] for k in range(3))) for q in points]
+        mu = [sum(c[k] for c in flat2) / len(flat2) for k in range(2)]
+        cxx = sum((c[0] - mu[0]) ** 2 for c in flat2)
+        cyy = sum((c[1] - mu[1]) ** 2 for c in flat2)
+        cxy = sum((c[0] - mu[0]) * (c[1] - mu[1]) for c in flat2)
+        angle = 0.5 * math.atan2(2 * cxy, cxx - cyy)
+        axes = [(math.cos(angle), math.sin(angle)), (-math.sin(angle), math.cos(angle))]
+        side = sorted(max(c[0] * a[0] + c[1] * a[1] for c in flat2) - min(c[0] * a[0] + c[1] * a[1] for c in flat2) for a in axes)
+        if side[0] < 0.01 or side[1] < 0.03:
+            continue
+        points = points[::max(1, len(points) // 24)]
+        others = [t for t in tris if t[0] != node]
+        shown = 0
+        for p in points:
+            # Hidden inside a solid (the nearest face either way along its flattened axis leaves one), or,
+            # lying level, under something (the game looks from above: glTF +y; a shower head's rain).
+            near = cast(p, d, others)
+            if near[1][1] and near[-1][1]:
+                continue
+            if abs(d[1]) > 0.7 and cast(p, [0, 1, 0], others)[1][0] < math.inf:
+                continue
+            shown += 1
+        if shown / len(points) > 0.25:
+            out.append((nodes[node].get('name', node), shown / len(points)))
+    return out
 
 
 # The finishes that are see-through (`alpha` under 1, the glass), filled as the manifests are read.
 SEE_THROUGH = set()
 
 
-def check(entry, finishes, path, far=None):
-    """(errors, warnings, summary) for one model entry and its file (and its far version's, at `far`)."""
-    errors, warnings, info = check_file(entry, finishes, path)
+def check(entry, finishes, path, far=None, facts=None):
+    """(errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
+    `facts`: its content's (`content_objects`)."""
+    errors, warnings, info = check_file(entry, finishes, path, facts)
     summary = f'{info["size"] / 1024:6.1f} KB {info["tris"]:6d} tris {info["draws"]} draws {info["materials"]:2d} materials  ' \
               + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m'
     if info['clips']:
@@ -282,6 +537,10 @@ def check(entry, finishes, path, far=None):
                 far_errors.append('has clips: a far version stands still')
             if far_info['tris'] > info['tris'] / 2:
                 far_warnings.append(f'{far_info["tris"]} triangles, over half the full model\'s {info["tris"]} (aim for a quarter)')
+            # It stands where the model stands: decimating can drop the lowest points and lift it off the floor.
+            if abs(far_info['lo'][1] - info['lo'][1]) > 0.005:
+                far_errors.append(f'its lowest point is {(far_info["lo"][1] - info["lo"][1]) * 100:+.1f} cm off the full model\'s: '
+                                  'a far version stands on the floor as the model does (G.far_of, or far= keeps the floor)')
             if any(abs(a - b) > max(0.05 * b, 0.02) for a, b in zip(far_info['dims'], info['dims'])):
                 far_warnings.append(' x '.join(f'{d:.2f}' for d in far_info['dims']) + ' m, the full model ' + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m')
             summary += f'  (far: {far_info["tris"]} tris)'
@@ -291,8 +550,8 @@ def check(entry, finishes, path, far=None):
     return errors, warnings, summary
 
 
-def check_file(entry, finishes, path):
-    """(errors, warnings, numbers) for one model entry and a file of it."""
+def check_file(entry, finishes, path, facts=None):
+    """(errors, warnings, numbers) for one model entry and a file of it; `facts`: its content's (`content_objects`)."""
     errors, warnings = [], []
     gltf, binary, size = read_glb(path)
     required = set(gltf.get('extensionsRequired', []))
@@ -338,7 +597,7 @@ def check_file(entry, finishes, path):
     # Per problem, the materials that have it.
     flags = {k: set() for k in ('unmapped', 'double', 'blend', 'emissive', 'uvs')}
     # Draw calls: one per finish group, the still body's and each moving part's apart.
-    for mesh_index, m, part in node_matrices(gltf):
+    for mesh_index, m, part, _node in node_matrices(gltf):
         for prim in gltf['meshes'][mesh_index]['primitives']:
             if prim.get('mode', 4) != 4:
                 errors.append('a primitive that is not triangles')
@@ -400,6 +659,13 @@ def check_file(entry, finishes, path):
     scale = 1 if entry.get('fit') else entry.get('scale', 1)
     lo, hi = [v * scale for v in lo], [v * scale for v in hi]
     dims = [hi[k] - lo[k] for k in range(3)]
+    # As it shows: the parts a clip grows (hidden or small at rest: darts, a pot thrown) grown, for what
+    # is compared with the placeholder (sizes, centre, the wall).
+    motions = entry.get('motions') or {}
+    slo, shi, sparts = bounds(gltf, grown(gltf, binary, {motions.get('open'), motions.get('night')}))
+    slo, shi = [v * scale for v in slo], [v * scale for v in shi]
+    sdims = [shi[k] - slo[k] for k in range(3)]
+    layer = (facts or {}).get('layer', 'floor')
     if not entry.get('fit') and not entry.get('offset'):
         # Centred on the footprint, or where its placeholder is (a wall bed at the back of its tiles).
         plo, phi = placeholder_box(entry['placeholder']) if entry.get('placeholder') else ([0] * 3, [0] * 3)
@@ -408,15 +674,48 @@ def check_file(entry, finishes, path):
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
         for k, axis in ((0, 'x'), (2, 'z')):
-            c = (lo[k] + hi[k]) / 2
+            c = (slo[k] + shi[k]) / 2
             if abs(c) > 0.02 and abs(c - (plo[k] + phi[k]) / 2) > 0.02:
-                warnings.append(f'off centre by {c * 100:.1f} cm in {axis} (origin at the footprint centre, or its placeholder\'s)')
+                warnings.append(f'off centre by {c * 100:.1f} cm in {axis}: centred on (x {(slo[0] + shi[0]) / 2:.3f}, depth {(slo[2] + shi[2]) / 2:.3f}), '
+                                f'its placeholder on ({(plo[0] + phi[0]) / 2:.3f}, {(plo[2] + phi[2]) / 2:.3f}) (origin at the footprint centre, or its placeholder\'s)')
+        # Against a wall: the wall's face is `WALL` into the footprint's back tile. A wall thing, or a floor
+        # thing indoors whose placeholder stands there, has its back on it, the model's and the placeholder's.
+        # (A rug lies under the wall: it may reach in.)
+        if facts and (layer == 'wall' or (layer == 'floor' and not facts['outside'])):
+            face = -facts['footprint'][1] / 2 + WALL
+            if slo[2] < face - 0.01:
+                warnings.append(f'reaches {(face - slo[2]) * 100:.1f} cm into the wall (its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f})')
+            if entry.get('placeholder'):
+                if plo[2] < face - 0.01:
+                    warnings.append(f'its placeholder reaches {(face - plo[2]) * 100:.1f} cm into the wall (its back at depth {plo[2]:.3f}, the wall\'s face at {face:.2f})')
+                if plo[2] <= face + 0.03 and slo[2] > max(plo[2], face) + 0.02:
+                    warnings.append(f'stands {(slo[2] - max(plo[2], face)) * 100:.1f} cm off the wall, where its placeholder stands against it '
+                                    f'(its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f}; README trap "Against a wall, on the floor")')
+        # Thin on the floor: a house's floor hides what lies under `FLOOR_TOP` (a mat, a belt), the whole
+        # model or a moving part (as it shows, grown).
+        if layer in ('floor', 'rug') and lo[1] <= 0.005:
+            flat = [(None, shi[1])] if shi[1] < FLOOR_TOP else []
+            flat += [(part, b[1][1] * scale) for part, b in sparts.items() if part is not None and b[1][1] * scale < FLOOR_TOP]
+            for part, top in flat:
+                what = 'it' if part is None else f'moving part {gltf["nodes"][part].get("name", part)}'
+                warnings.append(f'{what} reaches only {top * 100:.1f} cm up: a house\'s floor is drawn 1 cm up and hides it (make it reach {FLOOR_TOP * 100:.1f} cm)')
     if entry.get('placeholder') and not entry.get('fit'):
         plo, phi = placeholder_box(entry['placeholder'])
         for k, axis in enumerate('xyz'):
             want = phi[k] - plo[k]
-            if want > 0.05 and abs(dims[k] - want) > 0.1 * want:
-                warnings.append(f'{axis} size {dims[k]:.2f} m, its placeholder {want:.2f} m (fallback, picking and shadow follow the placeholder)')
+            if want > 0.05 and abs(sdims[k] - want) > 0.1 * want:
+                warnings.append(f'{axis} size {sdims[k]:.2f} m, its placeholder {want:.2f} m (only the fallback, drawn if the file fails to load, '
+                                'has the placeholder\'s size: clicking follows the drawn model, the contact shadow the footprint)')
+    # Parts flattened to nothing at rest whose flat shape shows (README trap "Grown from nothing").
+    def opaque(index):
+        mat = materials[index] if index is not None else {'name': ''}
+        ov = overrides.get(mat.get('name', ''), named_finish(mat.get('name', '')) or overrides.get('*'))
+        if ov and ov.get('hide'):
+            return False
+        return ov['finish'] not in SEE_THROUGH if ov and ov.get('finish') else mat.get('alphaMode') != 'BLEND'
+    for name, share in flattened_in_view(gltf, binary, opaque):
+        warnings.append(f'{name} lies flattened at rest with {share:.0%} of it outside anything opaque, so its flat shape shows: '
+                        'put its origin inside something opaque (README trap "Grown from nothing")')
 
     # Budgets.
     side = max(dims)
@@ -440,7 +739,7 @@ def check_file(entry, finishes, path):
             errors.append(f'texture {i} is {wh[0]}x{wh[1]}, at most {TEXTURE_MAX} px a side')
         warnings.append(f'texture {i} ({img.get("name", img.get("uri", "embedded"))}): a texture of its own, prefer the game\'s finishes')
 
-    info = {'size': size, 'tris': tris, 'draws': len(groups), 'materials': len(materials), 'dims': dims,
+    info = {'size': size, 'tris': tris, 'draws': len(groups), 'materials': len(materials), 'dims': dims, 'lo': lo,
             'clips': len(gltf.get('animations', [])), 'moving': len(moved_nodes(gltf))}
     return errors, warnings, info
 
@@ -449,6 +748,7 @@ def main(argv):
     keys = [a for a in argv if a.startswith('model.')]
     stack = manifests(os.path.join(ASSETS, 'manifest.json'))
     entries, finishes, stale = {}, {}, {}
+    facts = content_objects()
     for path, m in stack:
         for key, entry in m['entries'].items():
             if entry.get('type') == 'model':
@@ -473,7 +773,7 @@ def main(argv):
         path = os.path.normpath(os.path.join(os.path.dirname(manifest), url))
         far = os.path.normpath(os.path.join(os.path.dirname(manifest), entry['far'])) if entry.get('far') else None
         try:
-            errors, warnings, summary = check(entry, finishes, path, far)
+            errors, warnings, summary = check(entry, finishes, path, far, facts.get(key))
         except (OSError, ValueError, KeyError, IndexError) as err:
             errors, warnings, summary = [f'cannot read {path}: {err}'], [], ''
         if key in stale:

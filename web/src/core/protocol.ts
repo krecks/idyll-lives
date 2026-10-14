@@ -21,12 +21,16 @@ export type Command =
   | { type: 'setAutonomy'; enabled: boolean; household?: number }
   | { type: 'setLifespan'; lifespan: Lifespan }
   | { type: 'setPlayerMoves'; enabled: boolean }
+  /** Tests and `?debug` only (`__addFunds`): money for a household (negative takes it away, down to 0). */
+  | { type: 'addFunds'; household: number; amount: number }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number; seen?: Seen }
   /** Eat a serving of food (an item), or clear it away to the sink. */
   | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
+  /** A lamp switched on or off (sim-core `lights.rs`): at once, nobody walks over. */
+  | { type: 'switchLamp'; object: number; on: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
@@ -832,6 +836,8 @@ export type FromWorker =
   | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
   /** Food and dishes, whenever they change (`ItemPlacement`). */
   | { type: 'items'; items: ItemPlacement[] }
+  /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
+  | { type: 'lamps'; off: number[] }
   | { type: 'ui'; ui: UiUpdate }
   | { type: 'saved'; requestId: number; data: string }
   | { type: 'socialOptions'; requestId: number; options: SocialOption[] }

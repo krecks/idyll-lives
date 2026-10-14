@@ -354,7 +354,10 @@ def wallLightOutdoor():
         F.box('plate', 0.2, 0.3, 0.03, (0, 2.01, WALL + 0.015), M.iron, bevel=0.012)
         G.torus('frame', 1.0, 0.11, at=F.at(0, 2.01, WALL + 0.03), material=M.iron, rot=(90, 0, 0),
                 major_segments=28, minor_segments=5).scale = (0.074, 0.12, 0.12)
-        F.sphere('lens', 1.0, (0, 2.01, WALL + 0.03), M.lens, scale=(0.075, 0.06, 0.125), segments=20, rings=10)
+        lens = F.sphere('lens', 1.0, (0, 2.01, WALL + 0.03), M.lens, scale=(0.075, 0.06, 0.125), segments=20, rings=10)
+        for v in lens.data.vertices:      # its back half, hidden in the plate, flattened onto the wall face
+            if v.co.y > 0:
+                v.co.y *= 0.5
         _bulb(F, 'wallLightOutdoor', 0.035, (0, 2.01, -0.38), scale=(1, 0.8, 1.2), segments=10, rings=6)
         F.box('hood', 0.22, 0.025, 0.11, (0, 2.175, WALL + 0.055), M.iron, bevel=0.008)
         # the cage, just clear of the lens: a vertical bar and three cross bars on two side posts
@@ -605,11 +608,12 @@ FAMILY = G.Family(
         centre=(0, -0.295)),
      _m('wallLampArm', wallLampArm, (0.2, 0.296, 0.424), [('iron', 'Body'), ('shade_metal', 'Shade')], floor=False,
         centre=(0, -0.218)),
-     _m('wallLightOutdoor', wallLightOutdoor, (0.22, 0.327, 0.14), [('iron', 'Body'), ('lens', 'Shade')], floor=False,
-        centre=(0, -0.39)),
+     _m('wallLightOutdoor', wallLightOutdoor, (0.22, 0.327, 0.11), [('iron', 'Body'), ('lens', 'Shade')], floor=False,
+        centre=(0, -0.375)),
      _m('lamp', lamp, (0.45, 1.808, 0.45), [('stand', 'Stand'), ('lamp_shade', 'Shade'), ('brass', 'Fittings')]),
      _m('floorLampSimple', floorLampSimple, (0.28, 1.6, 0.28), [('iron', 'Stand'), ('shade', 'Shade')]),
-     _m('lampFloorArc', lampFloorArc, (0.85, 1.861, 0.81), [('arc', 'Stand'), ('arc_shade', 'Shade'), ('marble', 'Base')]),
+     _m('lampFloorArc', lampFloorArc, (0.85, 1.861, 0.81), [('arc', 'Stand'), ('arc_shade', 'Shade'), ('marble', 'Base')],
+        centre=(0, -0.025)),   # its base's back on the wall face
      _m('lampFloorTripod', lampFloorTripod, (0.554, 1.614, 0.557), [('walnut', 'Stand'), ('linen', 'Shade')]),
      _m('lampTorchiere', lampTorchiere, (0.4, 1.85, 0.4), [('brass', 'Stand'), ('bowl', 'Shade'), ('iron', 'Base')]),
      _m('tableLamp', tableLamp, (0.66, 0.92, 0.42), [('ceramic', 'Base'), ('shade', 'Shade'), ('oak', 'Table')]),

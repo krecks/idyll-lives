@@ -2051,7 +2051,7 @@
         ],
         "at": [
           0,
-          -0.24
+          -0.205
         ]
       },
       "interactions": []
@@ -2467,7 +2467,21 @@
       "layer": "wall",
       "decor": 0.2,
       "description": "A mirrored cabinet for above the basin.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 4,
+          "effects": {
+            "hygiene": 0.05
+          },
+          "tags": [
+            "hygiene"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "towelRail",
@@ -4010,7 +4024,8 @@
         "range": 4.0,
         "intensity": 0.8,
         "height": 0.7,
-        "tiles": 6
+        "tiles": 6,
+        "switch": false
       },
       "seat": {
         "height": 0.42,
@@ -4052,7 +4067,7 @@
       "light": {
         "range": 5.0,
         "intensity": 1.0,
-        "height": 2.1,
+        "height": 1.9,
         "tiles": 16
       },
       "description": "A frosted globe on a long cord.",
@@ -4379,7 +4394,8 @@
         "range": 4.0,
         "intensity": 0.8,
         "height": 0.5,
-        "tiles": 8
+        "tiles": 8,
+        "switch": false
       },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [

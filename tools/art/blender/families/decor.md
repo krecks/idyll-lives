@@ -12,12 +12,19 @@ Each is built where its placeholder stands (`F`, game axes):
 - **The hanging plant** hangs from the ceiling (2.8 m), centred, `floor=False`.
 - **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
   sit on the bench, the fire behind them (content `seat`: height 0.42, forward 0.02; the fire's `light.height` 0.7).
-- **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face. Their placeholders
-  reach 2–5 cm into the wall, so `check_glb.py` warns that they're off its centre (and the curtains, whose rail
-  brackets now reach the wall). Those warnings are expected.
+- **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face, and so do their
+  placeholders (moved forward 4 and 5 cm, 2026-10-14), and the curtains' (moved back 5 cm onto it, where the
+  models' rail brackets reach). The fireplace's placeholder is redrawn as the model: the chimney breast round a
+  dark firebox over the raised hearth bench, so a resident warming up sits on it if the file fails to load.
 - **The rest** stand centred on their tile, or lie flat (the rugs).
+- **Details** (2026-10-14): the ginger jar's blue sprigs are painted-on blossom sprigs (a curving stem, three leaves,
+  a five-petalled flower; `_sprig`), not V-shaped pairs that read as crosses; the cat sits on its rump with a thigh
+  bulging at either side and its hind feet tucked forward, not on one ball; the coat on the stand hangs by its
+  collar, flaring a little to the hem, its sleeves at its sides (`_coat`), not a capsule.
 
-The pictures are flat colour shapes (matte, one draw call with the frame), not textures.
+The pictures are flat colour shapes (matte, one draw call with the frame), not textures. Kept so (2026-10-14): a
+512 px painted texture would be a draw call of its own on each picture (1 to 2) and a download, for art seen
+small from the game camera, on a wall thing most houses have several of. Revisit for a close-up view.
 
 ## What moves
 
@@ -26,7 +33,7 @@ The pictures are flat colour shapes (matte, one draw call with the frame), not t
 | `wallClock` | `hands` | ambient (`idle`) | the red second hand goes round clockwise, one turn in 60 s (a clock's minute, so longer than the usual 1 s); the hour and minute hands stay at ten past ten |
 | `grandfatherClock` | `door_open` | use `wind`, `hold` 2.5 s | the trunk door (a walnut frame round an open window) swings 100° on its left hinge |
 | | `pendulum` | ambient (`idle`) | the pendulum swings 7° each way, 2 s a swing (`G.rock`) |
-| `hangingPlant` | `sway` | use `water`, `hold` 1.6 s | the plant, pot and hanger swing 5° about the ceiling hook and back (`G.rock`); played back after the hold, so it sways twice and settles |
+| `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`G.swing`, eased) and, played back after the hold, home: one sway (it was a `G.rock`, which played back swung twice) |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`G.grow`) for the whole use; the light is the content's |
 | `curtains`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`G.squash` in x, about the rail end) |
 
@@ -44,12 +51,12 @@ are their own fabric, so the moving panels cost one draw call each.
 | `model.wallShelf` | 0.90 × 0.66 × 0.24 m | 2,220 | 3 | Shelves |
 | `model.grandfatherClock` | 0.60 × 2.12 × 0.40 m | 2,752 | 4 | Case, Face |
 | `model.vaseTall` | 0.33 × 1.27 × 0.23 m | 1,040 | 2 | Body |
-| `model.urnPorcelain` | 0.36 × 0.62 × 0.36 m | 3,392 | 1 | Body |
+| `model.urnPorcelain` | 0.36 × 0.62 × 0.36 m | 3,492 | 1 | Body |
 | `model.vasePedestal` | 0.40 × 1.60 × 0.40 m | 1,612 | 2 | Vase, Pedestal |
 | `model.bustMarble` | 0.44 × 1.54 × 0.44 m | 1,932 | 1 | Bust, Plinth |
-| `model.statueCat` | 0.31 × 0.60 × 0.41 m | 2,144 | 1 | Body |
+| `model.statueCat` | 0.31 × 0.60 × 0.41 m | 2,920 | 1 | Body |
 | `model.statueHorse` | 0.46 × 1.41 × 0.44 m | 1,232 | 2 | Body |
-| `model.coatRack` | 0.42 × 1.79 × 0.34 m | 2,040 | 3 | Body |
+| `model.coatRack` | 0.43 × 1.79 × 0.36 m | 2,336 | 3 | Body |
 | `model.hangingPlant` | 0.46 × 1.83 × 0.46 m | 2,032 | 3 | Pot, Cord |
 | `model.fireplace` | 1.96 × 2.80 × 0.57 m | 2,648 | 3 | Surround, Mantel |
 | `model.curtains` | 0.99 × 1.52 × 0.10 m | 1,716 | 3 | Fabric, Rail |

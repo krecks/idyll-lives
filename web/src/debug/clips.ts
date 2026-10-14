@@ -14,7 +14,8 @@
  * URL: `?keys=model.fridge,model.sink` (which models; default every model whose entry has `motions`),
  * `?clip=water_on` (only that clip), `?t=0.2` (hold every clip at that time, for screenshots),
  * `?cols=4` (models a row), `?colors=body:%23c46b4a,stone:%232f3236` (the parts' colours),
- * `?renderer=webgl` (WebGL2; default WebGPU), `?alpha=…&beta=…&radius=…` (the camera), `?labels=0`.
+ * `?renderer=webgl` (WebGL2; default WebGPU), `?alpha=…&beta=…&radius=…` (the camera), `?target=1.6`
+ * (the height it looks at; `?target=x,y,z` a point), `?labels=0`.
  * From the console: `__clips.set(t)` holds every clip at `t`, `__clips.play()` lets them run again,
  * `__clips.solo('name')` plays only that clip (`solo(null)`: all).
  */
@@ -300,10 +301,17 @@ for (const name of ['', ...new Set(benches.flatMap((b) => b.clips.map((c) => c.n
 }
 setSolo(solo);
 
-// From the front (models face +z), a little above, everything in view.
+// From the front (models face +z), a little above, everything in view: at most 0.75 m up for things
+// on the floor, at the middle of things that all hang higher (on a wall), or at `target`.
 const tallest = Math.max(1, ...benches.map((b) => b.template.height));
+const top = Math.max(...benches.map((b) => b.template.height));
+const lowest = Math.min(...benches.map((b) => b.template.bottom ?? 0));
+const aim = new Vector3(0, lowest > 0.3 ? (lowest + top) / 2 : Math.min(0.75, tallest / 2), 0);
+const target = params.get('target')?.split(',').map(Number);
+if (target?.length === 1) aim.y = target[0];
+else if (target?.length === 3) aim.set(target[0], target[1], target[2]);
 const radius = Number(params.get('radius')) || Math.max(2.6, widest * 0.75 + depth * 0.8 + tallest * 0.4);
-const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? Math.PI / 2), Number(params.get('beta') ?? 1.1), radius, new Vector3(0, Math.min(0.75, tallest / 2), 0), scene);
+const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? Math.PI / 2), Number(params.get('beta') ?? 1.1), radius, aim, scene);
 camera.attachControl(canvas, true);
 camera.minZ = 0.02;
 camera.wheelPrecision = 20;

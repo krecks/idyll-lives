@@ -120,6 +120,8 @@ pub struct ObjectInstance {
     /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
     /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
     pub growth: f32,
+    /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
+    pub off: bool,
 }
 
 /// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer
@@ -1039,6 +1041,10 @@ pub struct World {
     pub(crate) view: Option<[i32; 4]>,
     /// Per plot: watched this tick (see `lod::plan`).
     pub(crate) watched: Vec<bool>,
+    /// Bumped when a lamp is switched on or off (see `lights.rs`); not a structure change.
+    pub(crate) lights_version: u32,
+    /// What residents switching lights saw last (see `lights::update`).
+    pub(crate) light_watch: crate::lights::Watch,
 }
 
 /// Read-only context for one Sim's update.
@@ -1251,12 +1257,19 @@ impl World {
             lod: true,
             view: None,
             watched: Vec::new(),
+            lights_version: 0,
+            light_watch: Default::default(),
         }
     }
 
     /// Bumped whenever walls or objects change, so renderers know to rebuild.
     pub fn structure_version(&self) -> u32 {
         self.structure_version
+    }
+
+    /// Bumped whenever a lamp is switched (see `lights::lamps_off`).
+    pub fn lights_version(&self) -> u32 {
+        self.lights_version
     }
 
     /// Changes whenever the lot does (see `lot_version`); never while only objects move.
@@ -1338,6 +1351,7 @@ impl World {
             open: false,
             // A crop comes ripe (as the catalog shows it).
             growth: 1.0,
+            off: false,
         };
         let name = &self.content.objects[def].id;
         let layer = self.content.objects[def].layer;
@@ -2279,6 +2293,7 @@ impl World {
         crate::lifecycle::update(self);
         crate::planner::update(self);
         crate::cooking::after_step(self);
+        crate::lights::update(self);
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }
@@ -2340,6 +2355,7 @@ impl World {
             Command::SetSpeed { .. }
                 | Command::SetLifespan { .. }
                 | Command::SetPlayerMoves { .. }
+                | Command::AddFunds { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -2478,6 +2494,10 @@ impl World {
             }
             Command::SetLifespan { lifespan } => self.lifespan = lifespan,
             Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
+            Command::AddFunds { household, amount } => {
+                let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
+                h.funds = (h.funds + amount).max(0);
+            }
             Command::Adopt { household, child } => {
                 crate::lifecycle::adopt(self, household, child)?;
             }
@@ -2492,6 +2512,13 @@ impl World {
                         h.free_will = enabled;
                     }
                 }
+            }
+            Command::SwitchLamp { object, on } => {
+                let obj = self.objects.get(object as usize).ok_or_else(|| Error::new(format!("unknown object {object}")))?;
+                if !crate::lights::switchable(self, obj.def) {
+                    return Err(Error::new(format!("the {} has no switch", self.content.objects[obj.def].name.to_lowercase())));
+                }
+                crate::lights::set(self, object, on);
             }
             Command::Use {
                 sim,

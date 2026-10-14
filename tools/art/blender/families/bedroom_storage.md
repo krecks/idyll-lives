@@ -10,11 +10,11 @@ by the existing `model.<id>` keys. They replace the primitive-part placeholders 
 
 - **Built in place.** The parts are placed in game axes with no shift (`F = G.GameFrame()`), where each
   placeholder stands, and settled with `G.settle(centre=False)` and `centre=` on each `Model`. Most stand at the
-  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several placeholders reach
+  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several placeholders reached
   3.5–7 cm into the wall (the nightstand and lamp nightstand to -0.465, the tall chest and low dresser to -0.48,
-  the armoire to -0.50); the models stop at the wall face, so `check_glb.py` warns that those five are off centre
-  from their placeholders (by 2.7–4.4 cm). The drum nightstand, hamper, chest and bench stand where their
-  placeholders do.
+  the armoire to -0.50); they stand on the wall face now too (2026-10-14; the armoire's and the chests' a little
+  shallower, as the models), and the content `surface`s of the nightstand, tall chest and low dresser start at
+  the wall face. The drum nightstand, hamper, chest and bench stand where their placeholders do.
 - **Tops are the content's `surface` heights**: nightstand, modern and lamp nightstand 0.56, drum 0.57, three-drawer
   0.60, blanket chest 0.505, dresser 0.89, low dresser 0.80, tall chest 1.16 (catalog2 `TOPS`). The bench's
   cushion top is its seat, 0.47. The lamp's bulb is at 0.935–0.97, around the content's `light.height` 0.95.
@@ -48,13 +48,16 @@ All are played for the `outfit` use (`motions.uses.outfit`):
 The dresser's placeholder has two columns of three drawers; the model has two small drawers over two wide ones,
 so "the middle drawer" is one drawer.
 
-## Parts for later (BR2, +use)
+## Lids and drawers for a use (BR2, +use)
 
-No clip yet (an unplayed clip is a gate warning), but these are nodes of their own so one can be added without
-remodelling: the three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it), the
-blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest is hollow with a folded blanket in it),
-and the hamper's lid (`lid`, hinged at its back; the basket is hollow). The game draws a node without a clip with
-the rest (`check_glb.py` counts them as still).
+The blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest is hollow with a folded blanket in
+it) lifts 95° (`lid_open`, 0.9 s, held 2 s) for the content's "Take out a blanket" (`takeBlanket`, `fetch`, 3
+minutes, comfort; not autonomous). It costs the chest a third draw call.
+
+No clip yet, as no use reads naturally for them: the three-drawer nightstand's top drawer (`drawer`, origin on the
+carcass face, box behind it) and the hamper's lid (`lid`, hinged at its back; the basket is hollow; putting washing
+in would need a laundry loop in the sim). They are nodes of their own, so a clip can be added without remodelling;
+the game draws a node without a clip with the rest (`check_glb.py` counts them as still), at no draw call.
 
 ## The models
 
@@ -65,7 +68,7 @@ the rest (`check_glb.py` counts them as still).
 | `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,396 | 2 | Body, Handles |
 | `model.nightstandDrawers` | 0.58 × 0.60 × 0.63 m | 1,032 | 1 | Body, Handles |
 | `model.nightstandLamp` | 0.54 × 1.08 × 0.47 m | 2,472 | 3 | Body, Shade (glows `#FFD9A0` at night) |
-| `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 2 | Body, Handles |
+| `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 3 | Body, Handles |
 | `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,184 | 2 | Hamper |
 | `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 1,680 | 2 | Frame, Cushion |
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 3,420 | 3 | Body, Handles (a picture, a vase and a box on top) |
@@ -75,8 +78,8 @@ the rest (`check_glb.py` counts them as still).
 | `model.wardrobeSingle` | 0.90 × 2.28 × 0.62 m | 2,220 | 2 | Body, Handles (a box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
 
-`check_glb.py`: 0 failed; five "off centre" warnings (the wall face, above). Khronos validator: 0 errors, 0
-warnings each.
+`check_glb.py`: 0 failed (the five "off centre" warnings went with the placeholders' move). Khronos validator: 0
+errors, 0 warnings each.
 
 ## Rebuild
 

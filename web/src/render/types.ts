@@ -292,6 +292,8 @@ export interface Renderer {
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void>;
   /** Food and dishes (sent apart from the world: they change far more often). */
   setItems(items: readonly ItemPlacement[]): void;
+  /** The lamps switched off (object ids): no light, no glow (sim-core `lights.rs`). */
+  setLampsOff(off: ReadonlySet<number>): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /** Canvas-relative CSS pixel coordinates. */

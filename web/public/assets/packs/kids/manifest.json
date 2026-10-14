@@ -35,7 +35,7 @@
           "cuddle": "side_down"
         },
         "loops": {
-          "lie": "mobile"
+          "play": "mobile"
         }
       },
       "paint": [
@@ -202,8 +202,7 @@
       "motions": {
         "uses": {
           "play": "lid_open"
-        },
-        "hold": 2
+        }
       },
       "paint": [
         {
@@ -251,8 +250,7 @@
       "motions": {
         "uses": {
           "play": "lid_open"
-        },
-        "hold": 2
+        }
       },
       "paint": [
         {

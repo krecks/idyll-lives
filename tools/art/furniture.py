@@ -98,7 +98,8 @@ E['model.fridge@minimal'] = placeholder(FP.fridge_classic(                      
 # =============================================================================================
 # Sink (1x1): a vanity / kitchen sink cabinet (used in both rooms), worktop at 0.9 m
 # =============================================================================================
-E['model.sink'] = placeholder(FP.sink_cabinet(0.86, 0.92))                              # shaker doors, steel basin, gooseneck tap
+E['model.sink'] = placeholder([dict(q, at=[q['at'][0], q['at'][1], round(q['at'][2] + 0.025, 4)])  # shaker doors, steel basin, gooseneck tap;
+                               for q in FP.sink_cabinet(0.86, 0.92)])                    # 2.5 cm forward, its back on the wall face
 E['model.sink@modern'] = placeholder(FP.sink_cabinet(                                    # grey carcass, oak slab doors, black square tap
     0.88, 0.92, cab='#C9CBCC', door=OAK, door_fin='wood', top='#F4F4F2', basin='#B9BDC1', tap=BLACKMETAL, tap_fin='metal',
     style='slab', hole=0.4, handle=BLACKMETAL, hfin='metal') + [

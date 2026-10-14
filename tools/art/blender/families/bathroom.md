@@ -18,6 +18,10 @@ overrides the base (`model.sink`), `catalog` and `catalog2` entries by key.
   keys it from there to scale 1. `motions` plays `water_on` for the `wash` animation tag, with no `hold`,
   so the water runs for the whole use and retracts afterwards (the `wash` tag covers both the `wash` and
   `washUp` interactions).
+- **Against the wall.** The sinks stand with their backs on the wall face (game depth -0.43): `centre=` on each
+  `Model`, where `G.settle()` centres it (they stood centred on the tile, 15–22 cm off the wall, until
+  2026-10-14). Their placeholders (`furniture.py`'s base sink, `catalog.py`, `catalog2.py`) reached 1–4 cm into
+  the wall and were moved forward onto it.
 - **Basins.** `_basin` is a `G.revolve` with thickness (an oval bowl); `_rect_basin` is a rectangular shell
   (floor and four thin walls) for the base cabinet sink, which has a rectangular worktop cut-out. The solid
   cabinet top must not sit above the basin floor, so each sink has painted "shoulders" filling from the
@@ -73,9 +77,10 @@ placeholder (`catalog.double_vanity`) has none either.
 | `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,600 | 3 | Bowl, Seat & lid (wood), Cistern |
 | `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,088 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel and flush plate) |
 
-`check_glb.py`: 0 failed. It warns that the compact and wall-hung toilets are off centre from their
-placeholders (whose backs are 2.5 and 5 cm inside the wall), and that the wall-hung one is deeper than its
-placeholder. Khronos validator: 0 errors, 0 warnings each.
+`check_glb.py`: 0 failed. The compact and wall-hung toilets' placeholders reached 2.5 and 5 cm into the wall;
+they stand on the wall face now (2026-10-14), the classic one's moved back 2 cm onto it, and the wall-hung one's
+placeholder is redrawn as the model (its seat at 0.45 m, not 0.6), so none warns. Khronos validator: 0 errors,
+0 warnings each.
 
 ## B2 — the showers
 
@@ -137,7 +142,8 @@ Validate › Baths until checked in play.
 ## B5 — bathroom storage and mirrors
 
 `model.mirrorCabinet`, `model.mirrorRound` and `model.bathCabinetTall`, built 2026-10-14. They sit in
-Validate › Bathroom Storage until checked in play. All three are still (no use opens them yet).
+Validate › Bathroom Storage until checked in play. The mirror cabinet's door opens while a resident brushes
+their teeth there; the other two are still.
 
 - **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
   face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check_glb.py` warns that they
@@ -145,15 +151,19 @@ Validate › Bathroom Storage until checked in play. All three are still (no use
 - **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`gloss`, `'front'`). Only the High
   preset reflects live (`mirrors: 2`); on Medium and Low it's plain pale gloss, as the placeholders' mirrors. It
   was see-through `glass` at first, which showed the round mirror's brass backing and the cabinet's door.
-- **Doors for later.** The mirror cabinet's mirrored door and the tall cabinet's upper door are parts of their own
-  (`door`), hinged on their left edge, with no clip yet: a swing can be added once content gives them a use (the
-  plan's "(+use)"). A still part costs no draw call of its own.
+- **Doors.** The mirror cabinet's mirrored door and the tall cabinet's upper door are parts of their own (`door`),
+  hinged on their left edge. The mirror cabinet's swings open 100° (`door_open`, 0.8 s, the reflection with it)
+  for the content's "Brush your teeth" (`brushTeeth`, `wash`, 4 minutes, hygiene; not autonomous, so generated
+  houses play as before), held 1.5 s. The tall cabinet's has no clip: no use for it reads naturally (the towels are
+  in the open niche), and a still part costs no draw call of its own.
+- **Against the wall.** The tall cabinet stood 2 cm into the wall, as its placeholder did; both stand on the wall
+  face now.
 - The mirror cabinet is an open box with two shelves, a cup and bottles behind its door, and a light strip on top.
   The tall cabinet has an open niche between its doors with two folded towels.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 1,308 | 1 | Cabinet, Frame |
+| `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 1,308 | 2 | Cabinet, Frame |
 | `model.mirrorRound` | 0.64 × 0.77 × 0.05 m | 1,528 | 1 | Frame, Strap |
 | `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 1,524 | 1 | Cabinet, Frame, Towels |
 
