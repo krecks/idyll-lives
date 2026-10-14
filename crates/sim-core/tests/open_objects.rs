@@ -1,10 +1,12 @@
 //! Things that open and close (content `when` and `leaves`): a wall bed folds down for the night
 //! and back up in the morning, or whenever someone is told to; it stays as it was left, saved.
+//! And the shipped ones: the futon and the sofa bed (opened to sleep or nap in, put away after),
+//! the washing line (the washing stays out until it's taken in) and the hot tub (its cover off).
 
 mod common;
 
 use sim_core::world::TaskKind;
-use sim_core::{Command, TICKS_PER_MINUTE, World};
+use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.01}],
@@ -110,4 +112,183 @@ fn nobody_folds_it_up_over_someone_in_it() {
     assert!(until(&mut w, 30, |w| w.sims[0].asleep(&w.content)), "Ada is asleep");
     let refused = w.apply(Command::Use { sim: 1, object: 0, interaction: FOLD_UP });
     assert!(refused.is_err_and(|e| e.to_string().contains("someone is using")), "Bea can't fold it up on her");
+}
+
+/// The shipped things that open and close, on one plot without walls.
+const SHIPPED_TOWN: &str = r#"{"width":18,"depth":14,
+    "plots":[{"name":"Home","x":0,"z":0,"w":18,"d":14,"entry":[8.5,13.5]}],
+    "households":[{"name":"Player","plot":0,"player":true}],
+    "objects":[{"def":"bedFuton","x":1,"z":1},{"def":"sofaBed","x":5,"z":1},
+               {"def":"clothesline","x":9,"z":1},{"def":"hotTubCedar","x":14,"z":1}],
+    "sims":[{"name":"Ada","traits":["bookworm"],"x":4.5,"z":8.5},{"name":"Bea","traits":["bookworm"],"x":9.5,"z":8.5}]}"#;
+
+const FUTON: u32 = 0;
+const SOFA_BED: u32 = 1;
+const WASHING_LINE: u32 = 2;
+const HOT_TUB: u32 = 3;
+
+/// The shipped content and the town above at 9 am, everyone's needs full, nobody choosing for
+/// themselves.
+fn shipped() -> (World, String) {
+    let content = common::content();
+    let mut w = World::from_json(&content, SHIPPED_TOWN, 1).unwrap();
+    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    let morning = clock::tick_at(1, 9.0 * 60.0).unwrap();
+    while w.tick < morning {
+        w.tick_once();
+    }
+    let n = w.content.needs.len();
+    for s in &mut w.sims {
+        s.needs[..n].fill(1.0);
+    }
+    (w, content)
+}
+
+fn interaction(w: &World, object: u32, id: &str) -> usize {
+    let def = w.objects[object as usize].def;
+    w.content.objects[def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("no {id}"))
+}
+
+fn energy(w: &World) -> usize {
+    w.content.needs.iter().position(|n| n.id == "energy").unwrap()
+}
+
+/// One of the shipped things: what opens it when told, what closes it, and what's only offered
+/// while it's closed.
+struct Thing {
+    object: u32,
+    opens: &'static str,
+    closes: &'static str,
+    only_closed: &'static [&'static str],
+}
+
+const THINGS: [Thing; 4] = [
+    Thing { object: FUTON, opens: "unfold", closes: "foldAway", only_closed: &["unfold"] },
+    Thing { object: SOFA_BED, opens: "pullOut", closes: "foldAway", only_closed: &["pullOut", "relax"] },
+    Thing { object: WASHING_LINE, opens: "washing", closes: "takeIn", only_closed: &["washing"] },
+    Thing { object: HOT_TUB, opens: "soak", closes: "coverOn", only_closed: &[] },
+];
+
+#[test]
+fn the_shipped_things_open_and_close_when_told() {
+    for t in &THINGS {
+        let (mut w, content) = shipped();
+        let o = t.object as usize;
+        let name = w.content.objects[w.objects[o].def].id.clone();
+        assert!(!w.objects[o].open, "{name}: bought closed");
+        let closes = interaction(&w, t.object, t.closes);
+        let refused = w.apply(Command::Use { sim: 0, object: t.object, interaction: closes });
+        assert!(refused.is_err_and(|e| e.to_string().contains("is closed")), "{name}: nothing to close");
+
+        let opens = interaction(&w, t.object, t.opens);
+        w.apply(Command::Use { sim: 0, object: t.object, interaction: opens }).unwrap();
+        assert!(until(&mut w, 30, |w| w.objects[o].open), "{name}: {} opens it", t.opens);
+        assert_eq!(using(&w, 0), Some(opens), "{name}: as the use starts");
+        for id in t.only_closed {
+            let i = interaction(&w, t.object, id);
+            let refused = w.apply(Command::Use { sim: 1, object: t.object, interaction: i });
+            assert!(refused.is_err_and(|e| e.to_string().contains("already open")), "{name}: no {id} while it's open");
+        }
+        assert!(until(&mut w, 60, |w| w.sims[0].current().is_none()), "{name}: {} done", t.opens);
+        assert!(!until(&mut w, 60, |w| !w.objects[o].open), "{name}: it stays open");
+
+        let mut w = common::reload(&w, &content);
+        assert!(w.objects[o].open, "{name}: still open after loading");
+        w.apply(Command::Use { sim: 1, object: t.object, interaction: closes }).unwrap();
+        assert!(
+            until(&mut w, 30, |w| !w.objects[o].open && w.sims[1].current().is_none()),
+            "{name}: {} closes it",
+            t.closes
+        );
+        for id in t.only_closed {
+            let i = interaction(&w, t.object, id);
+            assert!(w.objects[o].allows(&w.content.objects[w.objects[o].def].interactions[i], 0), "{name}: {id} again");
+        }
+    }
+}
+
+#[test]
+fn nobody_closes_the_shipped_things_over_someone_using_them() {
+    for (object, uses, closes) in [(SOFA_BED, "doze", "foldAway"), (HOT_TUB, "soak", "coverOn")] {
+        let (mut w, _) = shipped();
+        let e = energy(&w);
+        w.sims[0].needs[e] = 0.3;
+        let i = interaction(&w, object, uses);
+        w.apply(Command::Use { sim: 0, object, interaction: i }).unwrap();
+        assert!(until(&mut w, 30, |w| w.objects[object as usize].open && using(w, 0) == Some(i)), "{uses} under way");
+        let close = interaction(&w, object, closes);
+        let refused = w.apply(Command::Use { sim: 1, object, interaction: close });
+        assert!(refused.is_err_and(|e| e.to_string().contains("someone is using")), "no {closes} over them");
+    }
+}
+
+#[test]
+fn a_nap_pulls_out_the_bed_and_the_napper_puts_it_away() {
+    for (object, nap, puts_away) in [(SOFA_BED, "doze", "foldAway"), (FUTON, "nap", "foldAway")] {
+        let (mut w, _) = shipped();
+        let o = object as usize;
+        let e = energy(&w);
+        w.sims[0].needs[e] = 0.4;
+        let nap = interaction(&w, object, nap);
+        let puts_away = interaction(&w, object, puts_away);
+        w.apply(Command::Use { sim: 0, object, interaction: nap }).unwrap();
+        assert!(until(&mut w, 30, |w| w.objects[o].open && using(w, 0) == Some(nap)), "napping on it opened");
+        if object == SOFA_BED {
+            let relax = interaction(&w, object, "relax");
+            assert!(w.apply(Command::Use { sim: 1, object, interaction: relax }).is_err(), "no sitting on a bed");
+        }
+        let mut put_away = false;
+        let done = until(&mut w, 90, |w| {
+            put_away |= using(w, 0) == Some(puts_away);
+            !w.objects[o].open && w.sims[0].current().is_none()
+        });
+        assert!(done && put_away, "put away again after the nap, by the napper");
+    }
+}
+
+#[test]
+fn the_last_one_up_folds_the_futon_away() {
+    let (mut w, _) = shipped();
+    let e = energy(&w);
+    // Ada is less tired: she's up first, with Bea still asleep.
+    w.sims[0].needs[e] = 0.7;
+    w.sims[1].needs[e] = 0.0;
+    let sleep = interaction(&w, FUTON, "sleep");
+    let fold = interaction(&w, FUTON, "foldAway");
+    for sim in 0..2 {
+        w.apply(Command::Use { sim, object: FUTON, interaction: sleep }).unwrap();
+    }
+    assert!(until(&mut w, 30, |w| w.objects[0].open), "it's unfolded as they go to bed");
+    assert!(until(&mut w, 30, |w| w.sims.iter().all(|s| s.asleep(&w.content))), "both asleep");
+
+    let mut folded_by = None;
+    let mut ada_up_with_bea_asleep = false;
+    let done = until(&mut w, 14 * 60, |w| {
+        let asleep = |s: usize| w.sims[s].asleep(&w.content);
+        assert!(w.objects[0].open || !(asleep(0) || asleep(1)), "never folded away under a sleeper");
+        ada_up_with_bea_asleep |= !asleep(0) && asleep(1);
+        for s in 0..2 {
+            if using(w, s) == Some(fold) {
+                folded_by.get_or_insert(s);
+            }
+        }
+        !w.objects[0].open && w.sims.iter().all(|s| s.current().is_none())
+    });
+    assert!(ada_up_with_bea_asleep, "Ada got up first");
+    assert!(done, "folded away once both are up");
+    assert_eq!(folded_by, Some(1), "by Bea, the last one up");
+}
+
+#[test]
+fn the_washing_and_the_hot_tub_cover_stay_as_they_were_left() {
+    let (mut w, _) = shipped();
+    for (sim, object, id) in [(0, WASHING_LINE, "washing"), (1, HOT_TUB, "soak")] {
+        let i = interaction(&w, object, id);
+        w.apply(Command::Use { sim, object, interaction: i }).unwrap();
+    }
+    assert!(until(&mut w, 30, |w| w.objects[2].open && w.objects[3].open), "out and off as they start");
+    assert!(until(&mut w, 120, |w| w.sims.iter().all(|s| s.current().is_none())), "washing hung out, soak done");
+    assert!(!until(&mut w, 120, |w| !w.objects[2].open || !w.objects[3].open), "the washing stays out, the cover off");
+    let take_in = &w.content.objects[w.objects[2].def].interactions[interaction(&w, WASHING_LINE, "takeIn")];
+    assert!(take_in.autonomous, "residents take the washing in themselves");
 }

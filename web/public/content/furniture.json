@@ -1940,7 +1940,8 @@
           "tags": [
             "rest",
             "sleep"
-          ]
+          ],
+          "leaves": "open"
         },
         {
           "id": "nap",
@@ -1955,7 +1956,28 @@
           "tags": [
             "rest",
             "nap"
-          ]
+          ],
+          "leaves": "open"
+        },
+        {
+          "id": "unfold",
+          "label": "Unfold",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "foldAway",
+          "label": "Fold away",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
         }
       ]
     },
@@ -4602,7 +4624,18 @@
             "lounge",
             "outdoors"
           ],
-          "feeling": "home.pampered"
+          "feeling": "home.pampered",
+          "leaves": "open"
+        },
+        {
+          "id": "coverOn",
+          "label": "Put the cover on",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
         }
       ]
     },

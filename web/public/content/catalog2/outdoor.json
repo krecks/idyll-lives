@@ -518,7 +518,26 @@
             "chores",
             "cleaning",
             "outdoors"
-          ]
+          ],
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "takeIn",
+          "label": "Take the washing in",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "hygiene": 0.04,
+            "comfort": 0.04
+          },
+          "tags": [
+            "chores",
+            "cleaning",
+            "outdoors"
+          ],
+          "when": "open",
+          "leaves": "closed"
         }
       ]
     },

@@ -3981,11 +3981,14 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if !given_up {
                         sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
                     }
-                } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
-                    // Up: the toilet first, out of habit.
-                    sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
-                    // Then what sleeping opened is closed again (a wall bed folded up), unless
-                    // someone is still in it: whoever gets up last does it.
+                } else if inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
+                    // Up from a night's sleep: the toilet first, out of habit.
+                    if inter.tags & content.day_rhythm.sleep_tags != 0 {
+                        sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
+                    }
+                    // Then what sleeping or napping opened is closed again (a wall bed folded
+                    // up, a sofa bed's bed put away), unless someone is still in it: whoever
+                    // gets up last does it.
                     if let Some(close) = closing(sim, content, o, object) {
                         match sim.follow_up {
                             None => sim.follow_up = Some(close),
@@ -4389,11 +4392,8 @@ fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &cra
     }
 }
 
-/// What follows using `object` when its interaction has an `after` (`tags`): the nearest
-/// working object on the same plot with an interaction of those tags, one they may use and can
-/// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
-/// Closing `o` again after sleeping in it, if sleeping opened it (`Interaction::leaves`): its
-/// interaction that closes it, if `sim` may do it now. A routine, like washing hands.
+/// Closing `o` again after sleeping or napping in it, if that opened it (`Interaction::leaves`):
+/// its interaction that closes it, if `sim` may do it now. A routine, like washing hands.
 fn closing(sim: &Sim, content: &Content, o: &ObjectInstance, object: u32) -> Option<Task> {
     if !o.open {
         return None;
@@ -4403,6 +4403,9 @@ fn closing(sim: &Sim, content: &Content, o: &ObjectInstance, object: u32) -> Opt
     Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
 }
 
+/// What follows using `object` when its interaction has an `after` (`tags`): the nearest
+/// working object on the same plot with an interaction of those tags, one they may use and can
+/// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
 fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags: TagMask) -> Option<Task> {
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
     nearest(sim, ctx, objects, plot, Some(object), |i| i.tags & tags != 0 && !i.baby && i.recipe.is_none())

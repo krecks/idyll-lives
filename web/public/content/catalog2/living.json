@@ -271,14 +271,15 @@
           "tags": [
             "rest",
             "lounge"
-          ]
+          ],
+          "when": "closed"
         },
         {
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
           "minutes": 30,
-          "pose": "sit",
+          "pose": "lie",
           "effects": {
             "energy": 0.1,
             "comfort": 0.1
@@ -286,7 +287,28 @@
           "tags": [
             "rest",
             "nap"
-          ]
+          ],
+          "leaves": "open"
+        },
+        {
+          "id": "pullOut",
+          "label": "Pull out the bed",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "foldAway",
+          "label": "Fold the bed away",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
         }
       ]
     },
