@@ -101,6 +101,11 @@ The armchairs and small seats (`models/living/armchair.glb`, `armchairLounge.glb
 recliner tips back with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
 the designer lounge chair is still. Their primitive-part entries stay as the fallback.
 
+The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.glb`, `coffeeTableMarble.glb`,
+`sideTable.glb`, `coffeeTableRound.glb`, `coffeeTableLong.glb`, `nestingTables.glb`, `sideTableRound.glb`,
+`consoleTable.glb`, same pack) are built the same way (glTF, original, CC0). The coffee table's drawer slides out
+with a magazine in it; the rest are still. Their primitive-part entries stay as the fallback.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a

@@ -2,9 +2,10 @@
 
 `living.py` builds the living room's models into `web/public/assets/models/living/` and their entries in
 `packs/living/manifest.json`: the fold-down wall bed (`model.wallBed`), the sofa bed (`model.sofaBed`), the ten
-L1 sofas and sectionals and the eleven L2 armchairs and small seats. These replace the primitive-part placeholders
+L1 sofas and sectionals, the eleven L2 armchairs and small seats and the nine L3 coffee and side tables. These
+replace the primitive-part placeholders
 of `furniture_prims.py` (the classic sofa, the armchair), `catalog.py` and `catalog2.py`, which stay as the
-fallback. Built 2026-10-14; they sit in Validate › Sofas and Validate › Armchairs until checked in play.
+fallback. Built 2026-10-14; they sit in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
 
 ## The sofas and sectionals (L1)
 
@@ -76,6 +77,36 @@ Built as the sofas are, from their placeholders (`furniture_prims.py` `armchair_
 `check_glb.py`: 0 failed (warnings: the bergère's 4,496 triangles against a target of 4,000; the recliner's as
 above). Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
 WebGL at night: residents sit, recline, rock and flop on each, and each clip plays.
+
+## The coffee and side tables (L3)
+
+Copied from their placeholders, tops at the content `surface` heights (0.42 m for the coffee tables, 0.51–0.80 m
+for the side, nesting and console tables). Still, but for two:
+
+- **Coffee table** (`drawer_open` for magazine, `hold` 2.5 s): a drawer in the front apron, a magazine in it,
+  slides out 30 cm. `check_glb.py` warns its placeholder is 6 cm taller (it had magazines on the top; they're in
+  the drawer now).
+- **Nesting tables**: the small oak table is a part of its own (`small_table`), so a clip can pull it out once it
+  has a use.
+- **Side table**: the catalog pack's placeholder (catalog.py `side_table`, oak with a drawer and a brass knob) is the
+  one drawn, over the base manifest's (furniture_prims.py); the model copies the catalog one. `check_glb.py` warns the
+  two placeholders differ (they did before the model).
+- What stands on the tops (a plant, vases, magazines, a box) is plain finish, so it costs no draw call.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.coffeeTable` | 1.30 × 0.42 × 0.74 m | 1,428 | 3 | Wood, Knob |
+| `model.coffeeTableGlass` | 1.30 × 0.60 × 0.74 m | 1,764 | 2 | Frame, Glass |
+| `model.coffeeTableMarble` | 0.90 × 0.58 × 0.90 m | 1,164 | 1 | Top, Base |
+| `model.sideTable` | 0.55 × 0.55 × 0.45 m | 708 | 2 | Wood, Knob |
+| `model.coffeeTableRound` | 0.84 × 0.42 × 0.84 m | 884 | 2 | Top, Base |
+| `model.coffeeTableLong` | 1.66 × 0.42 × 0.72 m | 864 | 2 | Top, Legs |
+| `model.nestingTables` | 0.57 × 0.51 × 0.55 m | 1,080 | 2 | Top, Small table, Legs |
+| `model.sideTableRound` | 0.52 × 0.56 × 0.52 m | 964 | 1 | Top, Base |
+| `model.consoleTable` | 1.80 × 0.80 × 0.56 m | 1,024 | 3 | Top, Legs, Baskets |
+
+`check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
+facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
 
 ## Rebuild
 

@@ -3675,6 +3675,10 @@
           "label": "Armchairs"
         },
         {
+          "id": "coffee tables",
+          "label": "Coffee Tables"
+        },
+        {
           "id": "fridges",
           "label": "Fridges"
         },

@@ -1023,6 +1023,251 @@
           "label": "Seat"
         }
       ]
+    },
+    "model.coffeeTable": {
+      "type": "model",
+      "url": "../../models/living/coffeeTable.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "magazine_teal": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "magazine": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "brass",
+          "label": "Knob"
+        }
+      ]
+    },
+    "model.coffeeTableGlass": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableGlass.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "chrome",
+          "label": "Frame"
+        },
+        {
+          "material": "glass",
+          "label": "Glass"
+        }
+      ]
+    },
+    "model.coffeeTableMarble": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableMarble.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "magazine_navy": {
+          "finish": "material.finish.matte"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "marble_vein": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "marble",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.sideTable": {
+      "type": "model",
+      "url": "../../models/living/sideTable.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "brass",
+          "label": "Knob"
+        }
+      ]
+    },
+    "model.coffeeTableRound": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableRound.glb",
+      "materials": {
+        "cream_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "cream_gloss",
+          "label": "Top"
+        },
+        {
+          "material": "oak",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.coffeeTableLong": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableLong.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "box_sand": {
+          "finish": "material.finish.matte"
+        },
+        "magazine_teal": {
+          "finish": "material.finish.matte"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut_warm",
+          "label": "Top"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.nestingTables": {
+      "type": "model",
+      "url": "../../models/living/nestingTables.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "white_gloss": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "white_gloss",
+          "label": "Top"
+        },
+        {
+          "material": "oak",
+          "label": "Small table"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sideTableRound": {
+      "type": "model",
+      "url": "../../models/living/sideTableRound.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "stone_top": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone_top",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.consoleTable": {
+      "type": "model",
+      "url": "../../models/living/consoleTable.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.fabric"
+        },
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        },
+        {
+          "material": "basket",
+          "label": "Baskets"
+        }
+      ]
     }
   }
 }

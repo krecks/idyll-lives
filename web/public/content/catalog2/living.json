@@ -693,8 +693,8 @@
         1
       ],
       "price": 180,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.3,
       "surface": {
         "height": 0.42,
@@ -716,8 +716,8 @@
         1
       ],
       "price": 220,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.3,
       "surface": {
         "height": 0.42,
@@ -739,8 +739,8 @@
         1
       ],
       "price": 120,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.2,
       "surface": {
         "height": 0.51,
@@ -766,8 +766,8 @@
         1
       ],
       "price": 85,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.2,
       "surface": {
         "height": 0.56,
@@ -789,8 +789,8 @@
         1
       ],
       "price": 200,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.3,
       "surface": {
         "height": 0.8,

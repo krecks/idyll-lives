@@ -4,7 +4,7 @@ Seats keep their height and depth (`SEATS`); a seat that moves while sat on must
 The wall bed is done (`families/living.py`, the model for anything held open). L1 is done (notes:
 `families/living.md`): every sofa's seat cushions are a part of their own that sinks while sat on (`sink_in`). L2
 is done too: the recliner's seat and back tip back with the resident riding them, the rocking chair rocks (E1)
-with its rider.
+with its rider. L3 is done: still tables, but the coffee table's drawer opens for a magazine.
 
 ## L1. Sofas and sectionals (11) — **Done** (in Validate › Sofas)
 
@@ -46,7 +46,7 @@ with its rider.
 | `floorCushion` Floor cushion | 1x1 · floor | sit:sit | living / seating | Cushion | Use | `sink_in`. |
 | `beanBag` Bean bag | 1x1 · floor | flop:relax | living / seating | Bag | Use | `squash`: the bag flattens 15% for flop. |
 
-## L3. Coffee and side tables (9)
+## L3. Coffee and side tables (9) — **Done** (in Validate › Coffee Tables)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `coffee tables` (Validate › Coffee Tables)

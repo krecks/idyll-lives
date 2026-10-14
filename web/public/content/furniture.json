@@ -1385,8 +1385,8 @@
         1
       ],
       "price": 120,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "description": "A low table with a few magazines on it.",
       "surface": {
         "height": 0.42,
@@ -1421,8 +1421,8 @@
         1
       ],
       "price": 280,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.3,
       "description": "A glass-topped coffee table.",
       "surface": {
@@ -1458,8 +1458,8 @@
         1
       ],
       "price": 420,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.5,
       "description": "A round marble top on bent steel legs.",
       "surface": {
@@ -1495,8 +1495,8 @@
         1
       ],
       "price": 70,
-      "category": "living",
-      "group": "tables",
+      "category": "validate",
+      "group": "coffee tables",
       "decor": 0.2,
       "description": "A small table for beside the sofa.",
       "surface": {

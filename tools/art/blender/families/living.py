@@ -1,6 +1,6 @@
 # The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json), a
-# sofa bed (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals and the L2 armchairs and small
-# seats (notes: living.md).
+# sofa bed (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals, the L2 armchairs and small
+# seats and the L3 coffee and side tables (notes: living.md).
 #
 # A cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands folded up
 # in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at the
@@ -98,6 +98,23 @@ M = G.Palette(
     mustard_button=('#B5853A', 'fabric'),
     bag=('#C25B3E', 'fabric'),           # the bean bag
     bag_seat=('#B5523A', 'fabric'),
+    # L3, the coffee and side tables (and what stands on them: plain, so it costs no draw call)
+    oak=('#CDB08A', 'wood'),
+    glass=('#DCE6E8', 'glass'),
+    chrome=('#D0D3D6', 'chrome'),
+    marble=('#EEECE8', 'gloss'),
+    marble_vein=('#C9CBCC', 'gloss'),
+    cream_gloss=('#E8E2D6', 'gloss'),
+    white_gloss=('#F1F0EC', 'gloss'),
+    stone_top=('#E7E3DC', 'gloss'),
+    black_metal=('#2B2C2E', 'metal'),
+    basket=('#C9A979', 'fabric'),
+    magazine_teal=('#4E7A7F', 'matte'),
+    magazine_navy=('#3E5470', 'matte'),
+    box_sand=('#C9B79C', 'matte'),
+    vase=('#E8E6E1', 'gloss'),
+    pot_white=('#F2F2F0', 'gloss'),
+    plant=('#5E8F4E', 'satin'),
 )
 
 F = G.GameFrame()
@@ -689,6 +706,149 @@ def bean_bag():
     G.squash(bag, 'squash', (1.06, 1.06, 0.85), seconds=0.6)
 
 
+# L3, the coffee and side tables: still, but for the coffee table's drawer (`drawer_open`, a magazine in it,
+# for the magazine use). Their tops stay at the content `surface` heights (catalog2.py `TOPS`).
+def _legs4(xs, zs, h, t, mat, y0=0.0):
+    for x in xs:
+        for z in zs:
+            F.box(f'leg{x}{z}', t, h, t, (x, y0 + h / 2, z), mat, bevel=min(0.006, t / 4))
+
+
+def coffee_table():
+    """The coffee table (catalog.py `coffee_table`, classic): an oak top at 0.42 on tapered legs, aprons and
+    a slatted shelf; a drawer in the front apron."""
+    t, h = 0.04, 0.38
+    with G.new_parts() as still:
+        F.box('top', 1.3, t, 0.74, (0, 0.42 - t / 2, 0), M.oak, bevel=0.012)
+        F.box('apron_back', 1.12, 0.06, 0.02, (0, h - 0.03, -0.28), M.oak, bevel=0.005)
+        for s in (-1, 1):
+            F.box(f'apron_front{s}', 0.3, 0.06, 0.02, (s * 0.41, h - 0.03, 0.28), M.oak, bevel=0.005)
+            F.box(f'runner{s}', 0.02, 0.06, 0.56, (s * 0.26, h - 0.03, 0.0), M.oak)
+        for x in (-0.58, 0.58):
+            for z in (-0.3, 0.3):
+                F.cone(f'leg{x}{z}', 0.016, 0.025, h, (x, h / 2, z), M.oak, verts=12)
+        for z in (-0.2, -0.07, 0.07, 0.2):
+            F.box(f'slat{z}', 1.1, 0.02, 0.09, (0, 0.12, z), M.oak, bevel=0.004)
+    G.join(still, 'table', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        F.box('drawer_front', 0.5, 0.055, 0.02, (0, h - 0.03, 0.28), M.oak, bevel=0.004)
+        F.sphere('knob', 0.014, (0, h - 0.03, 0.296), M.brass, segments=10, rings=6)
+        F.box('drawer_bottom', 0.48, 0.01, 0.5, (0, h - 0.055, 0.02), M.oak)
+        for s in (-1, 1):
+            F.box(f'drawer_side{s}', 0.01, 0.045, 0.5, (s * 0.235, h - 0.03, 0.02), M.oak)
+        F.box('drawer_back', 0.48, 0.045, 0.01, (0, h - 0.03, -0.225), M.oak)
+        F.box('magazine', 0.3, 0.012, 0.22, (0.05, h - 0.044, 0.08), M.magazine_teal, rot=(0, 0, 8), bevel=0.002)
+    drawer = G.join(parts, 'drawer')
+    G.settle(centre=False)
+    G.slide(drawer, 'drawer_open', (0, -0.3, 0), seconds=0.8)
+
+
+def coffee_table_glass():
+    """The glass coffee table (catalog.py `glass_table`): a glass top and shelf in a chrome frame, a plant and
+    a vase."""
+    F.box('top', 1.3, 0.02, 0.74, (0, 0.41, 0), M.glass, bevel=0.008)
+    F.box('shelf', 1.2, 0.012, 0.64, (0, 0.12, 0), M.glass, bevel=0.005)
+    for x in (-0.6, 0.6):
+        for z in (-0.32, 0.32):
+            F.cyl(f'post{x}{z}', 0.015, 0.4, (x, 0.2, z), M.chrome, verts=12)
+    for y in (0.105, 0.39):
+        for s in (-1, 1):
+            F.box(f'rail_long{y}{s}', 1.2, 0.022, 0.022, (0, y, s * 0.32), M.chrome, bevel=0.006)
+            F.box(f'rail_short{y}{s}', 0.022, 0.022, 0.64, (s * 0.6, y, 0), M.chrome, bevel=0.006)
+    F.cyl('pot', 0.07, 0.08, (-0.3, 0.46, 0.0), M.pot_white, verts=20, bevel=0.01)
+    F.sphere('plant', 0.1, (-0.3, 0.53, 0.0), M.plant, scale=(1, 1, 0.7), segments=14, rings=8)
+    F.cone('vase', 0.05, 0.03, 0.18, (0.36, 0.22, 0.05), M.vase, verts=20)
+    G.join_all('coffeeTableGlass')
+    G.settle(centre=False)
+
+
+def coffee_table_marble():
+    """The marble side table (catalog.py): a round marble top on a brass tulip foot, a vase and a magazine."""
+    F.cyl('top', 0.45, 0.04, (0, 0.4, 0), M.marble, verts=48, bevel=0.006)
+    G.revolve('foot', [(0, -0.5), (0.5, -0.5), (0.5, -0.43), (0.2, -0.25), (0.11, 0.2), (0.18, 0.5), (0, 0.5)],
+              at=F.at(0, 0.19, 0), material=M.brass, segments=32, scale=(0.56, 0.56, 0.38))
+    for i, (x, z, l, turn) in enumerate(((-0.05, 0.06, 0.5, 32), (0.16, -0.12, 0.3, -20))):
+        F.box(f'vein{i}', l, 0.003, 0.012, (x, 0.4215, z), M.marble_vein, rot=(0, 0, -turn))
+    F.cone('vase', 0.05, 0.03, 0.16, (0.12, 0.5, 0.05), M.vase, verts=20)
+    F.box('magazine', 0.24, 0.03, 0.18, (-0.12, 0.435, -0.08), M.magazine_navy, rot=(0, 0, -14), bevel=0.003)
+    G.join_all('coffeeTableMarble')
+    G.settle(centre=False)
+
+
+def side_table():
+    """The side table (catalog.py `side_table`, classic, which the catalog pack draws over the base one): an oak
+    top at 0.55 over a drawer box with a brass knob, a lower shelf, tapered legs."""
+    F.box('top', 0.55, 0.03, 0.45, (0, 0.535, 0), M.oak, bevel=0.01)
+    F.box('drawer_box', 0.46, 0.08, 0.36, (0, 0.48, 0), M.oak, bevel=0.006)
+    F.box('drawer_front', 0.3, 0.06, 0.012, (0, 0.48, 0.185), M.oak, bevel=0.004)
+    F.sphere('knob', 0.014, (0, 0.48, 0.196), M.brass, segments=10, rings=6)
+    F.box('shelf', 0.46, 0.02, 0.36, (0, 0.16, 0), M.oak, bevel=0.004)
+    for x in (-0.23, 0.23):
+        for z in (-0.18, 0.18):
+            F.cone(f'leg{x}{z}', 0.014, 0.02, 0.52, (x, 0.26, z), M.oak, verts=12)
+    G.join_all('sideTable')
+    G.settle(centre=False)
+
+
+def coffee_table_round():
+    """The round coffee table (catalog2.py): a cream top at 0.42 on an oak drum."""
+    F.cyl('top', 0.42, 0.04, (0, 0.4, 0), M.cream_gloss, verts=48, bevel=0.008)
+    F.cone('drum', 0.3, 0.255, 0.36, (0, 0.2, 0), M.oak, verts=40)
+    F.cyl('plinth', 0.35, 0.02, (0, 0.01, 0), M.oak, verts=40)
+    G.join_all('coffeeTableRound')
+    G.settle(centre=False)
+
+
+def coffee_table_long():
+    """The long coffee table (catalog2.py): a walnut top at 0.42 and shelf on black legs, a box and a book."""
+    F.box('top', 1.66, 0.04, 0.72, (0, 0.4, 0), M.walnut_warm, bevel=0.012)
+    F.box('shelf', 1.5, 0.025, 0.58, (0, 0.14, 0), M.walnut_warm, bevel=0.008)
+    _legs4((-0.76, 0.76), (-0.3, 0.3), 0.38, 0.05, M.black_metal)
+    F.box('box', 0.32, 0.05, 0.24, (0.4, 0.178, 0.0), M.box_sand, bevel=0.008)
+    F.box('book', 0.28, 0.04, 0.2, (0.4, 0.22, 0.0), M.magazine_teal, bevel=0.006)
+    G.join_all('coffeeTableLong')
+    G.settle(centre=False)
+
+
+def nesting_tables():
+    """The nesting tables (catalog2.py): a white table at 0.51 on black legs, a smaller oak one under it (a
+    part of its own, for a clip pulling it out when it gets a use)."""
+    with G.new_parts() as big:
+        F.box('top', 0.56, 0.025, 0.46, (0, 0.5, -0.02), M.white_gloss, bevel=0.008)
+        for x in (-0.26, 0.26):
+            for z in (-0.23, 0.19):
+                F.box(f'leg{x}{z}', 0.02, 0.5, 0.02, (x, 0.25, z), M.black_metal, bevel=0.004)
+    G.join(big, 'table', origin=(0, 0, 0))
+    with G.new_parts() as small:
+        F.box('small_top', 0.42, 0.025, 0.36, (0.08, 0.38, 0.12), M.oak, bevel=0.008)
+        for x in (-0.11, 0.27):
+            for z in (-0.04, 0.28):
+                F.box(f'small_leg{x}{z}', 0.018, 0.37, 0.018, (x, 0.185, z), M.black_metal, bevel=0.004)
+    G.join(small, 'small_table')
+    G.settle(centre=False)
+
+
+def side_table_round():
+    """The round side table (catalog2.py): a stone top at 0.56 on a brass stem and disc foot."""
+    F.cyl('top', 0.26, 0.03, (0, 0.545, 0), M.stone_top, verts=40, bevel=0.006)
+    F.cyl('stem', 0.03, 0.5, (0, 0.28, 0), M.brass, verts=16)
+    F.cyl('foot', 0.18, 0.03, (0, 0.015, 0), M.brass, verts=36, bevel=0.006)
+    G.join_all('sideTableRound')
+    G.settle(centre=False)
+
+
+def console_table():
+    """The console table (catalog2.py): a narrow oak top at 0.8 against the wall, a low shelf with two baskets,
+    on black legs."""
+    F.box('top', 1.8, 0.035, 0.56, (0, 0.78, -0.18), M.oak, bevel=0.01)
+    F.box('shelf', 1.7, 0.025, 0.48, (0, 0.22, -0.18), M.oak, bevel=0.006)
+    _legs4((-0.86, 0.86), (-0.42, 0.06), 0.77, 0.04, M.black_metal)
+    for x in (-0.5, 0.0):
+        F.box(f'basket{x}', 0.36, 0.14, 0.3, (x, 0.31, -0.18), M.basket, bevel=0.03, bevel_segments=3)
+    G.join_all('consoleTable')
+    G.settle(centre=False)
+
+
 # The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
 _D, _MID = CAB_FRONT - BACK, (BACK + CAB_FRONT) / 2
 PLACEHOLDER = [
@@ -776,7 +936,25 @@ FAMILY = G.Family(
      G.Model('floorCushion', floor_cushion, key='model.floorCushion', size=(0.62, 0.139, 0.62), motions={'uses': {'sit': 'sink_in'}},
              paint=[('mustard', 'Cushion'), ('mustard_piping', 'Piping'), ('mustard_button', 'Button')]),
      G.Model('beanBag', bean_bag, key='model.beanBag', size=(0.84, 0.696, 0.844), centre=(0, 0.018), motions={'uses': {'flop': 'squash'}},
-             paint=[('bag', 'Bag'), ('bag_seat', 'Seat')])],
+             paint=[('bag', 'Bag'), ('bag_seat', 'Seat')]),
+     # L3: the coffee and side tables
+     G.Model('coffeeTable', coffee_table, key='model.coffeeTable', size=(1.3, 0.42, 0.74),
+             motions={'uses': {'magazine': 'drawer_open'}, 'hold': 2.5}, paint=[('oak', 'Wood'), ('brass', 'Knob')]),
+     G.Model('coffeeTableGlass', coffee_table_glass, key='model.coffeeTableGlass', size=(1.3, 0.6, 0.74),
+             paint=[('chrome', 'Frame'), ('glass', 'Glass')]),
+     G.Model('coffeeTableMarble', coffee_table_marble, key='model.coffeeTableMarble', size=(0.9, 0.58, 0.9),
+             paint=[('marble', 'Top'), ('brass', 'Base')]),
+     G.Model('sideTable', side_table, key='model.sideTable', size=(0.55, 0.55, 0.45), paint=[('oak', 'Wood'), ('brass', 'Knob')]),
+     G.Model('coffeeTableRound', coffee_table_round, key='model.coffeeTableRound', size=(0.84, 0.42, 0.84),
+             paint=[('cream_gloss', 'Top'), ('oak', 'Base')]),
+     G.Model('coffeeTableLong', coffee_table_long, key='model.coffeeTableLong', size=(1.66, 0.42, 0.72),
+             paint=[('walnut_warm', 'Top'), ('black_metal', 'Legs')]),
+     G.Model('nestingTables', nesting_tables, key='model.nestingTables', size=(0.57, 0.512, 0.55), centre=(0.005, 0.025),
+             paint=[('white_gloss', 'Top'), ('oak', 'Small table'), ('black_metal', 'Legs')]),
+     G.Model('sideTableRound', side_table_round, key='model.sideTableRound', size=(0.52, 0.56, 0.52),
+             paint=[('stone_top', 'Top'), ('brass', 'Base')]),
+     G.Model('consoleTable', console_table, key='model.consoleTable', size=(1.8, 0.7975, 0.56), centre=(0, -0.18),
+             paint=[('oak', 'Top'), ('black_metal', 'Legs'), ('basket', 'Baskets')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
             'game\'s finishes so a model costs one draw call per finish group.',
