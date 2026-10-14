@@ -221,6 +221,50 @@ fn practice_lasts_its_time_while_the_skill_is_wanted() {
     }
 }
 
+/// An order holds against needs: told to watch television, a resident watches it to the end,
+/// with free will off even as the essentials run low (`urgentBelow`), and with free will on while
+/// none is urgent. (Only a need running out ends it: an accident.)
+#[test]
+fn an_order_holds_against_needs() {
+    use sim_core::Command;
+    let content = common::content();
+    let town = common::town(&content, 7, 2);
+    for (free_will, low) in [(false, 0.12), (true, 0.4)] {
+        let mut w = World::from_json(&content, &town, 7).unwrap();
+        let h = w.households.iter().position(|h| h.player).unwrap();
+        w.households[h].funds = 100_000;
+        w.apply(Command::SetAutonomy { enabled: free_will, household: Some(h as u32) }).unwrap();
+        let noon = clock::tick_at(1, 12.0 * 60.0).unwrap();
+        while w.tick < noon {
+            w.tick_once();
+        }
+        w.apply(Command::Buy { household: h as u32, object: "tv".into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+        let tv = w.objects.len() as u32 - 1;
+        let sim = w.sims.iter().position(|s| s.household as usize == h).unwrap();
+        let n = w.content.needs.len();
+        w.sims[sim].needs[..n].fill(low);
+        let fun = w.content.needs.iter().position(|d| d.id == "fun").unwrap();
+        w.sims[sim].needs[fun] = 0.0;
+        w.apply(Command::Use { sim: sim as u32, object: tv, interaction: 0 }).unwrap();
+        let (mut watched, mut other) = (0u64, None);
+        for _ in 0..90 * sim_core::TICKS_PER_MINUTE {
+            w.tick_once();
+            match w.sims[sim].current().map(|a| (a.task.kind, &a.phase)) {
+                Some((TaskKind::Use { object, .. }, Phase::Using { .. })) if object == tv => watched += 1,
+                Some((TaskKind::Use { object, .. }, _)) if object == tv => {}
+                None if watched > 0 => break,
+                what => {
+                    other = Some(format!("{what:?}"));
+                    break;
+                }
+            }
+        }
+        let minutes = watched / sim_core::TICKS_PER_MINUTE;
+        assert!(other.is_none(), "free will {free_will}: {other:?} after {minutes} minutes of television");
+        assert!(minutes >= 59, "free will {free_will}: watched for {minutes} minutes");
+    }
+}
+
 #[test]
 fn newborns_are_born_at_age_zero() {
     let content = common::content();

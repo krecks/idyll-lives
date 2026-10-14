@@ -608,11 +608,23 @@ export class BuildBuyInput {
     if (layer === 'ceiling') {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!this.indoors(tx, tz)) return 'Hangs from a ceiling';
     }
+    // As the simulation (`check_fit`): furniture as tall as the wall leaves no room on the wall or
+    // the ceiling over it, and a thing hanging low from the ceiling none under it.
+    const over = (test: (o: ObjectDef) => boolean) => {
+      for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.takenBy(tx, tz, moving, test)) return true;
+      return false;
+    };
+    const on = (o: ObjectDef, ...layers: string[]) => layers.includes(this.content.layer(o));
+    if ((layer === 'wall' || layer === 'ceiling') && over((o) => on(o, 'floor') && !!o.fillsWall)) return 'The furniture there is as tall as the wall';
+    if (layer === 'ceiling' && def.hangsLow && over((o) => on(o, 'floor'))) return 'Hangs too low over the furniture there';
+    if (layer === 'floor' && def.fillsWall && over((o) => on(o, 'wall', 'ceiling'))) return 'Too tall for what hangs there';
+    if (layer === 'floor' && over((o) => !!o.hangsLow)) return 'Something hangs too low there';
     if (layer === 'wall') {
       const backs: { axis: Axis; x: number; z: number }[] = [];
       for (let tx = x; tx < x + w; tx++) if (rot % 4 === 0 || rot % 4 === 2) backs.push({ axis: 'h', x: tx, z: rot % 4 === 0 ? z : z + d });
       for (let tz = z; tz < z + d; tz++) if (rot % 4 === 1 || rot % 4 === 3) backs.push({ axis: 'v', x: rot % 4 === 1 ? x : x + w, z: tz });
       if (!backs.every((e) => ['wall', 'window'].includes(this.edgeState(e)))) return 'Hangs on a wall';
+      if (!def.overWindow && backs.some((e) => this.edgeState(e) === 'window')) return 'Not over a window';
     }
     // Something nobody uses needn't be reached (a picture, a rug, a table chairs go all round);
     // a chair pulled up to a table is used from any free side.
@@ -645,6 +657,14 @@ export class BuildBuyInput {
     return game.objects.some((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === on);
   }
 
+  /** Whether something (other than `moving`) of a kind that passes `test` stands on or hangs over a tile. */
+  private takenBy(tx: number, tz: number, moving: number | null, test: (def: ObjectDef) => boolean): boolean {
+    return game.objects.some((o) => {
+      const def = o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d ? this.content.object(o.def) : undefined;
+      return !!def && test(def);
+    });
+  }
+
   /**
    * Whether a resident can stand on a tile beside a thing to use it, as the simulation has it
    * (`approach_tiles`): on the home plot, nothing on its floor (bar `moving`), no diagonal wall
@@ -654,7 +674,7 @@ export class BuildBuyInput {
     const home = this.home();
     return ({ tile: [tx, tz], inner: [ix, iz] }) =>
       !!home && tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d &&
-      !this.taken('floor', tx, tz, moving) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
   }
 
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */

@@ -1,7 +1,8 @@
 //! Things that open and close (content `when` and `leaves`): a wall bed folds down for the night
 //! and back up in the morning, or whenever someone is told to; it stays as it was left, saved.
 //! And the shipped ones: the futon and the sofa bed (opened to sleep or nap in, put away after),
-//! the washing line (the washing stays out until it's taken in) and the hot tub (its cover off).
+//! the washing line (the washing stays out until it's taken in) and the hot tub (its cover off for
+//! a soak, and back on after it: `closeAfter`).
 
 mod common;
 
@@ -160,13 +161,15 @@ struct Thing {
     opens: &'static str,
     closes: &'static str,
     only_closed: &'static [&'static str],
+    /// Whoever opened it closes it again when done (`closeAfter`).
+    closed_after: bool,
 }
 
 const THINGS: [Thing; 4] = [
-    Thing { object: FUTON, opens: "unfold", closes: "foldAway", only_closed: &["unfold"] },
-    Thing { object: SOFA_BED, opens: "pullOut", closes: "foldAway", only_closed: &["pullOut", "relax"] },
-    Thing { object: WASHING_LINE, opens: "washing", closes: "takeIn", only_closed: &["washing"] },
-    Thing { object: HOT_TUB, opens: "soak", closes: "coverOn", only_closed: &[] },
+    Thing { object: FUTON, opens: "unfold", closes: "foldAway", only_closed: &["unfold"], closed_after: false },
+    Thing { object: SOFA_BED, opens: "pullOut", closes: "foldAway", only_closed: &["pullOut", "relax"], closed_after: false },
+    Thing { object: WASHING_LINE, opens: "washing", closes: "takeIn", only_closed: &["washing"], closed_after: false },
+    Thing { object: HOT_TUB, opens: "soak", closes: "coverOn", only_closed: &[], closed_after: true },
 ];
 
 #[test]
@@ -188,6 +191,15 @@ fn the_shipped_things_open_and_close_when_told() {
             let i = interaction(&w, t.object, id);
             let refused = w.apply(Command::Use { sim: 1, object: t.object, interaction: i });
             assert!(refused.is_err_and(|e| e.to_string().contains("already open")), "{name}: no {id} while it's open");
+        }
+        if t.closed_after {
+            let mut closed_by_them = false;
+            let done = until(&mut w, 90, |w| {
+                closed_by_them |= using(w, 0) == Some(closes);
+                !w.objects[o].open && w.sims[0].current().is_none()
+            });
+            assert!(done && closed_by_them, "{name}: closed again after the {} by them", t.opens);
+            continue;
         }
         assert!(until(&mut w, 60, |w| w.sims[0].current().is_none()), "{name}: {} done", t.opens);
         assert!(!until(&mut w, 60, |w| !w.objects[o].open), "{name}: it stays open");
@@ -280,15 +292,49 @@ fn the_last_one_up_folds_the_futon_away() {
 }
 
 #[test]
-fn the_washing_and_the_hot_tub_cover_stay_as_they_were_left() {
+fn the_washing_stays_out_as_it_was_left() {
     let (mut w, _) = shipped();
-    for (sim, object, id) in [(0, WASHING_LINE, "washing"), (1, HOT_TUB, "soak")] {
-        let i = interaction(&w, object, id);
-        w.apply(Command::Use { sim, object, interaction: i }).unwrap();
-    }
-    assert!(until(&mut w, 30, |w| w.objects[2].open && w.objects[3].open), "out and off as they start");
-    assert!(until(&mut w, 120, |w| w.sims.iter().all(|s| s.current().is_none())), "washing hung out, soak done");
-    assert!(!until(&mut w, 120, |w| !w.objects[2].open || !w.objects[3].open), "the washing stays out, the cover off");
+    let i = interaction(&w, WASHING_LINE, "washing");
+    w.apply(Command::Use { sim: 0, object: WASHING_LINE, interaction: i }).unwrap();
+    assert!(until(&mut w, 30, |w| w.objects[2].open), "out as they start");
+    assert!(until(&mut w, 120, |w| w.sims.iter().all(|s| s.current().is_none())), "washing hung out");
+    assert!(!until(&mut w, 120, |w| !w.objects[2].open), "the washing stays out");
     let take_in = &w.content.objects[w.objects[2].def].interactions[interaction(&w, WASHING_LINE, "takeIn")];
     assert!(take_in.autonomous, "residents take the washing in themselves");
+}
+
+#[test]
+fn the_last_one_out_of_the_hot_tub_puts_the_cover_on() {
+    for free_will in [false, true] {
+        let (mut w, _) = shipped();
+        w.apply(Command::SetAutonomy { enabled: free_will, household: None }).unwrap();
+        let soak = interaction(&w, HOT_TUB, "soak");
+        let cover = interaction(&w, HOT_TUB, "coverOn");
+        // Ada soaks a little, Bea a long while.
+        let wants = |w: &World, n: &str| w.content.needs.iter().position(|d| d.id == n).unwrap();
+        for n in ["comfort", "hygiene", "fun"] {
+            let i = wants(&w, n);
+            w.sims[0].needs[i] = 0.97;
+            w.sims[1].needs[i] = 0.2;
+        }
+        for sim in 0..2 {
+            w.apply(Command::Use { sim, object: HOT_TUB, interaction: soak }).unwrap();
+        }
+        assert!(until(&mut w, 30, |w| w.objects[3].open && (0..2).all(|s| using(w, s) == Some(soak))), "both in");
+        let mut covered_by = None;
+        let mut ada_out_first = false;
+        let done = until(&mut w, 120, |w| {
+            ada_out_first |= using(w, 0) != Some(soak) && using(w, 1) == Some(soak);
+            assert!(w.objects[3].open || using(w, 1) != Some(soak), "never covered on Bea");
+            for s in 0..2 {
+                if using(w, s) == Some(cover) {
+                    covered_by.get_or_insert(s);
+                }
+            }
+            !w.objects[3].open
+        });
+        assert!(ada_out_first, "Ada got out first");
+        assert!(done, "covered once both are out (free will {free_will})");
+        assert_eq!(covered_by, Some(1), "by Bea, the last one out");
+    }
 }

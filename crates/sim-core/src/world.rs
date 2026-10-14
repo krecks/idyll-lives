@@ -1349,29 +1349,55 @@ impl World {
             value: 0,
             wear: 0.0,
             open: false,
-            // A crop comes ripe (as the catalog shows it).
+            // A crop comes ripe with a lot (bought, it is just planted: `buy_at`).
             growth: 1.0,
             off: false,
         };
-        let name = &self.content.objects[def].id;
-        let layer = self.content.objects[def].layer;
+        let d = &self.content.objects[def];
+        let name = &d.id;
+        let layer = d.layer;
         if layer == Layer::Surface {
             return self.check_surface_fit(obj);
         }
+        let on = |o: &ObjectInstance, t: (i32, i32)| o.tiles(&self.content).any(|q| q == t);
+        let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
-            // on their own layer.
+            // on their own layer (and a hanging plant that hangs low the floor as well).
+            let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
             let taken = if layer.mounted() {
-                self.objects.iter().any(|o| {
-                    self.content.objects[o.def].layer == layer && o.tiles(&self.content).any(|t| t == (tx, tz))
-                })
+                self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
+                    || (d.hangs_low && floor && !self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz))))
             } else {
-                self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)]
+                floor && !self.objects.iter().any(|o| self.content.objects[o.def].hangs_low && on(o, (tx, tz)))
             };
             if !self.lot.in_bounds(tx, tz) || taken {
                 return Err(Error::new(format!(
                     "'{name}' at {x},{z} overlaps or leaves the lot"
                 )));
+            }
+            // Furniture as tall as the wall leaves no room on the wall or the ceiling over it; a
+            // thing hanging low from the ceiling none under it.
+            let clash = self.objects.iter().find(|o| {
+                let other = &self.content.objects[o.def];
+                on(o, (tx, tz))
+                    && match (layer, other.layer) {
+                        (Layer::Wall, Layer::Floor) => other.fills_wall,
+                        (Layer::Ceiling, Layer::Floor) => other.fills_wall || d.hangs_low,
+                        (Layer::Floor, Layer::Wall) => d.fills_wall,
+                        (Layer::Floor, Layer::Ceiling) => d.fills_wall || other.hangs_low,
+                        _ => false,
+                    }
+            });
+            if let Some(o) = clash {
+                let other = &self.content.objects[o.def];
+                let why = match layer {
+                    Layer::Floor if other.hangs_low => format!("is under the {}, which hangs too low", called(o)),
+                    Layer::Floor => format!("is too tall for the {} hanging there", called(o)),
+                    Layer::Ceiling if d.hangs_low && !other.fills_wall => format!("would hang too low over the {}", called(o)),
+                    _ => format!("would hang into the {}", called(o)),
+                };
+                return Err(Error::new(format!("'{name}' at {x},{z} {why}")));
             }
             if layer == Layer::Ceiling && self.lot.room_at(tx, tz) == crate::lot::OUTDOORS {
                 return Err(Error::new(format!("'{name}' at {x},{z} needs a ceiling")));
@@ -1396,8 +1422,12 @@ impl World {
         }) {
             return Err(Error::new(format!("'{name}' at {x},{z} is blocked by a wall")));
         }
-        if layer == Layer::Wall && !self.backed_by_wall(&obj) {
-            return Err(Error::new(format!("'{name}' at {x},{z} has no wall to hang on")));
+        if layer == Layer::Wall {
+            match self.wall_behind(&obj) {
+                None => return Err(Error::new(format!("'{name}' at {x},{z} has no wall to hang on"))),
+                Some(true) if !d.over_window => return Err(Error::new(format!("'{name}' at {x},{z} can't hang over a window"))),
+                _ => {}
+            }
         }
         self.check_storey_fit(&obj)?;
         Ok(obj)
@@ -1438,25 +1468,35 @@ impl World {
         NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs }
     }
 
-    /// Whether a wall (plain or with a window) runs along the whole back edge of `obj`.
-    fn backed_by_wall(&self, obj: &ObjectInstance) -> bool {
+    /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
+    /// all along, else whether a window is part of it.
+    fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
-        obj.back_edges(&self.content).into_iter().all(|(horizontal, x, z)| {
+        obj.back_edges(&self.content).into_iter().try_fold(false, |window, (horizontal, x, z)| {
             let e = if horizontal {
                 (x >= 0 && (x as usize) < lot.width && z >= 0 && (z as usize) <= lot.depth).then(|| lot.h_edge(x as usize, z as usize))
             } else {
                 (x >= 0 && (x as usize) <= lot.width && z >= 0 && (z as usize) < lot.depth).then(|| lot.v_edge(x as usize, z as usize))
             };
-            matches!(e, Some(Edge::Wall | Edge::Window))
+            match e? {
+                Edge::Wall => Some(window),
+                Edge::Window => Some(true),
+                _ => None,
+            }
+        })
+    }
+
+    /// What hangs on the wall at this grid edge (`horizontal`: an `h` edge).
+    pub(crate) fn hung_on(&self, horizontal: bool, x: i32, z: i32) -> impl Iterator<Item = &ObjectInstance> {
+        self.objects.iter().filter(move |o| {
+            self.content.objects[o.def].layer == Layer::Wall && o.back_edges(&self.content).contains(&(horizontal, x, z))
         })
     }
 
     /// Whether something hangs on the wall at this grid edge (`horizontal`: an `h` edge).
     pub(crate) fn hangs_on(&self, horizontal: bool, x: i32, z: i32) -> bool {
-        self.objects.iter().any(|o| {
-            self.content.objects[o.def].layer == Layer::Wall && o.back_edges(&self.content).contains(&(horizontal, x, z))
-        })
+        self.hung_on(horizontal, x, z).next().is_some()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -4072,14 +4112,14 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if !given_up {
                         sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
                     }
-                } else if inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
+                } else if inter.close_after || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
                     // Up from a night's sleep: the toilet first, out of habit.
                     if inter.tags & content.day_rhythm.sleep_tags != 0 {
                         sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
                     }
                     // Then what sleeping or napping opened is closed again (a wall bed folded
-                    // up, a sofa bed's bed put away), unless someone is still in it: whoever
-                    // gets up last does it.
+                    // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
+                    // `close_after`), unless someone is still in it: whoever gets up last does it.
                     if let Some(close) = closing(sim, content, o, object) {
                         match sim.follow_up {
                             None => sim.follow_up = Some(close),

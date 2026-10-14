@@ -31,6 +31,7 @@
       "footprint": [2, 1],
       "price": 1250,
       "category": "validate",
+      "fillsWall": true,
       "group": "bookworm",
       "slots": 1,
       "description": "Floor-to-ceiling shelves of rare editions with a rolling ladder. Trains Intelligence; scholars (Intelligence 4+) come away with a eureka moment.",

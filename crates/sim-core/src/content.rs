@@ -126,6 +126,10 @@ pub struct Interaction {
     /// so (content `leaves`): folding a wall bed down, going to sleep in it. Nothing closes an
     /// object someone else is using.
     pub leaves: Option<bool>,
+    /// Opening it is for this use only (content `closeAfter`, with `leaves`: "open"): when it
+    /// ends, the last one done closes it again, as after a night's sleep (a hot tub's cover goes
+    /// back on after a soak).
+    pub close_after: bool,
     /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
     /// `ObjectInstance::growth`).
     pub ripe: bool,
@@ -226,9 +230,21 @@ pub struct ObjectDef {
     /// Buy catalog group (`""`: none): things of one group with a use in common are the same
     /// kind of thing (see `planner::wanted_object`).
     pub group: String,
-    /// A crop that grows (content `grows`): bought ripe, picked by interactions that leave it
-    /// "picked", then fallow, planted again and growing (see `ObjectInstance::growth`).
+    /// A crop that grows (content `grows`): bought just planted (ripe in a lot's or a house's
+    /// file), picked by interactions that leave it "picked", then fallow, planted again and
+    /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
+    /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
+    /// plain wall behind it.
+    pub over_window: bool,
+    /// Furniture that fills the wall's height (content `fillsWall`: a wardrobe, a tall bookcase,
+    /// a fireplace's chimney breast): nothing hangs on the wall or from the ceiling over its
+    /// tiles.
+    pub fills_wall: bool,
+    /// Things from the ceiling that hang low enough to walk into (content `hangsLow`: a hanging
+    /// plant): it takes the floor under it as furniture does.
+    pub hangs_low: bool,
 }
 
 impl ObjectDef {
@@ -2007,6 +2023,12 @@ struct ObjectRaw {
     /// A crop that grows (see `ObjectDef::grows`).
     #[serde(default)]
     grows: Option<GrowsRaw>,
+    #[serde(default, rename = "overWindow")]
+    over_window: bool,
+    #[serde(default, rename = "fillsWall")]
+    fills_wall: bool,
+    #[serde(default, rename = "hangsLow")]
+    hangs_low: bool,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -2101,6 +2123,8 @@ struct InteractionRaw {
     /// What the use leaves the object (see `Interaction::leaves`).
     #[serde(default)]
     leaves: Option<OpenState>,
+    #[serde(default)]
+    close_after: bool,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2577,9 +2601,16 @@ impl Content {
                         Some(OpenState::Closed) => Some(false),
                         _ => None,
                     },
+                    close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
                 });
+                if it.close_after
+                    && (it.leaves != Some(OpenState::Open)
+                        || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
+                {
+                    return Err(Error::new(format!("{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed")));
+                }
                 if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
                     return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
                 }
@@ -2614,6 +2645,16 @@ impl Content {
                     )));
                 }
             };
+            for (set, flag, on) in [(obj.over_window, "overWindow", Layer::Wall), (obj.fills_wall, "fillsWall", Layer::Floor), (obj.hangs_low, "hangsLow", Layer::Ceiling)] {
+                if set && layer != on {
+                    let on = match on {
+                        Layer::Wall => "a wall",
+                        Layer::Floor => "the floor",
+                        _ => "the ceiling",
+                    };
+                    return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
+                }
+            }
             if layer == Layer::Surface
                 && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
             {
@@ -2742,6 +2783,9 @@ impl Content {
                     }
                     None => None,
                 },
+                over_window: obj.over_window,
+                fills_wall: obj.fills_wall,
+                hangs_low: obj.hangs_low,
             });
         }
 

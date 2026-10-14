@@ -2388,6 +2388,7 @@
       ],
       "price": 600,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "appliances"
     },
     {
@@ -2518,6 +2519,7 @@
       ],
       "price": 650,
       "category": "validate",
+      "fillsWall": true,
       "group": "showers"
     },
     {
@@ -2638,6 +2640,7 @@
       ],
       "price": 250,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves"
     },
     {
@@ -2697,6 +2700,7 @@
       ],
       "price": 40,
       "category": "validate",
+      "freeRotation": true,
       "group": "houseplants",
       "description": "A leafy plant in a terracotta pot."
     },
@@ -2782,6 +2786,7 @@
       ],
       "price": 60,
       "category": "validate",
+      "freeRotation": true,
       "group": "flowers",
       "description": "A wooden bed full of mixed bedding flowers. Tending it trains Gardening; a skilled gardener is proud of the result."
     },
@@ -2812,6 +2817,7 @@
       ],
       "price": 120,
       "category": "validate",
+      "freeRotation": true,
       "group": "trees",
       "outdoors": true,
       "description": "A broad, rounded shade tree. Its crown spreads about five metres across."
@@ -2827,6 +2833,7 @@
       "interactions": [],
       "price": 120,
       "category": "validate",
+      "freeRotation": true,
       "group": "trees",
       "outdoors": true,
       "description": "A tall evergreen pine."
@@ -2866,6 +2873,7 @@
       ],
       "price": 40,
       "category": "validate",
+      "freeRotation": true,
       "group": "shrubs",
       "outdoors": true,
       "description": "A rounded green shrub for borders and corners."
@@ -3302,6 +3310,7 @@
       ],
       "price": 120,
       "category": "validate",
+      "freeRotation": true,
       "group": "floor lamps",
       "interactions": []
     },
@@ -3480,7 +3489,7 @@
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "objectRules": {
-    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community", "validate"],
+    "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
     "maxQuality": 3,

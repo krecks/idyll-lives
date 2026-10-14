@@ -104,3 +104,102 @@ fn bunk_beds_put_both_sleepers_in_the_middle() {
     assert!((a[0] - c[0]).abs() < 0.05 && (b[0] - c[0]).abs() < 0.05, "{a:?} {b:?} {c:?}");
     assert!(b[0] > a[0], "a hair apart: the second sleeper is on the upper bunk");
 }
+
+/// Curtains (content `overWindow`), a wardrobe as tall as the wall (`fillsWall`) and a plant
+/// hanging low from the ceiling (`hangsLow`), with the things above.
+const TALL: &str = r#"{
+    "needs":[{"id":"energy","label":"Energy","decayPerHour":0.02}],
+    "objects":[
+      {"id":"sofa","name":"Sofa","price":100,"footprint":[2,1],"interactions":[]},
+      {"id":"picture","name":"Picture","price":50,"layer":"wall","interactions":[]},
+      {"id":"curtains","name":"Curtains","price":50,"layer":"wall","overWindow":true,"interactions":[]},
+      {"id":"pendant","name":"Pendant","price":50,"layer":"ceiling","interactions":[]},
+      {"id":"wardrobe","name":"Wardrobe","price":100,"fillsWall":true,"interactions":[]},
+      {"id":"plant","name":"Hanging plant","price":50,"layer":"ceiling","hangsLow":true,"interactions":[]},
+      {"id":"rug","name":"Rug","price":50,"layer":"rug","interactions":[]}],
+    "economy":{"startingFunds":5000}}"#;
+
+/// The room above, with windows in its top wall at x 3 and 4.
+const WINDOWS: &str = r#"{"width":12,"depth":12,
+    "walls":[[1,1,9,1],[1,7,9,7],[1,1,1,7],[9,1,9,7]],
+    "doors":[{"x":4,"z":7,"axis":"x"}],
+    "windows":[{"x":3,"z":1,"axis":"x"},{"x":4,"z":1,"axis":"x"}],
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[6.5,9.5]}],
+    "households":[{"name":"Player","plot":0,"player":true}],
+    "sims":[{"name":"Ada","x":7.5,"z":5.5}]}"#;
+
+fn edge(kind: sim_core::command::EdgeKind, x: i32) -> Command {
+    let e = sim_core::command::EdgeEdit { axis: sim_core::command::EdgeAxis::H, x, z: 1, kind, cover: None, form: None, style: None, sill: None, head: None };
+    Command::Build { household: 0, edits: vec![e] }
+}
+
+#[test]
+fn only_what_belongs_over_a_window_hangs_on_one() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    let err = buy(&mut w, "picture", 3, 1, 0).unwrap_err().to_string();
+    assert_eq!(err, "that can't hang over a window");
+    buy(&mut w, "curtains", 3, 1, 0).expect("curtains hang over a window");
+    buy(&mut w, "curtains", 6, 1, 0).expect("and on a plain wall");
+    buy(&mut w, "picture", 7, 1, 0).expect("a picture on a plain wall");
+    // Neither does a window go in behind a picture; behind curtains it does.
+    use sim_core::command::EdgeKind;
+    let err = w.apply(edge(EdgeKind::Window, 7)).unwrap_err().to_string();
+    assert!(err.contains("picture") && err.contains("window"), "{err}");
+    w.apply(edge(EdgeKind::Window, 6)).expect("a window behind the curtains");
+    // Moved over the window, the picture is refused and stays where it was.
+    let picture = w.objects.iter().position(|o| w.content.objects[o.def].id == "picture").unwrap() as u32;
+    let mv = Command::MoveObject { household: 0, object: picture, x: 4, z: 1, rot: 0, turn: None, offset: None, size: None, tall: None };
+    assert!(w.apply(mv).unwrap_err().to_string().contains("window"));
+    assert!(w.objects.iter().any(|o| w.content.objects[o.def].id == "picture" && o.x == 7));
+}
+
+#[test]
+fn tall_furniture_takes_the_wall_and_the_ceiling_over_it() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    buy(&mut w, "wardrobe", 6, 1, 0).unwrap();
+    let err = buy(&mut w, "picture", 6, 1, 0).unwrap_err().to_string();
+    assert_eq!(err, "that would hang into the wardrobe");
+    // (On any wall of its tile: the side wall of a corner too.)
+    buy(&mut w, "wardrobe", 8, 1, 0).unwrap();
+    assert!(buy(&mut w, "picture", 8, 1, 3).is_err(), "not on the side wall beside it");
+    assert!(buy(&mut w, "pendant", 6, 1, 0).unwrap_err().to_string().contains("hang into the wardrobe"));
+    buy(&mut w, "picture", 7, 1, 0).expect("beside it is fine");
+    buy(&mut w, "rug", 6, 2, 0).expect("so is a rug in front");
+    // Nor does a wardrobe go under a picture or a lamp.
+    let err = buy(&mut w, "wardrobe", 7, 1, 0).unwrap_err().to_string();
+    assert_eq!(err, "that is too tall for the picture hanging there");
+    buy(&mut w, "pendant", 2, 4, 0).unwrap();
+    assert!(buy(&mut w, "wardrobe", 2, 4, 0).is_err(), "not under a lamp either");
+    buy(&mut w, "sofa", 2, 4, 0).expect("a sofa under the lamp is fine");
+}
+
+#[test]
+fn a_plant_hanging_low_takes_the_floor_under_it() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    let free = |w: &World, x: i32, z: i32| !w.blocked()[w.lot.tile_index(x, z)];
+    let plant = buy(&mut w, "plant", 5, 4, 0).unwrap();
+    assert!(!free(&w, 5, 4), "nobody walks into its pot");
+    let err = buy(&mut w, "sofa", 4, 4, 0).unwrap_err().to_string();
+    assert_eq!(err, "that is under the hanging plant, which hangs too low");
+    buy(&mut w, "sofa", 2, 3, 0).unwrap();
+    let err = buy(&mut w, "plant", 3, 3, 0).unwrap_err().to_string();
+    assert_eq!(err, "that would hang too low over the sofa");
+    buy(&mut w, "pendant", 3, 3, 0).expect("a lamp hangs over the sofa");
+    buy(&mut w, "rug", 5, 4, 0).expect("a rug lies under the plant");
+    assert!(buy(&mut w, "plant", 7, 5, 0).unwrap_err().to_string().contains("standing there"), "not on Ada's head");
+
+    // Saved and loaded, it still takes its tile; sold, it's free again.
+    let loaded = World::from_save_json(TALL, &w.save_json()).unwrap();
+    assert!(!free(&loaded, 5, 4));
+    w.apply(Command::Sell { household: 0, object: plant }).unwrap();
+    assert!(free(&w, 5, 4), "the floor is free again");
+}
+
+#[test]
+fn the_flags_are_for_their_own_layers() {
+    for (flag, layer) in [("overWindow", "floor"), ("fillsWall", "wall"), ("hangsLow", "floor")] {
+        let content = format!(r#"{{"needs":[{{"id":"energy","label":"Energy"}}],"objects":[{{"id":"x","name":"X","layer":"{layer}","{flag}":true,"interactions":[]}}]}}"#);
+        let err = World::from_json(&content, WINDOWS, 1).err().map(|e| e.to_string()).unwrap_or_default();
+        assert!(err.contains(flag), "{flag} on the {layer}: {err}");
+    }
+}

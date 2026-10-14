@@ -156,6 +156,7 @@
       "footprint": [1, 1],
       "price": 160,
       "category": "validate",
+      "freeRotation": true,
       "group": "gloomy",
       "slots": 1,
       "description": "A glass column of endless indoor rain; watching it is oddly soothing and a little fun.",

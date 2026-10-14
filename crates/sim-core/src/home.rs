@@ -460,6 +460,12 @@ impl World {
             if !e.starts_with('\'') {
                 return Error::new(e);
             }
+            // Why it doesn't fit beside something else, as it says it.
+            for why in ["would hang into ", "would hang too low over ", "is too tall for ", "is under ", "can't hang over a window"] {
+                if let Some(i) = e.find(why) {
+                    return Error::new(format!("that {}", &e[i..]));
+                }
+            }
             Error::new(if e.contains("diagonal") {
                 "furniture can't stand on a tile with a diagonal wall"
             } else if e.contains("no wall to hang on") {
@@ -480,8 +486,9 @@ impl World {
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
         }
-        // Residents walk under pictures and lamps and over rugs.
-        let mounted = self.content.objects[def].layer.mounted();
+        // Residents walk under pictures and lamps and over rugs (not into a plant hanging low).
+        let d = &self.content.objects[def];
+        let mounted = d.layer.mounted() && !d.hangs_low;
         if !mounted && self.sim_in_the_way(&obj) {
             return Err(Error::new("someone is standing there"));
         }
@@ -534,7 +541,7 @@ impl World {
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
     fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
         let d = &self.content.objects[def];
-        if d.layer.mounted() || d.stairs {
+        if (d.layer.mounted() && !d.hangs_low) || d.stairs {
             return Ok(());
         }
         // Where it doesn't fit at all, `place_at_home` says why.
@@ -645,6 +652,10 @@ impl World {
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
+        // A crop bought new is just planted: it ripens over its days.
+        if self.content.objects[def].grows.is_some() {
+            self.objects[id as usize].growth = 0.0;
+        }
         self.pay(h, price);
         Ok(id)
     }
@@ -934,6 +945,14 @@ impl World {
                 && self.hangs_on(e.axis == EdgeAxis::H, e.x, e.z)
             {
                 return Err(Error::new("something hangs on that wall: move it first"));
+            }
+            // Only curtains and the like hang over a window.
+            if target == Edge::Window
+                && diagonal.is_none()
+                && let Some(o) = self.hung_on(e.axis == EdgeAxis::H, e.x, e.z).find(|o| !self.content.objects[o.def].over_window)
+            {
+                let name = self.content.objects[o.def].name.to_lowercase();
+                return Err(Error::new(format!("the {name} hangs there, and it can't hang over a window: move it first")));
             }
             if let Some(dir) = diagonal
                 && target != Edge::Open

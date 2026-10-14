@@ -1,4 +1,5 @@
-//! Crops that grow (content `grows`): a vegetable patch comes ripe, is picked by its harvest
+//! Crops that grow (content `grows`): a vegetable patch comes ripe with the lot (bought, it's just
+//! planted and ripens over its `days`), is picked by its harvest
 //! (`"when": "ripe"`, `"leaves": "picked"`), lies fallow, is planted again by itself and ripens
 //! over its `days`. Its stage is saved, and is what the renderer shows (`GrowthStage`).
 
@@ -82,6 +83,25 @@ fn nobody_picks_it_unripe_of_their_own_accord() {
     w.objects[0].growth = 1.0;
     let picked = until(&mut w, 6 * 60, |w| w.objects[0].growth_stage() == GrowthStage::Picked);
     assert!(picked.is_some(), "a hungry resident harvests the ripe patch");
+}
+
+#[test]
+fn a_crop_bought_new_is_just_planted_and_ripens_over_its_days() {
+    let mut w = world();
+    w.apply(Command::Buy { household: 0, object: "vegPatch".into(), at: Some([7, 2, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+    let bought = w.objects.len() - 1;
+    assert_eq!(w.objects[bought].growth_stage(), GrowthStage::Planted, "bought, it's just planted");
+    assert_eq!(w.objects[0].growth_stage(), GrowthStage::Ripe, "the one the lot came with is ripe");
+    let err = w.apply(Command::Use { sim: 0, object: bought as u32, interaction: HARVEST }).unwrap_err();
+    assert!(err.to_string().contains("isn't ripe yet"), "{err}");
+
+    // Moving it keeps how far it's grown.
+    w.objects[bought].growth = 0.5;
+    w.apply(Command::MoveObject { household: 0, object: bought as u32, x: 8, z: 4, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
+    let moved = w.objects.len() - 1;
+    assert_eq!(w.objects[moved].growth, 0.5);
+    let ripe = until(&mut w, 24 * 60, |w| w.objects[moved].ripe()).expect("ripe in half a day");
+    assert!((690..=750).contains(&ripe), "ripe after {ripe} minutes");
 }
 
 #[test]
