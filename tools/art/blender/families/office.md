@@ -41,7 +41,7 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
   15° and back (`swivel`, `hold` 0.6 s) as a resident sits (and, for the executive and desk chairs, writes or does
   homework), and carries them round with it (`ride`). Seats at the content's heights: 0.49, 0.48 and 0.47 m.
 - **Filing cabinet:** steel, three drawers with handles and label cards, a paper tray and a plant on top. Its top
-  drawer is a part of its own but still (+use).
+  drawer, with a box of files behind it, slides 30 cm out (`drawer_open`) for its use, File papers; `hold` 2 s.
 - **Whiteboard** (wall): an aluminium frame, a marker tray, a heading and a note. While a resident plans, the plan
   (lines, a chart) grows across the board from its left (`scribble`, `G.grow` in x and height from a point), and is
   wiped as the clip plays back at the end.
@@ -60,7 +60,7 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
 | `model.chairExecutive` | 0.62 × 1.34 × 0.64 m | 2,864 | 2 | Frame, Seat |
 | `model.chairTask` | 0.62 × 1.05 × 0.60 m | 2,904 | 3 | Frame, Seat, Back |
 | `model.officeChair` | 0.62 × 1.16 × 0.62 m | 2,648 | 3 | Frame, Seat |
-| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 2,260 | 2 | Cabinet, Handles |
+| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 3,340 | 3 | Cabinet, Handles |
 | `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 | 2 | Board, Frame |
 | `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 | 2 | Board, Frame |
 

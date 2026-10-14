@@ -33,6 +33,7 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `chrome` | chrome | handles and knobs |
 | `grate` | satin | burner heads, grates and hob rings |
 | `flame` | gloss | a gas flame ring (gloss, not emissive) |
+| `heat` | gloss | the hob counter's ring glowing red (gloss, so it reads by day) |
 | `charcoal` | satin | the microwave's body |
 | `display` | gloss | the microwave's display |
 | `tray` | metal | the oven tower's tray; a dishwasher's rack |
@@ -58,10 +59,11 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 | `model.stoveGas` | 0.920 × 1.113 × 0.704 m | 2,904 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
 | `model.wallOven` | 0.700 × 2.110 × 0.706 m | 1,668 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
 | `model.rangeCooker` | 1.580 × 1.140 × 0.754 m | 3,632 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
-| `model.cooktopCounter` | 1.000 × 0.963 × 0.790 m | 2,368 | 3 | knob, flame | `burner_on` (cook) |
-| `model.microwave` | 1.000 × 1.260 × 0.670 m | 1,644 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
+| `model.cooktopCounter` | 1.000 × 0.963 × 0.660 m | 2,188 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
+| `model.microwave` | 1.000 × 1.260 × 0.670 m | 2,076 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
 
-The microwave door hinges on its left edge and swings 100°; its glass turntable turns a full turn every 2 s
+Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
+the viewer's left) and swings 100°; its glass turntable turns a full turn every 2 s
 while it heats. The gas range and the range cooker carry a pot and a pan on the hob; the flame lights on a
 free burner beside them. `stoveGas`, `rangeCooker` and `microwave` take 4 draw calls (the most allowed);
 the rest take 3.
@@ -98,10 +100,12 @@ python3 -B tools/art/blender/build.py kitchen_cooking --preview  # previews/<id>
 ## Where it stands (review, 2026-10-14)
 
 Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
-wall), a run of counters and appliances lines up, and its top is under its content `surface`
-(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
-centred.
+not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
+appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
+2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
+their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+catalog2.py `shallow`). Islands stand free, centred.
 
 Also from the review: the hob clips (`knob_on`, `burner_on`) last the whole use, and only `oven_open`
 shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `oven_cavity` face just inside its closed door,

@@ -46,8 +46,9 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
   0.6 s, then it turns back. `ride: swivel` carries the sitter round with it, as the office chairs do. The legs,
   foot ring and hub are the still part. The wood stools' feet and swivel plate are in the frame's wood, so a
   stool draws in 3 groups (base wood; seat wood and fabric).
-- **Bar cart**: the cocktail shaker is a part of its own pivoting at its foot on the top tray. `shake` lifts it
-  10 cm and tips it 30° towards the front (one clip, both channels) in 0.6 s for `mix`; `hold` 1.5 s.
+- **Bar cart**: the cocktail shaker is a part of its own pivoting at its foot, in the middle of the top tray's
+  front edge, before the resident who mixes from the front tile. `shake` lifts it 10 cm and tips it 30° towards
+  them (one clip, both channels) in 0.6 s for `mix`; `hold` 1.5 s.
 - **Doors for later** (the plan's "+use"): the sideboard's four fluted doors, the buffet's five panelled doors and
   the china cabinet's two glazed doors are parts of their own, hinged on their outer edges, with no clip (a still
   part costs no draw call). The china cabinet's base doors and the buffet's drawers are in the body.
@@ -57,7 +58,7 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 | Model | Size (w × h × d) | Triangles | Draws | Notes |
 |---|---|---|---|---|
 | `model.diningTable` | 1.62 × 1.03 × 0.87 m | 4,816 | 3 | oak top to 0.765, runner, vase, two place settings, two ladder-back chairs |
-| `model.bistroSet` | 0.62 × 1.00 × 0.96 m | 3,496 | 3 | round oak top on a black column, cup and vase; a café chair with a looped back |
+| `model.bistroSet` | 0.62 × 1.00 × 0.91 m | 3,496 | 3 | round oak top on a black column, cup and vase; a café chair with a looped back |
 | `model.diningGlass` | 1.70 × 1.11 × 0.91 m | 6,068 | 2 | glass top on chrome sled legs; two dark chairs with grey seats |
 | `model.diningOak` | 1.76 × 1.10 × 0.92 m | 5,700 | 3 | thick oak top with breadboard ends on square tapered legs; two chairs |
 | `model.tableSquare2` | 0.82 × 0.75 × 0.82 m | 1,388 | 1 | round tapered legs with collars, aprons |
