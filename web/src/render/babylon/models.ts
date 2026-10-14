@@ -21,6 +21,8 @@
 
 import {
   Color3,
+  Constants,
+  StandardMaterial,
   ImportMeshAsync,
   TransformNode,
   PBRMaterial,
@@ -62,6 +64,12 @@ export interface ModelTemplate {
   outline?: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Its moving parts (a file's animated nodes: a fridge's doors) and the clips that move them. */
   motion?: ModelMotion;
+  /**
+   * What glows at night (a lamp's shade, a screen: materials with `glow`): a copy of those faces
+   * drawn added on top, off until the renderer gives each instance its strength (thin instance
+   * `color`, 0..1) and turns it on. Not in `meshes`: nothing else draws it.
+   */
+  glow?: Mesh;
 }
 
 /**
@@ -792,7 +800,7 @@ export function painted(entry: ModelEntry | undefined, colors: PartColors | unde
   const shown = paintColors(entry, colors);
   if (!entry || !shown) return entry;
   const materials = { ...((entry as ModelEntry & ModelExtras).materials ?? {}) };
-  for (const [name, color] of Object.entries(shown)) materials[name] = { ...(materials[name] ?? materials['*']), color };
+  for (const [name, color] of Object.entries(shown)) materials[name] = { ...(materials[name] ?? namedFinish(name) ?? materials['*']), color };
   return { ...entry, materials } as ModelEntry;
 }
 
@@ -824,6 +832,11 @@ interface MaterialOverride {
    * round as it is drawn.
    */
   mirror?: 'front' | 'back';
+  /**
+   * Glows at night in this colour (sRGB hex; a lamp's shade, a screen), as the lamps come on and
+   * out with its room's lights (`TemplateGlow`); unlit by day. On the still body.
+   */
+  glow?: string;
 }
 
 /** Downloads the files of these models in the background, so they're at hand when shown. */
@@ -1027,6 +1040,13 @@ function copyData(data: VertexData): VertexData {
   return copy;
 }
 
+/** A material named for its finish, `stone@matte`: drawn with `material.finish.matte` (unless the entry maps it), if `lib` has it. */
+function namedFinish(name: string, lib?: MaterialLibrary): MaterialOverride | undefined {
+  const at = name.lastIndexOf('@');
+  const finish = `material.finish.${name.slice(at + 1)}`;
+  return at > 0 && /^[a-z]+$/.test(name.slice(at + 1)) && (!lib || lib.hasFinish(finish)) ? { finish } : undefined;
+}
+
 /** Copies of a file's materials as entries draw them (as loaded, or restyled by `color`, `roughness`, `metallic`), by restyling. */
 const materialCopies = new WeakMap<Material, Map<string, Material>>();
 
@@ -1064,7 +1084,8 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     fit ? Vector3.Zero() : new Vector3(ox, oy, oz),
   );
   const overrides = extras.materials ?? {};
-  const overrideFor = (m: Material | null): MaterialOverride | undefined => (m && overrides[m.name]) ?? overrides['*'];
+  const finishes = MaterialLibrary.for(scene);
+  const overrideFor = (m: Material | null): MaterialOverride | undefined => (m && (overrides[m.name] ?? namedFinish(m.name, finishes))) ?? overrides['*'];
 
   // This build's copy of the geometry it shows.
   const pieces = file.pieces.filter((p) => !overrideFor(p.material)?.hide).map((p) => ({ data: copyData(p.data).transform(space), material: p.material, part: p.part }));
@@ -1132,6 +1153,9 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     }),
     ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
   ];
+  // What glows at night: its faces again, in the glow's colour (still body only, as mirrors).
+  const glowing = pieces.filter(({ material, part }) => part < 0 && overrideFor(material)?.glow);
+  const glow = glowing.length ? glowMesh(scene, `${name}|glow`, glowing.map(({ data, material }) => ({ data, color: overrideFor(material)!.glow! }))) : undefined;
   return {
     meshes,
     tints,
@@ -1140,6 +1164,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     bottom,
     outline,
     ...(mirrors.length ? { mirrors } : {}),
+    ...(glow ? { glow } : {}),
     ...(file.parts.length && file.clips.size ? { motion: { parts, clips: buildClips(file.clips, space, shifts) } } : {}),
   };
 }
@@ -1204,6 +1229,54 @@ function fileMirror(data: VertexData, { lo, hi }: { lo: number[]; hi: number[] }
   const onto = axis === 0 ? Matrix.RotationY((sign * Math.PI) / 2) : axis === 1 ? Matrix.RotationX((-sign * Math.PI) / 2) : sign > 0 ? Matrix.Identity() : Matrix.RotationY(Math.PI);
   const centre = new Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2).addInPlace(unit(axis, (size[axis] / 2 + 0.002) * sign));
   return { round, matrix: Matrix.Scaling(w, h, 1).multiply(onto).multiply(Matrix.Translation(centre.x, centre.y, centre.z)) };
+}
+
+/** The material glows are drawn with: unlit, added to what's behind, coloured per vertex and per instance. */
+const glowMaterials = new WeakMap<Scene, StandardMaterial>();
+
+/**
+ * One mesh of the glowing faces (`MaterialOverride.glow`), each piece in its glow colour, a hair in
+ * front of the faces it lights; off (the renderer turns it on at night).
+ */
+function glowMesh(scene: Scene, name: string, pieces: { data: VertexData; color: string }[]): Mesh {
+  let material = glowMaterials.get(scene);
+  if (!material) {
+    material = new StandardMaterial('glow', scene);
+    // Unlit: the emissive white, times the vertex colour (the glow's) and the instance's strength.
+    material.disableLighting = true;
+    material.diffuseColor = Color3.Black();
+    material.emissiveColor = Color3.White();
+    material.specularColor = Color3.Black();
+    material.alphaMode = Constants.ALPHA_ADD;
+    material.alpha = 0.999;
+    material.disableDepthWrite = true;
+    material.zOffset = -2;
+    // Both sides (a shade glows inside too; the faces' winding varies with the file's handedness).
+    material.backFaceCulling = false;
+    material.fogEnabled = false;
+    glowMaterials.set(scene, material);
+  }
+  const all = new VertexData();
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  for (const { data, color } of pieces) {
+    const base = positions.length / 3;
+    const pos = data.positions ?? [];
+    const c = Color3.FromHexString(color).toLinearSpace();
+    positions.push(...pos);
+    normals.push(...(data.normals ?? new Array<number>(pos.length).fill(0)));
+    for (let i = 0; i < pos.length / 3; i++) colors.push(c.r, c.g, c.b, 1);
+    for (const i of data.indices ?? Array.from({ length: pos.length / 3 }, (_, k) => k)) indices.push(base + i);
+  }
+  Object.assign(all, { positions, normals, colors, indices });
+  const mesh = new Mesh(name, scene);
+  all.applyToMesh(mesh);
+  mesh.material = material;
+  mesh.isPickable = false;
+  mesh.setEnabled(false);
+  return mesh;
 }
 
 /** The box (`lo`, `hi`: corners along x, y, z) of a mesh's positions. */

@@ -27,7 +27,7 @@ export class AssetRegistry {
       loadOptimized(base),
     ]);
     for (const [url, manifest] of manifests.flat()) {
-      for (const [key, entry] of Object.entries(manifest.entries)) registry.entries.set(key, resolveUrls(entry, url));
+      for (const [key, entry] of Object.entries(manifest.entries)) registry.entries.set(key, extended(registry.entries.get(key), resolveUrls(entry, url)));
     }
     return registry;
   }
@@ -99,6 +99,15 @@ async function readJson<T>(url: URL, check: (res: Response) => void): Promise<T>
 export function optimizedUrl(url: string): string {
   const copy = optimized.get(withoutBuild(new URL(url, location.href).href));
   return copy ? withBuild(copy) : url;
+}
+
+/**
+ * A pack's model entry over the one it overrides: it keeps that one's `placeholder` (the fallback)
+ * and `vary` unless it gives its own, so packs needn't copy primitive parts (or let them go stale).
+ */
+function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry {
+  if (below?.type !== 'model' || entry.type !== 'model') return entry;
+  return { ...entry, placeholder: entry.placeholder ?? below.placeholder, ...((entry.vary ?? below.vary) !== undefined ? { vary: entry.vary ?? below.vary } : {}) };
 }
 
 /** Makes file references absolute relative to the manifest that declared them, with this build's query. */

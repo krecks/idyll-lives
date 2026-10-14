@@ -465,6 +465,8 @@ export class BabylonRenderer implements Renderer {
   private fx!: BuildEffects;
   /** Placed objects' moving parts, played while residents use them. */
   private readonly motion = new ObjectMotion();
+  /** What glows at night (lamp shades, screens: a template's `glow`), per model: its instances' strengths and rooms. */
+  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[] }[] = [];
   private previewMeshes!: Record<'wall' | 'door' | 'window' | 'open', Mesh>;
   private previewBuffers!: Record<'wall' | 'door' | 'window' | 'open', Float32Array>;
   private previewValid = true;
@@ -809,9 +811,10 @@ export class BabylonRenderer implements Renderer {
       this.applyRoomLights();
       this.resetSnapshot();
     }
-    // And their windows stop glowing with them.
+    // And their windows (and lamp shades, screens) stop glowing with them.
     if (this.fadeWindowGlow(this.frameDt / 1000) && this.lampsLevel > 0) {
       this.house.setWindowGlow(this.windowGlowOn);
+      this.applyGlow();
       this.resetSnapshot();
     }
     this.steerCamera(this.frameDt / 1000);
@@ -3115,6 +3118,7 @@ export class BabylonRenderer implements Renderer {
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
     const mirrors: MirrorInstance[] = [];
     const moving: MovingObject[] = [];
+    const glows: typeof this.glows = [];
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
@@ -3172,7 +3176,8 @@ export class BabylonRenderer implements Renderer {
           bottom,
           wallRot: layer === 'wall' ? o.rot % 4 : undefined,
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
-          pop: { meshes: template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
+          // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
+          pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...(template.glow ? [template.glow] : [])], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
         if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth });
         if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
@@ -3185,7 +3190,20 @@ export class BabylonRenderer implements Renderer {
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
       });
+      if (template.glow) {
+        // Strengths per instance (`applyGlow`), by the room each stands in.
+        const colors = new Float32Array(list.length * 4);
+        template.glow.thinInstanceSetBuffer('matrix', matrices, 16, true);
+        template.glow.thinInstanceSetBuffer('color', colors, 4, false);
+        template.glow.thinInstanceRefreshBoundingInfo(false);
+        const W = world.width;
+        const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
+        glows.push({ mesh: template.glow, colors, rooms: list.map(roomOf) });
+      }
     });
+    for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
+    this.glows = glows;
+    this.applyGlow();
     this.mirrors.set(mirrors);
     this.motion.set(moving);
     shown.forEach((o, i) => {
@@ -3280,7 +3298,7 @@ export class BabylonRenderer implements Renderer {
     for (const [key, t] of this.templates) {
       if (keep.has(key)) continue;
       void t.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
+        if (!this.templatesInUse.has(key)) for (const mesh of [...template.meshes, ...(template.glow ? [template.glow] : [])]) mesh.setEnabled(false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -3480,8 +3498,9 @@ export class BabylonRenderer implements Renderer {
     // Warm lamps inside, glowing windows outside at night; cool daylight in the panes by day.
     this.lampsLevel = l.lamps;
     this.applyRoomLights();
-    // Curtains drawn from dusk to dawn.
+    // Curtains drawn from dusk to dawn; lamp shades and screens glowing.
     this.motion.setLamps(l.lamps);
+    this.applyGlow();
     const glass = this.lib.surface('material.window', { vertexColors: true, cutaway: true }) as PBRMaterial;
     // Windows light up only once it is getting dark outside.
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
@@ -3492,6 +3511,26 @@ export class BabylonRenderer implements Renderer {
     this.lib.setEmissive(inner, this.emissiveTmp.scaleInPlace((1 - l.lamps) * 0.9 + 0.05));
     this.street?.setNight(l.lamps, this.glowColor);
     this.overview?.setNight(l.lamps, this.glowColor);
+  }
+
+  /**
+   * Lamp shades and screens glow as the windows do: from dusk, as the lamps come up, and out with
+   * their room's lights where everyone is asleep (`windowGlowOn`). By day nothing is drawn.
+   */
+  private applyGlow(): void {
+    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    for (const g of this.glows) {
+      let lit = false;
+      g.rooms.forEach((room, i) => {
+        const f = level * (room ? (this.windowGlowOn.get(room) ?? 1) : 1);
+        g.colors.fill(f, i * 4, i * 4 + 3);
+        g.colors[i * 4 + 3] = 1;
+        lit ||= f > 0;
+      });
+      if (g.mesh.isDisposed()) continue;
+      g.mesh.thinInstanceBufferUpdated('color');
+      g.mesh.setEnabled(lit);
+    }
   }
 
   /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */

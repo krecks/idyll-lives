@@ -127,6 +127,12 @@ def first_value(gltf, binary, accessor, last=False):
     return struct.unpack_from(f'<{n}f', binary, view.get('byteOffset', 0) + acc.get('byteOffset', 0) + at)
 
 
+def named_finish(name):
+    """A material named for its finish (`stone@matte`) maps itself to it (models.ts `namedFinish`)."""
+    head, at, tail = name.rpartition('@')
+    return {'finish': f'material.finish.{tail}'} if head and at and tail.isalpha() and tail.islower() else None
+
+
 def played(motions):
     """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
     `loops`, `open`, `idle`, `night`, `growth`."""
@@ -290,6 +296,9 @@ def check_file(entry, finishes, path):
             errors.append(f'material {name!r}: `mirror` is front or back, not {ov["mirror"]!r}')
         elif ov.get('mirror') and name not in names:
             errors.append(f'material {name!r} is mirror glass, but no material of the file')
+        glow = ov.get('glow')
+        if glow is not None and not (isinstance(glow, str) and len(glow) == 7 and glow[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in glow[1:])):
+            errors.append(f'material {name!r}: `glow` is a colour, #rrggbb, not {glow!r}')
     lo, hi = [math.inf] * 3, [-math.inf] * 3
     tris, groups = 0, set()
     # Per problem, the materials that have it.
@@ -313,7 +322,9 @@ def check_file(entry, finishes, path):
                         hi = [max(hi[k], p[k]) for k in range(3)]
             mat = materials[prim['material']] if 'material' in prim else {'name': ''}
             name = mat.get('name', '')
-            ov = overrides.get(name, overrides.get('*'))
+            ov = overrides.get(name, named_finish(name) or overrides.get('*'))
+            if ov and ov.get('glow') and part is not None:
+                warnings.append(f'material {name!r} glows on a moving part, which doesn\'t: only the still body glows')
             if ov and ov.get('mirror'):
                 box = glass.setdefault(name, [[math.inf] * 3, [-math.inf] * 3, part])
                 for k in range(3):
@@ -410,10 +421,13 @@ def main(argv):
     for path, m in stack:
         for key, entry in m['entries'].items():
             if entry.get('type') == 'model':
-                # A pack's entry replaces the whole entry: its copy of the placeholder must follow the original.
+                # A pack's entry replaces the entry, keeping its placeholder and `vary` unless it gives its own
+                # (registry.ts `extended`): a copy of the placeholder must follow the original.
                 old = entries.get(key, (None, None))[0]
                 if old and old.get('placeholder') and entry.get('placeholder') and old['placeholder'] != entry['placeholder']:
                     stale[key] = os.path.relpath(path, ASSETS)
+                if old:
+                    entry = {**{k: old[k] for k in ('placeholder', 'vary') if k in old}, **entry}
                 entries[key] = (entry, path)
             elif entry.get('type') == 'material' and key.startswith('material.finish.'):
                 finishes[key] = not entry.get('texture') and entry.get('alpha', 1) >= 1

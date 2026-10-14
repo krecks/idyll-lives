@@ -47,9 +47,10 @@ def materials_used(objs=None):
 def write_pack(pack, entries, comment):
     """
     Writes the override pack `packs/<pack>/manifest.json` and lists it in the base manifest's `packs`.
-    `entries` is {key: fields}, e.g. {'url', 'materials', 'motions', 'paint'}; each entry also takes the
-    fields of the entry it overrides (its `placeholder`, the fallback, and `vary`...), read from the
-    manifests now so the copy can't go stale. Entries of the pack that aren't given are kept.
+    `entries` is {key: fields}, e.g. {'url', 'materials', 'motions', 'paint'}. The game keeps the
+    `placeholder` (the fallback) and `vary` of the entry it overrides (registry.ts `extended`); any other
+    fields of that entry are copied, read from the manifests now so the copy can't go stale. Entries of
+    the pack that aren't given are kept.
     """
     path = os.path.join(ASSETS, 'packs', pack, 'manifest.json')
     rel = os.path.relpath(path, ASSETS)
@@ -68,7 +69,7 @@ def write_pack(pack, entries, comment):
                              '(simple primitive parts, the fallback when the file fails to load)')
         entry = {'type': 'model', **fields}
         for k, v in (under or {}).items():
-            if k not in entry and k not in ('url', 'materials', 'motions', 'paint'):
+            if k not in entry and k not in ('url', 'far', 'materials', 'motions', 'paint', 'placeholder', 'vary'):
                 entry[k] = v
         kept[key] = entry
     manifest = {'$comment': comment, 'version': 1, 'entries': kept}

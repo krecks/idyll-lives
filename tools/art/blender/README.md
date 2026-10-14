@@ -87,7 +87,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 1. **Copy** `families/_template.py` to `families/<family>.py`, or add a model to an existing family.
    Families group what belongs together. A family's models go to
    `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`; the build
-   writes both, so never edit a pack by hand.
+   writes both, so never edit a pack by hand. A pack entry keeps the `placeholder` (the fallback) and
+   `vary` of the entry it overrides; the build doesn't copy them.
 2. **Palette.** One material per colour, named for what it is, with its finish:
    `M = G.Palette(body=('#F3F3F1', 'gloss'), handle=('#D0D3D6', 'chrome'))`.
    - The names become the material names in the file.
@@ -98,6 +99,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'glass', 'front')`. Make it a flat
      part of the still body; the game reflects the room in it live.
+   - A lamp's shade or a screen that glows at night takes its glow's colour:
+     `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. On the still body; nothing glows by day.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;

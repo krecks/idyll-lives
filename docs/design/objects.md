@@ -28,8 +28,8 @@ gate below, so the review does.
    in the family's `G.Palette`; the pack entry's `materials` is written from it.
 3. Stay in budget: 1–3 draw calls (finish groups), triangles for the size class below.
 4. Build with `python3 -B tools/art/blender/build.py <family>` (Blender 5.2 LTS): it exports, and
-5. registers the model in the family's pack with `url`, `materials` and the current placeholder as the
-   fallback, then
+5. registers the model in the family's pack with `url` and `materials` (it keeps the entry below's
+   placeholder as the fallback), then
 6. runs `check_glb.py` (no errors). Run the Khronos glTF validator too (no errors or warnings).
 7. Look at it next to its placeholder in the gallery, on a lot by day and at night, on WebGPU and
    WebGL2, and in the catalog. Credit it. Commit only the files you changed.
@@ -135,15 +135,22 @@ finish it uses.
   finish decides), so choose the finish, not a number. An unmapped material keeps the file's own
   PBR material: a draw call of its own, a look that doesn't match the furniture, and (today) a
   material left behind each time the model is rebuilt. `check_glb.py` warns of each one.
+- **Finishes by name.** A material named `<name>@<finish>` (`stone@matte`, `leaf@foliage`) is drawn
+  with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
+  with gamekit, whose palettes write the map themselves.
 - **Colours** are sRGB hex in the script, as in the manifests; `gamekit.mat` converts them to the
   linear values Blender and glTF use. (The first export wrote sRGB values as linear: every colour
   came out pale, and white-blue at night.)
 - **One-sided.** Meshes are closed and materials one-sided (`gamekit.mat` sets it).
 - **Water** is `gloss`, opaque, like the placeholders'. Real glass is `glass`: its own draw call,
   drawn after everything else.
-- **No emissive materials.** A lamp's glow is the content's `light`, which also lights the lamp's
-  own shade at night; an emissive surface glows at noon as well. (A night glow that follows the lamp
-  level, like the windows', is an engine change.)
+- **No emissive materials.** A lamp's light is the content's `light`, which also lights the lamp's
+  own shade at night; an emissive surface glows at noon as well.
+- **Night glow.** A material with `"glow": "#FFD9A0"` in its `materials` entry (a lamp's shade, a
+  screen) glows in that colour as the windows do: from dusk as the lamps come up, out with its
+  room's lights where everyone is asleep, nothing by day. It is a copy of those faces drawn added on
+  top (one more draw call at night, none by day), on the still body only. In gamekit:
+  `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`.
 - **Tints** (`body`, `skin`, `hair`) are for character parts; no object model uses one. A file
   can't carry one today.
 - **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
@@ -320,12 +327,13 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   cards keep float data).
 - **Registration** is an entry in the family's pack, listed in the base manifest's `packs`:
   ```json
-  "model.garden.gnome": { "type": "model", "url": "../../models/garden/gnome.glb", "materials": { "*": { "finish": "material.finish.satin" } }, "placeholder": [ … ] }
+  "model.garden.gnome": { "type": "model", "url": "../../models/garden/gnome.glb", "materials": { "*": { "finish": "material.finish.satin" } } }
   ```
-  A pack's entry replaces the base entry whole, so it carries a copy of the placeholder (the
-  fallback when the file fails to load) and the base entry's other fields (`vary`). The family
-  script writes its pack from the manifests at export time (`G.write_pack`, called by the build), never
-  by hand; `check_glb.py` warns when a copy has gone stale. `scale`, `rotationY`, `offset` and `fit` are for
+  A pack's entry replaces the base entry, keeping its placeholder (the fallback when the file fails
+  to load) and `vary` unless it gives its own (registry.ts `extended`); the base entry's other fields
+  are copied in. The family script writes its pack from the manifests at export time (`G.write_pack`,
+  called by the build), never by hand; `check_glb.py` warns when a pack's own copy of a placeholder
+  has gone stale. `scale`, `rotationY`, `offset` and `fit` are for
   third-party files; a model built to this standard needs none of them. `parts` adds primitive
   parts drawn with the file.
 - **A new object** also needs its content definition (footprint, interactions, price, category)
@@ -355,7 +363,7 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 - [ ] `check_glb.py` passes; the Khronos validator reports nothing.
 - [ ] Gallery next to the placeholder; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
-- [ ] Pack entry with `url`, `materials` and the current placeholder (written by the build); base manifest lists the pack.
+- [ ] Pack entry with `url` and `materials` (written by the build; the placeholder is the entry's below); base manifest lists the pack.
 - [ ] CREDITS.md updated; only the changed `.glb` files committed; previews not committed.
 
 ## The placeholders: migrate or keep
@@ -387,10 +395,11 @@ work for files.
    the town overview draw (`G.Model(far=…)` writes it).
 5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
    like placeholder parts do (`fileMirror`).
-6. **Finishes by name**, optional but it removes most of the manifest work: a material named
-   `stone@matte` maps itself; `tunic#body` would carry a tint slot.
-7. **Packs that extend.** A pack entry without `placeholder` could keep the placeholder (and
-   `vary`) of the entry it overrides, so packs stop copying primitive parts.
-8. **Night glow** for lamp parts that follows the lamp level, if lamps should glow beyond their light.
+6. ~~**Finishes by name.**~~ Done: a material named `stone@matte` maps itself (`namedFinish`). Still
+   open: `tunic#body` carrying a tint slot.
+7. ~~**Packs that extend.**~~ Done: a pack entry without `placeholder` (or `vary`) keeps the one of the
+   entry it overrides (registry.ts `extended`); gamekit's packs no longer copy them.
+8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and
+   its room's lights.
 9. **Quantised geometry** in `optimize.mjs` for files from Blender.
 10. **CI** runs `check_glb.py` (it needs no Blender) with the other checks.

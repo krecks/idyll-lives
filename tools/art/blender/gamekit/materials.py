@@ -77,16 +77,21 @@ class Palette:
     A family's colours: `name=(sRGB hex, finish)`. `palette.name` is that Blender material, made on
     first use after each `reset()`; `palette.finishes(names)` is the pack entry's `materials` map.
     The finish is one of the base manifest's `material.finish.*` (matte, satin, gloss, metal, chrome,
-    skin, hair, fabric, wood, bark, foliage, glass). Mirror glass takes a third: the side its face
-    reflects to, `glass=('#DCE6EA', 'glass', 'front')` (or 'back'), on a flat part that doesn't move.
+    skin, hair, fabric, wood, bark, foliage, glass). A third, on a part that doesn't move, says more
+    of it (the pack entry's material fields):
+      mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'glass', 'front')` (or 'back'),
+        on a flat part;
+      a lamp's shade or a screen that glows at night, in a colour: `shade=('#F2E6CC', 'fabric',
+        {'glow': '#FFD9A0'})`.
     """
 
     def __init__(self, **colours):
-        for name, (color, finish, *mirror) in colours.items():
+        for name, (color, finish, *more) in colours.items():
             if finish not in FINISHES:
                 raise ValueError(f'{name}: no finish {finish!r} (one of {", ".join(sorted(FINISHES))})')
-            if mirror not in ([], ['front'], ['back']):
-                raise ValueError(f'{name}: a mirror reflects to the front or the back, not {mirror}')
+            extra = _extra(name, more)
+            if 'glow' in extra:
+                rgb_of(extra['glow'])
             rgb_of(color)
         self._colours = colours
 
@@ -105,8 +110,21 @@ class Palette:
         unknown = sorted(set(names) - set(self._colours))
         if unknown:
             raise ValueError(f'materials not in the palette: {", ".join(unknown)}')
-        return {name: {'finish': self.finish(name), **({'mirror': self._colours[name][2]} if len(self._colours[name]) > 2 else {})}
-                for name in sorted(names)}
+        return {name: {'finish': self.finish(name), **_extra(name, self._colours[name][2:])} for name in sorted(names)}
+
+
+def _extra(name, more):
+    """A palette colour's third element as the material's extra pack fields: 'front' / 'back' (a
+    mirror's side), or {'mirror': ..., 'glow': '#rrggbb'}."""
+    if not more:
+        return {}
+    extra = {'mirror': more[0]} if isinstance(more[0], str) else dict(more[0])
+    unknown = set(extra) - {'mirror', 'glow'}
+    if len(more) > 1 or unknown:
+        raise ValueError(f'{name}: after the finish, a mirror\'s side or {{"mirror", "glow"}}, not {more}')
+    if extra.get('mirror') not in (None, 'front', 'back'):
+        raise ValueError(f'{name}: a mirror reflects to the front or the back, not {extra["mirror"]!r}')
+    return extra
 
 
 def rgb_of(color):

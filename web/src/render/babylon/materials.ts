@@ -495,6 +495,11 @@ export class MaterialLibrary {
     return mat;
   }
 
+  /** Whether the manifests have finish `key` (`material.finish.*`). */
+  hasFinish(key: string): boolean {
+    return !!this.assets?.has(key, 'material');
+  }
+
   /**
    * Whether a finish is untextured and opaque (it can share the plain material), with its
    * roughness and metalness.
