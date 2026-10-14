@@ -350,6 +350,10 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
         .expect("a vegetable patch fits in the garden");
     let o = &world.objects[patch as usize];
     assert_eq!(world.lot.room_at(o.x, o.z), sim_core::lot::OUTDOORS);
+    assert!(!o.ripe(), "bought, it's just planted");
+    // Days later, it's ripe.
+    world.objects[patch as usize].growth = 1.0;
+    let o = &world.objects[patch as usize];
     let def = &world.content.objects[o.def];
     let harvest = def.interactions.iter().position(|i| i.id == "harvest").unwrap();
     let hunger = world.content.needs.iter().position(|n| n.id == "hunger").unwrap();
