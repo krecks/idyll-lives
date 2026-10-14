@@ -77,8 +77,8 @@ class Palette:
     A family's colours: `name=(sRGB hex, finish)`. `palette.name` is that Blender material, made on
     first use after each `reset()`; `palette.finishes(names)` is the pack entry's `materials` map.
     The finish is one of the base manifest's `material.finish.*` (matte, satin, gloss, metal, chrome,
-    skin, hair, fabric, wood, bark, foliage, glass). A third, on a part that doesn't move, says more
-    of it (the pack entry's material fields):
+    skin, hair, fabric, wood, bark, foliage, glass). A third says more of it (the pack entry's
+    material fields):
       mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'glass', 'front')` (or 'back'),
         on a flat part;
       a lamp's shade or a screen that glows at night, in a colour: `shade=('#F2E6CC', 'fabric',

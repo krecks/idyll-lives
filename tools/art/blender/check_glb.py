@@ -12,6 +12,7 @@
 # Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 import json
 import math
+import re
 import os
 import struct
 import sys
@@ -128,21 +129,22 @@ def first_value(gltf, binary, accessor, last=False):
 
 
 def named_finish(name):
-    """A material named for its finish (`stone@matte`) maps itself to it (models.ts `namedFinish`)."""
-    head, at, tail = name.rpartition('@')
+    """A material named for its finish (`stone@matte`, `tunic@fabric#body`) maps itself to it (models.ts
+    `namedFinish`; a tint slot `#body`, `#skin` or `#hair` in the name aside)."""
+    head, at, tail = re.sub(r'#(body|skin|hair)(?=@|$)', '', name).rpartition('@')
     return {'finish': f'material.finish.{tail}'} if head and at and tail.isalpha() and tail.islower() else None
 
 
 def played(motions):
     """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
-    `loops`, `open`, `idle`, `night`, `growth`."""
+    `loops`, `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users)."""
     out = {}
     for use, value in (motions.get('uses') or {}).items():
         for u in value if isinstance(value, list) else [value]:
             out.setdefault(u['clip'] if isinstance(u, dict) else u, f'use {use!r}')
     for use, clip in (motions.get('loops') or {}).items():
         out.setdefault(clip, f'loop {use!r}')
-    for kind in ('open', 'idle', 'night', 'growth'):
+    for kind in ('open', 'idle', 'night', 'growth', 'ride'):
         if motions.get(kind):
             out.setdefault(motions[kind], kind)
     return out
@@ -289,7 +291,7 @@ def check_file(entry, finishes, path):
 
     accessors, materials = gltf.get('accessors', []), gltf.get('materials', [])
     overrides = entry.get('materials', {})
-    # Mirror glass (a material with `mirror`): flat, on the still body (models.ts `fileMirror`).
+    # Mirror glass (a material with `mirror`): flat, on one part (models.ts `fileMirror`).
     glass = {}
     for name, ov in overrides.items():
         if ov.get('mirror') not in (None, 'front', 'back'):
@@ -323,14 +325,13 @@ def check_file(entry, finishes, path):
             mat = materials[prim['material']] if 'material' in prim else {'name': ''}
             name = mat.get('name', '')
             ov = overrides.get(name, named_finish(name) or overrides.get('*'))
-            if ov and ov.get('glow') and part is not None:
-                warnings.append(f'material {name!r} glows on a moving part, which doesn\'t: only the still body glows')
             if ov and ov.get('mirror'):
                 box = glass.setdefault(name, [[math.inf] * 3, [-math.inf] * 3, part])
                 for k in range(3):
                     box[0][k] = min(box[0][k], sum(m[j * 4 + k] * pos['min' if m[j * 4 + k] >= 0 else 'max'][j] for j in range(3)) + m[12 + k])
                     box[1][k] = max(box[1][k], sum(m[j * 4 + k] * pos['max' if m[j * 4 + k] >= 0 else 'min'][j] for j in range(3)) + m[12 + k])
-                box[2] = part if box[2] is None else box[2]
+                if box[2] != part:
+                    errors.append(f'mirror glass {name!r} is on two parts: one material per mirror')
             textured = any(k in mat.get('pbrMetallicRoughness', {}) for k in ('baseColorTexture', 'metallicRoughnessTexture')) or any(
                 k in mat for k in ('normalTexture', 'occlusionTexture', 'emissiveTexture'))
             if 'TEXCOORD_0' in prim['attributes'] and (not textured or (ov and ov.get('finish'))):
@@ -353,8 +354,6 @@ def check_file(entry, finishes, path):
                 flags['emissive'].add(name)
     for name, (glo, ghi, part) in sorted(glass.items()):
         size = sorted(ghi[k] - glo[k] for k in range(3))
-        if part is not None:
-            errors.append(f'mirror glass {name!r} is on a moving part: only the still body reflects')
         if size[0] > 0.1 * size[1]:
             warnings.append(f'mirror glass {name!r} isn\'t flat ({size[0] * 100:.1f} cm thick, {size[1] * 100:.0f} cm across): the reflection lies on its box\'s thinnest side')
     for flag, text in (('unmapped', 'not mapped to a finish in the entry\'s `materials` (each its own draw call and look)'),

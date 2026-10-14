@@ -149,10 +149,13 @@ finish it uses.
 - **Night glow.** A material with `"glow": "#FFD9A0"` in its `materials` entry (a lamp's shade, a
   screen) glows in that colour as the windows do: from dusk as the lamps come up, out with its
   room's lights where everyone is asleep, nothing by day. It is a copy of those faces drawn added on
-  top (one more draw call at night, none by day), on the still body only. In gamekit:
+  top (one more draw call at night per part it's on, none by day); on a moving part (a laptop's lid)
+  it moves with it. In gamekit:
   `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`.
-- **Tints** (`body`, `skin`, `hair`) are for character parts; no object model uses one. A file
-  can't carry one today.
+- **Tints** (`body`, `skin`, `hair`) are for character parts; no object model uses one. A file's
+  material carries one in its name, `tunic#body` (with a finish: `tunic@fabric#body`), as a
+  placeholder part's `tint`: the template's `tints` say so. Nothing draws by them today (residents
+  have their own rig and outfits).
 - **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
   removed on 2026-10-14). Another look of the same thing is another object with its own model (the
   mini fridge, the built-in fridge).
@@ -175,10 +178,10 @@ finish it uses.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
   glass: its face reflects the room live, as placeholder parts with `mirror` do (the quality's
-  `mirrors`, the nearest ones). Make the glass a flat piece of the still body (a moving door can't
-  reflect); the face is across its thinnest side, square or round as drawn. In gamekit, the palette
-  takes the side: `glass=('#DCE6EA', 'glass', 'front')`. `check_glb.py` fails glass on a moving part
-  and warns of glass that isn't flat.
+  `mirrors`, the nearest ones). Make the glass a flat piece, on the still body or on one moving part
+  (a mirror cabinet's door: the reflection swings with it); the face is across its thinnest side,
+  square or round as drawn. In gamekit, the palette takes the side: `glass=('#DCE6EA', 'glass',
+  'front')`. `check_glb.py` fails glass split over two parts and warns of glass that isn't flat.
 
 ## Level of detail
 
@@ -229,8 +232,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   `check_glb.py` fails a loop that ends away from where it starts), never plays backwards, and when the
   use ends it finishes its round and stops at rest. A use can play `uses` clips and a loop together.
   ```json
-  "motions": { "loops": { "relax": "rocking", "read": "rocking" } }
+  "motions": { "loops": { "relax": "rocking", "read": "rocking" }, "ride": "rocking" }
   ```
+- **Riders:** `ride` names the clip whose part carries the residents sitting or lying on the object
+  (a rocking chair's seat, a swing, a hammock): while it plays they move and tilt with that part (the
+  first one the clip moves), as if sitting on it. Build the seat in its rest pose where the game seats
+  them (`SEATS`, `BEDS` heights), with its origin on the pivot.
 - **Ambient:** `idle` names a clip that goes round all the time, used or not (a ceiling fan, clock
   hands, a fountain's water), from rest to rest like a loop. It plays only within the quality's
   `ambientRange` of the camera (40 m on Medium, 60 on High) and not at all on Low, where it stays at
@@ -395,8 +402,8 @@ work for files.
    the town overview draw (`G.Model(far=…)` writes it).
 5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
    like placeholder parts do (`fileMirror`).
-6. ~~**Finishes by name.**~~ Done: a material named `stone@matte` maps itself (`namedFinish`). Still
-   open: `tunic#body` carrying a tint slot.
+6. ~~**Finishes by name.**~~ Done: a material named `stone@matte` maps itself (`namedFinish`), and
+   `tunic#body` carries a tint slot (`namedTint`).
 7. ~~**Packs that extend.**~~ Done: a pack entry without `placeholder` (or `vary`) keeps the one of the
    entry it overrides (registry.ts `extended`); gamekit's packs no longer copy them.
 8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and

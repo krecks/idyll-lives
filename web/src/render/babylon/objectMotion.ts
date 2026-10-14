@@ -16,7 +16,7 @@
  */
 
 import { writeMoving, type PopTarget } from './buildFx';
-import type { Mesh, Vector3 } from './core';
+import { Matrix, type Mesh, type Vector3 } from './core';
 import { GAME_RATE, QUIET_SPEED } from './characters';
 import { clipPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
@@ -270,6 +270,27 @@ export class ObjectMotion {
     for (const mesh of moved) if (!mesh.isDisposed()) mesh.thinInstanceRefreshBoundingInfo(false);
     return { moved: moved.size > 0, ambient };
   }
+
+  /**
+   * How object `id`'s seat (`motions.ride`: the first part its clip moves) has moved from rest, in
+   * world space (a point at rest times it is where it is now), for the residents sitting or lying
+   * on it; null while it rests.
+   */
+  ride(id: number): Matrix | null {
+    const o = this.objects.get(id);
+    const name = o?.motions.ride;
+    const state = name ? this.states.get(id)?.get(name) : undefined;
+    const part = state?.clip.tracks[0]?.part;
+    if (!o || !state || part === undefined || !clipPose(state.clip, part, state.time, this.rideTmp)) return null;
+    Matrix.FromArrayToRef(o.target.matrices, o.target.index * 16, this.placed);
+    this.placed.invertToRef(this.rideOut);
+    this.rideOut.multiplyToRef(Matrix.FromArrayToRef(this.rideTmp, 0, this.posed), this.rideOut);
+    return this.rideOut.multiplyToRef(this.placed, this.rideOut);
+  }
+  private readonly rideTmp = new Float32Array(16);
+  private readonly placed = new Matrix();
+  private readonly posed = new Matrix();
+  private readonly rideOut = new Matrix();
 
   /** Squared distance (m) from `eye` to where `o` stands. */
   private distance2(o: MovingObject, eye: Vector3): number {

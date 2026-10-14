@@ -604,6 +604,7 @@ export class BabylonRenderer implements Renderer {
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
+    this.characters.setRide((id) => this.motion.ride(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
@@ -835,13 +836,15 @@ export class BabylonRenderer implements Renderer {
 
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     this.simCount = count;
-    // Sims: pose every visible Sim into the shared pose texture (characters.ts).
-    this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
     // Doors that open while residents use what they're on, and ambient clips near the camera (the
     // sun's shadows aren't redrawn for those).
     const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
     if (motion.moved) this.sunShadows.moved();
     if (motion.moved || motion.ambient) this.resetSnapshot();
+    // Sims: pose every visible Sim into the shared pose texture (characters.ts).
+    // (After the moving parts: residents on a moving seat go with it.)
+    this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
     this.mirrors.update(this.camera);
@@ -3126,7 +3129,9 @@ export class BabylonRenderer implements Renderer {
       const motion = template.motion;
       const motions = motion && motionsOf(this.deps.assets.get(this.objectModel(list[0]), 'model'));
       const partCount = motion ? Math.max(-1, ...motion.parts) + 1 : 0;
-      const parts = Array.from({ length: partCount }, (_, k) => ({ meshes: template.meshes.filter((_, i) => motion!.parts[i] === k), matrices: new Float32Array(list.length * 16) }));
+      // (A part's glow, if any, moves with it.)
+      const glowOf = (k: number) => (template.glows ?? []).filter((g) => g.part === k).map((g) => g.mesh);
+      const parts = Array.from({ length: partCount }, (_, k) => ({ meshes: [...template.meshes.filter((_, i) => motion!.parts[i] === k), ...glowOf(k)], matrices: new Float32Array(list.length * 16) }));
       const vary = this.deps.assets.get(this.objectModel(list[0]), 'model')?.vary ?? 0;
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
@@ -3177,10 +3182,13 @@ export class BabylonRenderer implements Renderer {
           wallRot: layer === 'wall' ? o.rot % 4 : undefined,
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
-          pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...(template.glow ? [template.glow] : [])], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
+          pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
         if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth });
-        if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
+        // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
+        for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
+          mirrors.push({ surfaces, matrices: part >= 0 && parts[part] ? parts[part].matrices : matrices, index: i });
+        }
       });
       // At rest, the parts are where the body is.
       for (const part of parts) part.matrices.set(matrices);
@@ -3190,15 +3198,16 @@ export class BabylonRenderer implements Renderer {
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
       });
-      if (template.glow) {
-        // Strengths per instance (`applyGlow`), by the room each stands in.
+      for (const { mesh, part } of template.glows ?? []) {
+        // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
         const colors = new Float32Array(list.length * 4);
-        template.glow.thinInstanceSetBuffer('matrix', matrices, 16, true);
-        template.glow.thinInstanceSetBuffer('color', colors, 4, false);
-        template.glow.thinInstanceRefreshBoundingInfo(false);
+        const still = part < 0 || !parts[part];
+        mesh.thinInstanceSetBuffer('matrix', still ? matrices : parts[part].matrices, 16, still);
+        mesh.thinInstanceSetBuffer('color', colors, 4, false);
+        mesh.thinInstanceRefreshBoundingInfo(false);
         const W = world.width;
         const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
-        glows.push({ mesh: template.glow, colors, rooms: list.map(roomOf) });
+        glows.push({ mesh, colors, rooms: list.map(roomOf) });
       }
     });
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
@@ -3298,7 +3307,7 @@ export class BabylonRenderer implements Renderer {
     for (const [key, t] of this.templates) {
       if (keep.has(key)) continue;
       void t.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of [...template.meshes, ...(template.glow ? [template.glow] : [])]) mesh.setEnabled(false);
+        if (!this.templatesInUse.has(key)) for (const mesh of [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)]) mesh.setEnabled(false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);

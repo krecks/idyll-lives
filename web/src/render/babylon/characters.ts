@@ -54,6 +54,8 @@ import {
   RawTexture,
   Skeleton,
   Matrix,
+  Quaternion,
+  Vector3,
   VertexData,
   type Engine,
   type Scene,
@@ -189,8 +191,11 @@ function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: numbe
   const own = def?.seat;
   return SEATS[id] ?? (own ? { h: own.height, fwd: own.forward ?? 0 } : DEFAULT_SEAT);
 }
-/** Mattress / bench top height (m) for lying. */
-const BEDS: Record<string, { h: number }> = {
+/**
+ * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
+ * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa.
+ */
+const BEDS: Record<string, { h: number; fwd?: number }> = {
   bed: { h: 0.58 },
   crib: { h: 0.56 },
   weightBench: { h: 0.5 },
@@ -206,8 +211,10 @@ const BEDS: Record<string, { h: number }> = {
   sunLounger: { h: 0.35 },
   hammock: { h: 0.62 },
   wallBed: { h: 0.46 },
+  // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
+  sofaBed: { h: 0.42, fwd: 0.6 },
 };
-const DEFAULT_BED = { h: 0.5 };
+const DEFAULT_BED: { h: number; fwd?: number } = { h: 0.5 };
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk. */
 const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
@@ -576,6 +583,8 @@ interface SimRig {
   /** Bed while lying (for the blanket) and how far the blanket is pulled up (0..1). */
   bed: PlacedObject | null;
   bedH: number;
+  /** How far forward of the slot it lies (`BEDS` `fwd`). */
+  bedFwd: number;
   /**
    * Getting out of bed: sim-core puts the Sim on the tile in front at once; the lying body
    * (fading out) and the blanket stay where it lay (`lieX`, `lieZ`: its slot, kept while lying)
@@ -704,6 +713,12 @@ export class Characters {
     return d > 0 ? z - Math.floor(z / d) * d : z;
   }
   private readonly objectById = new Map<number, PlacedObject>();
+  /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
+  private rideOf: ((objectId: number) => Matrix | null) | null = null;
+  private readonly rideM = new Matrix();
+  private readonly rideQ = new Quaternion();
+  private readonly rideS = new Vector3();
+  private readonly rideT = new Vector3();
   /** Action tag per `sim.action` index (from the snapshot layout). */
   private actionTags: readonly string[] = [];
   private scratch!: PoseScratch;
@@ -1111,6 +1126,7 @@ export class Characters {
         emotion: 0,
         bed: null,
         bedH: 0,
+        bedFwd: 0,
         fromBed: false,
         lieX: 0,
         lieZ: 0,
@@ -1753,8 +1769,10 @@ export class Characters {
       // What the Sim is doing (sim-core's `object` / `action` fields; older layouts: guessed from position).
       let useObj: PlacedObject | null | undefined;
       let tag = '';
+      let usingId = -1;
       if (hasAction) {
         const objId = curr[o + k.object];
+        usingId = objId | 0;
         const act = curr[o + k.action];
         useObj = objId >= 0 ? (this.objectById.get(objId) ?? null) : null;
         tag = act >= 0 ? (this.actionTags[act | 0] ?? '') : '';
@@ -1905,6 +1923,9 @@ export class Characters {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
+      const ride = (pose === Pose.Sit || pose === Pose.Lie) && usingId >= 0 && this.rideOf ? this.rideOf(usingId) : null;
+      if (ride) this.riding(ride);
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
@@ -2007,6 +2028,7 @@ export class Characters {
       const bunk = obj && BUNKS[obj.def];
       const across = obj ? (rig.x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (rig.z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0;
       rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
+      rig.bedFwd = bed.fwd ?? 0;
       rig.useDef = obj?.def ?? '';
       if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
         // Getting in: sit down on the edge first; the crossfade to lying then leans the Sim back
@@ -2014,7 +2036,7 @@ export class Characters {
         const sp = this.sitPelvis.get(rig.body.name)!;
         key = 'sitDown';
         rootY = rig.bedH - sp.y * rig.scale;
-        rootFwd = LIE_ENTRY * rig.scale - sp.z * rig.scale;
+        rootFwd = LIE_ENTRY * rig.scale - sp.z * rig.scale + rig.bedFwd;
         fade = 0.35;
         if (rig.cur.key !== 'sitDown') rig.actTime = 0;
       } else if (rig.body.stage === 'baby') {
@@ -2032,7 +2054,7 @@ export class Characters {
         // `lie` clip (made standing) turned flat and slowed down.
         key = 'lie';
         rootY = rig.bedH + lieBack(rig);
-        rootFwd = lieCentre(rig);
+        rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
         rate = 0.3;
         fade = rig.cur.key === 'sitDown' ? 0.9 : 0.45;
@@ -2243,7 +2265,7 @@ export class Characters {
       cur.rootPitch = pitch;
     }
 
-    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig);
+    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
 
     // Upper-body layer.
     if (upper) {
@@ -2275,6 +2297,22 @@ export class Characters {
   /** Length (s) of the clip played for `key` (0 before the set has loaded). */
   clipDuration(key: string): number {
     return this.set ? this.clip(key).duration : 0;
+  }
+
+  /** Moves this frame's placement (`place`) by `ride`, a seat's move from rest in world space. */
+  private riding(ride: Matrix): void {
+    const pl = this.place;
+    this.rideQ.set(pl.qx, pl.qy, pl.qz, pl.qw);
+    Matrix.ComposeToRef(this.rideS.setAll(1), this.rideQ, this.rideT.set(pl.x, pl.y, pl.z), this.rideM);
+    this.rideM.multiplyToRef(ride, this.rideM);
+    this.rideM.decompose(this.rideS, this.rideQ, this.rideT);
+    [pl.x, pl.y, pl.z] = [this.rideT.x, this.rideT.y, this.rideT.z];
+    [pl.qx, pl.qy, pl.qz, pl.qw] = [this.rideQ.x, this.rideQ.y, this.rideQ.z, this.rideQ.w];
+  }
+
+  /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
+  setRide(rideOf: ((objectId: number) => Matrix | null) | null): void {
+    this.rideOf = rideOf;
   }
 
   private start(rig: SimRig, key: string, fade: number, rate: number, repeat: boolean, rootY: number, rootFwd: number, pitch: number): void {

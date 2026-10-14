@@ -20,6 +20,16 @@ A clip played forward, held, then played back. One `hold` per model. Nothing loo
 | E8 | materials named `stone@matte`; packs keep the placeholder below; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) |
 | C1 | the futon, the sofa bed, the washing line and the hot tub stay open (`tests/open_objects.rs`) |
 
+Added after, in the same spirit:
+- **Riders:** `motions.ride: clip`: residents sitting or lying on the object move with that clip's part (a
+  rocking chair's seat, a swing, a hammock).
+- **Mirrors and glow on moving parts:** a mirror cabinet's door reflects as it swings, a laptop's lid glows as it moves.
+- **Tint slots by name:** `tunic#body` (with a finish: `tunic@fabric#body`), as a placeholder part's `tint`.
+- **Beds that lie forward:** `characters.ts` `BEDS` takes `fwd` (m): the sofa bed's sleepers lie with their heads
+  on the seat and the rest on the pulled-out mattress.
+- **`ambientRange` measured** (graphics.md): 94 ambient things cost 0.09 ms (clips) and 0.15–0.3 ms (frame) of CPU
+  on an M3 Pro, about three times that with the CPU throttled 4×; not measured on Intel hardware.
+
 ## T0. Clips bench and gamekit helpers (before any category)
 
 - **Clips bench:** turn `/water.html` (`web/src/debug/water.ts`) into a bench for any model's clips.

@@ -33,7 +33,9 @@ class Model:
                    'open': clip held open while the object is open (content `leaves`);
                    'idle': clip going round all the time near the camera (G.spin, G.rock);
                    'night': clip held open from dusk to dawn (curtains drawn);
-                   'growth': a crop's clip, held where its growth stage is (G.stages)
+                   'growth': a crop's clip, held where its growth stage is (G.stages);
+                   'ride': the clip whose (first) part carries the residents sitting or lying on it
+                           (a rocking chair's seat, a swing), played by `loops` or `uses`
       paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part
                  first (the one the game's quick colour row paints), e.g. [('body', 'Cabinet'),
                  ('stone', 'Worktop')]; a bare material name is its own label

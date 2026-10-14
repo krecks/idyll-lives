@@ -67,7 +67,10 @@ export interface QualitySettings {
    * Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a
    * fountain's water: model `motions.idle`); 0: none, all at rest. Each moving thing rewrites its
    * model's part buffers every frame (one upload per model, not per thing); shadows aren't redrawn
-   * for them. Not measured yet.
+   * for them, and no draw calls are added (moving parts have their meshes anyway). 94 at once on a
+   * lot, M3 Pro headless: 0.09 ms of CPU for the clips and +0.15–0.3 ms for the frame; with the CPU
+   * throttled 4× (a stand-in for an old laptop's): 0.2–0.35 ms and +0.4–0.6 ms. Not measured on
+   * Intel graphics hardware.
    */
   ambientRange: number;
 }

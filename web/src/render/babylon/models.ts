@@ -66,10 +66,11 @@ export interface ModelTemplate {
   motion?: ModelMotion;
   /**
    * What glows at night (a lamp's shade, a screen: materials with `glow`): a copy of those faces
-   * drawn added on top, off until the renderer gives each instance its strength (thin instance
-   * `color`, 0..1) and turns it on. Not in `meshes`: nothing else draws it.
+   * drawn added on top, per moving part (-1: the still body), off until the renderer gives each
+   * instance its strength (thin instance `color`, 0..1) and turns it on. Not in `meshes`: nothing
+   * else draws them.
    */
-  glow?: Mesh;
+  glows?: { mesh: Mesh; part: number }[];
 }
 
 /**
@@ -119,6 +120,8 @@ export function clipPose(clip: ModelClip, part: number, seconds: number, out: Fl
 export interface MirrorSurface {
   round: boolean;
   matrix: Matrix;
+  /** The moving part it's on (a mirror cabinet's door), whose pose it follows; absent or -1: the still body. */
+  part?: number;
 }
 
 export interface BuildOptions {
@@ -750,6 +753,7 @@ interface MotionsEntry {
   idle?: string;
   night?: string;
   growth?: string;
+  ride?: string;
 }
 
 /** When a model's clips play: while residents use the object, and while it's open. */
@@ -777,6 +781,8 @@ export interface Motions {
    * growing and just planted along it, so each stage plays on to the next.
    */
   growth?: string;
+  /** The clip whose (first) part carries the residents sitting or lying on the object: a rocking chair's seat, a swing. */
+  ride?: string;
 }
 
 export interface UseClip {
@@ -813,7 +819,7 @@ export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   );
   const loops = m.loops ?? {};
   return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth
-    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth }
+    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride }
     : undefined;
 }
 
@@ -1040,11 +1046,19 @@ function copyData(data: VertexData): VertexData {
   return copy;
 }
 
-/** A material named for its finish, `stone@matte`: drawn with `material.finish.matte` (unless the entry maps it), if `lib` has it. */
+/** A material named for its finish, `stone@matte` (`tunic@fabric#body`): drawn with `material.finish.matte` (unless the entry maps it), if `lib` has it. */
 function namedFinish(name: string, lib?: MaterialLibrary): MaterialOverride | undefined {
-  const at = name.lastIndexOf('@');
-  const finish = `material.finish.${name.slice(at + 1)}`;
-  return at > 0 && /^[a-z]+$/.test(name.slice(at + 1)) && (!lib || lib.hasFinish(finish)) ? { finish } : undefined;
+  const named = /.@([a-z]+)$/.exec(name.replace(TINT_IN_NAME, ''));
+  const finish = named && `material.finish.${named[1]}`;
+  return finish && (!lib || lib.hasFinish(finish)) ? { finish } : undefined;
+}
+
+/** A tint slot in a material's name: `tunic#body` is tinted as a placeholder part with `tint: 'body'` is. */
+const TINT_IN_NAME = /#(body|skin|hair)(?=@|\||$)/;
+
+/** The tint slot a file's material carries in its name (`TINT_IN_NAME`), or null. */
+function namedTint(material: Material | null): TintSlot | null {
+  return (material && (TINT_IN_NAME.exec(material.name)?.[1] as TintSlot | undefined)) ?? null;
 }
 
 /** Copies of a file's materials as entries draw them (as loaded, or restyled by `color`, `roughness`, `metallic`), by restyling. */
@@ -1117,7 +1131,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
       bottom = Math.min(bottom, boxes[i].lo[1]);
       const ov = overrideFor(material);
       if (ov?.finish) {
-        groups.add(restyledMesh(scene, data, material, ov, groups.finish(ov.finish).alpha), null, groups.finish(ov.finish).group, null);
+        groups.add(restyledMesh(scene, data, material, ov, groups.finish(ov.finish).alpha), namedTint(material), groups.finish(ov.finish).group, null);
         return;
       }
       const mesh = new Mesh(name, scene);
@@ -1133,29 +1147,30 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     const merged = mergeByMaterial(kept, part < 0 ? name : `${name}|${file.parts[part].name}`);
     const restyled = groups.build(part < 0 ? name : `${name}|${file.parts[part].name}`);
     meshes.push(...merged, ...restyled.meshes);
-    tints.push(...merged.map(() => null), ...restyled.tints);
+    tints.push(...merged.map((m) => namedTint(m.material)), ...restyled.tints);
     parts.push(...[...merged, ...restyled.meshes].map(() => part));
   }
 
   const lo = (k: number) => Math.min(...boxes.map((b) => b.lo[k]));
   const hi = (k: number) => Math.max(...boxes.map((b) => b.hi[k]));
   const outline = boxes.length ? { minX: lo(0), maxX: hi(0), minZ: lo(2), maxZ: hi(2) } : undefined;
-  // Mirror glass: the still body's pieces of a `mirror` material, and placeholder parts drawn with it.
+  // Mirror glass: the pieces of a `mirror` material (on a moving part, following it), and placeholder parts drawn with the file.
   const mirrors = [
     ...pieces.flatMap(({ data, material, part }, i) => {
       const side = overrideFor(material)?.mirror;
-      if (!side) return [];
-      if (part >= 0) {
-        console.warn(`[render] ${name}: mirror ${material?.name} is on a moving part, which can't reflect`);
-        return [];
-      }
-      return [fileMirror(data, boxes[i], side)];
+      return side ? [{ ...fileMirror(data, boxes[i], side), part }] : [];
     }),
     ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
   ];
-  // What glows at night: its faces again, in the glow's colour (still body only, as mirrors).
-  const glowing = pieces.filter(({ material, part }) => part < 0 && overrideFor(material)?.glow);
-  const glow = glowing.length ? glowMesh(scene, `${name}|glow`, glowing.map(({ data, material }) => ({ data, color: overrideFor(material)!.glow! }))) : undefined;
+  // What glows at night: its faces again, in the glow's colour, a mesh per part they're on.
+  const glowing = Map.groupBy(
+    pieces.filter(({ material }) => overrideFor(material)?.glow),
+    ({ part }) => part,
+  );
+  const glows = [...glowing].map(([part, list]) => ({
+    part,
+    mesh: glowMesh(scene, `${name}|glow${part < 0 ? '' : `|${file.parts[part].name}`}`, list.map(({ data, material }) => ({ data, color: overrideFor(material)!.glow! }))),
+  }));
   return {
     meshes,
     tints,
@@ -1164,7 +1179,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     bottom,
     outline,
     ...(mirrors.length ? { mirrors } : {}),
-    ...(glow ? { glow } : {}),
+    ...(glows.length ? { glows } : {}),
     ...(file.parts.length && file.clips.size ? { motion: { parts, clips: buildClips(file.clips, space, shifts) } } : {}),
   };
 }

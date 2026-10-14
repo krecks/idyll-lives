@@ -98,9 +98,10 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'glass', 'front')`. Make it a flat
-     part of the still body; the game reflects the room in it live.
+     piece, on the still body or one moving part (a cabinet's door); the game reflects the room in it
+     live.
    - A lamp's shade or a screen that glows at night takes its glow's colour:
-     `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. On the still body; nothing glows by day.
+     `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
@@ -190,6 +191,8 @@ How the parts work:
     each with its own `hold` (a door shut after 1 s while the water runs).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock` or `G.spin`.
+  - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
+    rocking chair's seat, a swing. Join everything they sit on into that part.
   - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
     on the Low preset. It too ends where it starts.
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
