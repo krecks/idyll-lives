@@ -23,7 +23,7 @@ done.
 | `bookworm.firesideLounge` Fireside reading lounge | 2x2 · floor | readByFire:read readAloud:read | living / — | Wood, Fabric | Use | `flames`: the fire grows in the grate for readByFire and readAloud. |
 | `bookworm.bedsideStack` Bedside book stack | 1x1 · floor | chapter:read | bedroom / — | Wood, Fabric | Use | `book_up`: the top book lifts and opens for chapter. |
 
-## P2. Cheerful (6)
+## P2. Cheerful (6) — **Done** (in Validate › Cheerful)
 
 - **Family:** `tools/art/blender/families/pack_cheerful.py`
 - **Validate group:** `cheerful` (Validate › Cheerful)

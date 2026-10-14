@@ -87,6 +87,13 @@ built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` a
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
 drops, the teapot pours, the fire grows and the top book opens. Their primitive-part entries stay as the fallback.
 
+The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
+`rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_cheerful.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
+sways with its sleeper, the sun rises and the booth's curtain is drawn. Their primitive-part entries stay as the
+fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
