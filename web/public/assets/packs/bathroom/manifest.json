@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes; the double vanity carries its mirror glass as primitive `parts`, which a file cannot reflect yet.",
+  "$comment": "Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
   "version": 1,
   "entries": {
     "model.sink": {
@@ -34,7 +34,26 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "metal",
+          "label": "Basin"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
       ],
       "placeholder": [
         {
@@ -610,7 +629,18 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Pedestal"
+        },
+        {
+          "material": "porcelain",
+          "label": "Basin & cup"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap"
+        }
       ],
       "placeholder": [
         {
@@ -899,42 +929,25 @@
         }
       },
       "paint": [
-        "body"
-      ],
-      "parts": [
         {
-          "shape": "box",
-          "size": [
-            0.66,
-            0.76,
-            0.01
-          ],
-          "at": [
-            -0.48,
-            1.5,
-            -0.425
-          ],
-          "color": "#CFDCE2",
-          "material": "material.finish.gloss",
-          "radius": 0.02,
-          "mirror": "front"
+          "material": "body",
+          "label": "Cabinet"
         },
         {
-          "shape": "box",
-          "size": [
-            0.66,
-            0.76,
-            0.01
-          ],
-          "at": [
-            0.48,
-            1.5,
-            -0.425
-          ],
-          "color": "#CFDCE2",
-          "material": "material.finish.gloss",
-          "radius": 0.02,
-          "mirror": "front"
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "porcelain",
+          "label": "Basins"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
         }
       ],
       "placeholder": [
@@ -1192,23 +1205,6 @@
           ]
         },
         {
-          "shape": "box",
-          "size": [
-            0.66,
-            0.76,
-            0.03
-          ],
-          "at": [
-            -0.48,
-            1.5,
-            -0.42
-          ],
-          "color": "#CFDCE2",
-          "material": "material.finish.gloss",
-          "radius": 0.04,
-          "mirror": "front"
-        },
-        {
           "shape": "lathe",
           "size": [
             0.5,
@@ -1286,23 +1282,6 @@
           ]
         },
         {
-          "shape": "box",
-          "size": [
-            0.66,
-            0.76,
-            0.03
-          ],
-          "at": [
-            0.48,
-            1.5,
-            -0.42
-          ],
-          "color": "#CFDCE2",
-          "material": "material.finish.gloss",
-          "radius": 0.04,
-          "mirror": "front"
-        },
-        {
           "shape": "cylinder",
           "size": [
             0.06,
@@ -1369,7 +1348,30 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Vanity"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "blackmetal",
+          "label": "Tap"
+        },
+        {
+          "material": "wood",
+          "label": "Shelf & legs"
+        },
+        {
+          "material": "towel",
+          "label": "Towels"
+        }
       ],
       "placeholder": [
         {
@@ -1660,7 +1662,18 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Basin"
+        },
+        {
+          "material": "brass",
+          "label": "Legs & tap"
+        },
+        {
+          "material": "fabric",
+          "label": "Towel"
+        }
       ],
       "placeholder": [
         {

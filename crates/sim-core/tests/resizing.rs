@@ -28,7 +28,7 @@ fn world() -> World {
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32, size: Option<[u16; 2]>, tall: Option<i16>) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), color: None, turn: None, offset: None, size, tall })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size, tall })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -103,7 +103,7 @@ fn sizes_have_limits() {
 fn things_on_a_wall_slide_only_along_it() {
     let mut w = world();
     let buy_off = |w: &mut World, x, offset| {
-        w.apply(Command::Buy { household: 0, object: "picture".into(), at: Some([x, 1, 0]), color: None, turn: None, offset: Some(offset), size: None, tall: None })
+        w.apply(Command::Buy { household: 0, object: "picture".into(), at: Some([x, 1, 0]), colors: Default::default(), turn: None, offset: Some(offset), size: None, tall: None })
     };
     buy_off(&mut w, 3, [30, 0]).unwrap();
     assert!(buy_off(&mut w, 5, [0, 20]).unwrap_err().to_string().contains("flat on its wall"));

@@ -1,6 +1,6 @@
 //! World state and the per-tick update.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
@@ -108,8 +108,8 @@ pub struct ObjectInstance {
     pub users: [Option<u32>; MAX_SLOTS],
     /// Upgrade level: higher quality objects satisfy needs and teach skills faster.
     pub quality: u8,
-    /// Its colour, 0xRRGGBB, on the parts its model paints (visual only); None: as it's made.
-    pub color: Option<u32>,
+    /// The colours the player gave its parts (visual only): see `Colors`. Empty: as it's made.
+    pub colors: Colors,
     /// Money put into this object (price plus upgrades), for resale.
     pub value: i64,
     /// Wear from use, 0..1; at 1 it is broken until repaired.
@@ -1151,7 +1151,7 @@ impl World {
             let turn = world.check_turn(def, p.turn).map_err(at)?;
             let layout = world.check_layout(def, p.rot, Layout { offset: p.offset, extent: p.size, tall: p.tall }).map_err(at)?;
             let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(def, p.x, p.z, p.rot, layout, None, 0, value)?;
+            let id = world.place(def, p.x, p.z, p.rot, layout, Default::default(), 0, value)?;
             world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
@@ -1269,7 +1269,7 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, Layout::default(), None, 0, value)
+        self.place(def, x, z, rot, Layout::default(), Default::default(), 0, value)
     }
 
     /// Checks that object `def` fits at `x, z, rot` (laid out as `layout`, unchecked: see
@@ -1297,7 +1297,7 @@ impl World {
             tall: layout.tall,
             users: [None; MAX_SLOTS],
             quality: 0,
-            color: None,
+            colors: Colors::new(),
             value: 0,
             wear: 0.0,
             open: false,
@@ -1416,12 +1416,12 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        color: Option<u32>,
+        colors: Colors,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
         let mut obj = self.check_fit(def, x, z, rot, layout)?;
-        obj.color = color;
+        obj.colors = colors;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
         for (tx, tz) in self.blocking_tiles(&obj) {
@@ -2622,7 +2622,7 @@ impl World {
                 household,
                 object,
                 at,
-                color,
+                colors,
                 turn,
                 offset,
                 size,
@@ -2633,8 +2633,8 @@ impl World {
                 let rot = at.map_or(0, |a| a[2] as u8);
                 let layout = Layout { offset: offset.unwrap_or([0, 0]), extent: size, tall: tall.unwrap_or(0) };
                 let layout = def.map(|d| self.check_layout(d, rot, layout)).transpose()?;
-                let color = color.map(check_color).transpose()?;
-                let id = self.buy_at(household, &object, at, color, layout.unwrap_or_default())?;
+                let colors = check_colors(colors)?;
+                let id = self.buy_at(household, &object, at, colors, layout.unwrap_or_default())?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
@@ -2668,7 +2668,7 @@ impl World {
                 let (offset, size, tall) = (layout.map(|l| l.offset), layout.and_then(|l| l.extent), layout.map(|l| l.tall));
                 self.move_object_to(household, object, x, z, rot, turn, offset, size, tall)?;
             }
-            Command::Recolor { household, object, color } => self.recolor(household, object, color.map(check_color).transpose()?)?,
+            Command::Recolor { household, object, colors } => self.recolor(household, object, check_colors(colors)?)?,
             Command::Upgrade { household, object } => {
                 self.upgrade(household, object)?;
             }
@@ -4776,9 +4776,46 @@ mod tests {
     }
 }
 
-/// An object's colour as a command gives it: 0xRRGGBB.
-pub(crate) fn check_color(color: u32) -> Result<u32, Error> {
-    if color <= 0xFF_FFFF { Ok(color) } else { Err(Error::new(format!("no such colour: {color:#x}"))) }
+/// The colours a player gives an object's parts, 0xRRGGBB by the name of the model's material
+/// they go on (`body`, `stone`, `chrome`); a part not named is as it's made. The sim doesn't know
+/// the parts: the renderer colours only those the model lets the player paint.
+pub type Colors = BTreeMap<String, u32>;
+
+/// Parts one object may colour at most.
+pub const MAX_COLORS: usize = 16;
+
+/// An object's colours as a command gives them: at most `MAX_COLORS` parts, each named by a
+/// material (`[a-z0-9_]`, up to 32 characters), each 0xRRGGBB.
+pub(crate) fn check_colors(colors: Colors) -> Result<Colors, Error> {
+    if colors.len() > MAX_COLORS {
+        return Err(Error::new(format!("too many colours: {} (at most {MAX_COLORS})", colors.len())));
+    }
+    for (part, &color) in &colors {
+        if !part_name(part) {
+            return Err(Error::new(format!("no such part: {part:?}")));
+        }
+        if color > 0xFF_FFFF {
+            return Err(Error::new(format!("no such colour: {color:#x}")));
+        }
+    }
+    Ok(colors)
+}
+
+fn part_name(part: &str) -> bool {
+    (1..=32).contains(&part.len()) && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// An object's colours as saves and the view write them: `#rrggbb` by part.
+pub fn colors_hex(colors: &Colors) -> BTreeMap<String, String> {
+    colors.iter().map(|(part, &c)| (part.clone(), color_hex(c))).collect()
+}
+
+/// `colors_hex` read back, with an older file's one `color` on the `body` (the part every
+/// paintable model's colour went on); what isn't a part or a colour is left out.
+pub fn parse_colors(colors: &BTreeMap<String, String>, color: Option<&str>) -> Colors {
+    let old = color.and_then(parse_color).filter(|_| colors.is_empty()).map(|c| ("body".to_string(), c));
+    let parts = colors.iter().filter(|(part, _)| part_name(part)).filter_map(|(part, hex)| Some((part.clone(), parse_color(hex)?)));
+    old.into_iter().chain(parts).take(MAX_COLORS).collect()
 }
 
 /// An object's colour as saves and the view write it: `#rrggbb`.

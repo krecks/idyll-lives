@@ -5,7 +5,8 @@
   import { money } from '../format';
   import { services } from '../services';
   import { game } from '../state.svelte';
-  import { collectionOf, duration, loversOf, paintable, percent, summarize } from './catalog';
+  import { paintSlots } from '../../assets/paint';
+  import { collectionOf, duration, loversOf, paintable, percent, summarize, withColor } from './catalog';
   import ColorSwatches from './ColorSwatches.svelte';
   import Turntable from './Turntable.svelte';
 
@@ -40,9 +41,16 @@
   const ownSize = $derived(owned?.size ?? (owned ? (owned.rot % 2 === 0 ? [owned.w, owned.d] : [owned.d, owned.w]) : (def.footprint ?? [1, 1])).map((t) => t * 100));
   const resized = $derived(!!owned && (!!owned.size || !!owned.tall));
   const metres = (cm: number) => (cm / 100).toFixed(cm % 100 ? (cm % 10 ? 2 : 1) : 0);
+  /** Its parts the player may colour (the main one first), and the colours they have. */
+  const slots = $derived(paintSlots(services.assets.get(def.model, 'model')));
+  const colors = $derived(owned ? owned.colors : inHand ? game.placing?.colors : undefined);
+  /** Parts besides the main one that have a colour of their own (set in the colour studio). */
+  const others = $derived(slots.slice(1).filter((s) => colors?.[s.material]).length);
+  /** The quick row: the main part's colour, the others kept. */
   function pickColor(color: string | null) {
-    if (owned) services.controls.recolor(owned.id, color);
-    else services.controls.colorPlacing(color);
+    const next = withColor(colors, slots[0].material, color);
+    if (owned) services.controls.recolor(owned.id, next);
+    else services.controls.colorPlacing(next);
   }
   const sim = $derived(game.selectedSim);
   const skillLabel = (id: string) => content.skill(id)?.label ?? id;
@@ -74,7 +82,7 @@
 
 <div class="detail">
   {#if !(def.icon && services.assets.has(def.icon, 'icon'))}
-    <Turntable {model} footprint={def.footprint ?? [1, 1]} {glyph} compact={!!owned} />
+    <Turntable {model} footprint={def.footprint ?? [1, 1]} {glyph} {colors} compact={!!owned} />
   {/if}
   <div class="head">
     <div>
@@ -131,8 +139,14 @@
   {/if}
 
   {#if colorable && (owned || inHand)}
-    <h4>Colour</h4>
-    <ColorSwatches color={owned ? (owned.color ?? null) : (game.placing?.color ?? null)} onpick={pickColor} />
+    <div class="colour-head">
+      <h4>Colour{#if slots.length > 1}<small> · {slots[0].label}</small>{/if}</h4>
+      <button class="btn ghost small" title="Colour each part, with the item up close" onclick={() => (game.customising = { def: def.id, objectId: owned?.id ?? null })}>
+        {slots.length > 1 ? 'Every part…' : 'Up close…'}
+      </button>
+    </div>
+    <ColorSwatches color={colors?.[slots[0].material] ?? null} onpick={pickColor} />
+    {#if others}<p class="muted others">{others === 1 ? '1 more part' : `${others} more parts`} coloured</p>{/if}
   {/if}
 
   {#if upgradable && rules}
@@ -280,6 +294,16 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+  .colour-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .others {
+    margin: 0;
+    font-size: 12px;
   }
   h4 small {
     text-transform: none;

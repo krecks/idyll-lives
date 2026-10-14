@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
 
 M = G.Palette(
-    body=('#F3F3F1', 'gloss'),       # white cabinet and doors; takes the player's colour (`paint`)
+    body=('#F3F3F1', 'gloss'),       # white cabinet and doors; the main part the player colours (`paint`)
     trim=('#B9BCBF', 'satin'),       # plinth and badge
     seal=('#3A3D41', 'satin'),       # the gap between the doors
     chrome=('#D0D3D6', 'chrome'),    # bar handles
@@ -256,12 +256,17 @@ FAMILY = G.Family(
              # Taking food or a drink out opens the fridge door (snacks, a recipe's ingredients, a cold
              # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
              motions={'uses': {'fetch': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
-             # The player's colour goes on the cabinet and doors; the inside, food and handles keep theirs.
-             paint=['body']),
+             # The player colours the cabinet and doors, the handles, the plinth and the inside; the
+             # food keeps its own colours.
+             paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth & badge'), ('liner', 'Inside')]),
      G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink',
-             motions={'uses': {'wash': 'water_on'}}, paint=['body']),
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
+                    ('trim', 'Plinth')]),
      G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.79), key='model.counterSinkDouble',
-             motions={'uses': {'wash': 'water_on'}}, paint=['body'])],
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Cabinets'), ('stone', 'Worktop'), ('metal', 'Basins'), ('chrome', 'Tap & handles'),
+                    ('trim', 'Plinth')])],
     comment='Blender-built kitchen models (tools/art/blender/families/kitchen.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

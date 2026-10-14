@@ -53,7 +53,7 @@ fn edit(w: &mut World, rng: &mut common::Lcg) {
         _ => {
             let defs: Vec<&str> = w.content.objects.iter().filter(|d| d.price.is_some() && !d.stairs).map(|d| d.id.as_str()).collect();
             let def = defs[rng.below(defs.len())].to_string();
-            w.apply(Command::Buy { household, object: def, at: None, color: None, turn: None, offset: None, size: None, tall: None })
+            w.apply(Command::Buy { household, object: def, at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None })
         }
     };
     match rng.below(10) {

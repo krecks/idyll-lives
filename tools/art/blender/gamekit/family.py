@@ -23,7 +23,9 @@ class Model:
       key        the manifest key it draws for (default model.<family>.<id>)
       motions    the pack entry's `motions` for its clips: {'uses': {use: clip}, 'hold': seconds,
                  'open': clip held open while the object is open (content `leaves`)}
-      paint      the materials a player's colour goes on (the pack's `paint`)
+      paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part
+                 first (the one the game's quick colour row paints), e.g. [('body', 'Cabinet'),
+                 ('stone', 'Worktop')]; a bare material name is its own label
       placeholder  primitive parts for a key the manifests don't have yet (the fallback)
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
@@ -99,7 +101,7 @@ class Family:
             if model.motions:
                 entry['motions'] = model.motions
             if model.paint:
-                entry['paint'] = model.paint
+                entry['paint'] = paint_slots(model.paint, materials_used(objs))
             if model.placeholder:
                 entry['placeholder'] = model.placeholder
             if model.parts:
@@ -116,3 +118,14 @@ class Family:
         played = set(motions.get('uses', {}).values()) | ({motions['open']} if motions.get('open') else set())
         missing = sorted(played - names)
         assert not missing, f'{model.id}: `motions` plays {", ".join(missing)}, which it has no clip for'
+
+
+def paint_slots(paint, used):
+    """A model's `paint` as the pack writes it: [{'material', 'label'}], each a material the model uses."""
+    slots = []
+    for p in paint:
+        material, label = (p, p.capitalize()) if isinstance(p, str) else p
+        if material not in used:
+            raise ValueError(f'paint: the model has no material {material!r} (it has {sorted(used)})')
+        slots.append({'material': material, 'label': label})
+    return slots

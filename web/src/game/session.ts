@@ -33,7 +33,7 @@ import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
-import { colorValue } from '../ui/buy/catalog';
+import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
@@ -501,6 +501,7 @@ export async function startSession(
       // Creation is the new game's: in a game, only a family moving into an empty home.
       if (game.mode === mode || (mode === 'create' && game.occupied)) return;
       takeBack();
+      game.customising = null;
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
@@ -622,12 +623,12 @@ export async function startSession(
       buildBuy.clearPreviews();
       bridge.send({ type: 'redo', household: game.home });
     },
-    recolor(objectId, color) {
-      bridge.send({ type: 'recolor', household: game.home, object: objectId, color: colorValue(color), seen: seenAt(game.objects, objectId) });
+    recolor(objectId, colors) {
+      bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors), seen: seenAt(game.objects, objectId) });
     },
-    colorPlacing(color) {
+    colorPlacing(colors) {
       if (!game.placing || game.placing.objectId !== null) return;
-      game.placing = { ...game.placing, color: color ?? undefined };
+      game.placing = { ...game.placing, colors };
       buildBuy.rehover();
     },
     resetSize(objectId) {
@@ -1157,7 +1158,7 @@ export async function startSession(
     play('pick');
     if (p.kind === 'tool') return controls.setBuildTool(p.tool);
     controls.startPlacing(p.def);
-    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, color: p.color, size: p.size, tall: p.tall };
+    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, colors: p.colors, size: p.size, tall: p.tall };
   }
 
   const onKey = (e: KeyboardEvent) => {
@@ -1168,6 +1169,11 @@ export async function startSession(
     // A held key repeats only what's worth repeating (turning, storeys, undo and redo); toggles happen once.
     if (e.repeat && !REPEATING.has(e.key)) {
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
+      return;
+    }
+    // The colour studio: its keys are its own (Escape closes it, as Cancel).
+    if (game.customising) {
+      if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
       return;
     }
     // Creation: its keys are its own (Escape goes back to Live).

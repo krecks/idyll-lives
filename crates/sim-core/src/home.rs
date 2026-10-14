@@ -450,7 +450,7 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        color: Option<u32>,
+        colors: crate::world::Colors,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
@@ -486,7 +486,7 @@ impl World {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, layout, color, quality, value)?;
+        let id = self.place(def, x, z, rot, layout, colors, quality, value)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
         let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
@@ -603,9 +603,9 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        color: Option<u32>,
+        colors: crate::world::Colors,
     ) -> Result<u32, Error> {
-        self.buy_at(household, def_id, at, color, Layout::default())
+        self.buy_at(household, def_id, at, colors, Layout::default())
     }
 
     /// Buys an object for the household's home, laid out as `layout` (unchecked: see
@@ -617,7 +617,7 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        color: Option<u32>,
+        colors: crate::world::Colors,
         layout: Layout,
     ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
@@ -634,14 +634,14 @@ impl World {
         let id = match at {
             Some([x, z, rot]) => {
                 self.keep_doorway_clear(def, x, z, rot as u8, layout)?;
-                self.place_at_home(plot, def, x, z, rot as u8, layout, color, 0, price)?
+                self.place_at_home(plot, def, x, z, rot as u8, layout, colors, 0, price)?
             }
             None => self
                 .find_spot(plot, def)
                 .into_iter()
                 .find_map(|(x, z, rot, found)| {
                     let layout = if on_top { Layout::at(found) } else { layout };
-                    self.place_at_home(plot, def, x, z, rot, layout, color, 0, price).ok()
+                    self.place_at_home(plot, def, x, z, rot, layout, colors.clone(), 0, price).ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
@@ -656,7 +656,7 @@ impl World {
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), None, 0, value).ok())
+            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), Default::default(), 0, value).ok())
     }
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
@@ -733,7 +733,7 @@ impl World {
         let result = (|| {
             let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
-            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.color, old.quality, old.value)?;
+            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
@@ -755,7 +755,7 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.color, r.quality, r.value)
+                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.colors.clone(), r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let o = &mut self.objects[rid as usize];
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
@@ -778,9 +778,9 @@ impl World {
         result
     }
 
-    pub fn recolor(&mut self, household: u32, object: u32, color: Option<u32>) -> Result<(), Error> {
+    pub fn recolor(&mut self, household: u32, object: u32, colors: crate::world::Colors) -> Result<(), Error> {
         self.home_object(household, object)?;
-        self.objects[object as usize].color = color;
+        self.objects[object as usize].colors = colors;
         self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }

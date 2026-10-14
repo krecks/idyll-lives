@@ -149,14 +149,19 @@ finish it uses.
 - **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
   removed on 2026-10-14). Another look of the same thing is another object with its own model (the
   mini fridge, the built-in fridge).
-- **Colours the player picks.** A model whose entry has `paint` (material names, the fridge's
-  `["body"]`) can be given any colour by the player: one of the content's `objectColors` (the shared
-  palette) or one of their own, per placed object (sim-core `ObjectInstance::color`, saved as
-  `#rrggbb`; absent: as made). The renderer draws those materials in that colour with their finish
-  (`painted` in models.ts); the rest of the model keeps its colours. Name the parts that take a
-  colour `body` (or what they are) and give everything else its own material. Each colour in use is
-  a template of its own: a few more draw calls per colour on a lot, the file still loaded once.
-  Colours never change price or quality. Primitive models take no colour.
+- **Colours the player picks.** A model whose entry has `paint` lists the parts the player may colour:
+  `{material, label}` (the double vanity's `body` "Cabinet", `stone` "Worktop", `chrome` "Taps &
+  handles"…), the main part first. Each part can take one of the content's `objectColors` (the shared
+  palette) or a colour of the player's own, per placed object (sim-core `ObjectInstance::colors`,
+  `#rrggbb` by material, saved as `objects[].colors`; a part left out is as made). The item panel's
+  quick row colours the main part; its "Every part…" button opens the colour studio
+  (`ui/buy/CustomiseColours.svelte`): the item live on a stage of its own (`render/preview/itemStage.ts`)
+  beside its parts, applied on Done as one edit (one undo). The renderer draws each part in its colour
+  with its finish (`painted` in models.ts); parts not listed keep theirs. Name the main part `body`,
+  give every other part its own material named for what it is, and list in `paint` only what's worth
+  colouring (not drains, water or food). Each combination of colours in use is a template of its own:
+  a few more draw calls per combination on a lot, the file still loaded once. Colours never change
+  price or quality. Primitive models take no colour.
 - **Resizing** is switched off in Buy mode for now (`RESIZING` in `web/src/game/buildmode.ts`): a model's
   moving parts don't follow a resize well (a fridge stretched wide, a wall bed). It works for files and
   will come back for the objects it suits, decided per object.

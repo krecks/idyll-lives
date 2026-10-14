@@ -49,7 +49,34 @@
         "open": "bed_down"
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "frame",
+          "label": "Bed frame"
+        },
+        {
+          "material": "mattress",
+          "label": "Mattress"
+        },
+        {
+          "material": "pillow",
+          "label": "Pillows"
+        },
+        {
+          "material": "throw",
+          "label": "Throw"
+        },
+        {
+          "material": "inside",
+          "label": "Inside & shelves"
+        },
+        {
+          "material": "metal",
+          "label": "Handle"
+        }
       ],
       "placeholder": [
         {

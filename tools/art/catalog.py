@@ -1396,8 +1396,7 @@ def double_vanity(cab, top, fin, tap):
         p += [part('lathe', [0.5, 0.14, 0.38], [x, 0.94, -0.12], '#F6F6F4', 'gloss',
                    profile=[[0, -0.5], [0.4, -0.45], [0.5, 0.5], [0.46, 0.5], [0.36, -0.3], [0, -0.3]], segments=24),
               cyl([0.03, 0.22, 0.03], [x, 0.98, -0.36], tap, 'metal'),
-              rod([x, 1.08, -0.36], [x, 1.06, -0.24], 0.02, tap, 'metal'),
-              box([0.66, 0.76, 0.03], [x, 1.5, -0.42], '#CFDCE2', 'gloss', radius=0.04, mirror='front')]  # mirrors
+              rod([x, 1.08, -0.36], [x, 1.06, -0.24], 0.02, tap, 'metal')]  # no mirrors: the player hangs their own
     p += [cyl([0.06, 0.16, 0.06], [0.0, 0.96, -0.3], TEAL, 'gloss'), cyl([0.07, 0.1, 0.07], [0.1, 0.93, -0.32], '#F2F1EE', 'gloss')]
     return p
 

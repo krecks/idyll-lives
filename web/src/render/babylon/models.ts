@@ -36,7 +36,9 @@ import './loaders';
 import type { AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground, prefetch } from '../../assets/stream';
+import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PlaceholderPart, Vec3 } from '../../assets/types';
+import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
 
 export type TintSlot = NonNullable<PlaceholderPart['tint']>;
@@ -731,15 +733,23 @@ export interface Motions {
   open?: string;
 }
 
+/** Of a placed object's `colors`, those on parts its model lets the player paint; undefined for none. */
+export function paintColors(entry: ModelEntry | undefined, colors: PartColors | undefined): PartColors | undefined {
+  if (!colors) return undefined;
+  const shown = Object.fromEntries(paintSlots(entry).flatMap(({ material }) => (colors[material] ? [[material, colors[material]]] : [])));
+  return Object.keys(shown).length ? shown : undefined;
+}
+
 /**
- * `entry` with the materials its `paint` names in `color` (`#rrggbb`, a placed object's colour),
- * each keeping its finish (mapped by name or `*`); a material without a finish has its file colour
- * multiplied by it. The entry itself when there's no colour or nothing to paint.
+ * `entry` with each part its `paint` names in its colour from `colors` (`#rrggbb` by material, a
+ * placed object's colours), each keeping its finish (mapped by name or `*`); a material without a
+ * finish has its file colour multiplied by it. The entry itself when nothing is painted.
  */
-export function painted(entry: ModelEntry | undefined, color: string | undefined): ModelEntry | undefined {
-  if (!entry || !color || !entry.paint?.length) return entry;
+export function painted(entry: ModelEntry | undefined, colors: PartColors | undefined): ModelEntry | undefined {
+  const shown = paintColors(entry, colors);
+  if (!entry || !shown) return entry;
   const materials = { ...((entry as ModelEntry & ModelExtras).materials ?? {}) };
-  for (const name of entry.paint) materials[name] = { ...(materials[name] ?? materials['*']), color };
+  for (const [name, color] of Object.entries(shown)) materials[name] = { ...(materials[name] ?? materials['*']), color };
   return { ...entry, materials } as ModelEntry;
 }
 

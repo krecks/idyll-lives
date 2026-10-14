@@ -16,7 +16,7 @@ const TOWN: &str = r#"{"width":16,"depth":16,
         {"name":"Ed","household":0,"x":11.5,"z":10.5,"traits":["neat"]}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), color: None, turn: None, offset: None, size: None, tall: None })
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
         .unwrap_or_else(|e| panic!("{def}: {e}"));
     w.objects.len() as u32 - 1
 }

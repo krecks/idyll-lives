@@ -2414,7 +2414,7 @@
       "group": "sinks",
       "slots": 2,
       "decor": 0.3,
-      "description": "Two basins under two mirrors: no more queueing to brush your teeth.",
+      "description": "Two basins side by side: no more queueing to brush your teeth. Hang a mirror above it.",
       "interactions": [
         {
           "id": "wash",

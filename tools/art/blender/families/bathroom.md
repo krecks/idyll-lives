@@ -29,20 +29,18 @@ overrides the base (`model.sink`), `catalog` and `catalog2` entries by key.
 |---|---|---|---|---|
 | `model.sink` | 0.86 × 1.26 × 0.62 m | 3,320 | 2 | base cabinet, shaker doors, rectangular inset basin, gooseneck |
 | `model.sinkPedestal` | 0.56 × 1.06 × 0.47 m | 1,540 | 2 | column, oval bowl, tap deck with soap and a tooth mug |
-| `model.vanityDouble` | 1.90 × 1.88 × 0.57 m | 5,260 | 3 | two-basin cabinet, two taps, two wall mirrors |
+| `model.vanityDouble` | 1.90 × 1.12 × 0.56 m | 4,396 | 3 | two-basin cabinet, two taps (no mirrors) |
 | `model.sinkVessel` | 0.84 × 1.16 × 0.54 m | 1,920 | 3 | counter with a raised vessel bowl and a folded towel |
 | `model.sinkConsole` | 0.60 × 1.06 × 0.48 m | 1,108 | 3 | open console on two legs, oval bowl |
 
-All match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings). The
-`body` material takes the player's colour.
+All match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings). Each
+lists the parts the player may colour in `paint`, the `body` first.
 
-## The double vanity's mirrors
+## The double vanity has no mirrors
 
-`vanityDouble` is the only one with `mirror` parts (two glass panels, `catalog.double_vanity`). A file
-cannot reflect yet, so the cabinet and the mirror *frames* are in the file (so its height reaches the
-placeholder's 1.88 m), and the two glass panels are carried as primitive `parts` on the pack entry via the
-`parts=` argument on `G.Model` (`MIRRORS` in this file). `parts` already draws primitive parts alongside a
-file.
+It had two (frames in the file, the glass as primitive `parts`). They were taken off on 2026-10-14: the
+player chooses the mirror they hang above it (the wall mirror, the mirror cabinet), as for any sink. Its
+placeholder (`catalog.double_vanity`) has none either.
 
 ## Rebuild
 

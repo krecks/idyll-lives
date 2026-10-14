@@ -21,8 +21,8 @@
  */
 
 import type { Content, ObjectDef } from '../content/content';
-import { colorValue } from '../ui/buy/catalog';
-import { groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, seenAt, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { colorValues } from '../ui/buy/catalog';
+import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, seenAt, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
@@ -40,8 +40,8 @@ interface BuildPreview {
   setPlacementGhost(
     ghost: {
       model: string;
-      /** `#rrggbb` on the parts the model paints; absent: as made. */
-      color?: string;
+      /** Its parts' colours; absent: as made. */
+      colors?: PartColors;
       x: number;
       z: number;
       rot: number;
@@ -96,7 +96,7 @@ const MAX_DOOR_RUN = 2;
 const DOOR_HEAD = 210;
 
 /** What the eyedropper picked up: a build tool with its look set, or an object to buy again. */
-export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; color?: string; rot: number; turn: number; size?: [number, number]; tall?: number };
+export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; colors?: PartColors; rot: number; turn: number; size?: [number, number]; tall?: number };
 
 /**
  * Things stand anywhere on their tiles (all but stairs): their middle snaps to quarter tiles (the
@@ -437,7 +437,7 @@ export class BuildBuyInput {
     const def = obj && this.content.object(obj.def);
     if (obj && def?.stairs) return { kind: 'tool', tool: 'stairs' };
     if (obj && def?.price !== undefined) {
-      return { kind: 'object', def: obj.def, color: obj.color, rot: obj.rot, turn: obj.turn ?? 0, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
+      return { kind: 'object', def: obj.def, colors: obj.colors, rot: obj.rot, turn: obj.turn ?? 0, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
     }
     if (!ground) return null;
     const e = this.nearestEdge(ground);
@@ -667,14 +667,14 @@ export class BuildBuyInput {
   private hoverBuy(ground: Point): void {
     const p = this.placement(ground);
     if (!p) return this.preview.setPlacementGhost?.(null);
-    const color = game.placing?.objectId != null ? game.objects.find((o) => o.id === game.placing!.objectId)?.color : game.placing?.color;
+    const colors = game.placing?.objectId != null ? game.objects.find((o) => o.id === game.placing!.objectId)?.colors : game.placing?.colors;
     // The arrow marks where it'll be used from (the other middle tile in front when the front is
     // taken; nowhere free, the front, red as the rest of it): nothing for things nobody uses (or on a top).
     const used = p.def.interactions.length > 0 && p.def.layer !== 'surface';
     const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
     const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: p.def.model, color, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: p.def.model, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -701,7 +701,7 @@ export class BuildBuyInput {
       } else {
         // New purchases stay on the cursor so several can be placed in a row.
         const resized = this.resizeOf(p.def, p.size, p.tall);
-        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], ...(colorValue(placing.color) !== undefined ? { color: colorValue(placing.color) } : {}), ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}), ...(resized ? { size: resized.size, tall: resized.tall } : {}) });
+        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], ...(placing.colors ? { colors: colorValues(placing.colors) } : {}), ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}), ...(resized ? { size: resized.size, tall: resized.tall } : {}) });
       }
       return true;
     }
@@ -933,7 +933,7 @@ export class BuildBuyInput {
     const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
     r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
     const obj = game.objects.find((o) => o.id === r.id);
-    this.preview.setPlacementGhost?.({ model: r.def.model, color: obj?.color, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
+    this.preview.setPlacementGhost?.({ model: r.def.model, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
     if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
     const hint = fit === true ? null : (fit ?? "There's no room for it that size");
     if (game.placeHint !== hint) game.placeHint = hint;
@@ -1815,7 +1815,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   // the rest (moved, turned, recoloured or upgraded); the same id wins a tie.
   const before = new Map<number, ObjectPlacement>();
   const left = new Set(prev.objects);
-  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${o.color ?? ''}:${o.quality}`;
+  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${colorsKey(o.colors)}:${o.quality}`;
   const byKey = Map.groupBy(prev.objects, key);
   for (const o of next.objects) {
     const same = byKey.get(key(o));
@@ -1851,7 +1851,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
       if (o.quality > old.quality) {
         effects.push({ kind: 'upgrade', ...rect(o), objectId: o.id });
         sounds.add('upgrade');
-      } else if (o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) || o.rot !== old.rot || o.turn !== old.turn || o.color !== old.color) {
+      } else if (o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) || o.rot !== old.rot || o.turn !== old.turn || colorsKey(o.colors) !== colorsKey(old.colors)) {
         effects.push({ kind: 'place', ...rect(o), objectId: o.id });
         sounds.add(o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) ? 'place' : 'rotate');
       }

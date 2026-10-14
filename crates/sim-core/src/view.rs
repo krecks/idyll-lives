@@ -1420,9 +1420,9 @@ struct ObjectView<'a> {
     w: i32,
     d: i32,
     quality: u8,
-    /// The colour the player chose (`#rrggbb`), on the parts its model paints; absent: as made.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    color: Option<String>,
+    /// The colours the player chose, `#rrggbb` by part (the model's material); absent: as made.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    colors: std::collections::BTreeMap<String, String>,
     /// What selling it returns (None if it can't be sold).
     sell_value: Option<i64>,
     /// What the quick fix costs (worn things; as of the last structure change, so exact for
@@ -1639,7 +1639,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 w,
                 d,
                 quality: o.quality,
-                color: o.color.map(crate::world::color_hex),
+                colors: crate::world::colors_hex(&o.colors),
                 sell_value: content.objects[o.def].price.map(|_| {
                     let broken = if o.broken() { 0.5 } else { 1.0 };
                     (o.value as f32 * content.object_rules.resale * broken).round() as i64

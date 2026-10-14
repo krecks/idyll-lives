@@ -16,7 +16,7 @@ import gamekit as G  # noqa: E402
 # 1. The palette: one material per colour, named for what it is, with the finish the game draws it
 #    with. The names are the material names in the file and the keys of the pack's `materials`.
 M = G.Palette(
-    body=('#7FA7C9', 'satin'),     # the painted box; takes the player's colour (`paint` below)
+    body=('#7FA7C9', 'satin'),     # the painted box; the main part the player colours (`paint` below)
     trim=('#F1E9DA', 'satin'),     # plinth and lid edge
     inside=('#C9B79A', 'matte'),   # seen with the lid open
     brass=('#C9A54A', 'metal'),    # knob and handle
@@ -94,7 +94,7 @@ FAMILY = G.Family(
              # after the use starts (seconds of the residents' time; absent: until the use ends).
              motions={'uses': {'fetch': 'lid_open', 'putAway': 'drawer_open'}, 'hold': 2.5},
              # The materials the player's colour goes on.
-             paint=['body'],
+             paint=[('body', 'Body')],
              # A key the manifests don't have yet needs a placeholder: simple primitive parts, drawn when
              # the file fails to load. A key that exists (an object moving to Blender) keeps its own.
              placeholder=[{'shape': 'box', 'size': [0.8, 0.5, 0.45], 'at': [0, 0.25, 0], 'color': '#7FA7C9',

@@ -16,11 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
 
 M = G.Palette(
-    body=('#EDEBE6', 'satin'),       # cabinet / vanity / pedestal / basin; takes the player's colour
+    body=('#EDEBE6', 'satin'),       # cabinet / vanity / pedestal / basin; the main part the player colours
     porcelain=('#F6F6F4', 'gloss'),  # white ceramic
     stone=('#DCDDDA', 'gloss'),      # worktops and vanity tops
     wood=('#B98A5A', 'wood'),        # wooden tops, shelves and legs
-    trim=('#B9BCBF', 'satin'),       # plinths, mirror frames, seals
+    trim=('#B9BCBF', 'satin'),       # plinths and seals
     metal=('#8E9196', 'metal'),      # basin interiors, grey metal
     chrome=('#D0D3D6', 'chrome'),    # chrome taps
     brass=('#C9A54A', 'metal'),      # brass taps and legs
@@ -32,9 +32,9 @@ M = G.Palette(
     water=('#9EC9DD', 'gloss'),      # the stream from the tap
 )
 
-# The player's colour goes on the biggest painted part of every sink (the cabinet, vanity, pedestal,
-# console basin or vessel vanity). The rest keeps its own material.
-PAINT = ['body']
+# The parts the player may colour, the biggest first (the cabinet, vanity, pedestal, console basin or
+# vessel vanity: the one the quick colour row paints). Drains, water, soap and the basins' metal
+# insides keep their own material.
 
 
 def _tube(F, name, pts, r, material, verts=8):
@@ -169,14 +169,8 @@ def sinkPedestal():
     return G.meshes()
 
 
-# --- double vanity: a two-basin cabinet with two wall mirrors -----------------------------------------
-# The mirrors reflect (a file can't yet), so the glass is a primitive `part` drawn with the file; the
-# frames are in the file, so its height reaches the placeholder's 1.88 m.
-MIRRORS = [
-    {'shape': 'box', 'size': [0.66, 0.76, 0.01], 'at': [x, 1.5, -0.425], 'color': '#CFDCE2',
-     'material': 'material.finish.gloss', 'radius': 0.02, 'mirror': 'front'}
-    for x in (-0.48, 0.48)
-]
+# --- double vanity: a two-basin cabinet ----------------------------------------------------------------
+# No mirrors: the player hangs the ones they like above it (the wall mirror, the mirror cabinet).
 
 
 def vanityDouble():
@@ -195,11 +189,6 @@ def vanityDouble():
             F.cyl(f'drain{s}', 0.03, 0.012, (x, 0.895, -0.1), M.dark, verts=12)
             F.cyl(f'tap_base{s}', 0.04, 0.03, (x, 0.9, -0.35), M.chrome, verts=14)
             _gooseneck(F, f'tap{s}', x, 0.9, -0.35, -0.22, 1.1, M.chrome, tip_y=1.04)
-            # the mirror frame in the file (its glass is a `part`, MIRRORS)
-            F.box(f'mirror_top{s}', 0.66, 0.05, 0.03, (x, 1.855, -0.42), M.trim, bevel=0.008)
-            F.box(f'mirror_bottom{s}', 0.66, 0.05, 0.03, (x, 1.145, -0.42), M.trim, bevel=0.008)
-            F.box(f'mirror_left{s}', 0.05, 0.76, 0.03, (x - 0.305, 1.5, -0.42), M.trim, bevel=0.008)
-            F.box(f'mirror_right{s}', 0.05, 0.76, 0.03, (x + 0.305, 1.5, -0.42), M.trim, bevel=0.008)
     G.join(still, 'body', origin=(0, 0, 0))
     waters = [_water(F, (x, 1.04, -0.22), 0.895) for x in (-0.48, 0.48)]
     G.settle()
@@ -257,21 +246,28 @@ def sinkConsole():
 FAMILY = G.Family(
     'bathroom', M,
     [G.Model('sink', sink, size=(0.86, 1.262, 0.621), key='model.sink',
-             motions={'uses': {'wash': 'water_on'}}, paint=PAINT),
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('metal', 'Basin'), ('chrome', 'Tap & handles'),
+                    ('trim', 'Plinth')]),
      G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal',
-             motions={'uses': {'wash': 'water_on'}}, paint=PAINT),
-     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.880, 0.565), key='model.vanityDouble',
-             motions={'uses': {'wash': 'water_on'}}, paint=PAINT, parts=MIRRORS),
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Pedestal'), ('porcelain', 'Basin & cup'), ('chrome', 'Tap')]),
+     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble',
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('porcelain', 'Basins'), ('chrome', 'Taps & handles'),
+                    ('trim', 'Plinth')]),
      G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel',
-             motions={'uses': {'wash': 'water_on'}}, paint=PAINT),
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Vanity'), ('stone', 'Worktop'), ('porcelain', 'Bowl'), ('blackmetal', 'Tap'),
+                    ('wood', 'Shelf & legs'), ('towel', 'Towels')]),
      G.Model('sinkConsole', sinkConsole, size=(0.60, 1.062, 0.480), key='model.sinkConsole',
-             motions={'uses': {'wash': 'water_on'}}, paint=PAINT)],
+             motions={'uses': {'wash': 'water_on'}},
+             paint=[('body', 'Basin'), ('brass', 'Legs & tap'), ('fabric', 'Towel')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
             'a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from '
-            'the tap) played while a resident washes; the double vanity carries its mirror glass as '
-            'primitive `parts`, which a file cannot reflect yet.',
+            'the tap) played while a resident washes.',
 )
 
 if __name__ == '__main__':

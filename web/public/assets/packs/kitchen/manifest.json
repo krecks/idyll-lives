@@ -57,7 +57,22 @@
         "hold": 3.5
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth & badge"
+        },
+        {
+          "material": "liner",
+          "label": "Inside"
+        }
       ],
       "placeholder": [
         {
@@ -292,7 +307,26 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "wood",
+          "label": "Worktop"
+        },
+        {
+          "material": "porcelain",
+          "label": "Basin"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
       ],
       "placeholder": [
         {
@@ -561,7 +595,26 @@
         }
       },
       "paint": [
-        "body"
+        {
+          "material": "body",
+          "label": "Cabinets"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "metal",
+          "label": "Basins"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
       ],
       "placeholder": [
         {

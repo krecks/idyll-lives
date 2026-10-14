@@ -94,7 +94,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - The finishes become the pack's `materials`, so they're declared only once.
    - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
      (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
-   - Name the parts the player may colour `body`, and list them in `paint`.
+   - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
+     worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`rock`
    (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
@@ -103,7 +104,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 
    A model that stands off the middle of its footprint (the wall bed, at the back of its 2 × 3 tiles) is
    built in place and uses `G.settle(centre=False)`, with `centre=(x, depth)` on its `Model`.
-4. **Declare it**: `G.Model('<id>', build, size=(w, h, d), key='model.<id>', paint=['body'])`.
+4. **Declare it**: `G.Model('<id>', build, size=(w, h, d), key='model.<id>', paint=[('body', 'Cabinet'), ('stone', 'Worktop')])`.
    - `size` is asserted after the build, within 2 % (`tolerance`). It's the real size, never stretched.
      Take it from the placeholder, or from the `[gamekit]` line once the model is right.
    - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.

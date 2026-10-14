@@ -147,9 +147,9 @@ pub enum Command {
         object: String,
         #[serde(default)]
         at: Option<[i32; 3]>,
-        /// Its colour (0xRRGGBB, on the parts its model paints); absent: as it's made.
+        /// Its parts' colours (`crate::world::Colors`); absent: as it's made.
         #[serde(default)]
-        color: Option<u32>,
+        colors: crate::world::Colors,
         /// Degrees past the facing, for objects that turn freely (0..90).
         #[serde(default)]
         turn: Option<u8>,
@@ -190,12 +190,13 @@ pub enum Command {
         #[serde(default)]
         tall: Option<i16>,
     },
-    /// Change an object's colour (free; effects stay the same): 0xRRGGBB, or absent for as it's made.
+    /// Change an object's colours (free; effects stay the same): all of them at once, 0xRRGGBB by
+    /// part (`crate::world::Colors`); a part left out, or all of them when absent, as it's made.
     Recolor {
         household: u32,
         object: u32,
         #[serde(default)]
-        color: Option<u32>,
+        colors: crate::world::Colors,
     },
     /// Buy mode: buy the next quality level for an object at home (instant).
     Upgrade {

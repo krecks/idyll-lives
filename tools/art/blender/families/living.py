@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
 
 M = G.Palette(
-    body=('#E9E4DA', 'satin'),       # the cabinet and the bed's underside; takes the player's colour
+    body=('#E9E4DA', 'satin'),       # the cabinet and the bed's underside; the main part the player colours
     inside=('#D8D1C4', 'matte'),     # the cabinet's back and the shelves
     frame=('#B9A58A', 'satin'),      # the bed frame around the mattress
     metal=('#8D8F92', 'metal'),      # handle
@@ -133,7 +133,10 @@ FAMILY = G.Family(
              # Down while the bed is open (the sim's `open`), from the moment a use that opens it
              # starts (`uses`, so it doesn't wait for the house to be redrawn).
              motions={'uses': {'sleep': 'bed_down', 'nap': 'bed_down', 'foldDown': 'bed_down'}, 'open': 'bed_down'},
-             paint=['body'], placeholder=PLACEHOLDER)],
+             # The books keep their own colours.
+             paint=[('body', 'Cabinet'), ('frame', 'Bed frame'), ('mattress', 'Mattress'), ('pillow', 'Pillows'),
+                    ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')],
+             placeholder=PLACEHOLDER)],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
             'game\'s finishes so a model costs one draw call per finish group.',

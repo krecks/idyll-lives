@@ -7,6 +7,7 @@
 
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content, NeedDef, ObjectDef, TraitDef } from '../../content/content';
+import type { PartColors } from '../../core/protocol';
 
 export interface NeedBoost {
   need: NeedDef;
@@ -124,14 +125,24 @@ export function collectionOf(content: Content, def: ObjectDef): TraitDef | null 
   return dot > 0 ? (content.trait(def.id.slice(0, dot)) ?? null) : null;
 }
 
-/** Whether the player can give an item a colour of their own: its model paints some of its parts (`paint`). */
+/** Whether the player can give an item colours of their own: its model has parts to paint (`paint`). */
 export function paintable(assets: AssetRegistry, def: ObjectDef): boolean {
   return !!assets.get(def.model, 'model')?.paint?.length;
 }
 
-/** A colour as commands send it (0xRRGGBB) from `#rrggbb`; undefined for none (as made). */
-export function colorValue(hex: string | null | undefined): number | undefined {
-  return hex && /^#[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.slice(1), 16) : undefined;
+/** Colours as commands send them (0xRRGGBB by part) from `#rrggbb`; what isn't a colour is left out. */
+export function colorValues(colors: PartColors | undefined): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [part, hex] of Object.entries(colors ?? {})) if (/^#[0-9a-f]{6}$/i.test(hex)) out[part] = parseInt(hex.slice(1), 16);
+  return out;
+}
+
+/** `colors` with `part` as `color` (null: as made); undefined when nothing is left coloured. */
+export function withColor(colors: PartColors | undefined, part: string, color: string | null): PartColors | undefined {
+  const next = { ...colors };
+  if (color) next[part] = color;
+  else delete next[part];
+  return Object.keys(next).length ? next : undefined;
 }
 
 const cache = new WeakMap<ObjectDef, ItemSummary>();

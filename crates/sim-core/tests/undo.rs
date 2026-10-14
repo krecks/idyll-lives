@@ -6,6 +6,7 @@ mod common;
 use serde_json::json;
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind, FloorPaint};
 use sim_core::lot::Edge;
+use sim_core::world::Colors;
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -36,7 +37,7 @@ fn buy(w: &mut World, def: &str, x: i32, z: i32) {
         household: 0,
         object: def.into(),
         at: Some([x, z, 0]),
-        color: None,
+        colors: Default::default(),
         turn: None,
         offset: None,
         size: None,
@@ -332,17 +333,29 @@ fn a_colour_is_an_edit_and_goes_where_its_object_goes() {
     let mut w = world();
     buy(&mut w, "chair", 1, 1);
     let chair = w.objects.len() as u32 - 1;
-    w.apply(Command::Recolor { household: 0, object: chair, color: Some(0xD9483B) }).unwrap();
-    assert_eq!(w.objects[chair as usize].color, Some(0xD9483B));
+    let red: Colors = [("body".into(), 0xD9483B)].into();
+    w.apply(Command::Recolor { household: 0, object: chair, colors: red.clone() }).unwrap();
+    assert_eq!(w.objects[chair as usize].colors, red);
+    // Several parts at once are one edit.
+    let three: Colors = [("body".into(), 0x4E9C9A), ("trim".into(), 0xF2EFE8), ("chrome".into(), 0xC9A227)].into();
+    w.apply(Command::Recolor { household: 0, object: chair, colors: three.clone() }).unwrap();
+    assert_eq!(w.objects[chair as usize].colors, three);
     w.apply(Command::Undo { household: 0 }).unwrap();
-    assert_eq!(w.objects[chair as usize].color, None, "undone: as made");
+    assert_eq!(w.objects[chair as usize].colors, red, "undone in one step");
+    w.apply(Command::Undo { household: 0 }).unwrap();
+    assert!(w.objects[chair as usize].colors.is_empty(), "undone: as made");
     w.apply(Command::Redo { household: 0 }).unwrap();
-    assert_eq!(w.objects[chair as usize].color, Some(0xD9483B), "and done again");
+    assert_eq!(w.objects[chair as usize].colors, red, "and done again");
     w.apply(Command::MoveObject { household: 0, object: chair, x: 3, z: 3, rot: 1, turn: None, offset: None, size: None, tall: None }).unwrap();
     let moved = w.objects.iter().find(|o| o.def == 0).unwrap();
-    assert_eq!((moved.x, moved.color), (3, Some(0xD9483B)), "moved, it keeps its colour");
+    assert_eq!((moved.x, &moved.colors), (3, &red), "moved, it keeps its colour");
     assert!(w.blueprint_json(0).unwrap().contains("\"#d9483b\""), "a blueprint carries it");
-    assert!(w.apply(Command::Recolor { household: 0, object: chair, color: Some(0x100_0000) }).is_err(), "no such colour");
-    w.apply(Command::Recolor { household: 0, object: chair, color: None }).unwrap();
-    assert_eq!(w.objects[chair as usize].color, None, "back to as made");
+    let colors = |part: &str, c: u32| -> Colors { [(part.into(), c)].into() };
+    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors("body", 0x100_0000) }).is_err(), "no such colour");
+    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors("Body Top", 0xD9483B) }).is_err(), "no such part");
+    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors(&"a".repeat(33), 0xD9483B) }).is_err(), "too long a name");
+    let many: Colors = (0..17).map(|i| (format!("part{i}"), 0)).collect();
+    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: many }).is_err(), "too many parts");
+    w.apply(Command::Recolor { household: 0, object: chair, colors: Colors::new() }).unwrap();
+    assert!(w.objects[chair as usize].colors.is_empty(), "back to as made");
 }

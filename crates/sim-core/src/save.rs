@@ -39,7 +39,8 @@
 //! the game started from (`seed`, for bug reports; absent: 0, unknown); 24 = objects have a colour
 //! the player chose (`objects[].color`, `#rrggbb`; absent: as made) instead of a style (older
 //! files' object and household `style` is ignored); 25 = objects can be open (`objects[].open`: a
-//! wall bed folded down; absent: closed). Older files load. Saves
+//! wall bed folded down; absent: closed); 26 = a colour per part (`objects[].colors`, `#rrggbb` by
+//! the model's material name; an older file's `color` goes on the `body`). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -57,7 +58,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 25;
+pub const SAVE_VERSION: u32 = 26;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -244,8 +245,11 @@ pub struct ObjectSave {
     pub rot: u8,
     #[serde(default)]
     pub quality: u8,
-    /// The colour the player chose (`#rrggbb`; absent: as made).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The colours the player chose, `#rrggbb` by part (absent: as made).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub colors: BTreeMap<String, String>,
+    /// Before v26: its one colour, on the `body`.
+    #[serde(default, skip_serializing)]
     pub color: Option<String>,
     /// Money put into it; defaults to the price.
     #[serde(default)]
@@ -618,7 +622,8 @@ impl World {
                 z: o.z,
                 rot: o.rot,
                 quality: o.quality,
-                color: o.color.map(crate::world::color_hex),
+                colors: crate::world::colors_hex(&o.colors),
+                color: None,
                 value: Some(o.value),
                 turn: o.turn,
                 offset: o.offset,
@@ -973,12 +978,12 @@ impl World {
                     let value = o
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
-                    let color = o.color.as_deref().and_then(crate::world::parse_color);
+                    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
                     // A size the content no longer allows goes back to its kind's.
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
                     let (size, tall) = world.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
                     let layout = crate::world::Layout { offset: o.offset, extent: Some(size), tall };
-                    world.place(def, o.x, o.z, o.rot, layout, color, o.quality, value)
+                    world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value)
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };

@@ -201,9 +201,12 @@ def check(entry, finishes, path):
     clip_errors, clip_warnings = check_clips(gltf, binary, entry)
     errors += clip_errors
     warnings += clip_warnings
-    # The parts a player's colour goes on (`paint`): materials of the file.
+    # The parts the player may colour (`paint`: a material's name, or {material, label}): materials of the file.
     names = {m.get('name', '') for m in gltf.get('materials', [])}
-    for name in entry.get('paint', []):
+    for slot in entry.get('paint', []):
+        name = slot.get('material') if isinstance(slot, dict) else slot
+        if isinstance(slot, dict) and not slot.get('label'):
+            errors.append(f'`paint` part {name!r} has no label')
         if name not in names:
             errors.append(f'`paint` names {name!r}, which is no material of the file')
     if 'KHR_lights_punctual' in gltf.get('extensionsUsed', []):

@@ -6,7 +6,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import type { ItemPlacement, WorldStructure } from '../core/protocol';
+import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -171,8 +171,8 @@ export interface ResizeHandle {
 export interface PlacementGhost {
   /** Asset key of the model. */
   model: string;
-  /** Its colour (`#rrggbb`) on the parts the model paints; absent: as made. */
-  color?: string;
+  /** Its parts' colours; absent: as made. */
+  colors?: PartColors;
   /** Min corner (tiles) of the rotated footprint `w`×`d`. */
   x: number;
   z: number;
@@ -489,9 +489,18 @@ export interface ItemPreviews {
   /** The cached picture, if it has been drawn. */
   cachedThumbnail(model: string): string | null;
   /** The cached turntable, if it has been drawn. */
-  cachedTurntable(model: string, frames: number): string[] | null;
-  /** The model seen from `frames` angles, turning once around (the catalog's drag-to-turn preview). */
-  turntable(model: string, footprint: [number, number], frames: number): Promise<string[] | null>;
+  cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null;
+  /** The model (its parts in `colors`) seen from `frames` angles, turning once around (the catalog's drag-to-turn preview). */
+  turntable(model: string, footprint: [number, number], frames: number, colors?: PartColors): Promise<string[] | null>;
+  /** The colour studio's live stage for `model`, in `host`; null when 3D is unavailable. */
+  stage(host: HTMLElement, model: string, footprint: [number, number]): Promise<ItemStage | null>;
+}
+
+/** One item, live and turning, as the colour studio shows it. */
+export interface ItemStage {
+  /** Shows its parts in `colors` (the latest call wins; the one shown stays until it's ready). */
+  setColors(colors: PartColors | undefined): void;
+  detach(): void;
 }
 
 export interface SimPreviews {

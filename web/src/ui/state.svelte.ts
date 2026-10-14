@@ -1,6 +1,6 @@
 /** Reactive UI state. Written by the game layer at ~10 Hz, read by components. */
 
-import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
+import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
 
@@ -41,8 +41,8 @@ export interface Placing {
   rot: number;
   /** Degrees past `rot`, for objects that turn freely. */
   turn: number;
-  /** Colour for a new purchase (`#rrggbb`: chosen while in hand, or picked up with the eyedropper); absent: as made. */
-  color?: string;
+  /** Colours for a new purchase (chosen while in hand, or picked up with the eyedropper); absent: as made. */
+  colors?: PartColors;
   /** Set when moving an object the household already owns. */
   objectId: number | null;
   /** Its own size (centimetres across and deep, before turning), resized by the player; absent: its kind's. */
@@ -138,6 +138,11 @@ class GameState {
   placing = $state.raw<Placing | null>(null);
   /** Owned object picked in Build mode's catalog. */
   buySelection = $state<number | null>(null);
+  /**
+   * The colour studio, open over Build mode: the item whose parts are being coloured, a thing at
+   * home (`objectId`) or the new purchase in hand (null).
+   */
+  customising = $state<{ def: string; objectId: number | null } | null>(null);
   /**
    * The storey in view (0: the ground, -1: the basement), how many the lot has at and above the
    * ground and the lowest (-1 with a basement); higher storeys are hidden, and in the basement

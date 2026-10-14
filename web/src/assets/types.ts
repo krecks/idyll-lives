@@ -6,6 +6,12 @@
 
 export type Vec3 = [number, number, number];
 
+/** A part of a model the player may colour: a material of the file, and its name in the game. */
+export interface PaintSlot {
+  material: string;
+  label: string;
+}
+
 export interface PlaceholderPart {
   /** `blob` is a lumpy sphere for foliage and rocks. */
   shape: 'box' | 'cylinder' | 'cone' | 'sphere' | 'capsule' | 'blob';
@@ -59,10 +65,12 @@ export interface ModelEntry {
    */
   vary?: number;
   /**
-   * The file's materials (by name) that take the colour the player gives a placed object (the
-   * fridge's `body`: cabinet and doors). Absent: it comes in one colour.
+   * The parts the player may colour: the file's materials by name, each with what the player
+   * calls it (the double vanity's `body` is its Cabinet, `stone` its Worktop). The first is the
+   * main part, the one the quick colour row paints. A bare name is its own label. Absent: it
+   * comes as made.
    */
-  paint?: string[];
+  paint?: (string | PaintSlot)[];
 }
 
 export interface MaterialEntry {

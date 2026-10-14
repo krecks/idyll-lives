@@ -80,7 +80,7 @@ fn a_bare_room_is_disliked_until_it_gets_better() {
     // A vase: the wish came true.
     let spots = [(8, 1), (8, 3), (5, 1), (5, 3)];
     let bought = spots.iter().any(|&(x, z)| {
-        w.apply(Command::Buy { household: 0, object: "vase".into(), at: Some([x, z, 0]), color: None, turn: None, offset: None, size: None, tall: None }).is_ok()
+        w.apply(Command::Buy { household: 0, object: "vase".into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).is_ok()
     });
     assert!(bought, "somewhere for a vase");
     assert!(living(&w).scores.decor >= 0.6, "{:?}", living(&w).scores);

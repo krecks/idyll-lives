@@ -44,13 +44,13 @@ export type Command =
    * `MAX_SIZE` tiles; it takes them rounded up to whole tiles); `tall`: centimetres taller
    * (negative: shorter) than its kind.
    */
-  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; color?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
+  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; colors?: Record<string, number>; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
   | { type: 'sell'; household: number; object: number; seen?: Seen }
   /** The paid quick fix for something worn or broken. */
   | { type: 'repair'; household: number; object: number; seen?: Seen }
   | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number; seen?: Seen }
   /** `color`: 0xRRGGBB on the parts its model paints; absent: as made. */
-  | { type: 'recolor'; household: number; object: number; color?: number; seen?: Seen }
+  | { type: 'recolor'; household: number; object: number; colors: Record<string, number>; seen?: Seen }
   | { type: 'upgrade'; household: number; object: number; seen?: Seen }
   | { type: 'build'; household: number; edits: EdgeEdit[] }
   | { type: 'paint'; household: number; faces: FacePaint[] }
@@ -332,8 +332,8 @@ export interface ObjectPlacement {
   d: number;
   /** Upgrade level (0 = as bought). */
   quality: number;
-  /** The colour the player chose (`#rrggbb`), on the parts its model paints; absent: as made. */
-  color?: string;
+  /** The colours the player chose for its parts; absent: as made. */
+  colors?: PartColors;
   /** What selling returns; null if it can't be sold. */
   sellValue: number | null;
   /** Wear 0..1 (broken at 1). */
@@ -874,6 +874,22 @@ export function storeyRow(world: StoreyLayout, k: number): number {
   const b = world.basement;
   const block = k < 0 ? (b ?? 0) : b !== undefined && k >= b ? k + 1 : k;
   return block * groundDepth(world);
+}
+
+/**
+ * The colours a player gave an object's parts: `#rrggbb` by the name of the model's material it
+ * goes on (`body`, `stone`); a part left out is as made.
+ */
+export type PartColors = Record<string, string>;
+
+/** `colors` as one string, the same for the same colours (for template and cache keys); '' for none. */
+export function colorsKey(colors: PartColors | undefined): string {
+  return colors
+    ? Object.keys(colors)
+        .sort()
+        .map((part) => `${part}:${colors[part]}`)
+        .join(',')
+    : '';
 }
 
 /** What a command naming object `id` sends as `seen`: the object as the view shows it. */
