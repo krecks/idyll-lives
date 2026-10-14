@@ -757,10 +757,7 @@ def coffee_table(top, tfin, legc, lfin, style):
                 p.append(rod([sx * 0.6, 0, sz * 0.32], [sx * 0.54, h, sz * 0.27], 0.035, legc, lfin, segments=10))
     if style == 'splay':
         p += [lathe([0.26, 0.08, 0.26], [-0.32, 0.46, 0.0], '#E9E6E0', 'gloss', BOWL, segments=20)]
-    else:
-        p += [box([0.3, 0.03, 0.22], [0.3, 0.435, 0.05], TEAL, 'matte', radius=0.004, rotate=[0, 10, 0]),   # magazines
-              box([0.3, 0.02, 0.22], [0.31, 0.46, 0.04], CREAM, 'matte', radius=0.004, rotate=[0, -6, 0]),
-              cyl([0.18, 0.06, 0.18], [-0.32, 0.45, 0.0], '#E9E6E0', 'gloss')]
+    # the others' tops are bare, as the model's (it keeps its magazines in the drawer)
     return p
 
 
@@ -1821,7 +1818,8 @@ def pool_table(felt, wood, fin='wood'):
              ('#FFFFFF', -0.6, 0.0)]
     for c, x, z in balls:
         p.append(sph([0.057, 0.057, 0.057], [x, 0.815, z], c, 'gloss', segments=10))
-    p += [cyl([0.025, 1.45, 0.025], [-0.2, 0.8, 0.3], '#C9A27A', 'wood', rotate=[0, 70, 88]),   # cue on the table
+    p += [rod([-1.02, 0.8, 0.42], [-0.5, 0.798, 0.38], 0.028, '#3B2A20', 'satin'),           # the cue lying on the cloth, as the model's
+          rod([-0.5, 0.798, 0.38], [0.36, 0.794, 0.3], 0.018, '#D9B98A', 'satin'),
           box([0.2, 0.06, 0.03], [0, 0.11, 0.66], wood, fin, radius=0.01)]
     return p
 
