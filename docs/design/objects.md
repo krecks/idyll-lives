@@ -166,8 +166,12 @@ finish it uses.
   moving parts don't follow a resize well (a fridge stretched wide, a wall bed). It works for files and
   will come back for the objects it suits, decided per object.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
-- **Mirrors** (17 models) are placeholder parts with `mirror`; a file can't reflect yet. Keep them
-  primitive until the engine change below.
+- **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
+  glass: its face reflects the room live, as placeholder parts with `mirror` do (the quality's
+  `mirrors`, the nearest ones). Make the glass a flat piece of the still body (a moving door can't
+  reflect); the face is across its thinnest side, square or round as drawn. In gamekit, the palette
+  takes the side: `glass=('#DCE6EA', 'glass', 'front')`. `check_glb.py` fails glass on a moving part
+  and warns of glass that isn't flat.
 
 ## Level of detail
 
@@ -359,7 +363,7 @@ triangles (22,694 against 8,462).
 
 **Migrate by value**: things seen close and often, whose shape the primitives can't give (seating,
 beds, kitchens, the bathroom, garden decor, the residents' hobby things). Not worth it: small
-tabletop things, street props placed by the thousand, anything with a mirror, and plants and trees
+tabletop things, street props placed by the thousand, and plants and trees
 (they have their own pipeline). Each migrated model keeps its key, so saves and content don't change.
 
 ## Before Blender is the standard
@@ -376,8 +380,8 @@ work for files.
    copy its geometry and share its materials.
 4. **Level of detail** for files: read `<id>.far.glb` (or a second mesh) for LOD 1, as nature's
    `*.far` keys, before plants, trees or crowded props come from Blender.
-5. **Mirrors** from files: a material mapped to `mirror` (front or back), giving `mirrors` like
-   placeholder parts do.
+5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
+   like placeholder parts do (`fileMirror`).
 6. **Finishes by name**, optional but it removes most of the manifest work: a material named
    `stone@matte` maps itself; `tunic#body` would carry a tint slot.
 7. **Packs that extend.** A pack entry without `placeholder` could keep the placeholder (and

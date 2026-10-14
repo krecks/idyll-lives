@@ -14,7 +14,8 @@
  * - `materials`: restyle the file's materials by name: tint them, or replace them with one of the
  *   game's finishes (`material.finish.*`, vertex-coloured, box-projected UVs in metres). Replaced
  *   parts merge with placeholder parts of the same finish, so a flat-coloured kit model costs a few
- *   draw calls and matches the rest of the furniture. Style variants reuse one file this way.
+ *   draw calls and matches the rest of the furniture. Style variants reuse one file this way. A
+ *   material with `mirror` is mirror glass: its face reflects (`mirrors`), as placeholder parts' do.
  * - `parts`: extra placeholder primitives drawn with the file (books on a shelf, pillows, a lamp).
  */
 
@@ -811,6 +812,12 @@ interface MaterialOverride {
   metallic?: number;
   /** Drop the meshes that use this material. */
   hide?: boolean;
+  /**
+   * Mirror glass, reflecting the room live (`mirrors.ts`) from its face towards the front (+z) or
+   * the back: a flat piece (the face is across its thinnest side) of the still body, square or
+   * round as it is drawn.
+   */
+  mirror?: 'front' | 'back';
 }
 
 /** Downloads the files of these models in the background, so they're at hand when shown. */
@@ -1106,6 +1113,19 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, footprint
   const lo = (k: number) => Math.min(...boxes.map((b) => b.lo[k]));
   const hi = (k: number) => Math.max(...boxes.map((b) => b.hi[k]));
   const outline = boxes.length ? { minX: lo(0), maxX: hi(0), minZ: lo(2), maxZ: hi(2) } : undefined;
+  // Mirror glass: the still body's pieces of a `mirror` material, and placeholder parts drawn with it.
+  const mirrors = [
+    ...pieces.flatMap(({ data, material, part }, i) => {
+      const side = overrideFor(material)?.mirror;
+      if (!side) return [];
+      if (part >= 0) {
+        console.warn(`[render] ${name}: mirror ${material?.name} is on a moving part, which can't reflect`);
+        return [];
+      }
+      return [fileMirror(data, boxes[i], side)];
+    }),
+    ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
+  ];
   return {
     meshes,
     tints,
@@ -1113,6 +1133,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, footprint
     height,
     bottom,
     outline,
+    ...(mirrors.length ? { mirrors } : {}),
     ...(file.parts.length && file.clips.size ? { motion: { parts, clips: buildClips(file.clips, space, shifts) } } : {}),
   };
 }
@@ -1148,6 +1169,35 @@ function buildClips(clips: Map<string, ModelClip>, space: Matrix, shifts: Vector
       },
     ]),
   );
+}
+
+/**
+ * The reflecting face of a file's mirror glass (`MaterialOverride.mirror`), as `mirrorSurface` of a
+ * placeholder part: across the glass's thinnest side, a hair in front of the face towards `side`
+ * (front: +z, or +x / +y for glass turned that way). Round if its triangles facing that way cover
+ * well under its box (a disc covers π/4 of its square).
+ */
+function fileMirror(data: VertexData, { lo, hi }: { lo: number[]; hi: number[] }, side: 'front' | 'back'): MirrorSurface {
+  const size = [0, 1, 2].map((k) => hi[k] - lo[k]);
+  const axis = size.indexOf(Math.min(...size));
+  const sign = side === 'front' ? 1 : -1;
+  const [w, h] = axis === 0 ? [size[2], size[1]] : axis === 1 ? [size[0], size[2]] : [size[0], size[1]];
+  // How much of the box the face covers: the triangles facing `side`, measured across `axis`.
+  const pos = data.positions ?? [];
+  const nor = data.normals ?? [];
+  const idx = data.indices ?? Array.from({ length: pos.length / 3 }, (_, i) => i);
+  const [u, v] = [0, 1, 2].filter((k) => k !== axis);
+  let area = 0;
+  for (let t = 0; t + 2 < idx.length; t += 3) {
+    const [a, b, c] = [idx[t] * 3, idx[t + 1] * 3, idx[t + 2] * 3];
+    if ((nor[a + axis] + nor[b + axis] + nor[c + axis]) * sign <= 0) continue;
+    area += Math.abs((pos[b + u] - pos[a + u]) * (pos[c + v] - pos[a + v]) - (pos[c + u] - pos[a + u]) * (pos[b + v] - pos[a + v])) / 2;
+  }
+  const round = w > 0 && h > 0 && area / (w * h) < 0.9;
+  const unit = (k: number, x: number) => new Vector3(k === 0 ? x : 0, k === 1 ? x : 0, k === 2 ? x : 0);
+  const onto = axis === 0 ? Matrix.RotationY((sign * Math.PI) / 2) : axis === 1 ? Matrix.RotationX((-sign * Math.PI) / 2) : sign > 0 ? Matrix.Identity() : Matrix.RotationY(Math.PI);
+  const centre = new Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2).addInPlace(unit(axis, (size[axis] / 2 + 0.002) * sign));
+  return { round, matrix: Matrix.Scaling(w, h, 1).multiply(onto).multiply(Matrix.Translation(centre.x, centre.y, centre.z)) };
 }
 
 /** The box (`lo`, `hi`: corners along x, y, z) of a mesh's positions. */

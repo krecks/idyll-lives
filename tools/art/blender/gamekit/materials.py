@@ -77,13 +77,16 @@ class Palette:
     A family's colours: `name=(sRGB hex, finish)`. `palette.name` is that Blender material, made on
     first use after each `reset()`; `palette.finishes(names)` is the pack entry's `materials` map.
     The finish is one of the base manifest's `material.finish.*` (matte, satin, gloss, metal, chrome,
-    skin, hair, fabric, wood, bark, foliage, glass).
+    skin, hair, fabric, wood, bark, foliage, glass). Mirror glass takes a third: the side its face
+    reflects to, `glass=('#DCE6EA', 'glass', 'front')` (or 'back'), on a flat part that doesn't move.
     """
 
     def __init__(self, **colours):
-        for name, (color, finish) in colours.items():
+        for name, (color, finish, *mirror) in colours.items():
             if finish not in FINISHES:
                 raise ValueError(f'{name}: no finish {finish!r} (one of {", ".join(sorted(FINISHES))})')
+            if mirror not in ([], ['front'], ['back']):
+                raise ValueError(f'{name}: a mirror reflects to the front or the back, not {mirror}')
             rgb_of(color)
         self._colours = colours
 
@@ -91,7 +94,7 @@ class Palette:
         colours = self.__dict__.get('_colours', {})
         if name not in colours:
             raise AttributeError(f'no colour {name!r} in the palette')
-        color, finish = colours[name]
+        color, finish = colours[name][:2]
         return mat(name, color, **FINISHES[finish])
 
     def finish(self, name):
@@ -102,7 +105,8 @@ class Palette:
         unknown = sorted(set(names) - set(self._colours))
         if unknown:
             raise ValueError(f'materials not in the palette: {", ".join(unknown)}')
-        return {name: {'finish': self.finish(name)} for name in sorted(names)}
+        return {name: {'finish': self.finish(name), **({'mirror': self._colours[name][2]} if len(self._colours[name]) > 2 else {})}
+                for name in sorted(names)}
 
 
 def rgb_of(color):

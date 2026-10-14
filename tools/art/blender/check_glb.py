@@ -256,6 +256,13 @@ def check(entry, finishes, path):
 
     accessors, materials = gltf.get('accessors', []), gltf.get('materials', [])
     overrides = entry.get('materials', {})
+    # Mirror glass (a material with `mirror`): flat, on the still body (models.ts `fileMirror`).
+    glass = {}
+    for name, ov in overrides.items():
+        if ov.get('mirror') not in (None, 'front', 'back'):
+            errors.append(f'material {name!r}: `mirror` is front or back, not {ov["mirror"]!r}')
+        elif ov.get('mirror') and name not in names:
+            errors.append(f'material {name!r} is mirror glass, but no material of the file')
     lo, hi = [math.inf] * 3, [-math.inf] * 3
     tris, groups = 0, set()
     # Per problem, the materials that have it.
@@ -280,6 +287,12 @@ def check(entry, finishes, path):
             mat = materials[prim['material']] if 'material' in prim else {'name': ''}
             name = mat.get('name', '')
             ov = overrides.get(name, overrides.get('*'))
+            if ov and ov.get('mirror'):
+                box = glass.setdefault(name, [[math.inf] * 3, [-math.inf] * 3, part])
+                for k in range(3):
+                    box[0][k] = min(box[0][k], sum(m[j * 4 + k] * pos['min' if m[j * 4 + k] >= 0 else 'max'][j] for j in range(3)) + m[12 + k])
+                    box[1][k] = max(box[1][k], sum(m[j * 4 + k] * pos['max' if m[j * 4 + k] >= 0 else 'min'][j] for j in range(3)) + m[12 + k])
+                box[2] = part if box[2] is None else box[2]
             textured = any(k in mat.get('pbrMetallicRoughness', {}) for k in ('baseColorTexture', 'metallicRoughnessTexture')) or any(
                 k in mat for k in ('normalTexture', 'occlusionTexture', 'emissiveTexture'))
             if 'TEXCOORD_0' in prim['attributes'] and (not textured or (ov and ov.get('finish'))):
@@ -300,6 +313,12 @@ def check(entry, finishes, path):
                 flags['blend'].add(name)
             if any(mat.get('emissiveFactor', [0, 0, 0])):
                 flags['emissive'].add(name)
+    for name, (glo, ghi, part) in sorted(glass.items()):
+        size = sorted(ghi[k] - glo[k] for k in range(3))
+        if part is not None:
+            errors.append(f'mirror glass {name!r} is on a moving part: only the still body reflects')
+        if size[0] > 0.1 * size[1]:
+            warnings.append(f'mirror glass {name!r} isn\'t flat ({size[0] * 100:.1f} cm thick, {size[1] * 100:.0f} cm across): the reflection lies on its box\'s thinnest side')
     for flag, text in (('unmapped', 'not mapped to a finish in the entry\'s `materials` (each its own draw call and look)'),
                        ('double', 'double-sided (every back face drawn too)'),
                        ('blend', 'see-through (BLEND: drawn after everything else, unsorted between instances)'),

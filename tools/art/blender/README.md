@@ -96,6 +96,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
+   - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'glass', 'front')`. Make it a flat
+     part of the still body; the game reflects the room in it live.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
