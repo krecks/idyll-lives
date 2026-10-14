@@ -117,6 +117,12 @@ const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
 
 /** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
 const HANDLE_OUT = 0.3;
+/**
+ * Whether things can be resized in Buy mode (the arrows). Off for now: a Blender model's moving parts
+ * (a fridge's doors, a wall bed) don't follow a resize well. It comes back for the objects it suits.
+ * Things resized before keep their size, and "Reset size" still takes them back to their own.
+ */
+const RESIZING = false;
 
 type Point2 = { x: number; y: number };
 
@@ -734,13 +740,14 @@ export class BuildBuyInput {
 
   /**
    * The resize arrows for an object as it is (or as a resize would make it): one per side it
-   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs)
+   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs,
+   * and none at all while `RESIZING` is off)
    * and one for its height (none for rugs). `f`: its middle (tiles), its size along x and z (m),
    * facing, and top and bottom (m above its floor).
    */
   private handlesFor(def: ObjectDef, f: { cx: number; cz: number; ex: number; ez: number; rot: number; top: number; bottom: number }): ResizeHandle[] {
     const layer = this.content.layer(def);
-    if (def.stairs) return [];
+    if (!RESIZING || def.stairs) return [];
     const out: ResizeHandle[] = [];
     const [x0, x1, z0, z1] = [f.cx - f.ex / 2, f.cx + f.ex / 2, f.cz - f.ez / 2, f.cz + f.ez / 2];
     if (layer === 'wall') {

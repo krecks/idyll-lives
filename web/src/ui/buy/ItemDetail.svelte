@@ -94,7 +94,7 @@
       {#if !def.stairs}
         <div class="size muted">
           Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
-          · drag its arrows to resize (<kbd>Shift</kbd>: freely), drag it to move
+          · drag it to move
         </div>
       {/if}
       {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}

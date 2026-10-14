@@ -157,8 +157,9 @@ finish it uses.
   colour `body` (or what they are) and give everything else its own material. Each colour in use is
   a template of its own: a few more draw calls per colour on a lot, the file still loaded once.
   Colours never change price or quality. Primitive models take no colour.
-- **Resizing** works for files, but not every object looks right resized (a fridge stretched wide);
-  whether some objects keep their size is still to be decided.
+- **Resizing** is switched off in Buy mode for now (`RESIZING` in `web/src/game/buildmode.ts`): a model's
+  moving parts don't follow a resize well (a fridge stretched wide, a wall bed). It works for files and
+  will come back for the objects it suits, decided per object.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors** (17 models) are placeholder parts with `mirror`; a file can't reflect yet. Keep them
   primitive until the engine change below.
