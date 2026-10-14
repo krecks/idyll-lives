@@ -25,6 +25,9 @@ top (`TREADMILL_BELT`, 0.156 m), as it does for the trampoline.
 
 ## The exercise bike
 
+(The bike and the yoga mat stand with their backs on the wall face, -0.43, on their `Model` `centre`; they and
+their placeholders (`catalog.py`) reached 2 cm into the wall.)
+
 An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (`SEATS`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
 once in 1.2 s (`G.spin`), a loop while cycled (`loops: {cycle: pedals_turn}`). The pedals are round, so they look

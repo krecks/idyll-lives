@@ -277,7 +277,7 @@ def trampoline():
         G.revolve('mat', [(0, y0 - MAT_SAG - 0.008), (0.8, y0 - 0.008), (0.8, y0), (0, y0 - MAT_SAG)], at=F.at(0, 0, 0),
                   material=M.tramp_mat, segments=48)
     mat = G.hinged(G.join(mat, 'mat'), F.at(0, MAT_RIM, 0))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.squash(mat, 'bounce', (1, 1, 5), seconds=0.625, back=True)   # one bounce (the residents bounce 1.6 a second)
     return objs
 
@@ -523,7 +523,7 @@ FAMILY = G.Family(
              centre=(0, 0.1), motions={'loops': {'ride': 'pedals'}},
              paint=[('bike_frame', 'Frame'), ('bike_pad', 'Pads'), ('flywheel', 'Flywheel')]),
      G.Model('trampoline', trampoline, size=(1.9, 0.635, 1.904), key='model.energetic.trampoline',
-             centre=(0, 0.002), motions={'loops': {'bounce': 'bounce'}},
+             centre=(0, 0.022), motions={'loops': {'bounce': 'bounce'}},
              paint=[('tramp_frame', 'Frame'), ('tramp_pad', 'Pads'), ('tramp_mat', 'Mat')]),
      G.Model('streetballHoop', streetballHoop, size=(0.86, 2.833, 0.886), key='model.energetic.streetballHoop',
              centre=(0, 0.013), motions={'uses': {'shoot': 'swish'}},

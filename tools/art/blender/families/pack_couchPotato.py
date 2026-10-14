@@ -439,7 +439,7 @@ def lavaLamp():
             F.sphere(_name('drift'), r, (tx + 0.022 * G.cosd(a), y, tz + 0.022 * G.sind(a)), M.wax, scale=(1, 1, 1.3),
                      segments=10, rings=6)
     drift = G.hinged(G.join(drift, 'drift'), F.at(tx, y0, tz))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.slide(rise, 'blobs', (0, 0, 0.14), seconds=2.5)
     G.spin(drift, 'drift', 1, seconds=8.0)
     return objs
@@ -463,7 +463,7 @@ FAMILY = G.Family(
              centre=(0.032, 0.01), motions={'uses': {'workout': 'board'}},
              paint=[('fit_stand', 'Body'), ('fit_mat', 'Mat'), ('board', 'Board')]),
      G.Model('lavaLamp', lavaLamp, size=(0.85, 1.15, 0.89), key='model.couchPotato.lavaLamp',
-             centre=(0.005, -0.005), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
+             centre=(0.005, 0.015), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
              paint=[('lamp_metal', 'Body'), ('pouf', 'Upholstery'), ('vessel', 'Glass')])],
     comment='Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). Replaces the '
             'primitive-part placeholders of packs/couchPotato by key; the placeholder is kept as a fallback if a file '

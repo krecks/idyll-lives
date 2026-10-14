@@ -159,7 +159,7 @@ def microwaveCart():
         F.box('mw_window', dw - 0.08, h - 0.11, 0.004, (dx0 + dw / 2 - 0.015, y + h / 2, zf + 0.013), M.window)
         F.box('mw_handle', 0.02, h - 0.1, 0.02, (dx0 + dw - 0.025, y + h / 2, zf + 0.022), M.panel, bevel=0.006)
     door = G.hinged(G.join(door, 'door'), F.at(dx0, y + h / 2, zf + 0.004))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(door, 'door_open', -100, seconds=0.6)
     return objs
 
@@ -373,7 +373,7 @@ def gamingRecliner():
 FAMILY = G.Family(
     'pack_slob', M,
     [G.Model('microwaveCart', microwaveCart, size=(0.722, 1.099, 0.783), key='model.slob.microwaveCart',
-             centre=(0.011, -0.064), motions={'uses': {'nuke': 'door_open', 'invent': 'door_open'}, 'hold': 1.5},
+             centre=(0.011, -0.0386), motions={'uses': {'nuke': 'door_open', 'invent': 'door_open'}, 'hold': 1.5},
              paint=[('body', 'Body')]),
      G.Model('beanbag', beanbag, size=(0.888, 0.663, 0.875), key='model.slob.beanbag',
              centre=(0, 0.007), motions={'uses': {'flop': 'squash', 'snooze': 'squash'}},

@@ -174,7 +174,7 @@ def exerciseBike():
             F.cyl(f'pedal{s}', 0.022, 0.1, (s * 0.13, end[1], end[2]), M.dark, rot=(0, 90, 0), verts=10)
         F.cyl('axle', 0.018, 0.16, CRANK, M.steel, rot=(0, 90, 0), verts=10)
     pedals = G.hinged(G.join(parts, 'pedals'), F.at(*CRANK))
-    G.settle()
+    G.settle()      # on its Model centre: the back on the wall face
     G.spin(pedals, 'pedals_turn', turns=1, seconds=1.2, axis='X')
     return G.meshes()
 
@@ -203,7 +203,7 @@ def yogaMat():
         F.box('mat', MAT_W, MAT_T, MAT_L, (0, MAT_T / 2, BACK + MAT_L / 2), M.mat, bevel=0.002)
     mat = G.hinged(G.join(parts, 'mat'), F.at(0, 0, BACK))
     mat.scale[1] = 0.001
-    G.settle(centre=False)
+    G.settle()      # on its Model centre: the back on the wall face
     left = 0.12   # what is left of the roll at the front end: a curled edge
     run = MAT_L - ROLL_R - left * ROLL_R
     G.grow(mat, 'unroll', seconds=1.0, axis='Y')
@@ -241,9 +241,9 @@ FAMILY = G.Family(
              motions={'loops': {'run': 'belt_run'}}, paint=FRAME_PADS),
      G.Model('weightBench', weightBench, size=(0.9, 1.2, 1.849), key='model.weightBench', centre=(0, -0.026),
              paint=[('frame', 'Frame'), ('pads', 'Pads')]),
-     G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), key='model.exerciseBike',
+     G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), centre=(0, 0.02), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
-     G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, -0.315),
+     G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, -0.295),
              motions={'uses': {'yoga': 'unroll'}}, paint=[('mat', 'Mat')]),
      G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.71), key='model.dumbbells', centre=(0, 0.025),
              paint=[('frame', 'Rack'), ('plate', 'Weights')])],

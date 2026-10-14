@@ -273,7 +273,7 @@ def thunderDrums():
         part.location = F.at(x, y, z)
         part.rotation_euler = (math.radians(tilt), 0, 0)   # tipped towards the room
         moving.append(part)
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.rock(moving[0], 'cymbals', 9, seconds=0.8, axis='X')
     G.rock(moving[1], 'cymbals', -6, seconds=0.8, axis='X')
     return objs
@@ -316,7 +316,7 @@ def coolDownCushion():
                   rot=(0, 0, -a))
         F.cyl('zafu_button', 0.025, 0.012, (0, 0.448, 0), M.calm_deep, verts=10)
     zafu = G.hinged(G.join(zafu, 'zafu'), F.at(0, 0.08, 0))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.squash(zafu, 'sink_in', (1.03, 1.03, 0.86), seconds=0.6)
     return objs
 
@@ -451,10 +451,10 @@ FAMILY = G.Family(
      G.Model('smashBin', smashBin, size=(0.854, 0.643, 0.876), key='model.hotHeaded.smashBin', centre=(0.003, 0.008),
              motions={'uses': {'smash': 'lid_open'}, 'hold': 1},
              paint=[('crate', 'Body')]),
-     G.Model('thunderDrums', thunderDrums, size=(1.89, 1.279, 0.9), key='model.hotHeaded.thunderDrums', centre=(0.005, 0),
+     G.Model('thunderDrums', thunderDrums, size=(1.89, 1.279, 0.9), key='model.hotHeaded.thunderDrums', centre=(0.005, 0.02),
              motions={'loops': {'drum': 'cymbals'}},
              paint=[('shell', 'Body')]),
-     G.Model('coolDownCushion', coolDownCushion, size=(0.9, 0.454, 0.9), key='model.hotHeaded.coolDownCushion',
+     G.Model('coolDownCushion', coolDownCushion, size=(0.9, 0.454, 0.9), centre=(0, 0.02), key='model.hotHeaded.coolDownCushion',
              motions={'uses': {'countToTen': 'sink_in', 'breathe': 'sink_in'}},
              paint=[('zafu', 'Body')]),
      G.Model('grudgeJournal', grudgeJournal, size=(0.84, 1.018, 0.677), key='model.hotHeaded.grudgeJournal', centre=(0, 0.111),

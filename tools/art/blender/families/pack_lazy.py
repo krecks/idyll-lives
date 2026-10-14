@@ -194,14 +194,14 @@ def napPod():
         F.sphere('back_cushion', 0.3, (0, 0.78, -0.24), M.seat, scale=(1, 0.3, 1.2), segments=20, rings=12)
         F.box('pillow', 0.26, 0.2, 0.12, (0.17, 0.56, -0.06), M.blush, rot=(-20, 0, 20), bevel=0.05, bevel_segments=3)
         # a shaggy rug in front
-        F.cyl('rug', 0.27, 0.016, (0, 0.008, 0.33), M.shag, verts=24, scale=(1, 0.55, 1), bevel=0.006)
+        F.cyl('rug', 0.27, 0.016, (0, 0.008, 0.3), M.shag, verts=24, scale=(1, 0.55, 1), bevel=0.006)
     G.join(still, 'body', origin=(0, 0, 0))
     # The hood: a band of a sphere about the egg's upper half, folded back over the egg's top and turning about
     # that sphere's centre; `hood` swings it 60° forward, half over the opening.
     hood = _sphere_band('hood', F, HOOD, HOOD_R, HOOD_R + 0.02, (-62, 62), (-108, -20), M.hood)
     G.join([hood], 'hood')
     hood = G.hinged(hood, F.at(*HOOD))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(hood, 'hood', 60, seconds=1.0, axis='X')
     return objs
 
@@ -244,7 +244,7 @@ def quiltTable():
         F.box('quilt_flap', 1.62, 0.29, 0.03, (0, TOP_Y - 0.145, FLAP_Z + 0.004), M.quilt, bevel=0.012)
         F.box('flap_band', 1.62, 0.03, 0.032, (0, TOP_Y - 0.03, FLAP_Z), M.quilt_band)
     flap = G.hinged(G.join(flap, 'quilt_flap'), F.at(0, TOP_Y, FLAP_Z))
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(flap, 'quilt', 70, seconds=0.8, axis='X')
     return objs
 
@@ -382,10 +382,10 @@ FAMILY = G.Family(
     [G.Model('snoozecloudBed', snoozecloudBed, size=(1.86, 1.292, 1.86), key='model.lazy.snoozecloudBed',
              motions={'uses': {'sleepIn': 'head_up'}, 'hold': 2},
              paint=[('body', 'Body'), ('upholstery', 'Upholstery'), ('throw', 'Throw')]),
-     G.Model('napPod', napPod, size=(0.883, 1.42, 0.938), key='model.lazy.napPod', centre=(0, 0.009),
+     G.Model('napPod', napPod, size=(0.883, 1.42, 0.908), key='model.lazy.napPod', centre=(0, 0.024),
              motions={'uses': {'powerNap': 'hood', 'curlUp': 'hood'}},
              paint=[('shell', 'Body'), ('seat', 'Upholstery'), ('hood', 'Hood')]),
-     G.Model('quiltTable', quiltTable, size=(1.74, 0.743, 0.892), key='model.lazy.quiltTable', centre=(0, 0.005),
+     G.Model('quiltTable', quiltTable, size=(1.74, 0.743, 0.892), key='model.lazy.quiltTable', centre=(0, 0.016),
              motions={'uses': {'tuckIn': 'quilt', 'doze': 'quilt'}},
              paint=[('oak', 'Body'), ('quilt', 'Upholstery'), ('pouf', 'Poufs')]),
      G.Model('deliveryLocker', deliveryLocker, size=(0.86, 1.96, 0.81), key='model.lazy.deliveryLocker', centre=(0, -0.025),
