@@ -169,8 +169,10 @@ export interface ResizeHandle {
 }
 
 export interface PlacementGhost {
-  /** Asset key of the model (style variant already resolved by the caller, or a base key). */
+  /** Asset key of the model. */
   model: string;
+  /** Its colour (`#rrggbb`) on the parts the model paints; absent: as made. */
+  color?: string;
   /** Min corner (tiles) of the rotated footprint `w`×`d`. */
   x: number;
   z: number;
@@ -477,7 +479,7 @@ export interface Wardrobe {
 /** Catalog pictures of furniture models (see `render/preview/items.ts`). */
 export interface ItemPreviews {
   /**
-   * Picture of a model (asset key, style variant resolved), cached for the page and between
+   * Picture of a model (asset key), cached for the page and between
    * visits. `now` requests (on screen) come first, `idle` ones are drawn ahead of time; aborting
    * withdraws a request. Null when 3D is unavailable (or aborted).
    */

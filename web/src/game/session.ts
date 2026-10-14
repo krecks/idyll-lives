@@ -33,7 +33,7 @@ import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
-import { styledModel } from '../ui/buy/catalog';
+import { colorValue } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
@@ -236,7 +236,7 @@ export async function startSession(
   }
   const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
   const worldSound = new WorldSound(renderer, content);
-  const buildBuy = new BuildBuyInput(renderer, content, assets, (command) => bridge.send(command));
+  const buildBuy = new BuildBuyInput(renderer, content, (command) => bridge.send(command));
   buildBuy.showStorey = (storey) => {
     storeyChosenAt = performance.now();
     setStorey(storey);
@@ -622,8 +622,13 @@ export async function startSession(
       buildBuy.clearPreviews();
       bridge.send({ type: 'redo', household: game.home });
     },
-    restyle(objectId, style) {
-      bridge.send({ type: 'restyle', household: game.home, object: objectId, style, seen: seenAt(game.objects, objectId) });
+    recolor(objectId, color) {
+      bridge.send({ type: 'recolor', household: game.home, object: objectId, color: colorValue(color), seen: seenAt(game.objects, objectId) });
+    },
+    colorPlacing(color) {
+      if (!game.placing || game.placing.objectId !== null) return;
+      game.placing = { ...game.placing, color: color ?? undefined };
+      buildBuy.rehover();
     },
     resetSize(objectId) {
       const obj = game.objects.find((o) => o.id === objectId);
@@ -633,10 +638,6 @@ export async function startSession(
       const [w, d] = def.footprint ?? [1, 1];
       bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0, seen: seenAt(game.objects, obj.id) });
       buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: obj.rot });
-    },
-    setHouseholdStyle(style) {
-      bridge.send({ type: 'setStyle', household: game.home, style });
-      game.householdStyle = style;
     },
     /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
@@ -804,7 +805,6 @@ export async function startSession(
     game.funds = mine?.funds ?? 0;
     game.rent = mine?.rent ?? null;
     game.bills = mine?.bills ?? null;
-    game.householdStyle = mine?.style ?? 0;
     game.expecting = mine?.expecting ?? null;
     game.undoSteps = mine?.undo ?? 0;
     game.redoSteps = mine?.redo ?? 0;
@@ -934,7 +934,7 @@ export async function startSession(
       household = game.household = mine.name;
     }
     game.objects = w.objects;
-    // Something restyled while in hand: the ghost takes the new look.
+    // Something recoloured while in hand: the ghost takes the new colour.
     if (game.placing?.objectId != null) buildBuy.rehover();
     if (game.buySelection !== null && !w.objects.some((o) => o.id === game.buySelection)) game.buySelection = null;
     buildBuy.objectsChanged();
@@ -1156,7 +1156,7 @@ export async function startSession(
     play('pick');
     if (p.kind === 'tool') return controls.setBuildTool(p.tool);
     controls.startPlacing(p.def);
-    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, style: p.style, size: p.size, tall: p.tall };
+    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, color: p.color, size: p.size, tall: p.tall };
   }
 
   const onKey = (e: KeyboardEvent) => {
@@ -1381,7 +1381,7 @@ export async function startSession(
       prefetchTimer = setTimeout(() => {
         // (Not while benchmarking: drawing the pictures would show in the measurements.)
         if (disposed || BENCH) return;
-        services.items.prefetch(content.shop.map((def) => ({ model: styledModel(content, assets, def, game.householdStyle), footprint: def.footprint ?? [1, 1] })));
+        services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
       }, PREFETCH_PICTURES_MS);
     },
     save(name, slotId) {

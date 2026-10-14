@@ -19,7 +19,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), style: None, turn: Some(turn), offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), color: None, turn: Some(turn), offset: None, size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -52,7 +52,7 @@ fn decor_turns_freely_and_keeps_its_angle() {
 }
 
 fn buy_at(w: &mut World, household: u32, def: &str, x: i32, z: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: Some(offset), size: None, tall: None })?;
+    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), color: None, turn: None, offset: Some(offset), size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 

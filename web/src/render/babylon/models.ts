@@ -729,6 +729,18 @@ export interface Motions {
   hold?: number;
 }
 
+/**
+ * `entry` with the materials its `paint` names in `color` (`#rrggbb`, a placed object's colour),
+ * each keeping its finish (mapped by name or `*`); a material without a finish has its file colour
+ * multiplied by it. The entry itself when there's no colour or nothing to paint.
+ */
+export function painted(entry: ModelEntry | undefined, color: string | undefined): ModelEntry | undefined {
+  if (!entry || !color || !entry.paint?.length) return entry;
+  const materials = { ...((entry as ModelEntry & ModelExtras).materials ?? {}) };
+  for (const name of entry.paint) materials[name] = { ...(materials[name] ?? materials['*']), color };
+  return { ...entry, materials } as ModelEntry;
+}
+
 /** A model entry's `motions`, if it has any. */
 export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   const motions = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;

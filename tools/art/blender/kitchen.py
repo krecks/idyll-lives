@@ -27,9 +27,6 @@ SHIFT = 0.094
 # Seconds (the residents' animation time) a door stays opening or open once a use starts: it opens in
 # 1.75 s (`kitchen_doors.py`), stays open while they reach in, then closes.
 HOLD = 3.5
-# The model entries this model draws: the plain fridge and, for now, the default style (every placed
-# fridge has a style, `modern` unless chosen), so it shows on the lots.
-STYLED = {'model.fridge': None, 'model.fridge@modern': None}
 
 
 def P(x, y, z):
@@ -202,20 +199,18 @@ def _write_pack():
         # Taking food or a drink out opens the fridge door (snacks, a recipe's ingredients, a cold
         # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
         'motions': {'uses': {'fetch': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+        # The colour the player gives it goes on the cabinet and doors; the inside, the food and the
+        # handles stay as they are.
+        'paint': ['body'],
+        'placeholder': base['entries']['model.fridge']['placeholder'],
     }
-    # Every placed fridge has a style (0, `modern`, unless chosen), and a style's entry is drawn over the
-    # plain one: each style draws this model in its own colour. Each keeps its own placeholder as the fallback.
-    def styled(key, body):
-        materials = {**entry['materials'], 'body': body} if body else entry['materials']
-        return {**entry, 'materials': materials, 'placeholder': base['entries'][key]['placeholder']}
-    entries = {key: styled(key, body) for key, body in STYLED.items()}
     manifest = {
         '$comment': 'Blender-built kitchen models (tools/art/blender/kitchen.py). Replaces the '
                     'primitive-part placeholders by key; listed in the base manifest\'s packs. The '
                     'placeholder is kept as a fallback if a file fails to load, and the materials map '
                     'onto the game\'s finishes so a model costs one draw call per finish group.',
         'version': 1,
-        'entries': entries,
+        'entries': {'model.fridge': entry},
     }
     os.makedirs(os.path.dirname(PACK), exist_ok=True)
     with open(PACK, 'w') as f:

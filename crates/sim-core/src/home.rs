@@ -24,7 +24,7 @@ const REACH_MARGIN: i32 = 2;
 const UNDO_DEPTH: usize = 30;
 
 /// The world as it was before a build or buy edit: everything an edit can change (walls,
-/// objects, money and style, and residents stopped or moved by it). Time stands still while
+/// objects and money, and residents stopped or moved by it). Time stands still while
 /// edits are kept (see `World::apply`), so putting it back restores exactly that moment.
 #[derive(Debug, Clone)]
 pub(crate) struct HomeSnapshot {
@@ -126,7 +126,6 @@ impl World {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
         let changed = before.households[h].funds != self.households[h].funds
-            || before.households[h].style != self.households[h].style
             || before.objects != self.objects
             || lot_changed
             || before.plots != self.plots;
@@ -334,14 +333,6 @@ impl World {
         Ok(Layout { offset, extent: Some(size), tall })
     }
 
-    pub(crate) fn check_style(&self, style: u8) -> Result<u8, Error> {
-        if (style as usize) < self.content.styles.len().max(1) {
-            Ok(style)
-        } else {
-            Err(Error::new(format!("unknown style {style}")))
-        }
-    }
-
     fn home_object(&self, household: u32, object: u32) -> Result<(usize, u32), Error> {
         let (h, plot) = self.home_of(household)?;
         if object as usize >= self.objects.len() {
@@ -459,7 +450,7 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        style: u8,
+        color: Option<u32>,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
@@ -495,7 +486,7 @@ impl World {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, layout, style, quality, value)?;
+        let id = self.place(def, x, z, rot, layout, color, quality, value)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
         let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
@@ -612,9 +603,9 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        style: Option<u8>,
+        color: Option<u32>,
     ) -> Result<u32, Error> {
-        self.buy_at(household, def_id, at, style, Layout::default())
+        self.buy_at(household, def_id, at, color, Layout::default())
     }
 
     /// Buys an object for the household's home, laid out as `layout` (unchecked: see
@@ -626,7 +617,7 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        style: Option<u8>,
+        color: Option<u32>,
         layout: Layout,
     ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
@@ -639,19 +630,18 @@ impl World {
             .price
             .ok_or_else(|| Error::new(format!("{} isn't for sale", d.name)))?;
         self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
-        let style = self.check_style(style.unwrap_or(self.households[h].style))?;
         let on_top = d.layer == Layer::Surface;
         let id = match at {
             Some([x, z, rot]) => {
                 self.keep_doorway_clear(def, x, z, rot as u8, layout)?;
-                self.place_at_home(plot, def, x, z, rot as u8, layout, style, 0, price)?
+                self.place_at_home(plot, def, x, z, rot as u8, layout, color, 0, price)?
             }
             None => self
                 .find_spot(plot, def)
                 .into_iter()
                 .find_map(|(x, z, rot, found)| {
                     let layout = if on_top { Layout::at(found) } else { layout };
-                    self.place_at_home(plot, def, x, z, rot, layout, style, 0, price).ok()
+                    self.place_at_home(plot, def, x, z, rot, layout, color, 0, price).ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
@@ -662,12 +652,11 @@ impl World {
     /// Puts `def` into the household's home at the first good free spot, free of charge (a
     /// delivery: a crib for a new baby). None if there's no room.
     pub(crate) fn deliver(&mut self, household: u32, def: usize) -> Option<u32> {
-        let (h, plot) = self.home_of(household).ok()?;
-        let style = self.households[h].style;
+        let (_, plot) = self.home_of(household).ok()?;
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), style, 0, value).ok())
+            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), None, 0, value).ok())
     }
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
@@ -744,7 +733,7 @@ impl World {
         let result = (|| {
             let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
-            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.style, old.quality, old.value)?;
+            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.color, old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
@@ -765,7 +754,7 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.style, r.quality, r.value)
+                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.color, r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let o = &mut self.objects[rid as usize];
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
@@ -787,9 +776,9 @@ impl World {
         result
     }
 
-    pub fn restyle(&mut self, household: u32, object: u32, style: u8) -> Result<(), Error> {
+    pub fn recolor(&mut self, household: u32, object: u32, color: Option<u32>) -> Result<(), Error> {
         self.home_object(household, object)?;
-        self.objects[object as usize].style = self.check_style(style)?;
+        self.objects[object as usize].color = color;
         self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }

@@ -1,4 +1,5 @@
-# Furniture entries for the base objects and their style variants (`model.<key>[@modern|@cozy|@minimal]`).
+# Furniture entries for the base objects (`model.<key>`). Objects have no styles any more; the style
+# designs below (`@modern|@cozy|@minimal`) are kept as parts to draw from, but only plain keys are written.
 #
 # All primitive parts (box, cylinder, cone, sphere, capsule, blob, lathe, torus; see
 # render/babylon/models.ts): designs from objects_extra.py (kept, recoloured or rebuilt here) and the
@@ -606,8 +607,9 @@ def main(path):
         print(f'{k:26s} {"glTF " + e["url"].split("/")[-1] if "url" in e else "parts"} {len(parts)} parts {",".join(fins)}')
         for s in issues: print('   !', s)
         bad += len(issues)
-    json.dump(E, open(path, 'w'), indent=2)
-    print(f'{len(E)} entries -> {path}; {bad} issue(s)')
+    plain = {k: e for k, e in E.items() if '@' not in k}
+    json.dump(plain, open(path, 'w'), indent=2)
+    print(f'{len(plain)} entries -> {path}; {bad} issue(s)')
 
 
 if __name__ == '__main__':

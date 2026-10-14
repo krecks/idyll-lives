@@ -81,8 +81,10 @@ export interface GameControls {
   undo(): void;
   /** Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
   redo(): void;
-  restyle(objectId: number, style: number): void;
-  setHouseholdStyle(style: number): void;
+  /** Gives something at home a colour (`#rrggbb`; null: as made). Free; effects stay the same. */
+  recolor(objectId: number, color: string | null): void;
+  /** Gives the new purchase in hand a colour (`#rrggbb`; null: as made). */
+  colorPlacing(color: string | null): void;
   upgrade(objectId: number): void;
   /** Build mode: arms (or disarms) the eyedropper: the next click picks up a look (E). */
   toggleEyedropper(): void;

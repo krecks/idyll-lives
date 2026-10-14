@@ -75,7 +75,6 @@ struct FundsView<'a> {
     rent: Option<i64>,
     /// Weekly bills, which grow with what the household owns.
     bills: Option<i64>,
-    style: u8,
     /// Build and buy edits that can be undone, and undone edits that can be made again.
     undo: usize,
     redo: usize,
@@ -726,7 +725,6 @@ impl UiSync {
                 funds: h.funds,
                 rent: costs.map(|c| c.0),
                 bills: costs.map(|c| c.1),
-                style: h.style,
                 undo: world.undo_steps(i),
                 redo: world.redo_steps(i),
                 routines: h.player.then(|| h.routines.iter().map(|r| routine_view(content, r)).collect()),
@@ -1419,7 +1417,9 @@ struct ObjectView<'a> {
     w: i32,
     d: i32,
     quality: u8,
-    style: u8,
+    /// The colour the player chose (`#rrggbb`), on the parts its model paints; absent: as made.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
     /// What selling it returns (None if it can't be sold).
     sell_value: Option<i64>,
     /// What the quick fix costs (worn things; as of the last structure change, so exact for
@@ -1635,7 +1635,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 w,
                 d,
                 quality: o.quality,
-                style: o.style,
+                color: o.color.map(crate::world::color_hex),
                 sell_value: content.objects[o.def].price.map(|_| {
                     let broken = if o.broken() { 0.5 } else { 1.0 };
                     (o.value as f32 * content.object_rules.resale * broken).round() as i64

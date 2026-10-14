@@ -41,8 +41,8 @@ export interface Placing {
   rot: number;
   /** Degrees past `rot`, for objects that turn freely. */
   turn: number;
-  /** Style for a new purchase (picked up with the eyedropper); default: the household's favourite. */
-  style?: number;
+  /** Colour for a new purchase (`#rrggbb`: chosen while in hand, or picked up with the eyedropper); absent: as made. */
+  color?: string;
   /** Set when moving an object the household already owns. */
   objectId: number | null;
   /** Its own size (centimetres across and deep, before turning), resized by the player; absent: its kind's. */
@@ -129,8 +129,6 @@ class GameState {
   rent = $state<number | null>(null);
   /** Weekly bills of the player's home: they grow with what the household owns. */
   bills = $state<number | null>(null);
-  /** The household's favourite object style (index into content styles). */
-  householdStyle = $state(0);
   /** A baby on the way in the player's household. */
   expecting = $state.raw<{ parents: [number, number]; due: number } | null>(null);
   /** Careers and build/buy rules from the simulation. */

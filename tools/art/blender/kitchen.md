@@ -43,9 +43,8 @@ each door as a moving part and plays `fridge_open` while a resident takes someth
 (the entry's `motions`: the `fetch` and `drink` animation tags, `hold` 3.5 s). `freezer_open`
 plays for no use yet: no interaction takes frozen food. `fridge.glb` stays as the flat build.
 
-On lots every fridge is styled (`model.fridge@modern` by default), and the style variants are
-placeholders of other shapes (docs/design/objects.md, styles). For now the pack also draws
-`@modern` with this model (`STYLED` in `kitchen.py`), keeping the `@modern` placeholder as its fallback.
+The player can give it a colour (`paint: ["body"]` in the pack: the cabinet and doors; the inside,
+the food and the handles keep theirs), from the content's `objectColors` or any of their own.
 Other fridges (mini, built-in, French door, retro) are objects of their own and get models of their own.
 
 ## Design

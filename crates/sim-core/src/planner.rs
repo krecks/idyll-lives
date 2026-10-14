@@ -1413,7 +1413,7 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
         return Some(new);
     }
     // Put it back (and the money).
-    if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.style, o.quality, o.value) {
+    if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.color, o.quality, o.value) {
         let b = &mut w.objects[back as usize];
         (b.turn, b.wear) = (o.turn, o.wear);
     }

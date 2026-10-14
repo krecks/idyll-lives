@@ -44,13 +44,13 @@ export type Command =
    * `MAX_SIZE` tiles; it takes them rounded up to whole tiles); `tall`: centimetres taller
    * (negative: shorter) than its kind.
    */
-  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
+  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; color?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
   | { type: 'sell'; household: number; object: number; seen?: Seen }
   /** The paid quick fix for something worn or broken. */
   | { type: 'repair'; household: number; object: number; seen?: Seen }
   | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number; seen?: Seen }
-  | { type: 'restyle'; household: number; object: number; style: number; seen?: Seen }
-  | { type: 'setStyle'; household: number; style: number }
+  /** `color`: 0xRRGGBB on the parts its model paints; absent: as made. */
+  | { type: 'recolor'; household: number; object: number; color?: number; seen?: Seen }
   | { type: 'upgrade'; household: number; object: number; seen?: Seen }
   | { type: 'build'; household: number; edits: EdgeEdit[] }
   | { type: 'paint'; household: number; faces: FacePaint[] }
@@ -332,8 +332,8 @@ export interface ObjectPlacement {
   d: number;
   /** Upgrade level (0 = as bought). */
   quality: number;
-  /** Index into the content's styles. */
-  style: number;
+  /** The colour the player chose (`#rrggbb`), on the parts its model paints; absent: as made. */
+  color?: string;
   /** What selling returns; null if it can't be sold. */
   sellValue: number | null;
   /** Wear 0..1 (broken at 1). */
@@ -689,7 +689,6 @@ export interface FundsView {
   funds: number;
   rent: number | null;
   bills: number | null;
-  style: number;
   undo?: number;
   redo?: number;
   /** The routine template (the player's household only). */

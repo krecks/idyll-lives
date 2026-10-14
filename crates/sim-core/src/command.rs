@@ -147,9 +147,9 @@ pub enum Command {
         object: String,
         #[serde(default)]
         at: Option<[i32; 3]>,
-        /// Style index; defaults to the household's favourite.
+        /// Its colour (0xRRGGBB, on the parts its model paints); absent: as it's made.
         #[serde(default)]
-        style: Option<u8>,
+        color: Option<u32>,
         /// Degrees past the facing, for objects that turn freely (0..90).
         #[serde(default)]
         turn: Option<u8>,
@@ -190,16 +190,12 @@ pub enum Command {
         #[serde(default)]
         tall: Option<i16>,
     },
-    /// Change how an object looks (free; effects stay the same).
-    Restyle {
+    /// Change an object's colour (free; effects stay the same): 0xRRGGBB, or absent for as it's made.
+    Recolor {
         household: u32,
         object: u32,
-        style: u8,
-    },
-    /// Set the household's favourite style (used for new purchases).
-    SetStyle {
-        household: u32,
-        style: u8,
+        #[serde(default)]
+        color: Option<u32>,
     },
     /// Buy mode: buy the next quality level for an object at home (instant).
     Upgrade {
@@ -381,8 +377,7 @@ impl Command {
             Command::Buy { household, .. }
             | Command::Sell { household, .. }
             | Command::MoveObject { household, .. }
-            | Command::Restyle { household, .. }
-            | Command::SetStyle { household, .. }
+            | Command::Recolor { household, .. }
             | Command::Upgrade { household, .. }
             | Command::Build { household, .. }
             | Command::Paint { household, .. }
@@ -416,7 +411,7 @@ impl Command {
             Command::Use { object, .. }
             | Command::Sell { object, .. }
             | Command::MoveObject { object, .. }
-            | Command::Restyle { object, .. }
+            | Command::Recolor { object, .. }
             | Command::Upgrade { object, .. }
             | Command::Repair { object, .. } => Some(object),
             _ => None,
@@ -428,7 +423,7 @@ impl Command {
 /// id) and tile. Object ids are places in `World::objects` that shift when anything before them
 /// is sold or moved, so a command sent before the view caught up (a held-down key, a second
 /// click) could name another object; `World::apply_seen` skips it then. The UI sends it as
-/// `seen` with `use`, `sell`, `moveObject`, `restyle`, `upgrade` and `repair`.
+/// `seen` with `use`, `sell`, `moveObject`, `recolor`, `upgrade` and `repair`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Seen {
     pub def: String,

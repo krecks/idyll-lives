@@ -94,7 +94,7 @@ import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF,
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
 import { Geo } from './geometry';
-import { buildAhead, buildModel, motionsOf, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { buildAhead, buildModel, motionsOf, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -1054,7 +1054,7 @@ export class BabylonRenderer implements Renderer {
     }
     // A new thing in hand pops in; the same one resized just changes shape.
     const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
-    if (ghost.model + resizeKey(ghost.resize) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize);
+    if (ghost.model + resizeKey(ghost.resize) + (ghost.color ?? '') !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize, ghost.color);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -3080,15 +3080,14 @@ export class BabylonRenderer implements Renderer {
     return resizeKey(resize) ? resize : undefined;
   }
 
-  /** Model key for an object, preferring its style variant (`model.sofa@modern`) when one exists. */
+  /** Model key for an object. */
   private objectModel(o: ObjectPlacement): string {
-    const def = this.deps.content.object(o.def);
-    const base = def?.model ?? `model.${o.def}`;
-    // `style` and `styles` arrive with build/buy mode; read them defensively.
-    const style = (o as ObjectPlacement & { style?: number }).style;
-    const styles: readonly { id: string }[] = (this.deps.content as unknown as { styles?: { id: string }[] }).styles ?? [];
-    const id = typeof style === 'number' ? styles[style]?.id : undefined;
-    return id && this.deps.assets.has(`${base}@${id}`, 'model') ? `${base}@${id}` : base;
+    return this.deps.content.object(o.def)?.model ?? `model.${o.def}`;
+  }
+
+  /** The colour an object is drawn in (`#rrggbb`): the player's, if its model paints anything. */
+  private objectColor(o: ObjectPlacement): string | undefined {
+    return o.color && this.deps.assets.get(this.objectModel(o), 'model')?.paint?.length ? o.color : undefined;
   }
 
   private async buildObjects(world: WorldStructure): Promise<void> {
@@ -3097,7 +3096,7 @@ export class BabylonRenderer implements Renderer {
     const down = (o: ObjectPlacement) => this.storey >= 0 && this.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
     const shown = world.objects.filter((o) => (storeyShown(this.storeyOf(o.z), this.storey) || down(o)) && this.inView(o.x + o.w / 2, o.z - this.rowOf(this.storeyOf(o.z)) + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
-    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
+    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${this.objectColor(o) ?? ''}`);
     // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
     const pending: Promise<ModelTemplate>[] = [];
     for (const list of byModel.values()) {
@@ -3227,7 +3226,8 @@ export class BabylonRenderer implements Renderer {
     const def = this.deps.content.object(o.def);
     const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
     const resize = this.objectResize(o);
-    return [`object:${key}${resizeKey(resize)}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius, resize })];
+    const color = this.objectColor(o);
+    return [`object:${key}${resizeKey(resize)}${color ?? ''}`, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), color), def?.footprint ?? [1, 1], { radius, resize })];
   }
 
   /** Bumped by each world build: an older pass of `warmTemplates` stops. */
@@ -3336,8 +3336,8 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
-  private loadGhost(model: string, resize?: ObjectResize): void {
-    const key = model + resizeKey(resize);
+  private loadGhost(model: string, resize?: ObjectResize, color?: string): void {
+    const key = model + resizeKey(resize) + (color ?? '');
     this.ghostKey = key;
     // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
     if (model !== this.ghostModel) {
@@ -3346,7 +3346,7 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
-    void buildModel(this.scene, `ghost:${key}`, this.deps.assets.get(model, 'model'), resize?.from ?? [1, 1], { resize }).then((template) => {
+    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), color), resize?.from ?? [1, 1], { resize }).then((template) => {
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;

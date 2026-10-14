@@ -22,7 +22,7 @@ fn world() -> World {
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: None, size: None, tall: None })
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), color: None, turn: None, offset: None, size: None, tall: None })
         .unwrap_or_else(|e| panic!("{def}: {e}"));
     w.objects.len() as u32 - 1
 }
@@ -125,7 +125,7 @@ fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
     for (extra, at) in [("fruitBowl", None), ("rugLarge", Some([4, 4, 0]))] {
         let mut w = world();
         let rug = at.map(|[x, z, r]| {
-            w.apply(Command::Buy { household: 0, object: extra.into(), at: Some([x, z, r]), style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+            w.apply(Command::Buy { household: 0, object: extra.into(), at: Some([x, z, r]), color: None, turn: None, offset: None, size: None, tall: None }).unwrap();
             w.objects.len() as u32 - 1
         });
         let table = buy(&mut w, "tableDining4", 5, 5);
@@ -133,7 +133,7 @@ fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
         let thing = match rug {
             Some(r) => r,
             None => {
-                w.apply(Command::Buy { household: 0, object: extra.into(), at: None, style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+                w.apply(Command::Buy { household: 0, object: extra.into(), at: None, color: None, turn: None, offset: None, size: None, tall: None }).unwrap();
                 w.objects.len() as u32 - 1
             }
         };
@@ -157,7 +157,7 @@ fn moving_a_fruit_bowl_leaves_the_dinner_on_the_table() {
     let other = buy(&mut w, "tableDining4", 5, 9);
     let meal = meal_on(&mut w, table);
     let was = w.items.get(meal).unwrap().at;
-    w.apply(Command::Buy { household: 0, object: "fruitBowl".into(), at: None, style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy { household: 0, object: "fruitBowl".into(), at: None, color: None, turn: None, offset: None, size: None, tall: None }).unwrap();
     let bowl = w.objects.len() as u32 - 1;
     assert_eq!(sim_core::surface::host_of(&w.content, &w.objects, &w.objects[bowl as usize]), Some(table), "the bowl is on the table");
     let radius = w.content.objects[w.objects[bowl as usize].def].radius;
@@ -213,7 +213,7 @@ fn commands_for_an_object_that_moved_on_are_skipped() {
     let relax = interaction(&w, sofa - 1, "relax");
     let stale = [
         Command::Sell { household: 0, object: lamp },
-        Command::Restyle { household: 0, object: lamp, style: 1 },
+        Command::Recolor { household: 0, object: lamp, color: Some(0xD9483B) },
         Command::Upgrade { household: 0, object: lamp },
         Command::Repair { household: 0, object: lamp },
         Command::Use { sim: 0, object: lamp, interaction: relax },

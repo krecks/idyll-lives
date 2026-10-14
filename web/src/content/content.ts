@@ -217,10 +217,11 @@ export interface SkillDef {
   description: string;
 }
 
-/** A look for objects. Visual only: price and effects are the same in every style. */
-export interface StyleDef {
+/** A colour the player can give an object (the parts its model paints). Visual only: price and effects stay the same. */
+export interface ObjectColorDef {
   id: string;
   label: string;
+  color: string;
 }
 
 export interface BuyCategory {
@@ -473,7 +474,8 @@ interface ContentFile {
   events: Record<string, string>;
   objects: ObjectDef[];
   skills?: SkillDef[];
-  styles?: StyleDef[];
+  /** The palette of object colours; any other colour can be chosen too. */
+  objectColors?: ObjectColorDef[];
   buyCategories?: BuyCategory[];
   wallCoverings?: WallCoveringDef[];
   floorCoverings?: FloorCoveringDef[];
@@ -516,7 +518,7 @@ export class Content {
   readonly socials: readonly SocialDef[];
   readonly careerCategories: readonly CareerCategory[];
   readonly skills: readonly SkillDef[];
-  readonly styles: readonly StyleDef[];
+  readonly objectColors: readonly ObjectColorDef[];
   readonly buyCategories: readonly BuyCategory[];
   /** Build mode looks; a wall face's covering is an index into `wallCoverings` + 1 (0: automatic). */
   readonly wallCoverings: readonly WallCoveringDef[];
@@ -580,7 +582,7 @@ export class Content {
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
     this.skills = file.skills ?? [];
-    this.styles = file.styles ?? [];
+    this.objectColors = file.objectColors ?? [];
     this.buyCategories = file.buyCategories ?? [];
     this.wallCoverings = file.wallCoverings ?? [];
     this.floorCoverings = file.floorCoverings ?? [];

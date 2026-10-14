@@ -32,7 +32,7 @@ fn world() -> World {
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None, offset: Some(offset), size: None, tall: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), color: None, turn: None, offset: Some(offset), size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -89,11 +89,11 @@ fn no_floor_no_crowding_no_hanging_over_the_edge() {
     let err = buy(&mut w, "book", 4, 1, 0, [45, 0]).unwrap_err().to_string();
     assert!(err.contains("edge"), "across two tops: {err}");
     // And the turn is kept, like any freely turning thing's.
-    w.apply(Command::Buy { household: 0, object: "book".into(), at: Some([4, 1, 1]), style: None, turn: Some(40), offset: Some([5, -5]), size: None, tall: None }).unwrap();
+    w.apply(Command::Buy { household: 0, object: "book".into(), at: Some([4, 1, 1]), color: None, turn: Some(40), offset: Some([5, -5]), size: None, tall: None }).unwrap();
     let book = w.objects.last().unwrap();
     assert_eq!((book.rot, book.turn, book.offset), (1, 40, [5, -5]));
     // Bought with no place given, it goes on a top with room for it.
-    w.apply(Command::Buy { household: 0, object: "lamp".into(), at: None, style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy { household: 0, object: "lamp".into(), at: None, color: None, turn: None, offset: None, size: None, tall: None }).unwrap();
     assert!(host_of(&w.content, &w.objects, w.objects.last().unwrap()).is_some());
     common::check(&w);
 }

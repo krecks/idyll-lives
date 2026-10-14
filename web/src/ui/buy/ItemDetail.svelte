@@ -5,11 +5,11 @@
   import { money } from '../format';
   import { services } from '../services';
   import { game } from '../state.svelte';
-  import { collectionOf, duration, loversOf, percent, styledModel, styleOptions, summarize } from './catalog';
-  import Thumb from './Thumb.svelte';
+  import { collectionOf, duration, loversOf, paintable, percent, summarize } from './catalog';
+  import ColorSwatches from './ColorSwatches.svelte';
   import Turntable from './Turntable.svelte';
 
-  /** Everything an item is worth to the household; with `owned`, also upgrade/move/restyle/sell. */
+  /** Everything an item is worth to the household; with `owned`, also upgrade/move/recolour/sell. */
   let { def, owned = null }: { def: ObjectDef; owned?: ObjectPlacement | null } = $props();
 
   const content = services.content;
@@ -29,20 +29,20 @@
     const words = kinds.map((k) => KIND_WORDS[k] ?? k);
     return words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}` : words[0];
   }
-  const model = $derived(styledModel(content, services.assets, def, owned ? owned.style : game.householdStyle));
+  const model = $derived(def.model);
   const glyph = $derived(info.boosts[0]?.need.icon ?? 'icon.ui.buy');
   const residents = $derived(game.roster.filter((s) => game.households[s.household]?.player));
   const lovers = $derived(loversOf(content, def, residents));
-  /** The designs it comes in; picking one restyles it (owned) or sets the style for new purchases. */
-  const styles = $derived(styleOptions(content, services.assets, def));
-  const currentStyle = $derived(owned ? owned.style : game.householdStyle);
+  /** Things whose model paints some of its parts take a colour the player picks: recoloured (owned), or the one in hand. */
+  const colorable = $derived(paintable(services.assets, def));
+  const inHand = $derived(!owned && game.placing?.def === def.id && game.placing.objectId === null);
   /** Its own size before turning (centimetres across and deep), and whether the player resized it. */
   const ownSize = $derived(owned?.size ?? (owned ? (owned.rot % 2 === 0 ? [owned.w, owned.d] : [owned.d, owned.w]) : (def.footprint ?? [1, 1])).map((t) => t * 100));
   const resized = $derived(!!owned && (!!owned.size || !!owned.tall));
   const metres = (cm: number) => (cm / 100).toFixed(cm % 100 ? (cm % 10 ? 2 : 1) : 0);
-  function pickStyle(i: number) {
-    if (owned) services.controls.restyle(owned.id, i);
-    else services.controls.setHouseholdStyle(i);
+  function pickColor(color: string | null) {
+    if (owned) services.controls.recolor(owned.id, color);
+    else services.controls.colorPlacing(color);
   }
   const sim = $derived(game.selectedSim);
   const skillLabel = (id: string) => content.skill(id)?.label ?? id;
@@ -130,16 +130,9 @@
     <p class="desc tabular">{owned ? 'Each upgrade adds' : 'Adds'} about {money(addedBills)}/wk to your bills</p>
   {/if}
 
-  {#if styles.length}
-    <h4>Comes in {styles.length} styles <small>{owned ? 'restyle it for free' : 'same price and quality'}</small></h4>
-    <div class="looks" role="radiogroup" aria-label="Style">
-      {#each styles as i (i)}
-        <button role="radio" aria-checked={currentStyle === i} class:active={currentStyle === i} title={content.styles[i].label} onclick={() => pickStyle(i)}>
-          <span class="look"><Thumb model={styledModel(content, services.assets, def, i)} footprint={def.footprint ?? [1, 1]} {glyph} size={14} /></span>
-          <span>{content.styles[i].label}</span>
-        </button>
-      {/each}
-    </div>
+  {#if colorable && (owned || inHand)}
+    <h4>Colour</h4>
+    <ColorSwatches color={owned ? (owned.color ?? null) : (game.placing?.color ?? null)} onpick={pickColor} />
   {/if}
 
   {#if upgradable && rules}
@@ -373,36 +366,6 @@
   }
   .chip.feel.locked {
     opacity: 0.6;
-  }
-  .looks {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-    gap: 6px;
-  }
-  .looks button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 4px 4px 5px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-muted);
-    font-size: 11px;
-    font-weight: 650;
-    color: var(--text-muted);
-    transition: box-shadow var(--fast) var(--ease), transform 200ms var(--ease);
-  }
-  .looks button:hover {
-    transform: translateY(-1px);
-  }
-  .looks button.active {
-    color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent);
-    background: var(--surface);
-  }
-  .look {
-    width: 100%;
-    height: 52px;
   }
   .actions li {
     display: flex;

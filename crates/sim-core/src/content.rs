@@ -1209,13 +1209,6 @@ impl BuildRules {
     }
 }
 
-/// A look the player can pick for objects. Purely visual: price and effects never change.
-#[derive(Debug)]
-pub struct StyleDef {
-    pub id: String,
-    pub label: String,
-}
-
 #[derive(Debug)]
 pub struct Content {
     pub needs: Vec<NeedDef>,
@@ -1251,7 +1244,6 @@ pub struct Content {
     pub life: LifeRules,
     pub names: Names,
     pub build: BuildRules,
-    pub styles: Vec<StyleDef>,
     /// Animation tags (`"animations"`): what a Sim can be shown doing. Interactions refer
     /// to them by `anim`; the render snapshot sends indices into this list.
     pub animations: Vec<String>,
@@ -1348,8 +1340,6 @@ struct ContentFile {
     roof_colors: Vec<BuildStyleRaw>,
     #[serde(default)]
     floor_coverings: Vec<BuildStyleRaw>,
-    #[serde(default)]
-    styles: Vec<StyleRaw>,
     /// Extra tags that no interaction or social uses (yet), so traits and emotions can refer to them.
     #[serde(default)]
     tags: Vec<String>,
@@ -1812,12 +1802,6 @@ struct BuildStyleRaw {
     id: String,
     #[serde(default)]
     price: i64,
-}
-
-#[derive(Deserialize)]
-struct StyleRaw {
-    id: String,
-    label: String,
 }
 
 fn one() -> f32 {
@@ -3237,14 +3221,6 @@ impl Content {
             storeys: raw.build.storeys.unwrap_or(1).clamp(1, 4),
             basement: raw.build.basement,
         };
-        let styles = raw
-            .styles
-            .iter()
-            .map(|s| StyleDef {
-                id: s.id.clone(),
-                label: s.label.clone(),
-            })
-            .collect();
         let schedule = raw
             .schedule
             .iter()
@@ -3392,7 +3368,6 @@ impl Content {
             life,
             names: raw.names.clone(),
             build,
-            styles,
             animations,
             talk_anim,
             buff_feelings,

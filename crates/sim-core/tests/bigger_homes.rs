@@ -16,8 +16,7 @@ const CONTENT: &str = r#"{
     "doorStyles":[{"id":"panel","price":50},{"id":"french","price":90}],
     "windowStyles":[{"id":"classic","price":40},{"id":"tall","price":70}],
     "roofStyles":[{"id":"gable"},{"id":"hip"}],
-    "roofColors":[{"id":"slate"},{"id":"red"}],
-    "styles":[{"id":"modern","label":"Modern"},{"id":"cozy","label":"Cozy"}]}"#;
+    "roofColors":[{"id":"slate"},{"id":"red"}]}"#;
 
 /// Two empty lots side by side, facing opposite ways: the west lot's street is at its far side
 /// (entry at the bottom), the east lot's at its near side. Nobody lives on the east lot.
@@ -59,7 +58,7 @@ fn build_room(w: &mut World, household: u32, x: i32, z: i32) {
     let tiles = (0..4).flat_map(|i| (0..3).map(move |j| FloorPaint { x: x + i, z: z + j, covering: 1 })).collect();
     w.apply(Command::PaintFloor { household, tiles }).unwrap();
     w.apply(Command::SetRoof { household, style: 1, color: 1 }).unwrap();
-    w.apply(Command::Buy { household, object: "chair".into(), at: Some([x + 1, z, 0]), style: Some(1), turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy { household, object: "chair".into(), at: Some([x + 1, z, 0]), color: Some(0x7A8FA6), turn: None, offset: None, size: None, tall: None }).unwrap();
     let chair = w.objects.len() as u32 - 1;
     w.apply(Command::Upgrade { household, object: chair }).unwrap();
 }
@@ -116,7 +115,7 @@ fn a_room_moves_with_its_walls_floor_and_furniture() {
     build_room(&mut w, 0, 2, 2);
     let room = w.lot.room_at(3, 3);
     assert_ne!(room, OUTDOORS);
-    let chair = w.objects.iter().find(|o| o.def == 0).map(|o| (o.x, o.z, o.quality, o.style)).unwrap();
+    let chair = w.objects.iter().find(|o| o.def == 0).map(|o| (o.x, o.z, o.quality, o.color)).unwrap();
     w.apply(Command::MoveRoom { household: 0, x: 3, z: 3, dx: 3, dz: 1 }).unwrap();
     assert_eq!(w.lot.room_at(3, 3), OUTDOORS, "the old place is open ground");
     assert_ne!(w.lot.room_at(6, 4), OUTDOORS, "the room stands at its new place");
@@ -127,7 +126,7 @@ fn a_room_moves_with_its_walls_floor_and_furniture() {
     assert_eq!(w.lot.look(EdgeRef::H(6, 3)).sides[1], 2, "brick inside the top wall");
     assert_eq!(w.lot.floor(5, 3), 1);
     assert_eq!(w.lot.floor(2, 2), 0);
-    let moved = w.objects.iter().find(|o| o.def == 0).map(|o| (o.x, o.z, o.quality, o.style)).unwrap();
+    let moved = w.objects.iter().find(|o| o.def == 0).map(|o| (o.x, o.z, o.quality, o.color)).unwrap();
     assert_eq!(moved, (chair.0 + 3, chair.1 + 1, chair.2, chair.3));
     // Off the lot, or nowhere: refused, nothing changes.
     assert!(w.apply(Command::MoveRoom { household: 0, x: 6, z: 4, dx: 6, dz: 0 }).is_err());

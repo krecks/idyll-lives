@@ -108,8 +108,8 @@ pub struct ObjectInstance {
     pub users: [Option<u32>; MAX_SLOTS],
     /// Upgrade level: higher quality objects satisfy needs and teach skills faster.
     pub quality: u8,
-    /// Index into `Content::styles` (visual only).
-    pub style: u8,
+    /// Its colour, 0xRRGGBB, on the parts its model paints (visual only); None: as it's made.
+    pub color: Option<u32>,
     /// Money put into this object (price plus upgrades), for resale.
     pub value: i64,
     /// Wear from use, 0..1; at 1 it is broken until repaired.
@@ -842,8 +842,6 @@ pub struct Household {
     pub player: bool,
     /// Money earned from jobs.
     pub funds: i64,
-    /// Preferred object style for purchases (index into `Content::styles`).
-    pub style: u8,
     /// "Free will": whether this household's residents choose what to do on their own.
     pub free_will: bool,
     /// Routine blocks every member follows (each may skip some; their own blocks win).
@@ -1098,7 +1096,6 @@ impl World {
                 plot: None,
                 player: true,
                 funds: starting_funds,
-                style: 0,
                 free_will: true,
                 routines: Vec::new(),
                 expecting: None,
@@ -1115,7 +1112,6 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: h.funds.unwrap_or(starting_funds),
-                    style: 0,
                     free_will: true,
                     routines: Vec::new(),
                     expecting: None,
@@ -1143,7 +1139,7 @@ impl World {
             let turn = world.check_turn(def, p.turn).map_err(at)?;
             let layout = world.check_layout(def, p.rot, Layout { offset: p.offset, extent: p.size, tall: p.tall }).map_err(at)?;
             let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(def, p.x, p.z, p.rot, layout, 0, 0, value)?;
+            let id = world.place(def, p.x, p.z, p.rot, layout, None, 0, value)?;
             world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
@@ -1261,7 +1257,7 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, Layout::default(), 0, 0, value)
+        self.place(def, x, z, rot, Layout::default(), None, 0, value)
     }
 
     /// Checks that object `def` fits at `x, z, rot` (laid out as `layout`, unchecked: see
@@ -1289,7 +1285,7 @@ impl World {
             tall: layout.tall,
             users: [None; MAX_SLOTS],
             quality: 0,
-            style: 0,
+            color: None,
             value: 0,
             wear: 0.0,
         };
@@ -1407,12 +1403,12 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        style: u8,
+        color: Option<u32>,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
         let mut obj = self.check_fit(def, x, z, rot, layout)?;
-        obj.style = style;
+        obj.color = color;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
         for (tx, tz) in self.blocking_tiles(&obj) {
@@ -2600,7 +2596,7 @@ impl World {
                 household,
                 object,
                 at,
-                style,
+                color,
                 turn,
                 offset,
                 size,
@@ -2611,7 +2607,8 @@ impl World {
                 let rot = at.map_or(0, |a| a[2] as u8);
                 let layout = Layout { offset: offset.unwrap_or([0, 0]), extent: size, tall: tall.unwrap_or(0) };
                 let layout = def.map(|d| self.check_layout(d, rot, layout)).transpose()?;
-                let id = self.buy_at(household, &object, at, style, layout.unwrap_or_default())?;
+                let color = color.map(check_color).transpose()?;
+                let id = self.buy_at(household, &object, at, color, layout.unwrap_or_default())?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
@@ -2645,15 +2642,7 @@ impl World {
                 let (offset, size, tall) = (layout.map(|l| l.offset), layout.and_then(|l| l.extent), layout.map(|l| l.tall));
                 self.move_object_to(household, object, x, z, rot, turn, offset, size, tall)?;
             }
-            Command::Restyle {
-                household,
-                object,
-                style,
-            } => self.restyle(household, object, style)?,
-            Command::SetStyle { household, style } => {
-                let h = self.home_of(household)?.0;
-                self.households[h].style = self.check_style(style)?;
-            }
+            Command::Recolor { household, object, color } => self.recolor(household, object, color.map(check_color).transpose()?)?,
             Command::Upgrade { household, object } => {
                 self.upgrade(household, object)?;
             }
@@ -4728,4 +4717,20 @@ mod tests {
         assert!(s.couldnt_reach(2, 0) && !s.couldnt_reach(3, 0) && !s.couldnt_reach(1, 0));
         assert_eq!(s.unreachable_now(0).count(), 3);
     }
+}
+
+/// An object's colour as a command gives it: 0xRRGGBB.
+pub(crate) fn check_color(color: u32) -> Result<u32, Error> {
+    if color <= 0xFF_FFFF { Ok(color) } else { Err(Error::new(format!("no such colour: {color:#x}"))) }
+}
+
+/// An object's colour as saves and the view write it: `#rrggbb`.
+pub fn color_hex(color: u32) -> String {
+    format!("#{color:06x}")
+}
+
+/// `color_hex` read back; None if it isn't one.
+pub fn parse_color(hex: &str) -> Option<u32> {
+    let digits = hex.strip_prefix('#')?;
+    if digits.len() == 6 { u32::from_str_radix(digits, 16).ok() } else { None }
 }

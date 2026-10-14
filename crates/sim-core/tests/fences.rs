@@ -94,10 +94,10 @@ fn fences_cant_shut_anyone_in_or_run_through_furniture() {
     assert!(err.to_string().contains("gate"), "{err}");
     build(&mut w, around(true)).unwrap();
 
-    w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([3, 6, 0]), style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([3, 6, 0]), color: None, turn: None, offset: None, size: None, tall: None }).unwrap();
     assert!(build(&mut w, vec![edit(EdgeAxis::H, 3, 7, EdgeKind::Fence, None)]).is_err(), "not in front of the chair");
     assert!(
-        w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([8, 9, 0]), style: None, turn: None, offset: None, size: None, tall: None }).is_err(),
+        w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([8, 9, 0]), color: None, turn: None, offset: None, size: None, tall: None }).is_err(),
         "nor a chair facing a fence"
     );
 }

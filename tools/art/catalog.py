@@ -2802,7 +2802,11 @@ def main(path):
         for s in issues: print(f'  ! {k}: {s}')
         bad += len(issues)
     lines = []
+    # Objects have no styles any more (a player gives some a colour of their own): only each model's
+    # plain entry is written; the `@style` designs above stay as parts to draw from.
     for k, e in E.items():
+        if '@' in k:
+            continue
         lines.append(f'    {json.dumps(k)}: {json.dumps(e, separators=(",", ":"))}')
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
@@ -2810,7 +2814,7 @@ def main(path):
                 'written by tools/art/catalog.py. Listed in the base manifest\'s packs.",\n  "version": 1,\n  "entries": {\n')
         f.write(',\n'.join(lines) + '\n  }\n}\n')
     json.load(open(path))
-    print(f'{len(E)} entries ({len({k.split("@")[0] for k in E})} models) -> {path}; {bad} issue(s)')
+    print(f'{len(lines)} entries -> {path}; {bad} issue(s)')
     return bad
 
 

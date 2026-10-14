@@ -58,6 +58,11 @@ export interface ModelEntry {
    * ±`vary` (0.1 = 10%) larger or smaller, fixed by where it stands.
    */
   vary?: number;
+  /**
+   * The file's materials (by name) that take the colour the player gives a placed object (the
+   * fridge's `body`: cabinet and doors). Absent: it comes in one colour.
+   */
+  paint?: string[];
 }
 
 export interface MaterialEntry {

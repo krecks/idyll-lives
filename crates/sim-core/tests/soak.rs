@@ -348,7 +348,7 @@ impl Player {
                     let priced: Vec<usize> = (0..w.content.objects.len()).filter(|&d| w.content.objects[d].price.is_some_and(|p| p <= funds)).collect();
                     if let Some(d) = self.pick(&priced) {
                         let object = w.content.objects[d].id.clone();
-                        self.apply(w, "buy", Command::Buy { household: h, object, at: None, style: None, turn: None, offset: None, size: None, tall: None });
+                        self.apply(w, "buy", Command::Buy { household: h, object, at: None, color: None, turn: None, offset: None, size: None, tall: None });
                     }
                 } else if roll < 40 {
                     self.apply(w, "sell", Command::Sell { household: h, object });
@@ -366,8 +366,8 @@ impl Player {
                 } else if roll < 90 {
                     self.apply(w, "repair", Command::Repair { household: h, object });
                 } else if roll < 95 {
-                    let style = self.rng.below(3) as u8;
-                    self.apply(w, "restyle", Command::Restyle { household: h, object, style });
+                    let color = (self.rng.below(2) == 1).then(|| self.rng.below(0x100_0000) as u32);
+                    self.apply(w, "recolor", Command::Recolor { household: h, object, color });
                 } else {
                     self.apply(w, "undo", Command::Undo { household: h });
                 }

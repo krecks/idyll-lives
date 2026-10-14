@@ -198,6 +198,11 @@ def check(entry, finishes, path):
     clip_errors, clip_warnings = check_clips(gltf, binary, entry)
     errors += clip_errors
     warnings += clip_warnings
+    # The parts a player's colour goes on (`paint`): materials of the file.
+    names = {m.get('name', '') for m in gltf.get('materials', [])}
+    for name in entry.get('paint', []):
+        if name not in names:
+            errors.append(f'`paint` names {name!r}, which is no material of the file')
     if 'KHR_lights_punctual' in gltf.get('extensionsUsed', []):
         warnings.append('has lights; the game drops them (a lamp\'s light is the content\'s `light`)')
 

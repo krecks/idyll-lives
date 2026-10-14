@@ -124,19 +124,14 @@ export function collectionOf(content: Content, def: ObjectDef): TraitDef | null 
   return dot > 0 ? (content.trait(def.id.slice(0, dot)) ?? null) : null;
 }
 
-/**
- * The styles an item comes in (indices into content styles): only furniture with its own model
- * per style (`model.sofa@cozy`, ...) has any; the rest has one design. Empty when it has none.
- */
-export function styleOptions(content: Content, assets: AssetRegistry, def: ObjectDef): number[] {
-  const options = content.styles.flatMap((s, i) => (assets.has(`${def.model}@${s.id}`, 'model') ? [i] : []));
-  return options.length > 1 ? options : [];
+/** Whether the player can give an item a colour of their own: its model paints some of its parts (`paint`). */
+export function paintable(assets: AssetRegistry, def: ObjectDef): boolean {
+  return !!assets.get(def.model, 'model')?.paint?.length;
 }
 
-/** Model key of an item in a style (`model.sofa@cozy`), falling back to the plain model. */
-export function styledModel(content: Content, assets: AssetRegistry, def: ObjectDef, style: number): string {
-  const id = content.styles[style]?.id;
-  return id && assets.has(`${def.model}@${id}`, 'model') ? `${def.model}@${id}` : def.model;
+/** A colour as commands send it (0xRRGGBB) from `#rrggbb`; undefined for none (as made). */
+export function colorValue(hex: string | null | undefined): number | undefined {
+  return hex && /^#[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.slice(1), 16) : undefined;
 }
 
 const cache = new WeakMap<ObjectDef, ItemSummary>();

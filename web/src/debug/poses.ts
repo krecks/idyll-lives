@@ -338,7 +338,7 @@ await Promise.all(
       const ox = Math.round(cx - w / 2);
       const oz = Math.round(cz - d / 2);
       const id = objects.length;
-      objects.push({ id, def: s.def, x: ox, z: oz, rot: 0, w, d, quality: 0, style: 0, sellValue: null });
+      objects.push({ id, def: s.def, x: ox, z: oz, rot: 0, w, d, quality: 0, sellValue: null });
       const key = def?.model ?? `model.${s.def}`;
       const template = await buildModel(scene, key, assets.get(key, 'model'), [w, d]);
       for (const mesh of template.meshes) {

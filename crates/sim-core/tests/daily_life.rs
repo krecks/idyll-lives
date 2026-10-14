@@ -29,8 +29,7 @@ const CONTENT: &str = r#"{
     "dayRhythm":{"wakeHour":7,"bedHour":22,"sleepTags":["sleep"],"asleepDecay":{"hunger":0.5}},
     "economy":{"startingFunds":1000,"rent":{"weekday":6,"hour":12,"base":100,"perTile":1,"billsBase":20,"billsRate":0.1,"debtFeeling":"inDebt"}},
     "objectRules":{"maxQuality":2,"qualityBonus":0.5,"upgradeCost":0.5,"resale":0.5},
-    "build":{"wall":10,"door":50,"remove":5},
-    "styles":[{"id":"modern","label":"Modern"},{"id":"cozy","label":"Cozy"}]}"#;
+    "build":{"wall":10,"door":50,"remove":5}}"#;
 
 /// One 12×10 house plot with an open front (entry at the bottom).
 const TOWN: &str = r#"{"width":12,"depth":12,
@@ -243,8 +242,8 @@ fn buying_selling_and_moving_objects() {
         "selling lowers them again"
     );
     // Auto-placement finds a free spot.
-    let id = w.buy(0, "weights", None, Some(1)).unwrap();
-    assert_eq!(w.objects[id as usize].style, 1);
+    let id = w.buy(0, "weights", None, Some(0xC46B4A)).unwrap();
+    assert_eq!(w.objects[id as usize].color, Some(0xC46B4A));
     // Off the plot, or blocking the only way in, is refused.
     assert!(w.buy(0, "weights", Some([5, 11, 0]), None).is_err());
 }
@@ -447,21 +446,21 @@ fn windows_go_into_walls_cost_money_and_never_let_sims_through() {
 }
 
 #[test]
-fn skills_quality_and_style_survive_saving() {
+fn skills_quality_and_colour_survive_saving() {
     let mut w = world();
     w.sims[0].skills[1] = 3.5;
     w.objects[2].quality = 2;
-    w.apply(Command::Restyle {
+    w.apply(Command::Recolor {
         household: 0,
         object: 2,
-        style: 1,
+        color: Some(0x4E9C9A),
     })
     .unwrap();
-    w.apply(Command::SetStyle { household: 0, style: 1 }).unwrap();
+    assert!(w.save_json().contains("\"#4e9c9a\""), "saved as #rrggbb");
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.sims[0].skills[1], 3.5);
     assert_eq!(loaded.objects[2].quality, 2);
-    assert_eq!(loaded.objects[2].style, 1);
-    assert_eq!(loaded.households[0].style, 1);
+    assert_eq!(loaded.objects[2].color, Some(0x4E9C9A));
+    assert_eq!(loaded.objects[1].color, None, "as made");
     assert_eq!(loaded.save_json(), w.save_json());
 }

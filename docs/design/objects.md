@@ -145,16 +145,17 @@ finish it uses.
   level, like the windows', is an engine change.)
 - **Tints** (`body`, `skin`, `hair`) are for character parts; no object model uses one. A file
   can't carry one today.
-- **Styles** (`model.<id>@modern`, `@cozy`, `@minimal`; 230 variants today) are separate entries.
-  When only colours change, the variants use the same file with their own `materials` colours
-  (`{ "finish": "material.finish.fabric", "color": "#7A8FA6" }`); a variant with another shape gets
-  its own file. Styles never change price or quality.
-- **Every placed object has a style** (sim-core `ObjectInstance::style`, 0 = `modern` by default),
-  and the renderer draws `model.<id>@<style>` whenever that entry exists. So a pack that overrides
-  only `model.<id>` changes the catalog picture and nothing on the lots while the base manifest has
-  style variants of it: the fridge (`model.fridge`, 2026-10-13) was drawn from primitives on every
-  lot, because `@modern`, `@cozy` and `@minimal` are placeholders of other shapes; its pack now draws
-  `@modern` with the Blender model too.
+- **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
+  removed on 2026-10-14). Another look of the same thing is another object with its own model (the
+  mini fridge, the built-in fridge).
+- **Colours the player picks.** A model whose entry has `paint` (material names, the fridge's
+  `["body"]`) can be given any colour by the player: one of the content's `objectColors` (the shared
+  palette) or one of their own, per placed object (sim-core `ObjectInstance::color`, saved as
+  `#rrggbb`; absent: as made). The renderer draws those materials in that colour with their finish
+  (`painted` in models.ts); the rest of the model keeps its colours. Name the parts that take a
+  colour `body` (or what they are) and give everything else its own material. Each colour in use is
+  a template of its own: a few more draw calls per colour on a lot, the file still loaded once.
+  Colours never change price or quality. Primitive models take no colour.
 - **Resizing** works for files, but not every object looks right resized (a fridge stretched wide);
   whether some objects keep their size is still to be decided.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.

@@ -36,7 +36,7 @@ fn buy(w: &mut World, def: &str, x: i32, z: i32) {
         household: 0,
         object: def.into(),
         at: Some([x, z, 0]),
-        style: None,
+        color: None,
         turn: None,
         offset: None,
         size: None,
@@ -165,7 +165,7 @@ fn edits_that_change_nothing_or_fail_leave_no_step() {
     })
     .unwrap();
     assert_eq!(w.undo_steps(0), 1);
-    // Pausing and unpausing keeps the history; a new household style is an edit too.
+    // Pausing and unpausing keeps the history.
     w.apply(Command::SetSpeed { speed: 0 }).unwrap();
     assert_eq!(w.undo_steps(0), 1);
 }
@@ -325,4 +325,24 @@ fn undoing_an_upgrade_takes_back_its_story() {
     assert_eq!((w.objects[0].quality, upgraded(&w)), (1, 1));
     undo(&mut w);
     assert_eq!(upgraded(&w), 0);
+}
+
+#[test]
+fn a_colour_is_an_edit_and_goes_where_its_object_goes() {
+    let mut w = world();
+    buy(&mut w, "chair", 1, 1);
+    let chair = w.objects.len() as u32 - 1;
+    w.apply(Command::Recolor { household: 0, object: chair, color: Some(0xD9483B) }).unwrap();
+    assert_eq!(w.objects[chair as usize].color, Some(0xD9483B));
+    w.apply(Command::Undo { household: 0 }).unwrap();
+    assert_eq!(w.objects[chair as usize].color, None, "undone: as made");
+    w.apply(Command::Redo { household: 0 }).unwrap();
+    assert_eq!(w.objects[chair as usize].color, Some(0xD9483B), "and done again");
+    w.apply(Command::MoveObject { household: 0, object: chair, x: 3, z: 3, rot: 1, turn: None, offset: None, size: None, tall: None }).unwrap();
+    let moved = w.objects.iter().find(|o| o.def == 0).unwrap();
+    assert_eq!((moved.x, moved.color), (3, Some(0xD9483B)), "moved, it keeps its colour");
+    assert!(w.blueprint_json(0).unwrap().contains("\"#d9483b\""), "a blueprint carries it");
+    assert!(w.apply(Command::Recolor { household: 0, object: chair, color: Some(0x100_0000) }).is_err(), "no such colour");
+    w.apply(Command::Recolor { household: 0, object: chair, color: None }).unwrap();
+    assert_eq!(w.objects[chair as usize].color, None, "back to as made");
 }

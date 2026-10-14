@@ -153,7 +153,7 @@ fn the_checks_see_a_follow_up() {
     let mut w = World::from_json(&common::content(), town, 1).unwrap();
     w.autonomy = false;
     for (def, x) in [("toilet", 3), ("sink", 6)] {
-        let cmd = sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, 3, 0]), style: None, turn: None, offset: None, size: None, tall: None };
+        let cmd = sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, 3, 0]), color: None, turn: None, offset: None, size: None, tall: None };
         w.apply(cmd).unwrap();
     }
     let (toilet, sink) = (0, 1);

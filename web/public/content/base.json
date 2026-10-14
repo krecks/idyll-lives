@@ -3494,19 +3494,20 @@
     "storeys": 3,
     "basement": true
   },
-  "styles": [
-    {
-      "id": "modern",
-      "label": "Modern"
-    },
-    {
-      "id": "cozy",
-      "label": "Cozy"
-    },
-    {
-      "id": "minimal",
-      "label": "Minimal"
-    }
+  "objectColors": [
+    {"id": "white", "label": "Snow white", "color": "#F3F3F1"},
+    {"id": "cream", "label": "Cream", "color": "#EFE2BF"},
+    {"id": "butter", "label": "Butter yellow", "color": "#F2C94C"},
+    {"id": "peach", "label": "Peach", "color": "#F2A27E"},
+    {"id": "tomato", "label": "Tomato red", "color": "#D9483B"},
+    {"id": "rose", "label": "Rose", "color": "#E58FA6"},
+    {"id": "lavender", "label": "Lavender", "color": "#A99BD8"},
+    {"id": "sky", "label": "Sky blue", "color": "#7FB8E0"},
+    {"id": "teal", "label": "Teal", "color": "#4E9C9A"},
+    {"id": "mint", "label": "Mint", "color": "#A8D8B9"},
+    {"id": "sage", "label": "Sage", "color": "#8FA37A"},
+    {"id": "slate", "label": "Slate grey", "color": "#6B7178"},
+    {"id": "charcoal", "label": "Charcoal", "color": "#2F3236"}
   ],
   "wallCoverings": [
     {"id": "paint.white", "label": "White paint", "finish": "plaster", "color": "#F4F1EA", "price": 0},
