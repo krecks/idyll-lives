@@ -3977,8 +3977,12 @@
       "light": {
         "range": 4.0,
         "intensity": 0.8,
-        "height": 0.5,
+        "height": 0.7,
         "tiles": 6
+      },
+      "seat": {
+        "height": 0.42,
+        "forward": 0.02
       },
       "description": "A real fire under a mantel. It lights the room at night, and warming up by it leaves residents cosy.",
       "interactions": [

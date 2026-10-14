@@ -607,34 +607,40 @@ def hangingPlant():
 
 
 # --- D2: the fireplace ------------------------------------------------------------------------------------
+HEARTH = 0.42   # the raised hearth's top: the content's `seat` height, where residents warming up sit
+
+
 def fireplace():
-    """A stone chimney breast with a mantel shelf, a hearth, a dark firebox with logs on a grate, and things
-    on the mantel. The flames grow on the logs while someone warms up by it."""
+    """A stone chimney breast with a mantel shelf, a raised hearth bench, a dark firebox above it with logs
+    on a grate, and things on the mantel. The flames grow on the logs while someone warms up by it."""
     F = G.GameFrame()
     with G.new_parts() as still:
-        # the chimney breast, built round the firebox's opening (x ±0.44, from the hearth to 0.82 m)
+        # the chimney breast, built round the firebox's opening (x ±0.44, from the hearth bench up 0.66 m)
+        top = HEARTH + 0.66
         for side in (-1, 1):
             F.box(f'breast{side}', 0.48, 1.25, 0.4, (side * 0.68, 0.625, WALL + 0.2), M.surround, bevel=0.012)
-        F.box('breast_top', 0.9, 0.43, 0.4, (0, 1.035, WALL + 0.2), M.surround, bevel=0.012)
-        F.box('firebox_back', 0.9, 0.76, 0.1, (0, 0.44, WALL + 0.05), M.soot)
+        F.box('breast_top', 0.9, 1.25 - top, 0.4, (0, (1.25 + top) / 2, WALL + 0.2), M.surround, bevel=0.012)
+        F.box('firebox_back', 0.9, top - HEARTH + 0.02, 0.1, (0, (top + HEARTH) / 2, WALL + 0.05), M.soot)
         for side in (-1, 1):
-            F.box(f'firebox_side{side}', 0.012, 0.74, 0.3, (side * 0.434, 0.45, WALL + 0.25), M.firebox)
-        F.box('firebox_top', 0.88, 0.012, 0.3, (0, 0.814, WALL + 0.25), M.firebox)
+            F.box(f'firebox_side{side}', 0.012, top - HEARTH, 0.3, (side * 0.434, (top + HEARTH) / 2, WALL + 0.25), M.firebox)
+        F.box('firebox_top', 0.88, 0.012, 0.3, (0, top - 0.006, WALL + 0.25), M.firebox)
         F.box('flue', 1.6, 1.55, 0.28, (0, 2.025, WALL + 0.14), M.surround, bevel=0.012)
         F.box('mantel', 1.96, 0.07, 0.48, (0, 1.285, WALL + 0.24), M.oak, bevel=0.01)
         for side in (-1, 1):
             F.box(f'corbel{side}', 0.12, 0.08, 0.06, (side * 0.8, 1.21, WALL + 0.43), M.oak, bevel=0.008)
-        F.box('hearth', 1.96, 0.08, 0.57, (0, 0.04, WALL + 0.285), M.hearth, bevel=0.01)
-        F.box('surround_lintel', 1.08, 0.12, 0.03, (0, 0.88, WALL + 0.415), M.surround, bevel=0.008)
+        # the raised hearth: a stone bench along the front, the firebox's floor; residents warming up sit on it
+        F.box('hearth', 1.96, HEARTH, 0.57, (0, HEARTH / 2, WALL + 0.285), M.hearth, bevel=0.01)
+        F.box('surround_lintel', 1.08, 0.1, 0.03, (0, top + 0.05, WALL + 0.415), M.surround, bevel=0.008)
         for side in (-1, 1):
-            F.box(f'surround_jamb{side}', 0.1, 0.8, 0.03, (side * 0.49, 0.44, WALL + 0.415), M.surround, bevel=0.008)
+            F.box(f'surround_jamb{side}', 0.1, top - HEARTH, 0.03, (side * 0.49, (top + HEARTH) / 2, WALL + 0.415), M.surround, bevel=0.008)
         # the grate and the logs
+        y = HEARTH
         for s in (-1, 1):
-            F.box(f'grate_bar{s}', 0.6, 0.012, 0.012, (0, 0.13, WALL + 0.25 + s * 0.08), M.grate, bevel=0.003)
-            F.box(f'grate_leg{s}', 0.012, 0.04, 0.2, (s * 0.28, 0.11, WALL + 0.25), M.grate, bevel=0.003)
-        G.rod('log0', F.at(-0.25, 0.17, WALL + 0.21), F.at(0.2, 0.17, WALL + 0.29), 0.045, material=M.log, verts=10)
-        G.rod('log1', F.at(-0.18, 0.17, WALL + 0.31), F.at(0.26, 0.17, WALL + 0.2), 0.042, material=M.log, verts=10)
-        G.rod('log2', F.at(-0.12, 0.24, WALL + 0.25), F.at(0.14, 0.25, WALL + 0.26), 0.038, material=M.log, verts=10)
+            F.box(f'grate_bar{s}', 0.6, 0.012, 0.012, (0, y + 0.05, WALL + 0.25 + s * 0.08), M.grate, bevel=0.003)
+            F.box(f'grate_leg{s}', 0.012, 0.04, 0.2, (s * 0.28, y + 0.03, WALL + 0.25), M.grate, bevel=0.003)
+        G.rod('log0', F.at(-0.25, y + 0.09, WALL + 0.21), F.at(0.2, y + 0.09, WALL + 0.29), 0.045, material=M.log, verts=10)
+        G.rod('log1', F.at(-0.18, y + 0.09, WALL + 0.31), F.at(0.26, y + 0.09, WALL + 0.2), 0.042, material=M.log, verts=10)
+        G.rod('log2', F.at(-0.12, y + 0.16, WALL + 0.25), F.at(0.14, y + 0.17, WALL + 0.26), 0.038, material=M.log, verts=10)
         # on the mantel
         top = 1.32
         G.revolve('vase', [(0, 0), (0.04, 0), (0.055, 0.07), (0.04, 0.18), (0.028, 0.22), (0.034, 0.24), (0, 0.24)],
@@ -647,7 +653,7 @@ def fireplace():
     G.join(still, 'body', origin=(0, 0, 0))
 
     # the flames: an ember bed and tongues of fire, joined at the logs' top, grown from nothing
-    base = 0.2
+    base = HEARTH + 0.12
     with G.new_parts() as parts:
         F.box('embers', 0.5, 0.02, 0.16, (0, base, WALL + 0.25), M.ember, bevel=0.008)
         for k, (x, h, r, z) in enumerate(((-0.14, 0.26, 0.07, 0.24), (0.0, 0.36, 0.09, 0.26), (0.13, 0.28, 0.07, 0.25),

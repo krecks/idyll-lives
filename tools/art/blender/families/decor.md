@@ -10,6 +10,8 @@ Each is built where its placeholder stands (`F`, game axes):
   wall face: `G.settle(centre=False, floor=False)`, `floor=False` and `centre=` on the `Model`. `check_glb.py` warns
   that they float (right on a wall).
 - **The hanging plant** hangs from the ceiling (2.8 m), centred, `floor=False`.
+- **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
+  sit on the bench, the fire behind them (content `seat`: height 0.42, forward 0.02; the fire's `light.height` 0.7).
 - **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face. Their placeholders
   reach 2–5 cm into the wall, so `check_glb.py` warns that they're off its centre (and the curtains, whose rail
   brackets now reach the wall). Those warnings are expected.
