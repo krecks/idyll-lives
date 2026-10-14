@@ -85,6 +85,7 @@
       "footprint": [1, 1],
       "price": 340,
       "category": "validate",
+      "freeRotation": true,
       "group": "energetic",
       "slots": 2,
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",

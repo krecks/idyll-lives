@@ -11,6 +11,7 @@
       ],
       "price": 90,
       "category": "validate",
+      "freeRotation": true,
       "group": "kids study",
       "surface": {
         "height": 0.5,
@@ -33,6 +34,7 @@
       ],
       "price": 40,
       "category": "validate",
+      "freeRotation": true,
       "group": "kids study",
       "approach": "around",
       "seatAt": [
@@ -107,6 +109,7 @@
       ],
       "price": 120,
       "category": "validate",
+      "freeRotation": true,
       "group": "kids study",
       "decor": 0.2,
       "description": "Three slanted shelves with the covers facing out.",
@@ -141,6 +144,7 @@
       ],
       "price": 110,
       "category": "validate",
+      "freeRotation": true,
       "group": "toys",
       "description": "A yellow chest with its lid open: balls, blocks and a bear.",
       "interactions": [
@@ -172,6 +176,7 @@
       ],
       "price": 130,
       "category": "validate",
+      "freeRotation": true,
       "group": "toys",
       "decor": 0.3,
       "description": "A canvas teepee with bunting and a soft mat inside.",
@@ -206,6 +211,7 @@
       ],
       "price": 95,
       "category": "validate",
+      "freeRotation": true,
       "group": "kids study",
       "description": "A double-sided easel with paper and pots of paint.",
       "interactions": [
@@ -271,6 +277,7 @@
       ],
       "price": 180,
       "category": "validate",
+      "freeRotation": true,
       "group": "toys",
       "description": "A round pit full of coloured balls.",
       "interactions": [
@@ -300,6 +307,7 @@
       ],
       "price": 60,
       "category": "validate",
+      "freeRotation": true,
       "group": "toys",
       "seat": {
         "height": 0.24,

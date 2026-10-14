@@ -86,6 +86,7 @@
       "footprint": [1, 1],
       "price": 180,
       "category": "validate",
+      "freeRotation": true,
       "group": "hotHeaded",
       "slots": 1,
       "description": "A floor cushion, a singing bowl and a candle. Counting to ten here leaves a resident cooled down; longer breathing practice builds Perception.",

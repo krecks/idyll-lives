@@ -10,7 +10,9 @@ A task is signed off when its items have been checked in play and look and move 
    - let a resident use it, so every clip plays and shuts when it should;
    - check it by day and at night, on WebGPU and `&renderer=webgl`, and on the Medium and Low presets.
 2. **Move it back.** Set each item's `category` and `group` back to the task table's "Back to" column. An item
-   whose "Back to" group is "—" has no group (the personality packs).
+   whose "Back to" group is "—" has no group (the personality packs). Validate turns nothing freely by
+   itself: items whose home category turns them (`objectRules.freeRotation`) carry `"freeRotation": true`
+   while they're in Validate. Back home, the flag can go (the category gives it again) or stay.
 3. **Tidy up.**
    - Remove the task's group from the `validate` category in `web/public/content/base.json`.
    - Run `cargo test -p sim-core --test shipped_content`.

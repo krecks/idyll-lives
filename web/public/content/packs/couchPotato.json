@@ -209,6 +209,7 @@
       "footprint": [1, 1],
       "price": 90,
       "category": "validate",
+      "freeRotation": true,
       "group": "couchPotato",
       "slots": 1,
       "description": "Slow, glowing blobs of wax on a little side table. Watching them is a cheap bit of fun and comfort.",

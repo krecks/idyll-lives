@@ -126,6 +126,7 @@
       ],
       "price": 260,
       "category": "validate",
+      "freeRotation": true,
       "group": "floor lamps",
       "decor": 0.7,
       "light": {
@@ -147,6 +148,7 @@
       ],
       "price": 160,
       "category": "validate",
+      "freeRotation": true,
       "group": "floor lamps",
       "decor": 0.6,
       "light": {
@@ -168,6 +170,7 @@
       ],
       "price": 110,
       "category": "validate",
+      "freeRotation": true,
       "group": "floor lamps",
       "decor": 0.4,
       "light": {
@@ -189,6 +192,7 @@
       ],
       "price": 150,
       "category": "validate",
+      "freeRotation": true,
       "group": "ceiling lights",
       "layer": "ceiling",
       "decor": 0.3,
@@ -211,6 +215,7 @@
       ],
       "price": 45,
       "category": "validate",
+      "freeRotation": true,
       "group": "ceiling lights",
       "layer": "ceiling",
       "decor": 0.4,

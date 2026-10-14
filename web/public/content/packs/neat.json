@@ -159,6 +159,7 @@
       "footprint": [1, 1],
       "price": 110,
       "category": "validate",
+      "freeRotation": true,
       "group": "neat",
       "slots": 1,
       "description": "A slim console with a shoe shelf, key tray and coat hooks. A quick tidy of the entryway is a small comfort for orderly residents.",

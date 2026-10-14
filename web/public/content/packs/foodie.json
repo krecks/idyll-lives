@@ -8,6 +8,7 @@
       "footprint": [1, 1],
       "price": 140,
       "category": "validate",
+      "freeRotation": true,
       "group": "foodie",
       "slots": 1,
       "description": "Basil, thyme and rosemary within arm's reach. Tending it leaves residents eager to cook and learning Cooking faster for a few hours.",
