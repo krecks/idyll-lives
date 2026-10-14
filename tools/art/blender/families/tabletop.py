@@ -14,8 +14,8 @@
 # have no uses, so no clips, and every finish is a plain one (wood, fabric and leaves drawn satin or matte),
 # so each costs one draw call. The exceptions: the cookie jar, the wine glasses and the snow globe are
 # see-through `glass` (two); the kettle's lid, the bread bin's roll-top and the laptop's lid are parts of
-# their own, hinged where they would open, for a use to come (two); the alarm clock's second hand goes round
-# all the time near the camera (`hands`, an ambient loop; two).
+# their own, hinged where they would open, for a use to come (two); the alarm clock's hour and minute hands
+# tell the game's time (`motions.clock`; three).
 #
 # Run:  python3 -B tools/art/blender/build.py tabletop [--only kettle] [--preview]
 import math
@@ -662,9 +662,7 @@ def tableClock():
             a = i * 30
             box(f'tick{i}', (0.003, 0.002, 0.01 if i % 3 else 0.014),
                 (0.054 * G.sind(a), -0.0275, Z + 0.054 * G.cosd(a)), M.dark, rot=(0, a, 0))
-        # ten past ten
-        box('hour_hand', (0.005, 0.002, 0.032), (-0.012, -0.029, Z + 0.009), M.dark, rot=(0, -60, 0))
-        box('minute_hand', (0.004, 0.002, 0.05), (0.022, -0.03, Z + 0.013), M.dark, rot=(0, 60, 0))
+        cyl('hub', 0.004, 0.003, (0, -0.031, Z), M.red, verts=10, rot=(90, 0, 0))
         for s in (-1, 1):
             ball(f'bell{s}', 0.032, (s * 0.048, 0.0, Z + 0.083), M.brass, scale=(1, 1, 0.75), rot=(0, s * 30, 0))
             G.rod(f'leg{s}', (s * 0.045, 0.0, Z - 0.06), (s * 0.06, -0.008, 0.0), 0.005, material=M.brass, verts=6)
@@ -672,13 +670,17 @@ def tableClock():
         G.rod('bell_post', (0, 0.0, Z + R - 0.004), (0, 0.0, Z + 0.104), 0.0035, material=M.brass, verts=6)
         ball('hammer', 0.007, (0, 0.0, Z + 0.105), M.brass, seg=8, rings=5)
     G.join(body, 'clock', origin=(0, 0, 0))
-    # the second hand: its own part, round the face's middle, going round once a minute near the camera
-    with G.new_parts() as hand:
-        box('second_hand', (0.0018, 0.0015, 0.058), (0, -0.031, Z + 0.016), M.red)
-        cyl('hub', 0.004, 0.003, (0, -0.031, Z), M.red, verts=10, rot=(90, 0, 0))
-    hand = G.hinged(G.join(hand, 'second_hand'), (0, -0.031, Z))
+    # the hour and minute hands: parts of their own round the face's middle, telling the game's time
+    # (`motions.clock`), at rest ten past ten
+    hands = []
+    for name, (w, depth, length), y, angle in (('hour', (0.005, 0.002, 0.032), -0.029, 305), ('minute', (0.004, 0.002, 0.05), -0.03, 60)):
+        with G.new_parts() as hand:
+            box(f'{name}_hand', (w, depth, length), (G.sind(angle) * length / 2, y, Z + G.cosd(angle) * length / 2), M.dark,
+                rot=(0, angle, 0))
+        hands.append(G.hinged(G.join(hand, f'{name}_hand'), (0, y, Z)))
     G.settle()
-    G.spin(hand, 'hands', 1, seconds=60, axis='Y')
+    for hand in hands:
+        G.spin(hand, hand.name, 1, seconds=12, axis='Y')   # once round clockwise; the game holds it at the time
     return G.meshes()
 
 
@@ -894,7 +896,7 @@ FAMILY = G.Family(
         # TT4 small ornaments
         T('photoFrame', photoFrame, (0.18, 0.231, 0.114), [('frame', BODY)]),
         T('tableClock', tableClock, (0.153, 0.228, 0.063), [('clock', BODY), ('brass', 'Bells')],
-          motions={'idle': 'hands'}),
+          motions={'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 10 * 60 + 10}}),
         T('globe', globe, (0.212, 0.31, 0.24), [('globe', BODY), ('wood_dark', 'Stand')]),
         T('snowGlobe', snowGlobe, (0.128, 0.176, 0.128), [('wood_dark', BODY)]),
         T('trophy', trophy, (0.148, 0.226, 0.126), [('trophy', BODY)]),
@@ -914,7 +916,7 @@ FAMILY = G.Family(
     comment='Blender-built tabletop things (tools/art/blender/families/tabletop.py). Replaces the primitive-part '
             'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
             'file fails to load, and the materials map onto the game\'s finishes, so each costs one draw call (the '
-            'see-through ones, the parts kept for a use to come and the alarm clock\'s second hand one more).',
+            'see-through ones and the parts kept for a use to come one more, the alarm clock\'s two hands two more).',
 )
 
 if __name__ == '__main__':

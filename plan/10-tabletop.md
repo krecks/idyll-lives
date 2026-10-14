@@ -68,7 +68,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `photoFrame` Photo frame | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
-| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body | Ambient (E2) | `hands`: the second hand goes round once a minute. |
+| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body | Ambient (E2) | `hour_hand`, `minute_hand`: the hands tell the game's time (`motions.clock`); no second hand. |
 | `globe` Globe | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `snowGlobe` Snow globe | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `trophy` Trophy | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |

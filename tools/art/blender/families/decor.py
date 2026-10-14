@@ -6,9 +6,8 @@
 #
 # Built where the placeholders stand (`F`, game axes): the wall things at their real height with their back
 # on the wall face (`floor=False`), the hanging plant from the ceiling. What moves:
-#   - the wall clock's second hand goes round (`hands`, ambient);
-#   - the grandfather clock's trunk door opens to wind it (`door_open`) and its pendulum swings (`pendulum`,
-#     ambient);
+#   - the clocks' hour and minute hands tell the game's time (`hour_hand`, `minute_hand`, `motions.clock`); the
+#     grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls;
 #   - the hanging plant sways when watered (`sway`);
 #   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
 #   - the curtains are drawn closed at night (`close`), on cloth tabs over the rail.
@@ -278,16 +277,9 @@ def canvasAbstract():
 CLOCK_Y = 1.9
 
 
-def _hand(F, name, length, width, angle, z, material, tail=0.0):
-    """A clock hand from the centre (at `CLOCK_Y`), pointing `angle` degrees clockwise from twelve."""
-    a = math.radians(angle)
-    mid = (length - tail) / 2
-    return F.box(name, width, length + tail, 0.002, (math.sin(a) * mid, CLOCK_Y + math.cos(a) * mid, z), material, rot=(0, -angle, 0))
-
-
 def wallClock():
-    """A round wall clock: a steel case, a white face with ticks, hands at ten past ten and a red second
-    hand that goes round."""
+    """A round wall clock: a steel case, a white face with ticks, and hands that tell the game's time (ten
+    past ten at rest, the catalogue's picture)."""
     F = G.GameFrame()
     r = 0.18
     with G.new_parts() as still:
@@ -302,16 +294,39 @@ def wallClock():
             d = r - 0.045 if big else r - 0.04
             F.box(f'tick{k}', 0.01 if big else 0.005, 0.03 if big else 0.016, 0.002,
                   (math.sin(a) * d, CLOCK_Y + math.cos(a) * d, z + 0.001), M.ink, rot=(0, -k * 30, 0))
-        _hand(F, 'hour', 0.075, 0.012, 305, z + 0.003, M.ink, tail=0.015)
-        _hand(F, 'minute', 0.115, 0.008, 60, z + 0.005, M.ink, tail=0.018)
+        _disc(F, 'cap', 0, CLOCK_Y, z + 0.007, 0.009, M.second, t=0.004, verts=12)
     G.join(still, 'body', origin=(0, 0, 0))
-    with G.new_parts() as parts:
-        _hand(F, 'second', 0.13, 0.003, 0, z + 0.007, M.second, tail=0.03)
-        _disc(F, 'cap', 0, CLOCK_Y, z + 0.006, 0.009, M.second, t=0.004, verts=12)
-    second = G.hinged(G.join(parts, 'second_hand'), F.at(0, CLOCK_Y, z))
+    hands = _clock_hands(F, CLOCK_Y, z, ('hour', 0.075, 0.012, 0.003, 0.015), ('minute', 0.115, 0.008, 0.005, 0.018))
     G.settle(centre=False, floor=False)
-    G.spin(second, 'hands', turns=-1, seconds=60, axis='Y')   # clockwise, seen from the front
+    _clock_clips(*hands)
     return G.meshes()
+
+
+# The clocks' hands show the game's time (`motions.clock`, CLOCK): each hand its own part on the dial's
+# middle, one turn clockwise from rest a clip, and at rest ten past ten (CLOCK_AT, minutes past twelve).
+CLOCK_AT = 10 * 60 + 10
+CLOCK = {'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': CLOCK_AT}}
+
+
+def _clock_hands(F, y, z, hour, minute, x=0.0, material=None):
+    """The hour and minute hands, each (name, length, width, lift above `z`, tail), on a dial centred at
+    game (`x`, `y`, `z`), pointing at CLOCK_AT; returned hinged on the dial's middle. (Seen from the front, the
+    game's +x is on the left, so angles clockwise from twelve go towards -x.)"""
+    out = []
+    for (name, length, width, lift, tail), angle in ((hour, -(CLOCK_AT / 2) % 360), (minute, -(CLOCK_AT % 60 * 6))):
+        with G.new_parts() as parts:
+            a = math.radians(angle)
+            mid = (length - tail) / 2
+            F.box(name, width, length + tail, 0.002, (x + math.sin(a) * mid, y + math.cos(a) * mid, z + lift),
+                  material or M.ink, rot=(0, -angle, 0))
+        out.append(G.hinged(G.join(parts, f'{name}_hand'), F.at(x, y, z)))
+    return out
+
+
+def _clock_clips(hour, minute):
+    """Each hand once round clockwise (seen from the front); the game holds them at the time."""
+    for hand in (hour, minute):
+        G.spin(hand, f'{hand.name}', turns=1, seconds=12, axis='Y')
 
 
 def _books(F, x0, x1, y, z, depth, seed):
@@ -384,31 +399,21 @@ def grandfatherClock():
             a = math.radians(k * 30)
             F.box(f'numeral{k}', 0.01, 0.028, 0.002, (math.sin(a) * 0.13, DIAL_Y + math.cos(a) * 0.13, dz + 0.007),
                   M.ink, rot=(0, -k * 30, 0))
-        for name, length, width, angle, dy in (('hour', 0.07, 0.012, 310, 0.008), ('minute', 0.11, 0.008, 45, 0.010)):
-            a = math.radians(angle)
-            F.box(name, width, length, 0.002, (math.sin(a) * length / 2, DIAL_Y + math.cos(a) * length / 2, dz + dy),
-                  M.ink, rot=(0, -angle, 0))
-        _disc(F, 'arbor', 0, DIAL_Y, dz + 0.008, 0.012, M.brass, t=0.006, verts=10)
-    G.join(still, 'body', origin=(0, 0, 0))
-
-    # the pendulum: a brass rod and bob, hung from just under the hood, in front of the dark hollow
-    pz = TRUNK_FRONT + 0.008
-    with G.new_parts() as parts:
+        _disc(F, 'arbor', 0, DIAL_Y, dz + 0.014, 0.012, M.brass, t=0.006, verts=10)
+        # The pendulum (a brass rod and bob, hung from just under the hood, in front of the dark hollow) and
+        # the trunk door (a walnut frame round an open window) are still: the hands take their draws.
+        pz = TRUNK_FRONT + 0.008
         F.box('pendulum_rod', 0.012, 0.58, 0.006, (0, 1.12, pz), M.brass)
         _disc(F, 'pendulum_bob', 0, 0.8, pz - 0.004, 0.065, M.brass, t=0.012, verts=24)
-    pendulum = G.hinged(G.join(parts, 'pendulum'), F.at(0, 1.41, pz))
-
-    # the trunk door: a walnut frame round an open window, hinged on its left
-    door_z = TRUNK_FRONT + 0.026
-    with G.new_parts() as parts:
+        door_z = TRUNK_FRONT + 0.026
         for s in (-1, 1):
             F.box(f'door_rail{s}', 0.36, 0.06, 0.02, (0, 1.0 + s * 0.41, door_z), M.walnut, bevel=0.005)
             F.box(f'door_stile{s}', 0.05, 0.78, 0.02, (s * 0.155, 1.0, door_z), M.walnut, bevel=0.005)
         F.box('door_knob', 0.016, 0.03, 0.016, (0.15, 1.0, door_z + 0.016), M.walnut_dark, bevel=0.005)
-    door = G.hinged(G.join(parts, 'door'), F.at(-0.18, 1.0, door_z))
+    G.join(still, 'body', origin=(0, 0, 0))
+    hands = _clock_hands(F, DIAL_Y, dz, ('hour', 0.07, 0.012, 0.008, 0.0), ('minute', 0.11, 0.008, 0.010, 0.0))
     G.settle(centre=False)
-    G.swing(door, 'door_open', 100, seconds=1.0)
-    G.rock(pendulum, 'pendulum', 7, seconds=2.0, axis='Y')
+    _clock_clips(*hands)
     return G.meshes()
 
 
@@ -801,12 +806,12 @@ FAMILY = G.Family(
      G.Model('canvasAbstract', canvasAbstract, size=(1.5, 0.9, 0.05), key='model.canvasAbstract',
              centre=(0, -0.405), floor=False, paint=[('oak', 'Frame')]),
      G.Model('wallClock', wallClock, size=(0.36, 0.36, 0.066), key='model.wallClock',
-             centre=(0, -0.397), floor=False, motions={'idle': 'hands'}, paint=[('clock_case', 'Case'), ('face', 'Face')]),
+             centre=(0, -0.397), floor=False, motions=CLOCK, paint=[('clock_case', 'Case'), ('face', 'Face')]),
      G.Model('wallShelf', wallShelf, size=(0.9, 0.659, 0.24), key='model.wallShelf',
              centre=(0, -0.31), floor=False, paint=[('oak', 'Shelves')]),
      # D2. Ornaments
      G.Model('grandfatherClock', grandfatherClock, size=(0.6, 2.116, 0.4), key='model.grandfatherClock',
-             centre=(0, -0.23), motions={'uses': {'wind': 'door_open'}, 'hold': 2.5, 'idle': 'pendulum'},
+             centre=(0, -0.23), motions=CLOCK,
              paint=[('walnut', 'Case'), ('dial', 'Face')]),
      G.Model('vaseTall', vaseTall, size=(0.329, 1.27, 0.224), key='model.vaseTall', paint=[('ceramic', 'Body')]),
      G.Model('urnPorcelain', urnPorcelain, size=(0.36, 0.62, 0.363), key='model.urnPorcelain',
@@ -836,8 +841,7 @@ FAMILY = G.Family(
     comment='Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and '
             'rugs. Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder '
             'is kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so a model '
-            'costs one draw call per finish group. The wall clock\'s second hand and the grandfather clock\'s pendulum '
-            'go round near the camera (`idle`); the clock\'s door opens to wind it, the hanging plant sways when '
+            'costs one draw call per finish group. The clocks\' hands tell the game\'s time (`clock`); the hanging plant sways when '
             'watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.',
 )
 

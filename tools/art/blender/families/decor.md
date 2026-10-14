@@ -23,9 +23,11 @@ The pictures are flat colour shapes (matte, one draw call with the frame), not t
 
 | Model | Clip | Kind | What |
 |---|---|---|---|
-| `wallClock` | `hands` | ambient (`idle`) | the red second hand goes round clockwise, one turn in 60 s (a clock's minute, so longer than the usual 1 s); the hour and minute hands stay at ten past ten |
-| `grandfatherClock` | `door_open` | use `wind`, `hold` 2.5 s | the trunk door (a walnut frame round an open window) swings 100° on its left hinge |
-| | `pendulum` | ambient (`idle`) | the pendulum swings 7° each way, 2 s a swing (`G.rock`) |
+| `wallClock`, `grandfatherClock` | `hour_hand`, `minute_hand` | `clock` (`at` 610) | the hands tell the game's time: each clip turns its hand once round clockwise (`G.spin`, 12 s), and the game holds it where the time has it (ten past ten at rest, the catalogue picture). No second hand: at normal speed a game minute is a real second |
+
+The grandfather clock's trunk door and pendulum are still (they were the `door_open` use clip for `wind` and an
+ambient `pendulum`): with its walnut body at 2 draws, the two hands take the last two of the 4. A satin body (1 draw)
+would give one back for the pendulum, at the cost of the wood grain.
 | `hangingPlant` | `sway` | use `water`, `hold` 1.6 s | the plant, pot and hanger swing 5° about the ceiling hook and back (`G.rock`); played back after the hold, so it sways twice and settles |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`G.grow`) for the whole use; the light is the content's |
 | `curtains`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`G.squash` in x, about the rail end) |
