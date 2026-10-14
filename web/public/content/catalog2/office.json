@@ -146,7 +146,20 @@
       "category": "validate",
       "group": "office storage",
       "description": "Three steel drawers of paperwork, a plant on top.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "file",
+          "label": "File papers",
+          "anim": "fetch",
+          "minutes": 10,
+          "effects": {
+            "environment": 0.05
+          },
+          "tags": [
+            "chores"
+          ]
+        }
+      ]
     },
     {
       "id": "chairExecutive",

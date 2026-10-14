@@ -180,6 +180,12 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "fetch": "drawer_open"
+        },
+        "hold": 1.5
+      },
       "paint": [
         {
           "material": "cab",
@@ -679,6 +685,12 @@
         "steel": {
           "finish": "material.finish.metal"
         }
+      },
+      "motions": {
+        "uses": {
+          "clean": "lid_open"
+        },
+        "hold": 1.0
       },
       "paint": [
         {

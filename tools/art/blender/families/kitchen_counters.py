@@ -194,11 +194,22 @@ def counterDrawers():
     F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
         _unit79(F, w=1.0)
-        for i, y in enumerate((0.2125, 0.3975, 0.5825, 0.7675)):
+        for i, y in enumerate((0.2125, 0.3975, 0.5825)):
             F.box(f'drawer{i}', 0.97, 0.173, 0.02, (0, y, 0.25), M.cab, bevel=0.008)
             _handle_h(F, f'drawer_pull{i}', 0, y + 0.046, 0.27, 0.30)
     G.join(still, 'body', origin=(0, 0, 0))
+    # the top drawer with its box behind, sliding out while a resident puts clean dishes away
+    y = 0.7675
+    with G.new_parts() as parts:
+        F.box('drawer_front', 0.97, 0.173, 0.02, (0, y, 0.25), M.cab, bevel=0.008)
+        _handle_h(F, 'drawer_pull', 0, y + 0.046, 0.27, 0.30)
+        F.box('drawer_bottom', 0.91, 0.02, 0.5, (0, y - 0.07, -0.01), M.cab, bevel=0.003)
+        for s in (-1, 1):
+            F.box(f'drawer_side{s}', 0.02, 0.14, 0.5, (s * 0.445, y - 0.01, -0.01), M.cab, bevel=0.003)
+        F.box('drawer_back', 0.91, 0.14, 0.02, (0, y - 0.01, -0.25), M.cab, bevel=0.003)
+    drawer = G.join(parts, 'drawer', origin=F.at(0, y, 0.25))
     G.settle()
+    G.slide(drawer, 'drawer_open', (0, -0.25, 0), seconds=SECONDS)
 
 
 # --- the open-shelf counter: 1x1, an open carcass with two shelves of plates and pots (static) --------
@@ -498,10 +509,14 @@ def trashCan():
     with G.new_parts() as still:
         F.cyl('drum', 0.15, 0.6, (0, 0.32, -0.2), M.steel, verts=20)
         F.cyl('base', 0.15, 0.02, (0, 0.01, -0.2), M.dark, verts=20)
-        F.sphere('lid', 0.155, (0, 0.62, -0.2), M.lid, scale=(1, 1, 0.42), segments=20, rings=8)
         F.box('pedal', 0.1, 0.03, 0.08, (0, 0.03, -0.03), M.dark, bevel=0.01)
     G.join(still, 'body', origin=(0, 0, 0))
+    # the lid, hinged at its back edge, lifting while a resident scrapes a plate into the bin
+    with G.new_parts() as parts:
+        F.sphere('lid', 0.155, (0, 0.62, -0.2), M.lid, scale=(1, 1, 0.42), segments=20, rings=8)
+    lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.62, -0.355))
     G.settle()
+    G.swing(lid, 'lid_open', -75, seconds=0.5, axis='X')
 
 
 # --- the recycling bins: 1x1, three coloured bins with lids (static) ----------------------------------
@@ -624,6 +639,8 @@ FAMILY = G.Family(
      G.Model('counterCornerOuter', counterCornerOuter, size=(0.81, 1.035, 0.66), key='model.counterCornerOuter', centre=(-0.095, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
      G.Model('counterDrawers', counterDrawers, size=(1.0, 0.95, 0.66), key='model.counterDrawers', centre=(0, -0.10),
+             # putting clean dishes away here (cooking putAwayAt prep, anim fetch) slides the top drawer out
+             motions={'uses': {'fetch': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
      G.Model('counterOpenShelf', counterOpenShelf, size=(1.0, 0.95, 0.66), key='model.counterOpenShelf', centre=(0, -0.10),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
@@ -666,6 +683,8 @@ FAMILY = G.Family(
              centre=(0, -0.31), floor=False,
              paint=[('oak', 'Shelves'), ('oakd', 'Brackets')]),
      G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan', centre=(0, -0.247),
+             # scraping a plate into the bin (the cooking `bin` station, anim clean) lifts the lid
+             motions={'uses': {'clean': 'lid_open'}, 'hold': 1.0},
              paint=[('steel', 'Bin'), ('lid', 'Lid')]),
      G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins', centre=(0, -0.212),
              paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),
