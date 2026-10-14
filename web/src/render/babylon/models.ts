@@ -720,17 +720,41 @@ interface ModelExtras {
   /** Extra placeholder primitives drawn with the model (in the final, fitted space). */
   parts?: PlaceholderPart[];
   /** When the file's clips play (`objectMotion.ts`). */
-  motions?: Motions;
+  motions?: MotionsEntry;
+}
+
+/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold`; or several of these. */
+type UseEntry = string | { clip: string; hold?: number };
+
+/** A model entry's `motions` as the manifest writes it: when its clips play (see `Motions`). */
+interface MotionsEntry {
+  uses?: Record<string, UseEntry | UseEntry[]>;
+  hold?: number;
+  open?: string;
+  loops?: Record<string, string>;
 }
 
 /** When a model's clips play: while residents use the object, and while it's open. */
 export interface Motions {
-  /** The clip a use plays, by the interaction's id or, failing that, its animation tag (`fetch`, `drink`). */
-  uses: Record<string, string>;
-  /** Seconds after a use starts that the clip plays back (a door that closes again); absent: when the use ends. */
-  hold?: number;
+  /**
+   * The clips a use plays, by the interaction's id or, failing that, its animation tag (`fetch`,
+   * `drink`), each with the seconds after the use starts that it plays back (a door that closes
+   * again; absent: when the use ends). The manifest gives a clip's name (with the model's `hold`),
+   * `{clip, hold}`, or a list of them (a shower's door shutting after 1 s while its water runs on).
+   */
+  uses: Record<string, readonly UseClip[]>;
+  /**
+   * The clip a use plays round and round while it lasts (a rocking chair, a washer's drum), by
+   * interaction id or animation tag: from rest to rest, finishing its round when the use ends.
+   */
+  loops: Record<string, string>;
   /** The clip held open while the object is open (a wall bed folded down; the sim's `open`, set by `leaves`). */
   open?: string;
+}
+
+export interface UseClip {
+  clip: string;
+  hold?: number;
 }
 
 /** Of a placed object's `colors`, those on parts its model lets the player paint; undefined for none. */
@@ -755,8 +779,13 @@ export function painted(entry: ModelEntry | undefined, colors: PartColors | unde
 
 /** A model entry's `motions`, if it has any. */
 export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
-  const motions = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
-  return motions && (Object.keys(motions.uses ?? {}).length || motions.open) ? { ...motions, uses: motions.uses ?? {} } : undefined;
+  const m = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
+  if (!m) return undefined;
+  const uses = Object.fromEntries(
+    Object.entries(m.uses ?? {}).map(([use, value]) => [use, (Array.isArray(value) ? value : [value]).map((u) => (typeof u === 'string' ? { clip: u, hold: m.hold } : { clip: u.clip, hold: u.hold ?? m.hold }))]),
+  );
+  const loops = m.loops ?? {};
+  return Object.keys(uses).length || Object.keys(loops).length || m.open ? { uses, loops, open: m.open } : undefined;
 }
 
 interface MaterialOverride {

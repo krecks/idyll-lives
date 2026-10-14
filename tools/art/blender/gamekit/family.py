@@ -12,6 +12,9 @@ from .parts import check_size
 from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from check_glb import played  # noqa: E402  (the gate's reading of `motions`, shared)
+
 
 class Model:
     """
@@ -21,8 +24,13 @@ class Model:
                  floor and centred on its footprint; it may return its objects (default: every mesh)
       size       (width, height, depth) in game metres, asserted within `tolerance` (fraction, or 3)
       key        the manifest key it draws for (default model.<family>.<id>)
-      motions    the pack entry's `motions` for its clips: {'uses': {use: clip}, 'hold': seconds,
-                 'open': clip held open while the object is open (content `leaves`)}
+      motions    the pack entry's `motions` for its clips (docs/design/objects.md, "Moving parts"):
+                   'uses': {use: clip, or {'clip', 'hold'}, or a list of them}, played by a use (an
+                           interaction id or animation tag), each back after the model's 'hold'
+                           seconds or its own (absent: when the use ends);
+                   'hold': seconds;
+                   'loops': {use: clip} going round while the use lasts (G.spin, G.rock);
+                   'open': clip held open while the object is open (content `leaves`)
       paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part
                  first (the one the game's quick colour row paints), e.g. [('body', 'Cabinet'),
                  ('stone', 'Worktop')]; a bare material name is its own label
@@ -114,9 +122,7 @@ class Family:
 
     def _check_motions(self, model, clips):
         names = {name for _, name, _ in clips}
-        motions = model.motions or {}
-        played = set(motions.get('uses', {}).values()) | ({motions['open']} if motions.get('open') else set())
-        missing = sorted(played - names)
+        missing = sorted(set(played(model.motions or {})) - names)
         assert not missing, f'{model.id}: `motions` plays {", ".join(missing)}, which it has no clip for'
 
 

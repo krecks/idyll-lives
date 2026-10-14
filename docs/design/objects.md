@@ -202,6 +202,19 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "uses": { "fetch": "fridge_open", "drink": "fridge_open" }, "hold": 3.5 }
   ```
+- **Several clips, each its own hold:** a use's value may be `{"clip", "hold"}` (its own `hold`, over
+  the model's) or a list of clips, so one use can shut a door after a second while the water runs on.
+  A clip closed after its hold stays closed until the use ends.
+  ```json
+  "motions": { "uses": { "shower": [{ "clip": "door_open", "hold": 1 }, "water_on"] } }
+  ```
+- **Loops:** `loops` names the clip a use plays round and round while it lasts (a rocking chair, a
+  washer's drum), by interaction id or animation tag. It goes from rest to rest (`G.rock`, `G.spin`:
+  `check_glb.py` fails a loop that ends away from where it starts), never plays backwards, and when the
+  use ends it finishes its round and stops at rest. A use can play `uses` clips and a loop together.
+  ```json
+  "motions": { "loops": { "relax": "rocking", "read": "rocking" } }
+  ```
 - **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
   `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip
   held open while it is: the wall bed stays down after *Fold down* or a night's sleep until *Fold up*
@@ -216,7 +229,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn; nothing
   is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
-- **Not yet:** clips that play on their own (a fountain's water, a fan), the freezer door, which no use
+- **Not yet:** the freezer door, which no use
   opens (no interaction takes frozen food), and tiles that free up while an object is closed (a folded
   wall bed still takes all its tiles).
 

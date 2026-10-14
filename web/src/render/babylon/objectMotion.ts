@@ -1,10 +1,11 @@
 /**
  * Placed objects' moving parts (a fridge's doors): the clips of their models (`ModelMotion`)
  * played while residents use them, as the model entry's `motions` say. A use that starts opens
- * the clip; it plays back after `hold` seconds or when the use ends. An object that is open (the
- * sim's `open`: a wall bed folded down) holds its `motions.open` clip open as long as it stays so.
- * Each instance's parts draw from buffers of their own (`MovingTarget`), written only while
- * something moves.
+ * its clips; each plays back after its `hold` seconds or when the use ends. A loop (`loops`: a
+ * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
+ * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
+ * open as long as it stays so. Each instance's parts draw from buffers of their own
+ * (`MovingTarget`), written only while something moves.
  *
  * Time is the residents' animation time: it stops while the game is paused and runs faster
  * (up to 2.5 times) at higher speeds, as in `characters.ts`.
@@ -37,6 +38,17 @@ interface ClipState {
   use: string;
   /** Animation time it plays back from (Infinity: when the use ends). */
   until: number;
+  /** Goes round while used (`loops`), rather than opening and closing. */
+  loop: boolean;
+}
+
+/** A clip a use wants this frame. */
+interface Wanted {
+  /** The use (resident, action, interaction). */
+  use: string;
+  /** Seconds it stays open after the use starts (undefined: while it lasts). */
+  hold?: number;
+  loop: boolean;
 }
 
 export class ObjectMotion {
@@ -45,8 +57,8 @@ export class ObjectMotion {
   private states = new Map<number, Map<string, ClipState>>();
   private clock = 0;
   private lastNow = 0;
-  /** Uses this frame: by object id, the clip names and the use that plays each. */
-  private readonly wanted = new Map<number, Map<string, string>>();
+  /** Uses this frame: by object id, the clips wanted by clip name. */
+  private readonly wanted = new Map<number, Map<string, Wanted>>();
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
   set(objects: MovingObject[]): void {
@@ -61,7 +73,7 @@ export class ObjectMotion {
       if (!name || !clip || before.has(o.id)) continue;
       let clips = this.states.get(o.id);
       if (!clips) this.states.set(o.id, (clips = new Map()));
-      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity });
+      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, loop: false });
     }
     for (const [id, clips] of this.states) {
       const o = this.objects.get(id)!;
@@ -101,26 +113,42 @@ export class ObjectMotion {
       if ((wanted || held) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
       const heldClip = held ? o.motion.clips.get(held) : undefined;
-      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity });
+      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity, loop: false });
       let changed = false;
-      for (const [name, use] of wanted ?? []) {
+      for (const [name, want] of wanted ?? []) {
         const clip = o.motion.clips.get(name);
         if (!clip) continue;
         const state = clips.get(name);
-        if (state?.use === use) continue;
-        // A new use: open (again).
-        const until = o.motions.hold === undefined ? Infinity : this.clock + o.motions.hold;
-        if (state) Object.assign(state, { use, until });
-        else clips.set(name, { clip, time: 0, use, until });
+        if (state?.use === want.use) continue;
+        // A new use: open (again), or go round.
+        const until = want.hold === undefined ? Infinity : this.clock + want.hold;
+        if (state) Object.assign(state, { use: want.use, until, loop: want.loop });
+        else clips.set(name, { clip, time: 0, use: want.use, until, loop: want.loop });
       }
       for (const [name, state] of clips) {
+        const using = state.use !== '' && wanted?.get(name)?.use === state.use;
         // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
-        const open = name === held || (state.use !== '' && wanted?.get(name) === state.use && this.clock < state.until);
-        if (!open && !wanted?.has(name)) state.use = '';
-        const time = Math.min(Math.max(state.time + (open ? dt : -dt), 0), state.clip.duration);
+        if (!using && !wanted?.has(name)) state.use = '';
+        const d = state.clip.duration;
+        if (state.loop && name !== held) {
+          // Round and round while used; once not, on to the end of the round and stop there (at
+          // rest: a loop ends where it starts). One that never got going stops where it is.
+          if (!using && (state.time === 0 || state.time + dt >= d)) {
+            changed = true;
+            clips.delete(name);
+            continue;
+          }
+          const time = using && d > 0 ? (state.time + dt) % d : state.time + dt;
+          if (time !== state.time) changed = true;
+          state.time = time;
+          continue;
+        }
+        const open = name === held || (using && this.clock < state.until);
+        const time = Math.min(Math.max(state.time + (open ? dt : -dt), 0), d);
         if (time !== state.time) changed = true;
         state.time = time;
-        if (!time && !open) clips.delete(name);
+        // Closed again after its `hold`, it stays so (kept) until the use ends; a new use opens it again.
+        if (!time && !open && !using) clips.delete(name);
       }
       if (changed) {
         this.pose(o, clips);
@@ -150,11 +178,16 @@ export class ObjectMotion {
       const object = this.objects.get(id);
       if (!object) continue;
       const interaction = k.interaction === undefined ? -1 : curr[o + k.interaction] | 0;
-      const uses = object.motions.uses;
-      const clip = uses[object.interactions[interaction] ?? ''] ?? uses[actionTags[act] ?? ''];
-      if (!clip) continue;
-      const wanted = this.wanted.get(id) ?? new Map<string, string>();
-      wanted.set(clip, `${curr[o + k.id]}:${act}:${interaction}`);
+      const { uses, loops } = object.motions;
+      const it = object.interactions[interaction] ?? '';
+      const tag = actionTags[act] ?? '';
+      const clips = uses[it] ?? uses[tag];
+      const loop = loops[it] ?? loops[tag];
+      if (!clips && !loop) continue;
+      const use = `${curr[o + k.id]}:${act}:${interaction}`;
+      const wanted = this.wanted.get(id) ?? new Map<string, Wanted>();
+      for (const { clip, hold } of clips ?? []) wanted.set(clip, { use, hold, loop: false });
+      if (loop) wanted.set(loop, { use, loop: true });
       this.wanted.set(id, wanted);
     }
   }

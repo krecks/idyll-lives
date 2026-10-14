@@ -116,14 +116,34 @@ def moved_nodes(gltf):
     return {c['target']['node'] for a in gltf.get('animations', []) for c in a['channels'] if 'node' in c['target']}
 
 
-def first_value(gltf, binary, accessor):
-    """The first element of a float accessor (a clip's first key)."""
+def first_value(gltf, binary, accessor, last=False):
+    """The first (or `last`) element of a float accessor (a clip's first or last key)."""
     acc = gltf['accessors'][accessor]
     if acc.get('componentType') != 5126:
         return None
     view = gltf['bufferViews'][acc['bufferView']]
     n = {'SCALAR': 1, 'VEC3': 3, 'VEC4': 4}[acc['type']]
-    return struct.unpack_from(f'<{n}f', binary, view.get('byteOffset', 0) + acc.get('byteOffset', 0))
+    at = (acc['count'] - 1) * (view.get('byteStride') or 4 * n) if last else 0
+    return struct.unpack_from(f'<{n}f', binary, view.get('byteOffset', 0) + acc.get('byteOffset', 0) + at)
+
+
+def played(motions):
+    """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
+    `loops`, `open`."""
+    out = {}
+    for use, value in (motions.get('uses') or {}).items():
+        for u in value if isinstance(value, list) else [value]:
+            out.setdefault(u['clip'] if isinstance(u, dict) else u, f'use {use!r}')
+    for use, clip in (motions.get('loops') or {}).items():
+        out.setdefault(clip, f'loop {use!r}')
+    if motions.get('open'):
+        out.setdefault(motions['open'], 'open')
+    return out
+
+
+def loops(motions):
+    """The clips of `motions` that go round (and so must end where they start)."""
+    return set((motions.get('loops') or {}).values())
 
 
 def check_clips(gltf, binary, entry):
@@ -153,14 +173,26 @@ def check_clips(gltf, binary, entry):
             warnings.append(f'{nodes[i].get("name", i)} moves inside {nodes[p].get("name", p)}, which moves too: the game moves it with its own clip only')
     names = {a.get('name', '') for a in animations}
     motions = entry.get('motions') or {}
-    uses = dict(motions.get('uses', {}))
-    if motions.get('open'):
-        uses['(open)'] = motions['open']
-    for use, clip in sorted(uses.items()):
+    plays = played(motions)
+    for clip, by in sorted(plays.items()):
         if clip not in names:
-            errors.append(f'`motions` plays {clip!r} for {use!r}, which is no clip of the file')
-    for name in sorted(names - set(uses.values())):
+            errors.append(f'`motions` plays {clip!r} ({by}), which is no clip of the file')
+    for name in sorted(names - set(plays)):
         warnings.append(f'clip {name!r} plays for no use (name it in the entry\'s `motions`)')
+    # A loop goes round from rest to rest: each channel ends where it starts (a turn, either sign).
+    for a in animations:
+        if a.get('name', '') not in loops(motions):
+            continue
+        for c in a['channels']:
+            out = a['samplers'][c['sampler']]['output']
+            first, last = first_value(gltf, binary, out), first_value(gltf, binary, out, last=True)
+            if first is None or last is None:
+                continue
+            gap = min(max(abs(x - y) for x, y in zip(first, last)), max(abs(x + y) for x, y in zip(first, last))) \
+                if c['target'].get('path') == 'rotation' else max(abs(x - y) for x, y in zip(first, last))
+            if gap > 1e-3:
+                node = nodes[c['target']['node']].get('name', c['target']['node'])
+                errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock)')
     return errors, warnings
 
 

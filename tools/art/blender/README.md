@@ -176,13 +176,17 @@ How the parts work:
 - **When they play** is the model's `motions`:
   - `{'uses': {'fetch': 'fridge_open'}, 'hold': 3.5}`: a use, by interaction id or animation tag, plays
     a clip for `hold` seconds (absent: until the use ends).
+  - `{'uses': {'shower': [{'clip': 'door_open', 'hold': 1}, 'water_on']}}`: several clips for one use,
+    each with its own `hold` (a door shut after 1 s while the water runs).
+  - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
+    round. It must end where it starts: make it with `G.rock` or `G.spin`.
   - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.
 - **Timing.** A clip starts when the use starts, once the resident has arrived (a bed folds down as they
   lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
-  a clip that nothing plays.
+  a clip that nothing plays, and fails a loop that doesn't end where it starts.
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
   way round, a `rock` at its furthest).
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
