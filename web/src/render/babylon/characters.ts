@@ -148,7 +148,7 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   diningTable: { h: 0.46, fwd: -0.19 },
   // Content packs.
   'gloomy.soakingTub': { h: 0.25, fwd: 0 },
-  'romantic.heartTub': { h: 0.35, fwd: 0 },
+  'romantic.heartTub': { h: 0.35, fwd: -0.36 },
   'hotHeaded.coldPlunge': { h: 0.35, fwd: 0 },
   'hotHeaded.coolDownCushion': { h: 0.4, fwd: 0 },
   // The 0.20 catalogue (content/furniture.json).
