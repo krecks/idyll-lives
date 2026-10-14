@@ -11,8 +11,11 @@ A task is signed off when its items have been checked in play and look and move 
    - check it by day and at night, on WebGPU and `&renderer=webgl`, and on the Medium and Low presets.
 2. **Move it back.** Set each item's `category` and `group` back to the task table's "Back to" column. An item
    whose "Back to" group is "—" has no group (the personality packs).
+   `python3 -B tools/content/validate.py out --group <group>` does it by id, keeping the files' formatting:
+   each item goes back to its "Back to" (or `--to <category>/<group>`), and the emptied Validate group is
+   dropped. Try it with `--dry-run` first; `validate.py list` shows what's in Validate and where it goes.
 3. **Tidy up.**
-   - Remove the task's group from the `validate` category in `web/public/content/base.json`.
+   - Remove the task's group from the `validate` category in `web/public/content/base.json` (the tool does).
    - Run `cargo test -p sim-core --test shipped_content`.
    - Commit: `feat: <task> back in <category> after validation`.
 
