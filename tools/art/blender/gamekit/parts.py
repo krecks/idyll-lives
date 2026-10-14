@@ -1,0 +1,142 @@
+# Assembling a model from its parts: joining them into one mesh (or one per moving part), putting a
+# moving part's origin on its hinge, standing the model on the floor and checking its size.
+import contextlib
+
+import bpy
+from mathutils import Matrix, Vector
+
+from .scene import meshes
+
+
+@contextlib.contextmanager
+def new_parts():
+    """Collects the meshes made inside the block, in order:
+
+        with G.new_parts() as lid:
+            G.cube('lid', ...)
+            G.cube('lid_handle', ...)
+        G.join(lid, 'lid')
+    """
+    before = set(meshes())
+    made = []
+    yield made
+    made.extend(o for o in meshes() if o not in before)
+
+
+def join_all(name):
+    """Applies every transform and modifier, joins every mesh in the scene, returns the one object.
+    Its origin is the world origin: for a model with no moving parts."""
+    return join(meshes(), name, origin=(0, 0, 0))
+
+
+def join(parts, name, origin=None):
+    """
+    Joins `parts` into one object named `name`, modifiers, rotation and scale applied, so the object is
+    only placed (a clip turns it from rest). It keeps the first part's origin, or takes `origin` (a
+    Blender point) if given; the mesh stays where it is either way.
+    """
+    first = parts[0]
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = first
+    bpy.ops.object.convert(target='MESH')
+    if len(parts) > 1:
+        bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    obj.name = name
+    obj.data.name = name
+    if origin is not None:
+        set_origin(obj, origin)
+    return obj
+
+
+def set_origin(obj, point):
+    """Moves `obj`'s origin to `point` (Blender world, metres) without moving its mesh."""
+    local = obj.matrix_world.inverted() @ Vector(point)
+    obj.data.transform(Matrix.Translation(-local))
+    obj.matrix_world = obj.matrix_world @ Matrix.Translation(local)
+    return obj
+
+
+def hinged(obj, pivot):
+    """A moving part turning about `pivot` (Blender world): its origin goes there, so a clip's rotation
+    swings it about the hinge (docs/design/objects.md, "Moving parts"). For a slide, the pivot is where
+    it slides from; any point of the part will do."""
+    return set_origin(obj, pivot)
+
+
+def measure(objs=None):
+    """(lo, hi): the Blender world bounds of `objs` (default: every mesh), modifiers included."""
+    objs = objs if objs is not None else meshes()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    lo, hi = [float('inf')] * 3, [float('-inf')] * 3
+    for o in objs:
+        ev = o.evaluated_get(depsgraph)
+        mesh = ev.to_mesh()
+        for v in mesh.vertices:
+            p = ev.matrix_world @ v.co
+            lo = [min(lo[i], p[i]) for i in range(3)]
+            hi = [max(hi[i], p[i]) for i in range(3)]
+        ev.to_mesh_clear()
+    return lo, hi
+
+
+def game_size(objs=None):
+    """(width, height, depth) in metres, the game's way round."""
+    lo, hi = measure(objs)
+    return hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1]
+
+
+def settle(objs=None):
+    """Stands the model on the floor (lowest point at z = 0), centred on the footprint in x and y, by
+    moving it (never scaling). Call it before adding clips: they key the rest pose where it is. A moving
+    part moves whole, its hinge with it; the rest move their meshes, keeping their origins."""
+    objs = objs if objs is not None else meshes()
+    if any(o.animation_data and o.animation_data.nla_tracks for o in objs):
+        raise RuntimeError('settle() before swing()/slide(): a clip keys the rest pose where it is')
+    lo, hi = measure(objs)
+    shift = Vector((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]))
+    for o in objs:
+        o.location += shift
+    return objs
+
+
+def check_size(size, tolerance=0.02, objs=None, name='model'):
+    """
+    Asserts the model is `size` (game width, height, depth, metres) within `tolerance` (a fraction, or
+    one per axis), centred on its footprint and on the floor. Returns the measured size.
+    """
+    lo, hi = measure(objs)
+    got = game_size(objs)
+    tol = tolerance if isinstance(tolerance, (tuple, list)) else (tolerance,) * 3
+    for axis, g, want, t in zip(('width', 'height', 'depth'), got, size, tol):
+        assert abs(g - want) <= t * want, f'{name}: {axis} {g:.3f} m, want {want:.3f} m (±{t * 100:.0f} %)'
+    for i, axis in enumerate('xy'):
+        c = (lo[i] + hi[i]) / 2
+        assert abs(c) <= 0.002, f'{name}: off centre in Blender {axis} by {c * 100:.1f} cm (G.settle)'
+    assert abs(lo[2]) <= 0.002, f'{name}: bottom {lo[2] * 100:.1f} cm off the floor (G.settle)'
+    print(f'[gamekit] {name} {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), centred, on the floor')
+    return got
+
+
+def fit(obj, w, h, d):
+    """
+    Scales `obj` into an exact w × h × d box (game metres), bottom on z = 0, centred. It stretches each
+    axis on its own, so it is only for third-party files; a model built here is made to its real size
+    and checked with `check_size` (docs/design/objects.md, "Real size, uniform scale").
+    """
+    ws = [obj.matrix_world @ v.co for v in obj.data.vertices]
+    mn = [min(v[i] for v in ws) for i in range(3)]
+    mx = [max(v[i] for v in ws) for i in range(3)]
+    ext = [mx[i] - mn[i] for i in range(3)]
+    s = (w / ext[0], d / ext[1], h / ext[2])
+    for v in obj.data.vertices:
+        v.co.x = (v.co.x - (mn[0] + mx[0]) / 2) * s[0]
+        v.co.y = (v.co.y - (mn[1] + mx[1]) / 2) * s[1]
+        v.co.z = (v.co.z - mn[2]) * s[2]
+    obj.location = (0, 0, 0)
+    obj.scale = (1, 1, 1)
+    obj.data.update()
+    return obj

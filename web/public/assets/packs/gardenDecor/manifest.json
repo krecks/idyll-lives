@@ -1,9 +1,30 @@
 {
-  "$comment": "Blender-built garden decor (tools/art/blender/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one per finish group) and lights like the rest of the garden.",
+  "$comment": "Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one per finish group) and lights like the rest of the garden.",
   "version": 1,
   "entries": {
     "model.garden.gnome": {
       "type": "model",
+      "url": "../../models/garden/gnome.glb",
+      "materials": {
+        "beard": {
+          "finish": "material.finish.satin"
+        },
+        "hat": {
+          "finish": "material.finish.satin"
+        },
+        "nose": {
+          "finish": "material.finish.satin"
+        },
+        "skin": {
+          "finish": "material.finish.satin"
+        },
+        "tunic": {
+          "finish": "material.finish.satin"
+        },
+        "wood_dark": {
+          "finish": "material.finish.satin"
+        }
+      },
       "placeholder": [
         {
           "shape": "box",
@@ -218,16 +239,28 @@
             0
           ]
         }
-      ],
-      "url": "../../models/garden/gnome.glb",
-      "materials": {
-        "*": {
-          "finish": "material.finish.satin"
-        }
-      }
+      ]
     },
     "model.garden.birdbath": {
       "type": "model",
+      "url": "../../models/garden/birdbath.glb",
+      "materials": {
+        "beak": {
+          "finish": "material.finish.satin"
+        },
+        "bird_brown": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
       "placeholder": [
         {
           "shape": "cylinder",
@@ -407,25 +440,22 @@
             0
           ]
         }
-      ],
-      "url": "../../models/garden/birdbath.glb",
+      ]
+    },
+    "model.garden.fountain": {
+      "type": "model",
+      "url": "../../models/garden/fountain.glb",
       "materials": {
-        "*": {
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
           "finish": "material.finish.matte"
         },
         "water": {
           "finish": "material.finish.gloss"
-        },
-        "bird_brown": {
-          "finish": "material.finish.satin"
-        },
-        "beak": {
-          "finish": "material.finish.satin"
         }
-      }
-    },
-    "model.garden.fountain": {
-      "type": "model",
+      },
       "placeholder": [
         {
           "shape": "lathe",
@@ -642,19 +672,22 @@
           "material": "material.finish.glass",
           "segments": 6
         }
-      ],
-      "url": "../../models/garden/fountain.glb",
-      "materials": {
-        "*": {
-          "finish": "material.finish.matte"
-        },
-        "water": {
-          "finish": "material.finish.gloss"
-        }
-      }
+      ]
     },
     "model.garden.lantern": {
       "type": "model",
+      "url": "../../models/garden/lantern.glb",
+      "materials": {
+        "glow": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        }
+      },
       "placeholder": [
         {
           "shape": "cylinder",
@@ -833,19 +866,40 @@
           "material": "material.finish.matte",
           "segments": 4
         }
-      ],
-      "url": "../../models/garden/lantern.glb",
-      "materials": {
-        "*": {
-          "finish": "material.finish.matte"
-        },
-        "glow": {
-          "finish": "material.finish.satin"
-        }
-      }
+      ]
     },
     "model.garden.wheelbarrow": {
       "type": "model",
+      "url": "../../models/garden/wheelbarrow.glb",
+      "materials": {
+        "flower_pink": {
+          "finish": "material.finish.satin"
+        },
+        "flower_white": {
+          "finish": "material.finish.satin"
+        },
+        "flower_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "metal_dark": {
+          "finish": "material.finish.matte"
+        },
+        "paint": {
+          "finish": "material.finish.metal"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
       "placeholder": [
         {
           "shape": "box",
@@ -1256,34 +1310,28 @@
           "noise": 0.2,
           "segments": 1
         }
-      ],
-      "url": "../../models/garden/wheelbarrow.glb",
-      "materials": {
-        "*": {
-          "finish": "material.finish.satin"
-        },
-        "paint": {
-          "finish": "material.finish.metal"
-        },
-        "metal": {
-          "finish": "material.finish.metal"
-        },
-        "metal_dark": {
-          "finish": "material.finish.matte"
-        },
-        "soil": {
-          "finish": "material.finish.matte"
-        },
-        "wood": {
-          "finish": "material.finish.wood"
-        },
-        "leaf": {
-          "finish": "material.finish.foliage"
-        }
-      }
+      ]
     },
     "model.garden.boulder": {
       "type": "model",
+      "url": "../../models/garden/boulder.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "moss": {
+          "finish": "material.finish.foliage"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "stone_warm": {
+          "finish": "material.finish.matte"
+        }
+      },
       "placeholder": [
         {
           "shape": "blob",
@@ -1586,19 +1634,7 @@
           ]
         }
       ],
-      "vary": 0.1,
-      "url": "../../models/garden/boulder.glb",
-      "materials": {
-        "*": {
-          "finish": "material.finish.matte"
-        },
-        "moss": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf": {
-          "finish": "material.finish.foliage"
-        }
-      }
+      "vary": 0.1
     }
   }
 }

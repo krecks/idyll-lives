@@ -44,11 +44,11 @@ parts in the manifests (original, CC0), drawn by `tools/art/furniture.py`, `furn
 models are used.
 
 The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
-`tools/art/blender/garden_decor.py` on the shared `tools/art/blender/gamekit.py` toolkit and exported as `.glb`
+`tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`
 (glTF, original, CC0). The other primitive-part entries stay as the fallback.
 
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
-Blender by `tools/art/blender/kitchen.py` on `gamekit.py` and exported as `.glb` (glTF, original, CC0).
+Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.
 
 ## Generated art (original, CC0)

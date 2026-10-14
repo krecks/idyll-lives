@@ -1,40 +1,22 @@
 {
-  "$comment": "Blender-built kitchen models (tools/art/blender/kitchen.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "$comment": "Blender-built kitchen models (tools/art/blender/families/kitchen.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
   "version": 1,
   "entries": {
     "model.fridge": {
       "type": "model",
-      "url": "../../models/kitchen/fridge.doors.glb",
+      "url": "../../models/kitchen/fridge.glb",
       "materials": {
-        "*": {
+        "body": {
           "finish": "material.finish.gloss"
         },
-        "trim": {
-          "finish": "material.finish.satin"
-        },
-        "seal": {
-          "finish": "material.finish.satin"
-        },
-        "chrome": {
-          "finish": "material.finish.chrome"
-        },
-        "liner": {
-          "finish": "material.finish.matte"
-        },
-        "shelf": {
+        "bottle": {
           "finish": "material.finish.gloss"
         },
         "carton": {
           "finish": "material.finish.satin"
         },
-        "bottle": {
-          "finish": "material.finish.gloss"
-        },
-        "produce": {
-          "finish": "material.finish.satin"
-        },
-        "produce2": {
-          "finish": "material.finish.satin"
+        "chrome": {
+          "finish": "material.finish.chrome"
         },
         "egg": {
           "finish": "material.finish.matte"
@@ -45,7 +27,25 @@
         "icecream": {
           "finish": "material.finish.satin"
         },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
         "peas": {
+          "finish": "material.finish.satin"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "produce2": {
+          "finish": "material.finish.satin"
+        },
+        "seal": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
           "finish": "material.finish.satin"
         }
       },

@@ -4,9 +4,8 @@
 (the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 a new object's
 model is built in Blender and exported as glTF. Files now resize, are picked by what's drawn, load
 once per scene and can have [moving parts](#moving-parts) (branch `v0.3/object-motion`); the rest of
-[Before Blender is the standard](#before-blender-is-the-standard) is still to do. Mind
-[styles](#materials-finishes-tints-styles-and-quality): a model shows on lots only once its style
-variants come from it too.*
+[Before Blender is the standard](#before-blender-is-the-standard) is still to do. The toolkit and
+the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
 
 An object is three things, joined by keys:
 
@@ -14,7 +13,7 @@ An object is three things, joined by keys:
 |---|---|---|
 | The definition: footprint, layer, top, seat, slots, light, interactions, price | `web/public/content/*.json` (`objects`, see [content-packs.md](../content-packs.md#objects)) | The simulation. It never sees the model. |
 | The model entry: file, finishes, fallback | An asset manifest (`model.<family>.<id>`) | The renderer (`render/babylon/models.ts`) |
-| The model: one `.glb` | `web/public/assets/models/<family>/<id>.glb`, exported by a script in `tools/art/blender/` | The art |
+| The model: one `.glb` | `web/public/assets/models/<family>/<id>.glb`, exported by a family script in `tools/art/blender/families/` | The art |
 
 The content must agree with the model (a seat at the seat's height, a top where the top is), and
 the model must fit the footprint the content gives it. Nothing checks that for you yet beyond the
@@ -22,24 +21,25 @@ gate below, so the review does.
 
 ## The short version
 
-1. Write or extend a family script in `tools/art/blender/` on `gamekit.py`, in metres, front −Y,
-   origin at the footprint centre on the floor. Build to the real size; don't stretch to fit.
-2. Name materials for what they are (`stone`, `water`, `tunic`) and map each to one of the game's
-   finishes in the manifest entry's `materials`.
+1. Write or extend a family script in `tools/art/blender/families/` on `gamekit` (copy
+   `_template.py`; the steps are [tools/art/blender/README.md](../../tools/art/blender/README.md)), in
+   metres, front −Y, origin at the footprint centre on the floor. Build to the real size; don't stretch to fit.
+2. Name materials for what they are (`stone`, `water`, `tunic`), each with one of the game's finishes,
+   in the family's `G.Palette`; the pack entry's `materials` is written from it.
 3. Stay in budget: 1–3 draw calls (finish groups), triangles for the size class below.
-4. Export with `gamekit.export_glb` (Blender 5.2 LTS, `--background --factory-startup`).
-5. Register it in the family's pack with `url`, `materials` and the current placeholder as the fallback.
-6. Run `python3 -I -B tools/art/blender/check_glb.py` (no errors) and the Khronos glTF validator
-   (no errors or warnings).
+4. Build with `python3 -B tools/art/blender/build.py <family>` (Blender 5.2 LTS): it exports, and
+5. registers the model in the family's pack with `url`, `materials` and the current placeholder as the
+   fallback, then
+6. runs `check_glb.py` (no errors). Run the Khronos glTF validator too (no errors or warnings).
 7. Look at it next to its placeholder in the gallery, on a lot by day and at night, on WebGPU and
    WebGL2, and in the catalog. Credit it. Commit only the files you changed.
 
 ## Tools and folders
 
-- **Blender 5.2 LTS**, run from scripts: `Blender --background --factory-startup --python <script>`.
-  `gamekit.py` warns on another version. The committed files were exported with 5.2.2 (glTF I/O
+- **Blender 5.2 LTS**, run from scripts by `build.py` (`Blender --background --factory-startup --python
+  families/<family>.py`). `gamekit` warns on another version. The committed files were exported with 5.2.2 (glTF I/O
   5.2.40). A new LTS is adopted by re-exporting every family and checking the shots, in one commit.
-- **Scripts are the source.** A model is built by Python on `gamekit.py` (primitives, `revolve`,
+- **Scripts are the source.** A model is built by Python on `gamekit` (primitives, `revolve`,
   `rock`, bevels, `join_all`), so its source is reviewable text and re-exporting is one command.
   A shape that can't reasonably be scripted may come from a `.blend` file next to its script,
   saved compressed and under 2 MB; the export still runs from the script, so the settings stay fixed.
@@ -47,15 +47,15 @@ gate below, so the review does.
 
 | What | Where | Name |
 |---|---|---|
-| Shared toolkit | `tools/art/blender/gamekit.py` | |
-| A family's script | `tools/art/blender/<family>.py` | `garden_decor.py` builds `model.garden.*` |
+| Shared toolkit | `tools/art/blender/gamekit/` | `import gamekit as G` |
+| The runner | `tools/art/blender/build.py` | `build.py <family> [--only <id>] [--preview]` |
+| A family's script | `tools/art/blender/families/<family>.py` | `garden_decor.py` builds `model.garden.*`; `_template.py` to copy |
 | The models | `web/public/assets/models/<family>/<id>.glb` | the key's last part: `model.garden.gnome` → `garden/gnome.glb` |
-| Style variants of another shape | the same folder | `<id>@<style>.glb` (only when the shape differs, below) |
 | Their manifest entries | `web/public/assets/packs/<family>/manifest.json`, listed in the base manifest's `packs` | |
-| Previews (`-- --preview`, `check_glb.py -- --preview`) | `tools/art/blender/previews/` (ignored by git) | `<id>.png`, `rt_<id>.png` |
+| Previews (`build.py <family> --preview`, `check_glb.py -- --preview`) | `tools/art/blender/previews/` (ignored by git) | `<id>.png`, `<id>@<clip>.png`, `rt_<id>.png` |
 
-  Inside the file: one mesh object per model, named as the id; one material per colour, named for
-  what it is. Material names are the keys the manifest maps, so renaming one is a manifest change.
+  Inside the file: one mesh object per model, named as the id (one per moving part, below); one
+  material per colour, named for what it is. Material names are the keys the manifest maps, so renaming one is a manifest change.
 - **Exports aren't byte for byte repeatable.** Blender 5.2's exporter writes the same triangles
   in a different order on every run. Re-export, then commit only the models you meant to change
   (`git checkout` the others).
@@ -74,11 +74,12 @@ gate below, so the review does.
   stays inside it with a few centimetres to spare, unless it is meant to meet its neighbour (a
   counter run). The contact shadow (1.15 × the footprint) and buy mode's checks follow the
   footprint; picking follows the drawn outline.
-- **Real size, uniform scale.** Build to the object's real size. `gamekit.fit` scales each axis
-  on its own to hit an exact box; it stretched the garden lantern's hexagon 15 % wider than deep and
-  squashed the boulders to 75 % of their depth and 120 % of their height. Use it only to check
-  (`fit` should assert the size within a few per cent), and the manifest's `fit` only for
-  third-party files.
+- **Real size, uniform scale.** Build to the object's real size; `G.settle` stands it on the floor,
+  centred, by moving it, and the family's `G.Model(size=…, tolerance=…)` asserts its size (2 % by
+  default). `gamekit.fit` scales each axis on its own to hit an exact box: it stretched the garden
+  lantern's hexagon 15 % wider than deep and squashed the boulders to 75 % of their depth and 120 % of
+  their height, until the garden decor was rebuilt at real size (2026-10-14). It, and the manifest's
+  `fit`, are for third-party files only.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width. Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
@@ -176,16 +177,18 @@ finish it uses.
 ## Moving parts
 
 A door, a lid or a drawer that moves while residents use the object: one node per moving part in
-the file, moved by a clip of its own. The fridge's doors (`kitchen_doors.py`) are the example.
+the file, moved by a clip of its own. The fridge's doors (`families/kitchen.py`) and the template's lid
+and drawer (`families/_template.py`) are the examples; `G.hinged`, `G.swing` and `G.slide` do the work.
 
 - **One node per part, its origin on the hinge** (or where a drawer slides from), named for what it
   is (`door_fridge`). What moves with it is joined into it or parented to it (the handle). The rest
   of the model is one node (`cabinet`). Parts inside parts move only with their own clip.
-- **One clip per part**, named `<part>_open` (an NLA track of that name; `gamekit.export_glb(…,
-  clips=True)` writes the tracks). Its first key is the rest pose, where the file has the part and
-  where the game draws it closed: frame 1 when exporting. Rotation (and translation, scale) of the
+- **One clip per part**, named `<part>_open` (an NLA track of that name, made by `G.swing` or
+  `G.slide`; the build exports the tracks when a model has any). Its first key is the rest pose, where
+  the file has the part and where the game draws it closed: frame 1 when exporting. Add the clips after
+  `G.settle`. Rotation (and translation, scale) of the
   node only. Two keys are enough; the game blends between samples of the clip, 30 a second.
-- **When it plays** is the pack entry's `motions` (`objectMotion.ts`): the clip a use plays, by the
+- **When it plays** is the pack entry's `motions` (`objectMotion.ts`; the family's `G.Model(motions=…)`): the clip a use plays, by the
   interaction's id or its animation tag, and `hold`, the seconds after a use starts that the clip
   plays back (absent: when the use ends). Time is the residents' animation time: still while paused,
   faster at higher speeds.
@@ -202,7 +205,7 @@ the file, moved by a clip of its own. The fridge's doors (`kitchen_doors.py`) ar
 
 ## Export settings
 
-`gamekit.export_glb` holds them; don't export by hand.
+`gamekit.export_glb` holds them (`gamekit/export.py`); don't export by hand.
 
 | Setting | Value | Why |
 |---|---|---|
@@ -255,8 +258,8 @@ the file, moved by a clip of its own. The fridge's doors (`kitchen_doors.py`) ar
   ```
   A pack's entry replaces the base entry whole, so it carries a copy of the placeholder (the
   fallback when the file fails to load) and the base entry's other fields (`vary`). The family
-  script should write its pack from the base manifest at export time rather than by hand;
-  `check_glb.py` warns when a copy has gone stale. `scale`, `rotationY`, `offset` and `fit` are for
+  script writes its pack from the manifests at export time (`G.write_pack`, called by the build), never
+  by hand; `check_glb.py` warns when a copy has gone stale. `scale`, `rotationY`, `offset` and `fit` are for
   third-party files; a model built to this standard needs none of them. `parts` adds primitive
   parts drawn with the file.
 - **A new object** also needs its content definition (footprint, interactions, price, category)
@@ -278,15 +281,15 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 
 ## Review checklist
 
-- [ ] Built by a script in `tools/art/blender/` on `gamekit.py`, Blender 5.2 LTS; re-exports with one command.
+- [ ] Built by a family script in `tools/art/blender/families/` on `gamekit`, Blender 5.2 LTS; re-exports with `build.py <family>`.
 - [ ] Real size, no stretching; origin at the footprint centre on the floor (or the layer's rule); front −Y in Blender.
 - [ ] Inside its footprint; heights and tops agree with the content (`seat`, `surface`, `light`, `slots`).
 - [ ] Every material mapped to a finish; 1–3 draw calls; triangles within the target for its size (half for things placed many times).
 - [ ] No emissive, no see-through except `glass`, no textures of its own unless needed (then ≤ 512 px).
 - [ ] `check_glb.py` passes; the Khronos validator reports nothing.
 - [ ] Gallery next to the placeholder; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
-- [ ] Style variants: one entry per style, colours by `materials` unless the shape differs.
-- [ ] Pack entry with `url`, `materials` and the current placeholder; base manifest lists the pack.
+- [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
+- [ ] Pack entry with `url`, `materials` and the current placeholder (written by the build); base manifest lists the pack.
 - [ ] CREDITS.md updated; only the changed `.glb` files committed; previews not committed.
 
 ## The placeholders: migrate or keep
@@ -306,7 +309,7 @@ tabletop things, street props placed by the thousand, anything with a mirror, an
 
 What the engine (`render/babylon/models.ts` and around) must do first, most important first.
 Placement, turning, height, shadows, contact shadows, footprints, the fallback when a file fails,
-WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and style colours already
+WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and player colours (`paint`) already
 work for files.
 
 1. ~~**Resizing (blocker).**~~ Done: a file's vertices take the same edge bands and rise line as
