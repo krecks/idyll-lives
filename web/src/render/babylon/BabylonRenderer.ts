@@ -3174,7 +3174,7 @@ export class BabylonRenderer implements Renderer {
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           pop: { meshes: template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
-        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open });
+        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth });
         if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
       });
       // At rest, the parts are where the body is.

@@ -90,6 +90,23 @@ def squash(obj, clip, scale, seconds=0.6, back=False):
     return _peak(obj, clip, (1 + end) // 2 if back else end)
 
 
+def stages(obj, clip, picked, growing, planted, seconds=1.5):
+    """A crop's growth clip `clip` (`motions.growth`) for `obj`: the scale of it at each growth stage,
+    times its size at rest, which is ripe. A number for every axis or (x, y, z) Blender; 0.001 hides
+    it. The game holds the clip where the stage is: ripe at rest, picked a third of the way, growing two
+    thirds, planted at the end, and plays it on from stage to stage. The fruit: picked=0.001,
+    growing=0.001, planted=0.001; the plants: picked=1, growing=0.6, planted=0.25."""
+    end = last_frame(seconds)
+    frames = [1, 1 + (end - 1) / 3, 1 + 2 * (end - 1) / 3, end]
+    each = [k if isinstance(k, (tuple, list)) else (k,) * 3 for k in (1, picked, growing, planted)]
+    for i in range(3):
+        if any(k[i] != 1 for k in each):
+            rest = obj.scale[i]
+            _clip(obj, clip, 'scale', i, [(round(f), rest * k[i]) for f, k in zip(frames, each)])
+    assert obj.animation_data and obj.animation_data.nla_tracks.get(clip), f'stages {clip!r}: the same at every stage'
+    return obj
+
+
 def grow(obj, clip, seconds=0.4, axis='Z'):
     """A clip `clip` scaling `obj` about its own origin along `axis` ('X', 'Y' or 'Z', Blender) from
     where it is (built small and hidden) to full size (scale 1): a part that appears while a resident

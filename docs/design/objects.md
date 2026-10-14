@@ -230,6 +230,15 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "night": "close" }
   ```
+- **Growth:** a crop (content `grows`: planted, growing, ripe, picked) holds its `growth` clip where
+  its stage is: ripe at rest (the catalog picture, the fallback's look), picked a third of the way
+  along (the crop gone), growing two thirds (smaller) and just planted at the end (seedlings). From
+  stage to stage it plays on at the clip's pace: a harvest shrinks the crop away, replanting the
+  plants, and growing goes back through picked (no crop yet) to ripe. `G.stages` makes it, a scale
+  per stage for each part. A game loaded shows each crop at its stage without playing.
+  ```json
+  "motions": { "growth": "grow" }
+  ```
 - **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
   `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip
   held open while it is: the wall bed stays down after *Fold down* or a night's sleep until *Fold up*

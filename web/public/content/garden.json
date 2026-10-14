@@ -1425,6 +1425,9 @@
     },
     {
       "id": "garden.vegPatch",
+      "grows": {
+        "days": 2
+      },
       "name": "Vegetable patch",
       "model": "model.garden.vegPatch",
       "price": 90,
@@ -1454,6 +1457,8 @@
         },
         {
           "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Harvest vegetables",
           "anim": "harvest",
           "minutes": 20,
@@ -1478,6 +1483,9 @@
     },
     {
       "id": "garden.tomatoes",
+      "grows": {
+        "days": 3
+      },
       "name": "Tomato plants",
       "model": "model.garden.tomatoes",
       "price": 75,
@@ -1507,6 +1515,8 @@
         },
         {
           "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Pick tomatoes",
           "anim": "harvest",
           "minutes": 20,
@@ -1531,6 +1541,9 @@
     },
     {
       "id": "garden.strawberries",
+      "grows": {
+        "days": 2
+      },
       "name": "Strawberry bed",
       "model": "model.garden.strawberries",
       "price": 85,
@@ -1560,6 +1573,8 @@
         },
         {
           "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Pick strawberries",
           "anim": "harvest",
           "minutes": 20,
@@ -1630,6 +1645,9 @@
     },
     {
       "id": "garden.pumpkins",
+      "grows": {
+        "days": 4
+      },
       "name": "Pumpkin patch",
       "model": "model.garden.pumpkins",
       "price": 80,
@@ -1659,6 +1677,8 @@
         },
         {
           "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Harvest a pumpkin",
           "anim": "harvest",
           "minutes": 20,

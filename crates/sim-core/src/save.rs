@@ -40,7 +40,8 @@
 //! the player chose (`objects[].color`, `#rrggbb`; absent: as made) instead of a style (older
 //! files' object and household `style` is ignored); 25 = objects can be open (`objects[].open`: a
 //! wall bed folded down; absent: closed); 26 = a colour per part (`objects[].colors`, `#rrggbb` by
-//! the model's material name; an older file's `color` goes on the `body`). Older files load. Saves
+//! the model's material name; an older file's `color` goes on the `body`); 27 = crops grow
+//! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -58,7 +59,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 26;
+pub const SAVE_VERSION: u32 = 27;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -273,6 +274,9 @@ pub struct ObjectSave {
     /// Open (a wall bed folded down; absent before v25, or closed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub open: bool,
+    /// A crop's growth (see `ObjectInstance::growth`; absent before v27, or not a crop: ripe).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub growth: Option<f32>,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -631,6 +635,7 @@ impl World {
                 size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
                 tall: o.tall,
                 open: o.open,
+                growth: content.objects[o.def].grows.is_some().then_some(o.growth),
             })
             .collect();
         let sims = self
@@ -998,6 +1003,7 @@ impl World {
                 world.objects[id as usize].offset = offset;
                 world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
                 world.objects[id as usize].open = o.open;
+                world.objects[id as usize].growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
                 object_ids.insert(i as u32, id);
             }
         }

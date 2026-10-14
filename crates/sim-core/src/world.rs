@@ -117,7 +117,25 @@ pub struct ObjectInstance {
     /// Open (a wall bed folded down, a door or lid open): set by the interactions that open or
     /// close it (`Interaction::leaves`), and what some are offered for (`Interaction::when`).
     pub open: bool,
+    /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
+    /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
+    pub growth: f32,
 }
+
+/// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer
+/// shows (the model's `motions.growth` clip). The numbers are the view's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrowthStage {
+    Planted = 0,
+    Growing = 1,
+    Ripe = 2,
+    Picked = 3,
+}
+
+/// Share of the way to ripe at which a crop shows as growing rather than just planted.
+const GROWING_FROM: f32 = 1.0 / 3.0;
+/// Game minutes between crops' growth steps.
+const GROWTH_STEP_MINUTES: u64 = 15;
 
 /// Something that happened while a resident stepped, for the story (applied after the step).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -137,7 +155,24 @@ impl ObjectInstance {
     /// Whether its state lets resident `me` do `inter` now: open or closed as the interaction
     /// wants (`when`), and nothing closed on someone else using it (or on their way to).
     pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
-        inter.when.is_none_or(|w| w == self.open) && (inter.leaves != Some(false) || self.users().all(|u| u == me))
+        inter.when.is_none_or(|w| w == self.open)
+            && (!inter.ripe || self.ripe())
+            && (inter.leaves != Some(false) || self.users().all(|u| u == me))
+    }
+
+    /// Its crop is ripe (see `growth`).
+    pub fn ripe(&self) -> bool {
+        self.growth >= 1.0
+    }
+
+    /// Its crop's stage (for a kind that `grows`).
+    pub fn growth_stage(&self) -> GrowthStage {
+        match self.growth {
+            g if g < 0.0 => GrowthStage::Picked,
+            g if g >= 1.0 => GrowthStage::Ripe,
+            g if g >= GROWING_FROM => GrowthStage::Growing,
+            _ => GrowthStage::Planted,
+        }
     }
 
     pub fn users(&self) -> impl Iterator<Item = u32> + '_ {
@@ -1301,6 +1336,8 @@ impl World {
             value: 0,
             wear: 0.0,
             open: false,
+            // A crop comes ripe (as the catalog shows it).
+            growth: 1.0,
         };
         let name = &self.content.objects[def].id;
         let layer = self.content.objects[def].layer;
@@ -2255,6 +2292,33 @@ impl World {
         if tick.is_multiple_of(TICKS_PER_DAY) {
             self.relationships.decay(&self.content.social_rules);
         }
+        if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
+            self.grow(GROWTH_STEP_MINUTES as f32);
+        }
+    }
+
+    /// Crops grow by `minutes`: fallow ground is planted again, what's planted ripens. A crop
+    /// that shows another stage changes how the lot looks.
+    fn grow(&mut self, minutes: f32) {
+        let mut changed = false;
+        for o in &mut self.objects {
+            let Some(g) = self.content.objects[o.def].grows else { continue };
+            if o.growth >= 1.0 {
+                continue;
+            }
+            let before = o.growth_stage();
+            o.growth = if o.growth < 0.0 {
+                // Fallow, then planted afresh (from nothing: 0).
+                let fallow = o.growth + minutes / (g.fallow_days.max(1.0 / 1440.0) * 1440.0);
+                if fallow >= 0.0 { 0.0 } else { fallow }
+            } else {
+                (o.growth + minutes / (g.days * 1440.0)).min(1.0)
+            };
+            changed |= o.growth_stage() != before;
+        }
+        if changed {
+            self.structure_version = self.structure_version.wrapping_add(1);
+        }
     }
 
     /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
@@ -2455,6 +2519,7 @@ impl World {
                     return Err(Error::new(match inter.when {
                         Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
                         Some(w) if w != obj.open => format!("the {name} is closed"),
+                        _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
                         _ => format!("someone is using the {name}"),
                     }));
                 }
@@ -4206,6 +4271,11 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 && objects[object as usize].open != open
             {
                 objects[object as usize].open = open;
+                sim.reshaped = true;
+            }
+            // A crop picked as the harvest starts: it lies fallow, then grows again.
+            if inter.picks && objects[object as usize].growth >= 0.0 {
+                objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
             }
         }

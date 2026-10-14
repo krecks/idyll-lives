@@ -8,7 +8,8 @@
  *   closing again (played backwards);
  * - a loop (`loops`): at rest, then round after round, stopping at rest;
  * - the ambient clip (`idle`): round after round, always, alongside the others;
- * - the growth clip (`growth`): held at each stage in turn (planted, growing, ripe, picked).
+ * - the growth clip (`growth`): each stage in turn (planted, growing, ripe, picked), moving on to the
+ *   next at the clip's pace, as the game does (`GROWTH_TIMES`).
  *
  * URL: `?keys=model.fridge,model.sink` (which models; default every model whose entry has `motions`),
  * `?clip=water_on` (only that clip), `?t=0.2` (hold every clip at that time, for screenshots),
@@ -41,6 +42,7 @@ import { compressedTextureFeatures } from '../render/babylon/loaders';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { buildModel, clipPose, painted, type ModelClip, type ModelTemplate } from '../render/babylon/models';
 import { installNature } from '../render/babylon/nature';
+import { GROWTH_TIMES } from '../render/babylon/objectMotion';
 
 /** How a clip plays (see the file header). */
 type Kind = 'use' | 'loop' | 'idle' | 'growth';
@@ -49,9 +51,8 @@ type Kind = 'use' | 'loop' | 'idle' | 'growth';
 const REST = 0.9;
 const HOLD = 1.6;
 const RUNNING = 2.4;
-/** Growth stages (as the sim's: planted, growing, ripe, picked) and how long each shows. */
-const STAGES = 4;
-const STAGE = 1.1;
+/** How long each growth stage shows (planted, growing, ripe, picked), moving on from the one before included. */
+const STAGE = 1.6;
 /** Metres between the models, past their own sizes. */
 const GAP = 0.6;
 
@@ -190,14 +191,20 @@ ground.receiveShadows = true;
 function turnLength({ kind, clip }: Shown): number {
   const d = clip.duration;
   if (kind === 'loop') return REST + d * Math.max(2, Math.ceil(RUNNING / Math.max(d, 1e-3)));
-  if (kind === 'growth') return STAGES * STAGE;
+  if (kind === 'growth') return GROWTH_TIMES.length * STAGE;
   return REST + d + HOLD + d;
 }
 
 /** How far into its clip a turn is at `t` seconds into it. */
 function clipTime({ kind, clip }: Shown, t: number): number {
   const d = clip.duration;
-  if (kind === 'growth') return (Math.min(Math.floor(t / STAGE), STAGES - 1) / (STAGES - 1)) * d;
+  if (kind === 'growth') {
+    const n = GROWTH_TIMES.length;
+    const stage = Math.min(Math.floor(t / STAGE), n - 1);
+    const from = GROWTH_TIMES[(stage + n - 1) % n] * d;
+    const to = GROWTH_TIMES[stage] * d;
+    return from + Math.sign(to - from) * Math.min(Math.abs(to - from), t - stage * STAGE);
+  }
   if (t < REST) return 0;
   t -= REST;
   if (kind === 'loop') return d > 0 ? t % d : 0;

@@ -1052,8 +1052,10 @@ export async function startSession(
     // Dining at a table only at a chair pulled up to one; folding down only what's folded up.
     const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
     const state = placement.open ? 'open' : 'closed';
+    // A crop is harvested only ripe (growth stage 2).
+    const offered = (when: string | undefined) => !when || (when === 'ripe' ? placement.growth === undefined || placement.growth === 2 : when === state);
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      (it.needsTable && !atTable) || (it.when && it.when !== state) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
+      (it.needsTable && !atTable) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;

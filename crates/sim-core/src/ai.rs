@@ -174,6 +174,8 @@ mod tests {
             eats: None,
             when: None,
             leaves: None,
+            ripe: false,
+            picks: false,
         }
     }
 

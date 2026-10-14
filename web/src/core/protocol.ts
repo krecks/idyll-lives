@@ -340,6 +340,8 @@ export interface ObjectPlacement {
   wear?: number;
   /** Open (a wall bed folded down): set by interactions that open or close it (`leaves`). */
   open?: boolean;
+  /** A crop's stage (content `grows`): 0 planted, 1 growing, 2 ripe, 3 picked; absent for other things. */
+  growth?: number;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }

@@ -126,6 +126,12 @@ pub struct Interaction {
     /// so (content `leaves`): folding a wall bed down, going to sleep in it. Nothing closes an
     /// object someone else is using.
     pub leaves: Option<bool>,
+    /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
+    /// `ObjectInstance::growth`).
+    pub ripe: bool,
+    /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
+    /// planted again and grows (see `ObjectDef::grows`).
+    pub picks: bool,
 }
 
 impl Interaction {
@@ -151,6 +157,14 @@ impl Interaction {
         self.feeling
             .filter(|_| skilled && elapsed >= self.minutes * 0.5)
     }
+}
+
+/// How a crop grows (content `grows`): game days from planted to ripe, and lying fallow after
+/// it is picked, before it is planted again.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Growth {
+    pub days: f32,
+    pub fallow_days: f32,
 }
 
 #[derive(Debug)]
@@ -209,6 +223,9 @@ pub struct ObjectDef {
     /// Buy catalog group (`""`: none): things of one group with a use in common are the same
     /// kind of thing (see `planner::wanted_object`).
     pub group: String,
+    /// A crop that grows (content `grows`): bought ripe, picked by interactions that leave it
+    /// "picked", then fallow, planted again and growing (see `ObjectInstance::growth`).
+    pub grows: Option<Growth>,
 }
 
 impl ObjectDef {
@@ -1984,6 +2001,21 @@ struct ObjectRaw {
     stations: Vec<String>,
     #[serde(default)]
     stores: bool,
+    /// A crop that grows (see `ObjectDef::grows`).
+    #[serde(default)]
+    grows: Option<GrowsRaw>,
+}
+
+/// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
+#[derive(Deserialize)]
+struct GrowsRaw {
+    days: f32,
+    #[serde(default = "half_a_day")]
+    fallow: f32,
+}
+
+fn half_a_day() -> f32 {
+    0.5
 }
 
 #[derive(Deserialize)]
@@ -2068,12 +2100,15 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
 }
 
-/// An object's state for `when` and `leaves` (see `ObjectInstance::open`).
+/// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
+/// (`when`: "ripe", `leaves`: "picked"; see `ObjectInstance::growth`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum OpenState {
     Open,
     Closed,
+    Ripe,
+    Picked,
 }
 
 /// An interaction's `eat`: the item handed over and how long eating it takes.
@@ -2529,9 +2564,25 @@ impl Content {
                     recipe,
                     after,
                     eats,
-                    when: it.when.map(|s| s == OpenState::Open),
-                    leaves: it.leaves.map(|s| s == OpenState::Open),
+                    when: match it.when {
+                        Some(OpenState::Open) => Some(true),
+                        Some(OpenState::Closed) => Some(false),
+                        _ => None,
+                    },
+                    leaves: match it.leaves {
+                        Some(OpenState::Open) => Some(true),
+                        Some(OpenState::Closed) => Some(false),
+                        _ => None,
+                    },
+                    ripe: it.when == Some(OpenState::Ripe),
+                    picks: it.leaves == Some(OpenState::Picked),
                 });
+                if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
+                    return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
+                }
+                if (it.when == Some(OpenState::Ripe) || it.leaves == Some(OpenState::Picked)) && obj.grows.is_none() {
+                    return Err(Error::new(format!("{ctx}: \"ripe\" and \"picked\" are a crop's: give the object `grows`")));
+                }
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
                 return Err(Error::new(format!("duplicate object id '{}'", obj.id)));
@@ -2680,6 +2731,13 @@ impl Content {
                 stations,
                 stores: obj.stores,
                 group: obj.group.clone().unwrap_or_default(),
+                grows: match &obj.grows {
+                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
+                    Some(_) => {
+                        return Err(Error::new(format!("object '{}': `grows` needs days > 0 and fallow >= 0", obj.id)));
+                    }
+                    None => None,
+                },
             });
         }
 

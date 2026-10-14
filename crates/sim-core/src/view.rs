@@ -1417,6 +1417,9 @@ struct ObjectView<'a> {
     /// Open (a wall bed folded down): see `ObjectInstance::open`.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     open: bool,
+    /// A crop's stage (`GrowthStage`: 0 planted, 1 growing, 2 ripe, 3 picked); none for other things.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    growth: Option<u8>,
     w: i32,
     d: i32,
     quality: u8,
@@ -1636,6 +1639,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
                 open: o.open,
+                growth: world.content.objects[o.def].grows.is_some().then(|| o.growth_stage() as u8),
                 w,
                 d,
                 quality: o.quality,

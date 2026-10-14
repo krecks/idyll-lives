@@ -295,6 +295,9 @@
     },
     {
       "id": "raisedBed",
+      "grows": {
+        "days": 2
+      },
       "name": "Raised vegetable bed",
       "model": "model.raisedBed",
       "footprint": [
@@ -329,6 +332,8 @@
         },
         {
           "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Harvest vegetables",
           "anim": "harvest",
           "minutes": 20,

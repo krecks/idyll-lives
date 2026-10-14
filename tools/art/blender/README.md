@@ -158,6 +158,7 @@ The clips gamekit makes:
 | `G.squash(part, clip, scale, seconds, back=False)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again | a cushion sinking, a bag flattening, something hidden while held (0.001) |
 | `G.spin(part, clip, turns, seconds, axis='Z')` | whole turns at an even speed, ending at rest | wheels, platters, fans, the train |
 | `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
+| `G.stages(part, clip, picked, growing, planted, seconds)` | a crop's scale at each growth stage, ripe at rest | vegetables, fruit, a veggie bed |
 
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
 end where they start, so they also loop (`motions.loops`, `idle`). Keep a spin under about a turn a
@@ -183,6 +184,9 @@ How the parts work:
   - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
     on the Low preset. It too ends where it starts.
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
+  - `{'growth': 'grow'}`: a crop's clip, held where its growth stage is (content `grows`). Make it with
+    `G.stages(part, 'grow', picked=…, growing=…, planted=…)`, a scale per stage (ripe is the rest
+    pose): the fruit `0.001, 0.001, 0.001`, the plants `1, 0.6, 0.25`.
   - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.
@@ -249,7 +253,7 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
-| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home); `clips` |
+| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |

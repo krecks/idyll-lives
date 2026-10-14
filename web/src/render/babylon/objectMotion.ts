@@ -5,7 +5,8 @@
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
- * whoever is asleep. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
+ * whoever is asleep. A crop's `motions.growth` clip is held where its growth stage is, moving on
+ * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time, but only within `ambientRange` of the camera (none on Low), without the
  * shadows being redrawn for it. Each instance's parts draw from buffers of their own
  * (`MovingTarget`), written only while something moves.
@@ -30,7 +31,17 @@ export interface MovingObject {
   interactions: readonly string[];
   /** Open (the placement's `open`): its `motions.open` clip is held open. */
   open?: boolean;
+  /** A crop's growth stage (the placement's `growth`: 0 planted, 1 growing, 2 ripe, 3 picked). */
+  stage?: number;
 }
+
+/**
+ * Where a crop's growth clip stands (shares of it) for each stage, planted to picked: ripe at
+ * rest (the catalog's picture), then picked (the crop gone), growing (smaller) and just planted
+ * (seedlings). Each stage moves on to the next along it: picking plays forward to picked, planting
+ * on to planted, growing back through growing and picked (no crop yet) to ripe.
+ */
+export const GROWTH_TIMES = [1, 2 / 3, 0, 1 / 3];
 
 /** A clip of one object: how far it has played, and what plays it. */
 interface ClipState {
@@ -42,7 +53,7 @@ interface ClipState {
   /** Animation time it plays back from (Infinity: when the use ends). */
   until: number;
   /** Opens and closes (a use's, or held open), goes round while used (`loops`), or goes round always (`idle`). */
-  kind: 'use' | 'loop' | 'idle';
+  kind: 'use' | 'loop' | 'idle' | 'growth';
 }
 
 /** A clip a use wants this frame. */
@@ -101,6 +112,12 @@ export class ObjectMotion {
     // opening; what opens later (`update`) opens on screen.
     for (const o of objects) {
       if (before.has(o.id)) continue;
+      const growth = this.growth(o);
+      if (growth) {
+        let clips = this.states.get(o.id);
+        if (!clips) this.states.set(o.id, (clips = new Map()));
+        clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, kind: 'growth' });
+      }
       for (const name of this.held(o)) {
         const clip = o.motion.clips.get(name);
         if (!clip) continue;
@@ -124,6 +141,13 @@ export class ObjectMotion {
     this.objects.clear();
     this.states.clear();
     this.night = null;
+  }
+
+  /** A crop's growth clip and where its stage has it (seconds), if it has both. */
+  private growth(o: MovingObject): { name: string; clip: ModelClip; at: number } | undefined {
+    const name = o.motions.growth;
+    const clip = name !== undefined && o.stage !== undefined ? o.motion.clips.get(name) : undefined;
+    return clip ? { name: name!, clip, at: (GROWTH_TIMES[o.stage!] ?? 0) * clip.duration } : undefined;
   }
 
   /** The clips `o` holds open now: its `open` one while open, its `night` one at night. */
@@ -157,7 +181,8 @@ export class ObjectMotion {
       const held = this.held(o);
       const idle = o.motions.idle !== undefined && reach > 0 && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
       let clips = this.states.get(id);
-      if ((wanted || held.length || idle) && !clips) this.states.set(id, (clips = new Map()));
+      const growth = this.growth(o);
+      if ((wanted || held.length || idle || growth) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
       for (const name of held) {
         const clip = o.motion.clips.get(name);
@@ -165,6 +190,7 @@ export class ObjectMotion {
       }
       // The first lighting of a world: night clips as it is, without playing.
       const snap = this.snapNight && o.motions.night !== undefined ? o.motions.night : undefined;
+      if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, kind: 'growth' });
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, kind: 'idle' });
       let changed = false;
@@ -190,6 +216,15 @@ export class ObjectMotion {
             state.time = (state.time + dt) % d;
             drifted = true;
           }
+          continue;
+        }
+        if (state.kind === 'growth') {
+          // On towards where the stage has it.
+          const at = growth?.name === name ? growth.at : 0;
+          const time = state.time < at ? Math.min(at, state.time + dt) : Math.max(at, state.time - dt);
+          if (time !== state.time) changed = true;
+          state.time = time;
+          if (!growth && !time) clips.delete(name);
           continue;
         }
         const using = state.use !== '' && wanted?.get(name)?.use === state.use;

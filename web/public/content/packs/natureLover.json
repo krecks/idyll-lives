@@ -37,6 +37,9 @@
   "objects": [
     {
       "id": "natureLover.veggieBed",
+      "grows": {
+        "days": 2
+      },
       "name": "Raised veggie bed",
       "model": "model.natureLover.veggieBed",
       "footprint": [2, 1],
@@ -60,6 +63,8 @@
         },
         {
           "id": "pickSnack",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Pick something fresh",
           "anim": "eat",
           "minutes": 15,

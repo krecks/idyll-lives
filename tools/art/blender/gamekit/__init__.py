@@ -7,7 +7,7 @@
 from .export import export_glb, materials_used, stats, write_pack
 from .family import Family, Model
 from .materials import FINISHES, Palette, mat
-from .motion import clips, grow, rock, slide, spin, squash, swing
+from .motion import clips, grow, rock, slide, spin, squash, stages, swing
 from .parts import check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin, settle, turn
 from .place import GameFrame
 from .preview import preview, preview_clips
@@ -18,6 +18,6 @@ __all__ = [
     'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'boulder', 'check_size', 'clips',
     'cone', 'cosd', 'cube', 'cylinder', 'export_glb', 'fit', 'game_size', 'grow', 'hinged', 'join', 'join_all', 'mat',
     'materials_used', 'measure', 'meshes', 'new_parts', 'preview', 'preview_clips', 'reset', 'revolve', 'rock',
-    'rod', 'set_origin', 'settle', 'sind', 'slide', 'sphere', 'spin', 'squash', 'stats', 'swing', 'torus', 'turn',
+    'rod', 'set_origin', 'settle', 'sind', 'slide', 'sphere', 'spin', 'squash', 'stages', 'stats', 'swing', 'torus', 'turn',
     'write_pack',
 ]
