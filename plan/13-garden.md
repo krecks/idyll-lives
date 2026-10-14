@@ -5,7 +5,11 @@ the shader, `vary` for natural variation, `*.far` keys for distance). A Blender 
 with the `foliage` finish, the trunk or pot as a mesh, and a `.far.glb` (E7) before trees and hedges move over.
 Wind sway stays the shader's job; clips only show a resident's use.
 
-## G1. Houseplants (10)
+The ten G1 houseplants are done (`families/plants.py`, notes in `families/plants.md`): a file's parts on `foliage`
+(and `bark`) are drawn with the shared finish materials the nature shader hooks, so they sway in the wind as the
+placeholders do, with nothing more to build.
+
+## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `houseplants` (Validate › Houseplants)

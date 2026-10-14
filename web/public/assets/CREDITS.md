@@ -47,6 +47,12 @@ The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.js
 `tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`
 (glTF, original, CC0). The other primitive-part entries stay as the fallback.
 
+The houseplants (`models/plants/plant.glb`, `monstera.glb`, `fiddleFig.glb`, `snakePlant.glb`, `cacti.glb`,
+`succulents.glb`, `bostonFern.glb`, `palm.glb`, `orchid.glb`, `bonsai.glb`, override pack
+`packs/plants/manifest.json`) are built in Blender by `tools/art/blender/families/plants.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Their leaves sway in the nature shader's wind; the bonsai's stray sprig
+shrinks away while a resident prunes it. Their primitive-part entries stay as the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.

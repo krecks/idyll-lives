@@ -1,0 +1,311 @@
+{
+  "$comment": "Blender-built potted plants (tools/art/blender/families/plants.py): the G1 houseplants. Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them as it does the placeholders'; the pot is `body`, the part the player colours. The bonsai's stray sprig shrinks away while a resident prunes it.",
+  "version": 1,
+  "entries": {
+    "model.plant": {
+      "type": "model",
+      "url": "../../models/plants/plant.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.monstera": {
+      "type": "model",
+      "url": "../../models/plants/monstera.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.fiddleFig": {
+      "type": "model",
+      "url": "../../models/plants/fiddleFig.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.snakePlant": {
+      "type": "model",
+      "url": "../../models/plants/snakePlant.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.cacti": {
+      "type": "model",
+      "url": "../../models/plants/cacti.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_accent": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.succulents": {
+      "type": "model",
+      "url": "../../models/plants/succulents.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_pink": {
+          "finish": "material.finish.satin"
+        },
+        "sand": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.bostonFern": {
+      "type": "model",
+      "url": "../../models/plants/bostonFern.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.palm": {
+      "type": "model",
+      "url": "../../models/plants/palm.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.orchid": {
+      "type": "model",
+      "url": "../../models/plants/orchid.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_accent": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.bonsai": {
+      "type": "model",
+      "url": "../../models/plants/bonsai.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "moss": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "prune": "trim"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    }
+  }
+}

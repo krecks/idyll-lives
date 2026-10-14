@@ -198,8 +198,9 @@ finish it uses.
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
 - **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance and `*.far`
-  keys (100–250 triangles) for the far woods; a file's `far` serves as its reduced build. Plants also
-  need the nature shader's wind and tint before they come from Blender.
+  keys (100–250 triangles) for the far woods; a file's `far` serves as its reduced build. A file's
+  parts on `foliage` and `bark` take the nature shader's wind and tint, as the placeholders' do
+  (`families/plants.py`).
 
 ## Moving parts
 

@@ -1706,7 +1706,7 @@
       "name": "Monstera",
       "model": "model.garden.monstera",
       "price": 90,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "Big split leaves in a white pot: instant jungle.",
       "interactions": [
@@ -1747,7 +1747,7 @@
       "name": "Fiddle-leaf fig",
       "model": "model.garden.fiddleFig",
       "price": 130,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "A tall indoor tree with big, glossy leaves.",
       "interactions": [
@@ -1788,7 +1788,7 @@
       "name": "Snake plant",
       "model": "model.garden.snakePlant",
       "price": 45,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "Upright striped leaves. Almost impossible to kill.",
       "interactions": [
@@ -1829,7 +1829,7 @@
       "name": "Cactus trio",
       "model": "model.garden.cacti",
       "price": 35,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "Three little cacti in terracotta pots, one of them in bloom.",
       "interactions": [
@@ -1870,7 +1870,7 @@
       "name": "Succulent bowl",
       "model": "model.garden.succulents",
       "price": 40,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "A glazed bowl of rosette succulents in soft colours.",
       "interactions": [
@@ -1911,7 +1911,7 @@
       "name": "Fern on a stand",
       "model": "model.garden.bostonFern",
       "price": 70,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "A Boston fern spilling over its pot on a wooden plant stand.",
       "interactions": [
@@ -1952,7 +1952,7 @@
       "name": "Parlour palm",
       "model": "model.garden.palm",
       "price": 85,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "Soft, arching palm fronds for a bright corner.",
       "interactions": [
@@ -1993,7 +1993,7 @@
       "name": "Orchid",
       "model": "model.garden.orchid",
       "price": 75,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "White and pink orchids on a slim plant stand.",
       "interactions": [
@@ -2047,7 +2047,7 @@
       "name": "Bonsai",
       "model": "model.garden.bonsai",
       "price": 240,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "A tiny, patient tree. Pruning it trains Gardening and Creativity, and a skilled hand finds real calm in it.",
       "interactions": [

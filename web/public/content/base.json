@@ -2696,7 +2696,7 @@
         }
       ],
       "price": 40,
-      "category": "garden",
+      "category": "validate",
       "group": "houseplants",
       "description": "A leafy plant in a terracotta pot."
     },
@@ -3719,6 +3719,10 @@
         {
           "id": "textiles",
           "label": "Textiles"
+        },
+        {
+          "id": "houseplants",
+          "label": "Houseplants"
         }
       ]
     },
