@@ -23,7 +23,8 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 Each tree has a far version (`far_of`): every third clump of each crown, round a smooth core spanning all the full
 crown's clumps (their random numbers drawn as in the full build, so the core is measured, not guessed); conifers
 pointed cones of eight sides. It keeps the tree's size within 5 % at 18–40 % of its triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` placeholder keys whatever the model; they
-now draw a file's own far version when it has one, so the woods match the town. The town overview draws them too.
+now draw a file's own far version, so the woods match the town, and those keys are gone from `nature.py` (a tree
+whose file fails to load falls back to its placeholder at the low level of detail). The town overview draws them too.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|

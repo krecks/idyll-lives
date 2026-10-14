@@ -6,6 +6,7 @@
 # Blender +X into the game's -X: Blender (x, y, z) is the game's (-x, z, -y). `GameFrame` converts.
 from .export import export_glb, materials_used, stats, write_pack
 from .family import Family, Model
+from .far import far_of, is_low, low
 from .materials import FINISHES, Palette, mat
 from .motion import clips, grow, rock, scroll, slide, spin, squash, stages, swing, turns
 from .parts import check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin, settle, turn
@@ -16,8 +17,8 @@ from .shapes import boulder, cone, cube, cylinder, revolve, rod, sphere, torus
 
 __all__ = [
     'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'boulder', 'check_size', 'clips',
-    'cone', 'cosd', 'cube', 'cylinder', 'export_glb', 'fit', 'game_size', 'grow', 'hinged', 'join', 'join_all', 'mat',
-    'materials_used', 'measure', 'meshes', 'new_parts', 'preview', 'preview_clips', 'reset', 'revolve', 'rock',
+    'cone', 'cosd', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'hinged', 'is_low', 'join',
+    'join_all', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'new_parts', 'preview', 'preview_clips', 'reset', 'revolve', 'rock',
     'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'sphere', 'spin', 'squash', 'stages', 'stats', 'swing', 'torus', 'turn', 'turns',
     'write_pack',
 ]

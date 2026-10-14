@@ -1399,6 +1399,69 @@
         }
       ],
       "far": "../../models/plants/pumpkins.far.glb"
+    },
+    "model.bush.small": {
+      "type": "model",
+      "url": "../../models/plants/bushSmall.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/bushSmall.far.glb"
+    },
+    "model.bush.flowering": {
+      "type": "model",
+      "url": "../../models/plants/bushFlowering.glb",
+      "materials": {
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom2": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom3": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/bushFlowering.far.glb"
+    },
+    "model.hedge": {
+      "type": "model",
+      "url": "../../models/plants/streetHedge.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/streetHedge.far.glb"
     }
   }
 }
