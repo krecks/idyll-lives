@@ -155,7 +155,7 @@ done.
 | `lazy.vibePlate` Effortless vibration plate | 1x1 · floor | shake:exercise | fitness / — | Body, Upholstery | Loop (E1) | `shake` (E1). Until then static. |
 | `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Upholstery | Use | `screen_up`: the tablet tilts up for program and story. |
 
-## P11. Loner (6)
+## P11. Loner (6) — **Done** (in Validate › Loner)
 
 - **Family:** `tools/art/blender/families/pack_loner.py`
 - **Validate group:** `loner` (Validate › Loner)

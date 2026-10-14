@@ -29,7 +29,8 @@
     "packs/kitchen_cooking/manifest.json",
     "packs/kitchen_counters/manifest.json",
     "packs/laundry/manifest.json",
-    "packs/pack_bookworm/manifest.json"
+    "packs/pack_bookworm/manifest.json",
+    "packs/pack_loner/manifest.json"
   ],
   "entries": {
     "material.wall": {
