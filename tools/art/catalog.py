@@ -631,7 +631,7 @@ def sofa(w, fabric, legs, leg_fin='wood', arm='box', n=2, depth=0.84, z=-0.04, b
     return p
 
 
-addp('loveseat', sofa(1.84, SAGE, OAK, pillows=[(-0.55, CREAM, 10)]), (2, 1))
+addp('loveseat', shift(sofa(1.84, SAGE, OAK, pillows=[(-0.55, CREAM, 10)]), dz=0.03), (2, 1))   # its back on the wall face
 addp('loveseat@modern', sofa(1.84, '#B9BCBE', BLACKMETAL, 'metal', 'slim', back_h=0.76, leg='post', pillows=[(-0.55, COGNAC, 8)], soft=False), (2, 1))
 addp('loveseat@cozy', sofa(1.84, RUST, WALNUT, arm='roll', back_h=0.86, leg='bun', pillows=[(-0.55, MUSTARD, 12), (0.55, CREAM, -12)]), (2, 1))
 addp('loveseat@minimal', sofa(1.84, LINEN, BIRCH, arm='low', back_h=0.78), (2, 1))
@@ -655,7 +655,7 @@ def sofa3(fabric, base, cushion_col, base_fin='wood', legs=None):
     return p
 
 
-add('sofaThree', placeholder(sofa3('#C9C6BE', OAKD, SAGE)), (3, 1))
+add('sofaThree', placeholder(shift(sofa3('#C9C6BE', OAKD, SAGE), dz=0.03)), (3, 1))
 add('sofaThree@modern', placeholder(sofa3('#9AA4AB', BLACKMETAL, COGNAC, 'metal')), (3, 1))
 add('sofaThree@cozy', placeholder(sofa3('#B98F6A', WALNUT, MUSTARD)), (3, 1))
 add('sofaThree@minimal', placeholder(sofa3(LINEN, BIRCH, '#F2F0EA')), (3, 1))
@@ -678,12 +678,12 @@ def design_sofa(fabric, frame, ffin):
     return p
 
 
-addp('sofaDesign', design_sofa(TEAL, BRASS, 'metal'), (2, 1))
+addp('sofaDesign', shift(design_sofa(TEAL, BRASS, 'metal'), dz=0.037), (2, 1))
 addp('sofaDesign@modern', design_sofa('#D2D4D5', BLACKMETAL, 'metal'), (2, 1))
 addp('sofaDesign@cozy', design_sofa(COGNAC, WALNUT, 'wood'), (2, 1))
 addp('sofaDesign@minimal', design_sofa('#ECE7DD', BIRCH, 'wood'), (2, 1))
 
-addp('armchairLounge', sofa(0.82, SAGE, OAK, n=1))
+addp('armchairLounge', shift(sofa(0.82, SAGE, OAK, n=1), dz=0.03))
 addp('armchairLounge@modern', sofa(0.82, '#B9BCBE', BLACKMETAL, 'metal', 'slim', n=1, back_h=0.76, leg='post', soft=False))
 addp('armchairLounge@cozy', sofa(0.82, RUST, WALNUT, arm='roll', n=1, back_h=0.86, leg='bun', pillows=[(0, MUSTARD, 0)]))
 addp('armchairLounge@minimal', sofa(0.82, LINEN, BIRCH, arm='low', n=1, back_h=0.78))
@@ -702,7 +702,7 @@ for s in (-1, 1):
           box([0.07, 0.035, 0.64], [x, 0.635, -0.01], TEAKF, 'wood', radius=0.012),                         # arm rest
           box([0.04, 0.05, 0.68], [x, 0.3, 0.0], TEAKF, 'wood', radius=0.01)]
 p.append(box([0.66, 0.05, 0.04], [0, 0.92, -0.435], TEAKF, 'wood', radius=0.012))
-addp('armchairLeather', p)
+addp('armchairLeather', shift(p, dz=0.03))
 
 # Design lounge chair: walnut shells with leather cushions on a five-star swivel base.
 PLY, HIDE, ALU = '#6B4630', '#5A3A2A', '#C9CBCC'
@@ -722,7 +722,7 @@ for i in range(5):
     tip = [math.cos(a) * 0.36, 0.03, math.sin(a) * 0.36]
     p += [rod([0, 0.08, 0], tip, 0.04, ALU, 'metal', shape='box', t2=0.03, radius=0.01),
           cyl([0.05, 0.02, 0.05], [tip[0], 0.01, tip[2]], '#2B2C2E', 'satin', segments=8)]
-addp('armchairDesign', p)
+addp('armchairDesign', shift(p, dz=0.04))
 
 # Ottoman (a pouf to sit on): buttoned dark leather on short legs.
 p = [cushion([0.72, 0.34, 0.5], [0, 0.26, 0], '#3A2E2A', 'satin', radius=0.06),
@@ -1889,7 +1889,7 @@ def chemistry(top, legs):
     return p
 
 
-add('chemistrySet', placeholder(chemistry('#E4E3DF', BLACKMETAL)))
+add('chemistrySet', placeholder(shift(chemistry('#E4E3DF', BLACKMETAL), dz=-0.03)))      # back to the wall face
 
 # =============================================================================================
 # Fitness

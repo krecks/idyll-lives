@@ -137,8 +137,8 @@ const DEFAULT_FADE = 0.25;
 
 /** Seat surface height (m) and forward offset of the hips from the object's centre, per object def. */
 const SEATS: Record<string, { h: number; fwd: number }> = {
-  sofa: { h: 0.44, fwd: -0.1 },
-  armchair: { h: 0.42, fwd: -0.02 },
+  sofa: { h: 0.44, fwd: -0.087 },
+  armchair: { h: 0.42, fwd: -0.013 },
   bench: { h: 0.45, fwd: -0.03 },
   toilet: { h: 0.43, fwd: -0.13 },
   // Chairs at desks and tables sit in the back half of the footprint, facing the work surface.
@@ -157,12 +157,12 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   diningGlass: { h: 0.46, fwd: -0.22 },
   diningOak: { h: 0.46, fwd: -0.22 },
   diningChair: { h: 0.46, fwd: 0 },
-  loveseat: { h: 0.44, fwd: -0.1 },
-  sofaThree: { h: 0.44, fwd: -0.12 },
-  sofaDesign: { h: 0.42, fwd: -0.1 },
-  armchairLounge: { h: 0.42, fwd: -0.07 },
-  armchairLeather: { h: 0.44, fwd: -0.05 },
-  armchairDesign: { h: 0.45, fwd: -0.05 },
+  loveseat: { h: 0.44, fwd: -0.07 },
+  sofaThree: { h: 0.44, fwd: -0.09 },
+  sofaDesign: { h: 0.42, fwd: -0.07 },
+  armchairLounge: { h: 0.42, fwd: -0.04 },
+  armchairLeather: { h: 0.44, fwd: -0.02 },
+  armchairDesign: { h: 0.45, fwd: -0.013 },
   pouf: { h: 0.46, fwd: 0 },
   dressingTable: { h: 0.45, fwd: -0.22 },
   toiletCompact: { h: 0.43, fwd: -0.13 },

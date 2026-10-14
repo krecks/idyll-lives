@@ -670,7 +670,7 @@ FAMILY = G.Family(
      G.Model('kitchenShelfWall', kitchenShelfWall, size=(0.9, 0.76, 0.24), key='model.kitchenShelfWall',
              centre=(0, -0.31), floor=False,
              paint=[('oak', 'Shelves'), ('oakd', 'Brackets')]),
-     G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan', centre=(0, -0.172),
+     G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan', centre=(0, -0.247),
              paint=[('steel', 'Bin'), ('lid', 'Lid')]),
      G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins', centre=(0, -0.212),
              paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),

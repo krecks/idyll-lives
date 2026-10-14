@@ -14,7 +14,7 @@
       "group": "sofas",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "An armless seat of the sectional sofa. Put pieces side by side for a sofa of any length.",
       "interactions": [
@@ -62,7 +62,7 @@
       "group": "sofas",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A sectional seat with an arm on the left as you face it: the end of a run.",
       "interactions": [
@@ -110,7 +110,7 @@
       "group": "sofas",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A sectional seat with an arm on the right as you face it: the end of a run.",
       "interactions": [
@@ -158,7 +158,7 @@
       "group": "sofas",
       "seat": {
         "height": 0.44,
-        "forward": 0.1
+        "forward": 0.17
       },
       "description": "The corner of an L-shaped sectional, with backs on two sides.",
       "interactions": [
@@ -396,7 +396,7 @@
       "decor": 0.2,
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A long sage sofa with three seat cushions: three can sit side by side.",
       "interactions": [
@@ -647,7 +647,7 @@
       "decor": 0.4,
       "seat": {
         "height": 0.44,
-        "forward": 0.04
+        "forward": 0.07
       },
       "description": "A high-backed armchair in bottle green: the reading chair.",
       "interactions": [
@@ -801,7 +801,7 @@
         ],
         "at": [
           0.0,
-          -0.18
+          -0.15
         ]
       },
       "description": "A slim oak table for a hall or behind a sofa, baskets underneath.",

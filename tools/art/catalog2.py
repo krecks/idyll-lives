@@ -441,7 +441,7 @@ p = [cyl([0.3, 0.6, 0.3], [0, 0.32, -0.2], STEEL, 'metal', segments=20),
      lathe([0.31, 0.06, 0.31], [0, 0.65, -0.2], STEEL, 'metal', [[0, 0.5], [0.5, -0.5]], segments=20),
      cyl([0.3, 0.02, 0.3], [0, 0.01, -0.2], '#2B2C2E', 'satin', segments=20),
      box([0.1, 0.03, 0.08], [0, 0.03, -0.03], '#2B2C2E', 'satin', radius=0.01)]
-add('trashCan', p)
+add('trashCan', shift(p, dz=-0.075))                       # back to the wall face
 p = []
 for i, c in enumerate(('#3E7CC2', '#4E9A5A', '#E3B23C')):
     x = -0.31 + i * 0.31
@@ -754,7 +754,7 @@ def slatted(n, w):
 
 p = sideboard(1.8, 0.8, WALNUT, 'wood', slatted(4, 1.8), WALNUT)
 p += [cyl([0.14, 0.3, 0.14], [-0.6, 0.95, -0.3], CREAM, 'gloss', taper=0.6)]
-add('sideboard', p, (2, 1), top=(-0.91, 0.91, -0.48, 0.16, 0.8))
+add('sideboard', shift(p, dz=0.05), (2, 1), top=(-0.91, 0.91, WALL, 0.21, 0.8))          # its back on the wall face
 
 
 def buffet_front(zf, y0, y1, handle):
@@ -768,7 +768,7 @@ def buffet_front(zf, y0, y1, handle):
 
 p = sideboard(1.84, 0.9, '#9DAF8C', 'satin', buffet_front, OAK, top_col=OAK)
 p[1] = box([1.88, 0.035, 0.66], [0, 0.885, -0.16], OAK, 'wood', radius=0.008)
-add('buffet', p, (2, 1), top=(-0.94, 0.94, -0.49, 0.17, 0.9))
+add('buffet', shift(p, dz=0.06), (2, 1), top=(-0.94, 0.94, WALL, 0.23, 0.9))
 
 # China cabinet: a glazed hutch with plates on show over a two-door base.
 p = [box([0.94, 0.86, 0.48], [0, 0.47, -0.22], '#F1EDE4', 'satin', radius=0.012),
@@ -784,7 +784,7 @@ for y in (1.17, 1.52, 1.86):
     p.append(box([0.84, 0.02, 0.3], [0, y - 0.13, -0.29], '#F1EDE4', 'satin', radius=0.004))
     for x in (-0.3, -0.1, 0.1, 0.3):
         p.append(cyl([0.18, 0.015, 0.18], [x, y - 0.02, -0.34], [PORCELAIN, '#9DC6CF'][int(x * 10 + y * 10) % 2], 'gloss', rotate=[78, 0, 0], segments=16))
-add('chinaCabinet', p)
+add('chinaCabinet', shift(p, dz=0.05))
 
 # Bar cart: two brass-framed glass tiers on castors, bottles and glasses.
 p = []
@@ -848,11 +848,11 @@ def sofa_run(w, fabric, legs, arms=(), backs=('back',), depth=0.88, x=0.0, z=-0.
 
 
 SECT, SECT_LEG = '#A9A49A', '#3B302A'
-add('sectionalMiddle', sofa_run(1.0, SECT, SECT_LEG), seat=(SOFA_H, 0.08))
-add('sectionalArmLeft', sofa_run(1.0, SECT, SECT_LEG, arms=(1,)), seat=(SOFA_H, 0.08))
-add('sectionalArmRight', sofa_run(1.0, SECT, SECT_LEG, arms=(-1,)), seat=(SOFA_H, 0.08))
-add('sectionalCorner', sofa_run(1.0, SECT, SECT_LEG, backs=('back', 'right'), depth=0.96, z=-0.02,
-                                pillows=[(0.18, -0.24, MUSTARD, -35)]), seat=(SOFA_H, 0.1))
+add('sectionalMiddle', sofa_run(1.0, SECT, SECT_LEG, z=0.01), seat=(SOFA_H, 0.13))          # its back on the wall face
+add('sectionalArmLeft', sofa_run(1.0, SECT, SECT_LEG, arms=(1,), z=0.01), seat=(SOFA_H, 0.13))
+add('sectionalArmRight', sofa_run(1.0, SECT, SECT_LEG, arms=(-1,), z=0.01), seat=(SOFA_H, 0.13))
+add('sectionalCorner', sofa_run(1.0, SECT, SECT_LEG, backs=('back', 'right'), depth=0.89, z=0.015,
+                                pillows=[(0.18, -0.17, MUSTARD, -35)]), seat=(SOFA_H, 0.17))
 # Chaise (1x2): a long seat with a back at -Z and an arm along +X.
 p = [box([0.96, 0.22, 1.9], [0, 0.21, 0.0], SECT, 'fabric', radius=0.04),
      box([0.96, 0.5, 0.2], [0, 0.57, -0.85], SECT, 'fabric', radius=0.06),
@@ -868,9 +868,9 @@ add('chaise', p, (1, 2), seat=(SOFA_H, -0.3))
 # Sofa bed: a boxy sofa with a visible fold line.
 p = sofa_run(1.86, '#6F7F8C', '#2B2C2E', arms=(-1, 1), cushions=1, leg_fin='metal', pillows=[(-0.55, -0.22, '#E4B8AE', 10), (0.55, -0.22, CREAM, -10)])
 p.append(box([1.5, 0.006, 0.02], [0, 0.453, 0.12], '#5D6A75', 'fabric', radius=0.002))
-add('sofaBed', p, (2, 1), seat=(SOFA_H, 0.08))
-add('sofaThreeSeat', sofa_run(2.86, '#7A8C6E', OAK, arms=(-1, 1), cushions=3, pillows=[(-1.0, -0.22, CREAM, 14), (1.0, -0.22, MUSTARD, -14)]),
-    (3, 1), seat=(SOFA_H, 0.08))
+add('sofaBed', to_wall(p), (2, 1), seat=(SOFA_H, 0.08))          # the model stops at the wall face
+add('sofaThreeSeat', sofa_run(2.86, '#7A8C6E', OAK, arms=(-1, 1), cushions=3, z=0.01, pillows=[(-1.0, -0.17, CREAM, 14), (1.0, -0.17, MUSTARD, -14)]),
+    (3, 1), seat=(SOFA_H, 0.13))
 
 # Recliner: a chunky armchair on a skirted base, its footrest folded down against the front, as its model
 # stands at rest (families/living.py): 13 cm off the wall, so its back clears the wall when it tips back.
@@ -922,7 +922,7 @@ add('floorCushion', p, seat=(0.14, 0.0))
 p = sofa_run(0.84, '#2F5A4E', WALNUT, arms=(-1, 1), depth=0.8, z=-0.06)
 p += [box([0.16, 0.4, 0.3], [s * 0.34, 0.86, -0.3], '#2F5A4E', 'fabric', radius=0.06) for s in (-1, 1)]
 p.append(box([0.84, 0.3, 0.18], [0, 0.95, -0.37], '#2F5A4E', 'fabric', radius=0.07))
-add('armchairWingback', p, seat=(SOFA_H, 0.04))
+add('armchairWingback', shift(p, dz=0.03), seat=(SOFA_H, 0.07))          # its back on the wall face
 
 # Coffee and side tables (tops things stand on).
 p = [cyl([0.84, 0.04, 0.84], [0, 0.4, 0], '#E8E2D6', 'gloss', segments=32),
@@ -949,7 +949,7 @@ p = [box([1.8, 0.035, 0.56], [0, 0.78, -0.18], OAK, 'wood', radius=0.01),
      box([1.7, 0.025, 0.48], [0, 0.22, -0.18], OAK, 'wood', radius=0.006)]
 p += legs4((-0.86, 0.86), (-0.42, 0.06), 0.77, 0.04, BLACKMETAL, 'metal')
 p += [box([0.36, 0.14, 0.3], [-0.5, 0.31, -0.18], '#C9A979', 'fabric', radius=0.03), box([0.36, 0.14, 0.3], [0.0, 0.31, -0.18], '#C9A979', 'fabric', radius=0.03)]
-add('consoleTable', p, (2, 1), top=(-0.9, 0.9, -0.46, 0.1, 0.8))
+add('consoleTable', shift(p, dz=0.03), (2, 1), top=(-0.9, 0.9, WALL, 0.13, 0.8))          # its back on the wall face
 
 # Low TV bench with a flat TV on it.
 p = [box([1.8, 0.4, 0.46], [0, 0.26, -0.22], '#F1F0EC', 'satin', radius=0.012),
@@ -1473,7 +1473,7 @@ p += [cyl([0.5, 0.36, 0.5], [0, 0.27, 0.2], '#B03A2E', 'gloss', rotate=[90, 0, 0
 for x, y, z, d in ((-0.3, 1.0, 0.18, 0.34), (0.3, 1.05, 0.12, 0.36), (-0.32, 0.86, -0.16, 0.28)):
     p += [cyl([0.02, y, 0.02], [x, y / 2, z], CHROME, 'chrome', segments=6),
           cyl([d, 0.012, d], [x, y, z], '#C9A64A', 'chrome', rotate=[10, 0, 8], segments=20)]
-add('drumKit', p, seat=(0.52, -0.3))
+add('drumKit', shift(p, dz=0.07), seat=(0.52, -0.23))          # the bass drum's back on the wall face
 AC = '#2D3E8C'
 p = [box([0.04, 1.8, 0.66], [s * 0.31, 0.9, -0.14], '#1E1F22', 'satin', radius=0.01) for s in (-1, 1)]
 p += [box([0.012, 1.4, 0.4], [s * 0.331, 1.0, -0.1], AC, 'gloss', radius=0.004) for s in (-1, 1)]
@@ -1487,7 +1487,7 @@ p += [box([0.58, 1.8, 0.3], [0, 0.9, -0.32], '#1E1F22', 'satin', radius=0.01),
       box([0.66, 0.05, 0.62], [0, 1.795, -0.15], '#1E1F22', 'satin', radius=0.01)]
 p += [cyl([0.03, 0.08, 0.03], [-0.15, 0.97, 0.28], '#2B2C2E', 'satin'), sph([0.06, 0.06, 0.06], [-0.15, 1.02, 0.28], RED, 'gloss', segments=10)]
 p += [cyl([0.05, 0.02, 0.05], [0.05 + i * 0.08, 0.95, 0.26 + (i % 2) * 0.05], [RED, BLUE, YELLOW, GREEN][i], 'gloss', segments=10) for i in range(4)]
-add('arcadeCabinet', p)
+add('arcadeCabinet', shift(p, dz=0.04))                         # its back on the wall face
 p = [cyl([0.66, 0.36, 0.66], [0, 0.18, 0.12], '#7F8C8D', 'satin', segments=24),
      lathe([0.7, 0.12, 0.7], [0, 0.42, 0.12], '#9AA3A5', 'satin', BOWL, segments=24),
      cyl([0.34, 0.03, 0.34], [0, 0.46, 0.12], '#9AA3A5', 'satin', segments=20),
