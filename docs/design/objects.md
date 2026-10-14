@@ -148,7 +148,7 @@ finish it uses.
   own shade at night; an emissive surface glows at noon as well.
 - **Night glow.** A material with `"glow": "#FFD9A0"` in its `materials` entry (a lamp's shade, a
   screen) glows in that colour as the windows do: from dusk as the lamps come up, out with its
-  room's lights where everyone is asleep, nothing by day. It is a copy of those faces drawn added on
+  room's lights (a lamp's with the lamp itself, switched off), nothing by day. It is a copy of those faces drawn added on
   top (one more draw call at night per part it's on, none by day); on a moving part (a laptop's lid)
   it moves with it. In gamekit:
   `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`.

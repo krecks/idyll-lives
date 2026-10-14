@@ -163,6 +163,8 @@ const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
+/** Seconds a lamp takes to go off or on at its switch. */
+const LAMP_SWITCH_FADE = 0.25;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
@@ -412,6 +414,17 @@ export class BabylonRenderer implements Renderer {
   /** Rooms where everyone is asleep (lights out), and rooms with someone awake (scratch). */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
+  /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
+  private lampsOff: ReadonlySet<number> | null = null;
+  private lampsSettled = true;
+  /** Per lamp going off, off or coming on (object id): 1 on, 0 off, eased between; unlisted lamps are on. */
+  private readonly lampOn = new Map<number, number>();
+  /** The viewed lot's lamps (all of them, also those without an interior light to go round) by room. */
+  private lotLamps: { room: number; lamp?: number }[] = [];
+  /** Rooms whose lamps are all switched off: their windows go dark as when everyone is asleep. */
+  private readonly unlitRooms = new Set<number>();
+  /** More lights than interior lights to go round (Low): lamps switched off give theirs up (`placeRoomLights`). */
+  private lightsShort = false;
   /** Indices of the snapshot layout's sleeping action tags. */
   private sleepActions: { tags: readonly string[]; ids: Set<number> } | null = null;
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`). */
@@ -466,7 +479,7 @@ export class BabylonRenderer implements Renderer {
   /** Placed objects' moving parts, played while residents use them. */
   private readonly motion = new ObjectMotion();
   /** What glows at night (lamp shades, screens: a template's `glow`), per model: its instances' strengths and rooms. */
-  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[] }[] = [];
+  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[]; lamps: number[] }[] = [];
   private previewMeshes!: Record<'wall' | 'door' | 'window' | 'open', Mesh>;
   private previewBuffers!: Record<'wall' | 'door' | 'window' | 'open', Float32Array>;
   private previewValid = true;
@@ -806,6 +819,8 @@ export class BabylonRenderer implements Renderer {
       this.lastLightAt = frame.now;
       this.resetSnapshot();
     }
+    // Lamps switched off or on fade out or in.
+    const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
@@ -813,7 +828,7 @@ export class BabylonRenderer implements Renderer {
       this.resetSnapshot();
     }
     // And their windows (and lamp shades, screens) stop glowing with them.
-    if (this.fadeWindowGlow(this.frameDt / 1000) && this.lampsLevel > 0) {
+    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && this.lampsLevel > 0) {
       this.house.setWindowGlow(this.windowGlowOn);
       this.applyGlow();
       this.resetSnapshot();
@@ -890,6 +905,48 @@ export class BabylonRenderer implements Renderer {
 
   setItems(items: readonly ItemPlacement[]): void {
     this.items.set(items);
+  }
+
+  setLampsOff(off: ReadonlySet<number>): void {
+    // The first time (a game loading) they're as they are; afterwards a lamp switched off fades out.
+    const first = !this.lampsOff;
+    for (const id of off) if (!this.lampOn.has(id)) this.lampOn.set(id, first ? 0 : 1);
+    this.lampsOff = off;
+    this.lampsSettled = false;
+    this.findUnlitRooms();
+    if (this.lightsShort && this.lastWorld) {
+      this.placeRoomLights(this.lastWorld, this.view);
+      this.applyRoomLights();
+      this.resetSnapshot();
+    }
+  }
+
+  /** Eases each lamp towards off or on (`lampsOff`); true if any changed. */
+  private fadeLamps(dt: number): boolean {
+    if (this.lampsSettled) return false;
+    let changed = false;
+    const step = Math.min(1, dt / LAMP_SWITCH_FADE);
+    for (const [id, on] of this.lampOn) {
+      const target = this.lampsOff?.has(id) ? 0 : 1;
+      if (on === target && target === 0) continue;
+      const next = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
+      if (next === 1) this.lampOn.delete(id);
+      else this.lampOn.set(id, next);
+      changed = true;
+    }
+    this.lampsSettled = !changed;
+    return changed;
+  }
+
+  /** The viewed lot's rooms with lamps, all of them switched off (and nothing else lit there, a fire). */
+  private findUnlitRooms(): void {
+    const lit = new Set<number>();
+    this.unlitRooms.clear();
+    for (const { room, lamp } of this.lotLamps) {
+      if (lamp === undefined || !this.lampsOff?.has(lamp)) lit.add(room);
+      else if (room) this.unlitRooms.add(room);
+    }
+    for (const room of lit) this.unlitRooms.delete(room);
   }
 
   /** Food and dishes for the lot and storeys in view. */
@@ -2891,16 +2948,21 @@ export class BabylonRenderer implements Renderer {
     };
     const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     // With few lights to go round, the storey in view gets them first, then the nearest below it
-    // (the sort is stable: within a storey, each room's first light still comes before any second).
+    // (the sort is stable: within a storey, each room's first light still comes before any second);
+    // lamps switched off last of all.
     const away = (z: number) => Math.abs(this.storeyOf(z) - this.storey);
-    lights.sort((a, b) => away(a.z) - away(b.z));
+    const off = (l: RoomLight) => (l.lamp !== undefined && this.lampsOff?.has(l.lamp) ? 1 : 0);
+    lights.sort((a, b) => off(a) - off(b) || away(a.z) - away(b.z));
+    this.lightsShort = lights.length > this.roomLights.length;
+    this.lotLamps = lights.filter((l) => l.kind === 'lamp');
+    this.findUnlitRooms();
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];
       if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.rowOf(this.storeyOf(l.z)));
       else light.position.y = HIDDEN_Y;
       return l ?? null;
     });
-    this.roomLightOn = this.roomLightUse.map((use) => (use && this.darkRooms.has(use.room) ? 0 : 1));
+    this.roomLightOn = this.roomLightUse.map((use) => (use?.lamp !== undefined ? (this.lampOn.get(use.lamp) ?? 1) : use && this.darkRooms.has(use.room) ? 0 : 1));
   }
 
   /** The rooms whose occupants are all asleep (at least one, nobody awake, away residents not counted). */
@@ -2935,12 +2997,18 @@ export class BabylonRenderer implements Renderer {
     for (const room of awake) dark.delete(room);
   }
 
-  /** Eases each interior light towards out (its room dark) or on; true if any changed. */
+  /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */
   private fadeRoomLights(dt: number): boolean {
     let changed = false;
     const step = Math.min(1, dt / LIGHTS_OUT_FADE);
     this.roomLightUse.forEach((use, i) => {
       const on = this.roomLightOn[i] ?? 1;
+      if (use?.lamp !== undefined) {
+        const now = this.lampOn.get(use.lamp) ?? 1;
+        if (now !== on) changed = true;
+        this.roomLightOn[i] = now;
+        return;
+      }
       const target = use && this.darkRooms.has(use.room) ? 0 : 1;
       if (on === target) return;
       this.roomLightOn[i] = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
@@ -2949,14 +3017,15 @@ export class BabylonRenderer implements Renderer {
     return changed;
   }
 
-  /** Eases each room's window glow towards out (the room dark) or on, as its lights; true if any changed. */
+  /** Eases each room's window glow towards out (the room dark, or its lamps all off) or on, as its lights; true if any changed. */
   private fadeWindowGlow(dt: number): boolean {
     let changed = false;
     const step = Math.min(1, dt / LIGHTS_OUT_FADE);
     const glow = this.windowGlowOn;
     for (const room of this.darkRooms) if (!glow.has(room)) glow.set(room, 1);
+    for (const room of this.unlitRooms) if (!glow.has(room)) glow.set(room, 1);
     for (const [room, on] of glow) {
-      const target = this.darkRooms.has(room) ? 0 : 1;
+      const target = this.darkRooms.has(room) || this.unlitRooms.has(room) ? 0 : 1;
       if (on === target && target === 0) continue;
       const next = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
       if (next === 1) glow.delete(room);
@@ -3207,7 +3276,10 @@ export class BabylonRenderer implements Renderer {
         mesh.thinInstanceRefreshBoundingInfo(false);
         const W = world.width;
         const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
-        glows.push({ mesh, colors, rooms: list.map(roomOf) });
+        // A lamp's shade glows with the lamp (switched on or off), anything else's with its room's lights.
+        const light = this.deps.content.object(list[0].def)?.light;
+        const lamps = list.map((o) => (light && light.switch !== false ? o.id : -1));
+        glows.push({ mesh, colors, rooms: list.map(roomOf), lamps });
       }
     });
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
@@ -3524,14 +3596,16 @@ export class BabylonRenderer implements Renderer {
 
   /**
    * Lamp shades and screens glow as the windows do: from dusk, as the lamps come up, and out with
-   * their room's lights where everyone is asleep (`windowGlowOn`). By day nothing is drawn.
+   * their room's lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp
+   * (`lampOn`: off, no glow). By day nothing is drawn.
    */
   private applyGlow(): void {
     const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
     for (const g of this.glows) {
       let lit = false;
       g.rooms.forEach((room, i) => {
-        const f = level * (room ? (this.windowGlowOn.get(room) ?? 1) : 1);
+        const lamp = g.lamps[i];
+        const f = level * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;
         lit ||= f > 0;

@@ -80,6 +80,9 @@ export class SimBridge {
   /** Food and dishes, as last sent. */
   private items: ItemPlacement[] | null = null;
   private itemListeners: Listener<ItemPlacement[]>[] = [];
+  /** The lamps switched off (object ids; sim-core `lights.rs`), as last sent. */
+  private lampsOff: ReadonlySet<number> | null = null;
+  private lampListeners: Listener<ReadonlySet<number>>[] = [];
   private uiListeners: Listener<UiUpdate>[] = [];
   private errorListeners: Listener<string>[] = [];
   private fatalListeners: Listener<string>[] = [];
@@ -262,6 +265,17 @@ export class SimBridge {
     if (this.items) fn(this.items);
   }
 
+  /** The lamps switched off (object ids) whenever that changes; the latest replayed to late subscribers. */
+  onLamps(fn: Listener<ReadonlySet<number>>): void {
+    this.lampListeners.push(fn);
+    if (this.lampsOff) fn(this.lampsOff);
+  }
+
+  /** Whether lamp `id` is switched off, as last sent. */
+  lampOff(id: number): boolean {
+    return !!this.lampsOff?.has(id);
+  }
+
   /** The item `id` as last sent. */
   item(id: number): ItemPlacement | undefined {
     return this.items?.find((it) => it.id === id);
@@ -378,6 +392,12 @@ export class SimBridge {
         this.items = msg.items;
         for (const fn of this.itemListeners) fn(msg.items);
         break;
+      case 'lamps': {
+        const off = new Set(msg.off);
+        this.lampsOff = off;
+        for (const fn of this.lampListeners) fn(off);
+        break;
+      }
       case 'ui':
         this.uiSeen = true;
         for (const fn of this.uiListeners) fn(msg.ui);

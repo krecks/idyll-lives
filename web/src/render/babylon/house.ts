@@ -181,6 +181,8 @@ export interface RoomLight {
   /** Lamps: reach in metres and relative brightness (content `light`). */
   range?: number;
   power?: number;
+  /** A lamp with a switch (not a fire's): its object id, to follow it on and off. */
+  lamp?: number;
 }
 
 /** Per room: indoor area in tiles and the sums of tile centres (x, z) weighted by area. */
@@ -195,15 +197,15 @@ export type RoomTiles = ReadonlyMap<number, { n: number; sx: number; sz: number 
 export function placeLights(world: WorldStructure, inView: (x: number, z: number) => boolean, rooms: RoomTiles, lightOf: (def: string) => LampLight | undefined): RoomLight[] {
   const W = world.width;
   const roomAt = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-  const lamps: { x: number; z: number; lift: number; room: number; light: LampLight }[] = [];
+  const lamps: { x: number; z: number; lift: number; room: number; light: LampLight; id: number }[] = [];
   for (const o of world.objects) {
     const light = inView(o.x, o.z) ? lightOf(o.def) : undefined;
     // A lamp on a table shines from its own height above the top.
-    if (light) lamps.push({ ...objectCentre(o), lift: o.lift ?? 0, room: roomAt(o.x, o.z), light });
+    if (light) lamps.push({ ...objectCentre(o), lift: o.lift ?? 0, room: roomAt(o.x, o.z), light, id: o.id });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity, ...(l.light.switch === false ? {} : { lamp: l.id }) })),
     ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
   // How many lights of its room come before each.
@@ -222,6 +224,8 @@ export interface LampLight {
   range?: number;
   intensity?: number;
   height?: number;
+  /** False: no switch, lit every night (a fire). */
+  switch?: boolean;
 }
 
 /** How a storey is built (`HouseBuilder.build`); the ground storey needs none of it. */
