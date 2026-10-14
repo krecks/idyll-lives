@@ -2282,8 +2282,8 @@
         1
       ],
       "price": 750,
-      "category": "bathroom",
-      "group": "bathing",
+      "category": "validate",
+      "group": "baths",
       "description": "A long soak gets residents clean and comfortable.",
       "interactions": [
         {
@@ -2313,8 +2313,8 @@
         1
       ],
       "price": 1800,
-      "category": "bathroom",
-      "group": "bathing",
+      "category": "validate",
+      "group": "baths",
       "decor": 0.6,
       "description": "A deep freestanding tub on brass feet. A soak leaves residents pampered: they stay fresh for longer.",
       "interactions": [

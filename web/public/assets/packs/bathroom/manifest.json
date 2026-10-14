@@ -696,6 +696,158 @@
           "label": "Walls"
         }
       ]
+    },
+    "model.bathtub": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtub.glb",
+      "materials": {
+        "bath_panel": {
+          "finish": "material.finish.gloss"
+        },
+        "beak": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "duck": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "bath_panel",
+          "label": "Panel"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.bathtubClawfoot": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtubClawfoot.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "feet": {
+          "finish": "material.finish.metal"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "feet",
+          "label": "Feet"
+        },
+        {
+          "material": "brass",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.bathtubFreestanding": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtubFreestanding.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
     }
   }
 }

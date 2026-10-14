@@ -1,6 +1,6 @@
 # Bathroom — notes
 
-`bathroom.py` builds the five bathroom sinks, the five toilets and the four showers (below) into `web/public/assets/models/bathroom/` and their entries
+`bathroom.py` builds the five bathroom sinks, the five toilets, the four showers and the three baths (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
 (`sinkConsole.glb`). They replace the primitive-part placeholders in `catalog.py` / `catalog2.py`, which
@@ -103,6 +103,34 @@ Validate › Showers until checked in play.
 | `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,056 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
 | `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
 | `model.showerRain` | 0.94 × 2.19 × 0.94 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
+
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+
+## B3 — the baths
+
+`model.bathtub`, `model.bathtubClawfoot` and `model.bathtubFreestanding`, built 2026-10-14. They sit in
+Validate › Baths until checked in play.
+
+- **2 × 1 tiles, centred.** The resident sits at the middle (`SEATS` 0.25 m and 0.28 m, the content's `seat`
+  0.28 m); the tub floors are 0.15–0.17 m, so they sit in the water.
+- **The tub** is one closed shell (`_loft`): superellipse rings up the outside, over the rim and down the inside
+  to the floor, so the inside faces up into the tub; flat-shaded above 40°. The built-in bath is squarer
+  (higher exponent) behind a gloss front and end panels over a dark plinth set back under them.
+- **Two moving parts.** The tap's stream (`stream`, the sinks' `_water` way) grows in 0.4 s (`tap_on`, held
+  2.4 s, so it runs while the tub fills). The water (`bathwater`) is the tub's inside from the floor up to two
+  thirds of the depth, its origin just under the floor, scaled to nothing upright and in to the floor's size
+  across: at rest it's hidden under the floor; `fill` waits for the tap, then rises (and widens with the walls)
+  in 2 s. `motions` plays both for the `bath` tag; the water stays for the whole bath and drains as it ends.
+- **Draw calls: 3.** The still body (plain finishes), the stream, the water.
+- **Sizes against the placeholders.** The freestanding bath's filler stands beyond the tub's end (1.89 m
+  wide, its placeholder's tub 1.80 m); the clawfoot's rolled rim makes it 0.83 m deep (0.78 m). Both fit
+  their 2 × 1 tiles.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.bathtub` | 1.82 × 0.69 × 0.86 m | 2,144 | 3 | Tub, Panel, Taps, Towel (and a duck) |
+| `model.bathtubClawfoot` | 1.73 × 1.02 × 0.83 m | 4,428 | 3 | Tub, Feet, Taps, Towel |
+| `model.bathtubFreestanding` | 1.89 × 0.92 × 0.84 m | 2,248 | 3 | Tub, Taps, Towel |
 
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 

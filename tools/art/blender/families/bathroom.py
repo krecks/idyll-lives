@@ -3,12 +3,14 @@
 # (`model.sinkConsole`), over their primitive-part placeholders (`catalog.py`, `furniture_prims.py`),
 # which stay the fallback; and the five toilets (`model.toilet`, `model.toiletCompact`, `model.toiletSmart`,
 # `model.toiletClassic`, `model.toiletWallHung`) and the four showers (`model.shower`, `model.showerStall`,
-# `model.showerWalkIn`, `model.showerRain`). Notes: bathroom.md.
+# `model.showerWalkIn`, `model.showerRain`) and the three baths (`model.bathtub`, `model.bathtubClawfoot`,
+# `model.bathtubFreestanding`). Notes: bathroom.md.
 #
 # Each sink is one still body (cabinet / basin / pedestal / legs) plus one moving part: a stream of
 # water (`water`) that grows from the tap's spout into the basin while a resident washes (`motions`).
 # Each toilet is one still body plus its lid, which lifts while a resident uses it; each shower one still
-# body plus its rain, which grows down from the head while a resident showers.
+# body plus its rain, which grows down from the head while a resident showers; each bath one still body plus
+# its tap's stream and its water, which fills while a resident bathes.
 # Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py bathroom [--preview]
@@ -18,7 +20,10 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import bpy  # noqa: E402
 import gamekit as G  # noqa: E402
+from gamekit.motion import _clip, last_frame  # noqa: E402
+from gamekit.shapes import _recalc_normals  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
 M = G.Palette(
@@ -62,6 +67,11 @@ M = G.Palette(
     wall_stone=('#D7D3CC', 'matte'),  # and its walls
     bottle=('#F2F1EE', 'gloss'),     # shampoo bottles
     sage=('#9DAF8C', 'gloss'),
+    # the baths
+    bath_panel=('#ECECE8', 'gloss'),  # the built-in bath's front and end panels
+    feet=('#B8925A', 'metal'),       # the clawfoot tub's feet
+    duck=('#F2C14E', 'gloss'),       # a rubber duck
+    beak=('#E9853B', 'gloss'),
 )
 
 # The parts the player may colour, the biggest first (the cabinet, vanity, pedestal, console basin or
@@ -664,7 +674,213 @@ def showerRain():
     return G.meshes()
 
 
+# --- the baths: a tub, its taps and the bath water ----------------------------------------------------------
+# 2 x 1 tiles, centred; the resident sits in the middle (SEATS / the content's `seat`: 0.25-0.28 m, so the
+# tub's floor is 10-13 cm below). Each tub is one closed shell lofted through rounded rings (`_loft`): up the
+# outside, over the rim and down the inside to the floor, so its inside faces up into the tub.
+# Two moving parts: the tap's stream (`tap_on`, 0.4 s, held 2.4 s so the tap runs while the tub fills) and the
+# bath water (`fill`): a body of water in the tub's shape up to two thirds of its depth, its origin just under
+# the tub's floor and scaled to nothing upright, which waits 0.4 s for the tap and then rises in 2 s; it stays
+# for the whole bath and drains as the bath ends (the game plays `fill` back).
+BATH_TAP, BATH_FILL = 0.4, 2.0
+
+
+def _ring(a, b, n, segments):
+    """A superellipse |x/a|^n + |y/b|^n = 1 (n = 2: an ellipse; larger: squarer), as `segments` points."""
+    pts = []
+    for k in range(segments):
+        t = 2 * math.pi * k / segments
+        c, s = math.cos(t), math.sin(t)
+        pts.append((a * math.copysign(abs(c) ** (2 / n), c), b * math.copysign(abs(s) ** (2 / n), s)))
+    return pts
+
+
+def _loft(name, sections, material, at=(0, 0, 0), segments=48, sharp=40):
+    """A closed body through superellipse rings `sections` [(a, b, height, n)]: half its length (game x) and
+    half its depth at each height, in profile order; both end rings are capped. Edges sharper than `sharp`
+    degrees are shaded flat."""
+    verts, faces = [], []
+    for a, b, y, n in sections:
+        verts += [(x, z, y) for x, z in _ring(a, b, n, segments)]
+    m = len(sections)
+    for i in range(m - 1):
+        for k in range(segments):
+            k2 = (k + 1) % segments
+            faces.append((i * segments + k, i * segments + k2, (i + 1) * segments + k2, (i + 1) * segments + k))
+    for i in (0, m - 1):
+        verts.append((0, 0, sections[i][2]))
+        faces += [(i * segments + k, i * segments + (k + 1) % segments, len(verts) - 1) for k in range(segments)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    _recalc_normals(obj)
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(sharp))
+    obj.location = at
+    return obj
+
+
+def _stream(F, tip, floor_y, name='stream'):
+    """A tap's stream from its spout `tip` down to the tub's floor, hidden at rest (the sinks' `_water`)."""
+    x, y, z = tip
+    with G.new_parts() as parts:
+        F.cyl(name, 0.011, y - floor_y, (x, (y + floor_y) / 2, z), M.water, verts=10)
+    obj = G.join(parts, name, origin=F.at(x, y, z))
+    obj.scale[2] = 0.001
+    return obj
+
+
+def _bath_water(F, floor, top, inset=0.006):
+    """The bath water: the tub's inside from just under its floor ring `floor` (a, b, y, n) up to `top`,
+    a little in from the walls, its origin under the floor; scaled to nothing upright and in to the floor's
+    size across, so it is hidden under the floor at rest and widens with the walls as it rises."""
+    a0, b0, y0, n0 = floor
+    a1, b1, y1, n1 = top
+    water = _loft('bathwater', [(a0 - inset, b0 - inset, y0 - 0.004, n0), (a1 - inset, b1 - inset, y1, n1)], M.water,
+                  segments=40)
+    G.set_origin(water, F.at(0, y0 - 0.006, 0))
+    water.scale = ((a0 - inset) / (a1 - inset), (b0 - inset) / (b1 - inset), 0.001)
+    return water
+
+
+def _inside_at(sections, y):
+    """The inside ring (a, b, y, n) at height `y`, between the two inside sections around it (the ones
+    after the rim, going down)."""
+    inner = sections[[s[2] for s in sections].index(max(s[2] for s in sections)):]
+    for (a0, b0, y0, n0), (a1, b1, y1, n1) in zip(inner, inner[1:]):
+        if y1 <= y <= y0 and y0 > y1:
+            t = (y0 - y) / (y0 - y1)
+            return (a0 + (a1 - a0) * t, b0 + (b1 - b0) * t, y, n0 + (n1 - n0) * t)
+    raise ValueError(y)
+
+
+def _fill(stream, water):
+    """The clips: the stream runs out (`tap_on`), the water waits for it and rises (`fill`)."""
+    G.grow(stream, 'tap_on', seconds=BATH_TAP)
+    start, end = last_frame(BATH_TAP), last_frame(BATH_TAP + BATH_FILL)
+    for axis in range(3):
+        rest = water.scale[axis]
+        _clip(water, 'fill', 'scale', axis, [(1, rest), (start, rest), (end, 1.0)])
+
+
+def _tub(sections, rim, floor_y):
+    """The tub's shell; returns its floor ring and the water's top ring, two thirds of the way up."""
+    _loft('tub', sections, M.porcelain)
+    fill = floor_y + (rim - floor_y) * 2 / 3
+    return sections[-1], _inside_at(sections, fill)
+
+
+def _duck(F, x, y, z):
+    G.sphere('duck', 0.035, at=F.at(x, y + 0.028, z), material=M.duck, scale=(1.25, 1, 0.85),
+             segments=12, rings=8)
+    F.sphere('duck_head', 0.022, (x - 0.022, y + 0.07, z), M.duck, segments=10, rings=7)
+    F.cone('duck_beak', 0.009, 0.002, 0.02, (x - 0.046, y + 0.066, z), M.beak, rot=(0, -90, 0), verts=8)
+
+
+def bathtub():
+    F = G.GameFrame()
+    rim, floor_y = 0.58, 0.15
+    sections = [(0.70, 0.24, 0.12, 3), (0.79, 0.33, 0.48, 4),        # the tub's outside, behind the panels
+                (0.91, 0.43, 0.50, 10), (0.91, 0.43, rim, 10),         # the deck's edge
+                (0.77, 0.29, rim, 4), (0.765, 0.285, rim - 0.012, 4),   # the deck, and the inside's lip
+                (0.71, 0.25, 0.25, 3.5), (0.66, 0.2, floor_y, 3)]      # down the inside to the floor
+    with G.new_parts() as still:
+        floor_ring, top = _tub(sections, rim, floor_y)
+        # the panels down to a plinth set back under them
+        F.box('panel_front', 1.82, 0.45, 0.03, (0, 0.275, 0.415), M.bath_panel, bevel=0.006)
+        for s in (-1, 1):
+            F.box(f'panel_end{s}', 0.03, 0.45, 0.83, (s * 0.895, 0.275, -0.015), M.bath_panel, bevel=0.006)
+        F.box('plinth', 1.76, 0.05, 0.8, (0, 0.025, -0.025), M.dark)
+        # a deck mixer at the left end, its spout over the water, and its two handles
+        F.cyl('tap_pillar', 0.022, 0.1, (-0.85, rim + 0.05, 0), M.chrome, verts=12)
+        G.rod('spout', F.at(-0.85, rim + 0.09, 0), F.at(-0.68, rim + 0.09, 0), 0.016, material=M.chrome, verts=10)
+        F.cyl('spout_tip', 0.018, 0.03, (-0.68, rim + 0.08, 0), M.chrome, verts=10)
+        for z in (-0.1, 0.1):
+            F.cyl(f'handle{z}', 0.02, 0.04, (-0.85, rim + 0.02, z), M.chrome, verts=12)
+            F.box(f'handle_lever{z}', 0.06, 0.012, 0.014, (-0.83, rim + 0.045, z), M.chrome, bevel=0.004)
+        F.box('towel', 0.4, 0.05, 0.12, (0.55, rim + 0.025, 0.36), M.towel, bevel=0.018)
+        _duck(F, 0.12, rim, 0.36)
+    G.join(still, 'body', origin=(0, 0, 0))
+    stream = _stream(F, (-0.68, rim + 0.065, 0), floor_y)
+    water = _bath_water(F, floor_ring, top)
+    G.settle()
+    _fill(stream, water)
+    return G.meshes()
+
+
+def _claw(F, x, z):
+    """A brass claw foot: a flared leg down to a ball."""
+    F.cone(f'leg{x}{z}', 0.026, 0.05, 0.12, (x, 0.13, z), M.feet, verts=12)
+    F.sphere(f'ball{x}{z}', 0.042, (x, 0.042, z), M.feet, segments=12, rings=8)
+    for k in range(3):
+        a = (k - 1) * 40
+        F.box(f'toe{x}{z}{k}', 0.018, 0.02, 0.05, (x + 0.025 * G.sind(a), 0.02, z + 0.025 * G.cosd(a) * (1 if z > 0 else -1)),
+              M.feet, bevel=0.006)
+
+
+def bathtubClawfoot():
+    F = G.GameFrame()
+    rim, floor_y = 0.7, 0.17
+    sections = [(0.6, 0.24, 0.14, 2.3), (0.75, 0.33, 0.3, 2.4), (0.84, 0.385, 0.6, 2.5),   # the outside
+                (0.865, 0.398, 0.665, 2.5), (0.852, 0.392, rim, 2.5),                      # the rolled top
+                (0.815, 0.358, rim, 2.5), (0.795, 0.342, 0.665, 2.5),
+                (0.74, 0.3, 0.45, 2.4), (0.64, 0.22, 0.22, 2.3), (0.56, 0.17, floor_y, 2.3)]  # the inside
+    with G.new_parts() as still:
+        floor_ring, top = _tub(sections, rim, floor_y)
+        for x in (-0.5, 0.5):
+            for z in (-0.16, 0.16):
+                _claw(F, x, z)
+        # a brass filler on the left end: a riser over the rim with two cross handles
+        _tube(F, 'filler', [(-0.785, rim - 0.01, 0), (-0.785, 0.96, 0), (-0.765, 1.0, 0), (-0.64, 1.0, 0),
+                            (-0.6, 0.97, 0), (-0.6, 0.92, 0)], 0.016, M.brass)
+        G.rod('filler_bar', F.at(-0.785, 0.8, -0.08), F.at(-0.785, 0.8, 0.08), 0.012, material=M.brass, verts=8)
+        for z in (-0.08, 0.08):
+            F.cyl(f'filler_stem{z}', 0.01, 0.04, (-0.785, 0.82, z), M.brass, verts=8)
+            F.box(f'filler_cross{z}', 0.06, 0.012, 0.012, (-0.785, 0.845, z), M.brass, bevel=0.004)
+            F.box(f'filler_cross2{z}', 0.012, 0.012, 0.06, (-0.785, 0.845, z), M.brass, bevel=0.004)
+        # a towel over the back rim at the right end
+        F.box('towel_top', 0.32, 0.03, 0.09, (0.5, rim + 0.012, -0.375), M.towel, bevel=0.012)
+        F.box('towel_drop', 0.32, 0.24, 0.025, (0.5, rim - 0.11, -0.418), M.towel, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    stream = _stream(F, (-0.6, 0.91, 0), floor_y)
+    water = _bath_water(F, floor_ring, top)
+    G.settle()
+    _fill(stream, water)
+    return G.meshes()
+
+
+def bathtubFreestanding():
+    F = G.GameFrame()
+    rim, floor_y = 0.58, 0.15
+    sections = [(0.66, 0.27, 0.0, 2.2), (0.7, 0.3, 0.03, 2.2), (0.86, 0.395, 0.45, 2.3),   # the outside
+                (0.895, 0.41, 0.56, 2.3), (0.885, 0.405, rim, 2.3),                       # the rim
+                (0.85, 0.372, rim, 2.3), (0.832, 0.356, rim - 0.025, 2.3),
+                (0.77, 0.315, 0.35, 2.25), (0.67, 0.245, 0.18, 2.2), (0.61, 0.205, floor_y, 2.2)]  # the inside
+    with G.new_parts() as still:
+        floor_ring, top = _tub(sections, rim, floor_y)
+        # a floor-standing filler at the right end, its spout over the rim
+        F.cyl('filler_base', 0.07, 0.02, (0.93, 0.01, 0.12), M.chrome, verts=20, bevel=0.005)
+        _tube(F, 'filler', [(0.93, 0.02, 0.12), (0.93, 0.86, 0.12), (0.91, 0.9, 0.11), (0.8, 0.9, 0.06),
+                            (0.64, 0.9, 0.0), (0.61, 0.87, 0.0), (0.61, 0.82, 0.0)], 0.019, M.chrome)
+        F.cyl('filler_mixer', 0.026, 0.07, (0.93, 0.74, 0.12), M.chrome, verts=12)
+        F.box('filler_lever', 0.014, 0.014, 0.07, (0.93, 0.79, 0.15), M.chrome, bevel=0.005)
+        F.box('towel_top', 0.32, 0.03, 0.08, (-0.5, rim + 0.012, -0.37), M.towel, bevel=0.012)
+        F.box('towel_drop', 0.32, 0.22, 0.025, (-0.5, rim - 0.1, -0.415), M.towel, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    stream = _stream(F, (0.61, 0.81, 0.0), floor_y)
+    water = _bath_water(F, floor_ring, top)
+    G.settle()
+    _fill(stream, water)
+    return G.meshes()
+
+
 TOILET = {'uses': {'toilet': 'lid_up'}}
+BATH = {'uses': {'bath': [{'clip': 'tap_on', 'hold': BATH_TAP + BATH_FILL}, 'fill']}}
 SHOWER = {'uses': {'shower': 'water_on'}}
 
 FAMILY = G.Family(
@@ -710,7 +926,13 @@ FAMILY = G.Family(
                     ('slate_wall', 'Wall')]),
      G.Model('showerRain', showerRain, size=(0.94, 2.192, 0.94), key='model.showerRain', motions=SHOWER,
              paint=[('tray_stone', 'Tray'), ('frame_dark', 'Frame'), ('fittings_dark', 'Head & tap'),
-                    ('wall_stone', 'Walls')])],
+                    ('wall_stone', 'Walls')]),
+     G.Model('bathtub', bathtub, size=(1.82, 0.69, 0.86), key='model.bathtub', motions=BATH,
+             paint=[('porcelain', 'Tub'), ('bath_panel', 'Panel'), ('chrome', 'Taps'), ('towel', 'Towel')]),
+     G.Model('bathtubClawfoot', bathtubClawfoot, size=(1.73, 1.02, 0.829), key='model.bathtubClawfoot', motions=BATH,
+             paint=[('porcelain', 'Tub'), ('feet', 'Feet'), ('brass', 'Taps'), ('towel', 'Towel')]),
+     G.Model('bathtubFreestanding', bathtubFreestanding, size=(1.895, 0.919, 0.837), key='model.bathtubFreestanding',
+             motions=BATH, paint=[('porcelain', 'Tub'), ('chrome', 'Taps'), ('towel', 'Towel')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

@@ -1,6 +1,6 @@
 # Bathroom
 
-The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`) and the four B2 showers (`water_on`). Water here grows the same way: a stream built at
+The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`), the four B2 showers (`water_on`) and the three B3 baths (`tap_on`, `fill`). Water here grows the same way: a stream built at
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
@@ -31,7 +31,7 @@ files (E6), as the double vanity did.
 | `showerWalkIn` Walk-in rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on` from a wide rain head. |
 | `showerRain` Rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on` from the ceiling rose. |
 
-## B3. Baths (3)
+## B3. Baths (3) — **Done** (in Validate › Baths)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `baths` (Validate › Baths)
@@ -39,7 +39,7 @@ files (E6), as the double vanity did.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bathtub` Bathtub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`: the tap stream grows (0.4 s), then the water surface rises from the bottom to two thirds (2 s) and stays for the whole bath; it drains as the bath ends. |
+| `bathtub` Bathtub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `tap_on` + `fill`: the tap stream grows (0.4 s) and runs while the tub fills; the water rises from the bottom to two thirds (2 s) and stays for the whole bath; it drains as the bath ends. |
 | `bathtubClawfoot` Clawfoot tub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 | `bathtubFreestanding` Freestanding bath | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 

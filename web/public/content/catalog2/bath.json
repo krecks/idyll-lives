@@ -77,8 +77,8 @@
         1
       ],
       "price": 1600,
-      "category": "bathroom",
-      "group": "bathing",
+      "category": "validate",
+      "group": "baths",
       "decor": 0.6,
       "seat": {
         "height": 0.28,

@@ -3691,6 +3691,10 @@
         {
           "id": "showers",
           "label": "Showers"
+        },
+        {
+          "id": "baths",
+          "label": "Baths"
         }
       ]
     },

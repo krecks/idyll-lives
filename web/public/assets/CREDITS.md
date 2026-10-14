@@ -76,6 +76,11 @@ pack `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/
 exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers. Their
 primitive-part entries stay as the fallback.
 
+The bathroom baths (`models/bathroom/bathtub.glb`, `bathtubClawfoot.glb`, `bathtubFreestanding.glb`, override pack
+`packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Each runs its tap and fills with water (`tap_on`, `fill`) while a resident
+bathes, and drains after. Their primitive-part entries stay as the fallback.
+
 The kitchen farmhouse and double counter sinks (`models/kitchen/farmhouseSink.glb`, `counterSinkDouble.glb`, pack
 `packs/kitchen/manifest.json`) are built in Blender by `tools/art/blender/families/kitchen.py` alongside the
 fridge, on `gamekit`, and exported as `.glb` (glTF, original, CC0), also with a `water_on` clip. Their
