@@ -42,7 +42,8 @@
       "model": "model.cheerful.jukebox",
       "footprint": [1, 1],
       "price": 850,
-      "category": "living",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 2,
       "description": "Glowing retro jukebox full of feel-good hits: dancing to it is as fun as TV, keeps residents a little fitter and leaves them Upbeat.",
       "interactions": [
@@ -66,7 +67,8 @@
       "model": "model.cheerful.karaokeMachine",
       "footprint": [1, 1],
       "price": 700,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 1,
       "description": "Mic, lyrics screen and a little spotlight. Builds Charisma; skilled singers have more fun, and from Charisma 5 a song makes them a Showstopper.",
       "interactions": [
@@ -92,7 +94,8 @@
       "model": "model.cheerful.mocktailCart",
       "footprint": [1, 1],
       "price": 420,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 1,
       "description": "Fresh fruit, crushed ice and a blender: a quick, fruity pick-me-up ($3 a glass). Cooks of level 3+ mix drinks good enough to leave them Upbeat.",
       "interactions": [
@@ -119,7 +122,8 @@
       "outdoors": true,
       "footprint": [2, 1],
       "price": 360,
-      "category": "outdoor",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 1,
       "description": "A striped hammock for swinging and daydreaming in the sun: comfort with a side of fun, or a short, gentle nap.",
       "interactions": [
@@ -151,7 +155,8 @@
       "model": "model.cheerful.sunriseLamp",
       "footprint": [1, 1],
       "price": 240,
-      "category": "bedroom",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 1,
       "description": "A warm dawn-coloured light for gentle morning stretches: a little energy and a Bright morning that keeps residents going for hours.",
       "interactions": [
@@ -175,7 +180,8 @@
       "model": "model.cheerful.partyBooth",
       "footprint": [2, 2],
       "price": 2600,
-      "category": "living",
+      "category": "validate",
+      "group": "cheerful",
       "slots": 2,
       "description": "A plush horseshoe booth with a party screen and confetti lights: host a video party with friends ($6 for snacks and streamers) for fun, company and comfort, and a long-lasting Party glow.",
       "interactions": [

@@ -7,7 +7,8 @@
       "model": "model.loner.quietPod",
       "footprint": [1, 1],
       "price": 850,
-      "category": "living",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "A padded, hooded seat for exactly one: comfort and a little fun at once, and a recharged loner feels lonely more slowly.",
       "interactions": [
@@ -39,7 +40,8 @@
       "model": "model.loner.shortwaveRadio",
       "footprint": [1, 1],
       "price": 780,
-      "category": "office",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "Talk to strangers far away on your own terms: a little Social without small talk, and it builds Technology. Skilled operators (Technology 4+) catch a kindred signal.",
       "interactions": [
@@ -75,7 +77,8 @@
       "model": "model.loner.puzzleTable",
       "footprint": [1, 1],
       "price": 320,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "Hours of quiet fun that sharpen Perception. A fresh box costs $6; sharp eyes (Perception 3+) finish it in the zone.",
       "interactions": [
@@ -111,7 +114,8 @@
       "model": "model.loner.bonsaiBench",
       "footprint": [1, 1],
       "price": 420,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "A slow, silent craft: shaping a tiny tree builds Dexterity, and steady hands get more out of every session.",
       "interactions": [
@@ -142,7 +146,8 @@
       "model": "model.loner.soloSauna",
       "footprint": [1, 2],
       "price": 3400,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "A private cedar cabin: comfort and hygiene in one hot, silent session. Afterwards the resident sleeps deeper and barely misses company for hours.",
       "interactions": [
@@ -164,7 +169,8 @@
       "model": "model.loner.deliveryHatch",
       "footprint": [1, 1],
       "price": 280,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "loner",
       "slots": 1,
       "description": "Order a hot meal through a wall hatch: no doorbell, no small talk. Faster and more filling than cooking, but every order costs money.",
       "interactions": [

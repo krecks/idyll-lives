@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **371 are done**:
+**Where it stands (2026-10-14):** 540 objects. **465 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -43,13 +43,14 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the five G4 edibles: `garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins` (in Validate › Edibles);
 - the twelve G5 trees: `tree`, `pine`, `garden.maple`, `birch`, `cherry`, `apple`, `japaneseMaple`, `magnolia`, `willow`, `spruce`, `cypress`, `lemonTree` (in Validate › Trees).
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
+- the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**169 are to do.** All of them still draw primitive parts:
+**75 are to do.** All of them still draw primitive parts:
 - `tools/art/catalog.py`: 15;
 - `catalog2.py`: 20;
-- the base manifest: 6;
+- the base manifest: 4;
 - `community.py`: 36;
-- the personality packs: 92.
+- the personality packs: 0.
 
 ## The plan
 
@@ -70,7 +71,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11, **done**), OU2 Loungers, swings and the hot tub (5, **done**), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |
 | [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10, **done**), G2 Flowers (15, **done**), G3 Shrubs (11, **done**), G4 Edibles (5, **done**), G5 Trees (12, **done**) |
 | [Community and farm](14-community.md) | 36 | CM1 Playground (8, **done**), CM2 Street furniture (10, **done**), CM3 Food stalls and vending (5, **done**), CM4 Shops and café (5, **done**), CM5 Farm (8, **done**) |
-| [Personality packs](15-personality-packs.md) | 94 | P1–P16: one task per pack (bookworm … slob, and the example pack) |
+| [Personality packs](15-personality-packs.md) | 94 | P1–P16 (**done**): one task per pack (bookworm … slob, and the example pack) |
 | [Sign-off](16-sign-off.md) | — | Back from Validate, per task and per category; done means |
 
 Each task table lists, per item:

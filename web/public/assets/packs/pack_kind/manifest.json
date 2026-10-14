@@ -1,0 +1,439 @@
+{
+  "$comment": "Blender-built kind pack models (tools/art/blender/families/pack_kind.py). Replaces the primitive-part placeholders of packs/kind by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours, the feeder's roof lifts and songbirds fly out, and the settee's cushions sink.",
+  "version": 1,
+  "entries": {
+    "model.kind.neighbourlyOven": {
+      "type": "model",
+      "url": "../../models/pack_kind/neighbourlyOven.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "butcher": {
+          "finish": "material.finish.satin"
+        },
+        "cabinet": {
+          "finish": "material.finish.satin"
+        },
+        "cabinet_panel": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cork": {
+          "finish": "material.finish.satin"
+        },
+        "crust": {
+          "finish": "material.finish.matte"
+        },
+        "crust_dark": {
+          "finish": "material.finish.matte"
+        },
+        "enamel": {
+          "finish": "material.finish.gloss"
+        },
+        "flour": {
+          "finish": "material.finish.matte"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.satin"
+        },
+        "honey": {
+          "finish": "material.finish.satin"
+        },
+        "icing": {
+          "finish": "material.finish.matte"
+        },
+        "jar_gold": {
+          "finish": "material.finish.gloss"
+        },
+        "jar_red": {
+          "finish": "material.finish.gloss"
+        },
+        "jar_white": {
+          "finish": "material.finish.gloss"
+        },
+        "oven_dark": {
+          "finish": "material.finish.satin"
+        },
+        "oven_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sage_dark": {
+          "finish": "material.finish.gloss"
+        },
+        "sage_pot": {
+          "finish": "material.finish.gloss"
+        },
+        "terracotta": {
+          "finish": "material.finish.satin"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_check": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "familyPie": "oven_open",
+          "treatsToShare": "oven_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "enamel",
+          "label": "Body"
+        },
+        {
+          "material": "towel",
+          "label": "Fabric"
+        },
+        {
+          "material": "cabinet",
+          "label": "Cupboards"
+        }
+      ]
+    },
+    "model.kind.givingJar": {
+      "type": "model",
+      "url": "../../models/pack_kind/givingJar.glb",
+      "materials": {
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "chalk_line": {
+          "finish": "material.finish.matte"
+        },
+        "cork": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "gold": {
+          "finish": "material.finish.metal"
+        },
+        "heart": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "pedestal": {
+          "finish": "material.finish.satin"
+        },
+        "ribbon": {
+          "finish": "material.finish.satin"
+        },
+        "terracotta": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "donate": "coin"
+        }
+      },
+      "paint": [
+        {
+          "material": "pedestal",
+          "label": "Body"
+        },
+        {
+          "material": "ribbon",
+          "label": "Fabric"
+        }
+      ]
+    },
+    "model.kind.knittingRocker": {
+      "type": "model",
+      "url": "../../models/pack_kind/knittingRocker.glb",
+      "materials": {
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "honey": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "needle": {
+          "finish": "material.finish.metal"
+        },
+        "rocker": {
+          "finish": "material.finish.wood"
+        },
+        "rose_flower": {
+          "finish": "material.finish.satin"
+        },
+        "sky": {
+          "finish": "material.finish.satin"
+        },
+        "throw": {
+          "finish": "material.finish.fabric"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "knitGift": "rock",
+          "rock": "rock"
+        },
+        "ride": "rock"
+      },
+      "paint": [
+        {
+          "material": "rocker",
+          "label": "Body"
+        },
+        {
+          "material": "cushion",
+          "label": "Fabric"
+        }
+      ]
+    },
+    "model.kind.welcomeTeaTable": {
+      "type": "model",
+      "url": "../../models/pack_kind/welcomeTeaTable.glb",
+      "materials": {
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
+        },
+        "pouf": {
+          "finish": "material.finish.fabric"
+        },
+        "pouf_rose": {
+          "finish": "material.finish.fabric"
+        },
+        "rose": {
+          "finish": "material.finish.gloss"
+        },
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_edge": {
+          "finish": "material.finish.fabric"
+        },
+        "sky": {
+          "finish": "material.finish.satin"
+        },
+        "table": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shareTea": "pour"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "table",
+          "label": "Body"
+        },
+        {
+          "material": "pouf",
+          "label": "Fabric"
+        },
+        {
+          "material": "pouf_rose",
+          "label": "Second pouf"
+        },
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.kind.songbirdFeeder": {
+      "type": "model",
+      "url": "../../models/pack_kind/songbirdFeeder.glb",
+      "materials": {
+        "bird_blue": {
+          "finish": "material.finish.satin"
+        },
+        "bird_brown": {
+          "finish": "material.finish.satin"
+        },
+        "bird_cream": {
+          "finish": "material.finish.satin"
+        },
+        "bird_gold": {
+          "finish": "material.finish.satin"
+        },
+        "bird_grey": {
+          "finish": "material.finish.satin"
+        },
+        "bird_orange": {
+          "finish": "material.finish.satin"
+        },
+        "bird_pink": {
+          "finish": "material.finish.satin"
+        },
+        "bird_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "feeder": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "lilac": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "post": {
+          "finish": "material.finish.satin"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        },
+        "rose_flower": {
+          "finish": "material.finish.satin"
+        },
+        "sack": {
+          "finish": "material.finish.satin"
+        },
+        "seed": {
+          "finish": "material.finish.matte"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "tin": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "refill": "lid_open",
+          "watchBirds": "bird"
+        }
+      },
+      "paint": [
+        {
+          "material": "feeder",
+          "label": "Body"
+        },
+        {
+          "material": "sack",
+          "label": "Fabric"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.kind.hearthSettee": {
+      "type": "model",
+      "url": "../../models/pack_kind/hearthSettee.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.fabric"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "honey": {
+          "finish": "material.finish.satin"
+        },
+        "lantern": {
+          "finish": "material.finish.gloss"
+        },
+        "patch_a": {
+          "finish": "material.finish.fabric"
+        },
+        "patch_b": {
+          "finish": "material.finish.fabric"
+        },
+        "patch_c": {
+          "finish": "material.finish.fabric"
+        },
+        "patch_d": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_a": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_b": {
+          "finish": "material.finish.fabric"
+        },
+        "quilt": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "curlUp": "sink_in",
+          "quiltNap": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "quilt",
+          "label": "Fabric"
+        }
+      ]
+    }
+  }
+}

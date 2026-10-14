@@ -99,6 +99,7 @@ const STATIONS: Station[] = [
   // Lying
   { label: 'sleep', def: 'bed', tag: 'sleep', pose: P.Lie },
   { label: 'nap hammock', def: 'natureLover.gardenHammock', tag: 'nap', pose: P.Lie, female: true },
+  { label: 'swing hammock', def: 'cheerful.rainbowHammock', tag: 'relax', pose: P.Lie },
   { label: 'bench press', def: 'weightBench', tag: 'lift', pose: P.Lie },
   // The baby's crib: on their own (asleep, and awake), feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
   { label: 'baby asleep in crib', def: 'crib', baby: 'asleep', alone: true },

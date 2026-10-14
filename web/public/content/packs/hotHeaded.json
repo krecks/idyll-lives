@@ -8,7 +8,8 @@
       "model": "model.hotHeaded.heavyBag",
       "footprint": [1, 1],
       "price": 380,
-      "category": "fitness",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "A free-standing leather heavy bag that takes whatever you throw at it. Builds Strength, and every session leaves the resident having blown off steam.",
       "interactions": [
@@ -33,7 +34,8 @@
       "model": "model.hotHeaded.smashBin",
       "footprint": [1, 1],
       "price": 450,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "A padded, lidded crate and a stack of thrift-store plates to hurl into it. Loud, satisfying fun ($6 of crockery a go) that leaves the resident having blown off steam.",
       "interactions": [
@@ -56,7 +58,8 @@
       "model": "model.hotHeaded.thunderDrums",
       "footprint": [2, 1],
       "price": 1150,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "A five-piece rock kit for turning rage into rhythm. Builds Creativity and Dexterity; drummers with Creativity 4+ really pour their frustration into it and blow off steam.",
       "interactions": [
@@ -82,7 +85,8 @@
       "model": "model.hotHeaded.coolDownCushion",
       "footprint": [1, 1],
       "price": 180,
-      "category": "decor",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "A floor cushion, a singing bowl and a candle. Counting to ten here leaves a resident cooled down; longer breathing practice builds Perception.",
       "interactions": [
@@ -117,7 +121,8 @@
       "model": "model.hotHeaded.grudgeJournal",
       "footprint": [1, 1],
       "price": 280,
-      "category": "office",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "A small desk with a leather journal for writing grudges out instead of shouting them. Builds Writing; residents with Writing 3+ find the words to let it go and want to make up.",
       "interactions": [
@@ -143,7 +148,8 @@
       "model": "model.hotHeaded.coldPlunge",
       "footprint": [1, 2],
       "price": 2600,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "hotHeaded",
       "slots": 1,
       "description": "An insulated ice-bath tub with a chiller. A bracing plunge ($8 of ice and filtering) washes, wakes and soothes at once, and leaves even the hottest head in an ice-cold calm for hours.",
       "interactions": [

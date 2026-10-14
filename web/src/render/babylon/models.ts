@@ -955,6 +955,8 @@ interface FilePiece {
   material: Material | null;
   /** The moving part it belongs to, or -1. */
   part: number;
+  /** Where its part is grown, for a part scaled to nothing at rest: the shape its normals and UVs come from. */
+  full?: VertexData;
 }
 
 /** Files imported per scene, by URL (they go with the scene). */
@@ -991,11 +993,34 @@ async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
     }
     return -1;
   };
+  // A part grown from nothing (water, flames: scaled to almost 0 at rest) bakes flat, so its normals and the
+  // finishes' UVs come from where a clip ends with it largest (`FilePiece.full`).
+  const grownBy = moved.map((): AnimationGroup | null => null);
+  const largest = rest.map((m) => Math.abs(m.determinant()));
+  for (const group of result.animationGroups) {
+    for (const { animation, target } of group.targetedAnimations) (target as Record<string, unknown>)[animation.targetProperty] = animation.evaluate(group.to);
+    moved.forEach((node, i) => {
+      const size = Math.abs(computeFromRoot(node).determinant());
+      if (size > largest[i]) [largest[i], grownBy[i]] = [size, group];
+    });
+    atRest(group);
+  }
+  moved.forEach((_, i) => {
+    if (grownBy[i] && Math.abs(rest[i].determinant()) > largest[i] * 0.01) grownBy[i] = null;
+  });
   const pieces: FilePiece[] = [];
   for (const node of result.meshes) {
     if (!(node instanceof Mesh) || node.getTotalVertices() === 0) continue;
+    const part = partOf(node);
     // Bake the full hierarchy transform so thin-instance matrices place the model directly.
-    pieces.push({ data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part: partOf(node) });
+    const piece: FilePiece = { data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part };
+    const group = part >= 0 ? grownBy[part] : null;
+    if (group) {
+      for (const { animation, target } of group.targetedAnimations) (target as Record<string, unknown>)[animation.targetProperty] = animation.evaluate(group.to);
+      piece.full = VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node));
+      atRest(group);
+    }
+    pieces.push(piece);
   }
   const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation() }));
   const clips = new Map(result.animationGroups.map((group) => [group.name, readClip(group, moved, rest)]));
@@ -1102,7 +1127,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   const overrideFor = (m: Material | null): MaterialOverride | undefined => (m && (overrides[m.name] ?? namedFinish(m.name, finishes))) ?? overrides['*'];
 
   // This build's copy of the geometry it shows.
-  const pieces = file.pieces.filter((p) => !overrideFor(p.material)?.hide).map((p) => ({ data: copyData(p.data).transform(space), material: p.material, part: p.part }));
+  const pieces = file.pieces.filter((p) => !overrideFor(p.material)?.hide).map((p) => ({ data: copyData(p.data).transform(space), full: p.full && copyData(p.full).transform(space), material: p.material, part: p.part }));
   if (fit && pieces.length) space = space.multiply(fitInto(pieces.map((p) => p.data), fit, extras.align ?? 'centre', [ox, oy, oz]));
   const boxes = pieces.map((p) => dataBox(p.data));
   // Resized by the player as placeholders are; each moving part's pivot goes where its hinge went.
@@ -1110,7 +1135,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   const shifts = pivots.map(() => Vector3.Zero());
   if (resize && boxes.length && resizes(footprint, resize)) {
     const { maps, slopes } = resizeMaps(footprint, resize, Math.min(...boxes.map((b) => b.lo[1])), Math.max(...boxes.map((b) => b.hi[1])));
-    for (const p of pieces) resizeData(p.data, maps, slopes);
+    for (const p of pieces) for (const data of p.full ? [p.data, p.full] : [p.data]) resizeData(data, maps, slopes);
     pivots.forEach((p, i) => shifts[i].set(maps[0](p.x) - p.x, maps[1](p.y) - p.y, maps[2](p.z) - p.z));
     boxes.splice(0, boxes.length, ...pieces.map((p) => dataBox(p.data)));
   }
@@ -1125,13 +1150,13 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   for (let part = -1; part < file.parts.length; part++) {
     const groups = new PartGroups(scene);
     const kept: Mesh[] = [];
-    pieces.forEach(({ data, material, part: of }, i) => {
+    pieces.forEach(({ data, full, material, part: of }, i) => {
       if (of !== part) return;
       height = Math.max(height, boxes[i].hi[1]);
       bottom = Math.min(bottom, boxes[i].lo[1]);
       const ov = overrideFor(material);
       if (ov?.finish) {
-        groups.add(restyledMesh(scene, data, material, ov, groups.finish(ov.finish).alpha), namedTint(material), groups.finish(ov.finish).group, null);
+        groups.add(restyledMesh(scene, data, material, ov, groups.finish(ov.finish).alpha, full), namedTint(material), groups.finish(ov.finish).group, null);
         return;
       }
       const mesh = new Mesh(name, scene);
@@ -1146,6 +1171,8 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     }
     const merged = mergeByMaterial(kept, part < 0 ? name : `${name}|${file.parts[part].name}`);
     const restyled = groups.build(part < 0 ? name : `${name}|${file.parts[part].name}`);
+    // A part grown from nothing lies flat where it hides at rest: leaf flutter would lift it into view (nature.ts).
+    if (pieces.some((p) => p.part === part && p.full)) for (const mesh of restyled.meshes) mesh.metadata = { ...mesh.metadata, windStill: true };
     meshes.push(...merged, ...restyled.meshes);
     tints.push(...merged.map((m) => namedTint(m.material)), ...restyled.tints);
     parts.push(...[...merged, ...restyled.meshes].map(() => part));
@@ -1331,12 +1358,15 @@ function fitInto(pieces: VertexData[], [w, h, d]: Vec3, align: 'centre' | 'back'
 
 /**
  * A copy of a file's geometry in placeholder form (positions, normals, metre UVs, vertex colour
- * carrying the finish), so it merges with placeholder parts of the same finish.
+ * carrying the finish), so it merges with placeholder parts of the same finish. `full`, the same
+ * geometry where a part grown from nothing is grown, gives the normals, winding and UVs its flat rest
+ * shape can't (a textured finish's normal map draws nothing on UVs collapsed along an axis).
  */
-function restyledMesh(scene: Scene, data: VertexData, material: Material | null, ov: MaterialOverride, alpha: number): Mesh {
-  const positions = data.positions!;
+function restyledMesh(scene: Scene, data: VertexData, material: Material | null, ov: MaterialOverride, alpha: number, full?: VertexData): Mesh {
+  const shape = full ?? data;
+  const positions = shape.positions!;
   const indices = data.indices ?? Array.from({ length: positions.length / 3 }, (_, i) => i);
-  let normals = data.normals;
+  let normals = shape.normals;
   if (!normals) {
     normals = new Float32Array(positions.length);
     VertexData.ComputeNormals(positions, indices, normals);
@@ -1355,6 +1385,7 @@ function restyledMesh(scene: Scene, data: VertexData, material: Material | null,
   restyled.uvs = new Float32Array((positions.length / 3) * 2);
   restyled.applyToMesh(mesh, true);
   boxProjectUVs(mesh);
+  if (full) mesh.updateVerticesData(VertexBuffer.PositionKind, Float32Array.from(data.positions!));
   const c = ov.color ? Color3.FromHexString(ov.color) : material instanceof PBRMaterial ? material.albedoColor.toGammaSpace() : Color3.White();
   const count = positions.length / 3;
   const colors = new Float32Array(count * 4);

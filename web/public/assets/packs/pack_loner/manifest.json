@@ -1,0 +1,365 @@
+{
+  "$comment": "Blender-built loner pack models (tools/art/blender/families/pack_loner.py). Replaces the primitive-part placeholders of packs/loner by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves a part while it is used: the pod's hood, the radio's dial and antenna, a patch of the puzzle, a twig of the bonsai, the sauna's door and the delivery hatch.",
+  "version": 1,
+  "entries": {
+    "model.loner.quietPod": {
+      "type": "model",
+      "url": "../../models/pack_loner/quietPod.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "headrest": {
+          "finish": "material.finish.satin"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "retreat": "shell",
+          "read": "shell"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Body"
+        },
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushions"
+        }
+      ]
+    },
+    "model.loner.shortwaveRadio": {
+      "type": "model",
+      "url": "../../models/pack_loner/shortwaveRadio.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "dial": {
+          "finish": "material.finish.gloss"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "needle": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "rig_face": {
+          "finish": "material.finish.satin"
+        },
+        "seatpad": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tune": "dial",
+          "airwaves": [
+            "antenna",
+            "dial"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "seatpad",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.loner.puzzleTable": {
+      "type": "model",
+      "url": "../../models/pack_loner/puzzleTable.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "field_a": {
+          "finish": "material.finish.satin"
+        },
+        "field_b": {
+          "finish": "material.finish.satin"
+        },
+        "glaze": {
+          "finish": "material.finish.gloss"
+        },
+        "hill_a": {
+          "finish": "material.finish.satin"
+        },
+        "hill_b": {
+          "finish": "material.finish.satin"
+        },
+        "lens": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sea_a": {
+          "finish": "material.finish.satin"
+        },
+        "sea_b": {
+          "finish": "material.finish.satin"
+        },
+        "sky_a": {
+          "finish": "material.finish.satin"
+        },
+        "sky_b": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "piece": "pieces",
+          "newPuzzle": "pieces"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "wood",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.loner.bonsaiBench": {
+      "type": "model",
+      "url": "../../models/pack_loner/bonsaiBench.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glaze": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sack": {
+          "finish": "material.finish.matte"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "teak": {
+          "finish": "material.finish.satin"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "trunk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shape": "trim"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "teak",
+          "label": "Wood"
+        },
+        {
+          "material": "glaze",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.loner.soloSauna": {
+      "type": "model",
+      "url": "../../models/pack_loner/soloSauna.glb",
+      "materials": {
+        "cedar": {
+          "finish": "material.finish.wood"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "stones": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sweat": {
+            "clip": "door_open",
+            "hold": 1.5
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Wood"
+        },
+        {
+          "material": "cedar_dark",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.loner.deliveryHatch": {
+      "type": "model",
+      "url": "../../models/pack_loner/deliveryHatch.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "dial": {
+          "finish": "material.finish.gloss"
+        },
+        "kraft": {
+          "finish": "material.finish.matte"
+        },
+        "mat": {
+          "finish": "material.finish.matte"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "needle": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "screen_a": {
+          "finish": "material.finish.gloss"
+        },
+        "slate": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "order": "hatch",
+          "treat": "hatch"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "slate",
+          "label": "Body"
+        },
+        {
+          "material": "wood",
+          "label": "Wood"
+        }
+      ]
+    }
+  }
+}

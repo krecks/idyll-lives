@@ -4,7 +4,11 @@ The traits' own things (`web/public/content/packs/<trait>.json`, placeholders fr
 task per pack, one Blender family per pack (`families/pack_<trait>.py`), one Validate group per pack. Pack
 things are the residents' favourites, used often: give each its clip.
 
-## P1. Bookworm (6)
+Each family writes its own override pack, `packs/pack_<trait>/manifest.json`, keyed `model.<trait>.<id>`, so the
+trait's pack keeps its placeholders as the fallback (`families/pack_bookworm.py` and `.md` are the pattern). P1–P16
+are done (2026-10-14); what is left is in `future.md`.
+
+## P1. Bookworm (6) — **Done** (in Validate › Bookworm)
 
 - **Family:** `tools/art/blender/families/pack_bookworm.py`
 - **Validate group:** `bookworm` (Validate › Bookworm)
@@ -19,7 +23,7 @@ things are the residents' favourites, used often: give each its clip.
 | `bookworm.firesideLounge` Fireside reading lounge | 2x2 · floor | readByFire:read readAloud:read | living / — | Wood, Fabric | Use | `flames`: the fire grows in the grate for readByFire and readAloud. |
 | `bookworm.bedsideStack` Bedside book stack | 1x1 · floor | chapter:read | bedroom / — | Wood, Fabric | Use | `book_up`: the top book lifts and opens for chapter. |
 
-## P2. Cheerful (6)
+## P2. Cheerful (6) — **Done** (in Validate › Cheerful)
 
 - **Family:** `tools/art/blender/families/pack_cheerful.py`
 - **Validate group:** `cheerful` (Validate › Cheerful)
@@ -34,7 +38,7 @@ things are the residents' favourites, used often: give each its clip.
 | `cheerful.sunriseLamp` Sunrise stretch lamp | 1x1 · floor | stretch:exercise | bedroom / — | Body, Trim | Use | `sunrise`: the sun disc rises in its frame for stretch. N glow (E8). |
 | `cheerful.partyBooth` Confetti party booth | 2x2 · floor | party:phone | living / — | Body, Trim | Use | `curtain`: the booth curtain swings aside for party (`hold` 1.5 s). |
 
-## P3. Couch potato (6)
+## P3. Couch potato (6) — **Done** (in Validate › Couch Potato)
 
 - **Family:** `tools/art/blender/families/pack_couchPotato.py`
 - **Validate group:** `couch potato` (Validate › Couch Potato)
@@ -49,7 +53,7 @@ things are the residents' favourites, used often: give each its clip.
 | `couchPotato.fitnessGame` Living-room workout game | 1x1 · floor | workout:exercise | fitness / — | Body, Upholstery | Use | `board`: the balance board tilts 10° for workout. |
 | `couchPotato.lavaLamp` Lava glow lamp | 1x1 · floor | zoneOut:relax | decor / — | Body, Upholstery | Use | `blobs`: the wax blobs rise slowly for zoneOut. A drifting blobs (E2). |
 
-## P4. Energetic (7)
+## P4. Energetic (7) — **Done** (in Validate › Energetic)
 
 - **Family:** `tools/art/blender/families/pack_energetic.py`
 - **Validate group:** `energetic` (Validate › Energetic)
@@ -65,7 +69,7 @@ things are the residents' favourites, used often: give each its clip.
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Pads | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
-## P5. Example pack (2)
+## P5. Example pack (2) — **Done** (in Validate › Example)
 
 - **Family:** `tools/art/blender/families/pack_example.py`
 - **Validate group:** `example` (Validate › Example)
@@ -76,7 +80,7 @@ things are the residents' favourites, used often: give each its clip.
 | `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body | Use | `oven_open` (door drops) and `burner_on` (knob and flame ring) for cook and practise. |
 | `whirlpoolTub` Whirlpool tub | 2x2 · floor | soak:bath | wellness / — | Tub, Surround | Use | `fill`: the water rises for soak. L bubbles (E1). |
 
-## P6. Foodie (6)
+## P6. Foodie (6) — **Done** (in Validate › Foodie)
 
 - **Family:** `tools/art/blender/families/pack_foodie.py`
 - **Validate group:** `foodie` (Validate › Foodie)
@@ -91,7 +95,7 @@ things are the residents' favourites, used often: give each its clip.
 | `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza; `flames` grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop | Use | `drawer_open` for tastingMenu. |
 
-## P7. Gloomy (6)
+## P7. Gloomy (6) — **Done** (in Validate › Gloomy)
 
 - **Family:** `tools/art/blender/families/pack_gloomy.py`
 - **Validate group:** `gloomy` (Validate › Gloomy)
@@ -106,7 +110,7 @@ things are the residents' favourites, used often: give each its clip.
 | `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
-## P8. Hot-headed (6)
+## P8. Hot-headed (6) — **Done** (in Validate › Hot Headed)
 
 - **Family:** `tools/art/blender/families/pack_hotHeaded.py`
 - **Validate group:** `hot headed` (Validate › Hot Headed)
@@ -121,7 +125,7 @@ things are the residents' favourites, used often: give each its clip.
 | `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. |
 | `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the cover slides off for plunge. |
 
-## P9. Kind (6)
+## P9. Kind (6) — **Done** (in Validate › Kind)
 
 - **Family:** `tools/art/blender/families/pack_kind.py`
 - **Validate group:** `kind` (Validate › Kind)
@@ -136,7 +140,7 @@ things are the residents' favourites, used often: give each its clip.
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. |
 
-## P10. Lazy (6)
+## P10. Lazy (6) — **Done** (in Validate › Lazy)
 
 - **Family:** `tools/art/blender/families/pack_lazy.py`
 - **Validate group:** `lazy` (Validate › Lazy)
@@ -151,7 +155,7 @@ things are the residents' favourites, used often: give each its clip.
 | `lazy.vibePlate` Effortless vibration plate | 1x1 · floor | shake:exercise | fitness / — | Body, Upholstery | Loop (E1) | `shake` (E1). Until then static. |
 | `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Upholstery | Use | `screen_up`: the tablet tilts up for program and story. |
 
-## P11. Loner (6)
+## P11. Loner (6) — **Done** (in Validate › Loner)
 
 - **Family:** `tools/art/blender/families/pack_loner.py`
 - **Validate group:** `loner` (Validate › Loner)
@@ -166,7 +170,7 @@ things are the residents' favourites, used often: give each its clip.
 | `loner.soloSauna` Cedar sauna for one | 1x2 · floor | sweat:relax | bathroom / — | Body, Wood | Use | `door_open`: the door opens and shuts behind them (`hold` 1.5 s) for sweat. |
 | `loner.deliveryHatch` No-knock delivery hatch | 1x1 · floor | order:fetch treat:fetch | kitchen / — | Body, Wood | Use | `hatch`: the hatch opens for order and treat; `hold` 2 s. |
 
-## P12. Nature lover (7)
+## P12. Nature lover (7) — **Done** (in Validate › Nature Lover)
 
 - **Family:** `tools/art/blender/families/pack_natureLover.py`
 - **Validate group:** `nature lover` (Validate › Nature Lover)
@@ -182,7 +186,7 @@ things are the residents' favourites, used often: give each its clip.
 | `natureLover.mossTerrarium` Moss terrarium | 1x1 · floor | mist:water | decor / — | Wood | Use | `lid_open`: the glass lid lifts for mist. |
 | `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood | Use | `door_open`: the door and a roof vent open for unwind and orchids. |
 
-## P13. Neat (6)
+## P13. Neat (6) — **Done** (in Validate › Neat)
 
 - **Family:** `tools/art/blender/families/pack_neat.py`
 - **Validate group:** `neat` (Validate › Neat)
@@ -197,7 +201,7 @@ things are the residents' favourites, used often: give each its clip.
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program. |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body | Use | `tray`: the key tray drawer slides out for tidy. |
 
-## P14. Outgoing (6)
+## P14. Outgoing (6) — **Done** (in Validate › Outgoing)
 
 - **Family:** `tools/art/blender/families/pack_outgoing.py`
 - **Validate group:** `outgoing` (Validate › Outgoing)
@@ -212,7 +216,7 @@ things are the residents' favourites, used often: give each its clip.
 | `outgoing.danceFloor` Light-up dance floor | 2x2 · floor | dance:dance | hobbies / — | Body, Upholstery | Loop (E1) | `tiles`: the tiles pulse up and down (E1). Until then U: they lift a few millimetres in a pattern. |
 | `outgoing.photoWall` Party photo wall | 1x1 · floor | reminisce:look | decor / — | Body, Upholstery | Use | `photo`: a new photo grows on the wall for reminisce. |
 
-## P15. Romantic (6)
+## P15. Romantic (6) — **Done** (in Validate › Romantic)
 
 - **Family:** `tools/art/blender/families/pack_romantic.py`
 - **Validate group:** `romantic` (Validate › Romantic)
@@ -227,7 +231,7 @@ things are the residents' favourites, used often: give each its clip.
 | `romantic.letterBureau` Love-letter bureau | 1x1 · floor | writeLetter:write writePoem:write | office / — | Body, Fabric | Use | `fall_front`: the writing flap drops for writeLetter and writePoem. |
 | `romantic.roseArbourSwing` Rose-arbour swing | 2x1 · floor | swing:relax tendRoses:prune | outdoor / — | Body, Fabric | Loop (E1) | `swing` (E1); U `cut`: a bloom shrinks away for tendRoses. |
 
-## P16. Slob (6)
+## P16. Slob (6) — **Done** (in Validate › Slob)
 
 - **Family:** `tools/art/blender/families/pack_slob.py`
 - **Validate group:** `slob` (Validate › Slob)
