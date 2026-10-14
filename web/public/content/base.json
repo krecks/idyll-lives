@@ -2865,7 +2865,7 @@
         }
       ],
       "price": 40,
-      "category": "garden",
+      "category": "validate",
       "group": "shrubs",
       "outdoors": true,
       "description": "A rounded green shrub for borders and corners."
@@ -3790,6 +3790,11 @@
         {
           "id": "playground",
           "label": "Playground",
+          "outside": true
+        },
+        {
+          "id": "shrubs",
+          "label": "Shrubs",
           "outside": true
         }
       ]

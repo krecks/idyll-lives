@@ -13,6 +13,10 @@ The fifteen G2 flowers are done in the same family: each mound bed's colour part
 and its petals where they are all one colour; the geraniums' is the pot, the flower box's the box, the raised
 bed's its boards. The meadow has none.
 
+The eleven G3 shrubs are done too. They dress every lot (`natureDecor`) and the bush the woods, so they cost what
+their placeholders do; they, the flowers and the edibles each have a far version, the same build at low detail
+(`far_of`). Only the topiary has a pot; the flowering shrubs colour their flowers instead, the others nothing.
+
 ## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
@@ -56,7 +60,7 @@ bed's its boards. The meadow has none.
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot or box | Static | Static. |
 | `garden.flowerBox` Flower box | 1x1 · floor | water:water smell:smell | garden / flowers | Pot or box | Static | Static. |
 
-## G3. Shrubs (11)
+## G3. Shrubs (11) — **Done** (in Validate › Shrubs)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `shrubs` (Validate › Shrubs)

@@ -59,6 +59,12 @@ The flower beds (`models/plants/flowerbed.glb`, `tulips.glb`, `daffodils.glb`, `
 CC0. A flower in the wildflower meadow shrinks away while a resident picks it. Their primitive-part entries stay as
 the fallback.
 
+The shrubs (`models/plants/bush.glb`, `boxwood.glb`, `topiaryCone.glb`, `hedge.glb`, `hydrangea.glb`, `rosebush.glb`,
+`azalea.glb`, `lavender.glb`, `fern.glb`, `grass.glb`, `hosta.glb`, in the same pack) are built by the same script,
+also original and CC0, each with a far version (`<id>.far.glb`), as are the flower beds. A trim takes the clipped
+shrubs' stray sprigs off, a prune cuts a rose and a cut a few lavender stems. Their primitive-part entries stay as
+the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.

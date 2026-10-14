@@ -5,7 +5,7 @@
 trio, succulent bowl, fern on a stand, parlour palm, orchid and bonsai (`model.garden.*`). They replace the
 primitive-part placeholders of `furniture.py` and `nature.py`, which stay as the fallback. Built 2026-10-14; they
 sit in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
-Flowers); the shrubs and edibles (G3, G4) come into this family next.
+Flowers), then the G3 shrubs (Validate › Shrubs); the edibles (G4) come into this family next.
 
 ## How a plant is made
 
@@ -86,6 +86,47 @@ flowers here are set so each model is within 10 % of them, but for the geraniums
 | `model.garden.flowerBox` | 0.95 × 0.73 × 0.50 m | 2,912 | 2 |
 
 `check_glb.py`: 15 models, 0 failed (the geraniums' width warning). Khronos validator: 0 errors, 0 warnings each.
+
+## Far versions
+
+Every outdoor model (G2, G3) has a far version, `<id>.far.glb`, drawn in the town overview and the far woods: the
+same build function run with `LOW` set (`far_of`), so every shape is the same but coarser (leaves with half the
+rows, three-sided stems open at their ends, lumps and cups with fewer segments, smaller stars) and its moving part
+joined in, still. It keeps the model's size exactly; a decimated copy (`far=0.25`) dipped below the floor and lost
+thin parts. Shrubs come to a third of their triangles or less; the flower beds, all small flowers, to about 55–65 %
+(`check_glb` warns: aim for a quarter).
+
+## The shrubs (G3)
+
+`model.bush` and `model.garden.boxwood`, `topiaryCone`, `hedge`, `hydrangea`, `rosebush`, `azalea`, `lavender`,
+`fern`, `grass`, `hosta`. The bush, hydrangea, roses, lavender and boxwood also dress every lot's border, and the
+bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they cost what their placeholders do.
+
+- **Shrubs** (`shrub`): a dark core lump and clumps round it, lighter on top; flowers (`dots`) spread over the upper
+  part of an ellipsoid round the crown.
+- **Clips:** a trim (`trim`, for `trim`) shrinks a cluster of shaggy sprigs (`sprigs`) on the boxwood, the topiary's
+  tip, the hedge and the azalea; a prune (`cut`, for `prune`) one rose at the front; a cut (`cut`, for `cut`) the
+  three lavender stems nearest the front. Each part is one draw call on its own finish.
+- **Colour parts:** only the topiary has a pot ("Pot"); the hydrangea, azalea and lavender colour their flowers, the
+  roses their roses; the rest none.
+
+| Model | Size (w × h × d) | Triangles | Far | Draws |
+|---|---|---|---|---|
+| `model.bush` | 1.04 × 0.91 × 1.10 m | 700 | 252 | 1 |
+| `model.garden.boxwood` | 0.70 × 0.75 × 0.72 m | 604 | 316 | 2 |
+| `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 728 | 434 | 3 |
+| `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 660 | 372 | 2 |
+| `model.garden.hydrangea` | 1.20 × 0.86 × 1.18 m | 1,404 | 516 | 1 |
+| `model.garden.rosebush` | 0.93 × 0.86 × 0.95 m | 1,394 | 636 | 3 |
+| `model.garden.azalea` | 1.24 × 1.01 × 1.24 m | 2,260 | 948 | 2 |
+| `model.garden.lavender` | 0.61 × 0.87 × 0.63 m | 872 | 264 | 3 |
+| `model.garden.fern` | 0.79 × 0.48 × 0.93 m | 1,288 | 576 | 1 |
+| `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,120 | 480 | 2 |
+| `model.garden.hosta` | 0.62 × 0.84 × 0.68 m | 676 | 234 | 2 |
+
+`check_glb.py`: the family's 36 models, 0 failed. Warnings: far versions over half (boxwood, topiary, hedge and
+eight flower beds), the grass 13 % wider and the hydrangea 13 % lower than their placeholders' bounds. Khronos
+validator: 0 errors, 0 warnings on every new file.
 
 ## Rebuild
 

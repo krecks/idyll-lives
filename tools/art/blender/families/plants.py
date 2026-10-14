@@ -1,6 +1,7 @@
-# The garden's potted plants and flowers: G1, the houseplants (`model.plant` and `model.garden.monstera`,
-# `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), over the
-# primitive-part placeholders of `furniture.py` and `nature.py`, which stay the fallback.
+# The garden's plants: G1, the houseplants (`model.plant` and `model.garden.monstera`, `fiddleFig`, `snakePlant`,
+# `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), G2 the flowers and G3 the shrubs (below), over the
+# primitive-part placeholders of `furniture.py` and `nature.py`, which stay the fallback. The outdoor ones each have
+# a far version: the same build at low detail (`far_of`).
 #
 # Leaves are closed, thin, bent blades (`leaf`) on the `foliage` finish, stems and trunks swept tubes
 # (`tube`), pots surfaces of revolution (`pot`). The game's nature shader gives every part on `foliage`
@@ -56,6 +57,26 @@ BASE = dict(
 M = G.Palette(**BASE)
 
 
+# Building a far version (`far_of`): every shape with fewer segments and no moving part.
+LOW = [False]
+
+
+def low(full, reduced):
+    """`full` detail, or `reduced` while a far version is being built."""
+    return reduced if LOW[0] else full
+
+
+def far_of(build):
+    """A model's far version (`Model(far=...)`): the same build at low detail, all one still part."""
+    def far():
+        LOW[0] = True
+        try:
+            return build()
+        finally:
+            LOW[0] = False
+    return far
+
+
 def palette(**colours):
     """The family's palette with some colours changed (finishes stay the family's)."""
     return G.Palette(**{**BASE, **{k: (v, BASE[k][1]) for k, v in colours.items()}})
@@ -103,6 +124,9 @@ def leaf(name, base, yaw, tilt, length, width, material, shape='oval', droop=0.0
     `notch` (every, factor) narrows every nth row (a monstera's cuts, a fern's or palm's leaflets),
     `twist` turns it about its midrib by the tip (degrees).
     """
+    if LOW[0]:
+        rows, ring = max(2, rows // 2), 3
+        notch = notch if rows >= 4 else None
     prof = PROFILES[shape]
     bend = 2 * droop
 
@@ -144,6 +168,7 @@ def leaf(name, base, yaw, tilt, length, width, material, shape='oval', droop=0.0
 
 def tube(name, points, r0, r1, material, verts=6, cap=True):
     """A swept tube through `points` (Blender metres), radius `r0` at the first and `r1` at the last."""
+    verts, cap = low(verts, 3), low(cap, False)              # far: ends hidden in the ground or a flower
     pts = [Vector(p) for p in points]
     n = len(pts)
     ring_verts, faces = [], []
@@ -180,6 +205,7 @@ def arc(a, b, lift, steps=4):
 
 def pot(P, r_top, h, z0=0.0, r_bottom=None, rim=0.012, rim_h=0.03, segments=24, soil=True):
     """A pot standing at height `z0`, `h` tall, its top `r_top` across the rim's inside: returns its soil height."""
+    segments = low(segments, max(8, segments // 2))
     rb = r_bottom if r_bottom is not None else r_top * 0.72
     top = z0 + h
     profile = [(0, z0), (rb, z0), (rb + 0.004, z0 + 0.012), (r_top, top - rim_h)]
@@ -440,6 +466,7 @@ def _put(obj, at, yaw=0.0, tilt=0.0, lift=0.0):
 def star(name, at, r, n, material, yaw=0.0, tilt=0.0, inner=0.5, depth=0.008, cup=0.2):
     """A flower's face: a thin star of `n` petals, `r` across its radius, the petals lifted by `cup` (a fraction
     of their reach), facing up and leaning `tilt` degrees towards `yaw`."""
+    n = low(n, max(4, (n + 1) // 2))
     top, bottom = [], []
     for k in range(2 * n):
         rr = r if k % 2 == 0 else r * inner
@@ -459,26 +486,27 @@ def star(name, at, r, n, material, yaw=0.0, tilt=0.0, inner=0.5, depth=0.008, cu
 
 def dome(name, at, r, h, material, yaw=0.0, tilt=0.0, lift=0.004):
     """A flower's centre: a low dome on its face."""
-    G.sphere(name, 1.0, material=material, segments=6, rings=3, scale=(r, r, h))
+    G.sphere(name, 1.0, material=material, segments=low(6, 4), rings=3, scale=(r, r, h))
     return _put(bpy.context.object, at, yaw, tilt, lift)
 
 
 def cupped(name, profile, at, material, yaw=0.0, tilt=0.0, segments=6):
     """A bloom turned from `profile` [(r, z)] (a tulip, a poppy, a lily's trumpet), leaning `tilt` towards `yaw`."""
-    return _put(G.revolve(name, profile, material=material, segments=segments), at, yaw, tilt)
+    return _put(G.revolve(name, profile, material=material, segments=low(segments, max(4, segments - 2))), at, yaw, tilt)
 
 
 def lump(name, r, at, material, scale=(1, 1, 1), seed=0.0, noise=0.25, segments=10, rings=6):
     """A soft, lumpy ball (a leafy clump, a pompom, a cluster of florets): a smooth sphere pushed about by noise,
     its bottom at `at`."""
+    segments, rings = low(segments, max(6, round(segments * 0.6))), low(rings, max(3, round(rings * 0.6)))
     G.sphere(name, r, material=material, segments=segments, rings=rings, scale=scale)
     obj = bpy.context.object
     for v in obj.data.vertices:
         p = v.co
         n = noise_at(p.x / r * 1.3 + seed, p.y / r * 1.3 - seed, p.z / r * 1.3 + seed * 0.5)
         v.co = p * (1.0 + noise * n)
-    low = min(v.co.z for v in obj.data.vertices)
-    obj.data.transform(Matrix.Translation(Vector(at) - Vector((0, 0, low))))
+    bottom = min(v.co.z for v in obj.data.vertices)
+    obj.data.transform(Matrix.Translation(Vector(at) - Vector((0, 0, bottom))))
     return obj
 
 
@@ -496,7 +524,7 @@ def spiral(n, radius, rng, jitter=0.25):
 
 def mound(P, r=0.42, h=0.07):
     """A bed's low soil mound (`bed`, the part the player colours): returns its top."""
-    G.revolve('bed', [(0, 0), (r, 0), (r * 0.93, h * 0.4), (r * 0.65, h * 0.85), (0, h)], material=P.bed, segments=20)
+    G.revolve('bed', [(0, 0), (r, 0), (r * 0.93, h * 0.4), (r * 0.65, h * 0.85), (0, h)], material=P.bed, segments=low(20, 16))
     return h
 
 
@@ -546,7 +574,7 @@ def daffodils():
         stem(f'stem{i}', (x, y, top - 0.01), tip, P.stem)
         star(f'petals{i}', tip, 0.05, 6, P.bloom, yaw, 70, inner=0.62, cup=0.1)
         cupped(f'trumpet{i}', [(0, 0), (0.016, 0.0), (0.02, 0.04), (0.026, 0.05), (0.021, 0.05), (0, 0.012)], tip, P.centre,
-               yaw, 70, segments=8)
+               yaw, 70, segments=low(8, 6))
         blade(f'leaf{i}', (x, y, top), yaw + 150, 75, 0.3, 0.04, [P.leaf, P.leaf_light][i % 2])
     return G.settle([G.join_all('daffodils')])
 
@@ -663,7 +691,7 @@ def lupins():
         h = rng.uniform(0.66, 0.99)
         tip = (x + rng.uniform(-0.03, 0.03), y + rng.uniform(-0.03, 0.03), h)
         stem(f'stem{i}', (x, y, top + 0.05), (tip[0], tip[1], h - 0.3), P.stem, r=0.008)
-        G.cone(f'spike{i}', 0.05, 0.008, 0.36, at=(tip[0], tip[1], h - 0.18), material=cols[i % 4], verts=8)
+        G.cone(f'spike{i}', 0.05, 0.008, 0.36, at=(tip[0], tip[1], h - 0.18), material=cols[i % 4], verts=low(8, 4))
     return G.settle([G.join_all('lupins')])
 
 
@@ -719,15 +747,13 @@ def meadow():
         star(f'flower{i}', (x, y, h), 0.042, 6 + i % 3, getattr(P, MEADOW_FLOWERS[i % 5]), yaw, tilt, inner=0.6, cup=0.1)
         dome(f'eye{i}', (x, y, h), 0.011, 0.007, P.centre, yaw, tilt)
     still = G.join_all('meadow')
-    with G.new_parts() as parts:                                      # the one picked: at the front, standing tall
-        x, y, h = 0.06, -0.22, 0.48
+    x, y, h = 0.06, -0.22, 0.48
+
+    def picked():                                                     # the one picked: at the front, standing tall
         stem('picked_stem', (x, y, 0), (x, y, h), P.stalk, r=0.006)
         star('picked_flower', (x, y, h), 0.06, 10, P.bloom5, 180, 30, inner=0.6, cup=0.1)
         dome('picked_eye', (x, y, h), 0.02, 0.012, P.centre, 180, 30)
-    flower = G.join(parts, 'picked', origin=(x, y, 0))
-    G.settle([still, flower])
-    G.squash(flower, 'pick', 0.001, seconds=0.8)
-    return [still, flower]
+    return _with_part('picked', still, picked, (x, y, 0), 'pick')
 
 
 def geraniums():
@@ -783,6 +809,226 @@ def flowerbed():
     return G.settle([G.join_all('flowerbed')])
 
 
+# ---- shrubs (G3) -------------------------------------------------------------------------------------
+# Shrubs dress every lot (nature.ts `natureDecor`: the bush, hedge, hydrangea, roses, lavender and boxwood) and the
+# bush the woods, as thin instances, so they cost what their placeholders do (a few hundred triangles) and each has
+# a far version, a quarter of that.
+
+SHRUB = ['#44703A', '#517E3E', '#5E8C44', '#6E9A4A', '#7EA852']
+
+
+def shrub(P, rng, n, w, h, cols, name='bush'):
+    """A rounded shrub `w` wide and `h` tall: a dark core and `n` clumps round it and on top (lighter higher up)."""
+    lump(f'{name}_core', w * 0.4, (0, 0, h * 0.02), cols[0], scale=(1, 1, h * 0.78 / (w * 0.8)), seed=rng.random() * 9)
+    for i in range(n):
+        a = i / n * math.tau + rng.uniform(-0.3, 0.3)
+        rr = w * 0.26 * rng.uniform(0.8, 1.1)
+        r = w * 0.25 * rng.uniform(0.85, 1.1)
+        z = h * rng.uniform(0.15, 0.3)
+        lump(f'{name}_clump{i}', r, (rr * math.cos(a), rr * math.sin(a), z), cols[1 + i % (len(cols) - 2)],
+             scale=(1, 1, 0.85), seed=i * 1.9 + rng.random())
+    lump(f'{name}_top', w * 0.25, (rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), h * 0.5), cols[-1], scale=(1, 1, 0.8),
+         seed=rng.random() * 9)
+
+
+def dots(rng, n, centre, radii, size, materials, name, band=(-0.3, 0.95), out=1.0, flat=0.8, segments=8, rings=5):
+    """Flowers spread over a shrub's crown (an ellipsoid at `centre`, `radii`), on its upper part."""
+    cx, cy, cz = centre
+    ga = math.pi * (3 - math.sqrt(5))
+    for i in range(n):
+        t = band[0] + (band[1] - band[0]) * (i + 0.5) / n          # height on the ellipsoid, -1 .. 1
+        a = i * ga + rng.uniform(-0.3, 0.3)
+        ring = math.sqrt(max(0.0, 1 - t * t))
+        at = (cx + radii[0] * ring * math.cos(a) * out, cy + radii[1] * ring * math.sin(a) * out, cz + radii[2] * t * out - size / 2)
+        lump(f'{name}{i}', size / 2, at, materials[i % len(materials)], scale=(1, 1, flat), seed=i * 0.77,
+             segments=segments, rings=rings)
+
+
+def sprigs(name, P, centre, spread, n=5, length=0.09):
+    """Shaggy sprigs sticking up out of a clipped crown round `centre` (the part a trim takes off)."""
+    rng = random.Random(len(name))
+    for i in range(n):
+        a = i / n * 360 + rng.uniform(-20, 20)
+        base = Vector(centre) + Vector(polar(spread * rng.uniform(0.3, 1.0), a, 0))
+        for k in range(3):
+            leaf(f'{name}{i}_{k}', base, a + (k - 1) * 70, rng.uniform(45, 75), length * rng.uniform(0.8, 1.2), length * 0.45,
+                 [P.leaf_light, P.leaf][k % 2], shape='lance', droop=0.2, fold=0.2, rows=2, ring=3)
+
+
+def _with_part(name, still, build, origin, clip, kind='squash'):
+    """Joins what `build` makes into a moving part `name` (origin at `origin`), settles, and shrinks it away."""
+    if LOW[0]:                                                         # a far version: all one still part
+        build()
+        return G.settle([G.join_all(still.name)])
+    with G.new_parts() as parts:
+        build()
+    part = G.join(parts, name, origin=origin)
+    G.settle([still, part])
+    G.squash(part, clip, 0.001, seconds=0.8)
+    return [still, part]
+
+
+def bush():
+    """Round shrub: a dark core and leafy clumps round it, lighter on top."""
+    P = palette()
+    rng = random.Random(31)
+    shrub(P, rng, 5, 1.12, 0.95, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
+    return G.settle([G.join_all('bush')])
+
+
+def boxwood():
+    """Boxwood ball: a clipped dark-green ball; a few shaggy sprigs on top, which a trim takes off."""
+    P = palette(leaf='#3E6B33', leaf_dark='#365F2D', leaf_light='#4C7A3A')
+    lump('ball', 0.36, (0, 0, 0.0), P.leaf, scale=(1, 1, 0.94), noise=0.06, segments=14, rings=9)
+    lump('ball2', 0.15, (0.1, 0.1, 0.48), P.leaf_light, scale=(1, 1, 0.7), noise=0.15, seed=2.0)
+    lump('ball3', 0.13, (-0.18, -0.12, 0.38), P.leaf_dark, scale=(1, 1, 0.75), noise=0.15, seed=4.0)
+    still = G.join_all('boxwood')
+    return _with_part('sprigs', still, lambda: sprigs('sprig', P, (0.02, -0.03, 0.66), 0.12), (0.02, -0.03, 0.66), 'trim')
+
+
+def topiary_cone():
+    """Topiary cone: a stone pot, a short trunk and a clipped cone; shaggy sprigs near its tip, which a trim takes off."""
+    P = palette(body='#B9B2A6', leaf='#3E6B33', leaf_light='#4A7838', stalk='#8A7058')
+    top = pot(P, 0.24, 0.36, r_bottom=0.18, rim=0.014)
+    tube('trunk', [(0, 0, top - 0.02), (0, 0, top + 0.2)], 0.03, 0.025, P.stalk, verts=6)   # plain: three draw calls
+    G.cone('cone', 0.33, 0.012, 1.3, at=(0, 0, top + 0.82), material=P.leaf, verts=low(14, 8))
+    G.cone('cone2', 0.25, 0.01, 0.9, at=(-0.02, 0.02, top + 0.97), material=P.leaf_light, verts=low(9, 6), rot=(0, 0, 20))
+    still = G.join_all('topiaryCone')
+    tip = (0.0, 0.0, top + 1.18)
+    return _with_part('sprigs', still, lambda: sprigs('sprig', P, tip, 0.06, n=4, length=0.08), tip, 'trim')
+
+
+def hedge_block(P, length, h, depth, name='hedge'):
+    G.cube(f'{name}_block', (length, depth, h * 0.86), at=(0, 0, h * 0.43), material=P.leaf, bevel=low(min(0.2, depth * 0.28), 0.0))
+    for i, x in enumerate((-length * 0.3, 0.02, length * 0.3)):
+        lump(f'{name}_top{i}', length * 0.22, (x, 0.0, h * 0.72), [P.leaf_light, P.stem][i % 2], scale=(1, depth * 0.86 / (length * 0.44), 0.55),
+             noise=0.12, seed=i * 3.1)
+
+
+def garden_hedge():
+    """Clipped hedge: a squared-off block of leaves with a softer top; shaggy sprigs along it, which a trim takes off."""
+    P = palette(leaf=SHRUB[1], leaf_light=SHRUB[2], stem=SHRUB[3])
+    hedge_block(P, 1.5, 1.12, 0.92)
+    still = G.join_all('hedge')
+    at = (0.1, 0.0, 1.06)
+    return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.4, n=7), at, 'trim')
+
+
+def hydrangea():
+    """Hydrangea: a leafy shrub covered in big blue and lilac mopheads."""
+    P = palette(blossom='#9CB8F4', blossom2='#B8A6F0', blossom3='#8CA8EC', blossom4='#D4BCF4')
+    rng = random.Random(72)
+    shrub(P, rng, 5, 1.0, 0.82, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
+    dots(rng, 11, (0, 0, 0.46), (0.48, 0.48, 0.38), 0.28, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'mophead')
+    return G.settle([G.join_all('hydrangea')])
+
+
+def rosebush():
+    """Rose bush: a dark-leaved shrub dotted with red roses; one rose at the front, which a prune cuts."""
+    P = palette(leaf='#2C4C26', leaf_dark='#365A2C', leaf_light='#3F6632', stem='#4A7038', bloom='#C8203A')
+    rng = random.Random(73)
+    shrub(P, rng, 5, 1.02, 0.94, [P.leaf, P.leaf_dark, P.leaf_light, P.stem, P.stem])
+    dots(rng, 15, (0, 0, 0.5), (0.46, 0.46, 0.4), 0.1, [P.bloom], 'rose', out=0.88, segments=7, rings=4)
+    still = G.join_all('rosebush')
+    at = (0.05, -0.42, 0.62)
+    return _with_part('rose', still, lambda: lump('cut_rose', 0.06, at, P.bloom, scale=(1, 1, 0.8), segments=8, rings=5),
+                      (at[0], at[1], at[2] + 0.04), 'cut')
+
+
+def azalea():
+    """Azalea: a wide shrub smothered in pink flowers; shaggy sprigs on top, which a trim takes off."""
+    P = palette(blossom='#F0549C', blossom2='#F878B4', blossom3='#E04090', blossom4='#FC9CC8')
+    rng = random.Random(74)
+    shrub(P, rng, 6, 1.12, 0.92, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
+    dots(rng, 20, (0, 0, 0.5), (0.54, 0.54, 0.42), 0.2, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'flowers', flat=0.6)
+    still = G.join_all('azalea')
+    at = (-0.05, 0.05, 0.94)
+    return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.14), at, 'trim')
+
+
+def lavender():
+    """Lavender: a grey-green mound and a spray of stems with purple spikes; a few at the front, which are cut."""
+    P = palette(leaf='#748C70', leaf_light='#82987C', stem='#7E947A', stalk='#7E947A', bloom='#7E64B8', bloom2='#8F74C8',
+                bloom3='#6E58A8')
+    rng = random.Random(75)
+    lump('mound', 0.28, (0, 0, 0), P.leaf, scale=(1, 1, 0.6), seed=1.0)
+    lump('mound2', 0.2, (0.1, 0.06, 0.08), P.leaf_light, scale=(1, 1, 0.75), seed=2.0)
+
+    def spray(points, stem_mat, cut=False):
+        for i, (x, y, a) in points:
+            heading = math.degrees(math.atan2(x, y))
+            lean = math.radians(rng.uniform(4, 22) * (0.4 + math.hypot(x, y) * 3))
+            d = Vector((math.sin(math.radians(heading)) * math.sin(lean), math.cos(math.radians(heading)) * math.sin(lean), math.cos(lean)))
+            base = Vector((x * 0.5, y * 0.5, 0.18))
+            length = rng.uniform(0.38, 0.55)
+            tip = base + d * length
+            if LOW[0]:
+                G.cone(f'stem{i}', 0.012, 0.002, length + 0.14, material=[P.bloom, P.bloom2, P.bloom3][i % 3], verts=3)
+                bpy.context.object.data.transform(Matrix.Translation(base + d * (length + 0.14) / 2) @ d.to_track_quat('Z', 'Y').to_matrix().to_4x4())
+                continue
+            tube(f'{"cut_" if cut else ""}stem{i}', [base, tip], 0.005, 0.004, stem_mat, verts=3)
+            G.cone(f'{"cut_" if cut else ""}spike{i}', 0.018, 0.004, 0.15, material=[P.bloom, P.bloom2, P.bloom3][i % 3], verts=5)
+            spike = bpy.context.object
+            spike.data.transform(Matrix.Translation(tip + d * 0.07) @ d.to_track_quat('Z', 'Y').to_matrix().to_4x4())
+
+    pts = list(enumerate(spiral(24, 0.24, rng)))
+    front = sorted(pts, key=lambda p: p[1][1])[:3]                     # the three nearest the front (-y)
+    spray([p for p in pts if p not in front], P.stem)
+    still = G.join_all('lavender')
+    return _with_part('stems', still, lambda: spray(front, P.stalk, cut=True), (0, -0.12, 0.2), 'cut')
+
+
+def garden_fern():
+    """Garden fern: a crown of arching, finely cut fronds round a low tuft."""
+    P = palette(leaf='#5E9A3E', leaf_dark='#558E38', leaf_light='#78B24E')
+    rng = random.Random(76)
+    lump('crown', 0.09, (0, 0, 0), P.leaf_dark, scale=(1, 1, 0.7))
+    for i in range(9):
+        yaw = 90 + i / 9 * 360 + rng.uniform(-12, 12)
+        leaf(f'frond{i}', (0, 0, 0.1), yaw, rng.uniform(50, 62), rng.uniform(0.52, 0.62), 0.18, [P.leaf, P.leaf_dark, P.leaf][i % 3],
+             shape='lance', droop=rng.uniform(0.32, 0.42), fold=0.15, rows=13, ring=3, notch=(2, 0.4))
+        leaf(f'inner{i}', (0, 0, 0.14), yaw + 20, rng.uniform(65, 78), rng.uniform(0.3, 0.36), 0.13, P.leaf_light,
+             shape='lance', droop=0.45, fold=0.15, rows=9, ring=3, notch=(2, 0.4))
+    return G.settle([G.join_all('fern')])
+
+
+def ornamental_grass():
+    """Ornamental grass: a fountain of long, arching blades and pale plumes on tall stems."""
+    P = palette(leaf='#9AAA5A', leaf_dark='#8A9E4E', leaf_light='#B2B86A', stem='#A6B062', bloom='#E2D6A8', stalk='#B8B070')
+    rng = random.Random(77)
+    lump('tuft', 0.16, (0, 0, 0), P.leaf_dark, scale=(1, 1, 0.5))
+    cols = [P.leaf, P.leaf_light, P.leaf_dark, P.stem]
+    for i, (x, y, a) in enumerate(spiral(22, 0.12, rng)):
+        out = math.hypot(x, y)
+        leaf(f'blade{i}', (x, y, 0), math.degrees(math.atan2(x, y)) + rng.uniform(-20, 20), 86 - out * 130 - rng.uniform(0, 6),
+             rng.uniform(0.75, 1.05), 0.04, cols[i % 4], shape='strap', droop=0.22, thick=0.006, fold=0.3, rows=5, ring=3)
+    for i in range(6):
+        yaw = i * 60 + rng.uniform(-15, 15)
+        lean = math.radians(rng.uniform(6, 16))
+        d = Vector((math.sin(math.radians(yaw)) * math.sin(lean), math.cos(math.radians(yaw)) * math.sin(lean), math.cos(lean)))
+        tip = d * 0.98
+        tube(f'plume_stem{i}', [(0, 0, 0), tip], 0.005, 0.004, P.stem, verts=3)
+        lump(f'plume{i}', 0.03, tip, P.bloom, scale=(1, 1, 4.0), segments=6, rings=5, noise=0.15)
+    return G.settle([G.join_all('grass')])
+
+
+def hosta():
+    """Hosta: a clump of broad, ribbed leaves, and a few stems of lilac bells."""
+    P = palette(leaf='#5E8A5E', leaf_dark='#4E7A4A', leaf_light='#8EAE6C', stem='#6A9464', bloom='#B8A6D8')
+    rng = random.Random(78)
+    lump('crown', 0.15, (0, 0, 0), P.leaf_dark, scale=(1, 1, 0.5))
+    for i in range(12):
+        yaw = i / 12 * 720 + rng.uniform(-10, 10)
+        up = i >= 6
+        leaf(f'leaf{i}', (0, 0, 0.08 + (0.08 if up else 0)), yaw, rng.uniform(30, 45) if up else rng.uniform(12, 22),
+             rng.uniform(0.3, 0.36), 0.2, [P.leaf, P.leaf_light, P.leaf][i % 3], shape='heart', droop=0.35, fold=0.3, rows=5, ring=4)
+    for i in range(3):
+        top = (rng.uniform(-0.08, 0.08), rng.uniform(-0.08, 0.08), rng.uniform(0.62, 0.8))
+        stem(f'stem{i}', (0, 0, 0.1), top, P.stem, r=0.006)
+        G.cone(f'bells{i}', 0.025, 0.005, 0.18, at=(top[0], top[1], top[2] - 0.04), material=P.bloom, verts=low(6, 4))
+    return G.settle([G.join_all('hosta')])
+
+
 # (width, height, depth) as measured; each within 10 % of its placeholder's bounds (check_glb warns beyond).
 TOLERANCE = 0.03
 BED = [('bed', 'Bed')]
@@ -800,28 +1046,48 @@ FAMILY = G.Family(
      G.Model('orchid', orchid, size=(0.431, 1.198, 0.381), key='model.garden.orchid', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('bonsai', bonsai, size=(0.62, 0.974, 0.407), key='model.garden.bonsai', tolerance=TOLERANCE, paint=[('body', 'Pot')],
              motions={'uses': {'prune': 'trim'}}),
-     # G2: flowers
-     G.Model('flowerbed', flowerbed, size=(0.94, 0.475, 0.94), key='model.flowerbed', tolerance=TOLERANCE, paint=[('wood', 'Box')]),
-     G.Model('tulips', tulips, size=(0.84, 0.622, 0.843), key='model.garden.tulips', tolerance=TOLERANCE, paint=BED),
-     G.Model('daffodils', daffodils, size=(0.84, 0.491, 0.84), key='model.garden.daffodils', tolerance=TOLERANCE, paint=BED + [('bloom', 'Petals')]),
-     G.Model('daisies', daisies, size=(0.84, 0.376, 0.84), key='model.garden.daisies', tolerance=TOLERANCE, paint=BED + [('bloom', 'Petals')]),
-     G.Model('sunflowers', sunflowers, size=(0.84, 2.108, 0.907), key='model.garden.sunflowers', tolerance=TOLERANCE, paint=BED + [('bloom', 'Petals')]),
-     G.Model('poppies', poppies, size=(0.84, 0.657, 0.84), key='model.garden.poppies', tolerance=TOLERANCE, paint=BED + [('bloom', 'Petals')]),
-     G.Model('marigolds', marigolds, size=(0.885, 0.34, 0.84), key='model.garden.marigolds', tolerance=TOLERANCE, paint=BED),
-     G.Model('pansies', pansies, size=(0.84, 0.264, 0.84), key='model.garden.pansies', tolerance=TOLERANCE, paint=BED),
-     G.Model('lilies', lilies, size=(0.84, 0.939, 0.869), key='model.garden.lilies', tolerance=TOLERANCE, paint=BED),
-     G.Model('lupins', lupins, size=(0.84, 0.987, 0.84), key='model.garden.lupins', tolerance=TOLERANCE, paint=BED),
-     G.Model('forgetMeNots', forget_me_nots, size=(0.866, 0.28, 0.84), key='model.garden.forgetMeNots', tolerance=TOLERANCE, paint=BED),
-     G.Model('cosmos', cosmos, size=(0.885, 0.879, 0.84), key='model.garden.cosmos', tolerance=TOLERANCE, paint=BED),
-     G.Model('meadow', meadow, size=(0.811, 0.517, 0.919), key='model.garden.meadow', tolerance=TOLERANCE,
+     # G2: flowers (with G3 and G4, each with a far version: they stand outside, seen in the town overview)
+     G.Model('flowerbed', flowerbed, size=(0.94, 0.475, 0.94), key='model.flowerbed', tolerance=TOLERANCE, far=far_of(flowerbed), paint=[('wood', 'Box')]),
+     G.Model('tulips', tulips, size=(0.84, 0.622, 0.843), key='model.garden.tulips', tolerance=TOLERANCE, far=far_of(tulips), paint=BED),
+     G.Model('daffodils', daffodils, size=(0.84, 0.491, 0.84), key='model.garden.daffodils', tolerance=TOLERANCE, far=far_of(daffodils), paint=BED + [('bloom', 'Petals')]),
+     G.Model('daisies', daisies, size=(0.84, 0.376, 0.84), key='model.garden.daisies', tolerance=TOLERANCE, far=far_of(daisies), paint=BED + [('bloom', 'Petals')]),
+     G.Model('sunflowers', sunflowers, size=(0.84, 2.108, 0.907), key='model.garden.sunflowers', tolerance=TOLERANCE, far=far_of(sunflowers), paint=BED + [('bloom', 'Petals')]),
+     G.Model('poppies', poppies, size=(0.84, 0.657, 0.84), key='model.garden.poppies', tolerance=TOLERANCE, far=far_of(poppies), paint=BED + [('bloom', 'Petals')]),
+     G.Model('marigolds', marigolds, size=(0.885, 0.34, 0.84), key='model.garden.marigolds', tolerance=TOLERANCE, far=far_of(marigolds), paint=BED),
+     G.Model('pansies', pansies, size=(0.84, 0.264, 0.84), key='model.garden.pansies', tolerance=TOLERANCE, far=far_of(pansies), paint=BED),
+     G.Model('lilies', lilies, size=(0.84, 0.939, 0.869), key='model.garden.lilies', tolerance=TOLERANCE, far=far_of(lilies), paint=BED),
+     G.Model('lupins', lupins, size=(0.84, 0.987, 0.84), key='model.garden.lupins', tolerance=TOLERANCE, far=far_of(lupins), paint=BED),
+     G.Model('forgetMeNots', forget_me_nots, size=(0.866, 0.28, 0.84), key='model.garden.forgetMeNots', tolerance=TOLERANCE, far=far_of(forget_me_nots), paint=BED),
+     G.Model('cosmos', cosmos, size=(0.885, 0.879, 0.84), key='model.garden.cosmos', tolerance=TOLERANCE, far=far_of(cosmos), paint=BED),
+     G.Model('meadow', meadow, size=(0.811, 0.517, 0.919), key='model.garden.meadow', tolerance=TOLERANCE, far=far_of(meadow),
              motions={'uses': {'pickFlower': 'pick'}}),
-     G.Model('geraniums', geraniums, size=(0.424, 0.65, 0.503), key='model.garden.geraniums', tolerance=TOLERANCE, paint=[('body', 'Pot'), ('bloom', 'Flowers')]),
-     G.Model('flowerBox', flower_box, size=(0.945, 0.732, 0.505), key='model.garden.flowerBox', tolerance=TOLERANCE, paint=[('body', 'Box')])],
-    comment='Blender-built potted plants (tools/art/blender/families/plants.py): the G1 houseplants. Replaces the '
-            'primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest\'s packs. '
-            'The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` '
-            'finish, so the nature shader sways and tints them as it does the placeholders\'; the pot is `body`, '
-            'the part the player colours. The bonsai\'s stray sprig shrinks away while a resident prunes it.',
+     G.Model('geraniums', geraniums, size=(0.424, 0.65, 0.503), key='model.garden.geraniums', tolerance=TOLERANCE, far=far_of(geraniums), paint=[('body', 'Pot'), ('bloom', 'Flowers')]),
+     G.Model('flowerBox', flower_box, size=(0.945, 0.732, 0.505), key='model.garden.flowerBox', tolerance=TOLERANCE, far=far_of(flower_box), paint=[('body', 'Box')]),
+     # G3: shrubs (they dress every lot)
+     G.Model('bush', bush, size=(1.043, 0.91, 1.095), key='model.bush', tolerance=TOLERANCE, far=far_of(bush)),
+     G.Model('boxwood', boxwood, size=(0.696, 0.752, 0.722), key='model.garden.boxwood', tolerance=TOLERANCE, far=far_of(boxwood),
+             motions={'uses': {'trim': 'trim'}}),
+     G.Model('topiaryCone', topiary_cone, size=(0.643, 1.805, 0.66), key='model.garden.topiaryCone', tolerance=TOLERANCE, far=far_of(topiary_cone),
+             paint=[('body', 'Pot')], motions={'uses': {'trim': 'trim'}}),
+     G.Model('hedge', garden_hedge, size=(1.546, 1.167, 0.92), key='model.garden.hedge', tolerance=TOLERANCE, far=far_of(garden_hedge),
+             motions={'uses': {'trim': 'trim'}}),
+     G.Model('hydrangea', hydrangea, size=(1.196, 0.861, 1.182), key='model.garden.hydrangea', tolerance=TOLERANCE, far=far_of(hydrangea),
+             paint=[('blossom', 'Flowers')]),
+     G.Model('rosebush', rosebush, size=(0.925, 0.861, 0.951), key='model.garden.rosebush', tolerance=TOLERANCE, far=far_of(rosebush),
+             paint=[('bloom', 'Roses')], motions={'uses': {'prune': 'cut'}}),
+     G.Model('azalea', azalea, size=(1.239, 1.013, 1.238), key='model.garden.azalea', tolerance=TOLERANCE, far=far_of(azalea),
+             paint=[('blossom', 'Flowers')], motions={'uses': {'trim': 'trim'}}),
+     G.Model('lavender', lavender, size=(0.607, 0.865, 0.63), key='model.garden.lavender', tolerance=TOLERANCE, far=far_of(lavender),
+             paint=[('bloom', 'Flowers')], motions={'uses': {'cut': 'cut'}}),
+     G.Model('fern', garden_fern, size=(0.793, 0.478, 0.932), key='model.garden.fern', tolerance=TOLERANCE, far=far_of(garden_fern)),
+     G.Model('grass', ornamental_grass, size=(1.218, 1.21, 1.28), key='model.garden.grass', tolerance=TOLERANCE, far=far_of(ornamental_grass)),
+     G.Model('hosta', hosta, size=(0.621, 0.842, 0.675), key='model.garden.hosta', tolerance=TOLERANCE, far=far_of(hosta))],
+    comment='Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers and G3 shrubs. '
+            'Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest\'s '
+            'packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` '
+            'finish, so the nature shader sways and tints them as it does the placeholders\'. The outdoor ones have a far '
+            'version (`far`). Clips: the bonsai\'s sprig and the clipped shrubs\' sprigs shrink away while they are '
+            'trimmed, a rose and lavender stems while they are cut, a meadow flower while it is picked.'
 )
 
 if __name__ == '__main__':
