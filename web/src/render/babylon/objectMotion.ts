@@ -4,7 +4,8 @@
  * its clips; each plays back after its `hold` seconds or when the use ends. A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
- * open as long as it stays so. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
+ * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
+ * whoever is asleep. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time, but only within `ambientRange` of the camera (none on Low), without the
  * shadows being redrawn for it. Each instance's parts draw from buffers of their own
  * (`MovingTarget`), written only while something moves.
@@ -70,6 +71,22 @@ export class ObjectMotion {
   /** Metres from the camera within which ambient clips play (0: none; the quality's `ambientRange`). */
   private ambientRange = 0;
 
+  /** Night (the lamps are lit): `motions.night` clips are held open. Null until the lighting first says. */
+  private night: boolean | null = null;
+  /** The night clips go straight to where the lighting has them (the first lighting of a world), without playing. */
+  private snapNight = false;
+
+  /**
+   * The lamps' level (the lighting's `lamps`, 0 by day to 1 at night): night clips close from about
+   * half way up and open again below. The first level after a world is built shows them as they
+   * are, without playing.
+   */
+  setLamps(level: number): void {
+    const night = this.night ? level > 0.4 : level > 0.55;
+    if (this.night === null) this.snapNight = true;
+    this.night = night;
+  }
+
   /** Ambient clips play within `range` metres of the camera (0: nowhere, all at rest). */
   setAmbientRange(range: number): void {
     this.ambientRange = range;
@@ -83,12 +100,14 @@ export class ObjectMotion {
     // What is open when first seen (a game loaded, a lot looked at) is shown open, without the
     // opening; what opens later (`update`) opens on screen.
     for (const o of objects) {
-      const name = o.open ? o.motions.open : undefined;
-      const clip = name ? o.motion.clips.get(name) : undefined;
-      if (!name || !clip || before.has(o.id)) continue;
-      let clips = this.states.get(o.id);
-      if (!clips) this.states.set(o.id, (clips = new Map()));
-      if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, kind: 'use' });
+      if (before.has(o.id)) continue;
+      for (const name of this.held(o)) {
+        const clip = o.motion.clips.get(name);
+        if (!clip) continue;
+        let clips = this.states.get(o.id);
+        if (!clips) this.states.set(o.id, (clips = new Map()));
+        if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, kind: 'use' });
+      }
     }
     for (const [id, clips] of this.states) {
       const o = this.objects.get(id)!;
@@ -104,6 +123,15 @@ export class ObjectMotion {
   clear(): void {
     this.objects.clear();
     this.states.clear();
+    this.night = null;
+  }
+
+  /** The clips `o` holds open now: its `open` one while open, its `night` one at night. */
+  private held(o: MovingObject): string[] {
+    const held: string[] = [];
+    if (o.open && o.motions.open) held.push(o.motions.open);
+    if (this.night && o.motions.night) held.push(o.motions.night);
+    return held;
   }
 
   /** Plays this frame's clips, the ambient ones near `eye` (the camera). */
@@ -126,13 +154,17 @@ export class ObjectMotion {
     const reach = this.ambientRange * this.ambientRange;
     for (const [id, o] of this.objects) {
       const wanted = this.wanted.get(id);
-      const held = o.open ? o.motions.open : undefined;
+      const held = this.held(o);
       const idle = o.motions.idle !== undefined && reach > 0 && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
       let clips = this.states.get(id);
-      if ((wanted || held || idle) && !clips) this.states.set(id, (clips = new Map()));
+      if ((wanted || held.length || idle) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
-      const heldClip = held ? o.motion.clips.get(held) : undefined;
-      if (held && heldClip && !clips.has(held)) clips.set(held, { clip: heldClip, time: 0, use: '', until: Infinity, kind: 'use' });
+      for (const name of held) {
+        const clip = o.motion.clips.get(name);
+        if (clip && !clips.has(name)) clips.set(name, { clip, time: 0, use: '', until: Infinity, kind: 'use' });
+      }
+      // The first lighting of a world: night clips as it is, without playing.
+      const snap = this.snapNight && o.motions.night !== undefined ? o.motions.night : undefined;
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, kind: 'idle' });
       let changed = false;
@@ -163,7 +195,7 @@ export class ObjectMotion {
         const using = state.use !== '' && wanted?.get(name)?.use === state.use;
         // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
         if (!using && !wanted?.has(name)) state.use = '';
-        if (state.kind === 'loop' && name !== held) {
+        if (state.kind === 'loop' && !held.includes(name)) {
           // Round and round while used; once not, on to the end of the round and stop there (at
           // rest: a loop ends where it starts). One that never got going stops where it is.
           if (!using && (state.time === 0 || state.time + dt >= d)) {
@@ -176,8 +208,9 @@ export class ObjectMotion {
           state.time = time;
           continue;
         }
-        const open = name === held || (using && this.clock < state.until);
-        const time = Math.min(Math.max(state.time + (open ? dt : -dt), 0), d);
+        const open = held.includes(name) || (using && this.clock < state.until);
+        const step = name === snap ? d : dt;
+        const time = Math.min(Math.max(state.time + (open ? step : -step), 0), d);
         if (time !== state.time) changed = true;
         state.time = time;
         // Closed again after its `hold`, it stays so (kept) until the use ends; a new use opens it again.
@@ -190,6 +223,7 @@ export class ObjectMotion {
       }
       if (!clips.size) this.states.delete(id);
     }
+    this.snapNight = false;
     // Each buffer written goes up once, however many of its instances moved.
     for (const mesh of written) {
       if (mesh.isDisposed()) continue;

@@ -182,6 +182,7 @@ How the parts work:
     round. It must end where it starts: make it with `G.rock` or `G.spin`.
   - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
     on the Low preset. It too ends where it starts.
+  - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
   - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.

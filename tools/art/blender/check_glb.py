@@ -129,14 +129,14 @@ def first_value(gltf, binary, accessor, last=False):
 
 def played(motions):
     """{clip: what plays it} for an entry's `motions`: `uses` (a clip, {clip, hold} or a list of them),
-    `loops`, `open`, `idle`."""
+    `loops`, `open`, `idle`, `night`."""
     out = {}
     for use, value in (motions.get('uses') or {}).items():
         for u in value if isinstance(value, list) else [value]:
             out.setdefault(u['clip'] if isinstance(u, dict) else u, f'use {use!r}')
     for use, clip in (motions.get('loops') or {}).items():
         out.setdefault(clip, f'loop {use!r}')
-    for kind in ('open', 'idle'):
+    for kind in ('open', 'idle', 'night'):
         if motions.get(kind):
             out.setdefault(motions[kind], kind)
     return out

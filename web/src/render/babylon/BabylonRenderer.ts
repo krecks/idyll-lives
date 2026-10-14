@@ -3480,6 +3480,8 @@ export class BabylonRenderer implements Renderer {
     // Warm lamps inside, glowing windows outside at night; cool daylight in the panes by day.
     this.lampsLevel = l.lamps;
     this.applyRoomLights();
+    // Curtains drawn from dusk to dawn.
+    this.motion.setLamps(l.lamps);
     const glass = this.lib.surface('material.window', { vertexColors: true, cutaway: true }) as PBRMaterial;
     // Windows light up only once it is getting dark outside.
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));

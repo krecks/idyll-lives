@@ -222,6 +222,14 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "idle": "blades_turn" }
   ```
+- **Night:** `night` names a clip held open from dusk to dawn, while the lamps are lit (curtains
+  drawn): it closes as the lamps come up past half way and opens again as they go down. A room going
+  dark because everyone in it is asleep doesn't open it (the curtains stay drawn over the sleepers);
+  what follows a room's own lights is the shade glow (engine item 8). A game loaded at night shows it
+  closed without playing it.
+  ```json
+  "motions": { "night": "close" }
+  ```
 - **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
   `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip
   held open while it is: the wall bed stays down after *Fold down* or a night's sleep until *Fold up*
