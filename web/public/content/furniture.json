@@ -580,7 +580,7 @@
         1
       ],
       "price": 110,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "description": "A base cabinet with a worktop. Line them up for a proper kitchen; there's always room to make a sandwich.",
       "surface": {
@@ -619,7 +619,7 @@
         1
       ],
       "price": 130,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "description": "A deep corner unit that joins two runs of counters into an L.",
       "surface": {

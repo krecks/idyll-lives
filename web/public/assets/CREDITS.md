@@ -92,6 +92,14 @@ The coffee machine slides its cup under the spout and runs a coffee stream; the 
 lever slides and its toast pops, and its blender lid lifts; the dishwashers drop their door and slide a rack
 out. Their primitive-part entries stay as the fallback.
 
+The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
+`counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
+`counterMarble.glb`, override pack `packs/kitchen_counters/manifest.json`) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The plain, corner, marble and butcher-block counters slide their top (or knife) drawer out 25 cm
+while a resident makes a sandwich; the others are static base units with doors, drawers or open shelves.
+Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

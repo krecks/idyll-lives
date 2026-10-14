@@ -3679,6 +3679,10 @@
         {
           "id": "appliances",
           "label": "Appliances"
+        },
+        {
+          "id": "counters",
+          "label": "Counters"
         }
       ]
     },

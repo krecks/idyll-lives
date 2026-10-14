@@ -1,8 +1,8 @@
 # Kitchen
 
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
-(`families/kitchen.py`), and the six K2 cookers and the four K3 small appliances and dishwashers are done
-(`families/kitchen_cooking.py`).
+(`families/kitchen.py`), the six K2 cookers and the four K3 small appliances and dishwashers are done
+(`families/kitchen_cooking.py`), and the eight K4 base counters are done (`families/kitchen_counters.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -49,7 +49,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
 
-## K4. Base counters (8)
+## K4. Base counters (8) — **Done** (in Validate › Counters)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
 - **Validate group:** `counters` (Validate › Counters)

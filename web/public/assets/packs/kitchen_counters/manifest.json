@@ -1,0 +1,326 @@
+{
+  "$comment": "Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a carcass and a worktop (to 0.96 or 0.95): the plain, corner and marble counters carry a drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a sandwich, as does the butcher block's knife drawer.",
+  "version": 1,
+  "entries": {
+    "model.counter": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counter.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": "drawer_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.counterCorner": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterCorner.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": "drawer_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.counterEnd": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterEnd.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cream": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "rust": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.counterCornerOuter": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterCornerOuter.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.counterDrawers": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterDrawers.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.counterOpenShelf": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterOpenShelf.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "cream": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.butcherBlock": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/butcherBlock.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.satin"
+        },
+        "block": {
+          "finish": "material.finish.wood"
+        },
+        "block2": {
+          "finish": "material.finish.wood"
+        },
+        "leg": {
+          "finish": "material.finish.wood"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "wood2": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": "drawer_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "leg",
+          "label": "Base"
+        },
+        {
+          "material": "block",
+          "label": "Block top"
+        }
+      ]
+    },
+    "model.counterMarble": {
+      "type": "model",
+      "url": "../../models/kitchen_counters/counterMarble.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "navy": {
+          "finish": "material.finish.satin"
+        },
+        "vein": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": "drawer_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "navy",
+          "label": "Cabinet"
+        },
+        {
+          "material": "marble",
+          "label": "Marble top"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    }
+  }
+}

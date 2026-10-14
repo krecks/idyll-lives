@@ -10,7 +10,7 @@
         1
       ],
       "price": 140,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "surface": {
         "height": 0.95,
@@ -39,7 +39,7 @@
         1
       ],
       "price": 150,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "surface": {
         "height": 0.95,
@@ -68,7 +68,7 @@
         1
       ],
       "price": 160,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "surface": {
         "height": 0.95,
@@ -97,7 +97,7 @@
         1
       ],
       "price": 130,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "surface": {
         "height": 0.95,
@@ -126,7 +126,7 @@
         1
       ],
       "price": 260,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "decor": 0.2,
       "surface": {
@@ -162,7 +162,7 @@
         1
       ],
       "price": 380,
-      "category": "kitchen",
+      "category": "validate",
       "group": "counters",
       "decor": 0.3,
       "surface": {
