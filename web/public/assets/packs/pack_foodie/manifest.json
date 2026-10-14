@@ -1,0 +1,474 @@
+{
+  "$comment": "Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Replaces the primitive-part placeholders of packs/foodie by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts aside for the peel as the fire grows, and the island's drawer pulls out.",
+  "version": 1,
+  "entries": {
+    "model.foodie.herbGarden": {
+      "type": "model",
+      "url": "../../models/pack_foodie/herbGarden.glb",
+      "materials": {
+        "basil": {
+          "finish": "material.finish.satin"
+        },
+        "basil_light": {
+          "finish": "material.finish.satin"
+        },
+        "cedar": {
+          "finish": "material.finish.wood"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.wood"
+        },
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "rosemary": {
+          "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "terracotta": {
+          "finish": "material.finish.matte"
+        },
+        "thyme": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tendHerbs": "sprig"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Body"
+        },
+        {
+          "material": "terracotta",
+          "label": "Pots"
+        }
+      ]
+    },
+    "model.foodie.deliPantry": {
+      "type": "model",
+      "url": "../../models/pack_foodie/deliPantry.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "cheese_light": {
+          "finish": "material.finish.satin"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "cream_panel": {
+          "finish": "material.finish.satin"
+        },
+        "honey": {
+          "finish": "material.finish.satin"
+        },
+        "jar_a": {
+          "finish": "material.finish.gloss"
+        },
+        "jar_b": {
+          "finish": "material.finish.gloss"
+        },
+        "jar_c": {
+          "finish": "material.finish.gloss"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "oil": {
+          "finish": "material.finish.gloss"
+        },
+        "salami": {
+          "finish": "material.finish.matte"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        },
+        "wine": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "nibble": "doors_open",
+          "cheeseBoard": "doors_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cream",
+          "label": "Body"
+        },
+        {
+          "material": "marble",
+          "label": "Worktop"
+        },
+        {
+          "material": "honey",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.foodie.espressoBar": {
+      "type": "model",
+      "url": "../../models/pack_foodie/espressoBar.glb",
+      "materials": {
+        "beans": {
+          "finish": "material.finish.satin"
+        },
+        "black": {
+          "finish": "material.finish.gloss"
+        },
+        "book_teal": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "machine": {
+          "finish": "material.finish.gloss"
+        },
+        "oak_top": {
+          "finish": "material.finish.satin"
+        },
+        "sack": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "espresso": "brew",
+          "latteArt": "brew"
+        },
+        "hold": 4.0
+      },
+      "paint": [
+        {
+          "material": "teal",
+          "label": "Body"
+        },
+        {
+          "material": "oak_top",
+          "label": "Worktop"
+        },
+        {
+          "material": "machine",
+          "label": "Machine"
+        }
+      ]
+    },
+    "model.foodie.cookbookLectern": {
+      "type": "model",
+      "url": "../../models/pack_foodie/cookbookLectern.glb",
+      "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "book_mustard": {
+          "finish": "material.finish.satin"
+        },
+        "book_sage": {
+          "finish": "material.finish.satin"
+        },
+        "book_teal": {
+          "finish": "material.finish.satin"
+        },
+        "cover": {
+          "finish": "material.finish.satin"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "honey_wood": {
+          "finish": "material.finish.wood"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "studyRecipes": "page",
+          "foodMagazines": "page"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Body"
+        },
+        {
+          "material": "honey_wood",
+          "label": "Stool & ledge"
+        },
+        {
+          "material": "cover",
+          "label": "Cookbook"
+        }
+      ]
+    },
+    "model.foodie.pizzaOven": {
+      "type": "model",
+      "url": "../../models/pack_foodie/pizzaOven.glb",
+      "materials": {
+        "basil": {
+          "finish": "material.finish.satin"
+        },
+        "basil_light": {
+          "finish": "material.finish.satin"
+        },
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "brick": {
+          "finish": "material.finish.matte"
+        },
+        "brick_dark": {
+          "finish": "material.finish.matte"
+        },
+        "brick_light": {
+          "finish": "material.finish.matte"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "door_oak": {
+          "finish": "material.finish.satin"
+        },
+        "dough": {
+          "finish": "material.finish.matte"
+        },
+        "ember": {
+          "finish": "material.finish.gloss"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "log": {
+          "finish": "material.finish.satin"
+        },
+        "mouth": {
+          "finish": "material.finish.matte"
+        },
+        "mozzarella": {
+          "finish": "material.finish.satin"
+        },
+        "oil": {
+          "finish": "material.finish.gloss"
+        },
+        "peel": {
+          "finish": "material.finish.satin"
+        },
+        "plaster": {
+          "finish": "material.finish.matte"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stone": {
+          "finish": "material.finish.satin"
+        },
+        "terracotta": {
+          "finish": "material.finish.matte"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bakePizza": [
+            "door_off",
+            "flames"
+          ],
+          "warmUp": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "plaster",
+          "label": "Body"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "brick",
+          "label": "Brick"
+        }
+      ]
+    },
+    "model.foodie.chefsIsland": {
+      "type": "model",
+      "url": "../../models/pack_foodie/chefsIsland.glb",
+      "materials": {
+        "basil": {
+          "finish": "material.finish.satin"
+        },
+        "basil_light": {
+          "finish": "material.finish.satin"
+        },
+        "black": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cabinet": {
+          "finish": "material.finish.satin"
+        },
+        "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "cheese_light": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_dark": {
+          "finish": "material.finish.wood"
+        },
+        "oak_top": {
+          "finish": "material.finish.satin"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "ring": {
+          "finish": "material.finish.gloss"
+        },
+        "salami": {
+          "finish": "material.finish.matte"
+        },
+        "seat": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tastingMenu": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cabinet",
+          "label": "Body"
+        },
+        {
+          "material": "marble",
+          "label": "Worktop"
+        },
+        {
+          "material": "oak",
+          "label": "Stools"
+        }
+      ]
+    }
+  }
+}

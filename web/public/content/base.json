@@ -3707,6 +3707,10 @@
         {
           "id": "example",
           "label": "Example"
+        },
+        {
+          "id": "foodie",
+          "label": "Foodie"
         }
       ]
     },

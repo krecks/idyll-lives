@@ -80,7 +80,7 @@ done.
 | `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body | Use | `oven_open` (door drops) and `burner_on` (knob and flame ring) for cook and practise. |
 | `whirlpoolTub` Whirlpool tub | 2x2 · floor | soak:bath | wellness / — | Tub, Surround | Use | `fill`: the water rises for soak. L bubbles (E1). |
 
-## P6. Foodie (6)
+## P6. Foodie (6) — **Done** (in Validate › Foodie)
 
 - **Family:** `tools/art/blender/families/pack_foodie.py`
 - **Validate group:** `foodie` (Validate › Foodie)
