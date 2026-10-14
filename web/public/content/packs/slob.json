@@ -8,7 +8,8 @@
       "model": "model.slob.microwaveCart",
       "footprint": [1, 1],
       "price": 280,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "A microwave on wheels over a stack of frozen dinners: a quick hot meal for a few dollars, and skilled cooks (Cooking 4+) invent microwave recipes worth bragging about.",
       "interactions": [
@@ -45,7 +46,8 @@
       "model": "model.slob.beanbag",
       "footprint": [1, 1],
       "price": 240,
-      "category": "living",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "A huge wipe-clean beanbag that swallows residents whole: cheap comfort, and a spot for a lazy afternoon snooze.",
       "interactions": [
@@ -77,7 +79,8 @@
       "model": "model.slob.snackNightstand",
       "footprint": [1, 1],
       "price": 150,
-      "category": "bedroom",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "The top drawer is all chips and cookies. A midnight snack without the long walk to the kitchen.",
       "interactions": [
@@ -99,7 +102,8 @@
       "model": "model.slob.spritzStation",
       "footprint": [1, 1],
       "price": 260,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "Dry shampoo, body spray and a mirror you don't have to look into for long. A few minutes and a few dollars make a slob fresh enough, and they stay that way a little longer.",
       "interactions": [
@@ -122,7 +126,8 @@
       "model": "model.slob.arcadeCabinet",
       "footprint": [1, 1],
       "price": 750,
-      "category": "hobbies",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "A glowing upright cabinet full of retro shooters. Chasing the high score builds Dexterity; nimble players (Dexterity 5+) set records that keep them sharp for hours.",
       "interactions": [
@@ -159,7 +164,8 @@
       "model": "model.slob.gamingRecliner",
       "footprint": [2, 1],
       "price": 2600,
-      "category": "living",
+      "category": "validate",
+      "group": "slob",
       "slots": 1,
       "description": "A padded recliner with LED trim, a console dock and a mini-fridge in the side table. A gaming marathon covers fun and comfort at once and leaves residents feeling like a couch legend.",
       "interactions": [

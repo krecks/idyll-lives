@@ -231,7 +231,7 @@ done.
 | `romantic.letterBureau` Love-letter bureau | 1x1 · floor | writeLetter:write writePoem:write | office / — | Body, Fabric | Use | `fall_front`: the writing flap drops for writeLetter and writePoem. |
 | `romantic.roseArbourSwing` Rose-arbour swing | 2x1 · floor | swing:relax tendRoses:prune | outdoor / — | Body, Fabric | Loop (E1) | `swing` (E1); U `cut`: a bloom shrinks away for tendRoses. |
 
-## P16. Slob (6)
+## P16. Slob (6) — **Done** (in Validate › Slob)
 
 - **Family:** `tools/art/blender/families/pack_slob.py`
 - **Validate group:** `slob` (Validate › Slob)

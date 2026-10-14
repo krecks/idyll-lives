@@ -100,6 +100,12 @@ while it is used: the candles light, the tub fills with petals, the vanity's dra
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. Their primitive-part
 entries stay as the fallback.
 
+The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
+`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_slob.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
+waggles, and the recliner reclines and swings its cup holder out. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
