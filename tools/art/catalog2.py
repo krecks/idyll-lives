@@ -1289,7 +1289,7 @@ for a in range(0, 360, 60):
 for i in range(5):
     a = math.radians(-60 + i * 30)
     p.append(cone([0.06, 0.08, 0.02], [math.sin(a) * 0.36, 0.9 - abs(i - 2) * 0.03, -0.04 + math.cos(a) * 0.2], [RED, YELLOW, BLUE, GREEN, RED][i], 'fabric', segments=3, rotate=[180, 0, 0]))
-add('playTent', p)
+add('playTent', forward(p, 0.04))      # centred, as the model: it stands free, its poles clear of a wall behind
 p = []
 for s in (-1, 1):
     p += [rod([-0.3, 0, s * 0.3], [-0.3, 1.2, 0], 0.035, BIRCH, 'wood', segments=8), rod([0.3, 0, s * 0.3], [0.3, 1.2, 0], 0.035, BIRCH, 'wood', segments=8),

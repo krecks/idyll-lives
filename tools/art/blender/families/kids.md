@@ -85,7 +85,7 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 
 `check_glb.py`: 20 models, 0 failed. The toy box's and the chest's placeholders drew the lid open; they're shut
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
-into it, placeholders too; all stand on the wall face now. The remaining warnings are expected: the high chair's
+into it, placeholders too; all stand on the wall face now. The play tent's placeholder is centred, as the model (it stands free). The remaining warnings are expected: the high chair's
 and the tent's placeholder boxes count their splayed legs and poles unturned. Khronos validator: 0 errors,
 0 warnings each.
 

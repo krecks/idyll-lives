@@ -13,7 +13,10 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 - **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp's
   base stands in the back corner, its back on the wall face (`centre=`), as its placeholder now does.
 - **LT4, table:** `tableLamp` (a lamp on its own oak side table, a floor object), and the surface lamps
-  `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern`.
+  `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern`. Their content `radius` (the room
+  they take on a top) follows the drawn model: the round, square, mushroom and lantern lamps' were taken from their
+  placeholders' boxes (0.18–0.29 m), too wide for a side table's or nightstand's top, which refused them; they are
+  0.12–0.17 m now (2026-10-14), and all five stand on a side table in play.
 
 ## The light
 
