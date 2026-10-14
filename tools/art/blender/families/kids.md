@@ -19,20 +19,23 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
 
 - **Crib** (2 × 1): the crib on the left half, where the baby lies, and a changing table on the right. Two moving
   parts: the front rail (`side_down`, slides down 25 cm for feed, change and cuddle, `uses`) and the mobile over
-  the head end (`mobile`, a turn every 6 s while the baby lies in it, `loops.lie`). The mobile hangs at the back,
+  the head end (`mobile`, a turn every 6 s while a grown-up plays with the baby, `loops.play`: a toy for an awake
+  baby, not turning all night; the crib's uses can't tell a sleeping baby from an awake one, and playing is the
+  one that means awake). The mobile hangs at the back,
   clear of the arms of a grown-up lifting the baby out over the front rail.
 - **Kids' bed** and **race car bed** (1 × 2): as bedroom.py's beds, the duvet's top third (`duvet_flap`) folds back
   toward the foot while a resident sleeps or naps (`turn_down`). The kids' bed is in `BLANKET_BEDS`, so the game
   lays its quilt over the sleeper; the car bed isn't (no quilt, as before). The car's body, wheels and spoiler are
   still.
 - **High chair**: static. Its tray is a part of its own (no clip yet), so a "tray slides out" clip can come with a
-  use.
+  use. Content can't give it one yet: a baby is only ever placed lying (`baby`, `care` are for a baby lying in an
+  object), so feeding a baby in the chair needs the sim first.
 
 ## KD2: the toys
 
 | Model | Clip | Kind |
 |---|---|---|
-| Toy box, toy chest | `lid_open`: the lid swings up 100°, toys heaped inside | `uses.play`, `hold` 2 s |
+| Toy box, toy chest | `lid_open`: the lid swings up 100°, toys heaped inside | `uses.play`, open while the child plays |
 | Doll house | `front_open`: the front wall swings 120° on its side hinge, two furnished rooms behind | `uses.dolls` |
 | Rocking horse | `rock`: ±12° about the rockers' centre, 1 m up, in 1.2 s; the rider rides it | `loops.ride`, `ride` |
 | Play tent | `flap_open`: the door flap rolls up to its top edge (squashed along the canvas) | `uses.play` |
@@ -47,7 +50,9 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 ## KD3: the kids' study and art
 
 - **Kids' desk**: the desk and its chair (one model, as the placeholder). A pencil drawer under the top slides out
-  toward the child (`drawer_open`, `hold` 2 s) for homework and drawing.
+  toward the child (`drawer_open`, `hold` 2 s) for homework and drawing: they take a pencil out and shut it (left
+  open for a 45-minute use, it would read as forgotten). The toy box's and chest's lids, by contrast, stay open
+  while the child plays, the toys being out.
 - **Kids' table** and **kids' chair**: static, a set in blue and white.
 - **Picture-book shelf** (against the wall): three sloped tiers of face-out books; the middle one tips out 20°
   (`book_out`) for read.

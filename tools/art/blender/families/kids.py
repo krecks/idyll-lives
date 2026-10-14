@@ -1077,7 +1077,7 @@ def kidsEasel():
 
 # --- the family --------------------------------------------------------------------------------------------
 TURN_DOWN = {'uses': {'sleep': 'turn_down', 'nap': 'turn_down'}}
-LID = {'uses': {'play': 'lid_open'}, 'hold': 2}
+LID = {'uses': {'play': 'lid_open'}}   # open while the child plays (the toys are out), shut when they're done
 
 FAMILY = G.Family(
     'kids', M,
@@ -1085,7 +1085,8 @@ FAMILY = G.Family(
         # KD1
         G.Model('crib', crib, size=(1.86, 1.008, 0.94), key='model.crib', centre=(-0.02, 0.0),
                 motions={'uses': {'feed': 'side_down', 'change': 'side_down', 'cuddle': 'side_down'},
-                         'loops': {'lie': 'mobile'}},
+                         # the mobile turns for an awake baby, while someone plays with them; not all night
+                         'loops': {'play': 'mobile'}},
                 paint=[('crib', 'Frame'), ('crib_bedding', 'Bedding'), ('mobile', 'Mobile')]),
         G.Model('kidsBed', kidsBed, size=(0.97, 0.764, 1.93), key='model.kidsBed', centre=(0.005, -0.015),
                 motions=TURN_DOWN, paint=[('kids_frame', 'Frame'), ('kids_bedding', 'Bedding')]),
