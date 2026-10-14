@@ -1,8 +1,24 @@
 # Engine and tools first
 
-What the clips in the category files lean on. Today an object clip plays only while a resident uses the object,
-or while the sim holds it `open` (`web/src/render/babylon/objectMotion.ts`, `models.ts` `motionsOf` / `clipPose`).
-A clip plays forward, holds, then plays back. One `hold` per model. Nothing loops or plays on its own.
+What the clips in the category files lean on. Before this work, an object clip played only while a resident used the
+object, or while the sim held it `open` (`web/src/render/babylon/objectMotion.ts`, `models.ts` `motionsOf` / `clipPose`).
+A clip played forward, held, then played back. One `hold` per model. Nothing looped or played on its own.
+
+**Status (2026-10-14): all done**, on `v0.3/object-motion`. How each is used is in `tools/art/blender/README.md` and
+`docs/design/objects.md` ("Moving parts", "Level of detail", "Materials"). In short:
+
+| Task | Use it as |
+|---|---|
+| T0 | `/clips.html?keys=model.<id>` (`&clip=`, `&t=`, `&renderer=webgl`); `G.spin`, `G.rock`, `G.squash` (the boulder shape is now `G.boulder`) |
+| E1 | `motions.loops: {use: clip}`; `check_glb` fails a loop that doesn't end at rest |
+| E2 | `motions.idle: clip`; quality knob `ambientRange` (Low 0, Medium 40 m, High 60 m) |
+| E3 | `motions.night: clip`, held from dusk to dawn; curtains stay drawn over sleepers |
+| E4 | content `grows: {days, fallow}`, harvest `"when": "ripe"`, `"leaves": "picked"`; `motions.growth: clip`, made with `G.stages` (ripe at rest, then picked, growing, planted) |
+| E5 | `motions.uses: {use: [{clip, hold}, clip]}`: several clips, each with its own `hold` |
+| E6 | a material's `"mirror": "front"` (gamekit: `glass=('#hex', 'glass', 'front')`) |
+| E7 | an entry's `far` file, `<id>.far.glb`; `G.Model(far=0.25)` writes it |
+| E8 | materials named `stone@matte`; packs keep the placeholder below; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) |
+| C1 | the futon, the sofa bed, the washing line and the hot tub stay open (`tests/open_objects.rs`) |
 
 ## T0. Clips bench and gamekit helpers (before any category)
 
