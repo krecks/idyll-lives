@@ -193,9 +193,10 @@ function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: numbe
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
- * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa.
+ * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa. `across`: lain on
+ * along its width, head to its left (a hammock slung side to side on a wide footprint).
  */
-const BEDS: Record<string, { h: number; fwd?: number }> = {
+const BEDS: Record<string, { h: number; fwd?: number; across?: boolean }> = {
   bed: { h: 0.58 },
   crib: { h: 0.56 },
   weightBench: { h: 0.5 },
@@ -210,11 +211,13 @@ const BEDS: Record<string, { h: number; fwd?: number }> = {
   kidsBed: { h: 0.44 },
   sunLounger: { h: 0.35 },
   hammock: { h: 0.62 },
+  'cheerful.rainbowHammock': { h: 0.5, across: true },
+  'natureLover.gardenHammock': { h: 0.5, across: true },
   wallBed: { h: 0.46 },
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
   sofaBed: { h: 0.42, fwd: 0.6 },
 };
-const DEFAULT_BED: { h: number; fwd?: number } = { h: 0.5 };
+const DEFAULT_BED: { h: number; fwd?: number; across?: boolean } = { h: 0.5 };
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk. */
 const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
@@ -1804,6 +1807,8 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
+      // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
+      if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
