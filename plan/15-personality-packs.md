@@ -69,7 +69,7 @@ done.
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Pads | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
-## P5. Example pack (2)
+## P5. Example pack (2) — **Done** (in Validate › Example)
 
 - **Family:** `tools/art/blender/families/pack_example.py`
 - **Validate group:** `example` (Validate › Example)
@@ -80,7 +80,7 @@ done.
 | `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body | Use | `oven_open` (door drops) and `burner_on` (knob and flame ring) for cook and practise. |
 | `whirlpoolTub` Whirlpool tub | 2x2 · floor | soak:bath | wellness / — | Tub, Surround | Use | `fill`: the water rises for soak. L bubbles (E1). |
 
-## P6. Foodie (6)
+## P6. Foodie (6) — **Done** (in Validate › Foodie)
 
 - **Family:** `tools/art/blender/families/pack_foodie.py`
 - **Validate group:** `foodie` (Validate › Foodie)
@@ -95,7 +95,7 @@ done.
 | `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza; `flames` grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop | Use | `drawer_open` for tastingMenu. |
 
-## P7. Gloomy (6)
+## P7. Gloomy (6) — **Done** (in Validate › Gloomy)
 
 - **Family:** `tools/art/blender/families/pack_gloomy.py`
 - **Validate group:** `gloomy` (Validate › Gloomy)

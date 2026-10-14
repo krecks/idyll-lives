@@ -7,7 +7,8 @@
       "model": "model.foodie.herbGarden",
       "footprint": [1, 1],
       "price": 140,
-      "category": "decor",
+      "category": "validate",
+      "group": "foodie",
       "slots": 1,
       "description": "Basil, thyme and rosemary within arm's reach. Tending it leaves residents eager to cook and learning Cooking faster for a few hours.",
       "interactions": [
@@ -32,7 +33,8 @@
       "stations": ["ingredients"],
       "footprint": [1, 1],
       "price": 320,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "foodie",
       "slots": 1,
       "description": "Cured meats, aged cheese and good bread on hand: fast, slightly better bites for a few dollars each, perfect for a resident who is always peckish.",
       "interactions": [
@@ -67,7 +69,8 @@
       "model": "model.foodie.espressoBar",
       "footprint": [1, 1],
       "price": 450,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "foodie",
       "slots": 1,
       "description": "A proper lever machine on its own cart. A quick shot perks a resident up and slows their tiredness for a few hours; practising latte art builds steady hands.",
       "interactions": [
@@ -101,7 +104,8 @@
       "model": "model.foodie.cookbookLectern",
       "footprint": [1, 1],
       "price": 280,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "foodie",
       "slots": 1,
       "description": "A stand of well-thumbed cookbooks. Studying recipes trains Cooking without burning a thing; leafing through food magazines is pure fun for food lovers.",
       "interactions": [
@@ -137,7 +141,8 @@
       "stations": ["oven", "grill"],
       "footprint": [2, 1],
       "price": 1400,
-      "category": "outdoor",
+      "category": "validate",
+      "group": "foodie",
       "slots": 2,
       "description": "A brick dome for blistered crusts. Pizza gets better with Cooking skill, and good cooks (Cooking 4+) pull out a perfect pie that keeps them full and sociable; two residents can bake together.",
       "interactions": [
@@ -175,7 +180,8 @@
       "surface": { "height": 0.9, "kind": "counter" },
       "footprint": [2, 1],
       "price": 3200,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "foodie",
       "slots": 2,
       "description": "Marble-topped island with an induction hob and two bar stools. A multi-course tasting menu feeds, entertains and trains; master cooks (Cooking 6+) feel a culinary triumph that boosts their learning for hours.",
       "interactions": [

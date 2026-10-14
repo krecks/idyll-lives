@@ -106,6 +106,23 @@ The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snac
 it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
 waggles, and the recliner reclines and swings its cup holder out. Their primitive-part entries stay as the fallback.
 
+The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
+`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
+cooks; the tub fills and bubbles while residents soak. Their primitive-part entries stay as the fallback.
+
+The foodie pack models (`models/pack_foodie/herbGarden.glb`, `deliPantry.glb`, `espressoBar.glb`,
+`cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_foodie.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door comes off for the peel as the
+fire grows, and the island's drawer pulls out. Their primitive-part entries stay as the fallback.
+
+The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `journalDesk.glb`, `rainLamp.glb`,
+`windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_gloomy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The cabinet's
+lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
+rippling pool, the window seat's cushion sinks and the tub fills. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

@@ -1,0 +1,420 @@
+{
+  "$comment": "Blender-built gloomy pack models (tools/art/blender/families/pack_gloomy.py). Replaces the primitive-part placeholders of packs/gloomy by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The cabinet's lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp, the window seat's cushion sinks and the tub fills.",
+  "version": 1,
+  "entries": {
+    "model.gloomy.recordCabinet": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/recordCabinet.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dried": {
+          "finish": "material.finish.matte"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.gloss"
+        },
+        "mauve": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "platter": {
+          "finish": "material.finish.metal"
+        },
+        "slat": {
+          "finish": "material.finish.wood"
+        },
+        "sleeve_a": {
+          "finish": "material.finish.matte"
+        },
+        "sleeve_b": {
+          "finish": "material.finish.matte"
+        },
+        "sleeve_c": {
+          "finish": "material.finish.matte"
+        },
+        "sleeve_d": {
+          "finish": "material.finish.matte"
+        },
+        "twig": {
+          "finish": "material.finish.matte"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "vinyl": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "wax": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "listen": "lid_open",
+          "newAlbum": "lid_open"
+        },
+        "loops": {
+          "listen": "platter_spin",
+          "newAlbum": "platter_spin"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Body"
+        },
+        {
+          "material": "ink",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.gloomy.cello": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/cello.glb",
+      "materials": {
+        "bridge": {
+          "finish": "material.finish.matte"
+        },
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "ebony": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "plum": {
+          "finish": "material.finish.satin"
+        },
+        "rosewood": {
+          "finish": "material.finish.wood"
+        },
+        "string": {
+          "finish": "material.finish.chrome"
+        },
+        "varnish": {
+          "finish": "material.finish.gloss"
+        },
+        "wax": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "practise": "off_stand",
+          "lament": "off_stand"
+        }
+      },
+      "paint": [
+        {
+          "material": "rosewood",
+          "label": "Body"
+        },
+        {
+          "material": "plum",
+          "label": "Trim"
+        },
+        {
+          "material": "varnish",
+          "label": "Cello"
+        }
+      ]
+    },
+    "model.gloomy.journalDesk": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/journalDesk.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFC870"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "inkwell": {
+          "finish": "material.finish.gloss"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "plum": {
+          "finish": "material.finish.satin"
+        },
+        "rose": {
+          "finish": "material.finish.satin"
+        },
+        "rosewood": {
+          "finish": "material.finish.wood"
+        },
+        "sleeve_a": {
+          "finish": "material.finish.matte"
+        },
+        "sleeve_b": {
+          "finish": "material.finish.matte"
+        },
+        "sleeve_d": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.matte"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "wax": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "journal": "candle",
+          "poetry": "candle"
+        }
+      },
+      "paint": [
+        {
+          "material": "rosewood",
+          "label": "Body"
+        },
+        {
+          "material": "plum",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.gloomy.rainLamp": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/rainLamp.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "figure": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "pebble": {
+          "finish": "material.finish.satin"
+        },
+        "pebble_dark": {
+          "finish": "material.finish.satin"
+        },
+        "pool": {
+          "finish": "material.finish.gloss"
+        },
+        "rain": {
+          "finish": "material.finish.gloss"
+        },
+        "ripple": {
+          "finish": "material.finish.gloss"
+        },
+        "slate": {
+          "finish": "material.finish.metal"
+        },
+        "smoke": {
+          "finish": "material.finish.satin"
+        },
+        "umbrella": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "watchRain": "rain"
+        },
+        "idle": "ripple"
+      },
+      "paint": [
+        {
+          "material": "slate",
+          "label": "Body"
+        },
+        {
+          "material": "umbrella",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.gloomy.windowSeat": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/windowSeat.glb",
+      "materials": {
+        "bench": {
+          "finish": "material.finish.satin"
+        },
+        "bench_front": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "drop": {
+          "finish": "material.finish.gloss"
+        },
+        "frame": {
+          "finish": "material.finish.satin"
+        },
+        "ink": {
+          "finish": "material.finish.satin"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
+        },
+        "pane": {
+          "finish": "material.finish.gloss"
+        },
+        "pillow_a": {
+          "finish": "material.finish.satin"
+        },
+        "pillow_b": {
+          "finish": "material.finish.satin"
+        },
+        "plum": {
+          "finish": "material.finish.satin"
+        },
+        "throw": {
+          "finish": "material.finish.fabric"
+        },
+        "wax": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "brood": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "bench",
+          "label": "Body"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushion"
+        },
+        {
+          "material": "frame",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.gloomy.soakingTub": {
+      "type": "model",
+      "url": "../../models/pack_gloomy/soakingTub.glb",
+      "materials": {
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "foam": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "ledge": {
+          "finish": "material.finish.wood"
+        },
+        "ledge_top": {
+          "finish": "material.finish.satin"
+        },
+        "mauve": {
+          "finish": "material.finish.satin"
+        },
+        "moon": {
+          "finish": "material.finish.gloss"
+        },
+        "stone": {
+          "finish": "material.finish.satin"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wax": {
+          "finish": "material.finish.satin"
+        },
+        "wick": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "soak": "fill"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Body"
+        },
+        {
+          "material": "ledge",
+          "label": "Trim"
+        }
+      ]
+    }
+  }
+}

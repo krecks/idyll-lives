@@ -3715,6 +3715,18 @@
         {
           "id": "slob",
           "label": "Slob"
+        },
+        {
+          "id": "example",
+          "label": "Example"
+        },
+        {
+          "id": "foodie",
+          "label": "Foodie"
+        },
+        {
+          "id": "gloomy",
+          "label": "Gloomy"
         }
       ]
     },

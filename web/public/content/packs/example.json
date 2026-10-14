@@ -31,7 +31,8 @@
       "footprint": [2, 2],
       "slots": 2,
       "price": 2200,
-      "category": "wellness",
+      "category": "validate",
+      "group": "example",
       "description": "Bubbling jets melt the day away. A soak leaves residents relaxed: they sleep and lounge better for hours.",
       "interactions": [
         {
@@ -54,7 +55,8 @@
       "icon": "icon.object.chefStove",
       "footprint": [2, 1],
       "price": 1500,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "example",
       "description": "Six burners and a proper oven. The better the cook, the better the meal; good cooks (Cooking 4+) make delicious meals.",
       "interactions": [
         {

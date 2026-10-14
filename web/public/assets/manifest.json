@@ -32,7 +32,10 @@
     "packs/pack_bookworm/manifest.json",
     "packs/pack_outgoing/manifest.json",
     "packs/pack_romantic/manifest.json",
-    "packs/pack_slob/manifest.json"
+    "packs/pack_slob/manifest.json",
+    "packs/pack_example/manifest.json",
+    "packs/pack_foodie/manifest.json",
+    "packs/pack_gloomy/manifest.json"
   ],
   "entries": {
     "material.wall": {
