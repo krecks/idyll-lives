@@ -75,8 +75,7 @@ M = G.Palette(
     # the bathroom storage and mirrors
     cab=('#F2F1EE', 'satin'),        # a bathroom cabinet's carcass
     cab_door=('#E4E3DF', 'satin'),   # its doors and the mirror's frame
-    mirror=('#CFDCE2', 'glass', 'front'),  # mirror glass: reflects the room (its own draw call)
-    silvering=('#C9D6DC', 'gloss'),  # behind it: what the see-through glass shows where nothing reflects (Medium, Low)
+    mirror=('#CFDCE2', 'gloss', 'front'),  # mirror glass: reflects the room live on High, plain gloss elsewhere
     bulb=('#FFF1CF', 'gloss'),       # the mirror cabinet's light strip
     frame_brass=('#B8925A', 'metal'),  # the round mirror's frame and hook
     leather=('#6B4A33', 'satin'),    # its strap
@@ -892,8 +891,8 @@ def bathtubFreestanding():
 # --- bathroom storage and mirrors -------------------------------------------------------------------------
 # Built where the placeholders stand. The two wall things hang at their real height, their backs on the wall
 # face (`G.settle(centre=False, floor=False)`, `floor=False` on the Model). Mirror glass is a flat piece of
-# the `mirror` material (`'front'`): the game reflects the room in it where the preset has live mirrors (High);
-# elsewhere the glass is see-through, so a pale `silvering` plate behind it is what shows. The cabinets' doors are parts of
+# the `mirror` material (`gloss`, `'front'`): the game reflects the room in it where the preset has live mirrors
+# (High) and draws it pale gloss elsewhere, as the placeholders' mirrors. The cabinets' doors are parts of
 # their own, hinged on their left edge but still: no use opens them yet (the plan's "(+use)"), so a swing
 # can be added without remodelling.
 
@@ -927,7 +926,6 @@ def mirrorCabinet():
     G.join(still, 'body', origin=(0, 0, 0))
     with G.new_parts() as parts:
         F.box('door', w - 0.02, h - 0.02, 0.02, (0, y0 + h / 2, front + 0.01), M.cab_door, bevel=0.008)
-        F.box('door_silvering', 0.48, 0.64, 0.002, (0, y0 + h / 2, front + 0.0205), M.silvering)
         F.box('door_mirror', 0.48, 0.64, 0.004, (0, y0 + h / 2, front + 0.0235), M.mirror)
         F.box('door_pull', 0.012, 0.1, 0.02, (0.25, y0 + h / 2, front + 0.03), M.cab_door, bevel=0.004)
     G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
@@ -942,7 +940,6 @@ def mirrorRound():
         G.torus('frame', r, 0.02, at=F.at(0, y, z), material=M.frame_brass, rot=(90, 0, 0), major_segments=48,
                 minor_segments=10)
         F.cyl('backing', r, 0.01, (0, y, z - 0.012), M.frame_brass, rot=(90, 0, 0), verts=48)
-        F.cyl('silvering', r - 0.012, 0.002, (0, y, z - 0.0065), M.silvering, rot=(90, 0, 0), verts=48)
         # a leather strap from the frame's top up to a brass hook on the wall
         hook = (0, 1.98, WALL + 0.02)
         for s_ in (-1, 1):

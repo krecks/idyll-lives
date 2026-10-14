@@ -79,8 +79,8 @@ class Palette:
     The finish is one of the base manifest's `material.finish.*` (matte, satin, gloss, metal, chrome,
     skin, hair, fabric, wood, bark, foliage, glass). A third says more of it (the pack entry's
     material fields):
-      mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'glass', 'front')` (or 'back'),
-        on a flat part;
+      mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'gloss', 'front')` (or 'back'),
+        on a flat part; gloss, as the placeholders' mirrors (only High reflects live);
       a lamp's shade or a screen that glows at night, in a colour: `shade=('#F2E6CC', 'fabric',
         {'glow': '#FFD9A0'})`.
     """

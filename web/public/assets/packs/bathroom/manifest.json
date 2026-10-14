@@ -869,16 +869,13 @@
           "finish": "material.finish.chrome"
         },
         "mirror": {
-          "finish": "material.finish.glass",
+          "finish": "material.finish.gloss",
           "mirror": "front"
         },
         "porcelain": {
           "finish": "material.finish.gloss"
         },
         "sage": {
-          "finish": "material.finish.gloss"
-        },
-        "silvering": {
           "finish": "material.finish.gloss"
         },
         "teal": {
@@ -907,11 +904,8 @@
           "finish": "material.finish.satin"
         },
         "mirror": {
-          "finish": "material.finish.glass",
+          "finish": "material.finish.gloss",
           "mirror": "front"
-        },
-        "silvering": {
-          "finish": "material.finish.gloss"
         }
       },
       "paint": [

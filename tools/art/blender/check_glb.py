@@ -235,6 +235,10 @@ def placeholder_box(parts):
     return lo, hi
 
 
+# The finishes that are see-through (`alpha` under 1, the glass), filled as the manifests are read.
+SEE_THROUGH = set()
+
+
 def check(entry, finishes, path, far=None):
     """(errors, warnings, summary) for one model entry and its file (and its far version's, at `far`)."""
     errors, warnings, info = check_file(entry, finishes, path)
@@ -298,6 +302,9 @@ def check_file(entry, finishes, path):
             errors.append(f'material {name!r}: `mirror` is front or back, not {ov["mirror"]!r}')
         elif ov.get('mirror') and name not in names:
             errors.append(f'material {name!r} is mirror glass, but no material of the file')
+        elif ov.get('mirror') and ov.get('finish') in SEE_THROUGH:
+            warnings.append(f'mirror glass {name!r} is see-through ({ov["finish"]}): where nothing reflects (Medium, Low) '
+                            'it shows what is behind it; map it to gloss, as the placeholders\' mirrors')
         glow = ov.get('glow')
         if glow is not None and not (isinstance(glow, str) and len(glow) == 7 and glow[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in glow[1:])):
             errors.append(f'material {name!r}: `glow` is a colour, #rrggbb, not {glow!r}')
@@ -430,6 +437,8 @@ def main(argv):
                 entries[key] = (entry, path)
             elif entry.get('type') == 'material' and key.startswith('material.finish.'):
                 finishes[key] = not entry.get('texture') and entry.get('alpha', 1) >= 1
+                if entry.get('alpha', 1) < 1:
+                    SEE_THROUGH.add(key)
     failed = 0
     checked = []
     for key, (entry, manifest) in sorted(entries.items()):
