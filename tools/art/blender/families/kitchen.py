@@ -35,6 +35,15 @@ M = G.Palette(
     dark=('#2F3236', 'satin'),       # drains
     plant=('#5C8A4A', 'satin'),      # a potted herb on the counter
     water=('#9EC9DD', 'gloss'),      # the stream from the tap
+    # the rest of the fridge family (K1)
+    steel=('#C3C7CB', 'metal'),      # a stainless French-door fridge
+    panel=('#EDEBE6', 'satin'),      # built-in cabinet fronts and the wine fridge's body
+    mint=('#BFE0D2', 'gloss'),       # a retro fridge's rounded body
+    mint2=('#A9CFC0', 'gloss'),      # its trim (the plinth and the door seam)
+    doorframe=('#2B2C2E', 'satin'),  # the wine fridge's dark door frame
+    smoked=('#3A2A2E', 'glass'),     # its smoked glass
+    wine=('#5A1E2A', 'gloss'),       # red wine bottles
+    wine2=('#E3D9A0', 'gloss'),      # white wine bottles
 )
 
 # The placeholder's back sits 9.4 cm behind the middle of its tile (`furniture_prims.BACK = -0.455`);
@@ -250,6 +259,213 @@ def counterSinkDouble():
     return G.meshes()
 
 
+# --- K1: the rest of the fridge family ---------------------------------------------------------------
+# Five more fridges, built to their placeholders' sizes with the classic fridge's mechanics: a door
+# hinged on one edge (`G.hinged`) with `G.swing`, and a `hold` so it shuts while the resident is busy.
+# The French-door freezer and the wine fridge's top rack slide (`G.slide`).
+
+
+def _small_bar(F, name, x, y0, y1, z, t=0.02, stand=0.014):
+    """A short vertical bar handle, its back on the door face at game depth `z` (a slimmer `_bar`)."""
+    F.box(f'{name}_bar', t, y1 - y0, t, (x, (y0 + y1) / 2, z + stand + t / 2), M.chrome, bevel=t * 0.45)
+    for i, y in enumerate((y0 + 0.03, y1 - 0.03)):
+        F.box(f'{name}_stand{i}', t * 0.8, t * 0.8, stand, (x, y, z + stand / 2), M.chrome, bevel=0.004)
+
+
+def _fridgeMini():
+    """A small fridge: a white cabinet with one door over its whole front, a board and a jar on top."""
+    Fm = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        Fm.box('plinth', 0.56, 0.04, 0.52, (0, 0.02, -0.025), M.trim, bevel=0.006)
+        Fm.box('side_left', 0.03, 0.80, 0.54, (-0.285, 0.44, -0.015), M.body, bevel=0.006)
+        Fm.box('side_right', 0.03, 0.80, 0.54, (0.285, 0.44, -0.015), M.body, bevel=0.006)
+        Fm.box('top', 0.60, 0.03, 0.54, (0, 0.855, -0.015), M.body, bevel=0.006)
+        Fm.box('bottom', 0.60, 0.03, 0.54, (0, 0.055, -0.015), M.body, bevel=0.006)
+        Fm.box('back', 0.60, 0.80, 0.03, (0, 0.44, -0.27), M.body, bevel=0.006)
+        # the liner, a divider (the freezer floor) and a shelf
+        Fm.box('liner', 0.54, 0.74, 0.01, (0, 0.44, -0.25), M.liner, bevel=0.002)
+        Fm.box('divider', 0.54, 0.02, 0.50, (0, 0.66, -0.015), M.shelf, bevel=0.002)
+        Fm.box('shelf', 0.54, 0.015, 0.50, (0, 0.40, -0.015), M.shelf, bevel=0.002)
+        # food
+        Fm.box('milk', 0.07, 0.15, 0.07, (-0.15, 0.50, -0.04), M.carton, bevel=0.006)
+        Fm.cone('milk_top', 0.05, 0.0, 0.045, (-0.15, 0.5975, -0.04), M.carton, verts=4, rot=(0, 0, 45))
+        for i, x in enumerate((0.03, 0.11)):
+            Fm.sphere(f'apple{i}', 0.035, (x, 0.4175, -0.05), M.produce, segments=10, rings=6)
+        # a chopping board, a jar and an apple on top
+        Fm.box('board', 0.50, 0.02, 0.40, (0, 0.88, -0.02), M.wood, bevel=0.006)
+        Fm.cone('jar', 0.05, 0.04, 0.12, (-0.14, 0.94, -0.04), M.porcelain, verts=14)
+        Fm.sphere('apple_top', 0.045, (0.12, 0.92, 0.0), M.produce, segments=10, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the door over the whole front, hinged on its left edge
+    with G.new_parts() as parts:
+        Fm.box('door_low', 0.58, 0.62, 0.03, (0, 0.40, 0.27), M.body, bevel=0.010)
+        Fm.box('door_high', 0.58, 0.16, 0.03, (0, 0.78, 0.27), M.body, bevel=0.010)
+        Fm.box('seal', 0.50, 0.018, 0.026, (0, 0.705, 0.285), M.trim, bevel=0.004)
+        _small_bar(Fm, 'handle', 0.24, 0.36, 0.58, 0.285)
+    door = G.hinged(G.join(parts, 'door'), Fm.at(-0.29, 0.40, 0.27))
+    G.settle()
+    G.swing(door, 'fridge_open', 100, seconds=1.6)
+
+
+def _fridgeBuiltIn():
+    """A tall fridge-freezer behind cabinet fronts, a fridge door over a freezer door, long bar handles."""
+    Fb = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        Fb.box('plinth', 0.78, 0.10, 0.56, (0, 0.05, -0.04), M.dark, bevel=0.004)
+        Fb.box('side_left', 0.03, 1.88, 0.58, (-0.395, 1.06, -0.03), M.panel, bevel=0.006)
+        Fb.box('side_right', 0.03, 1.88, 0.58, (0.395, 1.06, -0.03), M.panel, bevel=0.006)
+        Fb.box('top', 0.82, 0.03, 0.58, (0, 1.995, -0.03), M.panel, bevel=0.006)
+        Fb.box('bottom', 0.82, 0.03, 0.58, (0, 0.115, -0.03), M.panel, bevel=0.006)
+        Fb.box('back', 0.82, 1.88, 0.03, (0, 1.06, -0.30), M.panel, bevel=0.006)
+        Fb.box('cornice', 0.84, 0.05, 0.62, (0, 2.00, -0.005), M.panel, bevel=0.008)
+        Fb.box('vent', 0.60, 0.05, 0.01, (0, 0.07, 0.24), M.dark, bevel=0.004)
+        # the liner, the divider between freezer (below) and fridge (above), and the shelves
+        Fb.box('liner_back', 0.76, 1.72, 0.01, (0, 1.06, -0.28), M.liner, bevel=0.002)
+        Fb.box('liner_left', 0.006, 1.72, 0.54, (-0.377, 1.06, -0.02), M.liner, bevel=0.002)
+        Fb.box('liner_right', 0.006, 1.72, 0.54, (0.377, 1.06, -0.02), M.liner, bevel=0.002)
+        Fb.box('divider', 0.76, 0.02, 0.52, (0, 0.80, -0.02), M.shelf, bevel=0.002)
+        for i, y in enumerate((1.08, 1.38, 1.68)):
+            Fb.box(f'shelf{i}', 0.76, 0.008, 0.52, (0, y, -0.02), M.shelf, bevel=0.002)
+        # food, fresh above and frozen below
+        Fb.box('milk', 0.08, 0.19, 0.08, (-0.22, 1.20, -0.03), M.carton, bevel=0.006)
+        Fb.cyl('juice', 0.032, 0.19, (0.0, 1.19, -0.03), M.bottle, verts=16, bevel=0.004)
+        for i, x in enumerate((-0.20, -0.11, -0.02)):
+            Fb.sphere(f'apple{i}', 0.036, (x, 1.418, -0.05), M.produce, segments=10, rings=6)
+        Fb.box('egg_carton', 0.16, 0.03, 0.11, (-0.16, 1.40, -0.03), M.carton, bevel=0.006)
+        Fb.box('pizza', 0.24, 0.03, 0.24, (-0.12, 0.815, -0.03), M.frozen, bevel=0.006)
+        Fb.box('ice_cream', 0.12, 0.10, 0.12, (0.16, 0.86, -0.03), M.icecream, bevel=0.01)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the tall fridge door, hinged on its left edge, with its water dispenser and handle
+    with G.new_parts() as parts:
+        Fb.box('fridge_door', 0.78, 1.14, 0.025, (0, 1.39, 0.30), M.panel, bevel=0.010)
+        Fb.box('water', 0.14, 0.20, 0.012, (-0.24, 1.42, 0.315), M.dark, bevel=0.012)
+        Fb.box('spout', 0.08, 0.025, 0.005, (-0.24, 1.48, 0.322), M.water, bevel=0.002)
+        _small_bar(Fb, 'handle_fridge', 0.33, 1.08, 1.70, 0.3125, t=0.02, stand=0.010)
+    fridge_door = G.hinged(G.join(parts, 'fridge_door'), Fb.at(-0.39, 1.39, 0.30))
+    # the freezer door below, same hinge, a clip of its own (unused until a use takes frozen food)
+    with G.new_parts() as parts:
+        Fb.box('freezer_door', 0.78, 0.62, 0.025, (0, 0.50, 0.30), M.panel, bevel=0.010)
+        Fb.box('handle_freezer', 0.50, 0.022, 0.032, (0, 0.72, 0.315), M.chrome, bevel=0.008)
+    freezer = G.hinged(G.join(parts, 'freezer_door'), Fb.at(-0.39, 0.50, 0.30))
+    G.settle()
+    G.swing(fridge_door, 'fridge_open', 100, seconds=DOOR_SECONDS)
+    G.swing(freezer, 'freezer_open', 100, seconds=DOOR_SECONDS)
+
+
+def _fridgeFrenchDoor():
+    """A stainless French-door fridge: two upper doors, a full-width freezer drawer below."""
+    Ff = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        Ff.box('plinth', 0.86, 0.04, 0.66, (0, 0.02, -0.05), M.trim, bevel=0.006)
+        Ff.box('side_left', 0.03, 1.76, 0.66, (-0.435, 0.92, -0.05), M.steel, bevel=0.008)
+        Ff.box('side_right', 0.03, 1.76, 0.66, (0.435, 0.92, -0.05), M.steel, bevel=0.008)
+        Ff.box('top', 0.90, 0.03, 0.66, (0, 1.805, -0.05), M.steel, bevel=0.008)
+        Ff.box('bottom', 0.90, 0.03, 0.66, (0, 0.035, -0.05), M.steel, bevel=0.008)
+        Ff.box('back', 0.90, 1.76, 0.03, (0, 0.92, -0.365), M.steel, bevel=0.008)
+        # the liner, the divider above the freezer and the fridge shelves
+        Ff.box('liner_back', 0.84, 1.70, 0.01, (0, 0.92, -0.345), M.liner, bevel=0.002)
+        Ff.box('divider', 0.84, 0.02, 0.64, (0, 0.68, -0.05), M.shelf, bevel=0.002)
+        for i, y in enumerate((0.96, 1.24, 1.52)):
+            Ff.box(f'shelf{i}', 0.84, 0.008, 0.64, (0, y, -0.05), M.shelf, bevel=0.002)
+        # food
+        Ff.box('milk', 0.08, 0.19, 0.08, (-0.24, 1.06, -0.06), M.carton, bevel=0.006)
+        Ff.cyl('juice', 0.033, 0.20, (0.02, 1.06, -0.06), M.bottle, verts=16, bevel=0.004)
+        for i, x in enumerate((-0.24, -0.15, -0.06)):
+            Ff.sphere(f'apple{i}', 0.036, (x, 1.278, -0.08), M.produce, segments=10, rings=6)
+        Ff.box('egg_carton', 0.16, 0.03, 0.11, (-0.20, 1.26, -0.06), M.carton, bevel=0.006)
+        Ff.box('pizza', 0.26, 0.03, 0.26, (-0.10, 0.71, -0.06), M.frozen, bevel=0.006)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the left upper door, hinged on its left edge, and the right, hinged on its right
+    with G.new_parts() as parts:
+        Ff.box('door_left', 0.436, 1.10, 0.03, (-0.222, 1.25, 0.345), M.steel, bevel=0.014)
+        Ff.box('handle_left', 0.022, 0.70, 0.03, (-0.03, 1.25, 0.36), M.chrome, bevel=0.008)
+    door_left = G.hinged(G.join(parts, 'door_left'), Ff.at(-0.44, 1.25, 0.345))
+    with G.new_parts() as parts:
+        Ff.box('door_right', 0.436, 1.10, 0.03, (0.222, 1.25, 0.345), M.steel, bevel=0.014)
+        Ff.box('handle_right', 0.022, 0.70, 0.03, (0.03, 1.25, 0.36), M.chrome, bevel=0.008)
+    door_right = G.hinged(G.join(parts, 'door_right'), Ff.at(0.44, 1.25, 0.345))
+    # the freezer drawer, sliding out to the front
+    with G.new_parts() as parts:
+        Ff.box('drawer', 0.88, 0.58, 0.03, (0, 0.38, 0.345), M.steel, bevel=0.014)
+        Ff.box('drawer_tub', 0.82, 0.50, 0.40, (0, 0.38, 0.12), M.liner, bevel=0.006)
+        Ff.box('handle_drawer', 0.60, 0.014, 0.022, (0, 0.60, 0.36), M.chrome, bevel=0.005)
+    drawer = G.join(parts, 'drawer', origin=Ff.at(0, 0.38, 0.345))
+    G.settle()
+    G.swing(door_left, 'fridge_open', 100, seconds=DOOR_SECONDS)
+    G.swing(door_right, 'fridge_open', -100, seconds=DOOR_SECONDS)
+    G.swing(door_right, 'door_right', -100, seconds=DOOR_SECONDS)
+    G.slide(drawer, 'freezer_open', (0, -0.35, 0), seconds=DOOR_SECONDS)
+
+
+def _fridgeRetro():
+    """A rounded mint fridge: a single door with a chrome lever handle and a top trim."""
+    Fr = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        Fr.box('plinth', 0.66, 0.08, 0.60, (0, 0.04, -0.05), M.mint2, bevel=0.010)
+        Fr.box('side_left', 0.04, 1.52, 0.62, (-0.34, 0.84, -0.05), M.mint, bevel=0.02)
+        Fr.box('side_right', 0.04, 1.52, 0.62, (0.34, 0.84, -0.05), M.mint, bevel=0.02)
+        Fr.box('top', 0.72, 0.04, 0.62, (0, 1.62, -0.05), M.mint, bevel=0.02)
+        Fr.box('bottom', 0.72, 0.04, 0.62, (0, 0.10, -0.05), M.mint, bevel=0.02)
+        Fr.box('back', 0.72, 1.52, 0.04, (0, 0.84, -0.34), M.mint, bevel=0.02)
+        # the liner, a divider and two shelves
+        Fr.box('liner', 0.64, 1.46, 0.01, (0, 0.84, -0.32), M.liner, bevel=0.002)
+        Fr.box('divider', 0.64, 0.02, 0.56, (0, 1.16, -0.05), M.shelf, bevel=0.002)
+        for i, y in enumerate((0.45, 0.75)):
+            Fr.box(f'shelf{i}', 0.64, 0.008, 0.56, (0, y, -0.05), M.shelf, bevel=0.002)
+        Fr.box('milk', 0.08, 0.19, 0.08, (-0.18, 0.56, -0.06), M.carton, bevel=0.006)
+        for i, x in enumerate((-0.18, -0.09, 0.0)):
+            Fr.sphere(f'apple{i}', 0.036, (x, 0.786, -0.08), M.produce, segments=10, rings=6)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the rounded door, hinged on its left edge, with a chrome lever and a top handle
+    with G.new_parts() as parts:
+        Fr.box('door', 0.68, 1.50, 0.04, (0, 0.84, 0.30), M.mint, bevel=0.06)
+        Fr.box('seam', 0.68, 0.012, 0.02, (0, 1.18, 0.325), M.mint2, bevel=0.004)
+        Fr.box('handle', 0.06, 0.24, 0.05, (0.27, 1.0, 0.34), M.chrome, bevel=0.02)
+        Fr.box('top_handle', 0.18, 0.05, 0.012, (0, 1.5, 0.325), M.chrome, bevel=0.01)
+    door = G.hinged(G.join(parts, 'door'), Fr.at(-0.36, 0.84, 0.30))
+    G.settle()
+    G.swing(door, 'fridge_open', 100, seconds=DOOR_SECONDS)
+
+
+def _wineFridge():
+    """A dark glass door over a bottle grid, a stack of drawer racks beside it; the top rack slides."""
+    Fw = G.GameFrame(shift=0.0)
+    with G.new_parts() as still:
+        Fw.box('plinth', 0.996, 0.10, 0.64, (0, 0.05, -0.075), M.dark, bevel=0.004)
+        Fw.box('side_left', 0.03, 0.80, 0.70, (-0.483, 0.50, -0.045), M.panel, bevel=0.006)
+        Fw.box('side_right', 0.03, 0.80, 0.70, (0.483, 0.50, -0.045), M.panel, bevel=0.006)
+        Fw.box('top', 1.00, 0.05, 0.79, (0, 0.925, 0.0), M.stone, bevel=0.008)
+        Fw.box('bottom', 0.996, 0.03, 0.70, (0, 0.115, -0.045), M.panel, bevel=0.006)
+        Fw.box('back', 0.996, 0.80, 0.03, (0, 0.50, -0.38), M.panel, bevel=0.006)
+        Fw.box('liner', 0.90, 0.74, 0.01, (0, 0.50, -0.36), M.liner, bevel=0.002)
+        # the bottle grid on the left: five shelf rows of three bottles
+        for r, y in enumerate((0.22, 0.35, 0.48, 0.61, 0.74)):
+            Fw.box(f'rack_left{r}', 0.46, 0.01, 0.52, (-0.22, y, -0.06), M.shelf, bevel=0.0)
+            for c, x in enumerate((-0.40, -0.25, -0.10)):
+                Fw.cyl(f'bottle{r}_{c}', 0.035, 0.30, (x, y + 0.04, -0.06), M.wine if (r + c) % 2 == 0 else M.wine2,
+                       rot=(90, 0, 0), verts=8, bevel=0.0)
+        # two static drawer racks on the right; the top one is the moving part
+        for r, y in enumerate((0.30, 0.55)):
+            Fw.box(f'rack_right{r}', 0.37, 0.2347, 0.02, (0.30, y, 0.25), M.panel, bevel=0.008)
+            Fw.box(f'rack_handle{r}', 0.16, 0.014, 0.022, (0.30, y + 0.0617, 0.27), M.chrome, bevel=0.005)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the smoked-glass door, hinged on its left edge
+    with G.new_parts() as parts:
+        Fw.box('doorframe', 0.58, 0.76, 0.03, (-0.20, 0.50, 0.325), M.doorframe, bevel=0.010)
+        Fw.box('glass', 0.48, 0.64, 0.012, (-0.20, 0.50, 0.345), M.smoked, bevel=0.004)
+        Fw.box('door_handle', 0.014, 0.40, 0.022, (0.06, 0.50, 0.35), M.chrome, bevel=0.005)
+    door = G.hinged(G.join(parts, 'door'), Fw.at(-0.49, 0.50, 0.325))
+    # the top drawer rack, sliding out 15 cm
+    with G.new_parts() as parts:
+        Fw.box('top_rack', 0.37, 0.2347, 0.02, (0.30, 0.74, 0.25), M.panel, bevel=0.008)
+        Fw.box('top_rack_handle', 0.16, 0.014, 0.022, (0.30, 0.8017, 0.27), M.chrome, bevel=0.005)
+        Fw.box('top_rack_tray', 0.35, 0.20, 0.30, (0.30, 0.74, 0.09), M.liner, bevel=0.002)
+    rack = G.join(parts, 'top_rack', origin=Fw.at(0.30, 0.74, 0.25))
+    G.settle()
+    G.swing(door, 'door_open', 100, seconds=1.5)
+    G.slide(rack, 'door_open', (0, -0.15, 0), seconds=1.5)
+
+
 FAMILY = G.Family(
     'kitchen', M,
     [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge',
@@ -259,6 +475,23 @@ FAMILY = G.Family(
              # The player colours the cabinet and doors, the handles, the plinth and the inside; the
              # food keeps its own colours.
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth & badge'), ('liner', 'Inside')]),
+     G.Model('fridgeMini', _fridgeMini, size=(0.60, 1.00, 0.60), key='model.fridgeMini',
+             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open'}, 'hold': 3.0},
+             paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
+     G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn',
+             # the tall door serves every use; the freezer door's clip waits for a use that takes frozen food
+             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             paint=[('panel', 'Panels'), ('chrome', 'Handles')]),
+     G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor',
+             # both doors for a snack or a meal; the right door alone for a cold drink
+             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
+             paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
+     G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro',
+             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
+     G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.79), key='model.wineFridge',
+             motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
+             paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),
      G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink',
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
@@ -271,7 +504,10 @@ FAMILY = G.Family(
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
             'a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from '
-            'the tap) played while a resident washes up.',
+            'the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and '
+            'swing it open while a resident takes food or a drink (`motions`); the French-door freezer and the '
+            'wine fridge\'s top rack slide, and the built-in freezer door and French freezer drawer carry clips '
+            'no use plays yet.',
 )
 
 if __name__ == '__main__':

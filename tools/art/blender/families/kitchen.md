@@ -1,11 +1,12 @@
 # Kitchen — notes
 
 `kitchen.py` builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
-`packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`) and the two **sinks**
+`packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the five **K1 fridges**
+(`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge`) and the two **sinks**
 (`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). They
 replace the primitive-part placeholders, which stay as the fallback. The fridge was first made as an
 evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
-`fridge.doors.glb`) became this one build, and the two sinks were added.
+`fridge.doors.glb`) became this one build, and the two sinks and the five K1 fridges were added.
 
 ## The fridge
 
@@ -69,6 +70,26 @@ tag covers both the `wash` and `washUp` interactions).
 | `model.counterSinkDouble` | 2.000 × 1.265 × 0.790 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
 Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings).
+
+## The K1 fridges
+
+Five more fridges match their placeholders' bounds. Each hinges a door built closed and swings it open
+with a `hold`, so it shuts while the resident is busy; the French-door freezer and the wine fridge's top
+rack slide instead. The clip each use plays is in the pack's `motions`:
+
+| Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
+|---|---|---|---|---|---|
+| `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 3 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
+| `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s, unused |
+| `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s, unused |
+| `model.fridgeRetro` | 0.720 × 1.640 × 0.715 m | 1,920 | 2 | door | `fridge_open` 1.75 s (fetch, cook, cold drink) |
+| `model.wineFridge` | 1.000 × 0.950 × 0.790 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
+
+The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no
+interaction takes frozen food: `check_glb.py` warns of both (as it does for `model.fridge`'s freezer).
+`fridgeFrenchDoor` and `wineFridge` take 4 draw calls (the most allowed, one per moving part plus the
+still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sit in Validate ›
+Fridges until checked in play.
 
 ## Rebuild
 

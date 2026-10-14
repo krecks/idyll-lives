@@ -1,11 +1,12 @@
 # Kitchen
 
-Appliances, counters, islands, dining. The fridge and the two kitchen sinks are done (`families/kitchen.py`).
+Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
+(`families/kitchen.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
 
-## K1. Fridges (5)
+## K1. Fridges (5) — **Done** (in Validate › Fridges)
 
 - **Family:** `tools/art/blender/families/kitchen.py`
 - **Validate group:** `fridges` (Validate › Fridges)

@@ -564,8 +564,8 @@
         1
       ],
       "price": 1500,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "fridges",
       "stations": [
         "ingredients"
       ],
@@ -647,8 +647,8 @@
         1
       ],
       "price": 950,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "fridges",
       "decor": 0.4,
       "stations": [
         "ingredients"
@@ -711,8 +711,8 @@
         1
       ],
       "price": 450,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "fridges",
       "surface": {
         "height": 0.95,
         "kind": "counter",

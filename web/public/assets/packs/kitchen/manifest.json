@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kitchen models (tools/art/blender/families/kitchen.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up.",
+  "$comment": "Blender-built kitchen models (tools/art/blender/families/kitchen.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and swing it open while a resident takes food or a drink (`motions`); the French-door freezer and the wine fridge's top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet.",
   "version": 1,
   "entries": {
     "model.fridge": {
@@ -192,6 +192,273 @@
         {
           "material": "trim",
           "label": "Plinth"
+        }
+      ]
+    },
+    "model.fridgeMini": {
+      "type": "model",
+      "url": "../../models/kitchen/fridgeMini.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "fridge_open",
+          "cook": "fridge_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.fridgeBuiltIn": {
+      "type": "model",
+      "url": "../../models/kitchen/fridgeBuiltIn.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "panel": {
+          "finish": "material.finish.satin"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "fridge_open",
+          "cook": "fridge_open",
+          "drink": "fridge_open"
+        },
+        "hold": 3.5
+      },
+      "paint": [
+        {
+          "material": "panel",
+          "label": "Panels"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.fridgeFrenchDoor": {
+      "type": "model",
+      "url": "../../models/kitchen/fridgeFrenchDoor.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "fridge_open",
+          "cook": "fridge_open",
+          "drink": "door_right"
+        },
+        "hold": 3.5
+      },
+      "paint": [
+        {
+          "material": "steel",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.fridgeRetro": {
+      "type": "model",
+      "url": "../../models/kitchen/fridgeRetro.glb",
+      "materials": {
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "mint": {
+          "finish": "material.finish.gloss"
+        },
+        "mint2": {
+          "finish": "material.finish.gloss"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "fridge_open",
+          "cook": "fridge_open",
+          "drink": "fridge_open"
+        },
+        "hold": 3.5
+      },
+      "paint": [
+        {
+          "material": "mint",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handle"
+        },
+        {
+          "material": "mint2",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.wineFridge": {
+      "type": "model",
+      "url": "../../models/kitchen/wineFridge.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "doorframe": {
+          "finish": "material.finish.satin"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "panel": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "smoked": {
+          "finish": "material.finish.glass"
+        },
+        "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "wine": {
+          "finish": "material.finish.gloss"
+        },
+        "wine2": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "drink": "door_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "panel",
+          "label": "Body"
+        },
+        {
+          "material": "doorframe",
+          "label": "Door frame"
         }
       ]
     }
