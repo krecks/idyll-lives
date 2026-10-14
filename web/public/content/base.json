@@ -3727,6 +3727,18 @@
         {
           "id": "gloomy",
           "label": "Gloomy"
+        },
+        {
+          "id": "loner",
+          "label": "Loner"
+        },
+        {
+          "id": "natureLover",
+          "label": "Nature Lover"
+        },
+        {
+          "id": "neat",
+          "label": "Neat"
         }
       ]
     },

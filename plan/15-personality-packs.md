@@ -155,7 +155,7 @@ done.
 | `lazy.vibePlate` Effortless vibration plate | 1x1 · floor | shake:exercise | fitness / — | Body, Upholstery | Loop (E1) | `shake` (E1). Until then static. |
 | `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Upholstery | Use | `screen_up`: the tablet tilts up for program and story. |
 
-## P11. Loner (6)
+## P11. Loner (6) — **Done** (in Validate › Loner)
 
 - **Family:** `tools/art/blender/families/pack_loner.py`
 - **Validate group:** `loner` (Validate › Loner)
@@ -170,7 +170,7 @@ done.
 | `loner.soloSauna` Cedar sauna for one | 1x2 · floor | sweat:relax | bathroom / — | Body, Wood | Use | `door_open`: the door opens and shuts behind them (`hold` 1.5 s) for sweat. |
 | `loner.deliveryHatch` No-knock delivery hatch | 1x1 · floor | order:fetch treat:fetch | kitchen / — | Body, Wood | Use | `hatch`: the hatch opens for order and treat; `hold` 2 s. |
 
-## P12. Nature lover (7)
+## P12. Nature lover (7) — **Done** (in Validate › Nature Lover)
 
 - **Family:** `tools/art/blender/families/pack_natureLover.py`
 - **Validate group:** `nature lover` (Validate › Nature Lover)
@@ -186,7 +186,7 @@ done.
 | `natureLover.mossTerrarium` Moss terrarium | 1x1 · floor | mist:water | decor / — | Wood | Use | `lid_open`: the glass lid lifts for mist. |
 | `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood | Use | `door_open`: the door and a roof vent open for unwind and orchids. |
 
-## P13. Neat (6)
+## P13. Neat (6) — **Done** (in Validate › Neat)
 
 - **Family:** `tools/art/blender/families/pack_neat.py`
 - **Validate group:** `neat` (Validate › Neat)

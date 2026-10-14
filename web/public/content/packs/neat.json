@@ -7,7 +7,8 @@
       "model": "model.neat.steamMopDock",
       "footprint": [1, 1],
       "price": 240,
-      "category": "kitchen",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "A wall dock with a steam mop and refills. Mopping is oddly satisfying and leaves the home feeling spotless for hours.",
       "interactions": [
@@ -31,7 +32,8 @@
       "model": "model.neat.laundryCenter",
       "footprint": [2, 1],
       "price": 780,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "Washer, dryer and a folding counter. Fresh clothes help a little with hygiene; deft hands (Dexterity 4+) press linens so crisp the resident sleeps better that night.",
       "interactions": [
@@ -68,7 +70,8 @@
       "model": "model.neat.rainShowerTower",
       "footprint": [1, 1],
       "price": 2400,
-      "category": "bathroom",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "A ceiling rain head, steam jets and a teak bench. Cleans as well as a shower while soothing tired muscles, and leaves the resident squeaky clean: they stay fresh much longer.",
       "interactions": [
@@ -92,7 +95,8 @@
       "model": "model.neat.organizerDesk",
       "footprint": [2, 1],
       "price": 650,
-      "category": "office",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "Cubbies, labelled bins and a label maker. Sorting things is fun for tidy minds and sharpens the eye; balancing the household ledger builds Business.",
       "interactions": [
@@ -127,7 +131,8 @@
       "model": "model.neat.robotVacuumDock",
       "footprint": [1, 1],
       "price": 560,
-      "category": "living",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "A self-emptying robot vacuum. Programming its route is a fun gadget puzzle; tech-savvy residents (Technology 3+) map it so well the home feels spotless.",
       "interactions": [
@@ -153,7 +158,8 @@
       "model": "model.neat.entryConsole",
       "footprint": [1, 1],
       "price": 110,
-      "category": "decor",
+      "category": "validate",
+      "group": "neat",
       "slots": 1,
       "description": "A slim console with a shoe shelf, key tray and coat hooks. A quick tidy of the entryway is a small comfort for orderly residents.",
       "interactions": [

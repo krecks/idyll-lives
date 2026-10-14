@@ -123,6 +123,28 @@ The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `jo
 lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
 rippling pool, the window seat's cushion sinks and the tub fills. Their primitive-part entries stay as the fallback.
 
+The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
+`bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_loner.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
+patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
+Their primitive-part entries stay as the fallback.
+
+The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
+`gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
+`packs/pack_natureLover/manifest.json`) are built in Blender by `tools/art/blender/families/pack_natureLover.py` on
+`gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
+veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
+runs, the cloche lifts and the glasshouse's door and roof vent open. Their primitive-part entries stay as the
+fallback.
+
+The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
+`organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
+slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their primitive-part
+entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
