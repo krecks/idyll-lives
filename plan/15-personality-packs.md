@@ -53,7 +53,7 @@ done.
 | `couchPotato.fitnessGame` Living-room workout game | 1x1 · floor | workout:exercise | fitness / — | Body, Upholstery | Use | `board`: the balance board tilts 10° for workout. |
 | `couchPotato.lavaLamp` Lava glow lamp | 1x1 · floor | zoneOut:relax | decor / — | Body, Upholstery | Use | `blobs`: the wax blobs rise slowly for zoneOut. A drifting blobs (E2). |
 
-## P4. Energetic (7)
+## P4. Energetic (7) — **Done** (in Validate › Energetic)
 
 - **Family:** `tools/art/blender/families/pack_energetic.py`
 - **Validate group:** `energetic` (Validate › Energetic)

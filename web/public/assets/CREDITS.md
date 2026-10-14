@@ -101,6 +101,13 @@ CC0). The cinema's curtains are drawn apart, the console's disc tray slides out,
 door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
 Their primitive-part entries stay as the fallback.
 
+The energetic pack models (`models/pack_energetic/boulderingWall.glb`, `spinBike.glb`, `trampoline.glb`,
+`streetballHoop.glb`, `powerBlender.glb`, `contrastShower.glb`, `recoveryPod.glb`, override pack
+`packs/pack_energetic/manifest.json`) are built in Blender by `tools/art/blender/families/pack_energetic.py` on
+`gamekit` and exported as `.glb` (glTF, original, CC0). The bike's cranks turn and the trampoline's mat dips while
+they are used, the hoop's net sways, the blender's lid lifts, the shower's rain grows and the recovery pod's canopy
+lowers; the bouldering wall is still. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

@@ -31,7 +31,8 @@
     "packs/laundry/manifest.json",
     "packs/pack_bookworm/manifest.json",
     "packs/pack_cheerful/manifest.json",
-    "packs/pack_couchPotato/manifest.json"
+    "packs/pack_couchPotato/manifest.json",
+    "packs/pack_energetic/manifest.json"
   ],
   "entries": {
     "material.wall": {
