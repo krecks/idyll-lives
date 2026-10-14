@@ -482,6 +482,11 @@ export async function startSession(
       bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
       game.menu = null;
     },
+    switchLamp(objectId) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
+      game.menu = null;
+    },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
     },
@@ -889,6 +894,9 @@ export async function startSession(
     itemsSeen = items;
     if (!disposed) renderer.setItems(items);
   });
+  bridge.onLamps((off) => {
+    if (!disposed) renderer.setLampsOff(off);
+  });
   bridge.onWorld((w) => {
     if (disposed) return;
     // Newcomers and babies the simulation made up carry an appearance seed: give them their
@@ -1057,6 +1065,8 @@ export async function startSession(
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
       (it.needsTable && !atTable) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
+    // A lamp: its switch (not a fire's).
+    if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };

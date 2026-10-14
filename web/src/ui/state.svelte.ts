@@ -12,7 +12,7 @@ export interface MenuState {
   /** Canvas-relative CSS pixels. */
   x: number;
   y: number;
-  /** `cost` is charged when chosen (shown, and checked against funds). */
+  /** `cost` is charged when chosen (shown, and checked against funds). Index -1: a lamp's "Turn on" / "Turn off". */
   items: { label: string; index: number; disabled?: boolean; cost?: number }[];
 }
 

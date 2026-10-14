@@ -245,6 +245,16 @@ impl Game {
         self.world.items.version
     }
 
+    /// The lamps switched off (JSON array of object ids; see `sim_core::lights`).
+    pub fn lamps_off(&self) -> String {
+        serde_json::to_string(&sim_core::lights::lamps_off(&self.world)).unwrap_or_else(|_| "[]".into())
+    }
+
+    /// Bumped whenever a lamp is switched on or off (see `lampsOff`).
+    pub fn lights_version(&self) -> u32 {
+        self.world.lights_version()
+    }
+
     /// Changes whenever the lot (walls, floors, fences...) does; see `World::lot_version`.
     pub fn lot_version(&self) -> u32 {
         self.world.lot_version()
