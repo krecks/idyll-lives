@@ -134,13 +134,16 @@ def check_size(size, tolerance=0.02, objs=None, name='model', centre=(0.0, 0.0),
     """
     lo, hi = measure(objs)
     got = game_size(objs)
+    # What it measures, said when a check fails, so `size` and `centre=` can be copied from it.
+    measured = (f'measured {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), '
+                f'centred on game ({-(lo[0] + hi[0]) / 2:.4f}, {-(lo[1] + hi[1]) / 2:.4f}) (x, depth)')
     tol = tolerance if isinstance(tolerance, (tuple, list)) else (tolerance,) * 3
     for axis, g, want, t in zip(('width', 'height', 'depth'), got, size, tol):
-        assert abs(g - want) <= t * want, f'{name}: {axis} {g:.3f} m, want {want:.3f} m (±{t * 100:.0f} %)'
+        assert abs(g - want) <= t * want, f'{name}: {axis} {g:.3f} m, want {want:.3f} m (±{t * 100:.0f} %); {measured}'
     want = (-centre[0], -centre[1])  # game (x, depth) in Blender x, y
     for i, axis in enumerate('xy'):
         c = (lo[i] + hi[i]) / 2 - want[i]
-        assert abs(c) <= 0.002, f'{name}: off its centre in Blender {axis} by {c * 100:.1f} cm (G.settle)'
+        assert abs(c) <= 0.002, f'{name}: off its centre in Blender {axis} by {c * 100:.1f} cm (G.settle, or the Model\'s centre=); {measured}'
     if floor:
         assert abs(lo[2]) <= 0.002, f'{name}: bottom {lo[2] * 100:.1f} cm off the floor (G.settle)'
     where = 'centred' if centre == (0.0, 0.0) else f'centred on game ({centre[0]:g}, {centre[1]:g})'

@@ -15,6 +15,9 @@ from .scene import ASSETS, PREVIEWS, meshes, reset
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from check_glb import played  # noqa: E402  (the gate's reading of `motions`, shared)
 
+# A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
+FAR_FEET = 0.05
+
 
 class Model:
     """
@@ -48,8 +51,10 @@ class Model:
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
                  town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
-                 joined, decimated, without what's hidden at rest), or a build function of its own; the
-                 entry's `far`. For what is placed by the hundred or seen far off: trees, street props.
+                 joined, decimated but for what stands on the floor, without what's hidden at rest), or a
+                 build function of its own (`G.far_of(build)`: the model's build again at low detail,
+                 gamekit/far.py); the entry's `far`. For what is placed by the hundred or seen far off:
+                 trees, street props.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
@@ -161,8 +166,14 @@ class Family:
         for o in hidden:
             bpy.data.objects.remove(o, do_unlink=True)
         far = join([o for o in objs if o not in hidden], f'{model.id}_far', origin=(0, 0, 0))
+        # What stands on the floor is left whole: decimating it lifted things off the ground (a tractor's
+        # wheels 1.7 cm, a fountain's slab 4 cm) and pulled their feet in. The rest is decimated.
+        bottom = min(v.co.z for v in far.data.vertices) if far.data.vertices else 0.0
+        keep = far.vertex_groups.new(name='decimate')
+        keep.add([v.index for v in far.data.vertices if v.co.z > bottom + FAR_FEET], 1.0, 'REPLACE')
         decimate = far.modifiers.new('far', 'DECIMATE')
         decimate.ratio = model.far
+        decimate.vertex_group = 'decimate'
         mesh = far.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
         mesh.calc_loop_triangles()
         print(f'[gamekit] {model.id}.far: {len(mesh.loop_triangles)} triangles ({model.far:.0%} kept)')

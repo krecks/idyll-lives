@@ -118,12 +118,15 @@ def turns(objs, clip, offset, seconds=1.0):
     return _peak(objs[0], clip, (bounds[0] + bounds[1]) // 2)
 
 
-def stages(obj, clip, picked, growing, planted, seconds=1.5):
+def stages(obj, clip, picked, growing, planted, seconds=1.5, sink=None):
     """A crop's growth clip `clip` (`motions.growth`) for `obj`: the scale of it at each growth stage,
     times its size at rest, which is ripe. A number for every axis or (x, y, z) Blender; 0.001 hides
     it. The game holds the clip where the stage is: ripe at rest, picked a third of the way, growing two
     thirds, planted at the end, and plays it on from stage to stage. The fruit: picked=0.001,
-    growing=0.001, planted=0.001; the plants: picked=1, growing=0.6, planted=0.25."""
+    growing=0.001, planted=0.001; the plants: picked=1, growing=0.6, planted=0.25.
+    `sink`: (picked, growing, planted), metres the part goes down into the soil at each stage, so plants
+    spread over a bed come up where they stand rather than shrink towards its middle: scale them only
+    in height ((1, 1, 0.5)) and sink them, and what shows is each plant's top, small, in its place."""
     end = last_frame(seconds)
     frames = [1, 1 + (end - 1) / 3, 1 + 2 * (end - 1) / 3, end]
     each = [k if isinstance(k, (tuple, list)) else (k,) * 3 for k in (1, picked, growing, planted)]
@@ -131,6 +134,9 @@ def stages(obj, clip, picked, growing, planted, seconds=1.5):
         if any(k[i] != 1 for k in each):
             rest = obj.scale[i]
             _clip(obj, clip, 'scale', i, [(round(f), rest * k[i]) for f, k in zip(frames, each)])
+    if sink and any(sink):
+        rest = obj.location[2]
+        _clip(obj, clip, 'location', 2, [(round(f), rest - d) for f, d in zip(frames, (0, *sink))])
     assert obj.animation_data and obj.animation_data.nla_tracks.get(clip), f'stages {clip!r}: the same at every stage'
     return obj
 
