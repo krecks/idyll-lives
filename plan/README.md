@@ -4,15 +4,16 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **21 are done**:
+**Where it stands (2026-10-14):** 540 objects. **27 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
+- the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`.
 
-**519 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 127;
-- `catalog2.py`: 192;
+**513 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 122;
+- `catalog2.py`: 186;
 - the base manifest: 77;
 - `community.py`: 36;
 - the personality packs: 92.
@@ -22,7 +23,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | Category | Items | Tasks |
 |---|---|---|
 | [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
-| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6), K3 Small appliances and dishwashers (4), K4 Base counters (8), K5 Tall and wall storage (11), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
+| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4), K4 Base counters (8), K5 Tall and wall storage (11), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5), B2 Showers (4), B3 Baths (3), B4 Laundry (6), B5 Bathroom storage and mirrors (3) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9), BR2 Nightstands and small storage (8), BR3 Wardrobes and drawers (6), BR4 Dressing and mirrors (4) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4), KD2 Toys (10), KD3 Kids' study and art (6) |

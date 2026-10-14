@@ -3671,6 +3671,10 @@
         {
           "id": "fridges",
           "label": "Fridges"
+        },
+        {
+          "id": "cookers",
+          "label": "Cookers"
         }
       ]
     },

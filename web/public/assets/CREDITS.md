@@ -78,6 +78,13 @@ while a resident takes food or a drink, held for a few seconds; the French-door 
 top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet. Their
 primitive-part entries stay as the fallback.
 
+The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`, `wallOven.glb`,
+`rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
+are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
+(glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
+while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+microwave swings its door and turns its turntable. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

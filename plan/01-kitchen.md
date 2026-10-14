@@ -1,7 +1,7 @@
 # Kitchen
 
 Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
-(`families/kitchen.py`).
+(`families/kitchen.py`), and the six K2 cookers are done (`families/kitchen_cooking.py`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
@@ -20,7 +20,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `fridge_open`: the chrome lever turns 30° (0.2 s), then the rounded door swings 100°; snack, meal, coldDrink. |
 | `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
 
-## K2. Cookers (6)
+## K2. Cookers (6) — **Done** (in Validate › Cookers)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
 - **Validate group:** `cookers` (Validate › Cookers)

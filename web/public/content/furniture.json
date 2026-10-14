@@ -290,8 +290,8 @@
         1
       ],
       "price": 450,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "cookers",
       "description": "A freestanding cooker with four rings and an oven. Cooking here trains Cooking; good cooks get more out of every meal.",
       "interactions": [
         {
@@ -345,8 +345,8 @@
         1
       ],
       "price": 850,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "cookers",
       "description": "Six flames and a big oven for serious cooks. From Cooking 3 a gourmet dinner leaves residents with that home-cooked glow.",
       "interactions": [
         {
@@ -420,8 +420,8 @@
         1
       ],
       "price": 180,
-      "category": "kitchen",
-      "group": "appliances",
+      "category": "validate",
+      "group": "cookers",
       "description": "A counter with a microwave on top: hot leftovers in a few minutes, no skill needed.",
       "interactions": [
         {
