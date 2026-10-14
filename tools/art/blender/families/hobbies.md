@@ -11,7 +11,10 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 
 ## Music (H1)
 
-- **Piano**: an upright facing its bench, the pianist's back to the wall, as the placeholder stands. Two
+- **Piano**: an upright with its back on the wall's face and its bench in front; the pianist faces the case
+  (content `"seat": {"height": 0.47, "forward": 0.227, "facing": "back"}`). It is built as the old placeholder
+  stood (keys to the back) and turned round (`_turn_round`), so its clips open the other way; the placeholder
+  (`furniture.py`, `turned`) is turned the same. Two
   parts share one clip, `fallboard`, played by `play` until the use ends: the fallboard lifts 90° off the keys
   to stand against the case, and the music desk, hinged at its top, swings its foot out 18° so the sheet leans
   back.

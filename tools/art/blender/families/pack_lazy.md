@@ -8,7 +8,7 @@ Validate › Lazy until checked in play.
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 What the renderer fixes is kept: the bed's mattress top at 0.49 (`BEDS` default 0.5; it is in `BLANKET_BEDS`, so no
 duvet is modelled, only a throw folded at the foot), the pod's and the poufs' seats at 0.45, the vibration plate's
-deck at 0.125 (`VIBE_PLATE` 0.12, where the resident stands).
+deck at 0.125 (content `stand.height` 0.12, where the resident stands).
 
 | Model | Moving part and clip | Played by |
 |---|---|---|

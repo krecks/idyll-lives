@@ -101,6 +101,8 @@ const STATIONS: Station[] = [
   { label: 'nap hammock', def: 'natureLover.gardenHammock', tag: 'nap', pose: P.Lie, female: true },
   { label: 'swing hammock', def: 'cheerful.rainbowHammock', tag: 'relax', pose: P.Lie },
   { label: 'bench press', def: 'weightBench', tag: 'lift', pose: P.Lie },
+  { label: 'hammock', def: 'hammock', tag: 'relax', pose: P.Lie, female: true },
+  { label: 'car bed', def: 'kidsBedCar', tag: 'sleep', pose: P.Lie, stage: 'child' },
   // The baby's crib: on their own (asleep, and awake), feeding (kneeling at it), and a cuddle (picked up, rocked, put back).
   { label: 'baby asleep in crib', def: 'crib', baby: 'asleep', alone: true },
   { label: 'baby awake in crib', def: 'crib', baby: true, alone: true },
@@ -170,6 +172,8 @@ const STATIONS: Station[] = [
   { label: 'read seated', def: 'bookworm.readingNook', tag: 'read', pose: P.Sit },
   { label: 'type', def: 'computerDesk', tag: 'type', pose: P.Sit, female: true },
   { label: 'piano', def: 'piano', tag: 'music', pose: P.Sit },
+  { label: 'chaise feet up', def: 'chaise', tag: 'relax', pose: P.Sit, female: true },
+  { label: 'exercise bike', def: 'exerciseBike', tag: 'exercise', pose: P.Sit },
   { label: 'cello', def: 'gloomy.cello', tag: 'music', pose: P.Sit, female: true },
   { label: 'drums', def: 'hotHeaded.thunderDrums', tag: 'music', pose: P.Sit },
   // Standing work
@@ -190,6 +194,11 @@ const STATIONS: Station[] = [
   { label: 'shower rain tower', def: 'neat.rainShowerTower', tag: 'shower', female: true },
   // Exercise
   { label: 'trampoline', def: 'energetic.trampoline', tag: 'exercise' },
+  { label: 'treadmill', def: 'treadmill', tag: 'run', female: true },
+  { label: 'dumbbells', def: 'dumbbells', tag: 'lift' },
+  { label: 'guitar acoustic', def: 'guitarAcoustic', tag: 'music', female: true },
+  { label: 'guitar electric', def: 'guitarElectric', tag: 'music' },
+  { label: 'ukulele', def: 'ukulele', tag: 'music', stage: 'child' },
   { label: 'bouldering', def: 'energetic.boulderingWall', tag: 'exercise', female: true },
   { label: 'vibe plate', def: 'lazy.vibePlate', tag: 'exercise' },
   { label: 'heavy bag', def: 'hotHeaded.heavyBag', tag: 'exercise' },
@@ -259,7 +268,7 @@ interface DefRaw {
 }
 const PACKS = ['bookworm', 'cheerful', 'couchPotato', 'energetic', 'foodie', 'gloomy', 'hotHeaded', 'kind', 'lazy', 'loner', 'natureLover', 'neat', 'outgoing', 'romantic', 'slob'];
 const files = await Promise.all(
-  ['base', 'furniture', 'garden', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
+  ['base', 'furniture', 'garden', 'catalog2/living', 'catalog2/hobbies', 'catalog2/kids', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
     fetch(`${base}content/${f}.json`)
       .then((r) => r.json() as Promise<{ objects?: DefRaw[]; animations?: string[] }>)
       .catch(() => ({ objects: [] as DefRaw[], animations: undefined as string[] | undefined })),

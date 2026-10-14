@@ -144,7 +144,6 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   // Chairs at desks and tables sit in the back half of the footprint, facing the work surface.
   chessTable: { h: 0.46, fwd: -0.2 },
   computerDesk: { h: 0.44, fwd: -0.17 },
-  piano: { h: 0.47, fwd: -0.2 },
   diningTable: { h: 0.46, fwd: -0.19 },
   // Content packs.
   'gloomy.soakingTub': { h: 0.25, fwd: 0 },
@@ -184,12 +183,28 @@ const SEATS: Record<string, { h: number; fwd: number }> = {
   gardenChair: { h: 0.4, fwd: -0.1 },
   swingSet: { h: 0.5, fwd: 0 },
 };
-const DEFAULT_SEAT = { h: 0.45, fwd: 0 };
+const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
 
-/** Where a Sim sits on an object: the table above, else the content's `seat`, else the default. */
-function seatOf(def: ObjectDef | undefined, id: string): { h: number; fwd: number } {
+/**
+ * Where a Sim sits on an object (`PlacedObject.seat`): the table above, else the content's `seat`
+ * (with how they sit: facing the object's back, legs out along it, pedalling), else the default.
+ */
+function seatOf(def: ObjectDef | undefined, id: string): Seat {
   const own = def?.seat;
-  return SEATS[id] ?? (own ? { h: own.height, fwd: own.forward ?? 0 } : DEFAULT_SEAT);
+  if (SEATS[id] || !own) return SEATS[id] ?? DEFAULT_SEAT;
+  const pedals = own.pedals ? { h: own.pedals.height, fwd: own.pedals.forward ?? 0, crank: own.pedals.crank } : undefined;
+  return { h: own.height, fwd: own.forward ?? 0, back: own.facing === 'back', legsOut: own.legs === 'out', pedals };
+}
+/** A seat (see `seatOf`): its height and the hips' forward offset (m, the object's frame), and how they sit. */
+interface Seat {
+  h: number;
+  fwd: number;
+  /** Facing the object's back (a pianist at an upright against the wall). */
+  back?: boolean;
+  /** Legs stretched out along the seat (a chaise). */
+  legsOut?: boolean;
+  /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
+  pedals?: { h: number; fwd: number; crank: number };
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
@@ -230,10 +245,6 @@ const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBun
 /** Lying: height of the back above the feet line, and how far the feet reach past the slot centre (body scale 1). */
 const LIE_BACK = 0.1;
 const LIE_CENTRE = 0.86;
-/** Standing surface heights (m) of exercise equipment Sims stand on. */
-const TRAMPOLINE_MAT = 0.5;
-const VIBE_PLATE = 0.12;
-const TREADMILL_BELT = 0.156;
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
@@ -265,6 +276,8 @@ const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean
  */
 const CRADLE = { forward: 0.08, lift: -0.03, tilt: 0.22, roll: -0.55 };
 
+/** A use sequence of the idle alone. */
+const IDLE_ONLY: readonly string[] = ['idle'];
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -347,8 +360,8 @@ const ACTIONS: Record<string, ActionAnim> = {
           ? ['dance', 'punchJab', 'punchCross']
           : def.includes('streetball')
             ? ['pickUp', 'interact']
-            : // Climbing, bouncing, vibrating and stretching: the idle with `activityPose` on top.
-              def.includes('boulder') || def.includes('trampoline') || def.includes('vibe') || def.includes('sunrise')
+            : // Climbing and stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
+              def.includes('boulder') || def.includes('sunrise')
               ? ['idle']
               : ['jog'],
     sit: 'sitHands',
@@ -547,8 +560,9 @@ interface SimRig {
   useSeq: readonly string[] | null;
   /** Current action tag ('' = none / unknown) and whether it came from the snapshot. */
   tag: string;
-  /** Def of the object in use ('' = none), for activity layers that depend on it. */
+  /** Def of the object in use ('' = none), for activity layers that depend on it, and the object. */
   useDef: string;
+  useObj: PlacedObject | null;
   tagKnown: boolean;
   cur: Player;
   prev: Player;
@@ -647,7 +661,9 @@ interface PlacedObject {
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
   /** Where Sims sit on it (see `seatOf`; resized taller or shorter, the seat moves with it). */
-  seat: { h: number; fwd: number };
+  seat: Seat;
+  /** What Sims stand up on to use it (content `stand`; resized, it moves too), or null. */
+  stand: { h: number; motion?: 'bounce' | 'buzz' } | null;
   /** Metres taller than its kind (the player's resizing): mattresses rise with it too. */
   lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
@@ -1107,6 +1123,7 @@ export class Characters {
         useSeq: null,
         tag: '',
         useDef: '',
+        useObj: null,
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -1197,7 +1214,8 @@ export class Characters {
       const restful = !!(SEATS[o.def] || BEDS[o.def]) || !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie');
       const lift = (o.tall ?? 0) / 100;
       const seat = seatOf(def, o.def);
-      return { def: o.def, rot: o.rot, seat: { h: seat.h + lift, fwd: seat.fwd }, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
+      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     for (const b of this.blankets.values()) {
@@ -1815,6 +1833,8 @@ export class Characters {
       let faceYaw = tyaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
+      // A seat facing the object's back (content `seat.facing`): turned round, facing into it.
+      else if (pose === Pose.Sit && (useObj ?? this.objectAt(rig.x, rig.z))?.seat.back) faceYaw = wrapAngle(tyaw + Math.PI);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -2041,6 +2061,7 @@ export class Characters {
       rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
       rig.bedFwd = bed.fwd ?? 0;
       rig.useDef = obj?.def ?? '';
+      rig.useObj = obj ?? null;
       if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
         // Getting in: sit down on the edge first; the crossfade to lying then leans the Sim back
         // (the root pitch blends with the clips).
@@ -2079,9 +2100,11 @@ export class Characters {
       const seat = obj?.seat ?? DEFAULT_SEAT;
       const sp = this.sitPelvis.get(rig.body.name)!;
       rootY = seat.h - sp.y * rig.scale;
-      rootFwd = seat.fwd - sp.z * rig.scale;
+      // (Facing the object's back, its forward is the Sim's back.)
+      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale;
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
+      rig.useObj = obj ?? null;
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
       else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
@@ -2168,12 +2191,16 @@ export class Characters {
       // Standing object use: the action's clip sequence (or, without action data, the object in front).
       const obj = known ? useObj : this.objectInFront(rig);
       rig.useDef = obj?.def ?? '';
+      rig.useObj = obj ?? null;
+      // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = known
-        ? act?.stand
-          ? typeof act.stand === 'function'
-            ? act.stand(useObj?.def ?? '')
-            : act.stand
-          : undefined
+        ? obj?.stand?.motion
+          ? IDLE_ONLY
+          : act?.stand
+            ? typeof act.stand === 'function'
+              ? act.stand(useObj?.def ?? '')
+              : act.stand
+            : undefined
         : obj
           ? USE[obj.def]
           : undefined;
@@ -2193,21 +2220,19 @@ export class Characters {
           reach = rig.cuddleStep;
           reachRate = 6;
         }
-        if (tag === 'run' && obj && rig.useDef.includes('treadmill')) {
-          // On the belt (Sims use it from the tile in front): forward to its centre, facing the console.
+        const on = obj?.stand;
+        if (on && obj && tag !== 'cuddle') {
+          // Up on the equipment (content `stand`; Sims use it from the tile in front): forward to its
+          // middle, on what they stand on (a treadmill's belt, facing the console).
           rootFwd = Math.hypot(obj.cx - rig.x, obj.cz - rig.z);
-          rootY = TREADMILL_BELT;
-        }
-        if (tag === 'exercise' && obj && (rig.useDef.includes('trampoline') || rig.useDef.includes('vibe'))) {
-          // Up on the equipment (Sims use it from the tile in front): forward to its centre.
-          rootFwd = Math.hypot(obj.cx - rig.x, obj.cz - rig.z);
-          if (rig.useDef.includes('trampoline')) {
+          rootY = on.h;
+          if (on.motion === 'bounce') {
             // Bouncing on the mat: the feet leave it for a little under half of each bounce.
             const b = Math.sin(((rig.actTime * 1.6) % 1) * Math.PI);
-            rootY = TRAMPOLINE_MAT + Math.max(0, b * 0.75 - 0.3) * 0.55;
-          } else {
+            rootY += Math.max(0, b * 0.75 - 0.3) * 0.55;
+          } else if (on.motion === 'buzz') {
             // On the vibration plate: a fine buzz.
-            rootY = VIBE_PLATE + Math.sin(rig.actTime * 90) * 0.004;
+            rootY += Math.sin(rig.actTime * 90) * 0.004;
           }
         }
       } else {
@@ -2652,7 +2677,7 @@ export class Characters {
           addRotation(add, B.calf_l, 1, 0, 0, 1.0 * r);
           addRotation(add, B.thigh_r, 1, 0, 0, -0.7 * l);
           addRotation(add, B.calf_r, 1, 0, 0, 1.0 * l);
-        } else if (def.includes('trampoline')) {
+        } else if (rig.useObj?.stand?.motion === 'bounce') {
           // Arms swing up in the air, knees give on landing.
           const b = Math.sin(((rig.actTime * 1.6) % 1) * Math.PI);
           addRotation(add, B.upperarm_l, 0, 0, 1, -1.3 * b);
@@ -2664,7 +2689,7 @@ export class Characters {
           addRotation(add, B.calf_r, 1, 0, 0, 1.6 * land);
           addRotation(add, B.foot_l, 1, 0, 0, -0.8 * land);
           addRotation(add, B.foot_r, 1, 0, 0, -0.8 * land);
-        } else if (def.includes('vibe')) {
+        } else if (rig.useObj?.stand?.motion === 'buzz') {
           // Knees soft on the vibrating plate, a little buzz through the body.
           const buzz = Math.sin(time * 70) * 0.012;
           addRotation(add, B.thigh_l, 1, 0, 0, -0.3);

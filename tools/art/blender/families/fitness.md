@@ -13,7 +13,7 @@ except the bike, which is centred).
 
 The belt runs along the depth, the console at the back, tilted 35° to face the runner. The runner jogs on the
 belt facing the console: `characters.ts` moves them forward from the tile in front onto its middle, at the belt's
-top (`TREADMILL_BELT`, 0.156 m), as it does for the trampoline.
+top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
 - **The slats** (`slats`): 15 strips across the belt, 10 cm apart. `belt_run` moves them one slat back (towards
   the rear) in 0.5 s at an even speed (`G.scroll`), a loop for the whole run (`loops: {run: belt_run}`). The game

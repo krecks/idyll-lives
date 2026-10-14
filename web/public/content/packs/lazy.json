@@ -169,6 +169,7 @@
       "id": "lazy.vibePlate",
       "name": "Effortless vibration plate",
       "model": "model.lazy.vibePlate",
+      "stand": {"height": 0.12, "motion": "buzz"},
       "footprint": [1, 1],
       "slots": 1,
       "price": 520,

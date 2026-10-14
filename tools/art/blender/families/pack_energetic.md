@@ -12,7 +12,7 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 |---|---|---|
 | `boulderingWall` | none: still, as the plan says (the holds are the shape) | — |
 | `spinBike` | the cranks, pedals and axle in the flywheel's hub: `pedals` turns them once a second, a loop; `ride: pedals` is not set (the rider sits on the still seat) | `ride` (loop) |
-| `trampoline` | the mat, a shallow dish from the springs in with its origin at its rim: `bounce` deepens the dip five times (the middle from 0.58 to 0.50 m, where the bouncing feet land, `TRAMPOLINE_MAT`) and back, 0.625 s, a loop at the residents' 1.6 bounces a second | `bounce` (loop) |
+| `trampoline` | the mat, a shallow dish from the springs in with its origin at its rim: `bounce` deepens the dip five times (the middle from 0.58 to 0.50 m, where the bouncing feet land, content `stand.height`) and back, 0.625 s, a loop at the residents' 1.6 bounces a second | `bounce` (loop) |
 | `streetballHoop` | the net (crossing cords and two rings), pivoting on the rim: `swish` sways it 9° either way and home (`G.rock`, 1 s) | `shoot` |
 | `powerBlender` | the jug's lid: `lid` lifts it 9 cm (0.5 s), `hold` 1 s, then it settles back | `blend` |
 | `contrastShower` | the rain: a 5 × 5 grid of streams under the square head, scaled to nothing: `water_on` grows them down (0.5 s) | `rinse` |

@@ -74,6 +74,18 @@ def shift(parts, dx=0.0, dy=0.0, dz=0.0, when=lambda p: True):
     return out
 
 
+def turned(parts, forward=0.0):
+    """Copy of parts turned half round about the footprint's middle, then moved `forward` (m, to the front).
+    (Turned parts' x and z rotations change sign; their y rotation stays.)"""
+    out = []
+    for p in parts:
+        q = json.loads(json.dumps(p))
+        q['at'] = [round(-q['at'][0], 4), q['at'][1], round(-q['at'][2] + forward, 4)]
+        if 'rotate' in q: q['rotate'] = [-q['rotate'][0], q['rotate'][1], -q['rotate'][2]]
+        out.append(q)
+    return out
+
+
 # =============================================================================================
 # Fridge (1x1): back on the wall
 # =============================================================================================
@@ -290,7 +302,9 @@ E['model.computerDesk@cozy'] = placeholder(computer_desk(top=HONEY, legs=WALNUT,
 E['model.computerDesk@minimal'] = placeholder(computer_desk(top=BIRCH, legs='#F2F2F0', leg_fin='satin', ped='#F2F2F0', chair='#E6E2DA', lamp='#F2F2F0'))
 
 # =============================================================================================
-# Piano (2x1): console upright in the front half (keys facing -Z), bench at the centre line
+# Piano (2x1): console upright, drawn in the front half (keys facing -Z) with the bench at the centre line,
+# then turned round (`turned`): its back on the wall's face, the bench in front, the pianist facing the
+# back (content `seat.facing`; Blender's hobbies.py does the same)
 # =============================================================================================
 def piano(wood=WALNUT, trim=HONEY, cushion_col='#7A2E2E'):
     p = [
@@ -331,7 +345,7 @@ def piano(wood=WALNUT, trim=HONEY, cushion_col='#7A2E2E'):
     return p
 
 
-E['model.piano'] = placeholder(piano())
+E['model.piano'] = placeholder(turned(piano(), 0.027))
 E['model.piano@modern'] = placeholder(recolor(piano(wood='#F3F2EE', trim=OAK, cushion_col='#55595F'), {'#F3F2EE': ('#F3F2EE', 'gloss')}))
 E['model.piano@cozy'] = placeholder(piano(wood=HONEY, trim=WALNUT, cushion_col=RUST))
 E['model.piano@minimal'] = placeholder(piano(wood=BIRCH, trim='#F2F2F0', cushion_col='#E6E2DA'))

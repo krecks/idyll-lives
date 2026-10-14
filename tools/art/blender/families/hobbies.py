@@ -279,6 +279,14 @@ def _stool(F, z, top, r, legs, seat, x=0.0):
     G.torus('stool_ring', 0.131, 0.007, at=F.at(x, 0.16, z), material=legs, major_segments=20, minor_segments=6)
 
 
+def _turn_round(objs, forward=0.0):
+    """Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
+    which moves round with it), then moves it `forward` m to the front. A part's clips then open the other way."""
+    for o in objs:
+        G.turn(o, 180, 'Z')
+        o.location = (-o.location.x, -o.location.y - forward, o.location.z)
+
+
 def _upright(parts, name):
     """Joins an instrument built upright (its foot at the origin) into one part, its origin at its foot."""
     return G.join(parts, name, origin=(0, 0, 0))
@@ -325,9 +333,11 @@ def _frets(F, n, scale, nut, w, z):
 
 
 # --- H1. Music ---------------------------------------------------------------------------------------------
-# The piano: an upright facing its bench at the back of the footprint, the pianist facing the front. Its
-# fallboard lies over the keys and lifts back against the case; its music desk, hinged at the top, swings
-# its foot out so the sheet music leans back for reading.
+# The piano: an upright with its back to the wall and its bench in front, the pianist facing the back
+# (content `seat.facing`). Built keys to the back, then turned round (`_turn_round`) and stood on the wall's
+# face. Its fallboard lies over the keys and lifts back against the case; its music desk, hinged at the top,
+# swings its foot out so the sheet music leans back for reading.
+PIANO_FORWARD = 0.027   # how far forward of where it was built, turned round, it stands: its back on the wall
 BLACK_KEYS = [-0.577 + 0.161 * o + d for o in range(8) for d in (0, 0.023, 0.069, 0.092, 0.115)]
 
 
@@ -378,9 +388,10 @@ def piano():
         F.box('desk_ledge', 0.62, 0.015, 0.025, (0, 0.992, 0.278), M.piano_trim, bevel=0.004)
         _sheet_music(F, 'music', 0.4, 0.19, (0, 1.105, 0.285))
     desk = G.hinged(G.join(dk, 'music_desk'), F.at(0, 1.205, 0.298))
+    _turn_round(G.meshes(), PIANO_FORWARD)
     G.settle(centre=False)
-    G.swing(fallboard, 'fallboard', 90, seconds=0.9, axis='X')
-    G.swing(desk, 'fallboard', 18, seconds=0.9, axis='X')
+    G.swing(fallboard, 'fallboard', -90, seconds=0.9, axis='X')
+    G.swing(desk, 'fallboard', -18, seconds=0.9, axis='X')
     return G.meshes()
 
 
@@ -1427,7 +1438,7 @@ def craftTable():
 
 FAMILY = G.Family(
     'hobbies', M,
-    [G.Model('piano', piano, size=(1.54, 1.48, 0.827), key='model.piano', centre=(0, 0.0435),
+    [G.Model('piano', piano, size=(1.54, 1.48, 0.827), key='model.piano', centre=(0, -0.0435 + PIANO_FORWARD),
              motions={'uses': {'play': 'fallboard'}}, paint=[('piano', 'Body'), ('piano_trim', 'Trim')]),
      G.Model('ukulele', ukulele, size=(0.348, 0.841, 0.258), key='model.ukulele', centre=(0, 0.065),
              paint=[('uke', 'Instrument'), ('stand', 'Stand')]),
