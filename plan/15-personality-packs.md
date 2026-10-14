@@ -201,7 +201,7 @@ done.
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program. |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body | Use | `tray`: the key tray drawer slides out for tidy. |
 
-## P14. Outgoing (6)
+## P14. Outgoing (6) — **Done** (in Validate › Outgoing)
 
 - **Family:** `tools/art/blender/families/pack_outgoing.py`
 - **Validate group:** `outgoing` (Validate › Outgoing)
