@@ -408,11 +408,7 @@ def island(body, top, top_fin, stool, legs):
          box([1.94, 0.05, 0.82], [0, 0.925, 0.04], top, top_fin, radius=0.01)]             # worktop overhanging the back, for stools
     for x in (-0.68, -0.23, 0.23, 0.68):
         p.append(box([0.42, 0.6, 0.02], [x, 0.5, 0.45], body, 'satin', radius=0.01))      # doors at the front, where residents stand
-    p += [cyl([0.3, 0.02, 0.3], [-0.45, 0.96, 0.1], '#F2F1EE', 'gloss'),                    # fruit bowl
-          sph([0.08, 0.07, 0.08], [-0.48, 1.0, 0.1], '#F2C14E', 'satin', segments=8),
-          sph([0.08, 0.07, 0.08], [-0.42, 1.0, 0.06], '#D9483B', 'satin', segments=8),
-          box([0.4, 0.03, 0.28], [0.4, 0.965, 0.2], OAK, 'wood', radius=0.01)]               # chopping board
-    return p                    # no stools: they are things of their own, set at the back (housegen)
+    return p                    # no stools, a bare top: stools and a fruit bowl are things of their own (housegen)
 
 
 add('kitchenIsland', placeholder(island('#EDEBE6', '#E8E6E1', 'gloss', SAGE, CHROME)), (2, 1))

@@ -354,11 +354,9 @@ def island_unit(w, body, top, tfin, handle, fp=(1, 1)):
     return p
 
 
-p = island_unit(1.0, SAGE, '#F2F1EE', 'gloss', BRASS)
-p += [cyl([0.26, 0.02, 0.26], [-0.18, 0.96, -0.12], PORCELAIN, 'gloss')]
+p = island_unit(1.0, SAGE, '#F2F1EE', 'gloss', BRASS)                # a bare top: housegen sets things on it
 add('islandSmall', p, top=(-0.48, 0.48, -0.47, 0.47, CT))
 p = island_unit(3.0, '#F1F0EC', '#C9CBCC', 'satin', BLACKMETAL, (3, 1))
-p += [box([0.42, 0.03, 0.28], [0.9, 0.965, -0.24], OAK, 'wood', radius=0.01)]
 add('islandLong', p, (3, 1), top=(-1.48, 1.48, -0.47, 0.47, CT))
 
 # Tall larder: two doors over two drawers, a cornice.

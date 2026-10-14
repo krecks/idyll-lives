@@ -560,12 +560,8 @@ def kitchenIsland():
         for s in (-1, 1):                                       # two doors under the drawer
             F.box(f'door{s}', 0.86, 0.6, 0.02, (s * 0.47, 0.35, 0.44), M.cab, bevel=0.008)
             _handle_h(F, f'door{s}_pull', s * 0.47, 0.6, 0.458, 0.14)
-        # no stools of its own: stools are things of their own, so residents sit on them at the
-        # island and nothing stands in a stool
-        F.cyl('bowl', 0.15, 0.02, (-0.45, 0.96, 0.1), M.porcelain, verts=16)   # a fruit bowl
-        F.sphere('fruit1', 0.04, (-0.48, 1.0, 0.1), M.yellow, scale=(1, 1, 0.875), segments=10, rings=8)
-        F.sphere('fruit2', 0.04, (-0.42, 1.0, 0.06), M.rust, scale=(1, 1, 0.875), segments=10, rings=8)
-        F.box('board', 0.4, 0.03, 0.28, (0.4, 0.965, 0.2), M.oak, bevel=0.01)   # a chopping board
+        # no stools of its own, and a bare top: stools and the things on its top (a fruit bowl, mugs)
+        # are things of their own (housegen sets them), so nothing is doubled or stands in a stool
     G.join(still, 'body', origin=(0, 0, 0))
     # the drawer over the doors, at the front where residents stand
     drawer = _drawer(F, 'drawer', 0.9, 0.77, 0.44, M.cab, handle_w=0.3)
@@ -577,8 +573,7 @@ def kitchenIsland():
 def islandSmall():
     F = G.GameFrame(shift=0.47)
     with G.new_parts() as still:
-        _island(F, 1.0, handles=M.brass)
-        F.cyl('bowl', 0.13, 0.02, (-0.18, 0.96, -0.12), M.porcelain, verts=16)
+        _island(F, 1.0, handles=M.brass)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
     G.settle()
 
@@ -586,8 +581,7 @@ def islandSmall():
 def islandLong():
     F = G.GameFrame(shift=0.47)
     with G.new_parts() as still:
-        _island(F, 3.0, handles=M.metal)
-        F.box('board', 0.42, 0.03, 0.28, (0.9, 0.965, -0.24), M.oak, bevel=0.01)
+        _island(F, 3.0, handles=M.metal)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
     G.settle()
 
@@ -689,13 +683,13 @@ FAMILY = G.Family(
      G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins', centre=(0, -0.212),
              paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),
      # K6: islands and bars
-     G.Model('kitchenIsland', kitchenIsland, size=(1.94, 1.035, 0.839), key='model.kitchenIsland', centre=(0, 0.0495),
+     G.Model('kitchenIsland', kitchenIsland, size=(1.94, 0.95, 0.839), key='model.kitchenIsland', centre=(0, 0.0495),
              # sandwich slides the drawer out (breakfast is eaten standing, or on a stool at the island)
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandSmall', islandSmall, size=(0.96, 0.97, 0.951), key='model.islandSmall',
+     G.Model('islandSmall', islandSmall, size=(0.96, 0.95, 0.951), key='model.islandSmall',
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandLong', islandLong, size=(2.96, 0.98, 0.951), key='model.islandLong',
+     G.Model('islandLong', islandLong, size=(2.96, 0.95, 0.951), key='model.islandLong',
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
