@@ -86,6 +86,11 @@ pub enum Command {
     SetPlayerMoves {
         enabled: bool,
     },
+    /// Switch a lamp on or off (see `lights.rs`): at once, nobody walks over.
+    SwitchLamp {
+        object: u32,
+        on: bool,
+    },
     /// Queue an interaction on an object for a Sim.
     Use {
         sim: u32,

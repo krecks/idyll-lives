@@ -3986,7 +3986,8 @@
         "range": 4.0,
         "intensity": 0.8,
         "height": 0.7,
-        "tiles": 6
+        "tiles": 6,
+        "switch": false
       },
       "seat": {
         "height": 0.42,
@@ -4355,7 +4356,8 @@
         "range": 4.0,
         "intensity": 0.8,
         "height": 0.5,
-        "tiles": 8
+        "tiles": 8,
+        "switch": false
       },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [

@@ -192,6 +192,9 @@ pub struct ObjectDef {
     /// `roomRules.lampTiles`): a chandelier lights more of a room than a table lamp. 0: it gives
     /// no light (no `light`).
     pub lamp: f32,
+    /// A lamp that can be switched on and off (a `light` without `"switch": false`, which fires
+    /// have; see `lights.rs`).
+    pub switch: bool,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -1978,7 +1981,7 @@ struct ObjectRaw {
     #[serde(default, rename = "wearPerUse")]
     wear_per_use: Option<f32>,
     /// Lamps: the renderer reads the light's look; the simulation only its `tiles`, the floor it
-    /// lights (default `roomRules.lampTiles`).
+    /// lights (default `roomRules.lampTiles`), and `switch` (false: always lit at night, a fire).
     #[serde(default)]
     light: Option<serde_json::Value>,
     /// `wall`, `ceiling` or `rug` (default `floor`: furniture).
@@ -2711,6 +2714,7 @@ impl Content {
                 lamp: obj.light.as_ref().map_or(0.0, |l| {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
+                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0

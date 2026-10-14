@@ -41,7 +41,8 @@
 //! files' object and household `style` is ignored); 25 = objects can be open (`objects[].open`: a
 //! wall bed folded down; absent: closed); 26 = a colour per part (`objects[].colors`, `#rrggbb` by
 //! the model's material name; an older file's `color` goes on the `body`); 27 = crops grow
-//! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe). Older files load. Saves
+//! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
+//! switched off (`objects[].off`; absent: on). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -59,7 +60,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 27;
+pub const SAVE_VERSION: u32 = 28;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -277,6 +278,9 @@ pub struct ObjectSave {
     /// A crop's growth (see `ObjectInstance::growth`; absent before v27, or not a crop: ripe).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub growth: Option<f32>,
+    /// A lamp switched off (absent before v28, or on).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub off: bool,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -636,6 +640,7 @@ impl World {
                 tall: o.tall,
                 open: o.open,
                 growth: content.objects[o.def].grows.is_some().then_some(o.growth),
+                off: o.off && content.objects[o.def].switch,
             })
             .collect();
         let sims = self
@@ -1003,6 +1008,7 @@ impl World {
                 world.objects[id as usize].offset = offset;
                 world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
                 world.objects[id as usize].open = o.open;
+                world.objects[id as usize].off = o.off && world.content.objects[world.objects[id as usize].def].switch;
                 world.objects[id as usize].growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
                 object_ids.insert(i as u32, id);
             }
