@@ -55,6 +55,18 @@ The fold-down wall bed (`models/living/wallBed.glb`, pack `packs/living/manifest
 `tools/art/blender/families/living.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A new object:
 its pack entry carries a simple primitive-part placeholder as the fallback.
 
+The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
+`sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
+`tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a
+`water_on` clip (the tap stream) played while a resident washes. The double vanity keeps its mirror glass as a
+primitive `part` (a file can't reflect yet); its cabinet and mirror frames are in the file. The primitive-part
+entries stay as the fallback.
+
+The kitchen farmhouse and double counter sinks (`models/kitchen/farmhouseSink.glb`, `counterSinkDouble.glb`, pack
+`packs/kitchen/manifest.json`) are built in Blender by `tools/art/blender/families/kitchen.py` alongside the
+fridge, on `gamekit`, and exported as `.glb` (glTF, original, CC0), also with a `water_on` clip. Their
+primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

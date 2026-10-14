@@ -1,10 +1,11 @@
 # Kitchen — notes
 
-`kitchen.py` builds the kitchen fridge (`model.fridge`) into `web/public/assets/models/kitchen/fridge.glb`
-and its entry in `packs/kitchen/manifest.json`. It replaces the primitive-part placeholder
-(`furniture_prims.fridge_classic`), which stays as the fallback. It was first made as an evaluation on
-2026-10-13. On 2026-10-14 the flat build and the doors build (`kitchen_doors.py`, `fridge.doors.glb`)
-became this one build.
+`kitchen.py` builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
+`packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`) and the two **sinks**
+(`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). They
+replace the primitive-part placeholders, which stay as the fallback. The fridge was first made as an
+evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
+`fridge.doors.glb`) became this one build, and the two sinks were added.
 
 ## The fridge
 
@@ -52,6 +53,22 @@ doors move at one speed, but each has its own angle:
 The pack's `motions` plays `fridge_open` for the `fetch` and `drink` animation tags (snacks, a recipe's
 ingredients, a cold drink, putting dishes away) and holds it for 3.5 s. `freezer_open` plays for no use
 yet, because no interaction takes frozen food: that is `check_glb.py`'s one warning.
+
+## The sinks
+
+The two kitchen sinks share the fridge's `GameFrame` style and the family's palette (extended with
+`porcelain`, `stone`, `wood`, `metal`, `dark`, `plant`, `water`). Each has a `body` material (paint) and a
+`water` moving part: the stream is built full length from the spout into the basin, hidden at rest (scaled
+to 0.001 along its axis), and a `water_on` clip grows it to 1 over 0.4 s. `motions` plays `water_on` for the
+`wash` animation tag, with no `hold`, so the water runs for the whole use and retracts afterwards (the `wash`
+tag covers both the `wash` and `washUp` interactions).
+
+| Model | Size (w × h × d) | Triangles | Draws | Note |
+|---|---|---|---|---|
+| `model.farmhouseSink` | 1.000 × 1.263 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
+| `model.counterSinkDouble` | 2.000 × 1.265 × 0.790 m | 5,496 | 3 | two inset basins, a bridge tap each |
+
+Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings).
 
 ## Rebuild
 

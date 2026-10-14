@@ -44,6 +44,14 @@ def slide(obj, clip, offset, seconds=1.0):
     return obj
 
 
+def grow(obj, clip, seconds=0.4, axis='Z'):
+    """A clip `clip` scaling `obj` about its own origin along `axis` ('X', 'Y' or 'Z', Blender) from
+    where it is (built small and hidden) to full size (scale 1): a part that appears while a resident
+    uses the object (a stream of water)."""
+    i = 'XYZ'.index(axis)
+    return _clip(obj, clip, 'scale', i, obj.scale[i], 1.0, seconds)
+
+
 def _clip(obj, clip, path, index, a, b, seconds):
     """Keys `obj`.`path`[`index`] from `a` (frame 1) to `b`, in an action pushed to the NLA track `clip`
     (one action per track; several channels of one clip share it)."""

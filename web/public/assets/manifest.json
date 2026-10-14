@@ -24,7 +24,8 @@
     "packs/kind/manifest.json",
     "packs/gardenDecor/manifest.json",
     "packs/kitchen/manifest.json",
-    "packs/living/manifest.json"
+    "packs/living/manifest.json",
+    "packs/bathroom/manifest.json"
   ],
   "entries": {
     "material.wall": {

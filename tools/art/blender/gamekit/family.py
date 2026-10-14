@@ -25,14 +25,16 @@ class Model:
                  'open': clip held open while the object is open (content `leaves`)}
       paint      the materials a player's colour goes on (the pack's `paint`)
       placeholder  primitive parts for a key the manifests don't have yet (the fallback)
+      parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
                  middle of its footprint (default: the middle)
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
-                 centre=(0.0, 0.0)):
+                 parts=None, centre=(0.0, 0.0)):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint, self.placeholder = tolerance, motions, paint, placeholder
+        self.parts = parts
         self.centre = centre
 
 
@@ -100,6 +102,8 @@ class Family:
                 entry['paint'] = model.paint
             if model.placeholder:
                 entry['placeholder'] = model.placeholder
+            if model.parts:
+                entry['parts'] = model.parts
             entries[self.key(model)] = entry
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
         if entries and '--no-pack' not in args:
