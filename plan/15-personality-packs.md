@@ -5,8 +5,8 @@ task per pack, one Blender family per pack (`families/pack_<trait>.py`), one Val
 things are the residents' favourites, used often: give each its clip.
 
 Each family writes its own override pack, `packs/pack_<trait>/manifest.json`, keyed `model.<trait>.<id>`, so the
-trait's pack keeps its placeholders as the fallback (`families/pack_bookworm.py` and `.md` are the pattern). P1 is
-done.
+trait's pack keeps its placeholders as the fallback (`families/pack_bookworm.py` and `.md` are the pattern). P1–P16
+are done (2026-10-14); what is left is in `future.md`.
 
 ## P1. Bookworm (6) — **Done** (in Validate › Bookworm)
 
