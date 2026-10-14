@@ -53,6 +53,12 @@ The houseplants (`models/plants/plant.glb`, `monstera.glb`, `fiddleFig.glb`, `sn
 exported as `.glb` (glTF, original, CC0). Their leaves sway in the nature shader's wind; the bonsai's stray sprig
 shrinks away while a resident prunes it. Their primitive-part entries stay as the fallback.
 
+The flower beds (`models/plants/flowerbed.glb`, `tulips.glb`, `daffodils.glb`, `daisies.glb`, `sunflowers.glb`,
+`poppies.glb`, `marigolds.glb`, `pansies.glb`, `lilies.glb`, `lupins.glb`, `forgetMeNots.glb`, `cosmos.glb`,
+`meadow.glb`, `geraniums.glb`, `flowerBox.glb`, in the same pack) are built by the same script, also original and
+CC0. A flower in the wildflower meadow shrinks away while a resident picks it. Their primitive-part entries stay as
+the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.

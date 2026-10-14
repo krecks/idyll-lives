@@ -9,6 +9,10 @@ The ten G1 houseplants are done (`families/plants.py`, notes in `families/plants
 (and `bark`) are drawn with the shared finish materials the nature shader hooks, so they sway in the wind as the
 placeholders do, with nothing more to build.
 
+The fifteen G2 flowers are done in the same family: each mound bed's colour part is its soil mound ("Bed"),
+and its petals where they are all one colour; the geraniums' is the pot, the flower box's the box, the raised
+bed's its boards. The meadow has none.
+
 ## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
@@ -28,7 +32,7 @@ placeholders do, with nothing more to build.
 | `garden.orchid` Orchid | 1x1 · floor | water:water talk:talk admire:look | garden / houseplants | Pot | Static | Static; the foliage sways in the shader. |
 | `garden.bonsai` Bonsai | 1x1 · floor | prune:tinker water:water | garden / houseplants | Pot | Use | `trim`: a stray twig shrinks away for prune. |
 
-## G2. Flowers (15)
+## G2. Flowers (15) — **Done** (in Validate › Flowers)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `flowers` (Validate › Flowers)

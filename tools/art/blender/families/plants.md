@@ -4,8 +4,8 @@
 `packs/plants/manifest.json`: the potted plant (`model.plant`), the monstera, fiddle-leaf fig, snake plant, cactus
 trio, succulent bowl, fern on a stand, parlour palm, orchid and bonsai (`model.garden.*`). They replace the
 primitive-part placeholders of `furniture.py` and `nature.py`, which stay as the fallback. Built 2026-10-14; they
-sit in Validate › Houseplants until checked in play. The flowers, shrubs and edibles (G2–G4) come into this family
-next.
+sit in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
+Flowers); the shrubs and edibles (G3, G4) come into this family next.
 
 ## How a plant is made
 
@@ -48,6 +48,44 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 `check_glb.py`: 10 models, 0 failed; warnings: the bonsai's four draw calls, the palm 11 % shallower and the
 succulents 15 % lower than their placeholders' bounds (which count each tilted part's whole box). Khronos
 validator: 0 errors, 0 warnings each.
+
+## The flowers (G2)
+
+`model.flowerbed` and `model.garden.tulips`, `daffodils`, `daisies`, `sunflowers`, `poppies`, `marigolds`,
+`pansies`, `lilies`, `lupins`, `forgetMeNots`, `cosmos`, `meadow`, `geraniums`, `flowerBox`, over the placeholders
+of `nature.py`. Twelve stand on a low soil mound (`mound`, material `bed`), the part the player colours ("Bed");
+where a bed's petals are one colour they are a second part ("Petals"). The geraniums colour their pot and flowers,
+the flower box its box, the raised bed its boards; the meadow, all grass and mixed flowers, has none.
+
+- **Flower faces** (`star`): a thin star of petals, cupped, leaning towards a heading; a low `dome` for the middle.
+  Tulips, poppies and lilies are turned cups (`cupped`). Marigolds, forget-me-nots and lupins are leafy `lump`s and
+  cones on `foliage` in their flower colours, as the placeholders draw them; other flowers are `satin` (still).
+- **Leafy clumps** (`clumps`, `lump`): a smooth sphere pushed about by noise, flattened.
+- **The meadow's picked flower**: a big white daisy at the front, its own part (stem and face on `satin`: one draw
+  call), `pick` squashes it to nothing in 0.8 s for `pickFlower`; the game brings it back after.
+
+The placeholders' mounds sink 6 cm into the ground, so their bounds read a little taller than the beds stand; the
+flowers here are set so each model is within 10 % of them, but for the geraniums' width (11 % under).
+
+| Model | Size (w × h × d) | Triangles | Draws |
+|---|---|---|---|
+| `model.flowerbed` | 0.94 × 0.48 × 0.94 m | 3,044 | 3 |
+| `model.garden.tulips` | 0.84 × 0.62 × 0.84 m | 1,672 | 2 |
+| `model.garden.daffodils` | 0.84 × 0.49 × 0.84 m | 2,530 | 2 |
+| `model.garden.daisies` | 0.84 × 0.38 × 0.84 m | 3,452 | 2 |
+| `model.garden.sunflowers` | 0.84 × 2.11 × 0.91 m | 1,344 | 2 |
+| `model.garden.poppies` | 0.84 × 0.66 × 0.84 m | 2,152 | 2 |
+| `model.garden.marigolds` | 0.88 × 0.34 × 0.84 m | 2,660 | 2 |
+| `model.garden.pansies` | 0.84 × 0.26 × 0.84 m | 1,820 | 2 |
+| `model.garden.lilies` | 0.84 × 0.94 × 0.87 m | 1,444 | 2 |
+| `model.garden.lupins` | 0.84 × 0.99 × 0.84 m | 1,120 | 2 |
+| `model.garden.forgetMeNots` | 0.87 × 0.28 × 0.84 m | 2,460 | 2 |
+| `model.garden.cosmos` | 0.89 × 0.88 × 0.84 m | 2,146 | 2 |
+| `model.garden.meadow` | 0.81 × 0.52 × 0.92 m | 2,548 | 3 |
+| `model.garden.geraniums` | 0.42 × 0.65 × 0.50 m | 1,648 | 2 |
+| `model.garden.flowerBox` | 0.95 × 0.73 × 0.50 m | 2,912 | 2 |
+
+`check_glb.py`: 15 models, 0 failed (the geraniums' width warning). Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 

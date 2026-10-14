@@ -2781,7 +2781,7 @@
         }
       ],
       "price": 60,
-      "category": "garden",
+      "category": "validate",
       "group": "flowers",
       "description": "A wooden bed full of mixed bedding flowers. Tending it trains Gardening; a skilled gardener is proud of the result."
     },
@@ -3768,6 +3768,11 @@
         {
           "id": "office storage",
           "label": "Office Storage"
+        },
+        {
+          "id": "flowers",
+          "label": "Flowers",
+          "outside": true
         }
       ]
     },
