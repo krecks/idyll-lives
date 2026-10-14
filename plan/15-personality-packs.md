@@ -4,7 +4,11 @@ The traits' own things (`web/public/content/packs/<trait>.json`, placeholders fr
 task per pack, one Blender family per pack (`families/pack_<trait>.py`), one Validate group per pack. Pack
 things are the residents' favourites, used often: give each its clip.
 
-## P1. Bookworm (6)
+Each family writes its own override pack, `packs/pack_<trait>/manifest.json`, keyed `model.<trait>.<id>`, so the
+trait's pack keeps its placeholders as the fallback (`families/pack_bookworm.py` and `.md` are the pattern). P1 is
+done.
+
+## P1. Bookworm (6) — **Done** (in Validate › Bookworm)
 
 - **Family:** `tools/art/blender/families/pack_bookworm.py`
 - **Validate group:** `bookworm` (Validate › Bookworm)

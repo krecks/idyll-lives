@@ -81,6 +81,12 @@ The bathroom baths (`models/bathroom/bathtub.glb`, `bathtubClawfoot.glb`, `batht
 exported as `.glb` (glTF, original, CC0). Each runs its tap and fills with water (`tap_on`, `fill`) while a resident
 bathes, and drains after. Their primitive-part entries stay as the fallback.
 
+The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.glb`, `writingBureau.glb`,
+`teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
+drops, the teapot pours, the fire grows and the top book opens. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
