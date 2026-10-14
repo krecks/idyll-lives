@@ -211,6 +211,11 @@ const BEDS: Record<string, { h: number; fwd?: number }> = {
   sunLounger: { h: 0.35 },
   hammock: { h: 0.62 },
   wallBed: { h: 0.46 },
+  // The oak double, the upholstered queen and the four-poster (their mattress tops), and the daybed.
+  bedDouble: { h: 0.52 },
+  bedQueenUpholstered: { h: 0.52 },
+  bedCanopy: { h: 0.52 },
+  bedDaybed: { h: 0.51 },
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
   sofaBed: { h: 0.42, fwd: 0.6 },
 };
@@ -218,7 +223,7 @@ const DEFAULT_BED: { h: number; fwd?: number } = { h: 0.5 };
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk. */
 const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
-const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'kidsBed', 'wallBed']);
+const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'wallBed']);
 /** Lying: height of the back above the feet line, and how far the feet reach past the slot centre (body scale 1). */
 const LIE_BACK = 0.1;
 const LIE_CENTRE = 0.86;

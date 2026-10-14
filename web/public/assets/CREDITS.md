@@ -149,6 +149,13 @@ The pantry and the tall larder swing both doors open 100° while a resident fetc
 cabinets, cooker hood, spice rack, pot rail and wall shelves are static, and the pedal and recycling bins
 are static this pass. Their primitive-part entries stay as the fallback.
 
+The bedroom beds (`models/bedroom/bed.glb`, `bedSingle.glb`, `bedBunk.glb`, `bedFuton.glb`, `bedKing.glb`,
+`bedDouble.glb`, `bedQueenUpholstered.glb`, `bedCanopy.glb`, `bedDaybed.glb`, override pack
+`packs/bedroom/manifest.json`) are built in Blender by `tools/art/blender/families/bedroom.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Each turns the top of its duvet down (`turn_down`) while a resident sleeps
+or naps; the futon's back folds down flat into a bed (`unfold`) and stays down until it is folded away; the daybed is
+static. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

@@ -31,7 +31,8 @@
     "packs/laundry/manifest.json",
     "packs/lighting/manifest.json",
     "packs/decor/manifest.json",
-    "packs/plants/manifest.json"
+    "packs/plants/manifest.json",
+    "packs/bedroom/manifest.json"
   ],
   "entries": {
     "material.wall": {

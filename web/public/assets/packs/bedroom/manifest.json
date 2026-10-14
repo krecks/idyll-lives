@@ -1,0 +1,410 @@
+{
+  "$comment": "Blender-built bedroom models (tools/art/blender/families/bedroom.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The beds turn their duvet down (`turn_down`) while a resident sleeps or naps; the futon unfolds into a bed (`unfold`) and stays open.",
+  "version": 1,
+  "entries": {
+    "model.bed": {
+      "type": "model",
+      "url": "../../models/bedroom/bed.glb",
+      "materials": {
+        "bedding_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_linen": {
+          "finish": "material.finish.fabric"
+        },
+        "headboard_linen": {
+          "finish": "material.finish.fabric"
+        },
+        "legs_teak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_linen",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_linen",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_cream",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedSingle": {
+      "type": "model",
+      "url": "../../models/bedroom/bedSingle.glb",
+      "materials": {
+        "bedding_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "headboard_oak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_oak",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_sage",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedBunk": {
+      "type": "model",
+      "url": "../../models/bedroom/bedBunk.glb",
+      "materials": {
+        "bedding_teal": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "headboard_oak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_oak",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_teal",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedFuton": {
+      "type": "model",
+      "url": "../../models/bedroom/bedFuton.glb",
+      "materials": {
+        "bedding_futon": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_ash": {
+          "finish": "material.finish.wood"
+        },
+        "headboard_ash": {
+          "finish": "material.finish.wood"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "quilt_oat": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "unfold",
+          "nap": "unfold",
+          "unfold": "unfold"
+        },
+        "open": "unfold"
+      },
+      "paint": [
+        {
+          "material": "frame_ash",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_ash",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_futon",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedKing": {
+      "type": "model",
+      "url": "../../models/bedroom/bedKing.glb",
+      "materials": {
+        "bedding_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_linen": {
+          "finish": "material.finish.fabric"
+        },
+        "headboard_linen": {
+          "finish": "material.finish.fabric"
+        },
+        "legs_teak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_linen",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_linen",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_cream",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedDouble": {
+      "type": "model",
+      "url": "../../models/bedroom/bedDouble.glb",
+      "materials": {
+        "bedding_blue": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_oak": {
+          "finish": "material.finish.wood"
+        },
+        "headboard_teak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_oak",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_teak",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_blue",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedQueenUpholstered": {
+      "type": "model",
+      "url": "../../models/bedroom/bedQueenUpholstered.glb",
+      "materials": {
+        "bedding_oat": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_stone": {
+          "finish": "material.finish.fabric"
+        },
+        "headboard_stone": {
+          "finish": "material.finish.fabric"
+        },
+        "legs_teak": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_stone",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_stone",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_oat",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedCanopy": {
+      "type": "model",
+      "url": "../../models/bedroom/bedCanopy.glb",
+      "materials": {
+        "bedding_rust": {
+          "finish": "material.finish.fabric"
+        },
+        "canopy": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_walnut": {
+          "finish": "material.finish.wood"
+        },
+        "headboard_walnut": {
+          "finish": "material.finish.wood"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "headboard_walnut",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_rust",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.bedDaybed": {
+      "type": "model",
+      "url": "../../models/bedroom/bedDaybed.glb",
+      "materials": {
+        "back_white": {
+          "finish": "material.finish.satin"
+        },
+        "bedding_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "cushion_rose": {
+          "finish": "material.finish.fabric"
+        },
+        "frame_white": {
+          "finish": "material.finish.satin"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_white",
+          "label": "Frame"
+        },
+        {
+          "material": "back_white",
+          "label": "Headboard"
+        },
+        {
+          "material": "bedding_sage",
+          "label": "Bedding"
+        }
+      ]
+    }
+  }
+}

@@ -2461,7 +2461,7 @@
         }
       ],
       "price": 750,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2
     },
@@ -3739,6 +3739,10 @@
         {
           "id": "table lamps",
           "label": "Table Lamps"
+        },
+        {
+          "id": "beds",
+          "label": "Beds"
         }
       ]
     },

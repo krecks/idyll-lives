@@ -10,7 +10,7 @@
         2
       ],
       "price": 900,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "decor": 0.2,
@@ -57,7 +57,7 @@
         2
       ],
       "price": 1400,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "decor": 0.4,
@@ -104,7 +104,7 @@
         2
       ],
       "price": 2200,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "decor": 0.8,
@@ -152,7 +152,7 @@
         2
       ],
       "price": 480,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "decor": 0.2,
       "description": "A single bed with a back and arms: a sofa by day, a bed by night.",

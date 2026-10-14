@@ -4,7 +4,7 @@ Mattress heights must match `BEDS`, and beds that get the game's blanket are in 
 (`web/src/render/babylon/characters.ts`): a bed's own duvet sits under that blanket. Things with drawers and doors
 follow the fridge (hinge, `hold`).
 
-## BR1. Beds (9)
+## BR1. Beds (9) — **Done** (in Validate › Beds)
 
 - **Family:** `tools/art/blender/families/bedroom.py`
 - **Validate group:** `beds` (Validate › Beds)

@@ -1830,7 +1830,7 @@
         2
       ],
       "price": 320,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "description": "A bed for one.",
       "interactions": [
@@ -1875,7 +1875,7 @@
         2
       ],
       "price": 650,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "bunk": true,
@@ -1922,7 +1922,7 @@
         2
       ],
       "price": 420,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "description": "A low platform with a firm futon: the cheapest double, if not the comfiest.",
@@ -1990,7 +1990,7 @@
         2
       ],
       "price": 1800,
-      "category": "bedroom",
+      "category": "validate",
       "group": "beds",
       "slots": 2,
       "decor": 0.5,

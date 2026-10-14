@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **124 are done**:
+**Where it stands (2026-10-14):** 540 objects. **133 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -17,6 +17,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the six B4 laundry models: `laundryWasher`, `laundryDryer`, `towelRail`, `towelLadder`, `laundryBasket`, `bathMat` (in Validate › Laundry);
 - the three B5 storage and mirrors: `mirrorCabinet`, `mirrorRound`, `bathCabinetTall` (in Validate › Bathroom Storage);
 - the 21 lamps: LT1 `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`, `trackLights`, `paperLantern` (in Validate › Ceiling Lights); LT2 `wallSconce`, `wallLampArm`, `wallLightOutdoor` (Validate › Wall Lights); LT3 `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere` (Validate › Floor Lamps); LT4 `tableLamp`, `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern` (Validate › Table Lamps);
+- the nine BR1 beds: `bed`, `bedSingle`, `bedBunk`, `bedFuton`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedDaybed` (in Validate › Beds);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
@@ -24,10 +25,10 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants).
 
-**416 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 72;
-- `catalog2.py`: 152;
-- the base manifest: 64;
+**407 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 68;
+- `catalog2.py`: 148;
+- the base manifest: 63;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -38,7 +39,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
 | [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
-| [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9), BR2 Nightstands and small storage (8), BR3 Wardrobes and drawers (6), BR4 Dressing and mirrors (4) |
+| [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8), BR3 Wardrobes and drawers (6), BR4 Dressing and mirrors (4) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4), KD2 Toys (10), KD3 Kids' study and art (6) |
 | [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11), L2 Armchairs and small seats (11), L3 Coffee and side tables (9), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
 | [Office](06-office.md) | 14 | O1 Desks (8), O2 Desk chairs (3), O3 Storage and boards (3) |
