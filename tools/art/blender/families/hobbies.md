@@ -35,6 +35,8 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 - **Dartboard**: twenty segments and the rings are one flat mesh (`_dart_face`). Three darts, one part, grow
   out of the board (`darts`). Hidden at rest, they leave the model 7 cm deep and centred on the board, where
   the placeholder (darts in) is 19 cm: `check_glb.py` warns of the depth and the centre.
+  Their origin is 2 cm inside the board, so at rest they flatten out of sight (on the face, the flights showed
+  as crosses).
 - **Arcade cabinet**: the sides are prisms cut to the classic profile (`_prism`). The screen and the marquee
   glow at night. The joystick waggles in a loop, `joystick`.
 - **Jigsaw table**: half the picture is done; a patch beside it spreads across (`pieces`, `G.grow` along X).
@@ -50,7 +52,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 - **Sewing table**: the presser foot and needle lower 1.6 cm (`presser`) and the handwheel turns in a loop
   (`handwheel`) for `sew` and `mend`.
 - **Chemistry bench**: glass flasks and test tubes (one see-through draw call). The middle flask's liquid
-  rises from its floor (`bubble`).
+  rises from its floor (`bubble`). Its origin is 1 cm inside the bench top, so at rest it flattens out of sight.
 - **Pottery wheel**: the pot rises from a squat lump, 30 % of its height (`clay`), and the wheel head turns in
   a loop (`wheel`) for `throw`. At rest it is lower than the placeholder's full pot: `check_glb.py` warns of it.
 - **Craft table**: the scrapbook's cover swings 176° open over its spine (`book_open`), onto the photos of its

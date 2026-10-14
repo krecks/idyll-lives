@@ -159,3 +159,51 @@ None of them blocks the plan. Each says where it lives.
   10-minute pastry use. The hot dog stand's lid stays up for the whole use, as the plan says.
 - **Parallel agents sharing a scratchpad** overwrote each other's helper scripts. Give each its own folder in the
   scratchpad (as with dev server ports).
+
+## Hobbies (H1–H3, built 2026-10-14)
+
+- **Grown parts that flatten onto a visible face show at rest.** A part `G.grow`n from 0.001 along one axis keeps
+  its other two: the dartboard's darts, flattened onto the board's face, left their flights as three coloured
+  crosses, and the flask's liquid, flattened onto the flask's floor, showed as an orange disc through the glass. Both
+  are fixed by putting the part's origin inside something opaque (the board, the bench top), so it flattens out of
+  sight. Worth a line in the README's traps, and perhaps a gate check: a part scaled near 0 at rest whose flattened
+  plane is outside the rest of the model.
+- **Instruments in the hands.** The guitars and the ukulele are parts of their own with no clip: the `music`
+  animation doesn't draw an instrument in the resident's hands, so hiding it from the stand (`off_stand`) would only
+  make it vanish. Once the renderer can draw a held prop with a hand pose, add `G.squash(part, 'off_stand', 0.001)`
+  and the use to `motions`.
+- **Seats face the front.** A seated use puts the resident behind the object facing +z (the `seat`'s `forward`
+  is negative), as at the desks. The piano follows that: against a wall, the pianist sits between the wall and the
+  keys, and the case's back faces the room. A real upright stands with its back to the wall, which needs a seat
+  facing the object's back (a `facing` on `seat`) and a use from behind. The digital piano and the sewing table are
+  the same, but read as tables.
+- **Parts hidden at rest skew the gate's size checks.** The dartboard (darts hidden) warns of its depth (0.07 m
+  against 0.19 m) and its centre; the pottery wheel (the pot a low lump at rest) of its height. Clicking, the
+  fallback and the shadow follow the placeholder, so nothing breaks, but the warnings are noise on every such model.
+  The gate could measure parts hidden at rest at their open pose.
+- **The pool table's cue** lies on the cloth; the placeholder's stuck out past the table, so the model is 1.40 m
+  deep against 1.69 m (a gate warning). The placeholder's picking box still includes the old cue.
+- **Draw calls shaped the models.** The foosball kicks two of its four rods (four turning rods would be six draw
+  calls), the drums' hi-hat is still and the throne satin, and the chess chair's pad and the sewing table are satin
+  rather than fabric or wood. Moving parts that share a draw call would allow all four rods.
+- **Testing in play.**
+  - Needs beat a queued use even with free will off (`setAutonomy`): in `wants-asking` the resident went for a snack
+    or the toilet. Re-send the `use` until its label shows in the resident's panel. A test state with needs topped
+    up would save that.
+  - Residents take a few seconds to sit down: a screenshot right after the label shows can catch them standing (the
+    chess player seemed not to sit at first; they do).
+  - `__controls.follow(sim)` pans to the resident but doesn't zoom; scroll the wheel over the middle of the canvas.
+    The renderer's `setCameraPose` isn't exposed under `?debug`, so a wall thing above the resident (the dartboard)
+    can't be framed in play; exposing it would help.
+  - The clips bench aims at most 0.75 m up, so wall things need `__scene.activeCamera.target.y` set from the page; a
+    `&target=` parameter would do it.
+  - After a long session the household runs out of money and buys fail silently ("not bought"): use a fresh page
+    for every few items.
+- **Working in one checkout.** Another session reset `furniture.json` from HEAD and dropped this task's category
+  edits, which had to be put back; the index is shared too, and other sessions had files staged. The commit was
+  built from HEAD plus this task's edits only, in a temporary index (`GIT_INDEX_FILE`), with an `update-ref` that
+  fails if HEAD moved, and the shared index updated for those paths, keeping what others had staged. Also, check a
+  port with `lsof` before starting vite: with the port taken, `--strictPort` fails and `curl` answers from another
+  session's server.
+- **Validate holds about 47 groups**, against the plan's "about three at a time". Signing tasks off
+  (16-sign-off.md) would make the catalog usable again.

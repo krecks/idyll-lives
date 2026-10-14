@@ -888,7 +888,8 @@ def dartboard():
             G.rod(f'shaft{k}', F.at(x, y, FACE_Z + 0.065), F.at(x, y, FACE_Z + 0.1), 0.0025, material=flight, verts=6)
             F.box(f'flight{k}a', 0.03, 0.002, 0.04, (x, y, FACE_Z + 0.105), flight)
             F.box(f'flight{k}b', 0.002, 0.03, 0.04, (x, y, FACE_Z + 0.105), flight)
-    darts = G.join(d, 'darts', origin=F.at(0, BOARD_C, FACE_Z))
+    # Hidden at rest by flattening into the board itself (on its face, the flights would show as crosses).
+    darts = G.join(d, 'darts', origin=F.at(0, BOARD_C, FACE_Z - 0.02))
     darts.scale[1] = 0.001
     G.settle(centre=False, floor=False)   # on the wall, at its real height
     G.grow(darts, 'darts', seconds=0.6, axis='Y')
@@ -1318,7 +1319,8 @@ def chemistrySet():
         for k, (dx, dy, r) in enumerate(((0.0, 0.098, 0.009), (0.015, 0.093, 0.007), (-0.012, 0.094, 0.006))):
             F.sphere(f'bubble{k}', r, (RISING[0] + dx, BENCH_TOP + dy, RISING[1] + 0.005 * k), M.liquid_orange,
                      segments=8, rings=6)
-    liquid = G.join(p, 'liquid', origin=F.at(RISING[0], BENCH_TOP, RISING[1]))
+    # Hidden at rest by flattening into the bench top (on the flask's floor, it would show through the glass).
+    liquid = G.join(p, 'liquid', origin=F.at(RISING[0], BENCH_TOP - 0.01, RISING[1]))
     liquid.scale[2] = 0.001
     G.settle(centre=False)
     G.grow(liquid, 'bubble', seconds=1.5, axis='Z')
