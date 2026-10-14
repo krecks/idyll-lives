@@ -2155,7 +2155,7 @@
         1
       ],
       "price": 340,
-      "category": "bedroom",
+      "category": "validate",
       "group": "dressing",
       "description": "A table with a mirror and a pouf: freshen up, practise a smile, look your best.",
       "interactions": [
@@ -2188,7 +2188,7 @@
         1
       ],
       "price": 110,
-      "category": "bedroom",
+      "category": "validate",
       "group": "dressing",
       "layer": "wall",
       "decor": 0.3,

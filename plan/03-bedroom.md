@@ -4,6 +4,11 @@ Mattress heights must match `BEDS`, and beds that get the game's blanket are in 
 (`web/src/render/babylon/characters.ts`): a bed's own duvet sits under that blanket. Things with drawers and doors
 follow the fridge (hinge, `hold`).
 
+All four tasks are built: the beds in `families/bedroom.py` (`turn_down`, the futon's `unfold`), the nightstands,
+wardrobes and drawers in `families/bedroom_storage.py` (`drawer_open`, `doors_open`, `door_open`), and the mirrors and
+dressing table in `families/bedroom_dressing.py` (`drawer_open`). The three new beds that turn down (`bedDouble`,
+`bedQueenUpholstered`, `bedCanopy`) are in `BLANKET_BEDS`, and those four not in `BEDS` before have their mattress tops there.
+
 ## BR1. Beds (9) — **Done** (in Validate › Beds)
 
 - **Family:** `tools/art/blender/families/bedroom.py`
@@ -54,9 +59,9 @@ follow the fridge (hinge, `hold`).
 | `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. |
 | `armoire` Armoire | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `doors_open`. |
 
-## BR4. Dressing and mirrors (4)
+## BR4. Dressing and mirrors (4) — **Done** (in Validate › Dressing)
 
-- **Family:** `tools/art/blender/families/bedroom.py`
+- **Family:** `tools/art/blender/families/bedroom_dressing.py`
 - **Validate group:** `dressing` (Validate › Dressing)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 

@@ -3127,7 +3127,7 @@
         1
       ],
       "price": 180,
-      "category": "bedroom",
+      "category": "validate",
       "group": "dressing",
       "description": "Builds Charisma.",
       "interactions": [
@@ -3751,6 +3751,10 @@
         {
           "id": "wardrobes",
           "label": "Wardrobes"
+        },
+        {
+          "id": "dressing",
+          "label": "Dressing"
         }
       ]
     },

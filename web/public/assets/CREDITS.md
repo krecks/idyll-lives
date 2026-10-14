@@ -168,6 +168,12 @@ The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardro
 slides its middle drawer out (`drawer_open`) or swings its doors open onto a rail of clothes (`doors_open`,
 `door_open`) while a resident picks an outfit. Their primitive-part entries stay as the fallback.
 
+The bedroom mirrors and dressing table (`models/bedroom_dressing/mirror.glb`, `dressingTable.glb`, `mirrorWall.glb`,
+`mirrorFloor.glb`, override pack `packs/bedroom_dressing/manifest.json`) are built in Blender by
+`tools/art/blender/families/bedroom_dressing.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Their
+glass is mirror glass the game reflects the room in; the dressing table slides its drawer out while a resident
+gets ready. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |
