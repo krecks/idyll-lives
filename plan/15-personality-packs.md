@@ -170,7 +170,7 @@ done.
 | `loner.soloSauna` Cedar sauna for one | 1x2 · floor | sweat:relax | bathroom / — | Body, Wood | Use | `door_open`: the door opens and shuts behind them (`hold` 1.5 s) for sweat. |
 | `loner.deliveryHatch` No-knock delivery hatch | 1x1 · floor | order:fetch treat:fetch | kitchen / — | Body, Wood | Use | `hatch`: the hatch opens for order and treat; `hold` 2 s. |
 
-## P12. Nature lover (7)
+## P12. Nature lover (7) — **Done** (in Validate › Nature Lover)
 
 - **Family:** `tools/art/blender/families/pack_natureLover.py`
 - **Validate group:** `nature lover` (Validate › Nature Lover)

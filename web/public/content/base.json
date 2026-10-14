@@ -3707,6 +3707,10 @@
         {
           "id": "loner",
           "label": "Loner"
+        },
+        {
+          "id": "natureLover",
+          "label": "Nature Lover"
         }
       ]
     },
