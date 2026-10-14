@@ -388,7 +388,7 @@ FAMILY = G.Family(
              centre=(0.031, -0.039), motions={'loops': {'chaseHighScore': 'joystick', 'quickRound': 'joystick'}},
              paint=[('cabinet', 'Body'), ('side', 'Sides')]),
      G.Model('gamingRecliner', gamingRecliner, size=(1.77, 1.103, 0.874), key='model.slob.gamingRecliner',
-             centre=(0.005, 0.01), motions={'uses': {'marathon': 'recline', 'armrestSoda': 'cup_out'}},
+             centre=(0.005, 0.01), motions={'uses': {'marathon': 'recline', 'armrestSoda': 'cup_out'}, 'ride': 'recline'},
              paint=[('seat', 'Body'), ('stripe', 'Stripes')])],
     comment='Blender-built slob pack models (tools/art/blender/families/pack_slob.py). Replaces the primitive-part '
             'placeholders of packs/slob by key; the placeholder is kept as a fallback if a file fails to load, and the '

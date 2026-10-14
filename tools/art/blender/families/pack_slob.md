@@ -18,8 +18,8 @@ nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the mi
 | `arcadeCabinet` | the joystick, its origin in the deck: `joystick` waggles it 18° each way, side to side, in 0.6 s (a loop) | `chaseHighScore`, `quickRound` (`loops`) |
 | `gamingRecliner` | the tall back with its stripe and headrest, hinged at the seat's back: `recline` lays it back 20° (1 s); the cup holder with a soda on the right armrest: `cup_out` swings it 110° out (0.6 s) | `marathon`; `armrestSoda` |
 
-The arcade's joystick is the loop the table asks for (E1). The recliner's back reclines behind the sitter; the
-sitter doesn't ride it (no `ride`: the renderer's sit pose stays upright).
+The arcade's joystick is the loop the table asks for (E1). The recliner's back reclines and the sitter rides
+it (`ride: recline`), tipping back with it.
 
 **Draw calls: 2–3 each.** Nothing here needs more:
 - the cart, the beanbag and the arcade cabinet are all plain (2: the body and the moving part); the beanbag's

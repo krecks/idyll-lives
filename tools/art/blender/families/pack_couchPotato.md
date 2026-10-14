@@ -13,7 +13,7 @@ the seats, their oak backs to the room: their curtains and tray show from behind
 |---|---|---|
 | `cinemaWall` | the left and right curtains over the picture, each with its origin at its outer end: `curtains` gathers both to their sides (scaled to 22 % across, 1.2 s) | `marathon`, `channelSurf` |
 | `gameConsole` | the disc tray with a disc on it: `tray` slides it 9 cm out of the console towards the players (0.6 s), `hold` 1.5 s, so it goes back in | `play`, `speedrun` |
-| `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back; the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s) | `recline`, `doze` |
+| `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back; the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s); the sitter rides the back (`ride: recline`) | `recline`, `doze` |
 | `snackFridge` | the door with its takeout screen and handle, hinged on its right edge: `fridge_open` swings it 100° (0.9 s); cans, a takeout box and a pizza inside | `snack`, `takeout` |
 | `fitnessGame` | the balance board on its rocker, on the mat: `board` tilts it 10° to one side (0.8 s) | `workout` |
 | `lavaLamp` | the wax in the glass: `blobs` lifts three blobs 14 cm (2.5 s, slow); `drift` turns two more round the glass once in 8 s, all the time near the camera (`idle`) | `zoneOut`; ambient |

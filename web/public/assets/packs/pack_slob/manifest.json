@@ -366,7 +366,8 @@
         "uses": {
           "marathon": "recline",
           "armrestSoda": "cup_out"
-        }
+        },
+        "ride": "recline"
       },
       "paint": [
         {

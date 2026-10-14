@@ -454,7 +454,7 @@ FAMILY = G.Family(
              centre=(0, 0), motions={'uses': {'play': 'tray', 'speedrun': 'tray'}, 'hold': 1.5},
              paint=[('console', 'Body'), ('gamer', 'Upholstery'), ('mustard', 'Cushion')]),
      G.Model('recliner', recliner, size=(0.94, 0.949, 0.76), key='model.couchPotato.recliner',
-             centre=(-0.01, -0.02), motions={'uses': {'recline': 'recline', 'doze': 'recline'}},
+             centre=(-0.01, -0.02), motions={'uses': {'recline': 'recline', 'doze': 'recline'}, 'ride': 'recline'},
              paint=[('plinth', 'Body'), ('plush', 'Upholstery'), ('throw', 'Throw')]),
      G.Model('snackFridge', snackFridge, size=(0.58, 0.538, 0.539), key='model.couchPotato.snackFridge',
              centre=(0, 0), motions={'uses': {'snack': 'fridge_open', 'takeout': 'fridge_open'}},
