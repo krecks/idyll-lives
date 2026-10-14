@@ -87,8 +87,13 @@ export interface ModelMotion {
 export interface ModelClip {
   /** Seconds. */
   duration: number;
-  /** Per part it moves: its pose in model space, sampled `CLIP_RATE` times a second (16 floats each). */
-  tracks: { part: number; poses: Float32Array }[];
+  /**
+   * Per part it moves (or carries: a part inside one it moves), its pose in model space, sampled
+   * `CLIP_RATE` times a second (16 floats each), and `depth`, how deep in the file's nodes the
+   * outermost node it moves of that part's is (0: the root's children), so a part posed by several
+   * clips at once takes the inner ones' poses first (`partPose`).
+   */
+  tracks: { part: number; poses: Float32Array; depth: number }[];
 }
 
 /** Samples per second of a clip's poses. */
@@ -110,6 +115,42 @@ export function clipPose(clip: ModelClip, part: number, seconds: number, out: Fl
   const b = Math.min(i + 1, last) * 16;
   // Samples are close together: blending the matrices is as good as turning between them.
   for (let k = 0; k < 16; k++) out[offset + k] = track.poses[a + k] * (1 - f) + track.poses[b + k] * f;
+  return true;
+}
+
+/**
+ * Where the clips playing (`playing`, each at its seconds) put `part` together, into `out` (as
+ * `clipPose`): one clip's pose as it is; several multiply, the clips that move the part itself
+ * before those that move a part it is inside (a record spinning on an arm that swings up: the spin
+ * and then the swing), so each clip of a nested part plays as if the others did too. False (`out`
+ * untouched) if none moves it.
+ */
+export function partPose(playing: readonly { clip: ModelClip; time: number }[], part: number, out: Float32Array, offset = 0): boolean {
+  let found = 0;
+  let first: { clip: ModelClip; time: number } | undefined;
+  for (const p of playing) {
+    if (!p.clip.tracks.some((t) => t.part === part)) continue;
+    if (!found++) first = p;
+  }
+  if (found <= 1) return found === 1 && clipPose(first!.clip, part, first!.time, out, offset);
+  const posed: { depth: number; pose: Float32Array }[] = [];
+  for (const p of playing) {
+    const track = p.clip.tracks.find((t) => t.part === part);
+    if (!track) continue;
+    const pose = new Float32Array(16);
+    clipPose(p.clip, part, p.time, pose);
+    posed.push({ depth: track.depth, pose });
+  }
+  // Deepest first (row vectors: a vertex times the first, then the next).
+  posed.sort((a, b) => b.depth - a.depth);
+  const acc = posed[0].pose;
+  const tmp = new Float32Array(16);
+  for (let n = 1; n < posed.length; n++) {
+    const m = posed[n].pose;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) tmp[i * 4 + j] = acc[i * 4] * m[j] + acc[i * 4 + 1] * m[4 + j] + acc[i * 4 + 2] * m[8 + j] + acc[i * 4 + 3] * m[12 + j];
+    acc.set(tmp);
+  }
+  out.set(acc, offset);
   return true;
 }
 
@@ -741,8 +782,8 @@ interface ModelExtras {
   motions?: MotionsEntry;
 }
 
-/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold`; or several of these. */
-type UseEntry = string | { clip: string; hold?: number };
+/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold` (and `delay`, `every`, `slot`); or several of these. */
+type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number };
 
 /** A model entry's `motions` as the manifest writes it: when its clips play (see `Motions`). */
 interface MotionsEntry {
@@ -754,6 +795,7 @@ interface MotionsEntry {
   night?: string;
   growth?: string;
   ride?: string;
+  clock?: ClockClips;
 }
 
 /** When a model's clips play: while residents use the object, and while it's open. */
@@ -783,11 +825,31 @@ export interface Motions {
   growth?: string;
   /** The clip whose (first) part carries the residents sitting or lying on the object: a rocking chair's seat, a swing. */
   ride?: string;
+  /** A clock's hands, set from the game's time (`ClockClips`). */
+  clock?: ClockClips;
 }
 
 export interface UseClip {
   clip: string;
+  /** Seconds after it starts that it plays back (absent: when the use ends). */
   hold?: number;
+  /** Seconds after the use starts that it starts (a net swishing after the shot). */
+  delay?: number;
+  /** Plays again every so many seconds while the use lasts, from rest to rest each time (a net swishing after each shot). */
+  every?: number;
+  /** Only for the resident in this slot (content `slots`, from 0 along the object's x, as sim-core's `slot_position`; a bunk's 1 is the upper one). */
+  slot?: number;
+}
+
+/**
+ * A clock's hands (`motions.clock`): each clip turns its hand once round from rest, the `hour` one
+ * in twelve hours and the `minute` one in an hour, and the game holds each where the game's time
+ * has it. `at`: the time the hands show at rest, in minutes past twelve (default 0: twelve o'clock).
+ */
+export interface ClockClips {
+  hour?: string;
+  minute?: string;
+  at?: number;
 }
 
 /** Of a placed object's `colors`, those on parts its model lets the player paint; undefined for none. */
@@ -815,11 +877,12 @@ export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   const m = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
   if (!m) return undefined;
   const uses = Object.fromEntries(
-    Object.entries(m.uses ?? {}).map(([use, value]) => [use, (Array.isArray(value) ? value : [value]).map((u) => (typeof u === 'string' ? { clip: u, hold: m.hold } : { clip: u.clip, hold: u.hold ?? m.hold }))]),
+    Object.entries(m.uses ?? {}).map(([use, value]) => [use, (Array.isArray(value) ? value : [value]).map((u) => (typeof u === 'string' ? { clip: u, hold: m.hold } : { ...u, hold: u.hold ?? m.hold }))]),
   );
   const loops = m.loops ?? {};
-  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth
-    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride }
+  const clock = m.clock?.hour || m.clock?.minute ? m.clock : undefined;
+  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || clock
+    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, clock }
     : undefined;
 }
 
@@ -1016,6 +1079,9 @@ async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
     const piece: FilePiece = { data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part };
     const group = part >= 0 ? grownBy[part] : null;
     if (group) {
+      // Its normals at rest by the inverse transpose of its matrix (flattened, they lean towards the
+      // grow axis): the game's instance matrix (the clip's pose) turns them back into the grown shape's.
+      restNormals(piece.data, VertexData.ExtractFromMesh(node, true, true).normals, computeFromRoot(node));
       for (const { animation, target } of group.targetedAnimations) (target as Record<string, unknown>)[animation.targetProperty] = animation.evaluate(group.to);
       piece.full = VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node));
       atRest(group);
@@ -1023,7 +1089,14 @@ async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
     pieces.push(piece);
   }
   const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation() }));
-  const clips = new Map(result.animationGroups.map((group) => [group.name, readClip(group, moved, rest)]));
+  // (Each read with the others at rest: a part inside another is read with it closed.)
+  const clips = new Map(
+    result.animationGroups.map((group) => {
+      const clip = readClip(group, moved, rest);
+      atRest(group);
+      return [group.name, clip];
+    }),
+  );
   result.animationGroups.forEach(atRest);
   // The nodes and clips go; the materials stay with the file.
   for (const node of [...result.transformNodes, ...result.meshes]) node.dispose(true, false);
@@ -1031,14 +1104,42 @@ async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
   return { pieces, parts, clips };
 }
 
-/** A clip's poses of the parts it moves (`ModelClip`): each node's world matrix then, relative to its world matrix at rest. */
+/** Sets `data`'s normals to `local` (a node's own) taken to model space by `world`'s inverse transpose, as a normal goes. */
+function restNormals(data: VertexData, local: ArrayLike<number> | null | undefined, world: Matrix): void {
+  if (!local || !data.normals) return;
+  const m = world.clone().invert().transpose();
+  const v = new Vector3();
+  const normals = Float32Array.from(local);
+  for (let i = 0; i < normals.length; i += 3) {
+    Vector3.TransformNormalFromFloatsToRef(normals[i], normals[i + 1], normals[i + 2], m, v);
+    v.normalize();
+    normals[i] = v.x;
+    normals[i + 1] = v.y;
+    normals[i + 2] = v.z;
+  }
+  data.normals = normals;
+}
+
+/**
+ * A clip's poses of the parts it moves (`ModelClip`): each node's world matrix then, relative to its
+ * world matrix at rest. The parts inside one it moves (a fridge's lever on its door) go with it.
+ */
 function readClip(group: AnimationGroup, moved: TransformNode[], rest: Matrix[]): ModelClip {
   const animations = group.targetedAnimations;
   const fps = animations[0]?.animation.framePerSecond || 60;
   const duration = Math.max(0, (group.to - group.from) / fps);
   const samples = Math.max(2, Math.ceil(duration * CLIP_RATE) + 1);
-  const targets = [...new Set(animations.map((a) => a.target))].filter((t): t is TransformNode => t instanceof TransformNode);
-  const tracks = targets.map((node) => ({ part: moved.indexOf(node), poses: new Float32Array(samples * 16) }));
+  const animated = new Set(animations.map((a) => a.target));
+  // Per moving part: the depth of the outermost node of it, or around it, that the clip moves (-1: none).
+  const depthOf = (node: TransformNode): number => {
+    let depth = -1;
+    let d = 0;
+    for (let n: Node | null = node.parent; n; n = n.parent) d++;
+    for (let n: Node | null = node; n; n = n.parent, d--) if (animated.has(n)) depth = d;
+    return depth;
+  };
+  const targets = moved.filter((node) => depthOf(node) >= 0);
+  const tracks = targets.map((node) => ({ part: moved.indexOf(node), poses: new Float32Array(samples * 16), depth: depthOf(node) }));
   const inverse = targets.map((node) => rest[moved.indexOf(node)].clone().invert());
   const pose = new Matrix();
   for (let s = 0; s < samples; s++) {
@@ -1224,7 +1325,7 @@ function buildClips(clips: Map<string, ModelClip>, space: Matrix, shifts: Vector
       name,
       {
         duration: clip.duration,
-        tracks: clip.tracks.map(({ part, poses }) => {
+        tracks: clip.tracks.map(({ part, poses, depth }) => {
           const shift = shifts[part];
           const [back, on] = [Matrix.Translation(-shift.x, -shift.y, -shift.z), Matrix.Translation(shift.x, shift.y, shift.z)];
           const built = new Float32Array(poses.length);
@@ -1237,7 +1338,7 @@ function buildClips(clips: Map<string, ModelClip>, space: Matrix, shifts: Vector
             out.multiplyToRef(on, out);
             out.copyToArray(built, o);
           }
-          return { part, poses: built };
+          return { part, poses: built, depth };
         }),
       },
     ]),
@@ -1385,7 +1486,11 @@ function restyledMesh(scene: Scene, data: VertexData, material: Material | null,
   restyled.uvs = new Float32Array((positions.length / 3) * 2);
   restyled.applyToMesh(mesh, true);
   boxProjectUVs(mesh);
-  if (full) mesh.updateVerticesData(VertexBuffer.PositionKind, Float32Array.from(data.positions!));
+  if (full) {
+    mesh.updateVerticesData(VertexBuffer.PositionKind, Float32Array.from(data.positions!));
+    // (Normals at rest that the instance's pose turns into the grown shape's: `restNormals`.)
+    if (data.normals) mesh.updateVerticesData(VertexBuffer.NormalKind, Float32Array.from(data.normals));
+  }
   const c = ov.color ? Color3.FromHexString(ov.color) : material instanceof PBRMaterial ? material.albedoColor.toGammaSpace() : Color3.White();
   const count = positions.length / 3;
   const colors = new Float32Array(count * 4);

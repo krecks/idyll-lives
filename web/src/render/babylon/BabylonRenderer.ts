@@ -104,7 +104,7 @@ import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } fro
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
-import { ObjectMotion, restPoses, type MovingObject } from './objectMotion';
+import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
 import { renderScale, watchPixelRatio } from './resolution';
@@ -3184,7 +3184,7 @@ export class BabylonRenderer implements Renderer {
           // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
           pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
-        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth });
+        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, slotOf: slotOf(o, def) });
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
           mirrors.push({ surfaces, matrices: part >= 0 && parts[part] ? parts[part].matrices : matrices, index: i });

@@ -172,6 +172,7 @@ The clips gamekit makes:
 | `G.scroll(part, clip, (x, y, z), seconds)` | moves by one repeat of a pattern at an even speed; the game jumps it home unseen | a treadmill's belt slats, a conveyor |
 | `G.turns(parts, clip, (x, y, z), seconds)` | the parts take turns moving out and back, ending at rest | a dance floor's tiles lifting in two sets |
 | `G.stages(part, clip, picked, growing, planted, seconds)` | a crop's scale at each growth stage, ripe at rest | vegetables, fruit, a veggie bed |
+| `G.attach(part, parent)` | (no clip) puts a part inside another, to move with it and by its own clips | a lever on a door, a label on a record |
 
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
 end where they start, so they also loop (`motions.loops`, `idle`), as does `turns`. `scroll` loops too: it ends one slat on,
@@ -185,6 +186,10 @@ then turned to rest with `G.turn(part, -90, 'X')` and swung open again by the op
 How the parts work:
 - **Nodes.** Each moving part is its own node, named for what it is. The still part is one more node,
   joined with `origin=(0, 0, 0)`. Each part costs a draw call (plus one per textured finish in it).
+- **Parts inside parts.** `G.attach(part, parent)` (after `G.settle`, before the clips) puts a part inside
+  another: it goes with the parent's clips and plays its own on top, about its own origin (the retro
+  fridge's lever on its door, the jukebox's label spinning on the record that swings up). Clips of one
+  part play together; for a swing and a spin, give each its own node this way.
 - **Clips.** A clip is an NLA track. Its first key (frame 1) is the rest pose, which is where the game
   draws the part closed. Angles turn about the part's own axis: about Z, negative opens a door hinged on
   its right; about X, negative lifts a lid's front.
@@ -193,13 +198,22 @@ How the parts work:
     a clip for `hold` seconds (absent: until the use ends).
   - `{'uses': {'shower': [{'clip': 'door_open', 'hold': 1}, 'water_on']}}`: several clips for one use,
     each with its own `hold` (a door shut after 1 s while the water runs).
+  - `{'clip': 'fridge_open', 'delay': 0.3}`: the clip starts 0.3 s into the use (its `hold` counts from
+    then): the retro fridge's lever turns first, then the door swings.
+  - `{'clip': 'swish', 'delay': 1.4, 'every': 3.2}`: the clip plays from rest to rest every 3.2 s while
+    the use lasts, the first 1.4 s in (the hoops' nets after each shot). It must end where it starts.
+  - `{'clip': 'turn_down_upper', 'slot': 1}`: only for the resident in that slot (`bedBunk`: one duvet
+    per bunk).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock`, `G.spin` or `G.turns` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
     rocking chair's seat, a swing. Join everything they sit on into that part.
-  - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a clock), not
+  - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a pendulum), not
     on the Low preset. It too ends where it starts.
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
+  - `{'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 610}}`: a clock's hands, each a
+    whole turn (`G.spin`), held where the game's time has them, on every preset; `at` is what they show
+    at rest, in minutes past twelve (`families/decor.py` `_clock_hands`).
   - `{'growth': 'grow'}`: a crop's clip, held where its growth stage is (content `grows`). Make it with
     `G.stages(part, 'grow', picked=…, growing=…, planted=…)`, a scale per stage (ripe is the rest
     pose): the fruit `0.001, 0.001, 0.001`, the plants `1, 0.6, 0.25`.
@@ -207,9 +221,11 @@ How the parts work:
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.
 - **Timing.** A clip starts when the use starts, once the resident has arrived (a bed folds down as they
-  lie down). Keep clips short, about 1 s. The clock is the residents' animation time.
+  lie down), or its `delay` later. Keep clips short, about 1 s. The clock is the residents' animation time.
+  Clock hands are the exception: the game's time sets them.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
-  a clip that nothing plays, and fails a loop (or `idle`) that doesn't end where it starts; one that ends
+  a clip that nothing plays, fails a `delay`, `hold`, `every` or `slot` that isn't one, and fails a loop
+  (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check.
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half

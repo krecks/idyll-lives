@@ -211,7 +211,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 
 - **One node per part, its origin on the hinge** (or where a drawer slides from), named for what it
   is (`door_fridge`). What moves with it is joined into it or parented to it (the handle). The rest
-  of the model is one node (`cabinet`). Parts inside parts move only with their own clip.
+  of the model is one node (`cabinet`). A part inside another (`G.attach`: the retro fridge's lever on
+  its door, the jukebox's label on its record) moves with that one's clips and plays its own on top.
+- **Several clips on one part** play together: their poses multiply, the clips of the part itself
+  first, then those of the parts it is inside. So a record swings up and spins (a `uses` clip on the
+  record, a loop on its label inside it). Two clips on the same node also multiply, but in no set
+  order: for a swing and a spin, put the spinning part inside the swinging one.
 - **One clip per part**, named `<part>_open` (an NLA track of that name, made by `G.swing` or
   `G.slide`; the build exports the tracks when a model has any). Its first key is the rest pose, where
   the file has the part and where the game draws it closed: frame 1 when exporting. Add the clips after
@@ -230,6 +235,25 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "uses": { "shower": [{ "clip": "door_open", "hold": 1 }, "water_on"] } }
   ```
+- **Later in the use:** `delay` starts a clip that many seconds after the use starts (its `hold`
+  counts from then): the retro fridge's lever turns first and the door swings 0.3 s later.
+  ```json
+  "motions": { "uses": { "fetch": [{ "clip": "lever", "hold": 0.4 }, { "clip": "fridge_open", "delay": 0.3 }] }, "hold": 3.5 }
+  ```
+- **Again and again:** `every` plays a clip from rest to rest once every that many seconds while the use
+  lasts, the first `delay` seconds in (a net swishing after each shot). It must end where it starts, as
+  a loop does (`G.rock`, `G.spin`, `G.squash(back=True)`); it never plays backwards, and when the use ends
+  it finishes the round it is in.
+  ```json
+  "motions": { "uses": { "shoot": { "clip": "swish", "delay": 1.4, "every": 3.2 } } }
+  ```
+- **Per slot:** `slot` plays a clip only for the resident in that slot (content `slots`, from 0 as
+  sim-core's `slot_position` spreads them; a bunk's upper bunk is 1), so each bunk's duvet turns down for
+  its own sleeper. The renderer tells the slot by where the resident is. (The sofas still sink every seat
+  cushion: their cushions are one part.)
+  ```json
+  "motions": { "uses": { "sleep": [{ "clip": "turn_down", "slot": 0 }, { "clip": "turn_down_upper", "slot": 1 }] } }
+  ```
 - **Loops:** `loops` names the clip a use plays round and round while it lasts (a rocking chair, a
   washer's drum), by interaction id or animation tag. It goes from rest to rest (`G.rock`, `G.spin`:
   `check_glb.py` fails a loop that ends away from where it starts), never plays backwards, and when the
@@ -241,12 +265,23 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   (a rocking chair's seat, a swing, a hammock): while it plays they move and tilt with that part (the
   first one the clip moves), as if sitting on it. Build the seat in its rest pose where the game seats
   them (`SEATS`, `BEDS` heights), with its origin on the pivot.
-- **Ambient:** `idle` names a clip that goes round all the time, used or not (a ceiling fan, clock
-  hands, a fountain's water), from rest to rest like a loop. It plays only within the quality's
+- **Ambient:** `idle` names a clip that goes round all the time, used or not (a ceiling fan, a
+  pendulum, a fountain's water), from rest to rest like a loop. It plays only within the quality's
   `ambientRange` of the camera (40 m on Medium, 60 on High) and not at all on Low, where it stays at
-  rest; the sun's shadows aren't redrawn for it. Make it something that looks fine at rest.
+  rest; the sun's shadows aren't redrawn for it. Make it something that looks fine at rest. When the
+  game is paused it holds where it is.
   ```json
   "motions": { "idle": "blades_turn" }
+  ```
+- **Clocks:** `clock` names a clock's hands: `hour` a clip turning its hand once round in 12 hours,
+  `minute` one turning its hand once round in an hour (each a whole turn from rest, any length:
+  `G.spin`), and `at` the time the hands show at rest, in minutes past twelve (the catalogue picture's
+  ten past ten is 610). The game holds each where the game's time has it, as state rather than motion:
+  on every preset, set each game minute (each five on Low) for the clocks within the ambient range
+  (30 m at least, and on Low), and not at all for the others until they come near. No second hand: at
+  normal speed a game minute is a real second.
+  ```json
+  "motions": { "clock": { "hour": "hour_hand", "minute": "minute_hand", "at": 610 } }
   ```
 - **Night:** `night` names a clip held open from dusk to dawn, while the lamps are lit (curtains
   drawn): it closes as the lamps come up past half way and opens again as they go down. A room going
@@ -277,7 +312,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **Cost:** each part is drawn on its own (one draw per finish group within it, and again in the sun's
   shadow map): the fridge takes 3 draws, 1 for the cabinet and 1 per door. Count parts in the 1–3.
   While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn (not for
-  ambient clips); nothing is done while all are still.
+  ambient clips or clock hands); nothing is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
 - **Not yet:** the freezer door, which no use
   opens (no interaction takes frozen food), and tiles that free up while an object is closed (a folded
