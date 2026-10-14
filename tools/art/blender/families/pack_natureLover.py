@@ -257,7 +257,7 @@ def pottingBench():
         del rnd
     G.join(still, 'body', origin=(0, 0, 0))
     # The seedling: a stem, two leaves and a tuft, origin on the pot's soil: `seedling` grows it up. Plain satin:
-    # a part in a textured finish grown from nothing never shows in the game (see the notes).
+    # a grown foliage part shows at rest as a thin film the leaf flutter lifts (see the notes).
     sx, sz = SEEDLING
     sy = TOP + 0.103
     with G.new_parts() as seedling:

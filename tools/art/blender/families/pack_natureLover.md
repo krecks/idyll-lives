@@ -38,8 +38,11 @@ at 0.45 m.
 - The shower's potted plant, the feeder's tube (plain gloss, no glass) and the bench's seedling are plain.
 
 **Found in the game:** a part in a textured finish (`foliage`) that is grown from nothing (`G.grow` from 0.001) never
-shows on the clips bench, WebGPU or WebGL; the same part in plain satin does. So the seedling is plain satin. The
-veggie bed's foliage parts start at full size and shrink, which works.
+showed on the clips bench, WebGPU or WebGL; the same part in plain satin did, so the seedling is plain satin. Fixed
+in the renderer since: such a part takes its normals and UVs from its grown shape (`models.ts`), and the foliage
+flutter is in world metres however far a part is scaled (`nature.ts`). A grown foliage part still shows at rest as a
+thin film the flutter lifts off its flat shape, so grown parts stay plain (plan/future.md). The veggie bed's foliage
+parts start at full size and shrink, which works.
 
 **The harvest is down into the soil, not a uniform shrink.** The lettuce has two clips (`grow` and `harvest`); the
 exporter samples a clip's unkeyed scale axes from the scene's last state, so a uniform `harvest` left `grow`
