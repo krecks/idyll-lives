@@ -216,6 +216,11 @@ How the parts work:
     round. It must end where it starts: make it with `G.rock`, `G.spin` or `G.turns` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
     rocking chair's seat, a swing. Join everything they sit on into that part.
+  - A part the resident holds while using it (content `held`: a guitar, a barbell, a mop) is drawn in their
+    hands by the game, in the part's own frame: give it its origin where it's held from (a guitar's foot, a
+    bar's middle, a mop head's foot) and its axes as it's held (a guitar upright, face to the front). Turn it
+    into place on the object as the node's rotation (`obj.rotation_euler`), not with `G.turn`, which bakes the
+    turn into the mesh. Hide it while it's used with `G.squash(part, 'off_stand', 0.001, seconds=0.2)` in `uses`.
   - `{'idle': 'blades_turn'}`: a clip that goes round all the time near the camera (a fan, a pendulum), not
     on the Low preset. It too ends where it starts.
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).

@@ -5,6 +5,7 @@
       "id": "neat.steamMopDock",
       "name": "Steam mop dock",
       "model": "model.neat.steamMopDock",
+      "held": {"part": "mop", "grip": "pole"},
       "footprint": [1, 1],
       "price": 240,
       "category": "validate",

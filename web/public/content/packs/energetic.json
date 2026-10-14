@@ -57,6 +57,7 @@
       "id": "energetic.trampoline",
       "name": "Rebound trampoline",
       "model": "model.energetic.trampoline",
+      "stand": {"height": 0.5, "motion": "bounce"},
       "outdoors": true,
       "footprint": [2, 2],
       "price": 480,

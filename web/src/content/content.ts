@@ -212,8 +212,26 @@ export interface ObjectDef {
   approach?: 'front' | 'around';
   /** Seats: the kinds of surface they tuck under; facing one, they are a seat at that table. */
   seatAt?: SurfaceKind[];
-  /** Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m). */
-  seat?: { height: number; forward?: number };
+  /**
+   * Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m);
+   * `facing: 'back'` turns the sitter to face the object's back (a pianist at an upright with its back to the
+   * wall), `legs: 'out'` stretches the legs out along the seat (a chaise), and `pedals` are what the feet
+   * turn (an exercise bike: the crank axle's height and forward offset, and the cranks' length, m).
+   */
+  seat?: { height: number; forward?: number; facing?: 'front' | 'back'; legs?: 'down' | 'out'; pedals?: { height: number; forward?: number; crank: number } };
+  /**
+   * Used standing up on it (renderer only): the height (m) of what residents stand on (a treadmill's belt, a
+   * trampoline's mat), who step up onto its middle from the tile in front; `motion` bounces them on it or
+   * buzzes them.
+   */
+  stand?: { height: number; motion?: 'bounce' | 'buzz' };
+  /**
+   * What residents hold while they use it (renderer only): a moving part of its model (by node name; the
+   * model hides it while used, `motions`), held by `grip`: a `bar` across both hands (a barbell), a `pair`
+   * (two parts, one in each hand: dumbbells), a `guitar` (its neck in the left hand, its body against
+   * the belly, strummed) or a `pole` (its foot on the floor ahead, its top in the hands: a mop).
+   */
+  held?: { part: string | string[]; grip: 'bar' | 'pair' | 'guitar' | 'pole' };
   /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`). */
   stations?: string[];
   /** Keeps leftovers (fridges). */

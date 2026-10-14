@@ -360,6 +360,14 @@ export class ObjectMotion {
     return this.rideOut.multiplyToRef(this.placed, this.rideOut);
   }
   private readonly rideTmp = new Float32Array(16);
+
+  /** How far round (0..1) object `id`'s loop is now (`loops`: a bike's pedals, for the rider's feet); null while none plays. */
+  loopPhase(id: number): number | null {
+    const clips = this.states.get(id);
+    if (!clips) return null;
+    for (const state of clips.values()) if (state.kind === 'loop' && state.clip.duration > 0) return (state.time / state.clip.duration) % 1;
+    return null;
+  }
   private readonly placed = new Matrix();
   private readonly posed = new Matrix();
   private readonly rideOut = new Matrix();

@@ -3145,6 +3145,10 @@
       "id": "ukulele",
       "name": "Ukulele",
       "model": "model.ukulele",
+      "held": {
+        "part": "ukulele",
+        "grip": "guitar"
+      },
       "footprint": [
         1,
         1
@@ -3199,6 +3203,10 @@
       "id": "guitarElectric",
       "name": "Electric guitar",
       "model": "model.guitarElectric",
+      "held": {
+        "part": "guitar",
+        "grip": "guitar"
+      },
       "footprint": [
         1,
         1
@@ -3484,6 +3492,15 @@
       "id": "exerciseBike",
       "name": "Exercise bike",
       "model": "model.exerciseBike",
+      "seat": {
+        "height": 0.76,
+        "forward": -0.12,
+        "pedals": {
+          "height": 0.3,
+          "forward": 0.04,
+          "crank": 0.16
+        }
+      },
       "footprint": [
         1,
         1
@@ -3558,6 +3575,13 @@
       "id": "dumbbells",
       "name": "Dumbbell rack",
       "model": "model.dumbbells",
+      "held": {
+        "part": [
+          "dumbbell_l",
+          "dumbbell_r"
+        ],
+        "grip": "pair"
+      },
       "footprint": [
         1,
         1

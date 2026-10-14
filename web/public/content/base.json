@@ -2882,6 +2882,9 @@
       "id": "treadmill",
       "name": "Treadmill",
       "model": "model.treadmill",
+      "stand": {
+        "height": 0.156
+      },
       "footprint": [
         1,
         2
@@ -2916,6 +2919,10 @@
       "id": "weightBench",
       "name": "Weight bench",
       "model": "model.weightBench",
+      "held": {
+        "part": "bar",
+        "grip": "bar"
+      },
       "footprint": [
         1,
         2
@@ -3227,6 +3234,11 @@
       "id": "piano",
       "name": "Piano",
       "model": "model.piano",
+      "seat": {
+        "height": 0.47,
+        "forward": 0.227,
+        "facing": "back"
+      },
       "footprint": [
         2,
         1

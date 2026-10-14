@@ -13,7 +13,7 @@ except the bike, which is centred).
 
 The belt runs along the depth, the console at the back, tilted 35° to face the runner. The runner jogs on the
 belt facing the console: `characters.ts` moves them forward from the tile in front onto its middle, at the belt's
-top (`TREADMILL_BELT`, 0.156 m), as it does for the trampoline.
+top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
 - **The slats** (`slats`): 15 strips across the belt, 10 cm apart. `belt_run` moves them one slat back (towards
   the rear) in 0.5 s at an even speed (`G.scroll`), a loop for the whole run (`loops: {run: belt_run}`). The game
@@ -23,10 +23,12 @@ top (`TREADMILL_BELT`, 0.156 m), as it does for the trampoline.
 
 ## The exercise bike
 
-An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (`SEATS`), the
+An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (content `seat`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
 once in 1.2 s (`G.spin`), a loop while cycled (`loops: {cycle: pedals_turn}`). The pedals are round, so they look
-the same at any angle. The rider's legs don't pedal (the `exercise` sitting pose).
+the same at any angle. The rider pedals: content `"seat": {"height": 0.76, "forward": -0.12, "pedals": {"height":
+0.3, "forward": 0.04, "crank": 0.16}}` puts each foot on its pedal, in time with `pedals_turn` (the right one at
+the bottom at rest; `characters.ts` `pedal`).
 
 ## The yoga mat
 
@@ -43,22 +45,28 @@ it is off centre and shallower than its placeholder (the flat mat with a roll): 
 placeholder, which is the unrolled mat's tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
 cross-legged on the unrolled mat.
 
-## The still ones
+## The weights
 
-The lift animation draws no weight in the hands (`lift`: `pickUp` standing, a bench press lying), so nothing
-leaves the bench's rack or the dumbbell rack: both are joined, still.
+Lifting holds the weight (content `held`, `characters.ts` `writeHeld`): the lifter presses the bench's bar lying
+down, and curls a pair of dumbbells standing at the rack. The weight is a part of its own, hidden while it's in
+the hands (squashed to 0.001 in 0.2 s, `uses: {lift: …}`), and the game draws that part in the hands, so there
+is never two of it.
 
-- **Weight bench**: a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
-  lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet.
-- **Dumbbell rack**: two tilted shelves of four hex dumbbells each on A-frames, a rubber mat in front.
+- **Weight bench**: 2 cm forward of where its placeholder stood (both now stop at the wall's face), a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
+  lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet. The bar with its plates
+  is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`).
+- **Dumbbell rack**: two tilted shelves of two hex dumbbell pairs each on A-frames (the lower shelf's heavier),
+  a rubber mat in front. The upper shelf's left pair (`LIFTED`) is two parts, `dumbbell_l` and `dumbbell_r`,
+  each with its origin at its middle; `pair_off` hides both (`"held": {"part": ["dumbbell_l", "dumbbell_r"],
+  "grip": "pair"}`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.treadmill` | 0.79 × 1.44 × 1.85 m | 2,736 | 2 | Frame, Pads |
-| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 4,444 | 1 | Frame, Pads |
+| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 4,444 | 2 | Frame, Pads |
 | `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 2,216 | 2 | Frame, Pads |
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 768 | 3 | Mat |
-| `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 1 | Rack, Weights |
+| `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 3 | Rack, Weights |
 
 `check_glb.py`: 5 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 

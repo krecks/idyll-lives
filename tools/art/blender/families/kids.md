@@ -24,8 +24,8 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
   one that means awake). The mobile hangs at the back,
   clear of the arms of a grown-up lifting the baby out over the front rail.
 - **Kids' bed** and **race car bed** (1 × 2): as bedroom.py's beds, the duvet's top third (`duvet_flap`) folds back
-  toward the foot while a resident sleeps or naps (`turn_down`). The kids' bed is in `BLANKET_BEDS`, so the game
-  lays its quilt over the sleeper; the car bed isn't (no quilt, as before). The car's body, wheels and spoiler are
+  toward the foot while a resident sleeps or naps (`turn_down`). Both are in `BLANKET_BEDS`, so the game lays its
+  quilt over the sleeper. The car's body, wheels and spoiler are
   still.
 - **High chair**: static. Its tray is a part of its own (no clip yet), so a "tray slides out" clip can come with a
   use. Content can't give it one yet: a baby is only ever placed lying (`baby`, `care` are for a baby lying in an

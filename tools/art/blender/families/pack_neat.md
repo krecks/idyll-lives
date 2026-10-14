@@ -11,7 +11,7 @@ the desk chair's seat at 0.45 m.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `steamMopDock` | the mop (pole, tank, head, pad), pivoting at its head: `mop_out` brings it 30 cm out of the dock and leans it 18° towards the resident (0.8 s) | `mop` |
+| `steamMopDock` | the mop (pole, tank, head, pad), its origin at its head's foot: `mop_off` hides it (0.2 s) while the game draws it in the resident's hands (content `held`, pushed over the floor) | `mop` |
 | `laundryCenter` | the washer's porthole door, hinged on its left: `door_open` swings it 100° (0.8 s) | `laundry`, `fold` |
 | `rainShowerTower` | streaks of rain from the square head, built full length, origin at the head: `water_on` grows them down (0.6 s) | `steamShower` |
 | `organizerDesk` | the middle bin of the hutch's lower row, with cards in it: `drawer_open` slides it 13 cm out towards the sitter (0.6 s) | `sort`, `ledger` |

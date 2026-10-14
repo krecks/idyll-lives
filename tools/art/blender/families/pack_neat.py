@@ -4,7 +4,7 @@
 # Notes: pack_neat.md.
 #
 # Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
-# `Model`), one moving part each: the mop leaves its dock (`mop_out`), the washer's door swings open
+# `Model`), one moving part each: the mop leaves its dock for the hands (`mop_off`), the washer's door swings open
 # (`door_open`), the rain falls (`water_on`), a bin slides out of the desk's hutch (`drawer_open`), the robot
 # rolls out of its dock and turns (`vacuum_out`) and the console's key tray drawer slides out (`tray`).
 #
@@ -118,8 +118,8 @@ def steamMopDock():
         F.box('spare_pad', 0.22, 0.02, 0.14, (0.27, 0.01, 0.16), M.towel_w, bevel=0.008)
         F.box('spare_pad_b', 0.22, 0.02, 0.14, (0.27, 0.03, 0.16), M.towel_c, bevel=0.008, rot=(0, 0, 8))
     G.join(still, 'body', origin=(0, 0, 0))
-    # The mop: pole, grip, water tank, head and pad, pivoting at its head: `mop_out` brings it out of its dock,
-    # leaning towards the resident.
+    # The mop: pole, grip, water tank, head and pad, its origin at its head's foot: hidden while it's used
+    # (`mop_off`), the game drawing it in the resident's hands (content `held`), pushed over the floor.
     x, y, z = MOP
     with G.new_parts() as mop:
         F.box('mop_head', 0.34, 0.05, 0.13, (x, y + 0.005, z), M.trim, bevel=0.02, bevel_segments=2)
@@ -130,8 +130,7 @@ def steamMopDock():
         F.box('mop_tank', 0.1, 0.28, 0.08, (x, 0.32, z - 0.035), M.teal, rot=(-6, 0, 0), bevel=0.03, bevel_segments=2)
     mop = G.hinged(G.join(mop, 'mop'), F.at(x, 0.0, z))
     objs = G.settle(centre=False)
-    G.slide(mop, 'mop_out', (0, -0.3, 0), seconds=0.8)
-    G.swing(mop, 'mop_out', 18, seconds=0.8, axis='X')
+    G.squash(mop, 'mop_off', 0.001, seconds=0.2)
     return objs
 
 
@@ -442,7 +441,7 @@ FAMILY = G.Family(
     'pack_neat', M,
     [G.Model('steamMopDock', steamMopDock, size=(0.788, 1.25, 0.708), key='model.neat.steamMopDock',
              centre=(-0.006, -0.076),
-             motions={'uses': {'mop': 'mop_out'}},
+             motions={'uses': {'mop': 'mop_off'}},
              paint=[('body', 'Body'), ('teal', 'Mop')]),
      G.Model('laundryCenter', laundryCenter, size=(1.82, 1.738, 0.625), key='model.neat.laundryCenter',
              centre=(0.01, -0.127),
@@ -465,7 +464,7 @@ FAMILY = G.Family(
     comment='Blender-built neat pack models (tools/art/blender/families/pack_neat.py). Replaces the primitive-part '
             'placeholders of packs/neat by key; the placeholder is kept as a fallback if a file fails to load, and '
             'the materials map onto the game\'s finishes so a model costs one draw call per finish group. Each '
-            'moves one part while it is used: the mop leaves its dock, the washer\'s door opens, the rain falls, '
+            'moves one part while it is used: the mop leaves its dock for the resident\'s hands, the washer\'s door opens, the rain falls, '
             'a bin slides out, the robot rolls out and the key tray drawer opens.',
 )
 

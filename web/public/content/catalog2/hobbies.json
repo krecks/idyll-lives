@@ -203,6 +203,10 @@
       "id": "guitarAcoustic",
       "name": "Acoustic guitar",
       "model": "model.guitarAcoustic",
+      "held": {
+        "part": "guitar",
+        "grip": "guitar"
+      },
       "footprint": [
         1,
         1

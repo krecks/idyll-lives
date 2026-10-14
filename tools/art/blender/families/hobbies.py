@@ -22,8 +22,10 @@
 #   chemistrySet   the liquid rises in the flask (`bubble`)
 #   potteryWheel   the pot rises from a lump (`clay`); the wheel head turns (`wheel`, a loop)
 #   craftTable     the scrapbook's cover swings open (`book_open`)
-# The guitars and the ukulele are their own part, off their stand, for a clip once the music animation
-# draws the instrument in the hands (08-hobbies.md); until then they stay put. The digital piano is still.
+#   ukulele, guitarElectric, guitarAcoustic
+#                  the instrument is hidden while played (`off_stand`): the game draws it in the player's hands
+#                  (content `held`), from this part, upright as built (its lean on the stand is the node's turn)
+# The digital piano is still.
 #
 # Run:  python3 -B tools/art/blender/build.py hobbies [--only piano] [--preview]
 import math
@@ -279,16 +281,31 @@ def _stool(F, z, top, r, legs, seat, x=0.0):
     G.torus('stool_ring', 0.131, 0.007, at=F.at(x, 0.16, z), material=legs, major_segments=20, minor_segments=6)
 
 
+def _turn_round(objs, forward=0.0):
+    """Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
+    which moves round with it), then moves it `forward` m to the front. A part's clips then open the other way."""
+    for o in objs:
+        G.turn(o, 180, 'Z')
+        o.location = (-o.location.x, -o.location.y - forward, o.location.z)
+
+
 def _upright(parts, name):
     """Joins an instrument built upright (its foot at the origin) into one part, its origin at its foot."""
     return G.join(parts, name, origin=(0, 0, 0))
 
 
 def _lean(F, obj, degrees, foot):
-    """Leans an upright instrument back by `degrees` and stands its foot at game `foot`."""
-    G.turn(obj, -degrees, 'X')
+    """Leans an upright instrument back by `degrees` and stands its foot at game `foot`. The lean is the node's
+    turn, not baked into its mesh: the game takes the part upright (its foot at its origin, its face to the front)
+    to draw it in a resident's hands (content `held`)."""
+    obj.rotation_euler[0] = math.radians(-degrees)
     obj.location = F.at(*foot)
     return obj
+
+
+def _off_stand(obj):
+    """The instrument hidden while it's played (`off_stand`, quickly: the game draws it in the hands then)."""
+    G.squash(obj, 'off_stand', 0.001, seconds=0.2)
 
 
 def _guitar_stand(F, base_z, cradle_y, top_y, top_z, reach=0.07, back=0.2, front=0.06):
@@ -325,9 +342,11 @@ def _frets(F, n, scale, nut, w, z):
 
 
 # --- H1. Music ---------------------------------------------------------------------------------------------
-# The piano: an upright facing its bench at the back of the footprint, the pianist facing the front. Its
-# fallboard lies over the keys and lifts back against the case; its music desk, hinged at the top, swings
-# its foot out so the sheet music leans back for reading.
+# The piano: an upright with its back to the wall and its bench in front, the pianist facing the back
+# (content `seat.facing`). Built keys to the back, then turned round (`_turn_round`) and stood on the wall's
+# face. Its fallboard lies over the keys and lifts back against the case; its music desk, hinged at the top,
+# swings its foot out so the sheet music leans back for reading.
+PIANO_FORWARD = 0.027   # how far forward of where it was built, turned round, it stands: its back on the wall
 BLACK_KEYS = [-0.577 + 0.161 * o + d for o in range(8) for d in (0, 0.023, 0.069, 0.092, 0.115)]
 
 
@@ -378,9 +397,10 @@ def piano():
         F.box('desk_ledge', 0.62, 0.015, 0.025, (0, 0.992, 0.278), M.piano_trim, bevel=0.004)
         _sheet_music(F, 'music', 0.4, 0.19, (0, 1.105, 0.285))
     desk = G.hinged(G.join(dk, 'music_desk'), F.at(0, 1.205, 0.298))
+    _turn_round(G.meshes(), PIANO_FORWARD)
     G.settle(centre=False)
-    G.swing(fallboard, 'fallboard', 90, seconds=0.9, axis='X')
-    G.swing(desk, 'fallboard', 18, seconds=0.9, axis='X')
+    G.swing(fallboard, 'fallboard', -90, seconds=0.9, axis='X')
+    G.swing(desk, 'fallboard', -18, seconds=0.9, axis='X')
     return G.meshes()
 
 
@@ -415,8 +435,9 @@ def ukulele():
     with G.new_parts() as still:
         _guitar_stand(F, 0.12, 0.2, 0.62, -0.005, back=0.17)
     G.join(still, 'stand', origin=(0, 0, 0))
-    _lean(F, _ukulele(G.GameFrame()), 15, (0, 0.215, 0.135))
+    uke = _lean(F, _ukulele(G.GameFrame()), 15, (0, 0.215, 0.135))
     G.settle(centre=False)
+    _off_stand(uke)
     return G.meshes()
 
 
@@ -462,8 +483,9 @@ def guitarElectric():
             for y in (0.01, 0.39):
                 F.box(f'amp_corner{sx}{y}', 0.03, 0.03, 0.03, (sx * 0.215, y + 0.005, -0.145), M.chrome, bevel=0.006)
     G.join(still, 'stand', origin=(0, 0, 0))
-    _lean(F, _electric(G.GameFrame()), 12, (0, 0.21, 0.106))
+    guitar = _lean(F, _electric(G.GameFrame()), 12, (0, 0.21, 0.106))
     G.settle(centre=False)
+    _off_stand(guitar)
     return G.meshes()
 
 
@@ -499,8 +521,9 @@ def guitarAcoustic():
     with G.new_parts() as still:
         _guitar_stand(F, -0.01, 0.19, 1.0, -0.075, reach=0.1, back=0.27)
     G.join(still, 'stand', origin=(0, 0, 0))
-    _lean(F, _acoustic(G.GameFrame()), 8, (0, 0.205, 0.06))
+    guitar = _lean(F, _acoustic(G.GameFrame()), 8, (0, 0.205, 0.06))
     G.settle(centre=False)
+    _off_stand(guitar)
     return G.meshes()
 
 
@@ -1427,19 +1450,19 @@ def craftTable():
 
 FAMILY = G.Family(
     'hobbies', M,
-    [G.Model('piano', piano, size=(1.54, 1.48, 0.827), key='model.piano', centre=(0, 0.0435),
+    [G.Model('piano', piano, size=(1.54, 1.48, 0.827), key='model.piano', centre=(0, -0.0435 + PIANO_FORWARD),
              motions={'uses': {'play': 'fallboard'}}, paint=[('piano', 'Body'), ('piano_trim', 'Trim')]),
      G.Model('ukulele', ukulele, size=(0.348, 0.841, 0.258), key='model.ukulele', centre=(0, 0.065),
-             paint=[('uke', 'Instrument'), ('stand', 'Stand')]),
+             motions={'uses': {'music': 'off_stand'}}, paint=[('uke', 'Instrument'), ('stand', 'Stand')]),
      G.Model('guitarElectric', guitarElectric, size=(0.46, 1.374, 0.584), key='model.guitarElectric',
-             centre=(0, -0.128), paint=[('electric', 'Guitar'), ('amp', 'Amp')]),
+             centre=(0, -0.128), motions={'uses': {'music': 'off_stand'}}, paint=[('electric', 'Guitar'), ('amp', 'Amp')]),
      G.Model('keyboardDigital', keyboardDigital, size=(0.9, 1.092, 0.75), key='model.keyboardDigital',
              centre=(0, 0.015), paint=[('kb_body', 'Body'), ('kb_trim', 'Trim')]),
      G.Model('drumKit', drumKit, size=(0.978, 1.088, 0.885), key='model.drumKit', centre=(0.0076, 0.0125),
              motions={'loops': {'drum': 'cymbals', 'practise': 'cymbals'}},
              paint=[('shell', 'Shells'), ('chrome', 'Hardware')]),
      G.Model('guitarAcoustic', guitarAcoustic, size=(0.36, 1.482, 0.405), key='model.guitarAcoustic',
-             centre=(0, -0.0217), paint=[('acoustic', 'Guitar'), ('stand', 'Stand')]),
+             centre=(0, -0.0217), motions={'uses': {'music': 'off_stand'}}, paint=[('acoustic', 'Guitar'), ('stand', 'Stand')]),
      G.Model('chessTable', chessTable, size=(0.46, 0.92, 0.85), key='model.chessTable', centre=(0, 0.025),
              motions={'uses': {'chess': 'move'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Trim')]),
      G.Model('poolTable', poolTable, size=(2.5, 0.842, 1.4), key='model.poolTable',

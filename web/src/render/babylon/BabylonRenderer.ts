@@ -618,6 +618,7 @@ export class BabylonRenderer implements Renderer {
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
     this.characters.setRide((id) => this.motion.ride(id));
+    this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
