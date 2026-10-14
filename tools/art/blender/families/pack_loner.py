@@ -334,6 +334,7 @@ def bonsaiBench():
     twig = G.hinged(G.join(twig, 'twig'), F.at(*TWIG))
     objs = G.settle(centre=False)
     G.squash(twig, 'trim', 0.001, seconds=0.7)
+    G.rock(twig, 'mist', 10, seconds=1.2, axis='Y')   # nodding under the mister while it is misted and fed
     return objs
 
 
@@ -468,7 +469,7 @@ FAMILY = G.Family(
              paint=[('body', 'Body'), ('wood', 'Wood')]),
      G.Model('bonsaiBench', bonsaiBench, size=(0.86, 1.31, 0.75), key='model.loner.bonsaiBench',
              centre=(0, -0.055),
-             motions={'uses': {'shape': 'trim'}},
+             motions={'uses': {'shape': 'trim'}, 'loops': {'tend': 'mist'}},
              paint=[('body', 'Body'), ('teak', 'Wood'), ('glaze', 'Pot')]),
      G.Model('soloSauna', soloSauna, size=(0.94, 2.085, 1.435), key='model.loner.soloSauna',
              centre=(0, -0.222),

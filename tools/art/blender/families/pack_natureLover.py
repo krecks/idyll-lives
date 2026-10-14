@@ -190,7 +190,7 @@ def veggieBed():
     with G.new_parts() as lettuce:
         _blob(F, -0.04, SOIL - 0.02, 0.22, 0.1, M.leaf_light, 7.1, scale=(1, 1, 0.8))
     lettuce = G.join(lettuce, 'lettuce', origin=F.at(-0.04, SOIL - 0.02, 0.22))   # flattened, it is under the soil
-    objs = G.settle(centre=False)
+    objs = G.settle()      # on its Model centre: the back on the wall face
     G.stages(plants, 'grow', picked=1, growing=(1, 1, 0.6), planted=(1, 1, 0.25))
     G.stages(lettuce, 'grow', picked=1, growing=(1, 1, 0.6), planted=(1, 1, 0.25))
     G.stages(fruit, 'grow', picked=0.001, growing=0.001, planted=0.001)
@@ -201,6 +201,7 @@ def veggieBed():
 # --- the potting bench (2x1): a sage bench against the wall, pots and seedlings, tools on the back board -------
 TOP = 0.88
 SEEDLING = (-0.62, -0.02)    # the pot the seedling comes up in (x, depth)
+BOUQUET = (-0.02, 0.09)      # where the tied bouquet lies on the worktop's front (x, depth: its twine)
 
 
 def pottingBench():
@@ -268,8 +269,23 @@ def pottingBench():
         _blob(F, sx + 0.01, sy + 0.14, sz, 0.035, M.green, 5)
     seedling = G.join(seedling, 'seedling', origin=F.at(sx, sy, sz))
     seedling.scale[2] = 0.001
+    # The bouquet a skilled gardener ties: stems lying along the worktop's front, flower heads, a twine wrap.
+    # Its origin is inside the worktop, flattened out of sight: `bouquet` grows it while it is tied.
+    bx, bz = BOUQUET
+    with G.new_parts() as bouquet:
+        for k, dz in enumerate((-0.025, 0.0, 0.025)):
+            G.rod(_name('bouquet_stem'), F.at(bx - 0.15, TOP + 0.012, bz + dz * 0.4),
+                  F.at(bx + 0.1, TOP + 0.014 + 0.006 * (k % 2), bz + dz), 0.006, material=M.green, verts=4)
+        for k, (dx, dy, dz, m) in enumerate(((0.12, 0.03, -0.03, 'pink'), (0.135, 0.04, 0.005, 'yellow'),
+                                             (0.115, 0.032, 0.035, 'lilac'))):
+            F.sphere(_name('bouquet_flower'), 0.03, (bx + dx, TOP + dy, bz + dz), _m(m), segments=7, rings=5)
+        G.torus('bouquet_twine', 0.02, 0.006, at=F.at(bx - 0.02, TOP + 0.017, bz), material=M.green_dark, rot=(0, 90, 0),
+                major_segments=8, minor_segments=3)
+    bouquet = G.join(bouquet, 'bouquet', origin=F.at(bx, TOP - 0.01, bz))
+    bouquet.scale[2] = 0.001
     objs = G.settle(centre=False)
     G.grow(seedling, 'seedling', seconds=1.0)
+    G.grow(bouquet, 'bouquet', seconds=0.8)
     return objs
 
 
@@ -600,11 +616,11 @@ def glasshouse():
 
 FAMILY = G.Family(
     'pack_natureLover', M,
-    [G.Model('veggieBed', veggieBed, size=(1.87, 1.3, 0.91), key='model.natureLover.veggieBed',
+    [G.Model('veggieBed', veggieBed, size=(1.87, 1.3, 0.91), centre=(0, 0.025), key='model.natureLover.veggieBed',
              motions={'uses': {'pickSnack': 'harvest'}, 'growth': 'grow'},
              paint=[('cedar', 'Wood'), ('cedar_dark', 'Posts & rails')]),
      G.Model('pottingBench', pottingBench, size=(1.76, 1.785, 0.6), key='model.natureLover.pottingBench',
-             centre=(0, -0.13), motions={'uses': {'potSeedlings': 'seedling'}},
+             centre=(0, -0.13), motions={'uses': {'potSeedlings': 'seedling', 'tieBouquet': 'bouquet'}},
              paint=[('bench', 'Wood'), ('sage', 'Frame')]),
      G.Model('birdFeeder', birdFeeder, size=(0.705, 1.783, 0.679), key='model.natureLover.birdFeeder',
              centre=(0.01, -0.05), motions={'uses': {'birdwatch': 'bird'}},

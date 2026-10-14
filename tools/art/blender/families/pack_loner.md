@@ -8,18 +8,21 @@ Validate › Loner until checked in play.
 Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 keeping its footprint, its wall side (the pod, the bench and the hatch against the wall face at depth −0.43, the
 sauna at −0.93 in its 1 × 2) and the seats at 0.45 m (the pod's cushion, the radio and puzzle chairs at the tile's
-middle, the sauna's bench).
+middle, the sauna's bench). The pod stood 3 cm into the wall; it is centred on its `Model` `centre` now
+(`G.settle()`), its back on the face. The placeholders of the wall-standing ones (`tools/art/pack_loner.py`, `pack_shapes.to_wall`) stand with their backs
+on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `quietPod` | the pram hood, an arc of padded ribs pivoting across the wings: `shell` swings it 40° forward over the reader (0.9 s) | `retreat`, `read` |
 | `shortwaveRadio` | the tuning knob on the receiver's face: `dial` turns it 150° (1 s); the antenna's inner section: `antenna` runs it 45 cm up out of its tube (1 s) | `tune` (dial); `airwaves` (antenna and dial) |
 | `puzzleTable` | a patch of seven pieces, built flat across with its origin on its left edge: `pieces` grows it across the gap in the puzzle (0.9 s) | `piece`, `newPuzzle` |
-| `bonsaiBench` | a leggy twig with two tufts, origin where it leaves the pad: `trim` shrinks it away (0.7 s) | `shape` |
+| `bonsaiBench` | a leggy twig with two tufts, origin where it leaves the pad: `trim` shrinks it away (0.7 s); `mist` nods it 10° each way (1.2 s, a loop) | `shape`; `tend` (loop) |
 | `soloSauna` | the glass door with its cedar pull, hinged on its post: `door_open` swings it 60° out (0.8 s), `hold` 1.5 s | `sweat` |
 | `deliveryHatch` | the steel hatch door, hinged on its edge: `hatch` swings it 105° open (0.8 s) over a recess with a parcel, `hold` 2 s | `order`, `treat` |
 
-`tend` (the bonsai's watering) plays nothing: the plan gives the bench one clip, for `shape`.
+`tend` (Mist and feed) nods the twig under the mister for as long as it lasts (`loops`), on the part `trim`
+already moves, so it costs no draw. A mist puff of its own would be a fourth draw.
 
 **Draw calls: 3 each, the sauna 4.**
 - The pod: its upholstery (`shell`, fabric) on the still body and the hood; its foot is plain satin oak.

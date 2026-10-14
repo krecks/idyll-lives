@@ -21,10 +21,17 @@ at 0.45 m.
 | `mossTerrarium` | the glass cloche: `lid_open` lifts it 22 cm (0.7 s) | `mist` |
 | `glasshouse` | the glass door, hinged on its post, and a roof vent hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `unwind`, `orchids` |
 
-`tendVeggies` and `tieBouquet` play nothing: the plan gives those objects their clip for `pickSnack` and
-`potSeedlings`.
+`tieBouquet` grows a tied bouquet (three stems, three flower heads and a twine wrap, plain) on the potting bench's
+worktop front (`bouquet`, 0.8 s), held while it is tied and gone when it ends, as the kids' painting. Its origin is
+inside the worktop, so it flattens out of sight at rest. It is a part of its own: the bench takes 4 draws (8,216
+triangles, over the 8,000 aim).
 
-**Draw calls: 3 each; the veggie bed and the glasshouse 4.**
+`tendVeggies` still plays nothing. Every part of the veggie bed already follows the crop's growth stage
+(`growth`), and a use clip on one of them would replace that pose (one part plays one clip's pose at a time):
+tending a just-planted bed would pop its plants to full size. A new part would be a fifth draw. It needs either
+use clips that compose with the growth pose (objectMotion.ts) or a cheaper bed.
+
+**Draw calls: 3 each; the veggie bed, the glasshouse and the potting bench 4.**
 - The cedar is plain satin on the veggie bed, the feeder and the glasshouse bench, so the leaves take the textured
   draw; the hammock's stand and the shower's slats are textured `wood`.
 - The veggie bed: a plain still body (box, soil, stakes), the plants (foliage), the fruit (plain) and the picked
@@ -59,7 +66,8 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 | `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 2,140 | 3 | Wood |
 | `model.natureLover.glasshouse` | 1.89 × 2.48 × 1.86 m | 7,496 | 4 | Wood, Frame, Cushions |
 
-`check_glb.py`: 7 models, 0 failed; warnings left: the veggie bed's and the glasshouse's 4 draw calls (above).
+`check_glb.py`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
+draw calls (above), and the potting bench's 8,216 triangles.
 Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open (the veggie bed's `harvest` alone, `&clip=`), the
 glasshouse's vent from above, the hammock from its end. Gallery: each next to its placeholder. In play

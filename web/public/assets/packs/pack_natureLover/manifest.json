@@ -121,7 +121,8 @@
       },
       "motions": {
         "uses": {
-          "potSeedlings": "seedling"
+          "potSeedlings": "seedling",
+          "tieBouquet": "bouquet"
         }
       },
       "paint": [
