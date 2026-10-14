@@ -87,6 +87,11 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The bathroom mirror cabinet, round mirror and tall cabinet (`models/bathroom/mirrorCabinet.glb`, `mirrorRound.glb`,
+`bathCabinetTall.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
+`tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The mirrors'
+glass is in the files and reflects the room live on High. Their primitive-part entries stay as the fallback.
+
 The kitchen farmhouse and double counter sinks (`models/kitchen/farmhouseSink.glb`, `counterSinkDouble.glb`, pack
 `packs/kitchen/manifest.json`) are built in Blender by `tools/art/blender/families/kitchen.py` alongside the
 fridge, on `gamekit`, and exported as `.glb` (glTF, original, CC0), also with a `water_on` clip. Their

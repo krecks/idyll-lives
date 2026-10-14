@@ -203,8 +203,8 @@
         1
       ],
       "price": 160,
-      "category": "bathroom",
-      "group": "sinks",
+      "category": "validate",
+      "group": "bathroom storage",
       "decor": 0.1,
       "description": "A slim cupboard with an open shelf for towels.",
       "interactions": []
@@ -249,8 +249,8 @@
         1
       ],
       "price": 120,
-      "category": "bathroom",
-      "group": "sinks",
+      "category": "validate",
+      "group": "bathroom storage",
       "layer": "wall",
       "decor": 0.4,
       "description": "A round mirror in a brass frame, hung from a strap.",

@@ -848,6 +848,120 @@
           "label": "Towel"
         }
       ]
+    },
+    "model.mirrorCabinet": {
+      "type": "model",
+      "url": "../../models/bathroom/mirrorCabinet.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "cab_door": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "mirror": {
+          "finish": "material.finish.glass",
+          "mirror": "front"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "silvering": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "cab_door",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.mirrorRound": {
+      "type": "model",
+      "url": "../../models/bathroom/mirrorRound.glb",
+      "materials": {
+        "frame_brass": {
+          "finish": "material.finish.metal"
+        },
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "mirror": {
+          "finish": "material.finish.glass",
+          "mirror": "front"
+        },
+        "silvering": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_brass",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Strap"
+        }
+      ]
+    },
+    "model.bathCabinetTall": {
+      "type": "model",
+      "url": "../../models/bathroom/bathCabinetTall.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "cab_door": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "towel_blue": {
+          "finish": "material.finish.satin"
+        },
+        "towel_cream": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "cab_door",
+          "label": "Frame"
+        },
+        {
+          "material": "towel_blue",
+          "label": "Towels"
+        }
+      ]
     }
   }
 }

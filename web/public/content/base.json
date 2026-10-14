@@ -3699,6 +3699,10 @@
         {
           "id": "laundry",
           "label": "Laundry"
+        },
+        {
+          "id": "bathroom storage",
+          "label": "Bathroom Storage"
         }
       ]
     },

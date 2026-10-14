@@ -2462,8 +2462,8 @@
         1
       ],
       "price": 90,
-      "category": "bathroom",
-      "group": "sinks",
+      "category": "validate",
+      "group": "bathroom storage",
       "layer": "wall",
       "decor": 0.2,
       "description": "A mirrored cabinet for above the basin.",

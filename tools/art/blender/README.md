@@ -252,6 +252,8 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
   whole tiles.
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
 - **Room kind.** A `sleep` interaction turns a living room into a bedroom.
+- **Mirrors on Medium.** Only the High preset reflects live; elsewhere mirror glass is see-through `glass`.
+  Put a pale gloss plate just behind it, or the mirror shows whatever is behind (a frame's backing, a door).
 - **Exports.** They differ on every run, so commit only what you meant to change.
 - **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `build.py`
   passes it.

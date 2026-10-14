@@ -1,6 +1,6 @@
 # Bathroom
 
-The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`), the four B2 showers (`water_on`) and the three B3 baths (`tap_on`, `fill`); the six B4 laundry models are done in `families/laundry.py`. Water here grows the same way: a stream built at
+The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`), the four B2 showers (`water_on`) and the three B3 baths (`tap_on`, `fill`); the six B4 laundry models are done in `families/laundry.py`, and the three B5 storage and mirror models in `families/bathroom.py`: the whole bathroom is done. Water here grows the same way: a stream built at
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
@@ -58,7 +58,7 @@ files (E6), as the double vanity did.
 | `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket | Static | Static. (+use) the lid lifts. |
 | `bathMat` Bath mat | 1x1 · rug | — | bathroom / laundry | Mat | Static | Static, flat. |
 
-## B5. Bathroom storage and mirrors (3)
+## B5. Bathroom storage and mirrors (3) — **Done** (in Validate › Bathroom Storage)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `bathroom storage` (Validate › Bathroom Storage)
@@ -66,6 +66,6 @@ files (E6), as the double vanity did.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `mirrorCabinet` Mirror cabinet | 1x1 · wall | — | bathroom / sinks | Cabinet, Frame | Static | Static; mirror glass as a primitive part (E6). (+use) the mirror door swings. |
-| `mirrorRound` Round mirror | 1x1 · wall | — | bathroom / sinks | Frame | Static | Static; mirror part (E6). |
-| `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | — | bathroom / sinks | Cabinet, Frame | Static | Static. (+use) the door swings. |
+| `mirrorCabinet` Mirror cabinet | 1x1 · wall | — | bathroom / sinks | Cabinet, Frame | Static | Static; the mirror glass is in the file (E6), with silvering behind it for presets without live mirrors. The mirror door is a part of its own for the (+use) swing. |
+| `mirrorRound` Round mirror | 1x1 · wall | — | bathroom / sinks | Frame | Static | Static; the mirror glass is in the file (E6). |
+| `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | — | bathroom / sinks | Cabinet, Frame | Static | Static. The upper door is a part of its own for the (+use) swing. |

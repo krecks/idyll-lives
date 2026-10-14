@@ -1,6 +1,6 @@
 # Bathroom — notes
 
-`bathroom.py` builds the five bathroom sinks, the five toilets, the four showers and the three baths (below) into `web/public/assets/models/bathroom/` and their entries
+`bathroom.py` builds the five bathroom sinks, the five toilets, the four showers, the three baths and the three storage and mirror models (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
 (`sinkConsole.glb`). They replace the primitive-part placeholders in `catalog.py` / `catalog2.py`, which
@@ -133,6 +133,31 @@ Validate › Baths until checked in play.
 | `model.bathtubFreestanding` | 1.89 × 0.92 × 0.84 m | 2,248 | 3 | Tub, Taps, Towel |
 
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+
+## B5 — bathroom storage and mirrors
+
+`model.mirrorCabinet`, `model.mirrorRound` and `model.bathCabinetTall`, built 2026-10-14. They sit in
+Validate › Bathroom Storage until checked in play. All three are still (no use opens them yet).
+
+- **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
+  face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check_glb.py` warns that they
+  float, which is right for a wall thing.
+- **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`glass`, `'front'`). Only the High
+  preset reflects live (`mirrors: 2`); on Medium and Low the glass is see-through, so a pale gloss `silvering`
+  plate sits just behind it. Without it the round mirror showed its brass backing and the cabinet its door.
+- **Doors for later.** The mirror cabinet's mirrored door and the tall cabinet's upper door are parts of their own
+  (`door`), hinged on their left edge, with no clip yet: a swing can be added once content gives them a use (the
+  plan's "(+use)"). A still part costs no draw call of its own.
+- The mirror cabinet is an open box with two shelves, a cup and bottles behind its door, and a light strip on top.
+  The tall cabinet has an open niche between its doors with two folded towels.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 1,320 | 2 | Cabinet, Frame |
+| `model.mirrorRound` | 0.64 × 0.77 × 0.05 m | 1,716 | 2 | Frame, Strap |
+| `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 1,524 | 1 | Cabinet, Frame, Towels |
+
+`check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
