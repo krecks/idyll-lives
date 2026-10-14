@@ -19,9 +19,12 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
   to stand against the case, and the music desk, hinged at its top, swings its foot out 18° so the sheet leans
   back.
 - **Ukulele, electric and acoustic guitars**: each instrument leans on a black A-frame stand (the electric
-  with a practice amp behind). The instrument is a part of its own, but has no clip: the music animation
-  doesn't draw an instrument in the hands, so hiding it from the stand would only make it vanish
-  (08-hobbies.md's condition). When the hands hold one, add `G.squash(part, 'off_stand', 0.001)`.
+  with a practice amp behind). The instrument is a part of its own (`ukulele`, `guitar`), built upright with
+  its foot at its origin; its lean on the stand is the node's turn (`_lean`), not baked into the mesh. While
+  it's played, `off_stand` hides it (squashed to 0.001 in 0.2 s; `uses: {music: off_stand}`) and the game
+  draws the same part in the player's hands (content `"held": {"part": "guitar", "grip": "guitar"}`,
+  `characters.ts` `writeHeld`): the neck in the left hand, the body against the belly, strummed. Each costs
+  one draw call more for it (3).
 - **Digital piano**: still. A slim keyboard on an X-stand, an X-legged bench behind.
 - **Drum kit**: the crash and ride cymbals are parts of their own, origins on their stands, and rock in one
   loop, `cymbals` (`drum`, `practise`), the crash about X and the ride about Y. The hi-hat is still. The
@@ -64,11 +67,11 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.piano` | 1.54 × 1.48 × 0.83 m | 5,072 | 3 | Body, Trim |
-| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,124 | 2 | Instrument, Stand |
-| `model.guitarElectric` | 0.46 × 1.37 × 0.58 m | 3,256 | 2 | Guitar, Amp |
+| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,124 | 3 | Instrument, Stand |
+| `model.guitarElectric` | 0.46 × 1.37 × 0.58 m | 3,256 | 3 | Guitar, Amp |
 | `model.keyboardDigital` | 0.90 × 1.09 × 0.75 m | 2,420 | 2 | Body, Trim |
 | `model.drumKit` | 0.98 × 1.09 × 0.89 m | 5,876 | 3 | Shells, Hardware |
-| `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 2 | Guitar, Stand |
+| `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 3 | Guitar, Stand |
 | `model.chessTable` | 0.46 × 0.92 × 0.85 m | 3,760 | 3 | Table, Trim |
 | `model.poolTable` | 2.50 × 0.84 × 1.40 m | 5,268 | 3 | Frame, Cloth |
 | `model.foosball` | 1.42 × 0.95 × 0.99 m | 7,928 | 3 | Table, Trim |

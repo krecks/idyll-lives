@@ -85,6 +85,11 @@
           "finish": "material.finish.wood"
         }
       },
+      "motions": {
+        "uses": {
+          "music": "off_stand"
+        }
+      },
       "paint": [
         {
           "material": "uke",
@@ -141,6 +146,11 @@
         },
         "string": {
           "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "music": "off_stand"
         }
       },
       "paint": [
@@ -276,6 +286,11 @@
         },
         "tortoise": {
           "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "music": "off_stand"
         }
       },
       "paint": [

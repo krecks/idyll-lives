@@ -82,6 +82,13 @@ export interface ModelMotion {
   parts: number[];
   /** By the file's animation name. */
   clips: Map<string, ModelClip>;
+  /**
+   * Per moving part: its node's name, and where its node is at rest in model space (its vertices in its
+   * own frame times this are where they're drawn; not resized). A part drawn on its own (a resident's held
+   * instrument, `Characters`) is placed by its own frame.
+   */
+  names?: string[];
+  rests?: Matrix[];
 }
 
 export interface ModelClip {
@@ -942,8 +949,8 @@ function importModel(url: string, scene: Scene): ReturnType<typeof ImportMeshAsy
  */
 interface LoadedFile {
   pieces: FilePiece[];
-  /** Its moving parts: the nodes its animations move, each with its pivot (the node's origin at rest, in model space). */
-  parts: { name: string; pivot: Vector3 }[];
+  /** Its moving parts: the nodes its animations move, each with its pivot (the node's origin at rest, in model space) and its whole place then. */
+  parts: { name: string; pivot: Vector3; rest: Matrix }[];
   /** Its animations, by name, in the file's model space. */
   clips: Map<string, ModelClip>;
 }
@@ -1022,7 +1029,7 @@ async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
     }
     pieces.push(piece);
   }
-  const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation() }));
+  const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation(), rest: rest[i] }));
   const clips = new Map(result.animationGroups.map((group) => [group.name, readClip(group, moved, rest)]));
   result.animationGroups.forEach(atRest);
   // The nodes and clips go; the materials stay with the file.
@@ -1207,7 +1214,9 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     outline,
     ...(mirrors.length ? { mirrors } : {}),
     ...(glows.length ? { glows } : {}),
-    ...(file.parts.length && file.clips.size ? { motion: { parts, clips: buildClips(file.clips, space, shifts) } } : {}),
+    ...(file.parts.length && file.clips.size
+      ? { motion: { parts, clips: buildClips(file.clips, space, shifts), names: file.parts.map((p) => p.name), rests: file.parts.map((p) => p.rest.multiply(space)) } }
+      : {}),
   };
 }
 

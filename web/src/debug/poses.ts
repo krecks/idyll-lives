@@ -199,6 +199,7 @@ const STATIONS: Station[] = [
   { label: 'guitar acoustic', def: 'guitarAcoustic', tag: 'music', female: true },
   { label: 'guitar electric', def: 'guitarElectric', tag: 'music' },
   { label: 'ukulele', def: 'ukulele', tag: 'music', stage: 'child' },
+  { label: 'ukulele grown-up', def: 'ukulele', tag: 'music', female: true },
   { label: 'bouldering', def: 'energetic.boulderingWall', tag: 'exercise', female: true },
   { label: 'vibe plate', def: 'lazy.vibePlate', tag: 'exercise' },
   { label: 'heavy bag', def: 'hotHeaded.heavyBag', tag: 'exercise' },

@@ -219,6 +219,13 @@ export interface ObjectDef {
    * buzzes them.
    */
   stand?: { height: number; motion?: 'bounce' | 'buzz' };
+  /**
+   * What residents hold while they use it (renderer only): a moving part of its model (by node name; the
+   * model hides it while used, `motions`), held by `grip`: a `bar` across both hands (a barbell), a `pair`
+   * (two parts, one in each hand: dumbbells), a `guitar` (its neck in the left hand, its body against
+   * the belly, strummed) or a `pole` (its foot on the floor ahead, its top in the hands: a mop).
+   */
+  held?: { part: string | string[]; grip: 'bar' | 'pair' | 'guitar' | 'pole' };
   /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`). */
   stations?: string[];
   /** Keeps leftovers (fridges). */

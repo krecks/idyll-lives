@@ -79,6 +79,11 @@
           "finish": "material.finish.satin"
         }
       },
+      "motions": {
+        "uses": {
+          "lift": "bar_off"
+        }
+      },
       "paint": [
         {
           "material": "frame",
@@ -170,6 +175,11 @@
         },
         "plate": {
           "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "lift": "pair_off"
         }
       },
       "paint": [

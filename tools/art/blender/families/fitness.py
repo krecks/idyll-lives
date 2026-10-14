@@ -101,6 +101,9 @@ def treadmill():
 
 
 # --- the weight bench: a padded bench, a rack with the bar at the head end, dumbbells by the feet ----------
+BAR = (0, 1.02, -0.72)   # the bar's middle on the J-hooks
+
+
 def weightBench():
     F = G.GameFrame()
     with G.new_parts() as parts:
@@ -123,15 +126,20 @@ def weightBench():
             F.box(f'hook{s}', 0.06, 0.05, 0.1, (s * 0.36, 0.98, -0.75), M.red, bevel=0.01)
             F.box(f'hook_lip{s}', 0.06, 0.06, 0.02, (s * 0.36, 1.02, -0.705), M.red, bevel=0.006)
         F.box('rack_brace', 0.66, 0.05, 0.05, (0, 0.26, -0.8), M.frame, bevel=0.01)
-        G.rod('bar', F.at(-0.45, 1.02, -0.72), F.at(0.45, 1.02, -0.72), 0.014, material=M.chrome, verts=12)
-        for s in (-1, 1):
-            F.cyl(f'plate{s}', 0.16, 0.03, (s * 0.41, 1.02, -0.72), M.plate, rot=(0, 90, 0), verts=28, bevel=0.006)
-            F.cyl(f'ring{s}', 0.11, 0.032, (s * 0.41, 1.02, -0.72), M.red, rot=(0, 90, 0), verts=24)
-            F.cyl(f'collar{s}', 0.025, 0.025, (s * 0.38, 1.02, -0.72), M.chrome, rot=(0, 90, 0), verts=12)
         for x in (-0.3, 0.3):
             _dumbbell(F, f'dumbbell{x}', x, 0.05, 0.85, 0.1)
-    G.join_all('weightBench')
+    G.join(parts, 'body', origin=(0, 0, 0))
+    # The bar on the J-hooks, its origin at its middle: hidden while lifted (`bar_off`), the game drawing it
+    # in the lifter's hands (content `held`).
+    with G.new_parts() as parts:
+        G.rod('bar', F.at(-0.45, BAR[1], BAR[2]), F.at(0.45, BAR[1], BAR[2]), 0.014, material=M.chrome, verts=12)
+        for s in (-1, 1):
+            F.cyl(f'plate{s}', 0.16, 0.03, (s * 0.41, BAR[1], BAR[2]), M.plate, rot=(0, 90, 0), verts=28, bevel=0.006)
+            F.cyl(f'ring{s}', 0.11, 0.032, (s * 0.41, BAR[1], BAR[2]), M.red, rot=(0, 90, 0), verts=24)
+            F.cyl(f'collar{s}', 0.025, 0.025, (s * 0.38, BAR[1], BAR[2]), M.chrome, rot=(0, 90, 0), verts=12)
+    bar = G.hinged(G.join(parts, 'bar'), F.at(*BAR))
     G.settle(centre=False)
+    G.squash(bar, 'bar_off', 0.001, seconds=0.2)
     return G.meshes()
 
 
@@ -210,7 +218,16 @@ def yogaMat():
     return G.meshes()
 
 
-# --- the dumbbell rack: two tilted shelves of hex dumbbells on A-frames, a rubber mat in front --------------
+# --- the dumbbell rack: two tilted shelves of hex dumbbell pairs on A-frames, a rubber mat in front ---------
+SHELVES = ((0.32, -0.08), (0.56, -0.17))   # the shelves' (height, depth): the lower, then the upper
+LIFTED = (1, 0)                            # the pair lifted: the upper shelf's left pair
+
+
+def _bell(k, i):
+    """The width across the heads of the rack's dumbbell `i` on shelf `k`: pairs, the lower shelf's heavier."""
+    return 0.1 + (i // 2) * 0.012 + (1 - k) * 0.024
+
+
 def dumbbells():
     F = G.GameFrame()
     with G.new_parts() as parts:
@@ -219,15 +236,29 @@ def dumbbells():
             G.rod(f'leg_front{s}', F.at(s * 0.36, 0.0, 0.08), F.at(s * 0.36, 0.7, -0.2), 0.02, material=M.frame, verts=8)
             F.box(f'base{s}', 0.05, 0.03, 0.44, (s * 0.36, 0.015, -0.11), M.frame, bevel=0.008)
             F.box(f'top{s}', 0.05, 0.04, 0.08, (s * 0.36, 0.69, -0.21), M.dark, bevel=0.01)
-        for k, (y, z) in enumerate(((0.32, -0.08), (0.56, -0.17))):
+        for k, (y, z) in enumerate(SHELVES):
             F.box(f'shelf{k}', 0.76, 0.025, 0.15, (0, y, z), M.frame, rot=(18, 0, 0), bevel=0.006)
             F.box(f'lip{k}', 0.76, 0.04, 0.012, (0, y + 0.015, z + 0.07), M.frame, bevel=0.004)
             for i in range(4):
-                w = 0.1 + i * 0.012
-                _dumbbell(F, f'dumbbell{k}{i}', -0.27 + i * 0.18, y + 0.012 + w / 2, z, w)
+                if (k, i // 2) != LIFTED:
+                    w = _bell(k, i)
+                    _dumbbell(F, f'dumbbell{k}{i}', -0.27 + i * 0.18, y + 0.012 + w / 2, z, w)
         F.box('floor_mat', 0.6, 0.012, 0.36, (0, 0.006, 0.2), M.dark, bevel=0.004)
-    G.join_all('dumbbells')
+    G.join(parts, 'body', origin=(0, 0, 0))
+    # The lifted pair, each its own part with its origin at its middle: hidden while lifted (`pair_off`), the
+    # game drawing one in each hand (content `held`).
+    k, p = LIFTED
+    y, z = SHELVES[k]
+    pair = []
+    for i, name in ((2 * p, 'dumbbell_l'), (2 * p + 1, 'dumbbell_r')):
+        w = _bell(k, i)
+        at = (-0.27 + i * 0.18, y + 0.012 + w / 2, z)
+        with G.new_parts() as one:
+            _dumbbell(F, name, *at, w)
+        pair.append(G.hinged(G.join(one, name), F.at(*at)))
     G.settle(centre=False)
+    for d in pair:
+        G.squash(d, 'pair_off', 0.001, seconds=0.2)
     return G.meshes()
 
 
@@ -238,13 +269,13 @@ FAMILY = G.Family(
     [G.Model('treadmill', treadmill, size=(0.794, 1.439, 1.85), key='model.treadmill', centre=(0.032, -0.005),
              motions={'loops': {'run': 'belt_run'}}, paint=FRAME_PADS),
      G.Model('weightBench', weightBench, size=(0.9, 1.2, 1.849), key='model.weightBench', centre=(0, -0.026),
-             paint=[('frame', 'Frame'), ('pads', 'Pads')]),
+             motions={'uses': {'lift': 'bar_off'}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
      G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
      G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, -0.315),
              motions={'uses': {'yoga': 'unroll'}}, paint=[('mat', 'Mat')]),
      G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.71), key='model.dumbbells', centre=(0, 0.025),
-             paint=[('frame', 'Rack'), ('plate', 'Weights')])],
+             motions={'uses': {'lift': 'pair_off'}}, paint=[('frame', 'Rack'), ('plate', 'Weights')])],
     comment='Blender-built home gym (tools/art/blender/families/fitness.py). Replaces the primitive-part '
             'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
             'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '

@@ -45,22 +45,28 @@ it is off centre and shallower than its placeholder (the flat mat with a roll): 
 placeholder, which is the unrolled mat's tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
 cross-legged on the unrolled mat.
 
-## The still ones
+## The weights
 
-The lift animation draws no weight in the hands (`lift`: `pickUp` standing, a bench press lying), so nothing
-leaves the bench's rack or the dumbbell rack: both are joined, still.
+Lifting holds the weight (content `held`, `characters.ts` `writeHeld`): the lifter presses the bench's bar lying
+down, and curls a pair of dumbbells standing at the rack. The weight is a part of its own, hidden while it's in
+the hands (squashed to 0.001 in 0.2 s, `uses: {lift: …}`), and the game draws that part in the hands, so there
+is never two of it.
 
 - **Weight bench**: a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
-  lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet.
-- **Dumbbell rack**: two tilted shelves of four hex dumbbells each on A-frames, a rubber mat in front.
+  lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet. The bar with its plates
+  is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`).
+- **Dumbbell rack**: two tilted shelves of two hex dumbbell pairs each on A-frames (the lower shelf's heavier),
+  a rubber mat in front. The upper shelf's left pair (`LIFTED`) is two parts, `dumbbell_l` and `dumbbell_r`,
+  each with its origin at its middle; `pair_off` hides both (`"held": {"part": ["dumbbell_l", "dumbbell_r"],
+  "grip": "pair"}`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.treadmill` | 0.79 × 1.44 × 1.85 m | 2,736 | 2 | Frame, Pads |
-| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 4,444 | 1 | Frame, Pads |
+| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 4,444 | 2 | Frame, Pads |
 | `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 2,216 | 2 | Frame, Pads |
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 768 | 3 | Mat |
-| `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 1 | Rack, Weights |
+| `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 3 | Rack, Weights |
 
 `check_glb.py`: 5 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 

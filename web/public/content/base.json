@@ -2911,6 +2911,10 @@
       "id": "weightBench",
       "name": "Weight bench",
       "model": "model.weightBench",
+      "held": {
+        "part": "bar",
+        "grip": "bar"
+      },
       "footprint": [
         1,
         2
