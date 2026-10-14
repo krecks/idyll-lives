@@ -67,7 +67,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Counter, Trim | Static | Static. |
 | `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Counter, Trim | Static | Static. |
 
-## CM5. Farm (8)
+## CM5. Farm (8) — **Done** (in Validate › Farm)
 
 - **Family:** `tools/art/blender/families/farm.py`
 - **Validate group:** `farm` (Validate › Farm)

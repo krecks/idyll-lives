@@ -1,0 +1,265 @@
+{
+  "$comment": "Blender-built farm (tools/art/blender/families/farm.py, plan/14-community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken coop (its pop-hole hatch a part of its own). Each has a far version (`far`, E7) for the town overview. Replaces the primitive-part placeholders of tools/art/community.py by key; the placeholder is kept as a fallback if a file fails to load.",
+  "version": 1,
+  "entries": {
+    "model.farm.barn": {
+      "type": "model",
+      "url": "../../models/farm/barn.glb",
+      "materials": {
+        "barn": {
+          "finish": "material.finish.matte"
+        },
+        "barn_roof": {
+          "finish": "material.finish.satin"
+        },
+        "barn_trim": {
+          "finish": "material.finish.satin"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "shadow": {
+          "finish": "material.finish.matte"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "barn",
+          "label": "Paint"
+        },
+        {
+          "material": "barn_roof",
+          "label": "Roof"
+        },
+        {
+          "material": "barn_trim",
+          "label": "Trim"
+        }
+      ],
+      "far": "../../models/farm/barn.far.glb"
+    },
+    "model.farm.silo": {
+      "type": "model",
+      "url": "../../models/farm/silo.glb",
+      "materials": {
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "silo": {
+          "finish": "material.finish.metal"
+        },
+        "silo_cap": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "silo",
+          "label": "Paint"
+        },
+        {
+          "material": "silo_cap",
+          "label": "Roof"
+        }
+      ],
+      "far": "../../models/farm/silo.far.glb"
+    },
+    "model.farm.tractor": {
+      "type": "model",
+      "url": "../../models/farm/tractor.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "rims": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.satin"
+        },
+        "tail_lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "tractor": {
+          "finish": "material.finish.gloss"
+        },
+        "tyre": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "tractor",
+          "label": "Paint"
+        },
+        {
+          "material": "rims",
+          "label": "Wheels"
+        }
+      ],
+      "far": "../../models/farm/tractor.far.glb"
+    },
+    "model.farm.hayBale": {
+      "type": "model",
+      "url": "../../models/farm/hayBale.glb",
+      "materials": {
+        "hay": {
+          "finish": "material.finish.fabric"
+        },
+        "hay_dark": {
+          "finish": "material.finish.fabric"
+        },
+        "twine": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "twine",
+          "label": "Twine"
+        }
+      ],
+      "far": "../../models/farm/hayBale.far.glb"
+    },
+    "model.farm.hayStack": {
+      "type": "model",
+      "url": "../../models/farm/hayStack.glb",
+      "materials": {
+        "hay": {
+          "finish": "material.finish.fabric"
+        },
+        "hay_dark": {
+          "finish": "material.finish.fabric"
+        },
+        "twine": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "twine",
+          "label": "Twine"
+        }
+      ],
+      "far": "../../models/farm/hayStack.far.glb"
+    },
+    "model.farm.scarecrow": {
+      "type": "model",
+      "url": "../../models/farm/scarecrow.glb",
+      "materials": {
+        "hat": {
+          "finish": "material.finish.fabric"
+        },
+        "patch": {
+          "finish": "material.finish.fabric"
+        },
+        "post": {
+          "finish": "material.finish.wood"
+        },
+        "sack": {
+          "finish": "material.finish.matte"
+        },
+        "shirt": {
+          "finish": "material.finish.fabric"
+        },
+        "shirt_check": {
+          "finish": "material.finish.fabric"
+        },
+        "stitch": {
+          "finish": "material.finish.matte"
+        },
+        "straw": {
+          "finish": "material.finish.matte"
+        },
+        "trousers": {
+          "finish": "material.finish.fabric"
+        },
+        "twine": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "idle": "sway"
+      },
+      "paint": [
+        {
+          "material": "shirt",
+          "label": "Shirt"
+        },
+        {
+          "material": "trousers",
+          "label": "Trousers"
+        },
+        {
+          "material": "hat",
+          "label": "Hat"
+        }
+      ],
+      "far": "../../models/farm/scarecrow.far.glb"
+    },
+    "model.farm.trough": {
+      "type": "model",
+      "url": "../../models/farm/trough.glb",
+      "materials": {
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "trough": {
+          "finish": "material.finish.metal"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "trough",
+          "label": "Paint"
+        }
+      ],
+      "far": "../../models/farm/trough.far.glb"
+    },
+    "model.farm.coop": {
+      "type": "model",
+      "url": "../../models/farm/coop.glb",
+      "materials": {
+        "coop": {
+          "finish": "material.finish.wood"
+        },
+        "coop_dark": {
+          "finish": "material.finish.matte"
+        },
+        "coop_roof": {
+          "finish": "material.finish.satin"
+        },
+        "coop_trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "coop",
+          "label": "Paint"
+        },
+        {
+          "material": "coop_roof",
+          "label": "Roof"
+        },
+        {
+          "material": "coop_trim",
+          "label": "Trim"
+        }
+      ],
+      "far": "../../models/farm/coop.far.glb"
+    }
+  }
+}

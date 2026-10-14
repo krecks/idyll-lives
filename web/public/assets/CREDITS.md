@@ -119,6 +119,12 @@ plank, the spring rider's horse and the merry-go-round's platform go round while
 riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
 ping-pong table are static. Their primitive-part entries stay as the fallback.
 
+The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
+`trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is
+built in Blender by `tools/art/blender/families/farm.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The scarecrow sways slowly on its post near the camera (`sway`, ambient); the coop's pop-hole hatch is a part of its
+own for a later use; the rest are static. Their primitive-part entries stay as the fallback.
+
 The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
 `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack

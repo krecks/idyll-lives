@@ -1016,7 +1016,7 @@
         6
       ],
       "price": 6400,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.9,
@@ -1032,7 +1032,7 @@
         3
       ],
       "price": 3200,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.5,
@@ -1048,7 +1048,7 @@
         4
       ],
       "price": 2800,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.4,
@@ -1064,7 +1064,7 @@
         1
       ],
       "price": 60,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.2,
@@ -1080,7 +1080,7 @@
         1
       ],
       "price": 140,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.25,
@@ -1096,7 +1096,7 @@
         1
       ],
       "price": 90,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.35,
@@ -1112,7 +1112,7 @@
         1
       ],
       "price": 220,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.15,
@@ -1128,7 +1128,7 @@
         2
       ],
       "price": 480,
-      "category": "community",
+      "category": "validate",
       "group": "farm",
       "outdoors": true,
       "decor": 0.4,

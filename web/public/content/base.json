@@ -3796,6 +3796,11 @@
           "id": "shrubs",
           "label": "Shrubs",
           "outside": true
+        },
+        {
+          "id": "farm",
+          "label": "Farm",
+          "outside": true
         }
       ]
     },
