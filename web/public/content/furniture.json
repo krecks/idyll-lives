@@ -2840,7 +2840,8 @@
         1
       ],
       "price": 260,
-      "category": "office",
+      "category": "validate",
+      "group": "desks",
       "description": "A plain desk with a lamp, paper and pens: writing trains Writing, and pupils do their homework here.",
       "surface": {
         "height": 0.75,
@@ -2903,7 +2904,8 @@
         1
       ],
       "price": 650,
-      "category": "office",
+      "category": "validate",
+      "group": "desks",
       "description": "A small desk with a laptop: browse, write or code without the price of a full computer desk.",
       "surface": {
         "height": 0.75,
@@ -3000,7 +3002,8 @@
         1
       ],
       "price": 1900,
-      "category": "office",
+      "category": "validate",
+      "group": "desks",
       "description": "Two screens, a glowing keyboard and a fast tower. Games are more fun the better the player (Dexterity); from Dexterity 3 a win leaves them sharp.",
       "interactions": [
         {
@@ -3070,7 +3073,8 @@
         1
       ],
       "price": 140,
-      "category": "office",
+      "category": "validate",
+      "group": "office chairs",
       "description": "A swivel chair on castors.",
       "approach": "around",
       "seatAt": [

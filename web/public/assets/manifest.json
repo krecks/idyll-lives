@@ -34,7 +34,8 @@
     "packs/plants/manifest.json",
     "packs/bedroom/manifest.json",
     "packs/bedroom_storage/manifest.json",
-    "packs/bedroom_dressing/manifest.json"
+    "packs/bedroom_dressing/manifest.json",
+    "packs/office/manifest.json"
   ],
   "entries": {
     "material.wall": {

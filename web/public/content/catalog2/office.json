@@ -10,7 +10,7 @@
         1
       ],
       "price": 180,
-      "category": "office",
+      "category": "validate",
       "group": "desks",
       "surface": {
         "height": 0.74,
@@ -36,7 +36,7 @@
         2
       ],
       "price": 420,
-      "category": "office",
+      "category": "validate",
       "group": "desks",
       "surface": {
         "height": 0.74,
@@ -58,7 +58,7 @@
         1
       ],
       "price": 650,
-      "category": "office",
+      "category": "validate",
       "group": "desks",
       "surface": {
         "height": 1.05,
@@ -116,7 +116,7 @@
         1
       ],
       "price": 1200,
-      "category": "office",
+      "category": "validate",
       "group": "desks",
       "decor": 0.5,
       "surface": {
@@ -143,7 +143,8 @@
         1
       ],
       "price": 120,
-      "category": "office",
+      "category": "validate",
+      "group": "office storage",
       "description": "Three steel drawers of paperwork, a plant on top.",
       "interactions": []
     },
@@ -156,8 +157,8 @@
         1
       ],
       "price": 450,
-      "category": "office",
-      "group": "chairs",
+      "category": "validate",
+      "group": "office chairs",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -233,8 +234,8 @@
         1
       ],
       "price": 160,
-      "category": "office",
-      "group": "chairs",
+      "category": "validate",
+      "group": "office chairs",
       "approach": "around",
       "seatAt": [
         "desk",
@@ -309,7 +310,8 @@
         1
       ],
       "price": 90,
-      "category": "office",
+      "category": "validate",
+      "group": "office storage",
       "layer": "wall",
       "description": "A whiteboard for plans and sums. Planning on it trains Intelligence and Business.",
       "interactions": [
@@ -340,7 +342,8 @@
         1
       ],
       "price": 40,
-      "category": "office",
+      "category": "validate",
+      "group": "office storage",
       "layer": "wall",
       "decor": 0.3,
       "description": "Notes and postcards pinned to cork.",

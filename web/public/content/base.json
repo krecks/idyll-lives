@@ -2979,7 +2979,8 @@
         1
       ],
       "price": 1100,
-      "category": "office",
+      "category": "validate",
+      "group": "desks",
       "description": "Builds Technology, Writing and Business.",
       "surface": {
         "height": 0.75,
@@ -3755,6 +3756,18 @@
         {
           "id": "dressing",
           "label": "Dressing"
+        },
+        {
+          "id": "desks",
+          "label": "Desks"
+        },
+        {
+          "id": "office chairs",
+          "label": "Office Chairs"
+        },
+        {
+          "id": "office storage",
+          "label": "Office Storage"
         }
       ]
     },

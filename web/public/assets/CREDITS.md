@@ -174,6 +174,15 @@ The bedroom mirrors and dressing table (`models/bedroom_dressing/mirror.glb`, `d
 glass is mirror glass the game reflects the room in; the dressing table slides its drawer out while a resident
 gets ready. Their primitive-part entries stay as the fallback.
 
+The office models (`models/office/deskSimple.glb`, `deskCorner.glb`, `deskStanding.glb`, `deskExecutive.glb`,
+`computerDesk.glb`, `deskWriting.glb`, `deskLaptop.glb`, `computerGaming.glb`, `chairExecutive.glb`, `chairTask.glb`,
+`officeChair.glb`, `filingCabinet.glb`, `whiteboard.glb`, `corkboard.glb`, override pack `packs/office/manifest.json`)
+are built in Blender by `tools/art/blender/families/office.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The standing and computer desks slide their keyboard shelf out while a resident types, the writing desk opens
+its drawer, the laptop opens, the gaming PC's fans spin while a game is played, the desk chairs swivel as a resident
+sits down and the whiteboard fills with a plan; the other desks, the filing cabinet and the corkboard are static.
+Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |
