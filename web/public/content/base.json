@@ -3298,8 +3298,8 @@
         1
       ],
       "price": 120,
-      "category": "lighting",
-      "group": "floor",
+      "category": "validate",
+      "group": "floor lamps",
       "interactions": []
     },
     {
@@ -3723,6 +3723,22 @@
         {
           "id": "houseplants",
           "label": "Houseplants"
+        },
+        {
+          "id": "ceiling lights",
+          "label": "Ceiling Lights"
+        },
+        {
+          "id": "wall lights",
+          "label": "Wall Lights"
+        },
+        {
+          "id": "floor lamps",
+          "label": "Floor Lamps"
+        },
+        {
+          "id": "table lamps",
+          "label": "Table Lamps"
         }
       ]
     },

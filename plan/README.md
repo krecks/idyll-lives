@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **103 are done**:
+**Where it stands (2026-10-14):** 540 objects. **124 are done**:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -16,6 +16,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the three B3 baths: `bathtub`, `bathtubClawfoot`, `bathtubFreestanding` (in Validate › Baths);
 - the six B4 laundry models: `laundryWasher`, `laundryDryer`, `towelRail`, `towelLadder`, `laundryBasket`, `bathMat` (in Validate › Laundry);
 - the three B5 storage and mirrors: `mirrorCabinet`, `mirrorRound`, `bathCabinetTall` (in Validate › Bathroom Storage);
+- the 21 lamps: LT1 `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`, `trackLights`, `paperLantern` (in Validate › Ceiling Lights); LT2 `wallSconce`, `wallLampArm`, `wallLightOutdoor` (Validate › Wall Lights); LT3 `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere` (Validate › Floor Lamps); LT4 `tableLamp`, `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern` (Validate › Table Lamps);
 - the `wallBed` and the `sofaBed` (in Validate › Sofas);
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
@@ -23,10 +24,10 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants).
 
-**437 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 82;
-- `catalog2.py`: 162;
-- the base manifest: 65;
+**416 are to do.** All of them still draw primitive parts:
+- `tools/art/catalog.py`: 72;
+- `catalog2.py`: 152;
+- the base manifest: 64;
 - `community.py`: 36;
 - the personality packs: 92.
 
@@ -45,7 +46,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Hobbies](08-hobbies.md) | 19 | H1 Music (6), H2 Games (6), H3 Crafts and science (7) |
 | [Decor](09-decor.md) | 22 | D1 Wall art and clocks (6, **done**), D2 Ornaments (10, **done**), D3 Textiles (6, **done**) |
 | [Tabletop](10-tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
-| [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
+| [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7, **done**), LT2 Wall lights (3, **done**), LT3 Floor lamps (5, **done**), LT4 Table lamps (6, **done**) |
 | [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |
 | [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10, **done**), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |
 | [Community and farm](14-community.md) | 36 | CM1 Playground (8), CM2 Street furniture (10), CM3 Food stalls and vending (5), CM4 Shops and café (5), CM5 Farm (8) |

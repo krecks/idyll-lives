@@ -1,0 +1,635 @@
+{
+  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn and the paper lantern sways all the time near the camera (`idle`).",
+  "version": 1,
+  "entries": {
+    "model.ceilingPendant": {
+      "type": "model",
+      "url": "../../models/lighting/ceilingPendant.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "dome": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Body"
+        },
+        {
+          "material": "dome",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.ceilingLight": {
+      "type": "model",
+      "url": "../../models/lighting/ceilingLight.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "panel": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Body"
+        },
+        {
+          "material": "panel",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.chandelier": {
+      "type": "model",
+      "url": "../../models/lighting/chandelier.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Body"
+        },
+        {
+          "material": "bulb",
+          "label": "Globes"
+        }
+      ]
+    },
+    "model.pendantIndustrial": {
+      "type": "model",
+      "url": "../../models/lighting/pendantIndustrial.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "industrial": {
+          "finish": "material.finish.metal"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "liner": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Body"
+        },
+        {
+          "material": "industrial",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.ceilingFan": {
+      "type": "model",
+      "url": "../../models/lighting/ceilingFan.glb",
+      "materials": {
+        "blade": {
+          "finish": "material.finish.wood"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "idle": "blades_turn"
+      },
+      "paint": [
+        {
+          "material": "white",
+          "label": "Body"
+        },
+        {
+          "material": "blade",
+          "label": "Blades"
+        }
+      ]
+    },
+    "model.trackLights": {
+      "type": "model",
+      "url": "../../models/lighting/trackLights.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "white",
+          "label": "Body"
+        },
+        {
+          "material": "iron",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.paperLantern": {
+      "type": "model",
+      "url": "../../models/lighting/paperLantern.glb",
+      "materials": {
+        "paper": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        },
+        "rib": {
+          "finish": "material.finish.fabric"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "idle": "sway"
+      },
+      "paint": [
+        {
+          "material": "paper",
+          "label": "Paper"
+        },
+        {
+          "material": "rib",
+          "label": "Ribs"
+        }
+      ]
+    },
+    "model.wallSconce": {
+      "type": "model",
+      "url": "../../models/lighting/wallSconce.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Body"
+        },
+        {
+          "material": "shade",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.wallLampArm": {
+      "type": "model",
+      "url": "../../models/lighting/wallLampArm.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "liner": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        },
+        "shade_metal": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Body"
+        },
+        {
+          "material": "shade_metal",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.wallLightOutdoor": {
+      "type": "model",
+      "url": "../../models/lighting/wallLightOutdoor.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "lens": {
+          "finish": "material.finish.glass",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Body"
+        },
+        {
+          "material": "lens",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lamp": {
+      "type": "model",
+      "url": "../../models/lighting/lamp.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "lamp_shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        },
+        "stand": {
+          "finish": "material.finish.metal"
+        },
+        "trim": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "stand",
+          "label": "Stand"
+        },
+        {
+          "material": "lamp_shade",
+          "label": "Shade"
+        },
+        {
+          "material": "brass",
+          "label": "Fittings"
+        }
+      ]
+    },
+    "model.floorLampSimple": {
+      "type": "model",
+      "url": "../../models/lighting/floorLampSimple.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Stand"
+        },
+        {
+          "material": "shade",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampFloorArc": {
+      "type": "model",
+      "url": "../../models/lighting/lampFloorArc.glb",
+      "materials": {
+        "arc": {
+          "finish": "material.finish.metal"
+        },
+        "arc_shade": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "liner": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "arc",
+          "label": "Stand"
+        },
+        {
+          "material": "arc_shade",
+          "label": "Shade"
+        },
+        {
+          "material": "marble",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.lampFloorTripod": {
+      "type": "model",
+      "url": "../../models/lighting/lampFloorTripod.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "linen": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Stand"
+        },
+        {
+          "material": "linen",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampTorchiere": {
+      "type": "model",
+      "url": "../../models/lighting/lampTorchiere.glb",
+      "materials": {
+        "bowl": {
+          "finish": "material.finish.glass",
+          "glow": "#FFD9A0"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Stand"
+        },
+        {
+          "material": "bowl",
+          "label": "Shade"
+        },
+        {
+          "material": "iron",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.tableLamp": {
+      "type": "model",
+      "url": "../../models/lighting/tableLamp.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "ceramic": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "ceramic",
+          "label": "Base"
+        },
+        {
+          "material": "shade",
+          "label": "Shade"
+        },
+        {
+          "material": "oak",
+          "label": "Table"
+        }
+      ]
+    },
+    "model.lampTableRound": {
+      "type": "model",
+      "url": "../../models/lighting/lampTableRound.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "jar": {
+          "finish": "material.finish.gloss"
+        },
+        "shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "jar",
+          "label": "Base"
+        },
+        {
+          "material": "shade",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampTableSquare": {
+      "type": "model",
+      "url": "../../models/lighting/lampTableSquare.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "square_shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Base"
+        },
+        {
+          "material": "square_shade",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampBanker": {
+      "type": "model",
+      "url": "../../models/lighting/lampBanker.glb",
+      "materials": {
+        "banker": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "liner": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Base"
+        },
+        {
+          "material": "banker",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampMushroom": {
+      "type": "model",
+      "url": "../../models/lighting/lampMushroom.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "cap": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Base"
+        },
+        {
+          "material": "cap",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.lampLantern": {
+      "type": "model",
+      "url": "../../models/lighting/lampLantern.glb",
+      "materials": {
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFC46A"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Base"
+        },
+        {
+          "material": "glass",
+          "label": "Glass"
+        }
+      ]
+    }
+  }
+}

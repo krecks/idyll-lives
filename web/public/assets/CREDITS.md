@@ -93,6 +93,11 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The lamps (`models/lighting/*.glb`: the seven ceiling lights, three wall lights, five floor lamps and six table
+lamps, override pack `packs/lighting/manifest.json`) are built in Blender by `tools/art/blender/families/lighting.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night; the ceiling fan's blades turn
+and the paper lantern sways. Their primitive-part entries stay as the fallback.
+
 The decor models (`models/decor/*.glb`: the D1 wall art and clocks, D2 ornaments and D3 curtains and rugs, override
 pack `packs/decor/manifest.json`) are built in Blender by `tools/art/blender/families/decor.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go

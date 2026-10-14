@@ -1,9 +1,13 @@
 # Lighting
 
 The light itself is the content's `light` (position, colour, power): the model must put its bulb where
-`tools/art/catalog2.py` `LIGHTS` says. Lamps have no on/off state; a shade that glows at night needs E3/E8.
+`tools/art/catalog2.py` `LIGHTS` says. Lamps have no on/off state; their shades glow at night (E8).
 
-## LT1. Ceiling lights (7)
+All 21 are done in `families/lighting.py` (notes: `lighting.md`): each bulb is asserted against the content's
+`light.height`, the shades, diffusers and bulbs glow at night, the ceiling fan's blades turn (`blades_turn`) and
+the paper lantern sways (`sway`), both ambient (E2).
+
+## LT1. Ceiling lights (7) — **Done** (in Validate › Ceiling Lights)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `ceiling lights` (Validate › Ceiling Lights)
@@ -19,7 +23,7 @@ The light itself is the content's `light` (position, colour, power): the model m
 | `trackLights` Track lights | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. |
 | `paperLantern` Paper lantern | 1x1 · ceiling | — | lighting / ceiling | Paper | Ambient (E2) | `sway`: a slow sway (E2). Until then static. |
 
-## LT2. Wall lights (3)
+## LT2. Wall lights (3) — **Done** (in Validate › Wall Lights)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `wall lights` (Validate › Wall Lights)
@@ -31,7 +35,7 @@ The light itself is the content's `light` (position, colour, power): the model m
 | `wallLampArm` Swing-arm wall lamp | 1x1 · wall | — | lighting / wall | Body, Shade | Static | Static. |
 | `wallLightOutdoor` Bulkhead light | 1x1 · wall | — | lighting / wall | Body, Shade | Static | Static. |
 
-## LT3. Floor lamps (5)
+## LT3. Floor lamps (5) — **Done** (in Validate › Floor Lamps)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `floor lamps` (Validate › Floor Lamps)
@@ -45,7 +49,7 @@ The light itself is the content's `light` (position, colour, power): the model m
 | `lampFloorTripod` Tripod floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. |
 | `lampTorchiere` Uplighter | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. |
 
-## LT4. Table lamps (6)
+## LT4. Table lamps (6) — **Done** (in Validate › Table Lamps)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `table lamps` (Validate › Table Lamps)
