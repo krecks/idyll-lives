@@ -3711,6 +3711,10 @@
         {
           "id": "natureLover",
           "label": "Nature Lover"
+        },
+        {
+          "id": "neat",
+          "label": "Neat"
         }
       ]
     },

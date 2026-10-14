@@ -31,7 +31,8 @@
     "packs/laundry/manifest.json",
     "packs/pack_bookworm/manifest.json",
     "packs/pack_loner/manifest.json",
-    "packs/pack_natureLover/manifest.json"
+    "packs/pack_natureLover/manifest.json",
+    "packs/pack_neat/manifest.json"
   ],
   "entries": {
     "material.wall": {

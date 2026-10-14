@@ -102,6 +102,13 @@ veggie bed (whose crop follows its growth stage), a seedling comes up, a bird la
 runs, the cloche lifts and the glasshouse's door and roof vent open. Their primitive-part entries stay as the
 fallback.
 
+The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
+`organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
+slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their primitive-part
+entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

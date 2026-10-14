@@ -186,7 +186,7 @@ done.
 | `natureLover.mossTerrarium` Moss terrarium | 1x1 · floor | mist:water | decor / — | Wood | Use | `lid_open`: the glass lid lifts for mist. |
 | `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood | Use | `door_open`: the door and a roof vent open for unwind and orchids. |
 
-## P13. Neat (6)
+## P13. Neat (6) — **Done** (in Validate › Neat)
 
 - **Family:** `tools/art/blender/families/pack_neat.py`
 - **Validate group:** `neat` (Validate › Neat)
