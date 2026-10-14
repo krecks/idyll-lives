@@ -3786,6 +3786,11 @@
         {
           "id": "kids study",
           "label": "Kids Study"
+        },
+        {
+          "id": "playground",
+          "label": "Playground",
+          "outside": true
         }
       ]
     },

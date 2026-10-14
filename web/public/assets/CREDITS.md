@@ -105,6 +105,14 @@ The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `tow
 the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
 are still. Their primitive-part entries stay as the fallback.
 
+The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
+`merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
+town overview, override pack `packs/playground/manifest.json`) is built in Blender by
+`tools/art/blender/families/playground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The seesaw's
+plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
+riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
+ping-pong table are static. Their primitive-part entries stay as the fallback.
+
 The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
 `dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
 `kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack

@@ -360,8 +360,8 @@
         2
       ],
       "price": 520,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "outdoors": true,
       "description": "Up the ladder, down the slide. And again. And again.",
       "interactions": [
@@ -390,8 +390,8 @@
         2
       ],
       "price": 900,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 2,
       "outdoors": true,
       "description": "A wooden fort with a rope net, a tower and a fireman's pole.",
@@ -427,8 +427,8 @@
         1
       ],
       "price": 340,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 2,
       "outdoors": true,
       "seat": {
@@ -464,8 +464,8 @@
         1
       ],
       "price": 160,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "outdoors": true,
       "seat": {
         "height": 0.78,
@@ -498,8 +498,8 @@
         2
       ],
       "price": 780,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 4,
       "outdoors": true,
       "seat": {
@@ -535,8 +535,8 @@
         1
       ],
       "price": 420,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 2,
       "outdoors": true,
       "description": "A hoop on a steel pole with a proper backboard. Shoot around alone or with a friend.",
@@ -573,8 +573,8 @@
         1
       ],
       "price": 650,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 2,
       "outdoors": true,
       "description": "A weatherproof concrete table with a steel net. Fast, silly and a little social.",
@@ -609,8 +609,8 @@
         1
       ],
       "price": 480,
-      "category": "community",
-      "group": "play",
+      "category": "validate",
+      "group": "playground",
       "slots": 2,
       "outdoors": true,
       "seat": {

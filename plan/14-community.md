@@ -3,9 +3,9 @@
 Town things (`tools/art/community.py`). They are placed on town lots and seen from far and by the hundred: LOD (E7)
 before the street furniture. Check them on a town lot (`?state=` from a test dump) as well as in Validate.
 
-## CM1. Playground (8)
+## CM1. Playground (8) — **Done** (in Validate › Playground)
 
-- **Family:** `tools/art/blender/families/community.py`
+- **Family:** `tools/art/blender/families/playground.py`
 - **Validate group:** `playground` (Validate › Playground)
 - **Placeholders to match:** `tools/art/community.py`
 
