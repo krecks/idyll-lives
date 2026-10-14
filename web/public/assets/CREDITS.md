@@ -87,6 +87,12 @@ built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` a
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
 drops, the teapot pours, the fire grows and the top book opens. Their primitive-part entries stay as the fallback.
 
+The hot-headed pack models (`models/pack_hotHeaded/heavyBag.glb`, `smashBin.glb`, `thunderDrums.glb`,
+`coolDownCushion.glb`, `grudgeJournal.glb`, `coldPlunge.glb`, override pack `packs/pack_hotHeaded/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_hotHeaded.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). Each moves while it is used: the bag swings, the crate's lid flips up, the cymbals rock, the zafu
+sinks, the desk drawer slides out and the plunge cover rolls back. Their primitive-part entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and

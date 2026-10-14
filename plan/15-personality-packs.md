@@ -110,7 +110,7 @@ done.
 | `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
-## P8. Hot-headed (6)
+## P8. Hot-headed (6) — **Done** (in Validate › Hot Headed)
 
 - **Family:** `tools/art/blender/families/pack_hotHeaded.py`
 - **Validate group:** `hot headed` (Validate › Hot Headed)

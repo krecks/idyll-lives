@@ -3703,6 +3703,10 @@
         {
           "id": "bookworm",
           "label": "Bookworm"
+        },
+        {
+          "id": "hotHeaded",
+          "label": "Hot Headed"
         }
       ]
     },
