@@ -8,6 +8,10 @@ from mathutils import Matrix, Vector
 
 from .scene import meshes
 
+# The (game x, depth) the model being built is centred on: its Model's `centre`, set by Family.make, so
+# `settle()` stands a floor model where its placeholder stands (a counter's back on the wall).
+CENTRE = (0.0, 0.0)
+
 
 @contextlib.contextmanager
 def new_parts():
@@ -101,8 +105,9 @@ def game_size(objs=None):
 
 def settle(objs=None, centre=True, floor=True):
     """Stands the model on the floor (lowest point at z = 0) and centres it on the footprint in x and y,
-    by moving it (never scaling). `centre=False` only stands it on the floor: for a model built in place
-    off the footprint's centre (a wall bed at the back of its tiles). `floor=False` leaves its height
+    or on its Model's `centre` (game x, depth), by moving it (never scaling). `centre=False` only stands
+    it on the floor: for a model built in place off the footprint's centre (a wall bed at the back of its
+    tiles). `floor=False` leaves its height
     alone, for a thing on a wall (docs/design/objects.md, "The origin"), built at its real height. Call
     it before adding clips: they key the rest pose where it is. A moving part moves whole, its hinge
     with it."""
@@ -112,7 +117,7 @@ def settle(objs=None, centre=True, floor=True):
     lo, hi = measure(objs)
     drop = -lo[2] if floor else 0.0
     if centre:
-        shift = Vector((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, drop))
+        shift = Vector((-CENTRE[0] - (lo[0] + hi[0]) / 2, -CENTRE[1] - (lo[1] + hi[1]) / 2, drop))
     else:
         shift = Vector((0, 0, drop))
     for o in objs:

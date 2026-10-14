@@ -237,10 +237,7 @@ def butcherBlock():
         F.box('box', 0.2, 0.16, 0.2, (0.24, 0.29, 0.06), M.porcelain, bevel=0.03)
     G.join(still, 'body', origin=(0, 0, 0))
     # the knife drawer under the block, sliding out for a sandwich
-    with G.new_parts() as parts:
-        F.box('drawer_front', 0.7, 0.18, 0.02, (0, 0.72, 0.39), M.wood2, bevel=0.008)
-        _handle_h(F, 'drawer_pull', 0, 0.72, 0.402, 0.6, M.metal)
-    drawer = G.join(parts, 'drawer', origin=F.at(0, 0.72, 0.39))
+    drawer = _drawer(F, 'drawer', 0.7, 0.72, 0.39, M.wood2, M.metal, handle_w=0.6)   # with its box behind
     G.settle()
     G.slide(drawer, 'drawer_open', (0, -0.25, 0), seconds=SECONDS)
 
@@ -366,7 +363,7 @@ def wallCabinet():
         _case(F, 0.98, 0.72, 0.34, 0, 1.81, WALL, M.cab)
         for s in (-1, 1):
             F.box(f'door{s}', 0.484, 0.7, 0.02, (s * 0.245, 1.81, WALL + 0.35), M.cab, bevel=0.008)
-            _handle_v(F, f'door{s}_pull', s * 0.06, 1.5, WALL + 0.368)
+            _handle_v(F, f'door{s}_pull', s * 0.06, 1.56, WALL + 0.368)   # on the doors, near their bottom
         F.box('light', 0.9, 0.012, 0.03, (0, 1.444, WALL + 0.07), M.bulb, bevel=0.004)
     G.join(still, 'body', origin=(0, 0, 0))
     G.settle(centre=False, floor=False)
@@ -447,7 +444,7 @@ def potRail():
     with G.new_parts() as still:
         F.cyl('rail', 0.02, 0.9, (0, 1.6, WALL + 0.08), M.metal, rot=(0, 90, 0), verts=12)
         for s in (-1, 1):
-            F.box(f'bracket{s}', 0.03, 0.03, 0.1, (s * 0.44, 1.6, WALL + 0.04), M.metal, bevel=0.006)
+            F.box(f'bracket{s}', 0.03, 0.03, 0.08, (s * 0.44, 1.6, WALL + 0.04), M.metal, bevel=0.006)   # from the wall face
         for x, kind in ((-0.32, 'pan'), (-0.12, 'ladle'), (0.06, 'pot'), (0.28, 'pan'), (0.4, 'ladle')):
             G.torus(f'hook{x}', 0.035, 0.007, at=F.at(x, 1.585, WALL + 0.08), material=M.metal,
                     rot=(0, 90, 0), major_segments=8, minor_segments=6)
@@ -608,9 +605,11 @@ def barEnd():
     G.settle()
 
 
+# A floor thing against a wall is centred where its placeholder stands (`centre`): its back on the wall,
+# its top under its content `surface` (catalog2.py TOPS).
 FAMILY = G.Family(
     'kitchen_counters', M,
-    [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter',
+    [G.Model('counter', counter, size=(1.0, 0.96, 0.66), key='model.counter', centre=(0, -0.15),
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
@@ -618,28 +617,28 @@ FAMILY = G.Family(
              # sandwich, as the counter
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterEnd', counterEnd, size=(1.0, 0.95, 0.79), key='model.counterEnd',
+     G.Model('counterEnd', counterEnd, size=(1.0, 0.95, 0.79), key='model.counterEnd', centre=(0, -0.085),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterCornerOuter', counterCornerOuter, size=(0.81, 1.035, 0.79), key='model.counterCornerOuter',
+     G.Model('counterCornerOuter', counterCornerOuter, size=(0.81, 1.035, 0.79), key='model.counterCornerOuter', centre=(-0.095, -0.085),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterDrawers', counterDrawers, size=(1.0, 0.95, 0.79), key='model.counterDrawers',
+     G.Model('counterDrawers', counterDrawers, size=(1.0, 0.95, 0.79), key='model.counterDrawers', centre=(0, -0.085),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('chrome', 'Handles')]),
-     G.Model('counterOpenShelf', counterOpenShelf, size=(1.0, 0.95, 0.79), key='model.counterOpenShelf',
+     G.Model('counterOpenShelf', counterOpenShelf, size=(1.0, 0.95, 0.79), key='model.counterOpenShelf', centre=(0, -0.085),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('butcherBlock', butcherBlock, size=(0.9, 0.945, 0.813), key='model.butcherBlock',
              # sandwich slides the knife drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('leg', 'Base'), ('block', 'Block top')]),
-     G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.79), key='model.counterMarble',
+     G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.79), key='model.counterMarble', centre=(0, -0.085),
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('navy', 'Cabinet'), ('marble', 'Marble top'), ('brass', 'Handles')]),
      # K5: tall and wall storage
-     G.Model('pantry', pantry, size=(0.94, 2.27, 0.63), key='model.pantry',
+     G.Model('pantry', pantry, size=(0.94, 2.27, 0.63), key='model.pantry', centre=(0, -0.141),
              # snack fetches from the larder: both doors swing open
              motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
-     G.Model('pantryTall', pantryTall, size=(0.96, 2.38, 0.71), key='model.pantryTall',
+     G.Model('pantryTall', pantryTall, size=(0.96, 2.38, 0.71), key='model.pantryTall', centre=(0, -0.104),
              # snack, as the larder
              motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('cab', 'Cabinet'), ('brass', 'Handles')]),
@@ -658,16 +657,16 @@ FAMILY = G.Family(
      G.Model('spiceRack', spiceRack, size=(0.52, 0.44, 0.106), key='model.spiceRack',
              centre=(0, -0.377), floor=False,
              paint=[('oak', 'Rack')]),
-     G.Model('potRail', potRail, size=(0.91, 0.545, 0.23), key='model.potRail',
-             centre=(0, -0.325), floor=False,
+     G.Model('potRail', potRail, size=(0.91, 0.545, 0.22), key='model.potRail',
+             centre=(0, -0.32), floor=False,
              paint=[('metal', 'Rail'), ('copper', 'Pots')]),
      G.Model('kitchenShelfWall', kitchenShelfWall, size=(0.9, 0.76, 0.24), key='model.kitchenShelfWall',
              centre=(0, -0.31), floor=False,
              paint=[('oak', 'Shelves'), ('oakd', 'Brackets')]),
-     G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan',
+     G.Model('trashCan', trashCan, size=(0.31, 0.685, 0.36), key='model.trashCan', centre=(0, -0.172),
              paint=[('steel', 'Bin'), ('lid', 'Lid')]),
-     G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins',
-             paint=[('bin1', 'Bins'), ('bin2', 'Bins'), ('bin3', 'Bins'), ('lid', 'Handles')]),
+     G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins', centre=(0, -0.212),
+             paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),
      # K6: islands and bars
      G.Model('kitchenIsland', kitchenIsland, size=(1.94, 1.035, 0.92), key='model.kitchenIsland',
              # sandwich (not breakfast: residents sit at the island) slides the drawer out
@@ -677,9 +676,9 @@ FAMILY = G.Family(
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('islandLong', islandLong, size=(2.96, 0.98, 0.951), key='model.islandLong',
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment',
+     G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, -0.045),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
-     G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd',
+     G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd', centre=(0, -0.045),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')])],
     comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). '
             'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The '

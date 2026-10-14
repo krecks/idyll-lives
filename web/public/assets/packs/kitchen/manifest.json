@@ -52,6 +52,7 @@
       "motions": {
         "uses": {
           "fetch": "fridge_open",
+          "cook": "fridge_open",
           "drink": "fridge_open"
         },
         "hold": 3.5

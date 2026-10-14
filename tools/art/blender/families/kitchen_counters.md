@@ -79,7 +79,7 @@ rest pose where it is.
 
 A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and
 `settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check_glb` reports it as floating,
-which is fine on a wall. A floor thing stands and is centred as usual.
+which is fine on a wall. A floor thing stands where its placeholder stands, its back on the wall (below).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
@@ -111,10 +111,22 @@ static this pass.
 | `model.barSegment` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 | `model.barEnd` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 
+Also from the review: the butcher block's knife drawer has its box; the wall cabinet's pulls sit on its
+doors; the pot rail's brackets start at the wall face (0.22 m deep); the recycling bins' colour parts are
+the left, middle and right bin (each with its lid) and the handles.
+
 All match their placeholder bounds (`check_glb.py`: 0 failed; Khronos glTF validator: 0 errors,
 0 warnings each). The eight K4 counters sit in Validate › Counters, the eleven K5 things in
 Validate › Kitchen Storage and the five K6 islands and bars in Validate › Islands & Bars, until
 checked in play.
+
+## Where it stands (review, 2026-10-14)
+
+Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
+wall), a run of counters and appliances lines up, and its top is under its content `surface`
+(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
+centred.
 
 ## Rebuild
 

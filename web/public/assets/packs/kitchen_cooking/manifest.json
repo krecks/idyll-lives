@@ -25,9 +25,11 @@
       "motions": {
         "uses": {
           "cook": "knob_on",
-          "bake": "oven_open"
-        },
-        "hold": 3.0
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
       },
       "paint": [
         {
@@ -77,9 +79,11 @@
         "uses": {
           "cook": "burner_on",
           "gourmet": "burner_on",
-          "bake": "oven_open"
-        },
-        "hold": 3.0
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
       },
       "paint": [
         {
@@ -164,9 +168,11 @@
         "uses": {
           "cook": "burner_on",
           "gourmet": "burner_on",
-          "bake": "oven_open"
-        },
-        "hold": 3.0
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
       },
       "paint": [
         {
@@ -212,8 +218,7 @@
       "motions": {
         "uses": {
           "cook": "burner_on"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {

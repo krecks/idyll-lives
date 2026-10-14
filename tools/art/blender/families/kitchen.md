@@ -14,7 +14,7 @@ A top-freezer fridge: the **top compartment is the freezer** (frozen food), the 
 the fridge** (normal food), separated by a real divider.
 
 - 0.740 × 1.800 × 0.722 m (w × h × d): exactly the placeholder's bounds, built in its numbers (`F`, a
-  `GameFrame` shifted 9.4 cm back to centre the placeholder's back-aligned box on its tile)
+  `GameFrame`) and standing where the placeholder stands (`centre=(0, -0.094)`), its back on the wall
 - 4,286 triangles, 3 nodes (`cabinet`, `door_freezer`, `door_fridge`), 3 draw calls (one per node), 14
   materials, no UVs
 - `check_glb.py`: ok, with one warning (below). Khronos glTF validator: 0 errors, 0 warnings.
@@ -51,8 +51,8 @@ doors move at one speed, but each has its own angle:
 | `freezer_open` | `door_freezer` | 1.75 s | 0° → −118° (the short door swings wide) |
 | `fridge_open` | `door_fridge` | 1.75 s | 0° → −102° (the tall door stops a little shorter) |
 
-The pack's `motions` plays `fridge_open` for the `fetch` and `drink` animation tags (snacks, a recipe's
-ingredients, a cold drink, putting dishes away) and holds it for 3.5 s. `freezer_open` plays for no use
+The pack's `motions` plays `fridge_open` for the `fetch`, `cook` and `drink` animation tags (snacks, a
+meal's ingredients, a cold drink, putting dishes away), as the K1 fridges do, and holds it for 3.5 s. `freezer_open` plays for no use
 yet, because no interaction takes frozen food: that is `check_glb.py`'s one warning.
 
 ## The sinks
@@ -97,3 +97,11 @@ Fridges until checked in play.
 python3 -B tools/art/blender/build.py kitchen            # fridge.glb, the pack, check_glb
 python3 -B tools/art/blender/build.py kitchen --preview  # previews/fridge.png, fridge@<clip>.png
 ```
+
+## Where it stands (review, 2026-10-14)
+
+Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
+wall), a run of counters and appliances lines up, and its top is under its content `surface`
+(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
+centred.

@@ -10,8 +10,8 @@ and the microwave counter (`model.microwave`) — and the four **K3 small applia
 `catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14.
 
 A cooker is a box on the floor with a hob on top and an oven below; a small appliance is a counter with a
-machine on it, or a dishwasher under a worktop. The parts are placed in game axes (`F`, a `GameFrame`
-shifted back by the placeholder's depth centre, so the model is centred on its tile).
+machine on it, or a dishwasher under a worktop. The parts are placed in game axes (`F`, a `GameFrame`),
+and each model stands where its placeholder stands, its back on the wall (below).
 
 ## Materials
 
@@ -72,9 +72,9 @@ A dishwasher is a tub under a worktop with a door hinged along its bottom edge (
 and a lower rack that slides out 30 cm as the door opens; the `dishwasher` wears the kitchen's cabinet
 fronts and the `dishwasherCompact` a stainless door. The coffee machine slides its cup back under the
 spout and runs a thin coffee stream (the sinks' `_water` way: built full size, origin at the spout tip,
-scaled to nothing along its length, `grow` runs it out). The breakfast counter's toaster lever slides down
-and the toast pops up at the end of `toast_down`; its blender lid lifts for `blend` (the jug blades need
-E1).
+scaled to nothing along its length, `grow` runs it out). The breakfast counter's toast stands up in the
+toaster at rest; `toast_down` presses it down with the lever, and playing back after the `hold` pops it up.
+Its blender lid lifts for `blend` (the jug blades need E1).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
@@ -94,3 +94,17 @@ Validate › Appliances until checked in play.
 python3 -B tools/art/blender/build.py kitchen_cooking            # the .glbs, the pack, check_glb
 python3 -B tools/art/blender/build.py kitchen_cooking --preview  # previews/<id>.png, <id>@<clip>.png
 ```
+
+## Where it stands (review, 2026-10-14)
+
+Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back meets the wall (the placeholders reach 1–5 cm past the wall face, inside the
+wall), a run of counters and appliances lines up, and its top is under its content `surface`
+(`catalog2.py` TOPS). Centred on the tile, they stood 3–13 cm off the wall. Islands and bars stand free,
+centred.
+
+Also from the review: the hob clips (`knob_on`, `burner_on`) last the whole use, and only `oven_open`
+shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `oven_cavity` face just inside its closed door,
+and each dishwasher's dark tub face sits just inside its door, so a dropped door shows an oven or a tub
+and the tray and rack slide out of it; the microwave is hollow (floor, top, back, side and the control
+column), so its turntable shows through the window and the open door.

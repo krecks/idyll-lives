@@ -248,6 +248,9 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
 ## Traps (each of these happened)
 
 - **Wall face.** A model built on the tile's back edge sits inside the house wall. Wall faces are 7 cm in.
+- **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
+  and off its content `surface`. Give its `Model` its placeholder's `centre` (`G.settle()` centres it
+  there), as the kitchen families do.
 - **Settle first.** Call `settle()` before `swing`/`slide`: clips key the rest pose where it is. It
   refuses after.
 - **Size check.** It counts everything at rest: knobs, handles, a folded bed's foot rail. Set `size` from

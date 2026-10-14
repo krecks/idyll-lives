@@ -138,6 +138,7 @@ def fridge():
     # the freezer door over the fridge door, a clip each
     freezer = _door('door_freezer', 1.51, 0.556, 1.274, 1.524, badge=True)
     door = _door('door_fridge', 0.643, 1.146, 0.804, 1.164)
+    G.settle()   # where its placeholder stands (`centre`), its back on the wall
     G.swing(freezer, 'freezer_open', FREEZER_ANGLE, DOOR_SECONDS)
     G.swing(door, 'fridge_open', FRIDGE_ANGLE, DOOR_SECONDS)
 
@@ -466,37 +467,39 @@ def _wineFridge():
     G.slide(rack, 'door_open', (0, -0.15, 0), seconds=1.5)
 
 
+# A floor thing against a wall is centred where its placeholder stands (`centre`): its back on the wall,
+# its top under its content `surface` (catalog2.py TOPS).
 FAMILY = G.Family(
     'kitchen', M,
-    [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge',
-             # Taking food or a drink out opens the fridge door (snacks, a recipe's ingredients, a cold
+    [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge', centre=(0, -0.094),
+             # Taking food or a drink out opens the fridge door (snacks, a meal's ingredients (cook), a cold
              # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
-             motions={'uses': {'fetch': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
              # The player colours the cabinet and doors, the handles, the plinth and the inside; the
              # food keeps its own colours.
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth & badge'), ('liner', 'Inside')]),
-     G.Model('fridgeMini', _fridgeMini, size=(0.60, 1.00, 0.60), key='model.fridgeMini',
+     G.Model('fridgeMini', _fridgeMini, size=(0.60, 1.00, 0.60), key='model.fridgeMini', centre=(0, -0.16),
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open'}, 'hold': 3.0},
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
-     G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn',
+     G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn', centre=(0, -0.132),
              # the tall door serves every use; the freezer door's clip waits for a use that takes frozen food
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
              paint=[('panel', 'Panels'), ('chrome', 'Handles')]),
-     G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor',
+     G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor', centre=(0, -0.09),
              # both doors for a snack or a meal; the right door alone for a cold drink
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
              paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
-     G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro',
+     G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.103),
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
              paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
-     G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.79), key='model.wineFridge',
+     G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.79), key='model.wineFridge', centre=(0, -0.085),
              motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
              paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),
-     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink',
+     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink', centre=(0, -0.145),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.79), key='model.counterSinkDouble',
+     G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.79), key='model.counterSinkDouble', centre=(0, -0.085),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinets'), ('stone', 'Worktop'), ('metal', 'Basins'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')])],

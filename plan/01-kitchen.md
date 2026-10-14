@@ -19,7 +19,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s, as the fridge. |
 | `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below gets `freezer_open`, unused until a use takes frozen food. |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer `freezer_open` slides out 35 cm, unused for now. |
-| `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `fridge_open`: the chrome lever turns 30° (0.2 s), then the rounded door swings 100°; snack, meal, coldDrink. |
+| `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `fridge_open`: the rounded door swings 100°, its chrome lever with it; snack, meal, coldDrink. (The lever turning 30° first needs a delayed clip on a part of the door: future.md.) |
 | `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
 
 ## K2. Cookers (6) — **Done** (in Validate › Cookers)
@@ -33,7 +33,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `stoveElectric` Electric cooker | 1x1 · floor | cook:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open`: the oven door drops 85° on its bottom hinge for bake; `knob_on`: the front-left knob turns 90° for cook. |
 | `stoveGas` Gas range | 1x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open` for bake (door drops); `burner_on` for cook and gourmet: a knob turns and a ring of blue flame (gloss, not emissive) grows on the front burner, the `water_on` way. |
 | `wallOven` Oven tower | 1x1 · floor | roast:cook bake:cook | kitchen / appliances | Tower, Handles | Use | `oven_open`: the upper oven door drops and its tray slides out 10 cm for roast and bake. |
-| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Rail | Use | `oven_open`: the left oven door drops for bake; `burner_on` (knob and flame ring) for cook and gourmet. |
+| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs & rail, Hob | Use | `oven_open`: the left oven door drops for bake; `burner_on` (knob and flame ring) for cook and gourmet. |
 | `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the flame ring grows for cook. |
 | `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat. L `turntable`: the glass plate turns while it heats (E1). |
 
@@ -63,7 +63,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `counterEnd` Counter end with shelves | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). |
 | `counterCornerOuter` Outer corner counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
 | `counterDrawers` Drawer counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. (+use) the three drawers slide out in turn. |
-| `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
+| `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop | Static | Static. |
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
@@ -85,7 +85,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. |
 | `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Static | Static. (+use) `lid_open`: the pedal lid lifts 70° (a "throw away" use). |
-| `recyclingBins` Recycling bins | 1x1 · floor | — | kitchen / counters | Bins, Lids | Static | Static. (+use) the lids lift. |
+| `recyclingBins` Recycling bins | 1x1 · floor | — | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Static | Static. (+use) the lids lift. |
 
 ## K6. Islands and bars (5) — **Done** (in Validate › Islands & Bars)
 

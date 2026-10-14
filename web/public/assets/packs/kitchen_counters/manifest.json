@@ -711,15 +711,15 @@
       "paint": [
         {
           "material": "bin1",
-          "label": "Bins"
+          "label": "Left bin"
         },
         {
           "material": "bin2",
-          "label": "Bins"
+          "label": "Middle bin"
         },
         {
           "material": "bin3",
-          "label": "Bins"
+          "label": "Right bin"
         },
         {
           "material": "lid",

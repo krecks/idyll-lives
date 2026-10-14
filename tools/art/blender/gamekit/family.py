@@ -6,7 +6,7 @@ import sys
 
 import bpy
 
-from . import motion
+from . import motion, parts
 from .export import export_glb, materials_used, stats, write_pack
 from .parts import check_size, join
 from .preview import preview, preview_clips
@@ -42,7 +42,9 @@ class Model:
       placeholder  primitive parts for a key the manifests don't have yet (the fallback)
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
-                 middle of its footprint (default: the middle)
+                 middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
+                 that stands against a wall (a counter, a fridge) takes its placeholder's, so it meets the
+                 wall and its neighbours, and its content `surface` (catalog2.py TOPS) stays on its top
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
                  town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
@@ -80,7 +82,11 @@ class Family:
     def make(self, model):
         """Builds one model in an empty scene and checks it; returns its objects."""
         reset()
-        objs = model.build() or meshes()
+        parts.CENTRE = model.centre
+        try:
+            objs = model.build() or meshes()
+        finally:
+            parts.CENTRE = (0.0, 0.0)
         bpy.context.scene.frame_set(1)
         check_size(model.size, model.tolerance, objs, name=model.id, centre=model.centre, floor=model.floor)
         stats(model.id)
