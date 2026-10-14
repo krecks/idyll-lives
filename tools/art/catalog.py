@@ -19,7 +19,7 @@ import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import objects_extra as OX                                          # noqa: E402
 from objects_extra import box, cyl, cone, sph, rod, part            # noqa: E402
-from furniture import (placeholder, shift, cushion, lathe, torus, office_chair,  # noqa: E402
+from furniture import (placeholder, shift, to_wall, cushion, lathe, torus, office_chair,  # noqa: E402
                        OAK, OAKD, BIRCH, HONEY, WALNUT, BLACKMETAL, STEEL,
                        CHROME, BRASS, TEAL, COGNAC, MUSTARD, SAGE, RUST, CREAM, SCREEN)
 import catalog2 as C2                                               # noqa: E402
@@ -1653,11 +1653,11 @@ def desk(top, legs, chair, top_fin='wood', leg_fin='metal', w=1.54, laptop=False
     return p
 
 
-add('deskWriting', placeholder(desk(OAK, BLACKMETAL, SAGE, lamp=BLACKMETAL)), (2, 1))
+add('deskWriting', placeholder(to_wall(desk(OAK, BLACKMETAL, SAGE, lamp=BLACKMETAL))), (2, 1))
 add('deskWriting@modern', placeholder(desk('#F1F0EC', BLACKMETAL, '#8E979E', 'gloss', lamp=BLACKMETAL)), (2, 1))
 add('deskWriting@cozy', placeholder(desk(HONEY, WALNUT, RUST, leg_fin='wood', lamp='#2F6B4F')), (2, 1))
 add('deskWriting@minimal', placeholder(desk(BIRCH, '#F2F2F0', '#E6E2DA', leg_fin='satin', lamp='#F2F2F0')), (2, 1))
-add('deskLaptop', placeholder(desk(OAK, BLACKMETAL, '#5F6E7A', w=0.9, laptop=True)))
+add('deskLaptop', placeholder(to_wall(desk(OAK, BLACKMETAL, '#5F6E7A', w=0.9, laptop=True))))
 add('deskLaptop@modern', placeholder(desk('#F1F0EC', BLACKMETAL, '#8E979E', 'gloss', w=0.9, laptop=True)))
 add('deskLaptop@cozy', placeholder(desk(HONEY, WALNUT, RUST, leg_fin='wood', w=0.9, laptop=True)))
 add('deskLaptop@minimal', placeholder(desk(BIRCH, '#F2F2F0', '#E6E2DA', leg_fin='satin', w=0.9, laptop=True)))
@@ -1685,7 +1685,7 @@ def gaming_pc(accent):
     return p
 
 
-add('computerGaming', placeholder(gaming_pc('#6E5CE6')), (2, 1))
+add('computerGaming', placeholder(to_wall(gaming_pc('#6E5CE6'))), (2, 1))
 add('computerGaming@cozy', placeholder(gaming_pc('#F2A23C')), (2, 1))
 def desk_chair(fabric, frame, ffin, back_h=0.62, arms=True, head=False):
     """A swivel desk chair (seat 0.47, centred): padded seat and back, a gas lift on five castors."""

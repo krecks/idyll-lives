@@ -21,7 +21,7 @@ import json, math, os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import objects_extra as OX                                          # noqa: E402
 from objects_extra import box, cyl, cone, sph, rod, part            # noqa: E402
-from furniture import (cushion, lathe, torus, shift, WHITE, OFFWHITE, LGREY, MGREY, OAK, OAKD, BIRCH, HONEY,  # noqa: E402
+from furniture import (cushion, lathe, torus, shift, to_wall, WHITE, OFFWHITE, LGREY, MGREY, OAK, OAKD, BIRCH, HONEY,  # noqa: E402
                        WALNUT, BLACKMETAL, STEEL, CHROME, BRASS, TEAL, COGNAC, MUSTARD, SAGE, RUST, CREAM, SCREEN)
 
 E, FOOT, KIND = {}, {}, {}
@@ -1375,7 +1375,7 @@ for x in (-0.68, 0.68):
     for z in (-0.4, 0.2):
         p.append(rod([x, 0, z], [x * 0.96, DT - 0.035, z * 0.94], 0.018, BLACKMETAL, 'metal', segments=6))
         p.append(rod([x + 0.04, 0, z], [x * 0.96 + 0.04, DT - 0.035, z * 0.94], 0.018, BLACKMETAL, 'metal', segments=6))
-add('deskSimple', p, (2, 1), top=(-0.75, 0.75, -0.46, 0.26, DT))
+add('deskSimple', to_wall(p), (2, 1), top=(-0.75, 0.75, WALL, 0.26, DT))          # the model's top stops at the wall face
 DC = '#F1F0EC'
 p = [box([1.96, 0.035, 1.36], [0, DT - 0.0175, -0.3], DC, 'satin', radius=0.008),
      box([1.36, 0.035, 0.6], [-0.3, DT - 0.0175, 0.68], DC, 'satin', radius=0.008),
@@ -1386,7 +1386,11 @@ p = [box([1.96, 0.035, 1.36], [0, DT - 0.0175, -0.3], DC, 'satin', radius=0.008)
      box([1.8, 0.4, 0.02], [0, 0.45, -0.94], OAK, 'wood', radius=0.004),
      box([0.42, 0.6, 0.55], [-0.7, 0.3, -0.62], DC, 'satin', radius=0.01)]
 p += [handle_h(-0.7, 0.5 - i * 0.18, -0.335, BLACKMETAL, 'metal', w=0.14) for i in range(3)]
-add('deskCorner', p, (2, 2), top=(-0.98, 0.98, -0.98, 0.98, DT))
+# The model is 1.86 m square, its back and sides on the wall faces of the corner (0.07 in from the tiles' edges)
+S = 1.86 / 1.96
+p = [dict(q, at=[round(q['at'][0] * S, 4), q['at'][1], round(q['at'][2] * S, 4)],
+          size=[round(q['size'][0] * S, 4), q['size'][1], round(q['size'][2] * S, 4)]) for q in p]
+add('deskCorner', p, (2, 2), top=(-0.93, 0.93, -0.93, 0.93, DT))
 p = [box([0.96, 0.03, 0.66], [0, 1.035, -0.13], BIRCH, 'wood', radius=0.01),
      box([0.84, 0.05, 0.08], [0, 0.98, -0.13], '#2B2C2E', 'metal', radius=0.008)]
 for x in (-0.38, 0.38):
@@ -1395,7 +1399,7 @@ for x in (-0.38, 0.38):
 p += [box([0.06, 0.03, 0.02], [0.4, 1.0, 0.2], '#3A3D41', 'satin', radius=0.006),
       box([0.56, 0.34, 0.03], [0, 1.37, -0.38], '#1E1F22', 'satin', radius=0.01), box([0.53, 0.31, 0.01], [0, 1.37, -0.364], SCREEN, 'gloss', radius=0.006),
       box([0.04, 0.2, 0.04], [0, 1.15, -0.41], '#2B2C2E', 'metal', radius=0.01), box([0.12, 0.03, 0.06], [0, 1.065, -0.42], '#2B2C2E', 'metal', radius=0.008)]
-add('deskStanding', p, top=(-0.48, 0.48, -0.46, 0.2, 1.05))
+add('deskStanding', to_wall(p), top=(-0.48, 0.48, WALL, 0.2, 1.05))
 EXE = '#5A3825'
 p = [box([1.8, 0.05, 0.8], [0, DT - 0.025, -0.06], EXE, 'wood', radius=0.012),
      box([1.4, 0.004, 0.5], [0, DT + 0.001, -0.1], '#2F4A3A', 'fabric', radius=0.002),
@@ -1404,7 +1408,7 @@ for x in (-0.66, 0.66):
     p += [box([0.44, DT - 0.05, 0.72], [x, (DT - 0.05) / 2, -0.06], EXE, 'wood', radius=0.012)]
     p += [box([0.4, 0.2, 0.02], [x, 0.58 - i * 0.22, 0.31], '#6B4630', 'wood', radius=0.006) for i in range(3)]
     p += [handle_h(x, 0.58 - i * 0.22, 0.325, BRASS, 'metal', w=0.12) for i in range(3)]
-add('deskExecutive', p, (2, 1), top=(-0.9, 0.9, -0.46, 0.34, DT))
+add('deskExecutive', to_wall(p), (2, 1), top=(-0.9, 0.9, WALL, 0.34, DT))
 FILE = '#8E959B'
 p = [box([0.46, 1.0, 0.62], [0, 0.5, -0.16], FILE, 'metal', radius=0.01)]
 for i in range(3):
@@ -1412,8 +1416,8 @@ for i in range(3):
     p += [box([0.42, 0.3, 0.02], [0, y, 0.155], FILE, 'metal', radius=0.008),
           handle_h(0, y + 0.06, 0.17, CHROME, 'metal', w=0.14),
           box([0.1, 0.04, 0.005], [0, y + 0.11, 0.167], '#F2F0EA', 'gloss', radius=0.002)]
-p += plant_pot(0.08, -0.2, 1.0, PORCELAIN, d=0.14, h=0.12, soil=False) + [box([0.24, 0.03, 0.3], [-0.08, 1.015, -0.2], '#F2F0EA', 'gloss', radius=0.004)]
-add('filingCabinet', p)
+p += plant_pot(0.12, -0.2, 1.0, PORCELAIN, d=0.13, h=0.11, tall=0.1, soil=False) + [box([0.24, 0.03, 0.3], [-0.1, 1.015, -0.2], '#F2F0EA', 'gloss', radius=0.004)]
+add('filingCabinet', to_wall(p))                                     # a low plant, as the model's
 
 
 def swivel(fabric, frame, fin='fabric', back_h=0.62, arms=True, seat_y=0.47):
