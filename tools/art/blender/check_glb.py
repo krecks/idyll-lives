@@ -416,7 +416,7 @@ def check_file(entry, finishes, path):
         for k, axis in enumerate('xyz'):
             want = phi[k] - plo[k]
             if want > 0.05 and abs(dims[k] - want) > 0.1 * want:
-                warnings.append(f'{axis} size {dims[k]:.2f} m, its placeholder {want:.2f} m (fallback, picking and shadow follow the placeholder)')
+                warnings.append(f'{axis} size {dims[k]:.2f} m, its placeholder {want:.2f} m (the fallback if the file fails to load; picking follows what is drawn, the shadow the footprint)')
 
     # Budgets.
     side = max(dims)

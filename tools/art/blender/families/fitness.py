@@ -96,7 +96,9 @@ def treadmill():
             k += 1
     slats = G.join(parts, 'slats')
     G.settle(centre=False)
-    G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=0.5)   # back towards the rear (game +z): 0.2 m/s
+    # Back towards the rear (game +z) at 0.4 m/s: slower than a jog, but faster blurs the slats, which move a
+    # third of their pitch a frame at 30 frames a second even at the fastest game speed (2.5x).
+    G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=0.25)
     return G.meshes()
 
 
