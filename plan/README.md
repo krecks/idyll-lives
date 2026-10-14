@@ -20,7 +20,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 
 | Category | Items | Tasks |
 |---|---|---|
-| [Engine and tools first](00-engine-and-tools.md) | — | T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content |
+| [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
 | [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5), K2 Cookers (6), K3 Small appliances and dishwashers (4), K4 Base counters (8), K5 Tall and wall storage (11), K6 Islands and bars (5), K7 Dining tables (13), K8 Chairs and stools (12), K9 Dining storage (4) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5), B2 Showers (4), B3 Baths (3), B4 Laundry (6), B5 Bathroom storage and mirrors (3) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9), BR2 Nightstands and small storage (8), BR3 Wardrobes and drawers (6), BR4 Dressing and mirrors (4) |
@@ -92,20 +92,26 @@ Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs
 
 ## Animations: the kinds in the tables
 
-| Kind | Plays | Works | Example |
+All of these work (the engine tasks are done); the manifest field and the gamekit helper for each are in
+[00-engine-and-tools.md](00-engine-and-tools.md)'s status table.
+
+| Kind | Plays | Manifest (`motions`) | Example |
 |---|---|---|---|
-| **Use** | While a resident uses the object (by interaction id, else by animation tag). Played back at the end of the use, or after the model's `hold`. | Today | Fridge door, sink water, toilet lid |
-| **Held open** | While the sim's `open` flag is set (an interaction's `when` / `leaves`) | Today; content per object (C1) | Wall bed, futon, sofa bed |
-| **Loop (E1)** | Repeats for as long as the use lasts | Engine task E1 | Rocking chair, treadmill belt, drum spin |
-| **Ambient (E2)** | Always, on its own | Engine task E2 | Ceiling fan, clock hands, fountain water |
-| **Night (E3)** | Held while the lamps are lit | Engine task E3 | Curtains drawn, shades glowing (E8) |
-| **Growth (E4)** | Follows a growth state from the sim | Engine task E4 | Vegetables ripening |
+| **Use** | While a resident uses the object (by interaction id, else by animation tag). Played back at the end of the use, or after its `hold` (per clip: E5). | `uses` | Fridge door, sink water, toilet lid |
+| **Held open** | While the sim's `open` flag is set (an interaction's `when` / `leaves`) | `open` (+ content, C1) | Wall bed, futon, sofa bed |
+| **Loop (E1)** | Repeats for as long as the use lasts | `loops` | Rocking chair, treadmill belt, drum spin |
+| **Ambient (E2)** | Always, on its own, near the camera (not on Low) | `idle` | Ceiling fan, clock hands, fountain water |
+| **Night (E3)** | Held while the lamps are lit | `night` | Curtains drawn; shades glow with a material's `glow` (E8) |
+| **Growth (E4)** | Follows the crop's growth stage from the sim (content `grows`) | `growth` | Vegetables ripening |
 | **Static** | No clip | — | Tables, rugs, ornaments |
+
+Residents sitting or lying on a moving seat ride it with `ride` (a rocking chair, a swing).
 
 - **No use yet:** "(+use)" marks a clip that needs an interaction first. These are ideas for when content gives
   the object a use. Until then the item is built with the part separate, so the clip can be added without
   remodelling.
-- **Interim clips:** where a loop needs E1, the table also gives what a plain use clip can show until then.
+- **Interim clips:** some tables also give a plain use clip "until E1" or "until then": no longer needed, build
+  the loop (or the ambient, night or growth clip) itself.
 - **Rules every clip keeps (`check_glb.py`):**
   - node transforms only (no skins or morph targets), starting at rest;
   - about 1 s long;
@@ -114,19 +120,20 @@ Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs
 
 ## Order
 
-1. **T0** (clips bench, gamekit `spin` / `rock` / `squash`).
-2. The tasks that only need today's clips, most seen first:
+The engine and tools tasks (T0, E1–E8, C1) are done, so every kind of clip can be built now.
+
+1. The most-seen categories first:
    - Kitchen K1–K3;
    - Bathroom B1–B4;
    - Bedroom BR1, BR3;
-   - Living L1, L2, L4, L5;
+   - Living L1 (the sofa bed is done), L2, L4, L5;
    - then the rest of those categories.
-3. Engine **E1**, then the loop items; **C1** with the futon and sofa bed.
-4. Office, Kids, Fitness, Hobbies, Decor, Lighting, Outdoor.
-5. The personality packs (P1–P16), one pack per task.
-6. Engine **E7**, then Garden plants and trees, and the street and community props. Tabletop at any point (small
-   and quick).
-7. **E2**, **E3** and **E8**, then the ambient and night clips on items already built.
+2. Office, Kids, Fitness, Hobbies, Decor, Lighting, Outdoor.
+3. The personality packs (P1–P16), one pack per task.
+4. Garden plants and trees, and the street and community props, each with a far version (`G.Model(far=…)`, E7).
+   Plants also need the nature shader's wind and tint before they come from Blender. Tabletop at any point
+   (small and quick).
+5. The ambient and night clips on items already built (the sinks, the fridge, the garden decor), where they fit.
 
 ## Done means
 
