@@ -197,8 +197,8 @@ finish it uses.
   what only shows while it moves), or `far=build_function` builds one of its own; `check_glb.py`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
-- **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance and `*.far`
-  keys (100–250 triangles) for the far woods; a file's `far` serves as its reduced build. A file's
+- **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance, for the far
+  woods too: a file's `far`, or a placeholder built at the low level of detail. A file's
   parts on `foliage` and `bark` take the nature shader's wind and tint, as the placeholders' do
   (`families/plants.py`).
 

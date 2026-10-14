@@ -5,7 +5,8 @@
  *
  * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
  * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
- * ~1-1.5k triangles per tree near the town and `*.far` LODs (~100-250) for the distant woods.
+ * ~1-1.5k triangles per tree, drawn over by Blender-built files (each tree and shrub with a far
+ * version for the distant woods: tools/art/blender/families/plants.py, trees.py).
  * `installNature` adds vertex-shader wind and per-instance tint variation to those two finishes;
  * `natureDecor` turns the house builder's garden dressing into species (hedges or mixed borders,
  * mixed lot trees kept clear of the street and paths).
@@ -422,8 +423,8 @@ export class Landscape {
 
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
-   * near the town are the full models and cast shadows; further ones use the `*.far` models (a few
-   * blobs each, built at the low level of detail), or a file's own far version, which don't.
+   * near the town are the full models and cast shadows; further ones use the low level of detail
+   * (a file's own far version; a placeholder built coarser), which don't.
    */
   private async forests(scene: Scene, assets: AssetRegistry): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -472,10 +473,8 @@ export class Landscape {
           new Vector3(x, this.heightAt(x, z) - 0.05, z),
         );
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
-        // A file with a far version of its own draws that (the low level of detail); placeholders their `*.far` key.
-        const key = !close && !assets.get(kind, 'model')?.far && assets.has(`${kind}.far`, 'model') ? `${kind}.far` : kind;
         const bucket = close ? near : far;
-        bucket.set(key, [...(bucket.get(key) ?? []), m]);
+        bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
       }
     }
     const out: (Instanced & { casts: boolean })[] = [];
