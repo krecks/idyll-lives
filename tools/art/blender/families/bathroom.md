@@ -1,6 +1,6 @@
 # Bathroom — notes
 
-`bathroom.py` builds the five bathroom sinks and the five toilets (below) into `web/public/assets/models/bathroom/` and their entries
+`bathroom.py` builds the five bathroom sinks, the five toilets and the four showers (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
 (`sinkConsole.glb`). They replace the primitive-part placeholders in `catalog.py` / `catalog2.py`, which
@@ -76,6 +76,35 @@ placeholder (`catalog.double_vanity`) has none either.
 `check_glb.py`: 0 failed. It warns that the compact and wall-hung toilets are off centre from their
 placeholders (whose backs are 2.5 and 5 cm inside the wall), and that the wall-hung one is deeper than its
 placeholder. Khronos validator: 0 errors, 0 warnings each.
+
+## B2 — the showers
+
+`model.shower`, `model.showerStall`, `model.showerWalkIn` and `model.showerRain`, built 2026-10-14. They sit in
+Validate › Showers until checked in play.
+
+- **They fill their tile**, centred, as their placeholders do: the resident steps in onto the middle
+  (`inside`). Walls at the back and on the left (game -x), the open sides glass or a curtain.
+- **The rain** is the one moving part (`water`): thin streams (`_rain`: a disc of rings, or a grid under the
+  square head) built full length from the head's underside to the tray, joined with the origin on the head
+  and scaled to 0.001 along their length, so they're hidden in the head at rest. `water_on` grows them down
+  in 0.5 s and `motions` holds it for the whole use (the `shower` tag). The stall's head is on the wall, so
+  its rain is turned about its origin (a fixed node rotation; the clip keys only the scale) to fall from the
+  head onto the resident in the middle.
+- **Draw calls: 3** each. The tray, walls and metal (1), the glass (1, see-through `glass`), the rain (1);
+  the stall has a fabric curtain instead of glass. The base shower's sliding door stays shut: a moving glass
+  door would be a 4th.
+- **Tiles** (`_tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
+  the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
+  The rain shower's front glass covers only the left half: the right half is the way in.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.shower` | 0.90 × 2.15 × 0.90 m | 2,968 | 3 | Tray, Frame, Head & tap, Tiles |
+| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,056 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
+| `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
+| `model.showerRain` | 0.94 × 2.19 × 0.94 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
+
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 

@@ -2517,8 +2517,8 @@
         }
       ],
       "price": 650,
-      "category": "bathroom",
-      "group": "bathing"
+      "category": "validate",
+      "group": "showers"
     },
     {
       "id": "sofa",
@@ -3687,6 +3687,10 @@
         {
           "id": "toilets",
           "label": "Toilets"
+        },
+        {
+          "id": "showers",
+          "label": "Showers"
         }
       ]
     },

@@ -114,8 +114,8 @@
         1
       ],
       "price": 950,
-      "category": "bathroom",
-      "group": "bathing",
+      "category": "validate",
+      "group": "showers",
       "decor": 0.3,
       "description": "A glass enclosure with a big square rain head. Leaves residents refreshed.",
       "interactions": [

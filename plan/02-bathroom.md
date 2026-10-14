@@ -1,6 +1,6 @@
 # Bathroom
 
-The seven sinks are done (`families/bathroom.py`, `water_on`), and the five B1 toilets (`lid_up`). Water here grows the same way: a stream built at
+The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toilets (`lid_up`) and the four B2 showers (`water_on`). Water here grows the same way: a stream built at
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
@@ -18,7 +18,7 @@ files (E6), as the double vanity did.
 | `toiletClassic` Classic toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`; the close-coupled cistern (the content and placeholder: no high cistern and chain) and wooden seat are static. |
 | `toiletWallHung` Wall-hung toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat and lid, Cistern | Use | `lid_up`. |
 
-## B2. Showers (4)
+## B2. Showers (4) — **Done** (in Validate › Showers)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `showers` (Validate › Showers)
@@ -26,8 +26,8 @@ files (E6), as the double vanity did.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `shower` Shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on`: a rain of thin streams grows down from the head for the whole use. The door opening first needs E5. |
-| `showerStall` Shower stall | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on`. |
+| `shower` Shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on`: a rain of thin streams grows down from the head for the whole use. The sliding door stays shut: a moving glass door would be a 4th draw call. |
+| `showerStall` Shower stall | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on`, slanted from the wall head onto the resident. |
 | `showerWalkIn` Walk-in rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on` from a wide rain head. |
 | `showerRain` Rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap | Use | `water_on` from the ceiling rose. |
 

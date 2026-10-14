@@ -483,6 +483,219 @@
           "label": "Cistern"
         }
       ]
+    },
+    "model.shower": {
+      "type": "model",
+      "url": "../../models/bathroom/shower.glb",
+      "materials": {
+        "fittings": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "grout": {
+          "finish": "material.finish.satin"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray",
+          "label": "Tray"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings",
+          "label": "Head & tap"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.showerStall": {
+      "type": "model",
+      "url": "../../models/bathroom/showerStall.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "curtain": {
+          "finish": "material.finish.fabric"
+        },
+        "fittings": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.chrome"
+        },
+        "grout": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray",
+          "label": "Tray"
+        },
+        {
+          "material": "frame",
+          "label": "Rail"
+        },
+        {
+          "material": "fittings",
+          "label": "Head & tap"
+        },
+        {
+          "material": "curtain",
+          "label": "Curtain"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.showerWalkIn": {
+      "type": "model",
+      "url": "../../models/bathroom/showerWalkIn.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "fittings_dark": {
+          "finish": "material.finish.metal"
+        },
+        "frame_dark": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "groove": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "slate": {
+          "finish": "material.finish.matte"
+        },
+        "slate_wall": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "slate",
+          "label": "Floor"
+        },
+        {
+          "material": "frame_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings_dark",
+          "label": "Head & tap"
+        },
+        {
+          "material": "slate_wall",
+          "label": "Wall"
+        }
+      ]
+    },
+    "model.showerRain": {
+      "type": "model",
+      "url": "../../models/bathroom/showerRain.glb",
+      "materials": {
+        "fittings_dark": {
+          "finish": "material.finish.metal"
+        },
+        "frame_dark": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "tray_stone": {
+          "finish": "material.finish.matte"
+        },
+        "wall_stone": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray_stone",
+          "label": "Tray"
+        },
+        {
+          "material": "frame_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings_dark",
+          "label": "Head & tap"
+        },
+        {
+          "material": "wall_stone",
+          "label": "Walls"
+        }
+      ]
     }
   }
 }

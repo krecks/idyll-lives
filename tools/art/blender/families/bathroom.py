@@ -2,20 +2,24 @@
 # vanity (`model.vanityDouble`), the vessel sink (`model.sinkVessel`) and the console sink
 # (`model.sinkConsole`), over their primitive-part placeholders (`catalog.py`, `furniture_prims.py`),
 # which stay the fallback; and the five toilets (`model.toilet`, `model.toiletCompact`, `model.toiletSmart`,
-# `model.toiletClassic`, `model.toiletWallHung`). Notes: bathroom.md.
+# `model.toiletClassic`, `model.toiletWallHung`) and the four showers (`model.shower`, `model.showerStall`,
+# `model.showerWalkIn`, `model.showerRain`). Notes: bathroom.md.
 #
 # Each sink is one still body (cabinet / basin / pedestal / legs) plus one moving part: a stream of
 # water (`water`) that grows from the tap's spout into the basin while a resident washes (`motions`).
-# Each toilet is one still body plus its lid, which lifts while a resident uses it.
+# Each toilet is one still body plus its lid, which lifts while a resident uses it; each shower one still
+# body plus its rain, which grows down from the head while a resident showers.
 # Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py bathroom [--preview]
+import math
 import os
 import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 M = G.Palette(
     body=('#EDEBE6', 'satin'),       # cabinet / vanity / pedestal / basin; the main part the player colours
@@ -41,6 +45,23 @@ M = G.Palette(
     screen=('#2A2C30', 'gloss'),     # flush plates and the smart toilet's display
     led=('#5EC28B', 'gloss'),        # the smart toilet's ready light
     paper=('#FBFBF8', 'matte'),      # toilet rolls
+    # the showers
+    tray=('#F4F4F2', 'gloss'),       # a shower tray
+    tile=('#E4ECEC', 'satin'),       # wall tiles
+    grout=('#C8D3D4', 'satin'),      # the grout between them
+    glass=('#DCE6E8', 'glass'),      # screens and doors (see-through: its own draw call)
+    frame=('#D0D3D6', 'chrome'),     # a screen's frame, a curtain rail
+    fittings=('#D0D3D6', 'chrome'),  # heads, risers and mixers
+    frame_dark=('#2B2C2E', 'metal'),     # a black screen frame
+    fittings_dark=('#2B2C2E', 'metal'),  # a black rain head and mixer
+    curtain=('#CFE0E4', 'fabric'),   # the stall's curtain
+    slate=('#C9C6C0', 'matte'),      # the walk-in shower's stone floor
+    slate_wall=('#C9C6C0', 'matte'),  # and its stone wall
+    groove=('#AFACA6', 'matte'),     # the joints in the stone wall
+    tray_stone=('#E8E6E1', 'matte'),  # the rain shower's stone tray
+    wall_stone=('#D7D3CC', 'matte'),  # and its walls
+    bottle=('#F2F1EE', 'gloss'),     # shampoo bottles
+    sage=('#9DAF8C', 'gloss'),
 )
 
 # The parts the player may colour, the biggest first (the cabinet, vanity, pedestal, console basin or
@@ -442,7 +463,209 @@ def toiletWallHung():
     return G.meshes()
 
 
+# --- the showers: a tray, walls, a screen or curtain, and a head that rains while a resident showers ------
+# Each fills its tile, as its placeholder does (the resident stands inside, at the middle). The rain is
+# the moving part: thin streams built full length below the head, joined with the origin on the head and
+# scaled to nothing along their length, so they are hidden at rest; `water_on` grows them down for the
+# whole use (the sinks' `water_on` way). Glass is its own draw call: tray, walls and metal (1), glass (1),
+# the rain (1).
+
+
+def _tiled_walls(F, x0, x1, z0, z1, y0, y1, t=0.03, size=0.3, gap=0.005):
+    """The back wall (from game x0 to x1, at the back z0) and the left wall (at x0, from z0 to z1): grout
+    backing with square tiles a little proud of it."""
+    F.box('grout_back', x1 - x0, y1 - y0, t, ((x0 + x1) / 2, (y0 + y1) / 2, z0 + t / 2), M.grout)
+    F.box('grout_left', t, y1 - y0, z1 - z0 - t, (x0 + t / 2, (y0 + y1) / 2, (z0 + t + z1) / 2), M.grout)
+    rows = max(1, round((y1 - y0) / size))
+    th = (y1 - y0) / rows
+    cols = max(1, round((x1 - x0 - t) / size))
+    tw = (x1 - x0 - t) / cols
+    deep = max(1, round((z1 - z0 - t) / size))
+    td = (z1 - z0 - t) / deep
+    for j in range(rows):
+        y = y0 + th * (j + 0.5)
+        for i in range(cols):
+            F.box(f'tile_b{i}_{j}', tw - gap, th - gap, 0.006, (x0 + t + tw * (i + 0.5), y, z0 + t + 0.003), M.tile)
+        for i in range(deep):
+            F.box(f'tile_l{i}_{j}', 0.006, th - gap, td - gap, (x0 + t + 0.003, y, z0 + t + td * (i + 0.5)), M.tile)
+
+
+def _rain(F, head, r, bottom, rings=2, grid=None, towards=None):
+    """The rain from a head at game `head` (the head's underside) down to the floor at height `bottom`:
+    thin parallel streams across a disc of radius `r` (`rings` rings round a middle one) or a `grid`
+    (n, spacing), joined with the origin on the head and scaled to nothing along their length. `towards`
+    (a game point on the floor) slants the rain from a wall head onto the resident."""
+    x, y, z = head
+    if grid:
+        n, step = grid
+        spots = [((i - (n - 1) / 2) * step, (k - (n - 1) / 2) * step) for i in range(n) for k in range(n)]
+    else:
+        spots = [(0.0, 0.0)] + [(r * ring / rings * G.cosd(360 * i / (6 * ring)), r * ring / rings * G.sind(360 * i / (6 * ring)))
+                                for ring in range(1, rings + 1) for i in range(6 * ring)]
+    if towards:
+        aim = Vector(F.at(*towards)) - Vector(F.at(x, y, z))
+        length = aim.length
+    else:
+        length = y - bottom
+    with G.new_parts() as parts:
+        for i, (dx, dz) in enumerate(spots):
+            F.cyl(f'rain{i}', 0.005, length, (x + dx, y - length / 2, z + dz), M.water, verts=6, smooth=False)
+    rain = G.join(parts, 'water', origin=F.at(x, y, z))
+    if towards:
+        # turn the straight-down rain about its origin, onto the resident
+        rain.rotation_mode = 'QUATERNION'
+        rain.rotation_quaternion = Vector((0, 0, -1)).rotation_difference(aim)
+    rain.scale[2] = 0.001
+    return rain
+
+
+def _post(F, name, x, z, y0, y1, material, t=0.025):
+    F.box(name, t, y1 - y0, t, (x, (y0 + y1) / 2, z), material, bevel=0.004)
+
+
+def shower():
+    F = G.GameFrame()
+    top = 2.15
+    with G.new_parts() as still:
+        F.box('tray', 0.9, 0.058, 0.9, (0, 0.029, 0), M.tray, bevel=0.015)
+        F.cyl('drain', 0.04, 0.006, (0.1, 0.06, 0.1), M.fittings, verts=16)
+        _tiled_walls(F, -0.45, 0.45, -0.45, 0.45, 0.058, top)
+        # a glass side, and a fixed panel with a sliding door in front
+        F.box('glass_side', 0.01, 2.0, 0.83, (0.435, 1.09, -0.005), M.glass)
+        F.box('glass_fixed', 0.46, 2.0, 0.01, (-0.195, 1.09, 0.437), M.glass)
+        F.box('glass_door', 0.44, 1.98, 0.01, (0.205, 1.08, 0.423), M.glass)
+        _post(F, 'post_front', 0.435, 0.435, 0.058, top, M.frame)
+        _post(F, 'post_back', 0.435, -0.42, 0.058, top, M.frame)
+        F.box('rail_front', 0.87, 0.03, 0.03, (0.015, top - 0.015, 0.435), M.frame, bevel=0.004)
+        F.box('rail_side', 0.03, 0.03, 0.84, (0.435, top - 0.015, 0.0), M.frame, bevel=0.004)
+        F.box('rail_bottom', 0.87, 0.02, 0.03, (0.015, 0.068, 0.435), M.frame, bevel=0.004)
+        F.box('door_handle', 0.02, 0.4, 0.02, (0.03, 1.05, 0.405), M.frame, bevel=0.006)
+        # a riser with a hand shower, a mixer, and the overhead head on an arm from the wall
+        F.cyl('riser', 0.012, 0.8, (-0.1, 1.3, -0.39), M.fittings, verts=10)
+        for y in (0.9, 1.7):
+            F.box(f'riser_bracket{y}', 0.03, 0.03, 0.03, (-0.1, y, -0.403), M.fittings, bevel=0.006)
+        G.rod('hand_shower', F.at(-0.1, 1.38, -0.37), F.at(-0.1, 1.56, -0.32), 0.016, material=M.fittings, verts=10)
+        F.cyl('hand_head', 0.04, 0.02, (-0.1, 1.58, -0.315), M.fittings, rot=(-20, 0, 0), verts=14, bevel=0.005)
+        F.box('mixer', 0.16, 0.07, 0.05, (0.12, 1.1, -0.39), M.fittings, bevel=0.012)
+        for x in (0.07, 0.17):
+            F.cyl(f'mixer_knob{x}', 0.024, 0.035, (x, 1.1, -0.35), M.fittings, rot=(90, 0, 0), verts=12, bevel=0.004)
+        G.rod('arm', F.at(0, 2.02, -0.415), F.at(0, 2.02, -0.15), 0.011, material=M.fittings, verts=10)
+        F.cyl('head', 0.12, 0.022, (0, 2.0, -0.15), M.fittings, verts=28, bevel=0.006)
+    G.join(still, 'body', origin=(0, 0, 0))
+    rain = _rain(F, (0, 1.988, -0.15), 0.095, 0.06)
+    G.settle()
+    G.grow(rain, 'water_on', seconds=0.5)
+    return G.meshes()
+
+
+def _pleats(F, a, b, y0, y1, n, depth=0.035):
+    """A curtain hanging in `n` pleats from game point `a` (x, z) to `b`, from `y0` up to `y1`."""
+    ax, az = a
+    bx, bz = b
+    L = math.hypot(bx - ax, bz - az)
+    ux, uz = (bx - ax) / L, (bz - az) / L                # along the rail
+    nx, nz = -uz, ux                                      # across it
+    pts = [(ax + ux * L * k / n + nx * (depth / 2 if k % 2 else -depth / 2),
+            az + uz * L * k / n + nz * (depth / 2 if k % 2 else -depth / 2)) for k in range(n + 1)]
+    for k in range(n):
+        p, q = Vector(F.at(pts[k][0], 0, pts[k][1])), Vector(F.at(pts[k + 1][0], 0, pts[k + 1][1]))
+        d = q - p
+        mid = (p + q) / 2
+        G.cube(f'pleat{k}', (d.length + 0.006, 0.01, y1 - y0), at=(mid.x, mid.y, (y0 + y1) / 2), material=M.curtain,
+               rot=(0, 0, math.degrees(math.atan2(d.y, d.x))))
+
+
+def showerStall():
+    F = G.GameFrame()
+    rail = 1.95
+    with G.new_parts() as still:
+        F.box('tray', 0.9, 0.08, 0.9, (0, 0.04, 0), M.tray, bevel=0.03)
+        F.cyl('drain', 0.04, 0.006, (0.05, 0.081, 0.05), M.fittings, verts=16)
+        _tiled_walls(F, -0.45, 0.45, -0.45, 0.45, 0.08, 2.08, t=0.04, size=0.25)
+        # an L-shaped rail at the open sides, and the curtain drawn along the side and part of the front
+        G.rod('rail_side', F.at(0.42, rail, -0.41), F.at(0.42, rail, 0.42), 0.011, material=M.frame, verts=10)
+        G.rod('rail_front', F.at(-0.41, rail, 0.42), F.at(0.42, rail, 0.42), 0.011, material=M.frame, verts=10)
+        F.sphere('rail_corner', 0.014, (0.42, rail, 0.42), M.frame, segments=10, rings=6)
+        F.cyl('rail_mount_side', 0.025, 0.012, (0.42, rail, -0.405), M.frame, rot=(90, 0, 0), verts=12)
+        F.cyl('rail_mount_front', 0.025, 0.012, (-0.405, rail, 0.42), M.frame, rot=(0, 90, 0), verts=12)
+        _pleats(F, (0.42, -0.4), (0.42, 0.16), 0.22, rail - 0.03, 9)
+        _pleats(F, (0.4, 0.42), (0.12, 0.42), 0.22, rail - 0.03, 5)
+        # a riser on the back wall with a tilted head, a mixer lever, a caddy with bottles
+        F.cyl('riser', 0.015, 0.75, (-0.2, 1.575, -0.39), M.fittings, verts=10)
+        G.rod('arm', F.at(-0.2, 1.94, -0.39), F.at(-0.2, 1.97, -0.33), 0.012, material=M.fittings, verts=10)
+        F.cyl('head', 0.07, 0.03, (-0.2, 1.96, -0.31), M.fittings, rot=(-25, 0, 0), verts=20, bevel=0.006)
+        F.box('mixer', 0.08, 0.1, 0.04, (-0.2, 1.05, -0.39), M.fittings, bevel=0.01)
+        F.box('lever', 0.1, 0.018, 0.02, (-0.17, 1.08, -0.36), M.fittings, bevel=0.006)
+        F.box('caddy', 0.24, 0.015, 0.1, (0.15, 1.15, -0.36), M.frame, bevel=0.004)
+        F.cyl('bottle0', 0.025, 0.14, (0.1, 1.227, -0.36), M.teal, verts=12)
+        F.cyl('bottle1', 0.03, 0.11, (0.18, 1.212, -0.36), M.bottle, verts=12)
+    G.join(still, 'body', origin=(0, 0, 0))
+    rain = _rain(F, (-0.2, 1.935, -0.3), 0.045, 0.08, rings=1, towards=(-0.05, 0.085, -0.02))
+    G.settle()
+    G.grow(rain, 'water_on', seconds=0.5)
+    return G.meshes()
+
+
+def showerWalkIn():
+    F = G.GameFrame()
+    with G.new_parts() as still:
+        F.box('floor', 0.92, 0.04, 0.92, (0, 0.02, 0), M.slate, bevel=0.008)
+        F.box('drain', 0.3, 0.006, 0.06, (0, 0.042, 0.2), M.fittings_dark, bevel=0.002)
+        F.box('wall', 0.92, 2.2, 0.04, (0, 1.14, -0.44), M.slate_wall, bevel=0.004)
+        for y in (0.6, 1.15, 1.7):
+            F.box(f'joint{y}', 0.92, 0.006, 0.004, (0, y, -0.419), M.groove)
+        F.box('joint_v', 0.006, 2.2, 0.004, (0.15, 1.14, -0.419), M.groove)
+        # one glass screen on the right, its channel on the wall and a black post and bar
+        F.box('glass_screen', 0.01, 2.0, 0.6, (0.42, 1.04, -0.11), M.glass)
+        F.box('channel', 0.025, 2.0, 0.02, (0.42, 1.04, -0.41), M.frame_dark, bevel=0.003)
+        _post(F, 'post', 0.42, 0.2, 0.04, 2.04, M.frame_dark, t=0.022)
+        F.box('bar', 0.02, 0.02, 0.62, (0.42, 2.05, -0.1), M.frame_dark, bevel=0.003)
+        # a riser up the wall, an arm out over the middle and the wide rain head
+        F.cyl('riser', 0.016, 0.5, (0, 1.99, -0.4), M.fittings_dark, verts=10)
+        F.sphere('elbow', 0.02, (0, 2.24, -0.4), M.fittings_dark, segments=10, rings=6)
+        G.rod('arm', F.at(0, 2.24, -0.4), F.at(0, 2.24, -0.08), 0.014, material=M.fittings_dark, verts=10)
+        F.cyl('head', 0.17, 0.02, (0, 2.218, -0.08), M.fittings_dark, verts=32, bevel=0.005)
+        F.box('mixer', 0.06, 0.14, 0.03, (-0.25, 1.1, -0.405), M.fittings_dark, bevel=0.01)
+        F.cyl('mixer_knob', 0.022, 0.04, (-0.25, 1.12, -0.375), M.fittings_dark, rot=(90, 0, 0), verts=12)
+        # a stone ledge with two bottles
+        F.box('ledge', 0.4, 0.04, 0.12, (-0.12, 1.3, -0.36), M.slate_wall, bevel=0.006)
+        F.cyl('bottle0', 0.025, 0.16, (-0.22, 1.4, -0.36), M.bottle, verts=12)
+        F.cyl('bottle1', 0.025, 0.12, (-0.12, 1.38, -0.36), M.sage, verts=12)
+    G.join(still, 'body', origin=(0, 0, 0))
+    rain = _rain(F, (0, 2.207, -0.08), 0.14, 0.04, rings=3)
+    G.settle()
+    G.grow(rain, 'water_on', seconds=0.5)
+    return G.meshes()
+
+
+def showerRain():
+    F = G.GameFrame()
+    with G.new_parts() as still:
+        F.box('tray', 0.94, 0.08, 0.94, (0, 0.04, 0), M.tray_stone, bevel=0.01)
+        F.box('drain', 0.1, 0.006, 0.1, (0.15, 0.082, 0.15), M.fittings_dark, bevel=0.002)
+        F.box('wall_back', 0.94, 2.1, 0.06, (0, 1.13, -0.44), M.wall_stone, bevel=0.008)
+        F.box('wall_left', 0.06, 2.0, 0.88, (-0.44, 1.08, 0.03), M.wall_stone, bevel=0.008)
+        # glass along the right and the left half of the front: the way in is the front's right half
+        F.box('glass_side', 0.012, 1.9, 0.86, (0.45, 1.03, 0.0), M.glass)
+        F.box('glass_front', 0.46, 1.9, 0.012, (-0.18, 1.03, 0.45), M.glass)
+        _post(F, 'post', 0.45, 0.45, 0.08, 2.04, M.frame_dark, t=0.02)
+        F.box('rail_front', 0.9, 0.02, 0.02, (0.0, 2.02, 0.45), M.frame_dark, bevel=0.003)
+        F.box('rail_side', 0.02, 0.02, 0.88, (0.45, 2.02, 0.0), M.frame_dark, bevel=0.003)
+        F.box('foot', 0.03, 0.012, 0.88, (0.45, 0.086, 0.0), M.frame_dark, bevel=0.003)
+        # the square rain head on an arm from the back wall, and a mixer
+        G.rod('arm', F.at(0, 2.12, -0.41), F.at(0, 2.18, -0.12), 0.0125, material=M.fittings_dark, verts=10)
+        F.box('head', 0.3, 0.02, 0.3, (0, 2.17, 0), M.fittings_dark, bevel=0.006)
+        F.box('mixer', 0.04, 0.16, 0.03, (0.3, 1.1, -0.395), M.fittings_dark, bevel=0.008)
+        F.cyl('mixer_knob', 0.02, 0.035, (0.3, 1.13, -0.365), M.fittings_dark, rot=(90, 0, 0), verts=12)
+    G.join(still, 'body', origin=(0, 0, 0))
+    rain = _rain(F, (0, 2.158, 0), 0, 0.08, grid=(5, 0.055))
+    G.settle()
+    G.grow(rain, 'water_on', seconds=0.5)
+    return G.meshes()
+
+
 TOILET = {'uses': {'toilet': 'lid_up'}}
+SHOWER = {'uses': {'shower': 'water_on'}}
 
 FAMILY = G.Family(
     'bathroom', M,
@@ -476,7 +699,18 @@ FAMILY = G.Family(
              paint=[('porcelain', 'Bowl'), ('seat_wood', 'Seat & lid'), ('cistern', 'Cistern')]),
      G.Model('toiletWallHung', toiletWallHung, size=(0.6, 1.1, 0.665), key='model.toiletWallHung',
              centre=(0, -0.0975), motions=TOILET,
-             paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('boxing', 'Cistern')])],
+             paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('boxing', 'Cistern')]),
+     G.Model('shower', shower, size=(0.9, 2.15, 0.9), key='model.shower', motions=SHOWER,
+             paint=[('tray', 'Tray'), ('frame', 'Frame'), ('fittings', 'Head & tap'), ('tile', 'Tiles')]),
+     G.Model('showerStall', showerStall, size=(0.9, 2.08, 0.9), key='model.showerStall', motions=SHOWER,
+             paint=[('tray', 'Tray'), ('frame', 'Rail'), ('fittings', 'Head & tap'), ('curtain', 'Curtain'),
+                    ('tile', 'Tiles')]),
+     G.Model('showerWalkIn', showerWalkIn, size=(0.92, 2.26, 0.92), key='model.showerWalkIn', motions=SHOWER,
+             paint=[('slate', 'Floor'), ('frame_dark', 'Frame'), ('fittings_dark', 'Head & tap'),
+                    ('slate_wall', 'Wall')]),
+     G.Model('showerRain', showerRain, size=(0.94, 2.192, 0.94), key='model.showerRain', motions=SHOWER,
+             paint=[('tray_stone', 'Tray'), ('frame_dark', 'Frame'), ('fittings_dark', 'Head & tap'),
+                    ('wall_stone', 'Walls')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
