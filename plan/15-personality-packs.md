@@ -216,7 +216,7 @@ done.
 | `outgoing.danceFloor` Light-up dance floor | 2x2 · floor | dance:dance | hobbies / — | Body, Upholstery | Loop (E1) | `tiles`: the tiles pulse up and down (E1). Until then U: they lift a few millimetres in a pattern. |
 | `outgoing.photoWall` Party photo wall | 1x1 · floor | reminisce:look | decor / — | Body, Upholstery | Use | `photo`: a new photo grows on the wall for reminisce. |
 
-## P15. Romantic (6)
+## P15. Romantic (6) — **Done** (in Validate › Romantic)
 
 - **Family:** `tools/art/blender/families/pack_romantic.py`
 - **Validate group:** `romantic` (Validate › Romantic)

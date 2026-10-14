@@ -353,9 +353,9 @@ def check_file(entry, finishes, path):
             if any(mat.get('emissiveFactor', [0, 0, 0])):
                 flags['emissive'].add(name)
     for name, (glo, ghi, part) in sorted(glass.items()):
-        size = sorted(ghi[k] - glo[k] for k in range(3))
-        if size[0] > 0.1 * size[1]:
-            warnings.append(f'mirror glass {name!r} isn\'t flat ({size[0] * 100:.1f} cm thick, {size[1] * 100:.0f} cm across): the reflection lies on its box\'s thinnest side')
+        extent = sorted(ghi[k] - glo[k] for k in range(3))   # not `size`: that is the file's, for the summary
+        if extent[0] > 0.1 * extent[1]:
+            warnings.append(f'mirror glass {name!r} isn\'t flat ({extent[0] * 100:.1f} cm thick, {extent[1] * 100:.0f} cm across): the reflection lies on its box\'s thinnest side')
     for flag, text in (('unmapped', 'not mapped to a finish in the entry\'s `materials` (each its own draw call and look)'),
                        ('double', 'double-sided (every back face drawn too)'),
                        ('blend', 'see-through (BLEND: drawn after everything else, unsorted between instances)'),

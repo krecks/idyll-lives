@@ -93,6 +93,13 @@ Blender by `tools/art/blender/families/pack_outgoing.py` on `gamekit` and export
 Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light
 swings up, the dance floor's tiles pulse and a new photo grows. Their primitive-part entries stay as the fallback.
 
+The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
+`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
+while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
+onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. Their primitive-part
+entries stay as the fallback.
+
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
