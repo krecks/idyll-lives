@@ -295,19 +295,20 @@ add('climbingFrame', climbing_frame(), (2, 2))
 def seesaw():
     p = [box([0.3, 0.4, 0.42], [0, 0.2, 0], BLUE, 'metal', radius=0.02),
          cyl([0.12, 0.46, 0.12], [0, 0.44, 0], '#5C6168', 'metal', rotate=[90, 0, 0], segments=10)]
-    pivot, r = [0, 0.48, 0], [0, 0, 7]
-    p.append(box([1.92, 0.07, 0.24], pivot, YELLOW, 'gloss', radius=0.02, rotate=r))
+    # a 2.5 m plank, level at rest, its seats on the content's two slots (x = +-0.75 m across 3 tiles)
+    pivot, r = [0, 0.46, 0], [0, 0, 0]
+    p.append(box([2.5, 0.07, 0.24], pivot, YELLOW, 'gloss', radius=0.02, rotate=r))
     for s in (-1, 1):
-        p.append(box([0.32, 0.06, 0.3], on(pivot, r, [s * 0.66, 0.06, 0]), RED, 'gloss', radius=0.02, rotate=r))
-        a = on(pivot, r, [s * 0.42, 0.04, 0])
-        b = on(pivot, r, [s * 0.42, 0.34, 0])
+        p.append(box([0.32, 0.06, 0.3], on(pivot, r, [s * 0.75, 0.06, 0]), RED, 'gloss', radius=0.02, rotate=r))
+        a = on(pivot, r, [s * 0.5, 0.04, 0])
+        b = on(pivot, r, [s * 0.5, 0.34, 0])
         p.append(rod(a, b, 0.04, '#5C6168', 'metal'))
         p.append(rod([b[0], b[1], -0.12], [b[0], b[1], 0.12], 0.04, '#5C6168', 'metal'))
-    p.append(cyl([0.26, 0.12, 0.26], [-0.84, 0.06, 0], '#26282A', 'matte', segments=12))                     # tyre under the low end
+        p.append(cyl([0.26, 0.12, 0.26], [s * 1.1, 0.06, 0], '#26282A', 'matte', segments=12))                # bumper tyres under the ends
     return p
 
 
-add('seesaw', seesaw(), (2, 1))
+add('seesaw', seesaw(), (3, 1))
 
 
 def spring_rider():
@@ -524,6 +525,11 @@ add('marketStall', market_stall(), (2, 1))
 # =============================================================================================
 # Shop and café
 # =============================================================================================
+def forward(parts, dz):
+    """`parts` moved `dz` towards the front: a counter whose worktop reached past the wall face (-0.43)."""
+    return [dict(q, at=[q['at'][0], q['at'][1], q['at'][2] + dz]) for q in parts]
+
+
 def shop_counter():
     p = [box([1.9, 0.92, 0.7], [0, 0.46, -0.08], OAK, 'wood', radius=0.015),
          box([1.96, 0.05, 0.78], [0, 0.945, -0.08], WALNUT, 'wood', radius=0.01),
@@ -542,7 +548,7 @@ def shop_counter():
     return p
 
 
-add('shopCounter', shop_counter(), (2, 1))
+add('shopCounter', forward(shop_counter(), 0.04), (2, 1))
 
 
 def bakery_case():
@@ -572,7 +578,7 @@ def bakery_case():
     return p + goods
 
 
-add('bakeryCase', bakery_case(), (2, 1))
+add('bakeryCase', forward(bakery_case(), 0.04), (2, 1))
 
 
 def grocery_shelf():

@@ -66,8 +66,8 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 | `model.pingPongTable` | 1.90 × 0.95 × 0.99 m | 1,148 (276) | 1 | Table, Legs |
 | `model.parkChessTable` | 0.80 × 0.85 × 0.88 m | 3,468 (1,216) | 2 | Table, Stools |
 
-`check_glb.py`: 8 models, 0 failed; one warning, the seesaw's width (2.50 m against its placeholder's 1.93 m: the
-placeholder was built for a 2 × 1 footprint, the content's is 3 × 1, and the seats must be at ±0.75 m). Khronos
+`check_glb.py`: 8 models, 0 failed, no warnings (the seesaw's placeholder, built for 2 × 1 tiles, was widened to the
+content's 3 × 1 with its seats at ±0.75 m, so the fallback, picking and shadow match the model). Khronos
 validator: 0 errors, 0 warnings on all 16 files.
 
 ## Rebuild

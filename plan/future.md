@@ -111,3 +111,51 @@ None of them blocks the plan. Each says where it lives.
   box and the rocking horse. Not caught in play (seen only on the clips bench): the toy box's lid and the desk's
   drawer (2 s holds), the bookshelf's book and the teddy (short uses), the kids' bed's duvet (under the game's
   quilt), and the ball pit's bounce and the bean bag's squash (too small to tell in the shots).
+
+## Community and farm (CM1–CM5, built 2026-10-14)
+
+- **Fixed after the build.**
+  - The seesaw's placeholder (`community.py`) was built for 2 × 1 tiles while its content is 3 × 1, so the fallback,
+    picking and shadow were 57 cm narrower than the model. It's now 3 × 1, with its seats on the slots (±0.75 m).
+  - The shop counter's worktop and the bakery case's deck reached to −0.47, 4 cm into the wall (the README's "wall
+    face" trap), placeholders included. Both models and both placeholders now stand 4 cm forward.
+- **Validate is crowded** (see above): the community tasks added five more groups (Playground, Street, Stalls,
+  Shops, Farm). All but Shops carry `"outside": true`, as their home groups do, so outdoor things keep counting as
+  outdoors while they're in Validate; sign-off moves the items back and drops the groups.
+- **One family per task**, not the plan's single `community.py`: `playground`, `street_furniture`, `stalls`,
+  `shops` (CM1–CM4) and `farm`. The keys are unchanged (`model.<id>`, `model.farm.<id>`).
+- **Far versions: decimation fails on some shapes.** A quarter of the triangles turned thin or inlaid parts into
+  spikes (the bale's twine, the trough's ridges, the chess board) and lifted things off the floor by dropping their
+  lowest vertices (the tractor 1.7 cm, the drinking fountain 3.9 cm, the statue 0.7 cm). Eight models have
+  hand-built far versions instead. `far=0.25` in gamekit could keep the vertices near the floor, and `check_glb.py`
+  could fail a far version that doesn't stand on the floor.
+- **Far versions not seen in the town overview.** The playground's and the shops' were only seen as Blender
+  previews. The street, stalls and farm ones were seen in the overview.
+- **No town dump with every community thing.** The park in `wants-asking` (`__showPlot(7)`) has most of the
+  playground and street things, but no market, shops, statue, post box, bus shelter or phone box. The agents made
+  gitignored dumps (`debug-states/shops-town.json`, `stalls-town.json`) by swapping park objects. Sign-off would
+  be easier with a committed dump of a town lot holding all 28 town things.
+- **The phone box's door is one hinged leaf**, not the plan's folding door: two leaves, each with glass, would be
+  6 draw calls (the most allowed is 4; the box is at 4). It swings out onto the tile where the caller stands, so
+  its edge may pass through them mid-swing. Look at it in play; a door opening inward, or a folding door with
+  opaque panes, would avoid that.
+- **Clips start with the use.** The basketball hoop's `swish` is meant to play "after a shot", but it plays at the
+  start of the use, for 0.6 s. A per-clip delay in `motions` would let a clip play part way into a use. The swish and
+  the post box's `flap` weren't caught in play (the resident stands in front of the slot); both play on the clips
+  bench.
+- **Long loops.** The merry-go-round's `spin` is a whole turn in 3.5 s, not about 1 s: its riders ride it, so a
+  quarter turn would snap them back each round, and a turn a second is too fast. The scarecrow's ambient `sway` is
+  3 s. `check_glb.py` has no length check, so "about 1 s" is a rule only for clips residents wait on.
+- **The street lamp's gate warning** (0.47 m deep against the placeholder's 0.65 m) is the gate measuring the
+  placeholder's turned pyramid cap unturned (Kids: "`check_glb.py` measures turned placeholder parts unturned").
+- **Things that need a use first ("+use").** The chicken coop's hatch is its own part, with its origin on its top
+  edge, so a use can slide it up its runners. With no clip yet it's joined into the body's draw calls; with one it
+  costs one more (3).
+- **Colour slots that differ from the plan's tables**, where the table's labels don't fit: the playground uses
+  Horse/Saddle/Spring, Platform/Rails/Stripes, Table/Legs and Table/Stools; the ice cream cart Body/Parasol/Bands; the
+  machines Body only; the grocery shelves Shelves/Trim; the café table and chair Top/Frame and Frame/Seat; the farm
+  Paint/Roof/Trim (barn, coop), Paint/Wheels (tractor), Twine (hay), Shirt/Trousers/Hat (scarecrow).
+- **Holds the plan didn't give.** The bakery case's back door shuts after 2 s, rather than staying open for the whole
+  10-minute pastry use. The hot dog stand's lid stays up for the whole use, as the plan says.
+- **Parallel agents sharing a scratchpad** overwrote each other's helper scripts. Give each its own folder in the
+  scratchpad (as with dev server ports).

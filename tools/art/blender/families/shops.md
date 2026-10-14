@@ -9,6 +9,8 @@ Validate › Shops until checked in play (back to community / shops).
 They stand on town lots, seen from far and by the dozen, so each has a far version (`far=0.25`: `<id>.far.glb`, the
 model at rest, joined and decimated to a quarter). Each is built where its placeholder stands (`F`, game axes): the
 counter, the case and the shelves back on their 2 × 1 tiles (`G.settle(centre=False)` and `centre=` on the `Model`),
+the counter's worktop and the case's deck at the back on the wall face (−0.43: their parts are placed 4 cm forward,
+`GameFrame(shift=0.04)`, as are their placeholders, which reached 4 cm into the wall before),
 the table centred, the chair's seat 2 cm forward. The family checks the café table's top (0.745 m) and the chair's
 seat (0.47 m, 2 cm forward) against `content/community.json` before it builds.
 

@@ -83,14 +83,14 @@ def _content_facts():
     assert objs['cafeChair']['seat'] == {'height': SEAT, 'forward': SEAT_FORWARD}, 'cafeChair: seat moved'
 
 
-def _prism(name, profile, a0, a1, material, axis='x'):
+def _prism(name, profile, a0, a1, material, axis='x', shift=0.0):
     """A slab from a0 to a1 along game x (its side the convex polygon `profile` [(depth, height)], in
     order: the bakery case's end panels) or along the depth (axis='z', its face [(x, height)]: a
-    sandwich pack)."""
+    sandwich pack). `shift` moves it back as a GameFrame's does."""
     bm = bmesh.new()
     if axis == 'x':
-        a = [bm.verts.new((-a0, -z, y)) for z, y in profile]
-        b = [bm.verts.new((-a1, -z, y)) for z, y in profile]
+        a = [bm.verts.new((-a0, -z - shift, y)) for z, y in profile]
+        b = [bm.verts.new((-a1, -z - shift, y)) for z, y in profile]
     else:
         a = [bm.verts.new((-x, -a0, y)) for x, y in profile]
         b = [bm.verts.new((-x, -a1, y)) for x, y in profile]
@@ -156,7 +156,7 @@ def _tilted(cx, cy, cz, deg, dz, up):
 
 
 def shopCounter():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.04)   # 4 cm forward: the worktop's back on the wall face (-0.43)
     Z, FRONT, TOP = -0.08, 0.27, 0.97          # the counter's depth centre, front face, worktop
     TX, TZ = 0.5, -0.2                          # the till on the worktop
     with G.new_parts() as still:
@@ -234,9 +234,9 @@ def shopCounter():
 
 # --- the bakery case: 2x1, a cream cabinet under a glass display, its back doors sliding ------------
 def bakeryCase():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.04)   # 4 cm forward: the worktop's back on the wall face (-0.43)
     Z, FRONT, DECK = -0.04, 0.36, 0.78
-    BACK = -0.43      # the display's back face
+    BACK = -0.43      # the display's back face, before the frame's 4 cm shift forward
     with G.new_parts() as still:
         F.box('plinth', 1.86, 0.06, 0.76, (0, 0.03, Z), M.rim, bevel=0.004)
         F.box('cabinet', 1.9, 0.68, 0.8, (0, 0.4, Z), M.case, bevel=0.01)
@@ -249,7 +249,7 @@ def bakeryCase():
         # the display: walnut ends, sloping front glass, glass top and rails
         for s in (-1, 1):
             x = s * 0.935
-            _prism(f'end{s}', [(-0.45, DECK), (0.38, DECK), (0.2, 1.29), (-0.45, 1.29)], x - 0.015, x + 0.015, M.rim)
+            _prism(f'end{s}', [(-0.45, DECK), (0.38, DECK), (0.2, 1.29), (-0.45, 1.29)], x - 0.015, x + 0.015, M.rim, shift=F.shift)
         lean = math.degrees(math.atan2(0.19, 0.48))
         F.box('glass_front', 1.84, math.hypot(0.19, 0.48), 0.01, (0, DECK + 0.24, 0.27), M.glass, rot=(-lean, 0, 0))
         F.box('glass_top', 1.84, 0.01, 0.6, (0, 1.265, -0.125), M.glass)
@@ -417,11 +417,11 @@ _FAR = 0.25   # placed on town lots, seen from afar: a quarter of the triangles 
 
 FAMILY = G.Family(
     'shops', M,
-    [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.08),
+    [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.04),
              # buying a little something pops the till's drawer
              motions={'uses': {'treat': 'till'}, 'hold': TILL_HOLD},
              paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_FAR),
-     G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, -0.04),
+     G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, 0.0),
              # buying a pastry slides the back door aside
              motions={'uses': {'pastry': 'door'}, 'hold': DOOR_HOLD},
              paint=[('case', 'Counter'), ('rim', 'Trim')], far=_FAR),
