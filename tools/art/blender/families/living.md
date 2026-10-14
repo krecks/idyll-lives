@@ -51,8 +51,8 @@ Built as the sofas are, from their placeholders (`furniture_prims.py` `armchair_
 - **Recliner** (`recline`, `footrest_up`, for relax and doze): a skirted base and arms (still); the seat cushion and
   the back as one part (`seat`) turning back 25° about the sitter's hips (content seat 0.44 m, forward 0), with
   `ride` on it, so the resident reclines with it; the padded footrest, folded flat against the front of the base at
-  rest, swings up 80°. It stands in the back 0.70 m of its tile (`check_glb.py` warns it's 7 cm off the placeholder's
-  middle and shallower than the placeholder, which was drawn with its footrest up).
+  rest, swings up 80°. It stands 13 cm off the wall's face, so the tipped back stops 4 cm short of the wall; the
+  hips (content `seat.forward` 0.12) and its placeholder (`catalog2.py`, drawn at rest) moved forward with it.
 - **Rocking chair** (`rock`, a loop for relax and read, `ride`): the whole chair rocks ±6° in 1.4 s about the
   rockers' centre of curvature (1 m above the floor), so the rockers roll on the floor; the rockers are flat bent
   strips.
@@ -62,20 +62,19 @@ Built as the sofas are, from their placeholders (`furniture_prims.py` `armchair_
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 4,496 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
+| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 3,880 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
 | `model.armchairLounge` | 0.82 × 0.83 × 0.84 m | 1,224 | 3 | Upholstery, Cushions, Legs |
 | `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 1,348 | 3 | Frame, Upholstery |
 | `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 1,756 | 2 | Frame, Upholstery, Base |
 | `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 1,788 | 3 | Upholstery, Cushion, Legs |
-| `model.recliner` | 0.92 × 0.84 × 0.70 m | 1,520 | 3 | Upholstery, Cushions & footrest |
+| `model.recliner` | 0.92 × 0.84 × 0.70 m | 1,248 | 3 | Upholstery, Cushions & footrest |
 | `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 1,148 | 2 | Wood, Cushion |
 | `model.pouf` | 0.72 × 0.47 × 0.50 m | 1,032 | 3 | Leather, Buttons, Legs |
 | `model.ottoman` | 0.62 × 0.45 × 0.62 m | 1,672 | 3 | Upholstery, Buttons, Feet |
 | `model.floorCushion` | 0.62 × 0.14 × 0.62 m | 1,120 | 1 | Cushion, Piping, Button |
 | `model.beanBag` | 0.84 × 0.70 × 0.84 m | 1,824 | 1 | Bag, Seat |
 
-`check_glb.py`: 0 failed (warnings: the bergère's 4,496 triangles against a target of 4,000; the recliner's as
-above). Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
 WebGL at night: residents sit, recline, rock and flop on each, and each clip plays.
 
 ## The coffee and side tables (L3)

@@ -841,12 +841,16 @@ add('sofaBed', p, (2, 1), seat=(SOFA_H, 0.08))
 add('sofaThreeSeat', sofa_run(2.86, '#7A8C6E', OAK, arms=(-1, 1), cushions=3, pillows=[(-1.0, -0.22, CREAM, 14), (1.0, -0.22, MUSTARD, -14)]),
     (3, 1), seat=(SOFA_H, 0.08))
 
-# Recliner: a chunky armchair with its footrest up.
+# Recliner: a chunky armchair on a skirted base, its footrest folded down against the front, as its model
+# stands at rest (families/living.py): 13 cm off the wall, so its back clears the wall when it tips back.
 REC = '#7A5A44'
-p = sofa_run(0.92, REC, '#2B2C2E', arms=(-1, 1), depth=0.74, z=-0.12, leg_fin='satin')
-p += [cushion([0.54, 0.13, 0.24], [0, 0.36, 0.35], REC, rotate=[16, 0, 0]),
-      box([0.4, 0.04, 0.16], [0, 0.27, 0.27], '#2B2C2E', 'satin', radius=0.01, rotate=[40, 0, 0])]
-add('recliner', p, seat=(SOFA_H, 0.0))
+p = [box([0.92, 0.3, 0.7], [0, 0.17, 0.05], REC, 'fabric', radius=0.04),
+     box([0.6, 0.5, 0.18], [0, 0.57, -0.21], REC, 'fabric', radius=0.06),
+     cushion([0.56, 0.13, 0.48], [0, 0.385, 0.15], REC),
+     cushion([0.55, 0.42, 0.16], [0, 0.63, -0.05], REC, rotate=[-9, 0, 0]),
+     cushion([0.54, 0.26, 0.11], [0, 0.17, 0.365], REC)]
+p += [box([0.17, 0.3, 0.7], [s * 0.375, 0.47, 0.05], REC, 'fabric', radius=0.07) for s in (-1, 1)]
+add('recliner', p, seat=(SOFA_H, 0.12))
 
 # Rocking chair: spindle back, curved rockers.
 RK = '#8A5A36'

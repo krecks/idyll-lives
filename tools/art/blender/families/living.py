@@ -505,7 +505,7 @@ def armchair_bergere():
         for i in range(6):
             u = (i + 0.5) / 6
             h = top(u) - 0.3
-            _cushion(f'channel{i}', 0.11, h, 0.12, (-0.3 + 0.6 * u, 0.3 + h / 2, -0.33), M.linen, rot=(-10, 0, 0))
+            F.box(f'channel{i}', 0.11, h, 0.12, (-0.3 + 0.6 * u, 0.3 + h / 2, -0.33), M.linen, rot=(-10, 0, 0), bevel=0.04)
         pts = [(-0.34, 0.42, zb + 0.055)] + [(-0.34 + 0.68 * i / 12, top(i / 12) + 0.025, zb + 0.06) for i in range(13)] \
             + [(0.34, 0.42, zb + 0.055)]
         for i in range(len(pts) - 1):
@@ -514,7 +514,7 @@ def armchair_bergere():
             ax = s * 0.32
             _cushion(f'arm_pad{s}', 0.1, 0.06, 0.605, (ax, 0.625, -0.022), M.linen)
             F.box(f'arm_rail{s}', 0.06, 0.03, 0.685, (ax, 0.585, -0.003), M.walnut, bevel=0.012)
-            F.sphere(f'arm_scroll{s}', 0.032, (ax, 0.59, 0.33), M.walnut, scale=(1.1, 0.95, 0.8), segments=12, rings=8)
+            F.sphere(f'arm_scroll{s}', 0.032, (ax, 0.59, 0.33), M.walnut, scale=(1.1, 0.95, 0.8), segments=10, rings=6)
             G.rod(f'arm_post{s}', F.at(ax, 0.3, 0.32), F.at(ax, 0.58, 0.3), 0.0225, M.walnut, verts=10)
             F.box(f'side{s}', 0.05, 0.25, 0.545, (ax, 0.45, -0.052), M.linen, bevel=0.02)
         _pillow('pillow', 0, 0.6, -0.245, M.pillow_sage, w=0.34, h=0.3)
@@ -590,8 +590,9 @@ def armchair_wingback():
 
 # The recliner: its seat and back tip back 25° about the sitter's hips (`recline`), carrying them (`ride`),
 # and its footrest swings up 80° from the front of the base (`footrest_up`), for relax and doze.
-RC_Z0, RC_Z1 = -0.42, 0.28   # the base, back to front (inside the footprint, clear of the wall when tipped)
-RC_HIPS = (0.44, 0.0)       # (height, depth): content seat 0.44, forward 0
+# It stands 13 cm off the wall's face, so the back's top stays out of the wall when tipped.
+RC_Z0, RC_Z1 = -0.30, 0.40   # the base, back to front
+RC_HIPS = (0.44, 0.12)      # (height, depth): content seat 0.44, forward 0.12
 
 
 def recliner():
@@ -923,7 +924,7 @@ FAMILY = G.Family(
      G.Model('armchairWingback', armchair_wingback, key='model.armchairWingback', size=(0.84, 1.1, 0.8), centre=(0, -0.06),
              motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
              paint=[('forest', 'Upholstery'), ('forest_cushion', 'Cushion'), ('walnut_warm', 'Legs')]),
-     G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.843, 0.7), centre=(0, -0.07),
+     G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.843, 0.7), centre=(0, 0.05),
              motions={'uses': {'relax': ['recline', 'footrest_up'], 'doze': ['recline', 'footrest_up']}, 'ride': 'recline'},
              paint=[('tan', 'Upholstery'), ('tan_cushion', 'Cushions & footrest')]),
      G.Model('rockingChair', rocking_chair, key='model.rockingChair', size=(0.525, 1.033, 0.9), centre=(0, 0.05),

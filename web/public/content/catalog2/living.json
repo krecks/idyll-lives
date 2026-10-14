@@ -444,7 +444,7 @@
       "group": "armchairs",
       "seat": {
         "height": 0.44,
-        "forward": 0.0
+        "forward": 0.12
       },
       "description": "A deep leather armchair with a footrest that pops up. Very hard to get out of.",
       "interactions": [

@@ -258,3 +258,42 @@ None of them blocks the plan. Each says where it lives.
   43 outdoor plants and trees; it could move into gamekit for other families' far versions (street props, the farm).
 - **Testing crops.** A crop's stages can be seen without waiting game days: write a state with `objects[].growth`
   set (−0.5 picked, 0.05 planted, 0.75 growing, 1 ripe) into `debug-states/` and open it with `?state=`.
+
+## Living room (L1–L3, built 2026-10-14)
+
+Fixed after the build:
+- **The recliner's back tipped 8 cm into the wall.** Its seat and back turn back 25° about the sitter's hips, and
+  it stood on the wall's face. It now stands 13 cm off the wall (the tipped back stops 4 cm short), with the hips
+  12 cm forward to match (content `seat.forward` 0.12, `RC_HIPS`). Its placeholder (`catalog2.py`) was redrawn as
+  the model stands at rest, footrest folded down on a skirted base, so the fallback, picking and shadow match it.
+- **The bergère armchair was over its triangle target** (4,496 of 4,000): its back channels have fewer bevel
+  segments now (3,880).
+- **The Blender README sent play tests to `wants-asking`**, whose resident never takes a `use`. It now says so,
+  and how to see a clip play (`__renderer.motion.states`).
+
+Open:
+- **`sideTable` has two placeholders.** The base manifest's (`furniture_prims.py` `side_table`, plain wood with a
+  shelf) is drawn over by the catalog pack's (`catalog.py` `side_table`, oak with a drawer and a knob), which the
+  model copies. `check_glb.py` warns that they differ (it did before the model). Keep one: drop the catalog
+  override, or give `furniture.py` the catalog design. Either regenerates a manifest other sessions are editing.
+- **The chaise's "Put your feet up" sits upright** at the back of the chaise (content `seat.forward` -0.3), the
+  lower legs bent down into the long seat. A legs-out sitting pose, or lying with the head raised, would suit it
+  (`characters.ts`, content `pose`).
+- **One sitter sinks every seat cushion.** A sofa's seat cushions are one part (`seat`), so `sink_in` sinks them
+  all. Per-slot cushions would need a clip per slot and the game to play the one under each resident.
+- **Pillows don't follow the sinking seat**: they stay on the back cushions, up to 1 cm above the sunk seat.
+- **The coffee table's placeholder is 6 cm taller** than the model (`check_glb.py` warns): it has magazines on the
+  top, which the model keeps in its drawer. Dropping them from the placeholder would clear the warning.
+- **The recliner's footrest, up, reaches 8 cm past the front of its tile**, and its seat front lifts 14 cm as it
+  tips (a rocker-recliner, not a wall-hugger). Fine in play; a sliding mechanism would be closer to life.
+- **The rocking chair's rock takes 1.4 s**, longer than the "about 1 s" rule, so it reads as a calm rock.
+- **Clips still to add when content gives a use** ("+use"): the nesting tables' small table slides out (it's a part
+  of its own, `small_table`).
+- **The style variants have no models.** `catalog.py` still builds `@modern`, `@cozy` and `@minimal` placeholders
+  (loveseat, three-seat and designer sofas, lounge chair, coffee and side tables), but no manifest lists them; only
+  the default look is built.
+- **Not checked**: two residents on one sofa, the colour studio's UI (colours checked on the clips bench), the
+  catalog pictures, and the sofas on a town lot.
+- **Testing in a shared checkout**: other sessions' edits reload the dev server's page mid-run, and once a content
+  file was briefly invalid ("the game data failed to load") while one was being written. A port given up by one
+  session (5293) was taken by another within minutes; pick a fresh one each run.

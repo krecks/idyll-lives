@@ -236,6 +236,10 @@ the real GPU), at 1 % volume (`page.addInitScript(quiet)` from `tools/bench/quie
     free wall at `[23, 14, 0]`.
   - Find it with `__world().objects`.
   - Use it with `__send({type: 'use', sim: 0, object: <id>, interaction: <index>})`.
+  - In `wants-asking` the resident doesn't take a `use` (the status stays "Taking a moment"; most likely its
+    needs are full, and residents with full needs skip uses). Use a copy of the dump with the needs lowered, as the bathroom tasks did, and turn
+    autonomy off first (`{type: 'setAutonomy', enabled: false, household: 0}`).
+  - See a clip play with `__renderer.motion.states.get(<id>)` (each clip's name, time and kind).
   - `{type: 'setSpeed', speed: 0..5}` pauses or speeds up time.
   - Click the object to see its pie menu.
   - `Escape` closes a menu, but opens the pause menu when none is open.
