@@ -94,6 +94,30 @@ fn the_player_switches_a_lamp() {
 }
 
 #[test]
+fn a_lamp_switched_off_stays_off_moved_undone_and_redone() {
+    let mut w = world_at(12.0);
+    let moved = |w: &World| w.objects.iter().find(|o| o.def == w.objects[GARDEN as usize].def && (o.x, o.z) == (11, 9)).map(|o| o.id);
+    w.apply(Command::MoveObject { household: 0, object: GARDEN, x: 11, z: 9, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
+    let lamp = moved(&w).expect("moved");
+    assert!(!on(&w, lamp), "moving it doesn't turn it on");
+    assert!(lights::lamps_off(&w).contains(&lamp));
+    w.apply(Command::Undo { household: 0 }).unwrap();
+    assert!(moved(&w).is_none() && !on(&w, GARDEN), "back where it was, off");
+    w.apply(Command::Redo { household: 0 }).unwrap();
+    assert!(!on(&w, moved(&w).expect("moved again")), "moved again, still off");
+
+    // A room moved with its lamps: they stay as they were.
+    w.apply(Command::SwitchLamp { object: A[1], on: true }).unwrap();
+    w.apply(Command::MoveRoom { household: 0, x: 6, z: 3, dx: 0, dz: 5 }).unwrap_or_else(|e| panic!("{e}"));
+    let b = w.objects.iter().find(|o| (o.x, o.z) == (8, 6)).expect("B's lamp moved with its room");
+    assert!(b.off, "B's lamp is still off");
+    assert!(on(&w, A[1]) && !on(&w, A[0]), "A's are as they were");
+    w.apply(Command::Undo { household: 0 }).unwrap();
+    w.apply(Command::Redo { household: 0 }).unwrap();
+    assert!(w.objects.iter().find(|o| (o.x, o.z) == (8, 6)).is_some_and(|o| o.off), "and after undo and redo");
+}
+
+#[test]
 fn coming_in_after_dark_turns_the_room_on_and_leaving_turns_it_off() {
     let mut w = world_at(21.0);
     tick(&mut w, 5);

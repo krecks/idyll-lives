@@ -12,6 +12,7 @@
 //! lights stay as the player left them. Outdoors (the garden's lanterns) is the player's. The
 //! renderer shows a lamp that's off with no light and no glow; by day nothing shows either way.
 //! Room scores count the lamps a room has, on or off (they're how well it can be lit).
+//! A lamp moved (alone, on a top or with its room), undone or redone stays on or off as it was.
 
 use crate::World;
 use crate::lot::OUTDOORS;

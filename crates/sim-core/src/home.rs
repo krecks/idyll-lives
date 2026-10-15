@@ -749,6 +749,7 @@ impl World {
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
             placed.open = old.open;
+            placed.off = old.off;
             placed.growth = old.growth;
             let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
             let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
@@ -773,6 +774,7 @@ impl World {
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
                 o.wear = r.wear;
                 o.open = r.open;
+                o.off = r.off;
                 o.growth = r.growth;
                 placed.push((r.clone(), rid));
             }
