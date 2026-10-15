@@ -1796,11 +1796,21 @@ export class BabylonRenderer implements Renderer {
   private spanPasses(): void {
     type QuerySet = { readTwoValuesAndSubtract(first: number): Promise<number | null>; _getBuffer(first: number, count: number): GPUBuffer | null; _dstBuffers: GPUBuffer[]; spans?: true };
     const engine = this.webgpu!;
-    const set = (engine as unknown as { _timestampQuery: { _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery._measureDuration?._querySet;
+    const current = () => (engine as unknown as { _timestampQuery: { _enabled: boolean; _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery;
+    const set = current()._measureDuration?._querySet;
     if (!set || set.spans || typeof set._getBuffer !== 'function') return;
     set.spans = true;
-    set.readTwoValuesAndSubtract = async (first: number) => {
+    // Babylon reads a pass's two stamps as the pass ends, before the frame's commands are sent: that
+    // gets what the stamps' slots held from an earlier frame, from another pass where the passes
+    // differ from frame to frame (a reflection drawn now and then). Read once the frame is sent.
+    set.readTwoValuesAndSubtract = (first: number) => {
       const frame = engine.frameId;
+      return new Promise<number | null>((resolve) => engine.onEndFrameObservable.addOnce(() => resolve(read(first, frame))));
+    };
+    const read = async (first: number, frame: number) => {
+      // (Timing turned off meanwhile: the query set is gone.)
+      const timer = current();
+      if (!timer._enabled || timer._measureDuration?._querySet !== set) return null;
       const buffer = set._getBuffer(first, 2);
       if (!buffer) return null;
       try {
