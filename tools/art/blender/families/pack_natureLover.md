@@ -23,8 +23,8 @@ at 0.45 m.
 
 `tieBouquet` grows a tied bouquet (three stems, three flower heads and a twine wrap, plain) on the potting bench's
 worktop front (`bouquet`, 0.8 s), held while it is tied and gone when it ends, as the kids' painting. Its origin is
-inside the worktop, so it flattens out of sight at rest. It is a part of its own: the bench takes 4 draws (8,216
-triangles, over the 8,000 aim).
+inside the worktop, so it flattens out of sight at rest. It is a part of its own: the bench takes 4 draws (7,704
+triangles: its pots leave out their undersides and, under the soil, their insides, `_pot(trim=True)`).
 
 `tendVeggies` rustles the bed (`rustle`, 0.6 s in and every 2.4 s while tended): the plants and the fruit sway
 3° back and forth about their shared origin on the soil line through the bed's middle. A use clip on a growing
@@ -59,7 +59,7 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 4,780 | 4 | Wood, Posts & rails |
-| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 7,964 | 3 | Wood, Frame |
+| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 7,704 | 4 | Wood, Frame |
 | `model.natureLover.birdFeeder` | 0.71 × 1.78 × 0.68 m | 3,372 | 3 | Wood, Roof |
 | `model.natureLover.gardenHammock` | 1.88 × 1.11 × 0.68 m | 2,416 | 3 | Wood, Fabric, Stripes |
 | `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 5,736 | 3 | Wood, Copper |
@@ -67,7 +67,7 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 | `model.natureLover.glasshouse` | 1.89 × 2.48 × 1.86 m | 7,496 | 4 | Wood, Frame, Cushions |
 
 `check_glb.py`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
-draw calls (above), and the potting bench's 8,216 triangles.
+draw calls (above).
 Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open (the veggie bed's `harvest` alone, `&clip=`), the
 glasshouse's vent from above, the hammock from its end. Gallery: each next to its placeholder. In play
