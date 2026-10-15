@@ -622,7 +622,8 @@ export class BabylonRenderer implements Renderer {
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
-    this.mirrors = new Mirrors(scene, this.diag.has('nomirrors') ? 0 : this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    const q = this.quality;
+    this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
     this.motion.setAmbientRange(this.quality.ambientRange);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
@@ -856,14 +857,17 @@ export class BabylonRenderer implements Renderer {
     // sun's shadows aren't redrawn for those).
     const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
     if (motion.moved) this.sunShadows.moved();
-    if (motion.moved || motion.ambient) this.resetSnapshot();
+    if (motion.moved) this.resetSnapshot();
+    // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
+    else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
-    this.mirrors.update(this.camera);
+    // Held reflections are drawn again when a resident in them moved.
+    this.mirrors.update(this.camera, this.characters.posed ? { heads: this.characters.heads, visible: this.characters.visible, count } : null);
     this.handles.update(this.camera.globalPosition);
     this.simShadow.thinInstanceBufferUpdated('matrix');
     this.lastFrame = frame;
@@ -1908,6 +1912,8 @@ export class BabylonRenderer implements Renderer {
         residentsDrawn: this.characters ? this.characters.visible.subarray(0, this.simCount).reduce((n, v) => n + (v ? 1 : 0), 0) : 0,
         mirrors: this.mirrors.count,
         mirrorsLive: live,
+        mirrorSpots: this.mirrors.spots,
+        mirrorDraws: this.mirrors.draws,
         nightGrade: this.nightGrade?.amount ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
       },
@@ -3697,8 +3703,10 @@ export class BabylonRenderer implements Renderer {
     return ready;
   }
 
+  /** Something on screen changed: a WebGPU recording is made again, and held reflections are drawn again. */
   private resetSnapshot(): void {
     if (this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
+    this.mirrors?.changed();
   }
 
   /** A world or overview build starts: no snapshot recording until every build is done. */

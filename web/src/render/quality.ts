@@ -40,10 +40,20 @@ export interface QualitySettings {
    */
   clusteredLamps: boolean;
   /**
-   * How many mirrors (the nearest the camera) reflect the room live; 0: none. Each draws the world
-   * once more, about 50 MB of memory traffic a frame (P1-09); the live cost wasn't measured.
+   * How many mirrors (the nearest the camera, on screen) reflect the room; 0: none. Each draws again
+   * what can be seen through its glass (MEASURED).
    */
   mirrors: number;
+  /**
+   * A reflection's resolution, as a share of the screen's along each side (its multisampling is
+   * `msaaSamples`'s). MEASURED.
+   */
+  mirrorScale: number;
+  /**
+   * At most this many draws of a reflection a second, each only when something in it changed (the
+   * camera, a resident in it, the light, things placed); held in between. 0: every frame. MEASURED.
+   */
+  mirrorRate: number;
   /**
    * Game minutes between lighting updates at speed 3 and up (slower speeds: every half minute).
    * Each update re-colours the sun, sky and lamps and thaws the materials for a few frames: at
@@ -81,9 +91,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true, ambientRange: 0 },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 40 },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 60 },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true, ambientRange: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 40 },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 60 },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];
