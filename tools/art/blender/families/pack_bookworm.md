@@ -11,6 +11,11 @@ the trait's pack keeps its placeholders. The bedside stack stood 3 cm into the w
 `centre` now (`G.settle()`), its back on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_bookworm.py`, `pack_shapes.to_wall`) stand with their backs
 on the wall face too, so the fallback, the model and the wall agree within a centimetre.
 
+The writer's bureau stands with its back on the wall's face and its chair in front; the writer faces the bureau
+(content `"seat": {"height": 0.45, "forward": 0.12, "facing": "back"}`, as the piano). It is built as the old
+placeholder stood (the chair between the wall and the desk) and turned round (`_turn_round`), so its flap drops the
+other way (+90°); the placeholder (`pack_bookworm.py`, `furniture.turned`, then `to_wall`) is turned the same.
+
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `readingNook` | the seat cushion and throw, origin on their underside: `sink_in` presses them 2 cm (0.6 s) | `curlUp` |

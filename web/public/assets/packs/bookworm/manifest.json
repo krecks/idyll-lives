@@ -4623,7 +4623,7 @@
           "at": [
             0,
             0.75,
-            0.29
+            -0.265
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -4639,7 +4639,7 @@
           "at": [
             0,
             0.98,
-            0.385
+            -0.36
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -4655,7 +4655,7 @@
           "at": [
             0,
             1.26,
-            0.345
+            -0.32
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4671,7 +4671,7 @@
           "at": [
             0,
             1.31,
-            0.35
+            -0.325
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -4685,9 +4685,25 @@
             0.01
           ],
           "at": [
-            -0.28,
+            0.28,
             1.02,
-            0.31
+            -0.285
+          ],
+          "color": "#5A3F2E",
+          "material": "material.finish.matte",
+          "radius": 0.004
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.15,
+            0.12,
+            0.01
+          ],
+          "at": [
+            0.1,
+            1.02,
+            -0.285
           ],
           "color": "#5A3F2E",
           "material": "material.finish.matte",
@@ -4703,7 +4719,7 @@
           "at": [
             -0.1,
             1.02,
-            0.31
+            -0.285
           ],
           "color": "#5A3F2E",
           "material": "material.finish.matte",
@@ -4717,25 +4733,9 @@
             0.01
           ],
           "at": [
-            0.1,
+            -0.28,
             1.02,
-            0.31
-          ],
-          "color": "#5A3F2E",
-          "material": "material.finish.matte",
-          "radius": 0.004
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.15,
-            0.12,
-            0.01
-          ],
-          "at": [
-            0.28,
-            1.02,
-            0.31
+            -0.285
           ],
           "color": "#5A3F2E",
           "material": "material.finish.matte",
@@ -4749,9 +4749,9 @@
             0.06
           ],
           "at": [
-            -0.28,
+            0.28,
             0.995,
-            0.33
+            -0.305
           ],
           "color": "#F4EEDF",
           "material": "material.finish.matte",
@@ -4765,9 +4765,9 @@
             0.06
           ],
           "at": [
-            0.1,
+            -0.1,
             0.995,
-            0.33
+            -0.305
           ],
           "color": "#E6DCC6",
           "material": "material.finish.matte",
@@ -4781,9 +4781,9 @@
             0.06
           ],
           "at": [
-            0.28,
+            -0.28,
             0.995,
-            0.33
+            -0.305
           ],
           "color": "#C9B48A",
           "material": "material.finish.matte",
@@ -4797,9 +4797,9 @@
             0.28
           ],
           "at": [
-            -0.31,
+            0.31,
             0.365,
-            0.3
+            -0.275
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -4813,9 +4813,9 @@
             0.012
           ],
           "at": [
-            -0.31,
+            0.31,
             0.2,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4829,9 +4829,9 @@
             0.02
           ],
           "at": [
-            -0.31,
+            0.31,
             0.2,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -4845,9 +4845,9 @@
             0.012
           ],
           "at": [
-            -0.31,
+            0.31,
             0.45,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4861,9 +4861,9 @@
             0.02
           ],
           "at": [
-            -0.31,
+            0.31,
             0.45,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -4877,9 +4877,9 @@
             0.012
           ],
           "at": [
-            -0.31,
+            0.31,
             0.62,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4893,9 +4893,9 @@
             0.02
           ],
           "at": [
-            -0.31,
+            0.31,
             0.62,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -4909,9 +4909,9 @@
             0.28
           ],
           "at": [
-            0.31,
+            -0.31,
             0.365,
-            0.3
+            -0.275
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -4925,9 +4925,9 @@
             0.012
           ],
           "at": [
-            0.31,
+            -0.31,
             0.2,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4941,9 +4941,9 @@
             0.02
           ],
           "at": [
-            0.31,
+            -0.31,
             0.2,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -4957,9 +4957,9 @@
             0.012
           ],
           "at": [
-            0.31,
+            -0.31,
             0.45,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -4973,9 +4973,9 @@
             0.02
           ],
           "at": [
-            0.31,
+            -0.31,
             0.45,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -4989,9 +4989,9 @@
             0.012
           ],
           "at": [
-            0.31,
+            -0.31,
             0.62,
-            0.155
+            -0.13
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -5005,9 +5005,9 @@
             0.02
           ],
           "at": [
-            0.31,
+            -0.31,
             0.62,
-            0.145
+            -0.12
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -5023,7 +5023,7 @@
           "at": [
             0,
             0.42,
-            0.44
+            -0.415
           ],
           "color": "#9A6A45",
           "material": "material.finish.wood",
@@ -5039,7 +5039,7 @@
           "at": [
             0,
             0.42,
-            0.449
+            -0.424
           ],
           "color": "#B88A60",
           "material": "material.finish.wood",
@@ -5053,9 +5053,9 @@
             0.22
           ],
           "at": [
-            0.0,
+            -0.0,
             0.815,
-            0.27
+            -0.245
           ],
           "color": "#3F6E73",
           "material": "material.finish.gloss",
@@ -5069,15 +5069,15 @@
             0.08
           ],
           "at": [
-            0.0,
+            -0.0,
             0.85,
-            0.2
+            -0.175
           ],
           "color": "#3F6E73",
           "material": "material.finish.gloss",
           "radius": 0.012,
           "rotate": [
-            20,
+            -20,
             0,
             0
           ]
@@ -5090,16 +5090,16 @@
             0.04
           ],
           "at": [
-            0.0,
+            -0.0,
             0.88,
-            0.34
+            -0.315
           ],
           "color": "#2B2C2E",
           "material": "material.finish.satin",
           "rotate": [
             0,
             0,
-            90
+            -90
           ],
           "segments": 10
         },
@@ -5111,15 +5111,15 @@
             0.004
           ],
           "at": [
-            0.0,
+            -0.0,
             0.95,
-            0.33
+            -0.305
           ],
           "color": "#F4EEDF",
           "material": "material.finish.matte",
           "radius": 0.002,
           "rotate": [
-            -12,
+            12,
             0,
             0
           ]
@@ -5132,89 +5132,9 @@
             0.016
           ],
           "at": [
-            -0.105,
+            0.105,
             0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.075,
-            0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.045,
-            0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.015,
-            0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            0.015,
-            0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            0.045,
-            0.85,
-            0.165
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5230,7 +5150,7 @@
           "at": [
             0.075,
             0.85,
-            0.165
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5244,73 +5164,9 @@
             0.016
           ],
           "at": [
-            0.105,
+            0.045,
             0.85,
-            0.165
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.105,
-            0.862,
-            0.187
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.075,
-            0.862,
-            0.187
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.045,
-            0.862,
-            0.187
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.015,
-            0.862,
-            0.187
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5325,8 +5181,8 @@
           ],
           "at": [
             0.015,
-            0.862,
-            0.187
+            0.85,
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5340,9 +5196,9 @@
             0.016
           ],
           "at": [
-            0.045,
-            0.862,
-            0.187
+            -0.015,
+            0.85,
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5356,9 +5212,41 @@
             0.016
           ],
           "at": [
-            0.075,
-            0.862,
-            0.187
+            -0.045,
+            0.85,
+            -0.14
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.075,
+            0.85,
+            -0.14
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.105,
+            0.85,
+            -0.14
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5374,103 +5262,7 @@
           "at": [
             0.105,
             0.862,
-            0.187
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.105,
-            0.874,
-            0.209
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.075,
-            0.874,
-            0.209
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.045,
-            0.874,
-            0.209
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            -0.015,
-            0.874,
-            0.209
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            0.015,
-            0.874,
-            0.209
-          ],
-          "color": "#F2EDE2",
-          "material": "material.finish.gloss",
-          "segments": 8
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.016,
-            0.01,
-            0.016
-          ],
-          "at": [
-            0.045,
-            0.874,
-            0.209
+            -0.162
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5485,8 +5277,104 @@
           ],
           "at": [
             0.075,
-            0.874,
-            0.209
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            0.045,
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            0.015,
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.015,
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.045,
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.075,
+            0.862,
+            -0.162
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.105,
+            0.862,
+            -0.162
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5502,7 +5390,119 @@
           "at": [
             0.105,
             0.874,
-            0.209
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            0.075,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            0.045,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            0.015,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.015,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.045,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.075,
+            0.874,
+            -0.184
+          ],
+          "color": "#F2EDE2",
+          "material": "material.finish.gloss",
+          "segments": 8
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.016,
+            0.01,
+            0.016
+          ],
+          "at": [
+            -0.105,
+            0.874,
+            -0.184
           ],
           "color": "#F2EDE2",
           "material": "material.finish.gloss",
@@ -5516,9 +5516,9 @@
             0.13
           ],
           "at": [
-            -0.28,
+            0.28,
             0.79,
-            0.21
+            -0.185
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -5550,9 +5550,9 @@
             0.025
           ],
           "at": [
-            -0.28,
+            0.28,
             0.9035,
-            0.21
+            -0.185
           ],
           "color": "#B8925A",
           "material": "material.finish.metal",
@@ -5566,9 +5566,9 @@
             0.28
           ],
           "at": [
-            -0.28,
+            0.28,
             1.0352,
-            0.21
+            -0.185
           ],
           "color": "#3E5A3A",
           "material": "material.finish.fabric",
@@ -5600,9 +5600,9 @@
             0.07
           ],
           "at": [
-            -0.28,
+            0.28,
             0.9944,
-            0.21
+            -0.185
           ],
           "color": "#FFF1C8",
           "material": "material.finish.gloss",
@@ -5616,9 +5616,9 @@
             0.08
           ],
           "at": [
-            0.36,
+            -0.36,
             0.815,
-            0.2
+            -0.175
           ],
           "color": "#D6A64A",
           "material": "material.finish.gloss",
@@ -5658,14 +5658,14 @@
             0.05
           ],
           "at": [
-            0.405,
+            -0.405,
             0.815,
-            0.2
+            -0.175
           ],
           "color": "#D6A64A",
           "material": "material.finish.gloss",
           "rotate": [
-            90,
+            -90,
             0,
             0
           ],
@@ -5679,9 +5679,9 @@
             0.15
           ],
           "at": [
-            0.16,
+            -0.16,
             0.78,
-            0.23
+            -0.205
           ],
           "color": "#F4EEDF",
           "material": "material.finish.matte",
@@ -5702,7 +5702,7 @@
           "at": [
             0,
             0.41,
-            -0.1
+            0.125
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5718,7 +5718,7 @@
           "at": [
             0,
             0.45,
-            -0.09
+            0.115
           ],
           "color": "#7A2E2E",
           "material": "material.finish.fabric",
@@ -5732,9 +5732,9 @@
             0.035
           ],
           "at": [
-            -0.18,
+            0.18,
             0.2,
-            0.06
+            -0.035
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5749,9 +5749,9 @@
             0.035
           ],
           "at": [
-            -0.18,
+            0.18,
             0.46,
-            -0.28
+            0.305
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5766,9 +5766,9 @@
             0.035
           ],
           "at": [
-            0.18,
+            -0.18,
             0.2,
-            0.06
+            -0.035
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5783,9 +5783,9 @@
             0.035
           ],
           "at": [
-            0.18,
+            -0.18,
             0.46,
-            -0.28
+            0.305
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5802,7 +5802,7 @@
           "at": [
             0,
             0.84,
-            -0.28
+            0.305
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",
@@ -5818,7 +5818,7 @@
           "at": [
             0,
             0.64,
-            -0.28
+            0.305
           ],
           "color": "#A8754A",
           "material": "material.finish.wood",

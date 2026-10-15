@@ -235,7 +235,16 @@ def libraryWall():
     return objs
 
 
-# --- the writer's bureau (1x1): the resident sits in the middle, the bureau before them -------------------
+def _turn_round(objs):
+    """Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
+    which moves round with it), as hobbies.py turns the piano. A part's clips then open the other way."""
+    for o in objs:
+        G.turn(o, 180, 'Z')
+        o.location = (-o.location.x, -o.location.y, o.location.z)
+
+
+# --- the writer's bureau (1x1): its back on the wall, the chair in front; the writer faces the bureau ------
+# (content `seat.facing: "back"`). Built as the placeholder first stood, the chair at the back, then turned round.
 def writingBureau():
     F = G.GameFrame()
     rnd = random.Random(5)
@@ -252,7 +261,7 @@ def writingBureau():
         F.box('top', 0.84, 0.04, 0.32, (0, 0.75, 0.29), M.body, bevel=0.01)
         # the hutch on the desk: pigeonholes behind the flap, an open shelf above, a curved crest
         F.box('hutch_back', 0.8, 0.52, 0.02, (0, 1.03, 0.43), M.body)
-        for x in (-0.19, 0.19):                            # panels on its back, which faces the room
+        for x in (-0.19, 0.19):                            # panels on its back (on the wall; out in a room, it shows)
             F.box(_name('hutch_panel'), 0.32, 0.4, 0.008, (x, 1.03, 0.442), M.panel, bevel=0.003)
         for x in (-0.4, 0.4):
             F.box(_name('hutch_side'), 0.022, 0.52, 0.17, (x, 1.03, 0.355), M.body, bevel=0.004)
@@ -289,8 +298,9 @@ def writingBureau():
         F.box('flap_inset', 0.42, 0.14, 0.006, (0, 0.875, 0.253), M.body, bevel=0.003)
         F.box('flap_pull', 0.06, 0.015, 0.015, (0, 0.95, 0.248), M.honey, bevel=0.005)
     flap = G.hinged(G.join(flap, 'flap'), F.at(0, 0.775, 0.265))
-    objs = G.settle(centre=False)
-    G.swing(flap, 'fall_front', -90, seconds=0.8, axis='X')
+    _turn_round(G.meshes())
+    objs = G.settle()      # on its Model centre: the back on the wall face
+    G.swing(flap, 'fall_front', 90, seconds=0.8, axis='X')
     return objs
 
 
@@ -480,7 +490,7 @@ FAMILY = G.Family(
              centre=(0, -0.02), motions={'uses': {'research': 'ladder', 'browse': 'ladder'}},
              paint=[('body', 'Wood'), ('honey', 'Ladder')]),
      G.Model('writingBureau', writingBureau, size=(0.852, 1.35, 0.758), key='model.bookworm.writingBureau',
-             centre=(-0.006, 0.071), motions={'uses': {'draft': 'fall_front', 'letter': 'fall_front'}},
+             centre=(0.006, -0.051), motions={'uses': {'draft': 'fall_front', 'letter': 'fall_front'}},
              paint=[('body', 'Wood'), ('seatpad', 'Fabric'), ('honey', 'Chair')]),
      G.Model('teaTrolley', teaTrolley, size=(0.746, 0.939, 0.492), key='model.bookworm.teaTrolley',
              centre=(0, -0.184), motions={'uses': {'brew': 'pour'}, 'hold': 1.5},

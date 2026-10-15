@@ -42,7 +42,12 @@
       },
       "motions": {
         "uses": {
-          "pickSnack": "harvest"
+          "pickSnack": "harvest",
+          "tendVeggies": {
+            "clip": "rustle",
+            "delay": 0.6,
+            "every": 2.4
+          }
         },
         "growth": "grow"
       },

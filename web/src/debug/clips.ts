@@ -275,7 +275,7 @@ function poseAll(seconds: number): void {
     for (let i = 0; i < template.meshes.length; i++) {
       const part = template.motion ? template.motion.parts[i] : -1;
       // As the game: every clip that moves the part poses it, together (`partPose`).
-      const playing = b.clips.flatMap((c) => (at.has(c.name) ? [{ clip: c.clip, time: at.get(c.name)! }] : []));
+      const playing = b.clips.flatMap((c) => (at.has(c.name) ? [{ clip: c.clip, time: at.get(c.name)!, kind: c.kind }] : []));
       const moved = part >= 0 && partPose(playing, part, posed);
       const m = moved ? Matrix.FromArray(posed).multiply(place) : place;
       template.meshes[i].thinInstanceSetBuffer('matrix', m.asArray() as unknown as Float32Array, 16, true);
