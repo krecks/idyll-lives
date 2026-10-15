@@ -103,45 +103,62 @@ Merges `7a0ba3c` (veggie bed, bureau), `85650aa` (beds), `224b52f` (tables), `11
   is free and reachable (the mirror cabinet's "Brush your teeth" had left 7 of 180 sample houses failing). Sample
   houses: 0 problems; islands with two stools 19 of 60 large (was 28, some with stools on the cook's side).
 
+## Decided in the third round (2026-10-15, review these)
+
+Merges `1c26a81` (worktops, potting bench), `702e57b` (play-check states), `25a31ad` (plants, quilts), `384cd54`
+(lamp, hot tub, housegen), and `b07e885` (catalog pictures).
+
+- **Every kitchen worktop is 0.95 m** (7 counters and appliances came down 1 cm with what stands on them; the
+  butcher block's top is 5 mm thicker; the hob glass stands 4 mm proud, so a pan no longer sinks into it).
+  Cookers and the foodie pack's chef's island (0.9) keep their own heights.
+- **The potting bench** is 7,704 triangles: its pots leave out undersides and the inside under the soil.
+- **Houseplants turn without touching the wall** (at most 44 cm from their middle): the monstera 0.78 m across
+  (was 1.33), the palm and fern pulled in. Plant size warnings are gone: the placeholders of the oak, maple,
+  grass, succulents, hosta and meadow changed, the geraniums' model (it was lopsided).
+- **The vegetable patch's lettuces** are 17 cm heads, so a top shows when just planted.
+- **A quilt per body:** each life stage's body gets a quilt shaped over its own lying pose (children's shoes,
+  hands and forearms poked through the grown-up one, in every bed); a draw call only while someone with that
+  body is home. The quilt comes up from the foot once the sleeper lies flat (it rose through swinging legs).
+  `BEDS` has a `foot` (the car bed's quilt ends at its mattress).
+- **A lamp switched off stays off** when moved, with its room or on a top, and through undo and redo.
+- **An order to close something someone else got into first** (the hot tub's cover) is dropped with a story line
+  ("… didn't close the cedar hot tub: someone else got in first", event `notClosed`), not queued.
+- **Housegen** keeps small things off hobs, grills and sinks (61 on `cooktopCounter` in the sample before), and
+  hangs curtains only over a window (206 of 345 were on plain walls; now all 321 are over one). The generated
+  houses check fails on either.
+- **Catalog pictures:** the smallest view is 0.6 m across (was 1.1), so a mug is a third of the picture; the
+  contact shadow is the model's own size, no longer cut off square at the edges (picture cache `v2`).
+
 ## Still open
 
-Placement
-- **The steam mop dock's placeholder** reaches 2 cm into the wall.
-- **Houseplants into the wall:** `garden.monstera` 24 cm, `palm` 6, `bostonFern` 4. The plants' 10–15 % size
-  differences from their placeholders are real now (the gate measures turned parts exactly), and `tree`,
-  `tree.maple`, `grass`, `geraniums`, `succulents` still warn.
-- **The kitchen worktops** differ by 1 cm in height (0.96 vs 0.95).
-- **Housegen puts small things on the hob** (a bread bin on `cooktopCounter`).
-- **`GameFrame(shift=…)`'s comment** says it moves depths back; a positive shift moves them forward (+z).
-
-Uses and clips
+- **Beds that model their own duvet** (`bedDouble`, `bedCanopy`, `bedKing`, `bed`, `bedSingle`) show its
+  turned-down band at the edges of a sleeper's quilt (older than round three).
+- **Islands with two stools** in the generated sample: 16 of 60 large houses; the check fails below 15. Each
+  housegen change reshuffles the random draws, so the next one may tip it.
+- **A houseplant moved off its tile's middle** (quarter tiles, Shift) can still reach the wall.
+- **The garden lantern** is 0.58 m deep against its placeholder's 0.47 (the gate warns).
+- **The Adirondack chair's sitter** sits upright instead of leaning into its slanted back.
+- **A game whose story is empty** doesn't show its first event in the feed (the first batch counts as history).
 - **Parts still with no use:** the executive desk's drawer (residents use the desk through its chair, and a
   clip plays only on the object used: needs a seat's use to play a clip on the desk it faces); the nesting
   tables' small table (no use reads naturally, and one would need its front tile free beside a sofa); the high
   chair's tray (the sim never seats a baby in it); the laundry basket's lid (not built); the kettle, bread bin
   and laptop (content rules forbid uses on things on a top: sim work).
-- **Lettuces don't show at the planted stage**; they appear from growing on.
-- **Moving a lamp turns it back on** (the move and undo code don't carry `off`; one line next to each `open` copy).
-- **An ordered "Put the cover on"** is dropped silently when another resident is in or heading to the tub.
 - **Kids' (and all) uses end once every need they raise is full**, by design; it makes clips easy to miss in
   checks.
-- **The potting bench** is 8,216 triangles (aim 8,000).
-
-Engine
 - **Mirrors on High** log an occasional `GL_INVALID_VALUE: glGetProgramiv`; not reproduced in 5 runs, probably
   Babylon's parallel shader compile, not ours.
 - **`partBox`** draws spheres and tori up to 5 % / 2.5 % bigger than Babylon's meshes (never smaller).
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row (`tests/`) couldn't
   reproduce it.
 
-## Not checked yet
+## Checked in play (2026-10-15, WebGPU and WebGL2)
 
-- In play: the bike from its left side, children in the car bed, the garden hammock; the pedal bin and drawer
-  counter during a real meal (clips bench only); the fourth facing of the kitchen models; the bathroom, bedroom,
-  kitchen and outdoor things on a town lot beyond the samples; the catalog pictures of the other groups.
-- After the second round: a baby in the crib and a second sleeper in the upper bunk, the garden chairs and
-  outdoor bar, the long island, the hamper in a house (it played in the agent's test), all on WebGL2. A sleeper
-  in `bedDouble` shows their shoes through the quilt halfway down (seen once, likely older than this round).
+The bike from both sides, a baby in the crib, two children in the bunk (a duvet each), children in the car bed,
+the hammock, the garden and Adirondack chairs and the outdoor bar, the long island (cook at the front, stool
+behind), the hamper, the pedal bin and drawer counter through a whole meal, all four facings of the kitchen
+models, generated houses room by room, and all 501 Validate pictures. States: `DUMP_STATES=1 cargo test -p
+sim-core --test play_checks` (`family-check`; `generated-<i>` with `--ignored`, `HOUSES=…`, `PICK=…`).
 
 ## Testing (how, after the fix-up round)
 
