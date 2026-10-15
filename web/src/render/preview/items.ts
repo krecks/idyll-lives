@@ -32,8 +32,11 @@ const TURNTABLE_CACHE = 24;
 /** Three-quarter view from the front, a little to the side and above (radians). */
 const YAW = -0.62;
 const PITCH = 0.5;
-/** Smallest half-height of the view (m), so a pot plant doesn't fill the frame like a bed. */
-const MIN_HALF = 0.55;
+/**
+ * Smallest half-height of the view (m), so a pot plant doesn't fill the frame like a bed; small
+ * enough that a mug on a top still shows (about a third of the picture).
+ */
+const MIN_HALF = 0.3;
 
 /** `now`: on screen (drawn first, in request order); `idle`: drawn ahead of time when nothing else waits. */
 export type Priority = 'now' | 'idle';
@@ -57,7 +60,7 @@ const turntables = new Map<string, string[]>();
  * are deleted when it opens. Bump `v1` to drop old pictures after a look change.
  */
 const STORE_PREFIX = 'littlelives-item-pictures-';
-const STORE = `${STORE_PREFIX}v1-${__APP_VERSION__}`;
+const STORE = `${STORE_PREFIX}v2-${__APP_VERSION__}`;
 
 export function createItemPreviews(assets: AssetRegistry): ItemPreviews {
   return new ItemThumbnails(assets);
@@ -337,9 +340,12 @@ class ItemStudio {
       const corners = boxCorners(meshes);
       if (!corners.length || !(await this.whenReady(meshes))) return null;
 
-      // The contact shadow follows the footprint (it turns with the model).
-      const [fw, fd] = footprint;
-      this.shadow.scaling.set(fw * 1.25 + 0.2, 1, fd * 1.25 + 0.2);
+      // The contact shadow is the model's own ground size, under its middle (it turns with the
+      // model), not its footprint's: a mug's tile-sized shadow ran off the picture's edges.
+      let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+      for (const v of corners) [x0, x1, z0, z1] = [Math.min(x0, v.x), Math.max(x1, v.x), Math.min(z0, v.z), Math.max(z1, v.z)];
+      const [sx, sz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+      this.shadow.scaling.set((x1 - x0) * 1.3 + 0.08, 1, (z1 - z0) * 1.3 + 0.08);
 
       const angles = Array.from({ length: frames }, (_, i) => (i * Math.PI * 2) / frames);
       this.frame(corners, angles);
@@ -348,6 +354,9 @@ class ItemStudio {
       for (const angle of angles) {
         this.root.rotation.y = angle;
         this.shadow.rotation.y = angle;
+        // Babylon's rotation.y turns +x towards -z.
+        this.shadow.position.x = sx * Math.cos(angle) + sz * Math.sin(angle);
+        this.shadow.position.z = -sx * Math.sin(angle) + sz * Math.cos(angle);
         this.scene.render();
         urls.push(this.capture(size));
       }
