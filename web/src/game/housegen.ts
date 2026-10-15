@@ -91,6 +91,8 @@ interface BasementSpec {
 interface RoomSpec {
   weight: number;
   minSide: number;
+  /** Per lot size, a narrowest width instead of `minSide` (a large house's kitchen, room for an island). */
+  minSideOn?: Record<string, number>;
   /** The most a room may measure (tiles: its short side, its long side); bigger floors get more rooms. */
   maxSide?: [number, number];
   /** Kitchens: a counter run along one wall, placed before the furniture. */
@@ -115,6 +117,8 @@ interface Slot {
   chance?: number;
   count?: [number, number];
   opposite?: string;
+  /** On the same wall as another piece if there's room (`"run"`: the kitchen's counter run; a fridge at its end). */
+  beside?: string;
   /** Things on walls: on the wall behind one of these if the room has one (a mirror over the basin). */
   over?: string[];
 }
@@ -124,6 +128,8 @@ interface CounterRun {
   segments: string[];
   with: Slot[];
   length: [number, number];
+  /** Rows of room it leaves in front of it where a wall allows (an island and its stools). */
+  clear?: number;
 }
 
 /**
@@ -221,6 +227,8 @@ interface Floor {
   fronts: ([number, number][] | null)[];
   /** Tiles nothing may stand on (by doors, stairs, the landing). */
   keep: Set<string>;
+  /** Of `keep`, the tiles along an open kitchen and living room's missing wall: an island's stools may stand on them. */
+  open?: Set<string>;
   /** Tiles taken by furniture. */
   taken: Set<string>;
   /** Tiles taken on the wall, ceiling and rug layers (`wall:x:z`, ...). */
@@ -248,6 +256,9 @@ export function random(seed: number): () => number {
  * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
  */
 export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
+  // Rooms as narrow as their kind may be on this size of lot.
+  const sized = (s: RoomSpec): RoomSpec => (s.minSideOn?.[lotSize] === undefined ? s : { ...s, minSide: s.minSideOn[lotSize] });
+  cfg = { ...cfg, rooms: Object.fromEntries(Object.entries(cfg.rooms).map(([k, s]) => [k, sized(s)])) };
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
     // The basement draws numbers of its own: a house without one is laid out as it was before
@@ -596,10 +607,14 @@ function connect(f: Floor, rng: () => number, openPlan: boolean): void {
     const l = rooms.find((r) => r.kind === 'living');
     const wall = k && l ? shared(k, l) : [];
     if (wall.length >= 2) {
-      // The way between them stays clear of furniture.
+      // The way between them stays clear of furniture (but for stools pulled up to an island).
+      f.open = new Set();
       for (const e of wall) {
         f.edges.delete(e);
-        for (const [x, z] of sides(e)) f.keep.add(key(x, z));
+        for (const [x, z] of sides(e)) {
+          f.keep.add(key(x, z));
+          f.open.add(key(x, z));
+        }
       }
     }
   }
@@ -923,8 +938,12 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
       continue;
     }
     const spec = cfg.rooms[r.kind];
-    if (spec.run && !counterRun(f, r, info, rng, spec.run)) return false;
     const sideOf = new Map<string, number>();
+    if (spec.run) {
+      const side = counterRun(f, r, info, rng, spec.run);
+      if (side === false) return false;
+      if (side !== undefined) sideOf.set('run', side);
+    }
     const required = (slot: Slot) => slot.chance === undefined || slot.chance >= 1;
     const furniture = (slot: Slot) => {
       const count = slot.count ? between(rng, slot.count) : 1;
@@ -934,7 +953,7 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
         let done = false;
         for (const def of options) {
           const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
-          const prefer = across === undefined ? undefined : (across + 2) % 4;
+          const prefer = across === undefined ? (slot.beside ? sideOf.get(slot.beside) : undefined) : (across + 2) % 4;
           // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
           // one that must come goes wherever it fits if it has to.
           const aside = !info(def)!.used;
@@ -1052,10 +1071,13 @@ function undo(f: Floor, n: number, tiles: string[]): void {
 /**
  * A kitchen's counter run: the pieces of `run.with` (one of each slot that comes; a sink, a
  * stove, maybe a dishwasher) in a random order among plain segments, side by side along one wall,
- * each used from the row in front (kept clear). Shorter if the walls are short; if no wall has
- * room, the pieces go against the walls one by one. False if a piece that must come doesn't fit.
+ * each used from the row in front (kept clear). Along a wall with `run.clear` rows of room in
+ * front of it if there's one (an island and its stools), shorter if the walls are short; if no
+ * wall has room, the pieces go against the walls one by one. The side it went on (0 the side
+ * towards the street, then clockwise; undefined one by one), false if a piece that must come
+ * doesn't fit.
  */
-function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run: CounterRun): boolean {
+function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run: CounterRun): number | undefined | false {
   const pieces: { def: string; w: number; required: boolean }[] = [];
   for (const slot of run.with) {
     if (slot.chance !== undefined && rng() >= slot.chance) continue;
@@ -1065,10 +1087,14 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
   const segments = run.segments.filter((d) => info(d)?.footprint.every((n) => n === 1));
   const segment = segments.length ? pick(rng, segments) : null;
   const least = pieces.reduce((n, p) => n + p.w, 0);
-  for (let len = Math.max(least, between(rng, run.length)); len >= Math.max(least, 1); len--) {
+  const longest = Math.max(least, between(rng, run.length));
+  // The walls with room enough in front first, then any.
+  const roomy = (side: number) => (side % 2 === 0 ? r.d : r.w) >= (run.clear ?? 0);
+  for (const first of [true, false]) for (let len = longest; len >= Math.max(least, 1); len--) {
     if (len > least && !segment) continue;
     const order = [...pieces.map((p) => p.def), ...Array<string>(len - least).fill(segment ?? '')].sort(() => rng() - 0.5);
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
+      if (roomy(side) !== first) continue;
       // Back to the wall on `side` (0 the side towards the street, then clockwise), as in `place`.
       const rot = [0, 3, 2, 1][side];
       const along = side % 2 === 0;
@@ -1098,14 +1124,15 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
         }
         if (ok && reachable(f, r)) {
           for (const fr of f.fronts.slice(n)) for (const [x, z] of fr ?? []) f.keep.add(key(x, z));
-          return true;
+          return side;
         }
         undo(f, n, tiles);
       }
     }
   }
   // No wall long enough: one by one.
-  return pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required);
+  if (!pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required)) return false;
+  return undefined;
 }
 
 /** Room a chair takes along a table's edge (m). */
@@ -1195,7 +1222,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
       const [fs, bs] = [[2, 1, 0, 3][rot % 4], [0, 3, 2, 1][rot % 4]];
       const one = (w === d ? [[0, 2], [1, 3]] : w > d ? [[0], [2]] : [[1], [3]]).sort(() => rng() - 0.5);
       const choices = set.wall ? [[fs]] : set.oneSide ? (table.used ? [[bs]] : one) : [undefined];
-      const free = (s: { x: number; z: number }) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && !f.keep.has(key(s.x, s.z));
+      // Stools may stand on the kitchen's side of the way into an open living room (it stays open on the other).
+      const free = (s: { x: number; z: number }) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && (!f.keep.has(key(s.x, s.z)) || (!!set.oneSide && !!f.open?.has(key(s.x, s.z))));
       const options = choices.map((sides) => seatTiles(table, x, z, rot, sides).filter(free)).filter((seats) => seats.length >= least);
       if (!options.length) continue;
       const n = f.objects.length;
