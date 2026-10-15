@@ -110,10 +110,6 @@ Engine
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row (`tests/`) couldn't
   reproduce it.
 
-Performance
-- **Nothing is measured on the Intel HD 620 target.** On this Mac (orbit-day, Medium) the village draws 3.44 M
-  triangles (GPU 7–8 ms) and the forest 5.19 M (8–14 ms), below the commit before G3, with 3–7 more draw calls.
-
 ## Not checked yet
 
 - In play: the bike from its left side, children in the car bed, the garden hammock; the pedal bin and drawer

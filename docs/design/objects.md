@@ -113,8 +113,8 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
   without UVs.
 - **The presets** draw the same models. Low trims shadows, the lawn and lamps, not objects, and on
-  the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low on the target
-  Intel HD 620 laptops; Medium and High have room to spare. There is no level of detail for objects
+  the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low; Medium and High
+  have room to spare. There is no level of detail for objects
   yet (below).
 
 ## Materials, finishes, tints, styles and quality

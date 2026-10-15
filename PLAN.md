@@ -235,10 +235,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - **Resolution:** Auto draws native pixels up to about 1920×1080 and doesn't step down when frames run slow (the owner put that off for 0.2.0). A Custom resolution draws 50–100 %.
 - **Presets:** the three graphics presets and their costs are in [docs/design/graphics.md](docs/design/graphics.md).
 
-**Targets (the owner, 0.2.0):** laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1080p: Medium at 30 fps or more. Low there is best effort; 60 fps on Low is not a 0.2.0 target.
-- 30 fps is Medium's target, not a release gate, and it hasn't been measured on Intel hardware. Scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is estimated at about 14–41 fps by day.
-- Before 0.2.0, P1 estimated Medium at about 6–10 fps and Low at about 9–27 fps there, with the GPU as the limit.
-- The owner confirms them on real hardware with the in-game benchmark (`?bench=village`).
+**No hardware target** (the owner, 2026-10-15): there is no frame-rate goal for particular machines. Low is for older laptops, best effort.
 
 *(The plan's first targets were 60 fps at 1080p on integrated GPUs such as Apple M1 and Intel Iris Xe, with about 300 draw calls or fewer a frame and main-thread CPU at 6 ms or less, and 120 fps on discrete GPUs.)*
 
@@ -336,7 +333,6 @@ The snapshot memory layout is **defined once in Rust** (`sim-core/src/snapshot.r
 | v0.3 | **Objects built in Blender** (the owner's decision, 2026-10-13) | New objects are made in Blender and exported as glTF, as the standard. The pipeline is `tools/art/blender` on the branch `v0.3/garden-decor` (six garden decor models over their placeholders, as a pack); the standard goes into `docs/design/objects.md` once it is reviewed. The code-built placeholder models stay as fallbacks, or move over in time. |
 | v0.3 | **Stable object ids** | Every object keeps an id of its own for life, so selling or moving one shifts nothing. That replaces the remapping of follow-ups, queues and unreachable things and the `seen` guard on commands that 0.2.0 uses, and saves keep their ids across a reload. |
 | v0.3 | **Unreachable goals** | A goal in an area the resident can't reach is refused before A* floods the town, instead of capping the search (P3-08). People join the unreachable memory (Social, Join). Walkers re-route when walls change. `structure_version` is split so a change refreshes only what it touched. Settings get a version and ordered migrations. |
-| v0.3 | **Low-end PCs** (best effort) | Measured first on real Intel HD 620/530 laptops with `?bench=village` (WebGPU and WebGL2). Then, as the numbers say: weak GPUs detected at first start and given Low or WebGL2; Auto resolution stepping down when frames run slow; fewer draw calls (static shadow casters merged per lot, snapshot rendering retried in play); generated LODs for furniture and the street's houses; neighbours' houses as shells on Low; an LDR path for Low. Goal: Medium at 30 fps at 1080p on those laptops, measured; Low as fast as the trims allow. |
 | next | Voices III: Auto mode | Auto picks the right mode without frame drops, and a slow machine steps down with a clear message (phase 6 of `docs/design/voices.md`). ONNX Runtime Web stays. |
 | later | Smarter thoughts (research) | The language model also writes thoughts for actions the utility AI already chose, feeding Resident voices. The utility AI keeps deciding; a model may at most re-rank its top-3 shortlist, entering the sim as a recorded command so saves and replays stay deterministic. |
 

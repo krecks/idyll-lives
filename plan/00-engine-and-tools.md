@@ -63,7 +63,7 @@ Added after, in the same spirit:
 - **Manifest:** `motions.idle: clip`, looping always.
 - **Cost:**
   - drawn only within a distance of the camera;
-  - off on the Low preset, which must still run on Intel HD 620 / 530;
+  - off on the Low preset;
   - shadows aren't redrawn for them.
 - **For:** the ceiling fan, clock hands and pendulum, the fountains' water, pond ripples, the parasol, string
   lights, the scarecrow, the paper lantern, the lava lamp and the rain lamp.

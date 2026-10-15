@@ -44,18 +44,7 @@ Removed in 0.2.0: Ultra, Custom and the fine-tune toggles, and ambient occlusion
 
 ## Targets
 
-The owner's target machines are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
-
-| Preset | 0.2.0 target | Estimate for 0.2.0, by day / at night | Estimate before 0.2.0 (P1, §2.5.1) | Status |
-|---|---|---|---|---|
-| Medium | 30 fps or more | about 10–21 / 8–13 fps | about 6–10 fps | Probably falls short; not measured on Intel hardware; not a release gate |
-| Low | none: best effort | about 14–41 / 13–39 fps | about 9–27 fps | The owner made Low at 60 fps not a 0.2.0 target |
-| High | none | about 9–17 / 7–11 fps | about 6 fps | – |
-
-- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by 2–3×; at sign-off it applied the same models to 0.2.0 (on AC power, `render.mjs --throughput`, median of 3). Only a run on a real Intel laptop settles it; the owner does that with the benchmark (the release review's §5).
-- **Medium misses 30 fps on both models.** At night it barely improved (8.84 → 7.39 ms of GPU on the M3), because lit lamps still cost: the night range cap for the lamp cluster (P1-02) wasn't done.
-- **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
-- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, 0.2.0 allows 47–57 fps on WebGPU and 78–98 fps on WebGL2, above every GPU estimate (P1's sign-off). Before 0.2.0 WebGPU spent 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, so on WebGPU the CPU alone also kept Low from 60 fps there (P1-07).
+There is no hardware target (the owner, 2026-10-15): no frame-rate goal for particular machines. Low is for older laptops, best effort. 0.2.0's estimates for Intel HD 620/530 laptops, the old target, are in the release review's §2.5.1.
 
 ## Resolution
 
