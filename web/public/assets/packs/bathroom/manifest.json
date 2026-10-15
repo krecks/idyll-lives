@@ -929,6 +929,9 @@
       "type": "model",
       "url": "../../models/bathroom/bathCabinetTall.glb",
       "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
         "cab": {
           "finish": "material.finish.satin"
         },
@@ -941,12 +944,21 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
         "towel_blue": {
           "finish": "material.finish.satin"
         },
         "towel_cream": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "takeTowel": "door_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {

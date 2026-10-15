@@ -65,6 +65,7 @@ SECONDS = 1.4   # a drawer slides in this long
 HOLD = 1.5      # seconds it stays open once a use starts
 DOOR_SECONDS = 1.6   # a cupboard door swings in this long
 DOOR_HOLD = 2.5      # seconds a pantry's doors stay open once a use starts
+WALL_DOOR_SECONDS = 0.8   # a wall cabinet's door swings open in this long, while clean things are put away
 # catalog2's 0.79-deep counter numbers (worktop -0.48..0.31, carcass -0.46..0.24) as drawn: 0.66 deep, the
 # worktop -0.43..0.23 and the carcass -0.41..0.19 (catalog2.py COUNTER66; gamekit GameFrame `depths`)
 COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
@@ -279,7 +280,9 @@ def counterMarble():
 # Tall larders (`pantry`, `pantryTall`), wall cabinets (`wallCabinet`, `wallCabinetGlass`,
 # `wallCabinetCorner`), a cooker hood (`rangeHood`), a spice rack, a pot rail, a wall shelf
 # (`kitchenShelfWall`), a pedal bin (`trashCan`) and recycling bins. The two larders' doors swing open
-# (`doors_open`); everything else stands still this pass. A wall thing sits on the wall face (z = WALL)
+# (`doors_open`) for a snack, the wall cabinets' while clean things are put away in them, the pedal bin's lid
+# while a plate is scraped and the recycling bins' lids while the recycling is sorted; the hood, rack, rail
+# and shelf are still. A wall thing sits on the wall face (z = WALL)
 # at its real height: `floor=False`, centred in x and depth.
 
 WALL = -0.43   # the back face of a wall thing, in game depth (catalog.py WALL, docs/design/objects.md)
@@ -374,20 +377,34 @@ def pantryTall():
     G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
 
 
-# --- the wall cabinet: 1x1, two doors with pulls under it and a strip light ----------------------------
+# --- the wall cabinet: 1x1, two doors with pulls under it and a strip light; plates, bowls and mugs
+# inside, the doors swinging open while a resident puts the clean things away (`doors_open`)
 def wallCabinet():
     F = G.GameFrame(shift=0.0)
     with G.new_parts() as still:
         _case(F, 0.98, 0.72, 0.34, 0, 1.81, WALL, M.cab)
-        for s in (-1, 1):
-            F.box(f'door{s}', 0.484, 0.7, 0.02, (s * 0.245, 1.81, WALL + 0.35), M.cab, bevel=0.008)
-            _handle_v(F, f'door{s}_pull', s * 0.06, 1.56, WALL + 0.368)   # on the doors, near their bottom
+        _shelf(F, 'shelf', 0.94, 1.81, WALL + 0.02, 0.3, M.cab)
+        for i in range(6):
+            F.cyl(f'plate{i}', 0.1, 0.012, (-0.24, 1.476 + i * 0.015, WALL + 0.18), M.porcelain, verts=16)
+        for i in range(3):
+            F.cone(f'bowl{i}', 0.055, 0.075, 0.05, (0.2, 1.497 + i * 0.022, WALL + 0.18), M.porcelain, verts=14)
+        for i, x in enumerate((-0.3, -0.16, 0.12, 0.26)):
+            F.cyl(f'mug{i}', 0.038, 0.09, (x, 1.865, WALL + 0.17), M.porcelain, verts=12)
         F.box('light', 0.9, 0.012, 0.03, (0, 1.444, WALL + 0.07), M.bulb, bevel=0.004)
     G.join(still, 'body', origin=(0, 0, 0))
+    doors = []
+    for s in (-1, 1):
+        with G.new_parts() as parts:
+            F.box(f'door{s}', 0.484, 0.7, 0.02, (s * 0.245, 1.81, WALL + 0.35), M.cab, bevel=0.008)
+            _handle_v(F, f'door{s}_pull', s * 0.06, 1.56, WALL + 0.368)   # on the doors, near their bottom
+        doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.487, 1.81, WALL + 0.34)))
     G.settle(centre=False, floor=False)
+    G.swing(doors[0], 'doors_open', 100, seconds=WALL_DOOR_SECONDS)
+    G.swing(doors[1], 'doors_open', -100, seconds=WALL_DOOR_SECONDS)
 
 
-# --- the glazed wall cabinet: 1x1, glass doors showing glasses and plates ------------------------------
+# --- the glazed wall cabinet: 1x1, glass doors showing glasses and plates; the right one opens while
+# clean things are put away (`door_open`) ---------------------------------------------------------------
 def wallCabinetGlass():
     F = G.GameFrame(shift=0.0)
     with G.new_parts() as still:
@@ -398,16 +415,21 @@ def wallCabinetGlass():
             F.cyl(f'glass{i}', 0.035, 0.12, (x, 1.54, WALL + 0.17), M.glass, verts=10)
         for i in range(5):
             F.cyl(f'plate{i}', 0.1, 0.012, (0.24, 1.852 + i * 0.016, WALL + 0.17), M.porcelain, verts=16)
-        for s in (-1, 1):
-            cx = s * 0.24
+    G.join(still, 'body', origin=(0, 0, 0))
+    doors = []
+    for s in (-1, 1):
+        cx = s * 0.24
+        with G.new_parts() as parts:
             F.box(f'door{s}_l', 0.045, 0.7, 0.02, (cx - 0.2075, 1.81, WALL + 0.37), M.cab, bevel=0.004)
             F.box(f'door{s}_r', 0.045, 0.7, 0.02, (cx + 0.2075, 1.81, WALL + 0.37), M.cab, bevel=0.004)
             F.box(f'door{s}_b', 0.46, 0.045, 0.02, (cx, 1.4825, WALL + 0.37), M.cab, bevel=0.004)
             F.box(f'door{s}_t', 0.46, 0.045, 0.02, (cx, 2.1375, WALL + 0.37), M.cab, bevel=0.004)
             F.box(f'door{s}_glass', 0.37, 0.61, 0.012, (cx, 1.81, WALL + 0.365), M.glass, bevel=0.002)
             _handle_v(F, f'door{s}_pull', s * 0.04, 1.6, WALL + 0.395)
-    G.join(still, 'body', origin=(0, 0, 0))
+        doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.48, 1.81, WALL + 0.36)))
     G.settle(centre=False, floor=False)
+    # only the right door, in front of the plates, swings open: each glazed door is two draws (frame, glass)
+    G.swing(doors[1], 'door_open', -100, seconds=WALL_DOOR_SECONDS)
 
 
 # --- the corner wall cabinet: 1x1, a door on one side and open shelves on the other -------------------
@@ -415,15 +437,23 @@ def wallCabinetCorner():
     F = G.GameFrame(shift=0.0)
     with G.new_parts() as still:
         _case(F, 0.6, 0.72, 0.36, -0.18, 1.81, WALL, M.cab)
-        F.box('door', 0.58, 0.7, 0.02, (-0.18, 1.81, WALL + 0.37), M.cab, bevel=0.008)
-        _handle_v(F, 'door_pull', 0.06, 1.6, WALL + 0.395)
+        F.box('shelf', 0.56, 0.02, 0.32, (-0.18, 1.81, WALL + 0.18), M.cab, bevel=0.003)
+        for i in range(5):
+            F.cyl(f'plate{i}', 0.1, 0.012, (-0.3, 1.476 + i * 0.015, WALL + 0.19), M.porcelain, verts=16)
+        for i, x in enumerate((-0.36, -0.22, -0.08)):
+            F.cyl(f'mug{i}', 0.038, 0.09, (x, 1.865, WALL + 0.18), M.porcelain, verts=12)
         for i, y in enumerate((1.46, 1.81, 2.15)):
             F.box(f'end_shelf{i}', 0.36, 0.025, 0.34, (0.3, y, WALL + 0.17), M.oak, bevel=0.006)
         F.box('end_panel', 0.03, 0.72, 0.36, (0.46, 1.81, WALL + 0.18), M.oak, bevel=0.006)
         F.cone('pot', 0.05, 0.04, 0.14, (0.24, 1.53, WALL + 0.16), M.sage, verts=14)
         F.cyl('bowl', 0.07, 0.05, (0.3, 1.86, WALL + 0.14), M.porcelain, verts=14)
     G.join(still, 'body', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        F.box('door', 0.58, 0.7, 0.02, (-0.18, 1.81, WALL + 0.37), M.cab, bevel=0.008)
+        _handle_v(F, 'door_pull', 0.06, 1.6, WALL + 0.395)
+    door = G.join(parts, 'door', origin=F.at(-0.47, 1.81, WALL + 0.36))
     G.settle(centre=False, floor=False)
+    G.swing(door, 'door_open', 100, seconds=WALL_DOOR_SECONDS)
 
 
 # --- the cooker hood: 1x1, a canopy and a chimney with a lamp and a filter ------------------------------
@@ -519,16 +549,26 @@ def trashCan():
     G.swing(lid, 'lid_open', -75, seconds=0.5, axis='X')
 
 
-# --- the recycling bins: 1x1, three coloured bins with lids (static) ----------------------------------
+# --- the recycling bins: 1x1, three coloured bins with lids, each lid hinged at its back; they lift one
+# after another while a resident sorts the recycling (`lid0_open` .. `lid2_open`)
+BINS = ((-0.31, 'bin1'), (0.0, 'bin2'), (0.31, 'bin3'))
+
+
 def recyclingBins():
     F = G.GameFrame(shift=0.212)
     with G.new_parts() as still:
-        for i, (x, c) in enumerate(((-0.31, M.bin1), (0.0, M.bin2), (0.31, M.bin3))):
-            F.box(f'body{i}', 0.29, 0.62, 0.42, (x, 0.31, -0.22), c, bevel=0.03)
-            F.box(f'lid{i}', 0.3, 0.04, 0.44, (x, 0.64, -0.22), c, bevel=0.015)
+        for i, (x, c) in enumerate(BINS):
+            F.box(f'body{i}', 0.29, 0.62, 0.42, (x, 0.31, -0.22), getattr(M, c), bevel=0.03)
             F.box(f'handle{i}', 0.14, 0.03, 0.03, (x, 0.6, 0.0), M.lid, bevel=0.01)
     G.join(still, 'body', origin=(0, 0, 0))
+    lids = []
+    for i, (x, c) in enumerate(BINS):
+        with G.new_parts() as parts:
+            F.box(f'lid{i}', 0.3, 0.04, 0.44, (x, 0.64, -0.22), getattr(M, c), bevel=0.015)
+        lids.append(G.hinged(G.join(parts, f'lid{i}'), F.at(x, 0.62, -0.44)))
     G.settle()
+    for i, lid in enumerate(lids):
+        G.swing(lid, f'lid{i}_open', -80, seconds=0.5, axis='X')
 
 
 # --- K6: islands and bars ---------------------------------------------------------------------------
@@ -655,14 +695,15 @@ FAMILY = G.Family(
              # snack, as the larder
              motions={'uses': {'snack': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('cab', 'Cabinet'), ('brass', 'Handles')]),
+     # putting clean dishes away (a `cupboard` station, cooking putAwayAt, anim fetch) opens the doors
      G.Model('wallCabinet', wallCabinet, size=(0.98, 0.732, 0.379), key='model.wallCabinet',
-             centre=(0, -0.2405), floor=False,
+             centre=(0, -0.2405), floor=False, motions={'uses': {'fetch': 'doors_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
      G.Model('wallCabinetGlass', wallCabinetGlass, size=(0.96, 0.72, 0.406), key='model.wallCabinetGlass',
-             centre=(0, -0.227), floor=False,
+             centre=(0, -0.227), floor=False, motions={'uses': {'fetch': 'door_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
      G.Model('wallCabinetCorner', wallCabinetCorner, size=(0.96, 0.722, 0.406), key='model.wallCabinetCorner',
-             centre=(0, -0.227), floor=False,
+             centre=(0, -0.227), floor=False, motions={'uses': {'fetch': 'door_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('chrome', 'Handles')]),
      G.Model('rangeHood', rangeHood, size=(0.9, 0.712, 0.515), key='model.rangeHood',
              centre=(0, -0.1725), floor=False,
@@ -681,6 +722,9 @@ FAMILY = G.Family(
              motions={'uses': {'clean': 'lid_open'}, 'hold': 1.0},
              paint=[('steel', 'Bin'), ('lid', 'Lid')]),
      G.Model('recyclingBins', recyclingBins, size=(0.92, 0.66, 0.455), key='model.recyclingBins', centre=(0, -0.212),
+             # sorting the recycling lifts the three lids one after another
+             motions={'uses': {'sortRecycling': [{'clip': f'lid{i}_open', 'delay': 0.6 * i} for i in range(3)]},
+                      'hold': 0.9},
              paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),
      # K6: islands and bars
      G.Model('kitchenIsland', kitchenIsland, size=(1.94, 0.95, 0.839), key='model.kitchenIsland', centre=(0, 0.0495),

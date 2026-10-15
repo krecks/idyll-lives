@@ -209,7 +209,19 @@
       "group": "bathroom storage",
       "decor": 0.1,
       "description": "A slim cupboard with an open shelf for towels.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "takeTowel",
+          "label": "Take a fresh towel",
+          "anim": "fetch",
+          "minutes": 2,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "towelLadder",

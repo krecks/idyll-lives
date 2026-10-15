@@ -9,9 +9,9 @@
 # the back of their tile, their backs on the wall face (game depth -0.43), so they're built in place and
 # settled with `centre=False` (`centre=` on each Model). Their tops are the content's `surface` heights.
 # The BR3 pieces open for a resident choosing an outfit: a drawer slides out 30 cm (`drawer_open`), or
-# the doors swing out 100 degrees (`doors_open`, `door_open`) onto a rail of clothes. The BR2 pieces are
-# static, but the three-drawer nightstand's top drawer, the chest's lid and the hamper's lid are parts of
-# their own, so a clip can be added once content gives them a use.
+# the doors swing out 100 degrees (`doors_open`, `door_open`) onto a rail of clothes. Of the BR2 pieces,
+# the three-drawer nightstand's top drawer slides out for an outfit too, the chest's lid lifts for a
+# blanket and the hamper's while the washing is sorted; the rest are static.
 #
 # Run:  python3 -B tools/art/blender/build.py bedroom_storage [--preview]
 import os
@@ -251,10 +251,12 @@ def nightstandDrawers():
             _bar(f'pull{i}', 0.12, 0.014, (0, y + 0.02, front + 0.03), M.brass, d=0.016)
         _gap('drawer', 0.52, 0.135, 0, 0.485, front, M.plinth)
     G.join(still, 'nightstandDrawers', origin=(0, 0, 0))
-    # the top drawer: no use opens it yet, but it slides out on its own (`drawer`) when one does
-    _drawer('drawer', 0.52, 0.135, 0, 0.485, front, 0.44, M.walnut,
-            pulls=[(_bar, ('pull_top', 0.12, 0.014, (0, 0.505, front + 0.03), M.brass, 0.016))])
+    # the top drawer with folded clothes in it, sliding out while a resident picks an outfit
+    drawer = _drawer('drawer', 0.52, 0.135, 0, 0.485, front, 0.44, M.walnut,
+                     pulls=[(_bar, ('pull_top', 0.12, 0.014, (0, 0.505, front + 0.03), M.brass, 0.016))],
+                     contents=lambda x, y, z: _drawer_clothes(x, y, z, 0.44, 0.34))
     G.settle(centre=False)
+    G.slide(drawer, 'drawer_open', (0, -PULL, 0), seconds=DRAWER_SECONDS)
 
 
 # --- the blanket chest: a cedar box on a plinth with iron straps and side handles; the lid a part --------
@@ -297,15 +299,19 @@ def laundryHamper():
                     major_segments=28, minor_segments=6)
         G.torus('rim', 0.226, 0.012, at=F.at(0, 0.552, z), material=M.wicker2, major_segments=28,
                 minor_segments=6)
-        # a sleeve hanging out under the lid
+        # the washing in it, near the top, and a sleeve hanging out under the lid
+        for i, (x, zz, y, m) in enumerate(((-0.05, -0.04, 0.44, M.cloth1), (0.07, 0.05, 0.46, M.cloth2),
+                                           (0.0, 0.07, 0.42, M.cloth3))):
+            F.sphere(f'washing{i}', 0.13, (x, y, z + zz), m, segments=12, rings=6, scale=(1, 0.9, 0.4))
         F.box('sleeve', 0.06, 0.16, 0.01, (0.03, 0.49, z + 0.231), M.cloth1, bevel=0.004, rot=(0, 8, 0))
     G.join(still, 'laundryHamper', origin=(0, 0, 0))
-    # the lid, hinged at its back: no use lifts it yet (+use)
+    # the lid, hinged at its back: it lifts while a resident sorts the washing
     with G.new_parts() as parts:
         F.cyl('lid', 0.236, 0.04, (0, 0.58, z), M.wicker2, verts=28, bevel=0.012)
         F.sphere('lid_knob', 0.03, (0, 0.61, z), M.wicker2, segments=12, rings=6, scale=(1, 1, 0.7))
-    G.hinged(G.join(parts, 'lid'), F.at(0, 0.56, z - 0.236))
+    lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.56, z - 0.236))
     G.settle(centre=False)
+    G.swing(lid, 'lid_open', -70, seconds=0.7, axis='X')   # not past upright: it stands at the wall
 
 
 # --- the bed-end bench: a buttoned olive cushion on a slim brass frame ------------------------------------
@@ -519,8 +525,8 @@ DRAWER_USE = {'uses': {'outfit': 'drawer_open'}, 'hold': DRAWER_HOLD}
 
 FAMILY = G.Family(
     'bedroom_storage', M,
-    # BR2: static; the three-drawer nightstand's top drawer and the chest's and hamper's lids are parts
-    # of their own, for a clip once content gives them a use
+    # BR2: the three-drawer nightstand's top drawer slides out for an outfit, the chest's lid lifts for a
+    # blanket and the hamper's while the washing is sorted
     [G.Model('nightstand', nightstand, size=(0.54, 0.66, 0.468), key=_key('nightstand'), centre=(0, -0.1958),
              paint=[('oak', 'Body'), ('brass', 'Handles')]),
      G.Model('nightstandModern', nightstandModern, size=(0.58, 0.56, 0.628), key=_key('nightstandModern'),
@@ -528,13 +534,13 @@ FAMILY = G.Family(
      G.Model('nightstandRound', nightstandRound, size=(0.54, 0.57, 0.56), key=_key('nightstandRound'),
              centre=(0, -0.0498), paint=[('clay', 'Body'), ('brass', 'Handles')]),
      G.Model('nightstandDrawers', nightstandDrawers, size=(0.58, 0.6, 0.628), key=_key('nightstandDrawers'),
-             centre=(0, -0.116), paint=[('walnut', 'Body'), ('brass', 'Handles')]),
+             centre=(0, -0.116), motions=DRAWER_USE, paint=[('walnut', 'Body'), ('brass', 'Handles')]),
      G.Model('nightstandLamp', nightstandLamp, size=(0.54, 1.08, 0.468), key=_key('nightstandLamp'),
              centre=(0, -0.1958), paint=[('oak', 'Body'), ('shade', 'Shade')]),
      G.Model('cedarChest', cedarChest, size=(0.974, 0.505, 0.52), key=_key('cedarChest'),
              motions={'uses': {'takeBlanket': 'lid_open'}, 'hold': 2.0}, paint=[('cedar', 'Body'), ('iron', 'Handles')]),
      G.Model('laundryHamper', laundryHamper, size=(0.476, 0.631, 0.476), key=_key('laundryHamper'),
-             centre=(0, -0.2), paint=[('wicker', 'Hamper')]),
+             centre=(0, -0.2), motions={'uses': {'sortWashing': 'lid_open'}}, paint=[('wicker', 'Hamper')]),
      G.Model('benchBedEnd', benchBedEnd, size=(1.6, 0.471, 0.42), key=_key('benchBedEnd'),
              paint=[('brass', 'Frame'), ('olive', 'Cushion')]),
      # BR3: each opens while a resident picks an outfit

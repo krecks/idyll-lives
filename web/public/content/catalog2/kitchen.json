@@ -819,12 +819,29 @@
       "category": "validate",
       "group": "kitchen storage",
       "description": "Three bins side by side: paper, glass and plastic.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sortRecycling",
+          "label": "Sort the recycling",
+          "anim": "clean",
+          "minutes": 4,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "wallCabinetGlass",
       "name": "Glazed wall cabinet",
       "model": "model.wallCabinetGlass",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1
@@ -841,6 +858,9 @@
       "id": "wallCabinetCorner",
       "name": "Wall cabinet with end shelves",
       "model": "model.wallCabinetCorner",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1

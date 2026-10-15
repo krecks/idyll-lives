@@ -268,7 +268,21 @@
         ]
       },
       "description": "A walnut bedside chest with three drawers.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "chestOfDrawers",
@@ -524,7 +538,21 @@
       "group": "nightstands",
       "decor": 0.1,
       "description": "A wicker hamper with a lid.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sortWashing",
+          "label": "Sort the washing",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores"
+          ],
+          "autonomous": false
+        }
+      ]
     }
   ]
 }
