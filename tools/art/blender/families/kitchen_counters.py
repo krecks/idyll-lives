@@ -532,21 +532,22 @@ def recyclingBins():
 
 
 # --- K6: islands and bars ---------------------------------------------------------------------------
-# A freestanding island: cupboards on the back (-Z), a worktop overhanging the front (+Z) for stools.
+# A freestanding island: cupboards at the front (+Z), where residents stand to use it, as the kitchen island;
+# the worktop overhangs the back (-Z) 30 cm for stools, its edge on the wall face.
 def _island(F, w, body=None, top=None, handles=None):
-    """A freestanding island unit as catalog2's `island_unit`: worktop to 0.95, cupboards on the back."""
+    """A freestanding island unit as catalog2's `island_unit`: worktop to 0.95, cupboards at the front."""
     body, top, handles = body or M.cab, top or M.worktop, handles or M.chrome
-    F.box('carcass', w - 0.16, 0.82, 0.58, (0, 0.51, -0.16), body, bevel=0.012)
-    F.box('plinth', w - 0.2, 0.10, 0.52, (0, 0.05, -0.16), M.dark, bevel=0.004)
-    F.box('worktop', w - 0.04, 0.05, 0.91, (0, 0.925, -0.015), top, bevel=0.012)
+    F.box('carcass', w - 0.16, 0.82, 0.58, (0, 0.51, 0.16), body, bevel=0.012)
+    F.box('plinth', w - 0.2, 0.10, 0.52, (0, 0.05, 0.16), M.dark, bevel=0.004)
+    F.box('worktop', w - 0.04, 0.05, 0.90, (0, 0.925, 0.02), top, bevel=0.012)
     n = max(1, round((w - 0.16) / 0.46))
     dw = (w - 0.18) / n
     for i in range(n):
         x = -(w - 0.18) / 2 + dw * (i + 0.5)
-        F.box(f'door{i}', dw - 0.02, 0.72, 0.02, (x, 0.5, -0.455), body, bevel=0.008)
-        _handle_h(F, f'door{i}_pull', x, 0.78, -0.47, 0.14, handles)
+        F.box(f'door{i}', dw - 0.02, 0.72, 0.02, (x, 0.5, 0.455), body, bevel=0.008)
+        _handle_h(F, f'door{i}_pull', x, 0.78, 0.47, 0.14, handles)
     for s in (-1, 1):
-        F.box(f'end{s}', 0.04, 0.92, 0.6, (s * (w - 0.16) / 2, 0.46, -0.15), body, bevel=0.008)
+        F.box(f'end{s}', 0.04, 0.92, 0.6, (s * (w - 0.16) / 2, 0.46, 0.15), body, bevel=0.008)
 
 # --- the kitchen island: 2x1, two stools at the front, a drawer for a sandwich -----------------------
 def kitchenIsland():
@@ -569,17 +570,17 @@ def kitchenIsland():
     # sandwich slides the drawer out to the front
     G.slide(drawer, 'drawer_open', (0, -0.25, 0), seconds=SECONDS)
 
-# --- the small island: 1x1, cupboards on the back and a bowl on top (static) -------------------------
+# --- the small island: 1x1, cupboards at the front, a bare top (static) -----------------------------
 def islandSmall():
-    F = G.GameFrame(shift=0.05)                # 5 cm forward: the handles on the wall face
+    F = G.GameFrame()
     with G.new_parts() as still:
         _island(F, 1.0, handles=M.brass)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
     G.settle()
 
-# --- the long island: 3x1, six cupboards on the back and a chopping board (static) -------------------
+# --- the long island: 3x1, six cupboards at the front, a bare top (static) ---------------------------
 def islandLong():
-    F = G.GameFrame(shift=0.05)                # 5 cm forward: the handles on the wall face
+    F = G.GameFrame()
     with G.new_parts() as still:
         _island(F, 3.0, handles=M.metal)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
@@ -687,9 +688,9 @@ FAMILY = G.Family(
              # sandwich slides the drawer out (breakfast is eaten standing, or on a stool at the island)
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandSmall', islandSmall, size=(0.96, 0.95, 0.921), key='model.islandSmall', centre=(0, 0.0295),
+     G.Model('islandSmall', islandSmall, size=(0.96, 0.95, 0.911), key='model.islandSmall', centre=(0, 0.0255),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandLong', islandLong, size=(2.96, 0.95, 0.921), key='model.islandLong', centre=(0, 0.0295),
+     G.Model('islandLong', islandLong, size=(2.96, 0.95, 0.911), key='model.islandLong', centre=(0, 0.0255),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
@@ -702,7 +703,7 @@ FAMILY = G.Family(
             'drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a '
             'sandwich, as does the butcher block\'s knife drawer. The tall and wall storage (K5) adds a '
             'larder whose doors swing open for a snack; the islands and bars (K6) add freestanding '
-            'islands with a worktop overhanging the front for stools, and slatted bars with a top at '
+            'islands with their cupboards at the front and a worktop overhanging the back for stools, and slatted bars with a top at '
             '1.06, the kitchen island sliding a drawer out between its stools for a sandwich.',
 )
 

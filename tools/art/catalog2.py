@@ -344,25 +344,26 @@ add('barEnd', shift(bar(end=True), dz=0.06), top=(-0.5, 0.5, -0.42, 0.46, BT))
 
 
 def island_unit(w, body, top, tfin, handle, fp=(1, 1)):
-    """Freestanding island: cupboards on the back (-Z), an overhang for stools on the front (+Z)."""
-    p = [box([w - 0.16, 0.82, 0.58], [0, 0.51, -0.16], body, 'satin', radius=0.012),
-         box([w - 0.2, 0.1, 0.52], [0, 0.05, -0.16], PLINTH, 'satin', radius=0.004),
-         box([w - 0.04, 0.05, 0.91], [0, CT - 0.025, -0.015], top, tfin, radius=0.012)]
+    """Freestanding island: cupboards at the front (+Z), where residents stand, the worktop overhanging the
+    back (-Z) 30 cm for stools, its edge on the wall face."""
+    p = [box([w - 0.16, 0.82, 0.58], [0, 0.51, 0.16], body, 'satin', radius=0.012),
+         box([w - 0.2, 0.1, 0.52], [0, 0.05, 0.16], PLINTH, 'satin', radius=0.004),
+         box([w - 0.04, 0.05, 0.9], [0, CT - 0.025, 0.02], top, tfin, radius=0.012)]
     n = max(1, round((w - 0.16) / 0.46))
     dw = (w - 0.18) / n
     for i in range(n):
         x = -(w - 0.18) / 2 + dw * (i + 0.5)
-        p += [box([dw - 0.02, 0.72, 0.02], [x, 0.5, -0.455], body, 'satin', radius=0.008),
-              handle_h(x, 0.78, -0.47, handle, 'metal', w=0.14)]
+        p += [box([dw - 0.02, 0.72, 0.02], [x, 0.5, 0.455], body, 'satin', radius=0.008),
+              handle_h(x, 0.78, 0.47, handle, 'metal', w=0.14)]
     for x in (-(w - 0.16) / 2, (w - 0.16) / 2):                                             # end panels
-        p.append(box([0.04, 0.92, 0.6], [x, 0.46, -0.15], body, 'satin', radius=0.008))
+        p.append(box([0.04, 0.92, 0.6], [x, 0.46, 0.15], body, 'satin', radius=0.008))
     return p
 
 
 p = island_unit(1.0, SAGE, '#F2F1EE', 'gloss', BRASS)                # a bare top: housegen sets things on it
-add('islandSmall', shift(p, dz=0.05), top=(-0.48, 0.48, -0.42, 0.49, CT))    # the handles on the wall face
+add('islandSmall', p, top=(-0.48, 0.48, -0.43, 0.47, CT))
 p = island_unit(3.0, '#F1F0EC', '#C9CBCC', 'satin', BLACKMETAL, (3, 1))
-add('islandLong', shift(p, dz=0.05), (3, 1), top=(-1.48, 1.48, -0.42, 0.49, CT))
+add('islandLong', p, (3, 1), top=(-1.48, 1.48, -0.43, 0.47, CT))
 
 # Tall larder: two doors over two drawers, a cornice.
 p = [box([0.92, 2.06, 0.66], [0, 1.08, -0.12], CAB, 'satin', radius=0.012),
