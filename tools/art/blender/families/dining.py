@@ -385,7 +385,7 @@ def tableDining4():
 
 def tableDining6():
     """Dining table for six (catalog2): a walnut top on six round tapered legs, aprons."""
-    lx, lz = _rect_table(2.84, 0.92, M.top_walnut, M.legs_walnut, leg=0.07, round_legs=True, taper=0.7)
+    lx, lz = _rect_table(2.84, 0.88, M.top_walnut, M.legs_walnut, leg=0.07, round_legs=True, taper=0.7)
     for x in (-lx, 0.0, lx):
         for z in (-lz, lz):
             _ring(f'collar{x}{z}', 0.032, 0.006, 0.5, x, z, M.legs_walnut, segments=14)
@@ -394,8 +394,8 @@ def tableDining6():
 
 def tableBanquet8():
     """Banquet table (catalog2): a long planked top on six chunky legs with feet, aprons and a stretcher."""
-    lx, lz = _rect_table(3.84, 0.94, M.top_banquet, M.legs_banquet, leg=0.08, taper=0.8)
-    for z in (-0.235, 0.0, 0.235):
+    lx, lz = _rect_table(3.84, 0.88, M.top_banquet, M.legs_banquet, leg=0.08, taper=0.8)
+    for z in (-0.22, 0.0, 0.22):
         F.box(f'joint{z}', 3.84, 0.003, 0.005, (0, TT - 0.001, z), M.legs_banquet)
     for x in (-lx, 0.0, lx):
         for z in (-lz, lz):
@@ -420,9 +420,9 @@ def tableSquare8():
 
 def tableFarmhouse6():
     """Farmhouse table (catalog2): a thick planked top on two trestles joined by a stretcher."""
-    F.box('top', 2.86, 0.06, 0.94, (0, TT - 0.03, 0), M.top_farm, bevel=0.01)
-    for z in (-0.31, 0.0, 0.31):
-        F.box(f'joint{z}', 2.86, 0.003, 0.006, (0, TT - 0.001, z + 0.155), M.groove)
+    F.box('top', 2.86, 0.06, 0.88, (0, TT - 0.03, 0), M.top_farm, bevel=0.01)
+    for z in (-0.44 / 3, 0.44 / 3):
+        F.box(f'joint{z}', 2.86, 0.003, 0.006, (0, TT - 0.001, z), M.groove)
     for x in (-1.15, 1.15):
         F.box(f'post{x}', 0.1, 0.6, 0.1, (x, 0.37, 0), M.legs_farm, bevel=0.012)
         F.box(f'foot{x}', 0.1, 0.07, 0.8, (x, 0.035, 0), M.legs_farm, bevel=0.012)
@@ -915,15 +915,15 @@ FAMILY = G.Family(
              paint=[('top_white', 'Top'), ('legs_black', 'Legs')]),
      G.Model('tableDining4', tableDining4, size=(1.84, 0.75, 0.88), key='model.tableDining4',
              paint=[('top_oak', 'Top'), ('legs_oak', 'Legs')]),
-     G.Model('tableDining6', tableDining6, size=(2.84, 0.75, 0.92), key='model.tableDining6',
+     G.Model('tableDining6', tableDining6, size=(2.84, 0.75, 0.88), key='model.tableDining6',
              paint=[('top_walnut', 'Top'), ('legs_walnut', 'Legs')]),
-     G.Model('tableBanquet8', tableBanquet8, size=(3.84, 0.751, 0.94), key='model.tableBanquet8',
+     G.Model('tableBanquet8', tableBanquet8, size=(3.84, 0.751, 0.88), key='model.tableBanquet8',
              paint=[('top_banquet', 'Top'), ('legs_banquet', 'Legs')]),
      G.Model('tableRound4', tableRound4, size=(1.52, 0.75, 1.52), key='model.tableRound4',
              paint=[('top_birch', 'Top'), ('legs_birch', 'Legs')]),
      G.Model('tableSquare8', tableSquare8, size=(1.86, 0.75, 1.86), key='model.tableSquare8',
              paint=[('top_white_satin', 'Top'), ('legs_black', 'Legs')]),
-     G.Model('tableFarmhouse6', tableFarmhouse6, size=(2.86, 0.751, 0.94), key='model.tableFarmhouse6',
+     G.Model('tableFarmhouse6', tableFarmhouse6, size=(2.86, 0.751, 0.88), key='model.tableFarmhouse6',
              paint=[('top_farm', 'Top'), ('legs_farm', 'Legs')]),
      G.Model('tableBarHigh', tableBarHigh, size=(0.7, 1.06, 0.7), key='model.tableBarHigh',
              paint=[('top_black', 'Top'), ('legs_black', 'Legs')]),

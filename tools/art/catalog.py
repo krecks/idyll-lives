@@ -783,7 +783,7 @@ addp('coffeeTableGlass@modern', glass_table(BLACKMETAL, 'metal', [
     box([0.24, 0.03, 0.18], [0.3, 0.475, 0.05], COGNAC, 'matte', radius=0.004, rotate=[0, -5, 0])]), (2, 1))
 
 # Round marble table on a brass tulip foot.
-p = [cyl([0.9, 0.04, 0.9], [0, 0.4, 0], '#EEECE8', 'gloss', segments=36),
+p = [cyl([0.88, 0.04, 0.88], [0, 0.4, 0], '#EEECE8', 'gloss', segments=36),
      lathe([0.56, 0.38, 0.56], [0, 0.19, 0], BRASS, 'metal', [[0, -0.5], [0.5, -0.5], [0.5, -0.43], [0.2, -0.25], [0.11, 0.2], [0.18, 0.5], [0, 0.5]], segments=28),
      box([0.5, 0.003, 0.02], [-0.05, 0.4215, 0.06], '#C9CBCC', 'gloss', radius=0.001, rotate=[0, 32, 0]),        # veins
      box([0.3, 0.003, 0.012], [0.16, 0.4215, -0.12], '#C9CBCC', 'gloss', radius=0.001, rotate=[0, -20, 0]),
@@ -1849,7 +1849,7 @@ def foosball(body, men_a, men_b):
             p.append(box([0.08, 0.7, 0.08], [x, 0.35, z], body, 'wood', radius=0.01))
     for i, x in enumerate((-0.45, -0.15, 0.15, 0.45)):                                        # rods with players
         c = men_a if i % 2 == 0 else men_b
-        p.append(cyl([0.02, 0.96, 0.02], [x, 0.84, 0], CHROME, 'chrome', rotate=[90, 0, 0]))
+        p.append(cyl([0.02, 0.87, 0.02], [x, 0.84, 0.005], CHROME, 'chrome', rotate=[90, 0, 0]))    # its end on the wall face
         p.append(cyl([0.05, 0.08, 0.05], [x, 0.84, 0.46], '#2A2C30', 'satin', rotate=[90, 0, 0]))
         for z in (-0.18, 0.0, 0.18):
             p.append(box([0.04, 0.12, 0.05], [x, 0.8, z], c, 'gloss', radius=0.01))
@@ -2748,9 +2748,9 @@ def garden_chair(wood):
     return p
 
 
-add('gardenChair', placeholder(garden_chair('#F2F0EA')))
-add('gardenChair@modern', placeholder(garden_chair('#5C6168')))
-add('gardenChair@cozy', placeholder(garden_chair('#4E7A7F')))
+add('gardenChair', placeholder(shift(garden_chair('#F2F0EA'), dz=0.011)))           # its back on the wall face
+add('gardenChair@modern', placeholder(shift(garden_chair('#5C6168'), dz=0.011)))
+add('gardenChair@cozy', placeholder(shift(garden_chair('#4E7A7F'), dz=0.011)))
 
 
 def lamp_post(metal):

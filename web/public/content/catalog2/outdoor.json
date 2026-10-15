@@ -123,7 +123,7 @@
       "outdoors": true,
       "seat": {
         "height": 0.42,
-        "forward": 0.04
+        "forward": 0.065
       },
       "description": "A fan-backed garden chair with wide arms for a drink.",
       "interactions": [
@@ -256,7 +256,7 @@
         ],
         "at": [
           0.0,
-          -0.04
+          0.02
         ]
       },
       "description": "A teak bar for the garden; pull up bar stools.",

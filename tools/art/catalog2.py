@@ -344,25 +344,26 @@ add('barEnd', shift(bar(end=True), dz=0.06), top=(-0.5, 0.5, -0.42, 0.46, BT))
 
 
 def island_unit(w, body, top, tfin, handle, fp=(1, 1)):
-    """Freestanding island: cupboards on the back (-Z), an overhang for stools on the front (+Z)."""
-    p = [box([w - 0.16, 0.82, 0.58], [0, 0.51, -0.16], body, 'satin', radius=0.012),
-         box([w - 0.2, 0.1, 0.52], [0, 0.05, -0.16], PLINTH, 'satin', radius=0.004),
-         box([w - 0.04, 0.05, 0.94], [0, CT - 0.025, 0], top, tfin, radius=0.012)]
+    """Freestanding island: cupboards at the front (+Z), where residents stand, the worktop overhanging the
+    back (-Z) 30 cm for stools, its edge on the wall face."""
+    p = [box([w - 0.16, 0.82, 0.58], [0, 0.51, 0.16], body, 'satin', radius=0.012),
+         box([w - 0.2, 0.1, 0.52], [0, 0.05, 0.16], PLINTH, 'satin', radius=0.004),
+         box([w - 0.04, 0.05, 0.9], [0, CT - 0.025, 0.02], top, tfin, radius=0.012)]
     n = max(1, round((w - 0.16) / 0.46))
     dw = (w - 0.18) / n
     for i in range(n):
         x = -(w - 0.18) / 2 + dw * (i + 0.5)
-        p += [box([dw - 0.02, 0.72, 0.02], [x, 0.5, -0.455], body, 'satin', radius=0.008),
-              handle_h(x, 0.78, -0.47, handle, 'metal', w=0.14)]
+        p += [box([dw - 0.02, 0.72, 0.02], [x, 0.5, 0.455], body, 'satin', radius=0.008),
+              handle_h(x, 0.78, 0.47, handle, 'metal', w=0.14)]
     for x in (-(w - 0.16) / 2, (w - 0.16) / 2):                                             # end panels
-        p.append(box([0.04, 0.92, 0.6], [x, 0.46, -0.15], body, 'satin', radius=0.008))
+        p.append(box([0.04, 0.92, 0.6], [x, 0.46, 0.15], body, 'satin', radius=0.008))
     return p
 
 
 p = island_unit(1.0, SAGE, '#F2F1EE', 'gloss', BRASS)                # a bare top: housegen sets things on it
-add('islandSmall', p, top=(-0.48, 0.48, -0.47, 0.47, CT))
+add('islandSmall', p, top=(-0.48, 0.48, -0.43, 0.47, CT))
 p = island_unit(3.0, '#F1F0EC', '#C9CBCC', 'satin', BLACKMETAL, (3, 1))
-add('islandLong', p, (3, 1), top=(-1.48, 1.48, -0.47, 0.47, CT))
+add('islandLong', p, (3, 1), top=(-1.48, 1.48, -0.43, 0.47, CT))
 
 # Tall larder: two doors over two drawers, a cornice.
 p = [box([0.92, 2.06, 0.66], [0, 1.08, -0.12], CAB, 'satin', radius=0.012),
@@ -517,7 +518,7 @@ p = [box([0.72, 1.56, 0.66], [0, 0.86, -0.13], '#BFE0D2', 'gloss', radius=0.09),
      box([0.68, 0.012, 0.02], [0, 1.18, 0.205], '#A9CFC0', 'gloss', radius=0.004),
      box([0.06, 0.24, 0.05], [0.27, 1.0, 0.23], CHROME, 'chrome', radius=0.02),
      box([0.18, 0.05, 0.012], [0, 1.5, 0.205], CHROME, 'chrome', radius=0.01)]
-add('fridgeRetro', p)
+add('fridgeRetro', shift(p, dz=0.03))                            # its back on the wall face
 
 # Compact dishwasher: a stainless door under the worktop.
 p = counter_body()
@@ -558,8 +559,8 @@ def round_top(key, dia, h, pad=0.0):
 add('tableSquare2', table_rect(0.82, 0.82, OAK, OAKD, round_legs=True, taper=0.75), top=(-0.41, 0.41, -0.41, 0.41, TT))
 add('tableBistroRound', table_round(0.72, '#F1F0EC', BLACKMETAL, 'gloss'), top=round_top('tableBistroRound', 0.72, TT))
 add('tableDining4', table_rect(1.84, 0.88, OAK, OAK, leg=0.065), (2, 1), top=(-0.92, 0.92, -0.44, 0.44, TT))
-add('tableDining6', table_rect(2.84, 0.92, WALNUT, WALNUT, leg=0.07, round_legs=True, taper=0.7), (3, 1), top=(-1.42, 1.42, -0.46, 0.46, TT))
-add('tableBanquet8', table_rect(3.84, 0.94, '#8A5A36', '#6B4A33', leg=0.08), (4, 1), top=(-1.92, 1.92, -0.47, 0.47, TT))
+add('tableDining6', table_rect(2.84, 0.88, WALNUT, WALNUT, leg=0.07, round_legs=True, taper=0.7), (3, 1), top=(-1.42, 1.42, -0.44, 0.44, TT))
+add('tableBanquet8', table_rect(3.84, 0.88, '#8A5A36', '#6B4A33', leg=0.08), (4, 1), top=(-1.92, 1.92, -0.44, 0.44, TT))
 p = table_round(1.52, BIRCH, BIRCH, 'wood', 'wood', foot=0.6)
 p[2] = cyl([0.22, TT - 0.12, 0.22], [0, (TT - 0.08) / 2 + 0.03, 0], BIRCH, 'wood', taper=0.7, segments=18)
 add('tableRound4', p, (2, 2), top=round_top('tableRound4', 1.52, TT))
@@ -570,15 +571,15 @@ add('tableSquare8', p, (2, 2), top=(-0.93, 0.93, -0.93, 0.93, TT))
 
 # Farmhouse table: a thick planked top on trestle legs with a stretcher.
 FARM, FARMD = '#B48A5E', '#8E6A48'
-p = [box([2.86, 0.06, 0.94], [0, TT - 0.03, 0], FARM, 'wood', radius=0.01)]
-for z in (-0.31, 0.0, 0.31):
-    p.append(box([2.86, 0.004, 0.006], [0, TT + 0.001, z + 0.155], '#7A5A3A', 'wood', radius=0.001))
+p = [box([2.86, 0.06, 0.88], [0, TT - 0.03, 0], FARM, 'wood', radius=0.01)]
+for z in (-0.44 / 3, 0.44 / 3):
+    p.append(box([2.86, 0.004, 0.006], [0, TT + 0.001, z], '#7A5A3A', 'wood', radius=0.001))
 for x in (-1.15, 1.15):
     p += [box([0.1, 0.6, 0.1], [x, 0.37, 0], FARMD, 'wood', radius=0.012),
           box([0.1, 0.07, 0.8], [x, 0.035, 0], FARMD, 'wood', radius=0.012),
           box([0.1, 0.06, 0.78], [x, TT - 0.09, 0], FARMD, 'wood', radius=0.012)]
 p.append(box([2.3, 0.08, 0.06], [0, 0.32, 0], FARMD, 'wood', radius=0.01))
-add('tableFarmhouse6', p, (3, 1), top=(-1.43, 1.43, -0.47, 0.47, TT))
+add('tableFarmhouse6', p, (3, 1), top=(-1.43, 1.43, -0.44, 0.44, TT))
 
 # Bar-height café table (for bar stools).
 p = table_round(0.7, '#2B2C2E', BLACKMETAL, 'satin', 'metal', h=BT, foot=0.5)
@@ -866,7 +867,7 @@ p = [box([0.96, 0.22, 1.9], [0, 0.21, 0.0], SECT, 'fabric', radius=0.04),
 for lx in (-0.42, 0.42):
     for lz in (-0.88, 0.88):
         p.append(cyl([0.045, 0.1, 0.045], [lx, 0.05, lz], SECT_LEG, 'wood', taper=0.8, segments=8))
-add('chaise', p, (1, 2), seat=(SOFA_H, -0.3))
+add('chaise', shift(p, dz=0.02), (1, 2), seat=(SOFA_H, -0.28))         # its back on the wall face
 
 # Sofa bed: a boxy sofa with a visible fold line.
 p = sofa_run(1.86, '#6F7F8C', '#2B2C2E', arms=(-1, 1), cushions=1, leg_fin='metal', pillows=[(-0.55, -0.22, '#E4B8AE', 10), (0.55, -0.22, CREAM, -10)])
@@ -1493,9 +1494,9 @@ p = [cyl([0.66, 0.36, 0.66], [0, 0.18, 0.12], '#7F8C8D', 'satin', segments=24),
      lathe([0.7, 0.12, 0.7], [0, 0.42, 0.12], '#9AA3A5', 'satin', BOWL, segments=24),
      cyl([0.34, 0.03, 0.34], [0, 0.46, 0.12], '#9AA3A5', 'satin', segments=20),
      lathe([0.2, 0.2, 0.2], [0, 0.575, 0.12], '#B5653F', 'matte', VASE, segments=16),
-     cyl([0.36, 0.04, 0.36], [0, 0.42, -0.3], '#8A5A36', 'wood', segments=16)]
-p += [splayed_leg(x, z - 0.3, 0.4, 0.035, '#8A5A36', 'wood', out=0.03) for x, z in ((-0.12, -0.1), (0.12, -0.1), (-0.12, 0.1), (0.12, 0.1))]
-add('potteryWheel', p, seat=(0.45, -0.3))
+     cyl([0.3, 0.04, 0.3], [0, 0.42, -0.3], '#8A5A36', 'wood', segments=16)]
+p += [splayed_leg(x, z - 0.3, 0.4, 0.035, '#8A5A36', 'wood', out=0.03) for x, z in ((-0.1, -0.1), (0.1, -0.1), (-0.1, 0.1), (0.1, 0.1))]
+add('potteryWheel', shift(p, dz=0.02), seat=(0.45, -0.28))     # the stool's back on the wall face
 CR = '#E9E2D4'
 p = [box([1.7, 0.035, 0.5], [0, 0.735, 0.2], CR, 'satin', radius=0.01)]
 p += legs4((-0.8, 0.8), (0.0, 0.4), 0.72, 0.045, OAK, 'wood')
@@ -1776,7 +1777,7 @@ for s in (-1, 1):
           box([0.06, 0.62, 0.06], [s * 0.36, 0.31, 0.26], AD, 'satin', radius=0.01),
           box([0.06, 0.42, 0.06], [s * 0.32, 0.21, -0.24], AD, 'satin', radius=0.01),
           box([0.05, 0.08, 0.6], [s * 0.32, 0.36, 0.0], AD, 'satin', radius=0.01, rotate=[10, 0, 0])]
-add('adirondackChair', p, seat=(0.42, 0.04))
+add('adirondackChair', shift(p, dz=0.02), seat=(0.42, 0.065))   # its back on the wall face
 BEN = '#A9744E'
 p = []
 for z in (-0.08, 0.04, 0.16):
@@ -1894,7 +1895,7 @@ for x, z, w, h, c in ((-0.9, -0.26, 0.5, 0.6, '#9DC6CF'), (-0.3, -0.26, 0.4, 0.5
           box([0.02, 0.05, 0.02], [x - w / 2 + 0.05, 1.76, z], '#C08A52', 'matte', radius=0.004), box([0.02, 0.05, 0.02], [x + w / 2 - 0.05, 1.76, z], '#C08A52', 'matte', radius=0.004)]
 p.append(box([0.5, 0.26, 0.34], [-1.0, 0.13, 0.22], '#C9A979', 'fabric', radius=0.04))
 add('clothesline', p, (3, 1))
-add('outdoorBar', bar(-1.0, 1.0, body=TEAK, top='#C9A06A', rail='#8E959B'), (2, 1), top=(-1.0, 1.0, -0.48, 0.4, BT))
+add('outdoorBar', shift(bar(-1.0, 1.0, body=TEAK, top='#C9A06A', rail='#8E959B'), dz=0.06), (2, 1), top=(-1.0, 1.0, -0.42, 0.46, BT))   # its back on the wall face
 p = [box([0.06, 1.5, 0.06], [0, 0.75, 0], '#8E6E52', 'wood', radius=0.008),
      box([0.24, 0.26, 0.22], [0, 1.63, 0], '#E9DCC4', 'satin', radius=0.01),
      cyl([0.07, 0.01, 0.07], [0, 1.66, 0.111], '#2B2C2E', 'matte', rotate=[90, 0, 0], segments=12),

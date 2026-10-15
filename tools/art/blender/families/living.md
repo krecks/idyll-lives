@@ -96,7 +96,7 @@ for the side, nesting and console tables). Still, but for two:
 |---|---|---|---|---|
 | `model.coffeeTable` | 1.30 × 0.42 × 0.74 m | 1,428 | 3 | Wood, Knob |
 | `model.coffeeTableGlass` | 1.30 × 0.60 × 0.74 m | 1,764 | 2 | Frame, Glass |
-| `model.coffeeTableMarble` | 0.90 × 0.58 × 0.90 m | 1,164 | 1 | Top, Base |
+| `model.coffeeTableMarble` | 0.88 × 0.58 × 0.88 m | 1,164 | 1 | Top, Base |
 | `model.sideTable` | 0.55 × 0.55 × 0.45 m | 708 | 2 | Wood, Knob |
 | `model.coffeeTableRound` | 0.84 × 0.42 × 0.84 m | 884 | 2 | Top, Base |
 | `model.coffeeTableLong` | 1.66 × 0.42 × 0.72 m | 864 | 2 | Top, Legs |

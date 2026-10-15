@@ -810,7 +810,7 @@ ROD_Y = 0.84
 
 
 def _rod_men(F, name, x, team):
-    G.rod(f'{name}_bar', F.at(x, ROD_Y, -0.48), F.at(x, ROD_Y, 0.44), 0.009, material=M.chrome, verts=10)
+    G.rod(f'{name}_bar', F.at(x, ROD_Y, -0.43), F.at(x, ROD_Y, 0.44), 0.009, material=M.chrome, verts=10)   # its end on the wall face
     F.cyl(f'{name}_handle', 0.02, 0.09, (x, ROD_Y, 0.46), M.grip, rot=(90, 0, 0), verts=12, bevel=0.006)
     for z in (-0.37, 0.37):
         F.cyl(f'{name}_bumper{z}', 0.016, 0.016, (x, ROD_Y, z), M.grip, rot=(90, 0, 0), verts=10)
@@ -1361,7 +1361,7 @@ LUMP = 0.3          # the pot's height at rest, as a share of its height thrown
 
 
 def potteryWheel():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=0.02)        # 2 cm forward: the stool's back on the wall face
     with G.new_parts() as still:
         F.cyl('base', 0.33, 0.36, (0, 0.18, WHEEL_Z), M.wheel_body, verts=32, bevel=0.02)
         pan = [(0, -0.5), (0.3, -0.5), (0.42, -0.2), (0.5, 0.5), (0.45, 0.5), (0.36, -0.15), (0.25, -0.35), (0, -0.35)]
@@ -1374,7 +1374,7 @@ def potteryWheel():
         F.box('sponge', 0.06, 0.025, 0.04, (-0.24, 0.395, WHEEL_Z + 0.14), M.drill, bevel=0.008)
         G.rod('wire_tool', F.at(0.2, 0.39, WHEEL_Z + 0.18), F.at(0.27, 0.39, WHEEL_Z + 0.12), 0.003, material=M.chrome,
               verts=4)
-        _stool(F, -0.3, 0.44, 0.18, M.stool, M.stool)
+        _stool(F, -0.3, 0.44, 0.15, M.stool, M.stool)
     G.join(still, 'body', origin=(0, 0, 0))
     with G.new_parts() as w:
         F.cyl('wheel_head', 0.17, 0.03, (0, 0.46, WHEEL_Z), M.pan, verts=32, bevel=0.004)
@@ -1468,7 +1468,7 @@ FAMILY = G.Family(
      G.Model('poolTable', poolTable, size=(2.5, 0.842, 1.4), key='model.poolTable',
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
-     G.Model('foosball', foosball, size=(1.42, 0.947, 0.985), key='model.foosball', centre=(0, 0.0125),
+     G.Model('foosball', foosball, size=(1.42, 0.947, 0.935), key='model.foosball', centre=(0, 0.0375),
              motions={'loops': {'foosball': 'rods'}}, paint=[('foos', 'Table'), ('foos_trim', 'Trim')]),
      G.Model('dartboard', dartboard, size=(0.62, 0.62, 0.07), key='model.dartboard', centre=(0, -0.393), floor=False,
              motions={'uses': {'darts': 'darts'}}, paint=[('board', 'Board'), ('cabinet', 'Cabinet')]),
@@ -1488,7 +1488,7 @@ FAMILY = G.Family(
              paint=[('sew_table', 'Table'), ('machine', 'Machine')]),
      G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.18),
              motions={'uses': {'experiment': 'bubble'}}, paint=[('chem_bench', 'Bench'), ('glass', 'Glassware')]),
-     G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.95), key='model.potteryWheel', centre=(0, -0.005),
+     G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.92), key='model.potteryWheel', centre=(0, 0.03),
              motions={'uses': {'throw': 'clay'}, 'loops': {'throw': 'wheel'}},
              paint=[('wheel_body', 'Wheel'), ('stool', 'Stool')]),
      G.Model('craftTable', craftTable, size=(1.7, 0.904, 0.89), key='model.craftTable', centre=(0, 0.005),
