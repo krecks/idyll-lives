@@ -97,9 +97,11 @@ def _rod(name, a, b, r, material, verts=10):
     return G.rod(name, F.at(*a), F.at(*b), r, material=material, verts=verts)
 
 
-def _finish(name):
+def _finish(name, centred=False):
+    """Joins the model; `centred`: moves it onto its Model's `centre` (its back onto the wall face), else
+    leaves it where it was built."""
     G.join_all(name)
-    G.settle(centre=False)
+    G.settle(centre=centred)
     return G.meshes()
 
 
@@ -234,7 +236,7 @@ def gardenChair():
         _board('top_rail', (-0.3, 0.98, -0.43), (0.3, 0.98, -0.43), 0.05, 0.025, M.garden_white,
                face=(0, G.sind(22), G.cosd(22)), bevel=0.01)
         F.cyl('cup', 0.05, 0.1, (0.36, 0.683, 0.18), M.cup, verts=14)
-    return _finish('gardenChair')
+    return _finish('gardenChair', centred=True)
 
 
 def adirondackChair():
@@ -242,7 +244,7 @@ def adirondackChair():
         _slatted_chair('', M.adirondack, fan=1.6)
         xs = (-0.18, -0.09, 0.0, 0.09, 0.18)
         _back_slats('back', xs, (0.78, 0.84, 0.87, 0.84, 0.78), M.adirondack, fan=1.6)
-    return _finish('adirondackChair')
+    return _finish('adirondackChair', centred=True)
 
 
 # --- the round patio table: a mosaic top on an iron pedestal ---------------------------------------------------
@@ -343,7 +345,7 @@ def outdoorBar():
             _rod(f'bracket{x}', (x, 0.2, 0.15), (x, 0.2, 0.26), 0.014, M.steel, verts=10)
         for x in (-0.95, 0.95):
             F.sphere(f'rail_end{x}', 0.022, (x, 0.2, 0.26), M.steel, segments=12, rings=8)
-    return _finish('outdoorBar')
+    return _finish('outdoorBar', centred=True)
 
 
 # --- the parasol: an octagonal canopy on ribs, on a pole in a weighted base ------------------------------------
@@ -578,7 +580,7 @@ FAMILY = G.Family(
              paint=[('iron', 'Frame'), ('bistro', 'Slats')]),
      G.Model('picnicTable', picnicTable, size=(2.5, 0.958, 1.62), key='model.picnicTable',
              paint=[('pine_dark', 'Frame'), ('pine', 'Planks'), ('cloth', 'Cloth')]),
-     G.Model('gardenChair', gardenChair, size=(0.84, 1.041, 0.757), centre=(0, -0.069), key='model.gardenChair',
+     G.Model('gardenChair', gardenChair, size=(0.84, 1.041, 0.757), centre=(0, -0.052), key='model.gardenChair',
              paint=[('garden_white', 'Chair')]),
      G.Model('patioTableRound', patioTableRound, size=(0.816, 0.725, 0.816), key='model.patioTableRound',
              paint=[('iron', 'Frame'), ('mosaic', 'Top'), ('tile', 'Tiles')]),
@@ -586,11 +588,11 @@ FAMILY = G.Family(
              paint=[('teak_dark', 'Frame'), ('teak', 'Top')]),
      G.Model('patioChair', patioChair, size=(0.46, 0.928, 0.448), centre=(0, 0.042), key='model.patioChair',
              paint=[('patio_green', 'Frame'), ('cushion', 'Cushion')]),
-     G.Model('adirondackChair', adirondackChair, size=(0.88, 1.097, 0.785), centre=(0, -0.063), key='model.adirondackChair',
+     G.Model('adirondackChair', adirondackChair, size=(0.88, 1.097, 0.785), centre=(0, -0.038), key='model.adirondackChair',
              paint=[('adirondack', 'Chair')]),
      G.Model('benchGarden3', benchGarden3, size=(2.7, 0.906, 0.602), centre=(0, -0.021), key='model.benchGarden3',
              paint=[('iron', 'Frame'), ('bench_slats', 'Slats')]),
-     G.Model('outdoorBar', outdoorBar, size=(2.0, 1.06, 0.89), centre=(0, -0.045), key='model.outdoorBar',
+     G.Model('outdoorBar', outdoorBar, size=(2.0, 1.06, 0.89), centre=(0, 0.015), key='model.outdoorBar',
              paint=[('teak', 'Body'), ('bar_top', 'Counter'), ('steel', 'Foot rail')]),
      G.Model('parasol', parasol, size=(2.2, 2.46, 2.2), key='model.parasol', motions={'idle': 'stir'},
              paint=[('canopy', 'Canopy'), ('pole', 'Pole'), ('valance', 'Edge')]),

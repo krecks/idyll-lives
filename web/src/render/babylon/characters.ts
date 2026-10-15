@@ -183,7 +183,7 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
   sewingTable: { h: 0.46, fwd: -0.22 },
   patioSet: { h: 0.44, fwd: -0.62 },
   picnicTable: { h: 0.4, fwd: -0.68 },
-  gardenChair: { h: 0.4, fwd: -0.1 },
+  gardenChair: { h: 0.4, fwd: -0.083 },
   swingSet: { h: 0.5, fwd: 0 },
 };
 const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };

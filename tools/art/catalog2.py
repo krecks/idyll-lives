@@ -1776,7 +1776,7 @@ for s in (-1, 1):
           box([0.06, 0.62, 0.06], [s * 0.36, 0.31, 0.26], AD, 'satin', radius=0.01),
           box([0.06, 0.42, 0.06], [s * 0.32, 0.21, -0.24], AD, 'satin', radius=0.01),
           box([0.05, 0.08, 0.6], [s * 0.32, 0.36, 0.0], AD, 'satin', radius=0.01, rotate=[10, 0, 0])]
-add('adirondackChair', p, seat=(0.42, 0.04))
+add('adirondackChair', shift(p, dz=0.02), seat=(0.42, 0.065))   # its back on the wall face
 BEN = '#A9744E'
 p = []
 for z in (-0.08, 0.04, 0.16):
@@ -1894,7 +1894,7 @@ for x, z, w, h, c in ((-0.9, -0.26, 0.5, 0.6, '#9DC6CF'), (-0.3, -0.26, 0.4, 0.5
           box([0.02, 0.05, 0.02], [x - w / 2 + 0.05, 1.76, z], '#C08A52', 'matte', radius=0.004), box([0.02, 0.05, 0.02], [x + w / 2 - 0.05, 1.76, z], '#C08A52', 'matte', radius=0.004)]
 p.append(box([0.5, 0.26, 0.34], [-1.0, 0.13, 0.22], '#C9A979', 'fabric', radius=0.04))
 add('clothesline', p, (3, 1))
-add('outdoorBar', bar(-1.0, 1.0, body=TEAK, top='#C9A06A', rail='#8E959B'), (2, 1), top=(-1.0, 1.0, -0.48, 0.4, BT))
+add('outdoorBar', shift(bar(-1.0, 1.0, body=TEAK, top='#C9A06A', rail='#8E959B'), dz=0.06), (2, 1), top=(-1.0, 1.0, -0.42, 0.46, BT))   # its back on the wall face
 p = [box([0.06, 1.5, 0.06], [0, 0.75, 0], '#8E6E52', 'wood', radius=0.008),
      box([0.24, 0.26, 0.22], [0, 1.63, 0], '#E9DCC4', 'satin', radius=0.01),
      cyl([0.07, 0.01, 0.07], [0, 1.66, 0.111], '#2B2C2E', 'matte', rotate=[90, 0, 0], segments=12),

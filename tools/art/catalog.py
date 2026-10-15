@@ -2748,9 +2748,9 @@ def garden_chair(wood):
     return p
 
 
-add('gardenChair', placeholder(garden_chair('#F2F0EA')))
-add('gardenChair@modern', placeholder(garden_chair('#5C6168')))
-add('gardenChair@cozy', placeholder(garden_chair('#4E7A7F')))
+add('gardenChair', placeholder(shift(garden_chair('#F2F0EA'), dz=0.011)))           # its back on the wall face
+add('gardenChair@modern', placeholder(shift(garden_chair('#5C6168'), dz=0.011)))
+add('gardenChair@cozy', placeholder(shift(garden_chair('#4E7A7F'), dz=0.011)))
 
 
 def lamp_post(metal):
