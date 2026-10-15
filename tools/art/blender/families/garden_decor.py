@@ -92,23 +92,23 @@ def fountain():
     return G.settle([G.join_all('fountain')])
 
 
-# The lantern's hexagons are regular, so it is wider corner to corner (Blender y) than flat to flat (x):
-# its radii are sized so both sides land within 8 % of the placeholder's 0.54 m square.
-LANTERN_R = 1.075
+# The lantern's hexagons are regular and turned as the placeholder's (Babylon cylinders): corners to the
+# sides (x), flats to the front and back, so it is 0.54 m across its roof's corners and 0.47 deep, as the
+# placeholder. (Blender starts a circle at +y; `rot` turns it 30 degrees.)
 
 
 def lantern():
     # a Japanese stone lantern: hexagonal base, column, fire box and roof
     def hexa(name, r1, r2, depth, z, material, verts=6):
-        G.cone(name, r1 * LANTERN_R, r2 * LANTERN_R, depth, at=(0, 0, z), material=material, verts=verts, smooth=False)
+        G.cone(name, r1, r2, depth, at=(0, 0, z), material=material, verts=verts, smooth=False, rot=(0, 0, 30))
     hexa('base', 0.23, 0.21, 0.09, 0.045, M.stone_dark)
     hexa('base2', 0.16, 0.13, 0.05, 0.115, M.stone_dark)
     hexa('column', 0.085, 0.075, 0.36, 0.32, M.stone)
     hexa('platform', 0.20, 0.185, 0.07, 0.535, M.stone)
     hexa('firebox', 0.15, 0.145, 0.20, 0.67, M.glow)
     for i in range(6):
-        a = 60 * i + 30
-        r = 0.115 * LANTERN_R
+        a = 60 * i
+        r = 0.115
         G.cone(f'post{i}', 0.026, 0.024, 0.20, at=(r * G.cosd(a), r * G.sind(a), 0.67),
                material=M.stone, verts=4, smooth=False)
     hexa('roof', 0.27, 0.045, 0.17, 0.855, M.stone)
@@ -166,7 +166,7 @@ FAMILY = G.Family(
     [G.Model('gnome', gnome, size=(0.26, 0.58, 0.18), tolerance=TOLERANCE),
      G.Model('birdbath', birdbath, size=(0.68, 0.935, 0.68), tolerance=TOLERANCE),
      G.Model('fountain', fountain, size=(0.92, 1.17, 0.92), tolerance=TOLERANCE),
-     G.Model('lantern', lantern, size=(0.54, 1.035, 0.54), tolerance=TOLERANCE),
+     G.Model('lantern', lantern, size=(0.54, 1.035, 0.468), tolerance=TOLERANCE),
      G.Model('wheelbarrow', wheelbarrow, size=(0.587, 0.754, 1.036), tolerance=TOLERANCE),
      G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE)],
     pack='gardenDecor',
