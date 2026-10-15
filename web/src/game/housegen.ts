@@ -722,11 +722,12 @@ const BASEMENT_TRIES = [40, 400];
 
 /**
  * A basement under the house: stairs down from a ground-floor room (the living room, the
- * entrance hall or the dining room; else the kitchen), along one of its walls, climbing either
- * way, their top and landing in the room (which stays walkable round the stairwell). Below, a
- * hall two tiles wide holding the stairs, at least as long as they and their foot, and the rooms
- * of `kinds` off it (as upstairs) on the side away from the stairs, under the house; the
- * basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
+ * entrance hall or the dining room; else the kitchen), along one of its walls (its only outside
+ * wall, which its windows need, if nothing else will do; never that of a room open to the next),
+ * climbing either way, their top and landing in the room (which stays walkable round the
+ * stairwell). Below, a hall two tiles wide holding the stairs, at least as long as they and
+ * their foot, and the rooms of `kinds` off it (as upstairs) on the side away from the stairs,
+ * under the house; the basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
  * once it all fits does the ground keep the stairwell and landing clear. Null if it doesn't.
  */
 function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[], has: Set<Kind>, lampTiles: number): Floor | null {
@@ -739,16 +740,26 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
   const could = (w: number, d: number) => kinds.every((k) => longest(k, w) >= cfg.rooms[k].minSide) && d >= kinds.reduce((n, k) => n + cfg.rooms[k].minSide, 0) && d <= kinds.reduce((n, k) => n + longest(k, w), 0);
   // Worked out along z, the stairs in column `u` climbing along `v`; stairs along x (`across`)
   // the same with x and z swapped.
-  type Spot = { across: boolean; u: number; first: boolean; room: Room };
+  // `dark`: along the room's only outside wall, which its windows need.
+  type Spot = { across: boolean; u: number; first: boolean; room: Room; dark: boolean };
   const spots: Spot[] = [];
   for (const room of g.rooms.filter((r) => DOWN_ROOMS.includes(r.kind)).sort(() => rng() - 0.5)) {
+    // Its outside walls (towards the street, then clockwise).
+    const out = [room.z === house.z, room.x + room.w === house.x + house.w, room.z + room.d === house.z + house.d, room.x === house.x];
+    const only = out.filter(Boolean).length === 1;
+    // Never there in a kitchen or living room open to the other (its windows light both).
+    const opened = [...(g.open ?? [])].some((t) => inside(room, ...(t.split(':').map(Number) as [number, number])));
     for (const across of [false, true]) {
       const [u0, n] = across ? [room.z, room.d] : [room.x, room.w];
       // Against the room's first wall (the hall past the stairs, the rooms past it), or its last.
-      spots.push({ across, u: u0, first: true, room }, { across, u: u0 + n - 1, first: false, room });
+      const [low, high] = [only && out[across ? 0 : 3], only && out[across ? 2 : 1]];
+      if (!(low && opened)) spots.push({ across, u: u0, first: true, room, dark: low });
+      if (!(high && opened)) spots.push({ across, u: u0 + n - 1, first: false, room, dark: high });
     }
   }
-  spots.sort(() => rng() - 0.5).sort((a, b) => Number(a.room.kind === 'kitchen') - Number(b.room.kind === 'kitchen'));
+  // The kitchen last (it wants its floor for an island), and a room's only outside wall only if nothing else will do.
+  const last = (s: Spot) => 2 * Number(s.dark) + Number(s.room.kind === 'kitchen');
+  spots.sort(() => rng() - 0.5).sort((a, b) => last(a) - last(b));
   let total = 0;
   for (const { across, u, first, room } of spots) {
     const at = (a: number, b: number): [number, number] => (across ? [b, a] : [a, b]);
@@ -1464,7 +1475,8 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectIn
 
 /**
  * Every free tile of the room the doors need is still connected, and so is a way to everything
- * in it: its front tile (which must be free), or for chairs one of the free tiles round them.
+ * in it: its front tile (which must be free), or for chairs one of the free tiles round them;
+ * no free floor is shut off behind furniture.
  */
 function reachable(f: Floor, r: Room): boolean {
   const free = (x: number, z: number) => inside(r, x, z) && !f.taken.has(key(x, z));
@@ -1493,7 +1505,10 @@ function reachable(f: Floor, r: Room): boolean {
       }
     }
   }
-  return needed.every((k) => seen.has(k)) && ways.every((w) => w.some((k) => seen.has(k)));
+  if (!needed.every((k) => seen.has(k)) || !ways.every((w) => w.some((k) => seen.has(k)))) return false;
+  // No free floor shut off behind furniture.
+  for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (free(x, z) && !seen.has(key(x, z))) return false;
+  return true;
 }
 
 function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }): void {
