@@ -340,26 +340,39 @@ fn the_last_one_out_of_the_hot_tub_puts_the_cover_on() {
     }
 }
 
+/// On their way to it, or with the order still in their queue. With `DUMP_STATES=1`, writes
+/// `hot-tub-cover`: the tub open, before the orders (to give them in the browser and see the
+/// story's line).
 #[test]
 fn told_to_cover_the_hot_tub_as_someone_gets_in_first_the_player_hears_of_it() {
-    let (mut w, _) = shipped();
-    let soak = interaction(&w, HOT_TUB, "soak");
-    let cover = interaction(&w, HOT_TUB, "coverOn");
-    w.objects[HOT_TUB as usize].open = true;
-    for n in ["comfort", "hygiene", "fun"] {
-        let i = w.content.needs.iter().position(|d| d.id == n).unwrap();
-        w.sims[1].needs[i] = 0.2;
+    for queued in [false, true] {
+        let (mut w, _) = shipped();
+        let soak = interaction(&w, HOT_TUB, "soak");
+        let cover = interaction(&w, HOT_TUB, "coverOn");
+        w.objects[HOT_TUB as usize].open = true;
+        for n in ["comfort", "hygiene", "fun"] {
+            let i = w.content.needs.iter().position(|d| d.id == n).unwrap();
+            w.sims[1].needs[i] = 0.2;
+        }
+        if !queued {
+            common::dump_state(&w, "hot-tub-cover");
+        }
+        // Ada is told to put the cover on (nobody's in it yet: after a walk to the far corner, if
+        // queued), then Bea to soak; Bea is nearer.
+        if queued {
+            w.apply(Command::MoveTo { sim: 0, x: 1.5, z: 12.5 }).unwrap();
+        }
+        w.apply(Command::Use { sim: 0, object: HOT_TUB, interaction: cover }).unwrap();
+        w.apply(Command::Use { sim: 1, object: HOT_TUB, interaction: soak }).unwrap();
+        let told = |w: &World| w.events.iter().filter(|e| e.kind == EventKind::NotClosed && e.a == 0).count();
+        assert!(until(&mut w, 30, |w| told(w) > 0), "Ada's order is dropped, and the player told (queued {queued})");
+        assert_eq!(told(&w), 1, "once");
+        let def = w.objects[HOT_TUB as usize].def as i64;
+        assert_eq!(w.events.iter().rev().find(|e| e.kind == EventKind::NotClosed).and_then(|e| e.n), Some(def), "about the tub");
+        assert!(EventKind::NotClosed.importance() >= 1, "it shows in the feed");
+        assert!(until(&mut w, 30, |w| using(w, 1) == Some(soak)), "Bea soaks");
+        assert!(w.objects[HOT_TUB as usize].open && using(&w, 0).is_none(), "the cover off, Ada not at it");
+        assert!(until(&mut w, 120, |w| !w.objects[HOT_TUB as usize].open), "Bea puts it on as she gets out");
+        assert_eq!(told(&w), 1);
     }
-    // Ada is told to put the cover on (nobody's in it yet), then Bea to soak; Bea is nearer.
-    w.apply(Command::Use { sim: 0, object: HOT_TUB, interaction: cover }).unwrap();
-    w.apply(Command::Use { sim: 1, object: HOT_TUB, interaction: soak }).unwrap();
-    let told = |w: &World| w.events.iter().filter(|e| e.kind == EventKind::NotClosed && e.a == 0).count();
-    assert!(until(&mut w, 30, |w| told(w) > 0), "Ada's order is dropped, and the player told");
-    assert_eq!(told(&w), 1, "once");
-    let def = w.objects[HOT_TUB as usize].def as i64;
-    assert_eq!(w.events.iter().rev().find(|e| e.kind == EventKind::NotClosed).and_then(|e| e.n), Some(def), "about the tub");
-    assert!(EventKind::NotClosed.importance() >= 1, "it shows in the feed");
-    assert!(w.objects[HOT_TUB as usize].open && using(&w, 1) == Some(soak) && using(&w, 0).is_none(), "Bea soaks, the cover off");
-    assert!(until(&mut w, 120, |w| !w.objects[HOT_TUB as usize].open), "Bea puts it on as she gets out");
-    assert_eq!(told(&w), 1);
 }

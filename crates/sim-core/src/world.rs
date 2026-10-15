@@ -3763,6 +3763,12 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(inter) = content.objects[obj.def].interactions.get(interaction) else {
                 return;
             };
+            // An order to close it on someone who got in (or set off for it) after it was given:
+            // the player is told.
+            if task.directed && obj.closes_on_someone(inter, sim.id) {
+                sim.news.get_or_insert(News::NotClosed(object));
+                return;
+            }
             if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
                 return;
             }
@@ -3777,9 +3783,6 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             }
             if !obj.allows(inter, sim.id) {
-                if task.directed && obj.closes_on_someone(inter, sim.id) {
-                    sim.news.get_or_insert(News::NotClosed(object));
-                }
                 return;
             }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
