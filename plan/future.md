@@ -67,17 +67,39 @@ Models and content
   vegetable patch is bare (all its plants under the soil); the unused `*.far` tree keys are gone; flowers are
   colourable only where their petals are one colour.
 
+## Decided in the second round (2026-10-15, review these)
+
+Merges `7a0ba3c` (veggie bed, bureau), `85650aa` (beds), `224b52f` (tables), `110aee3` (parts), and `b392650`,
+`1571669` (housegen).
+
+- **Beds keep their place; the head end is tucked:** headboards 3.5–4 cm thick (were 5.5–6), posts and boards
+  2.5–5 cm forward, the car bed's body shorter at the back, so mattresses, pillows and sleepers stay put and no
+  foot passes its tile. The crib, ball pit and play mat moved 3–3.5 cm forward; the ball pit, crib and rain
+  shower are 1 cm smaller so their fronts end on the tile; showers 2–3 cm forward; the rocking horse rocks ±14°.
+- **The six-seat, farmhouse and banquet tables are 0.88 m deep** (as the four-seat), the marble coffee table
+  0.88 across: shallower, still centred, so housegen's chairs line up on both sides. The chaise and pottery
+  wheel moved 2 cm forward (its stool 30 cm across); the foosball's rods stop at the wall face.
+- **The small and long islands are turned round** as the kitchen island (cupboards at the front).
+- **Outdoor things:** the gate skips the `outside` groups by design. Only those with a real back stand on the
+  wall face now (garden chair, Adirondack chair, outdoor bar); swings, slide, phone box, stalls, fountain, farm
+  and the playground stand free and keep their depth.
+- **Putting clean things away goes to the nearest cupboard or counter** (new `cupboard` station,
+  `putAwayAt: ["cupboard", "prep"]`, `cooking.rs`): the wall cabinets, sideboard, buffet and china cabinet open a
+  door for it (the sideboard and buffet got a real cupboard inside). New non-autonomous uses: "Take a fresh
+  towel" (tall bathroom cabinet), "Sort the washing" (hamper, lid at 70° so it stays out of the wall), "Sort the
+  recycling" (lids one after another); the three-drawer nightstand's drawer opens on "Pick an outfit".
+- **A use clip plays on top of the growth pose** (`partPose`, documented in `objects.md`): tending the veggie
+  bed sways its plants 3° about the soil line, every 2.4 s.
+- **The writing bureau is turned round** (back on the wall face, the writer in front facing it, `seat.facing:
+  "back"`).
+- **Housegen:** cooking stations count as a use (an island's stools go behind, its front stays clear for the
+  cook); free tables try both facings (48 spots, was 24); a wall thing with a use hangs only where its front tile
+  is free and reachable (the mirror cabinet's "Brush your teeth" had left 7 of 180 sample houses failing). Sample
+  houses: 0 problems; islands with two stools 19 of 60 large (was 28, some with stools on the cook's side).
+
 ## Still open
 
 Placement
-- **Freestanding things still reach 2–6 cm into the wall** (hidden unless the wall is cut away), model and
-  placeholder both: the beds (moving them pushes the foot past the tile or the headboard onto the sleeper),
-  crib, showers, play mat; the dining tables, small and long islands, foosball, pottery wheel, marble coffee
-  table, chaise; 13 outdoor and community things (bistro set, adirondack and garden chairs, outdoor bar 6 cm,
-  phone box, porch swing, swing set, slide, ping-pong table, playground, stalls, town fountain, farm);
-  `soloSauna` and `danceFloor` 1 cm. The gate lists them all.
-- **`fridgeRetro`** reaches 3.5 cm into the wall (re-exported for its lever from the old place): `catalog2.py`
-  `shift(p, dz=0.03)` for the placeholder and `Model` centre about (0, -0.07).
 - **The steam mop dock's placeholder** reaches 2 cm into the wall.
 - **Houseplants into the wall:** `garden.monstera` 24 cm, `palm` 6, `bostonFern` 4. The plants' 10–15 % size
   differences from their placeholders are real now (the gate measures turned parts exactly), and `tree`,
@@ -87,15 +109,11 @@ Placement
 - **`GameFrame(shift=…)`'s comment** says it moves depths back; a positive shift moves them forward (+z).
 
 Uses and clips
-- **Parts with no use yet** (built separate, no clip): the tall bathroom cabinet's door, `nightstandDrawers`'
-  drawer, the hamper lid, the laundry basket's lid (not built), the high chair's tray (the sim only places a baby
-  lying), the wall cabinets', sideboard's, buffet's and china cabinet's doors, the nesting tables' small table,
-  the executive desk's drawer, the recycling bins' lids. The kettle, bread bin and laptop sit on tops, and
-  nothing on a top has a use yet.
-- **The veggie bed's `tendVeggies` plays no clip:** every part follows the growth stage, and a use clip would
-  override it. Needs use clips that combine with the growth pose (`objectMotion.ts`).
-- **The writing bureau (bookworm)** seats the writer between the wall and the bureau: give it
-  `seat.facing: "back"` as the piano.
+- **Parts still with no use:** the executive desk's drawer (residents use the desk through its chair, and a
+  clip plays only on the object used: needs a seat's use to play a clip on the desk it faces); the nesting
+  tables' small table (no use reads naturally, and one would need its front tile free beside a sofa); the high
+  chair's tray (the sim never seats a baby in it); the laundry basket's lid (not built); the kettle, bread bin
+  and laptop (content rules forbid uses on things on a top: sim work).
 - **Lettuces don't show at the planted stage**; they appear from growing on.
 - **Moving a lamp turns it back on** (the move and undo code don't carry `off`; one line next to each `open` copy).
 - **An ordered "Put the cover on"** is dropped silently when another resident is in or heading to the tub.
@@ -115,6 +133,9 @@ Engine
 - In play: the bike from its left side, children in the car bed, the garden hammock; the pedal bin and drawer
   counter during a real meal (clips bench only); the fourth facing of the kitchen models; the bathroom, bedroom,
   kitchen and outdoor things on a town lot beyond the samples; the catalog pictures of the other groups.
+- After the second round: a baby in the crib and a second sleeper in the upper bunk, the garden chairs and
+  outdoor bar, the long island, the hamper in a house (it played in the agent's test), all on WebGL2. A sleeper
+  in `bedDouble` shows their shoes through the quilt halfway down (seen once, likely older than this round).
 
 ## Testing (how, after the fix-up round)
 
