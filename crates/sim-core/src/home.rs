@@ -927,7 +927,10 @@ impl World {
             if matches!(target, Edge::Window | Edge::Fence | Edge::Gate) && (self.storey_of(a.1) < 0 || self.storey_of(b.1) < 0) {
                 return Err(Error::new("a basement is underground: no windows, fences or gates down there"));
             }
-            if e.kind != EdgeKind::Open && diagonal.is_some() && object_at(a.0, a.1).is_some() {
+            if e.kind != EdgeKind::Open
+                && let Some(dir) = diagonal
+                && (object_at(a.0, a.1).is_some() || self.objects.iter().any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
+            {
                 return Err(Error::new("a wall can't go through furniture"));
             }
             if e.kind != EdgeKind::Open

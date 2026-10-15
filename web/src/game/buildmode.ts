@@ -159,22 +159,39 @@ function offsetKey(offset: [number, number] | undefined): string {
  * `offset` off their middle and `extent` (cm, before turning) in size, as sim-core `body_edges`.
  */
 function bodyEdges(x: number, z: number, w: number, d: number, rot: number, offset: readonly [number, number], extent: readonly [number, number]): [[number, number], [number, number]][] {
+  const [x0, x1, z0, z1] = bodyBox(x, z, w, d, rot, offset, extent);
+  // The tiles it overlaps, and the tile lines strictly inside it.
+  const lines = (lo: number, hi: number) => range(Math.floor(lo / 200) + 1, Math.floor((hi - 1) / 200) + 1);
+  const edges: [[number, number], [number, number]][] = [];
+  for (const lx of lines(x0, x1)) for (const tz of boxTiles(z0, z1)) edges.push([[lx - 1, tz], [lx, tz]]);
+  for (const lz of lines(z0, z1)) for (const tx of boxTiles(x0, x1)) edges.push([[tx, lz - 1], [tx, lz]]);
+  return edges;
+}
+
+const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
+/** The tiles a body's sides `lo`..`hi` (half centimetres) overlap along one axis. */
+const boxTiles = (lo: number, hi: number) => range(Math.floor(lo / 200), Math.floor((hi + 199) / 200));
+
+/** A body's sides `[x0, x1, z0, z1]` in half centimetres (tile lines every 200), as sim-core `body_box`. */
+function bodyBox(x: number, z: number, w: number, d: number, rot: number, offset: readonly [number, number], extent: readonly [number, number]): [number, number, number, number] {
   const [ex, ez] = rot % 2 === 0 ? extent : [extent[1], extent[0]];
-  // Its sides along one axis, in half centimetres (tile lines every 200).
   const span = (at: number, tiles: number, off: number, size: number) => {
     const mid = 2 * (at * 100 + off) + tiles * 100;
     return [mid - size, mid + size];
   };
-  const [x0, x1] = span(x, w, offset[0], ex);
-  const [z0, z1] = span(z, d, offset[1], ez);
-  // The tiles it overlaps, and the tile lines strictly inside it.
-  const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
-  const tiles = (lo: number, hi: number) => range(Math.floor(lo / 200), Math.floor((hi + 199) / 200));
-  const lines = (lo: number, hi: number) => range(Math.floor(lo / 200) + 1, Math.floor((hi - 1) / 200) + 1);
-  const edges: [[number, number], [number, number]][] = [];
-  for (const lx of lines(x0, x1)) for (const tz of tiles(z0, z1)) edges.push([[lx - 1, tz], [lx, tz]]);
-  for (const lz of lines(z0, z1)) for (const tx of tiles(x0, x1)) edges.push([[tx, lz - 1], [tx, lz]]);
-  return edges;
+  return [...span(x, w, offset[0], ex), ...span(z, d, offset[1], ez)] as [number, number, number, number];
+}
+
+/** Whether a diagonal wall `axis` across tile `tx, tz` runs through a body (`bodyBox`), as sim-core `body_crosses`. */
+function bodyCrosses([x0, x1, z0, z1]: readonly [number, number, number, number], tx: number, tz: number, axis: 'dp' | 'dn'): boolean {
+  // The part of the body on that tile; the wall runs through it when it passes strictly inside.
+  const [a0, a1] = [Math.max(x0, tx * 200), Math.min(x1, tx * 200 + 200)];
+  const [b0, b1] = [Math.max(z0, tz * 200), Math.min(z1, tz * 200 + 200)];
+  if (a0 >= a1 || b0 >= b1) return false;
+  // `dp` (/): x - z is that of corner (x, z) all along it; `dn` (\): x + z that of (x, z + 1).
+  const on = axis === 'dp' ? 200 * (tx - tz) : 200 * (tx + tz + 1);
+  const [lo, hi] = axis === 'dp' ? [a0 - b1, a1 - b0] : [a0 + b0, a1 + b1];
+  return lo < on && on < hi;
 }
 
 export class BuildBuyInput {
@@ -641,6 +658,15 @@ export class BuildBuyInput {
     }
     // Nor through its body where it stands off its tiles (sim-core `body_edges`).
     if (offset && extent && bodyEdges(x, z, w, d, rot, offset, extent).some(([[ax, az], [bx, bz]]) => this.wallBetween(ax, az, bx, bz))) return 'Blocked by a wall';
+    if (offset && extent) {
+      const box = bodyBox(x, z, w, d, rot, offset, extent);
+      for (const tz of boxTiles(box[2], box[3])) {
+        for (const tx of boxTiles(box[0], box[1])) {
+          const axis = this.diagonals.get(`${tx}:${tz}`);
+          if (axis && bodyCrosses(box, tx, tz, axis)) return 'Blocked by a wall';
+        }
+      }
+    }
     const [fx, fz] = front;
     const back = [
       [fx, fz - 1],
@@ -1357,7 +1383,9 @@ export class BuildBuyInput {
       if ((e.axis !== 'dp' && e.axis !== 'dn') || e.kind === 'open') return true;
       const other = this.diagonals.get(`${e.x}:${e.z}`);
       if (other && other !== e.axis) return false;
-      return !game.objects.some((o) => e.x >= o.x && e.z >= o.z && e.x < o.x + o.w && e.z < o.z + o.d);
+      // Nor through the body of something standing off its tiles.
+      const body = (o: ObjectPlacement) => bodyBox(o.x, o.z, o.w, o.d, o.rot, o.offset ?? [0, 0], ownSize(this.content, o));
+      return !game.objects.some((o) => (e.x >= o.x && e.z >= o.z && e.x < o.x + o.w && e.z < o.z + o.d) || bodyCrosses(body(o), e.x, e.z, e.axis as 'dp' | 'dn'));
     });
   }
 

@@ -92,8 +92,9 @@ pub struct ObjectInstance {
     /// Degrees turned past `rot` (0..90), for objects that turn freely; only for looks.
     pub turn: u8,
     /// Centimetres (x, z) its middle stands off the middle of its footprint (within
-    /// `MAX_OFFSET`), for objects that turn freely: they can stand anywhere on their tile.
-    /// Only for looks, like `turn`; the footprint stays on tiles.
+    /// `MAX_OFFSET`), for anything but stairs, things on a wall only along it: they can stand
+    /// anywhere on their tiles. The footprint stays on tiles; its body (`extent` about its
+    /// middle) may reach past them, but no wall may run through it (`body_edges`, `body_crosses`).
     pub offset: [i8; 2],
     /// Tiles it takes across and deep, before turning: its `extent` rounded up to whole tiles
     /// (`MAX_SIZE` at most).
@@ -305,18 +306,52 @@ impl ObjectInstance {
         (0..d).flat_map(move |dz| (0..w).map(move |dx| (x0 + dx, z0 + dz)))
     }
 
-    /// Pairs of neighbouring tiles its body stands across: off the middle of its footprint
-    /// (`offset`), it can reach past the footprint's side, and no wall may run through it there.
-    pub(crate) fn body_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+    /// Its body's sides, `(x0, x1, z0, z1)` in half centimetres (tile lines every 200): its own
+    /// size (`extent`, turned) about its middle, `offset` off the middle of its footprint.
+    fn body_box(&self, content: &Content) -> (i32, i32, i32, i32) {
         let (w, d) = self.size(content);
         let [ex, ez] = if self.rot.is_multiple_of(2) { self.extent } else { [self.extent[1], self.extent[0]] };
-        // Its sides along one axis, in half centimetres (tile lines every 200).
         let span = |at: i32, tiles: i32, off: i8, size: u16| {
             let mid = 2 * (at * 100 + off as i32) + tiles * 100;
             (mid - size as i32, mid + size as i32)
         };
         let (x0, x1) = span(self.x, w, self.offset[0], ex);
         let (z0, z1) = span(self.z, d, self.offset[1], ez);
+        (x0, x1, z0, z1)
+    }
+
+    /// The tiles its body overlaps (more than touches): its footprint's, and those it reaches
+    /// into off the footprint's middle.
+    pub(crate) fn body_tiles(&self, content: &Content) -> impl Iterator<Item = (i32, i32)> + use<> {
+        let (x0, x1, z0, z1) = self.body_box(content);
+        let (xs, zs) = (x0.div_euclid(200)..(x1 + 199).div_euclid(200), z0.div_euclid(200)..(z1 + 199).div_euclid(200));
+        zs.flat_map(move |tz| xs.clone().map(move |tx| (tx, tz)))
+    }
+
+    /// Whether a diagonal wall across tile `(tx, tz)` would run through its body (touching its
+    /// side or corner is fine, as a wall on a tile line along its side).
+    pub(crate) fn body_crosses(&self, content: &Content, tx: i32, tz: i32, dir: crate::lot::DiagDir) -> bool {
+        let (x0, x1, z0, z1) = self.body_box(content);
+        // The part of the body on that tile.
+        let (tx0, tz0) = (tx * 200, tz * 200);
+        let (a0, a1) = (x0.max(tx0), x1.min(tx0 + 200));
+        let (b0, b1) = (z0.max(tz0), z1.min(tz0 + 200));
+        if a0 >= a1 || b0 >= b1 {
+            return false;
+        }
+        match dir {
+            // `/`: x - z is that of the corner (x, z) all along it; strictly between the least
+            // and the most of the body's, it runs through.
+            crate::lot::DiagDir::Dp => (a0 - b1 + 1..a1 - b0).contains(&(tx0 - tz0)),
+            // `\`: x + z is that of the corners (x, z + 1) and (x + 1, z).
+            crate::lot::DiagDir::Dn => (a0 + b0 + 1..a1 + b1).contains(&(tx0 + tz0 + 200)),
+        }
+    }
+
+    /// Pairs of neighbouring tiles its body stands across: off the middle of its footprint
+    /// (`offset`), it can reach past the footprint's side, and no wall may run through it there.
+    pub(crate) fn body_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+        let (x0, x1, z0, z1) = self.body_box(content);
         // The tiles it overlaps, and the tile lines strictly inside it.
         let tiles = |lo: i32, hi: i32| lo.div_euclid(200)..(hi + 199).div_euclid(200);
         let lines = |lo: i32, hi: i32| lo.div_euclid(200) + 1..=(hi - 1).div_euclid(200);
@@ -1426,9 +1461,12 @@ impl World {
         // the footprint, or between the object and where it's used from.
         let in_lot = |(a, b): &((i32, i32), (i32, i32))| self.lot.in_bounds(a.0, a.1) && self.lot.in_bounds(b.0, b.1);
         let body = obj.body_edges(&self.content).into_iter().filter(in_lot);
+        // Nor a diagonal wall across a tile it reaches into.
+        let diagonal = |(tx, tz): (i32, i32)| self.lot.diag(tx, tz).is_some_and(|g| obj.body_crosses(&self.content, tx, tz, g.dir));
         if obj.wall_edges(&self.content).chain(body).any(|(a, b)| {
             self.lot.edge_between(a.0, a.1, b.0, b.1) != crate::lot::Edge::Open
-        }) {
+        }) || obj.body_tiles(&self.content).any(diagonal)
+        {
             return Err(Error::new(format!("'{name}' at {x},{z} is blocked by a wall")));
         }
         if layer == Layer::Wall {
