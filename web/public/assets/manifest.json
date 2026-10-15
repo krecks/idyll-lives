@@ -8842,9 +8842,9 @@
             1.581
           ],
           "at": [
-            -0.693,
-            6.653,
-            -0.077
+            -0.656,
+            6.591,
+            -0.073
           ],
           "color": "#8AB250",
           "material": "material.finish.foliage",
@@ -8859,9 +8859,9 @@
             2.068
           ],
           "at": [
-            0.744,
-            6.618,
-            -1.107
+            0.705,
+            6.558,
+            -1.048
           ],
           "color": "#9EC25C",
           "material": "material.finish.foliage",
@@ -8876,9 +8876,9 @@
             1.361
           ],
           "at": [
-            -0.308,
-            6.287,
-            1.393
+            -0.292,
+            6.245,
+            1.319
           ],
           "color": "#8AB250",
           "material": "material.finish.foliage",
@@ -8893,9 +8893,9 @@
             1.773
           ],
           "at": [
-            -1.391,
-            6.153,
-            -1.029
+            -1.317,
+            6.118,
+            -0.975
           ],
           "color": "#8AB250",
           "material": "material.finish.foliage",
@@ -8910,9 +8910,9 @@
             1.756
           ],
           "at": [
-            1.757,
-            5.96,
-            0.618
+            1.663,
+            5.935,
+            0.585
           ],
           "color": "#8AB250",
           "material": "material.finish.foliage",
@@ -8927,9 +8927,9 @@
             1.588
           ],
           "at": [
-            -1.473,
-            5.754,
-            1.112
+            -1.394,
+            5.741,
+            1.052
           ],
           "color": "#76A246",
           "material": "material.finish.foliage",
@@ -8944,9 +8944,9 @@
             2.14
           ],
           "at": [
-            0.508,
-            5.585,
-            -2.146
+            0.481,
+            5.58,
+            -2.031
           ],
           "color": "#64923E",
           "material": "material.finish.foliage",
@@ -8961,9 +8961,9 @@
             1.421
           ],
           "at": [
-            0.182,
-            5.386,
-            1.943
+            0.172,
+            5.392,
+            1.839
           ],
           "color": "#558238",
           "material": "material.finish.foliage",
@@ -8978,9 +8978,9 @@
             1.71
           ],
           "at": [
-            -2.066,
-            5.157,
-            -0.599
+            -1.956,
+            5.175,
+            -0.567
           ],
           "color": "#558238",
           "material": "material.finish.foliage",
@@ -8995,9 +8995,9 @@
             1.882
           ],
           "at": [
-            1.708,
-            5.032,
-            -0.231
+            1.617,
+            5.057,
+            -0.218
           ],
           "color": "#558238",
           "material": "material.finish.foliage",
@@ -11596,9 +11596,9 @@
             1.462
           ],
           "at": [
-            0.507,
-            6.808,
-            0.313
+            0.481,
+            6.721,
+            0.297
           ],
           "color": "#A6C85E",
           "material": "material.finish.foliage",
@@ -11613,9 +11613,9 @@
             1.347
           ],
           "at": [
-            -0.918,
-            6.542,
-            -0.251
+            -0.871,
+            6.468,
+            -0.239
           ],
           "color": "#A6C85E",
           "material": "material.finish.foliage",
@@ -11630,9 +11630,9 @@
             1.287
           ],
           "at": [
-            0.855,
-            6.53,
-            -1.045
+            0.811,
+            6.457,
+            -0.991
           ],
           "color": "#92BA52",
           "material": "material.finish.foliage",
@@ -11647,9 +11647,9 @@
             1.209
           ],
           "at": [
-            -0.757,
-            6.284,
-            1.284
+            -0.718,
+            6.223,
+            1.218
           ],
           "color": "#92BA52",
           "material": "material.finish.foliage",
@@ -11664,9 +11664,9 @@
             1.425
           ],
           "at": [
-            -1.072,
-            6.048,
-            -1.139
+            -1.017,
+            6.0,
+            -1.081
           ],
           "color": "#7EAA48",
           "material": "material.finish.foliage",
@@ -11681,9 +11681,9 @@
             1.457
           ],
           "at": [
-            1.452,
-            5.88,
-            0.891
+            1.378,
+            5.84,
+            0.846
           ],
           "color": "#7EAA48",
           "material": "material.finish.foliage",
@@ -11698,9 +11698,9 @@
             1.719
           ],
           "at": [
-            -1.95,
-            5.769,
-            0.506
+            -1.85,
+            5.734,
+            0.48
           ],
           "color": "#7EAA48",
           "material": "material.finish.foliage",
@@ -11715,9 +11715,9 @@
             1.514
           ],
           "at": [
-            0.882,
-            5.478,
-            -1.477
+            0.837,
+            5.459,
+            -1.401
           ],
           "color": "#7EAA48",
           "material": "material.finish.foliage",
@@ -11732,9 +11732,9 @@
             1.478
           ],
           "at": [
-            1.251,
-            5.338,
-            1.629
+            1.187,
+            5.325,
+            1.545
           ],
           "color": "#6A9A3E",
           "material": "material.finish.foliage",
@@ -11749,9 +11749,9 @@
             1.388
           ],
           "at": [
-            -1.352,
-            5.127,
-            -1.127
+            -1.282,
+            5.126,
+            -1.069
           ],
           "color": "#6A9A3E",
           "material": "material.finish.foliage",
@@ -11766,9 +11766,9 @@
             1.246
           ],
           "at": [
-            1.864,
-            4.933,
-            -0.672
+            1.768,
+            4.941,
+            -0.638
           ],
           "color": "#6A9A3E",
           "material": "material.finish.foliage",
@@ -11783,9 +11783,9 @@
             1.709
           ],
           "at": [
-            -1.493,
-            4.747,
-            1.153
+            -1.417,
+            4.765,
+            1.094
           ],
           "color": "#5A8A36",
           "material": "material.finish.foliage",
@@ -11800,9 +11800,9 @@
             1.243
           ],
           "at": [
-            0.049,
-            4.504,
-            -2.013
+            0.047,
+            4.535,
+            -1.91
           ],
           "color": "#5A8A36",
           "material": "material.finish.foliage",
@@ -11817,9 +11817,9 @@
             1.601
           ],
           "at": [
-            1.501,
-            4.437,
-            0.524
+            1.424,
+            4.471,
+            0.497
           ],
           "color": "#5A8A36",
           "material": "material.finish.foliage",
@@ -34571,15 +34571,15 @@
             0.017
           ],
           "at": [
-            -0.025,
-            0.171,
-            0.02
+            -0.023,
+            0.17,
+            0.017
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            10.8,
+            12.3,
             153.6,
             0
           ]
@@ -34592,15 +34592,15 @@
             0.017
           ],
           "at": [
-            0.008,
-            0.212,
-            -0.088
+            0.013,
+            0.211,
+            -0.085
           ],
           "color": "#8EAE52",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            10.6,
+            12.0,
             62.3,
             0
           ]
@@ -34613,15 +34613,15 @@
             0.017
           ],
           "at": [
-            0.049,
-            0.211,
-            0.063
+            0.044,
+            0.208,
+            0.053
           ],
           "color": "#6E9240",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            16.5,
+            19.4,
             208.5,
             0
           ]
@@ -34634,15 +34634,15 @@
             0.017
           ],
           "at": [
-            -0.148,
+            -0.146,
             0.139,
-            -0.022
+            -0.02
           ],
           "color": "#A2B45E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            10.0,
+            11.2,
             36.6,
             0
           ]
@@ -34655,15 +34655,15 @@
             0.017
           ],
           "at": [
-            0.114,
-            0.166,
-            -0.078
+            0.113,
+            0.16,
+            -0.065
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            23.1,
+            27.6,
             356.0,
             0
           ]
@@ -34676,15 +34676,15 @@
             0.017
           ],
           "at": [
-            -0.001,
-            0.228,
-            0.163
+            -0.004,
+            0.226,
+            0.157
           ],
           "color": "#8EAE52",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            12.4,
+            14.2,
             203.7,
             0
           ]
@@ -34697,15 +34697,15 @@
             0.017
           ],
           "at": [
-            -0.11,
-            0.234,
-            -0.22
+            -0.106,
+            0.232,
+            -0.226
           ],
           "color": "#6E9240",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            11.9,
+            13.6,
             143.7,
             0
           ]
@@ -34718,15 +34718,15 @@
             0.017
           ],
           "at": [
-            0.248,
-            0.214,
-            0.003
+            0.249,
+            0.212,
+            -0.003
           ],
           "color": "#A2B45E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            11.9,
+            13.6,
             170.6,
             0
           ]
@@ -34739,15 +34739,15 @@
             0.017
           ],
           "at": [
-            -0.246,
-            0.167,
-            0.041
+            -0.247,
+            0.162,
+            0.029
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            21.5,
+            25.6,
             186.6,
             0
           ]
@@ -34768,7 +34768,7 @@
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            5.3,
+            5.4,
             231.3,
             0
           ]
@@ -34781,15 +34781,15 @@
             0.017
           ],
           "at": [
-            0.167,
-            0.145,
-            0.273
+            0.175,
+            0.142,
+            0.274
           ],
           "color": "#6E9240",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            18.4,
+            21.7,
             80.0,
             0
           ]
@@ -34802,15 +34802,15 @@
             0.017
           ],
           "at": [
-            -0.332,
-            0.194,
-            -0.081
+            -0.337,
+            0.193,
+            -0.084
           ],
           "color": "#A2B45E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            11.9,
+            13.6,
             235.7,
             0
           ]
@@ -34823,15 +34823,15 @@
             0.017
           ],
           "at": [
-            0.245,
-            0.151,
-            -0.178
+            0.24,
+            0.149,
+            -0.181
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            13.2,
+            15.2,
             236.5,
             0
           ]
@@ -34844,15 +34844,15 @@
             0.017
           ],
           "at": [
-            -0.081,
-            0.153,
-            0.39
+            -0.082,
+            0.146,
+            0.403
           ],
           "color": "#8EAE52",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            24.8,
+            29.8,
             356.9,
             0
           ]
@@ -34865,15 +34865,15 @@
             0.017
           ],
           "at": [
-            -0.127,
-            0.226,
-            -0.236
+            -0.133,
+            0.217,
+            -0.22
           ],
           "color": "#6E9240",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            23.6,
+            28.3,
             338.9,
             0
           ]
@@ -34886,15 +34886,15 @@
             0.017
           ],
           "at": [
-            0.339,
-            0.188,
-            0.127
+            0.347,
+            0.182,
+            0.116
           ],
           "color": "#A2B45E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            21.8,
+            25.9,
             146.1,
             0
           ]
@@ -34907,15 +34907,15 @@
             0.017
           ],
           "at": [
-            -0.388,
-            0.135,
-            0.105
+            -0.394,
+            0.13,
+            0.114
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            23.5,
+            28.1,
             331.0,
             0
           ]
@@ -34928,15 +34928,15 @@
             0.017
           ],
           "at": [
-            0.315,
-            0.164,
+            0.321,
+            0.163,
             -0.246
           ],
           "color": "#8EAE52",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            12.5,
+            14.4,
             84.4,
             0
           ]
@@ -34949,15 +34949,15 @@
             0.017
           ],
           "at": [
-            0.053,
+            0.05,
             0.216,
-            0.389
+            0.39
           ],
           "color": "#6E9240",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            8.4,
+            9.2,
             292.9,
             0
           ]
@@ -34970,15 +34970,15 @@
             0.017
           ],
           "at": [
-            -0.351,
-            0.14,
-            -0.227
+            -0.356,
+            0.139,
+            -0.226
           ],
           "color": "#A2B45E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            13.1,
+            15.1,
             281.6,
             0
           ]
@@ -34992,14 +34992,14 @@
           ],
           "at": [
             0.41,
-            0.192,
-            0.006
+            0.191,
+            0.008
           ],
           "color": "#7FA04A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            7.8,
+            8.4,
             10.8,
             0
           ]
@@ -35012,7 +35012,7 @@
             0.017
           ],
           "at": [
-            -0.33,
+            -0.329,
             0.213,
             0.212
           ],
@@ -35020,7 +35020,7 @@
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            6.5,
+            6.9,
             101.5,
             0
           ]
@@ -35962,9 +35962,9 @@
         {
           "shape": "lathe",
           "size": [
-            0.44,
+            0.4,
             0.34,
-            0.44
+            0.4
           ],
           "at": [
             0,
@@ -36012,9 +36012,9 @@
         {
           "shape": "cylinder",
           "size": [
-            0.378,
+            0.344,
             0.02,
-            0.378
+            0.344
           ],
           "at": [
             0,
@@ -39667,15 +39667,15 @@
             0.016
           ],
           "at": [
-            0.047,
-            0.401,
-            -0.095
+            0.062,
+            0.394,
+            -0.12
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            12.4,
+            16.6,
             150.5,
             0
           ]
@@ -39688,15 +39688,15 @@
             0.016
           ],
           "at": [
-            0.078,
-            0.391,
-            0.134
+            0.092,
+            0.381,
+            0.159
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            17.5,
+            21.8,
             29.8,
             0
           ]
@@ -39709,15 +39709,15 @@
             0.016
           ],
           "at": [
-            -0.157,
-            0.481,
-            -0.062
+            -0.192,
+            0.47,
+            -0.074
           ],
           "color": "#8A9E4E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            15.1,
+            19.5,
             -108.4,
             0
           ]
@@ -39730,15 +39730,15 @@
             0.016
           ],
           "at": [
-            0.194,
-            0.509,
-            -0.155
+            0.224,
+            0.491,
+            -0.181
           ],
           "color": "#A6B062",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            21.6,
+            26.1,
             130.5,
             0
           ]
@@ -39751,15 +39751,15 @@
             0.016
           ],
           "at": [
-            -0.1,
-            0.5,
-            0.186
+            -0.118,
+            0.486,
+            0.221
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            17.4,
+            22.0,
             -28.6,
             0
           ]
@@ -39772,15 +39772,15 @@
             0.016
           ],
           "at": [
-            -0.053,
-            0.356,
-            -0.211
+            -0.06,
+            0.342,
+            -0.238
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            23.9,
+            28.5,
             -165.4,
             0
           ]
@@ -39793,15 +39793,15 @@
             0.016
           ],
           "at": [
-            0.187,
-            0.365,
-            0.1
+            0.213,
+            0.352,
+            0.112
           ],
           "color": "#8A9E4E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            22.0,
+            26.6,
             65.2,
             0
           ]
@@ -39814,15 +39814,15 @@
             0.016
           ],
           "at": [
-            -0.195,
-            0.443,
-            0.123
+            -0.224,
+            0.428,
+            0.144
           ],
           "color": "#A6B062",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            20.2,
+            24.9,
             -52.6,
             0
           ]
@@ -39835,15 +39835,15 @@
             0.016
           ],
           "at": [
-            0.116,
-            0.344,
-            -0.215
+            0.126,
+            0.328,
+            -0.241
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            26.7,
+            31.4,
             157.5,
             0
           ]
@@ -39856,15 +39856,15 @@
             0.016
           ],
           "at": [
-            0.031,
-            0.446,
-            0.316
+            0.035,
+            0.425,
+            0.353
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            28.2,
+            33.0,
             6.0,
             0
           ]
@@ -39877,15 +39877,15 @@
             0.016
           ],
           "at": [
-            -0.177,
-            0.374,
-            -0.186
+            -0.2,
+            0.358,
+            -0.207
           ],
           "color": "#8A9E4E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            25.0,
+            29.9,
             -133.3,
             0
           ]
@@ -39898,15 +39898,15 @@
             0.016
           ],
           "at": [
-            0.268,
-            0.462,
-            -0.131
+            0.301,
+            0.442,
+            -0.151
           ],
           "color": "#A6B062",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            25.0,
+            29.8,
             121.1,
             0
           ]
@@ -39919,15 +39919,15 @@
             0.016
           ],
           "at": [
-            -0.246,
-            0.341,
-            0.076
+            -0.274,
+            0.326,
+            0.081
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            26.4,
+            31.3,
             -79.3,
             0
           ]
@@ -39940,15 +39940,15 @@
             0.016
           ],
           "at": [
-            0.037,
-            0.375,
-            -0.315
+            0.043,
+            0.355,
+            -0.345
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            31.0,
+            35.9,
             -191.2,
             0
           ]
@@ -39961,15 +39961,15 @@
             0.016
           ],
           "at": [
-            0.21,
-            0.47,
-            0.313
+            0.233,
+            0.444,
+            0.346
           ],
           "color": "#8A9E4E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            30.8,
+            35.8,
             35.8,
             0
           ]
@@ -39982,15 +39982,15 @@
             0.016
           ],
           "at": [
-            -0.279,
-            0.34,
-            -0.027
+            -0.308,
+            0.323,
+            -0.029
           ],
           "color": "#A6B062",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            27.9,
+            32.9,
             -92.8,
             0
           ]
@@ -40003,15 +40003,15 @@
             0.016
           ],
           "at": [
-            0.273,
-            0.349,
-            -0.059
+            0.303,
+            0.332,
+            -0.063
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            27.0,
+            32.1,
             96.3,
             0
           ]
@@ -40024,15 +40024,15 @@
             0.016
           ],
           "at": [
-            0.041,
-            0.441,
-            0.382
+            0.048,
+            0.415,
+            0.419
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            32.4,
+            37.5,
             10.7,
             0
           ]
@@ -40045,15 +40045,15 @@
             0.016
           ],
           "at": [
-            -0.124,
-            0.438,
-            -0.339
+            -0.133,
+            0.413,
+            -0.376
           ],
           "color": "#8A9E4E",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            30.2,
+            35.3,
             -165.2,
             0
           ]
@@ -40066,15 +40066,15 @@
             0.016
           ],
           "at": [
-            0.356,
-            0.389,
-            0.009
+            0.39,
+            0.365,
+            0.008
           ],
           "color": "#A6B062",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            32.2,
+            37.3,
             91.7,
             0
           ]
@@ -40087,15 +40087,15 @@
             0.016
           ],
           "at": [
-            -0.282,
-            0.339,
-            0.022
+            -0.312,
+            0.323,
+            0.02
           ],
           "color": "#9AAA5A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            26.6,
+            31.8,
             -92.3,
             0
           ]
@@ -40108,15 +40108,15 @@
             0.016
           ],
           "at": [
-            0.181,
-            0.474,
-            -0.322
+            0.202,
+            0.45,
+            -0.358
           ],
           "color": "#B2B86A",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            27.9,
+            33.1,
             149.3,
             0
           ]
@@ -40130,14 +40130,14 @@
           ],
           "at": [
             -0.002,
-            0.479,
-            0.143
+            0.473,
+            0.161
           ],
           "color": "#B8B070",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            16.6,
+            18.8,
             -0.7,
             0
           ]
@@ -40151,15 +40151,15 @@
           ],
           "at": [
             -0.004,
-            1.006,
-            0.3
+            0.994,
+            0.339
           ],
           "color": "#E2D6A8",
           "material": "material.finish.satin",
           "taper": 0.2,
           "segments": 5,
           "rotate": [
-            16.6,
+            18.8,
             -0.7,
             0
           ]
@@ -40172,15 +40172,15 @@
             0.012
           ],
           "at": [
-            0.06,
-            0.494,
-            0.052
+            0.083,
+            0.488,
+            0.072
           ],
           "color": "#B8B070",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            9.1,
+            12.6,
             49.1,
             0
           ]
@@ -40193,16 +40193,16 @@
             0.06
           ],
           "at": [
-            0.126,
-            1.037,
-            0.109
+            0.173,
+            1.025,
+            0.15
           ],
           "color": "#E2D6A8",
           "material": "material.finish.satin",
           "taper": 0.2,
           "segments": 5,
           "rotate": [
-            9.1,
+            12.6,
             49.1,
             0
           ]
@@ -40215,15 +40215,15 @@
             0.012
           ],
           "at": [
-            0.048,
-            0.496,
-            -0.038
+            0.074,
+            0.491,
+            -0.058
           ],
           "color": "#B8B070",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            7.0,
+            10.9,
             128.2,
             0
           ]
@@ -40236,16 +40236,16 @@
             0.06
           ],
           "at": [
-            0.101,
-            1.042,
-            -0.079
+            0.156,
+            1.031,
+            -0.122
           ],
           "color": "#E2D6A8",
           "material": "material.finish.satin",
           "taper": 0.2,
           "segments": 5,
           "rotate": [
-            7.0,
+            10.9,
             128.2,
             0
           ]
@@ -40258,101 +40258,101 @@
             0.012
           ],
           "at": [
-            0.01,
-            0.497,
-            -0.054
-          ],
-          "color": "#B8B070",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            6.3,
-            169.9,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.06,
-            0.24,
-            0.06
-          ],
-          "at": [
-            0.02,
-            1.044,
-            -0.113
-          ],
-          "color": "#E2D6A8",
-          "material": "material.finish.satin",
-          "taper": 0.2,
-          "segments": 5,
-          "rotate": [
-            6.3,
-            169.9,
-            0
-          ]
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.012,
-            1.0,
-            0.012
-          ],
-          "at": [
-            -0.073,
-            0.494,
-            -0.021
-          ],
-          "color": "#B8B070",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            8.8,
-            253.7,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.06,
-            0.24,
-            0.06
-          ],
-          "at": [
-            -0.154,
-            1.038,
-            -0.045
-          ],
-          "color": "#E2D6A8",
-          "material": "material.finish.satin",
-          "taper": 0.2,
-          "segments": 5,
-          "rotate": [
-            8.8,
-            253.7,
-            0
-          ]
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.012,
-            1.0,
-            0.012
-          ],
-          "at": [
-            -0.079,
+            0.016,
             0.492,
-            0.046
+            -0.088
           ],
           "color": "#B8B070",
           "material": "material.finish.foliage",
           "segments": 3,
           "rotate": [
-            10.5,
+            10.3,
+            169.9,
+            0
+          ]
+        },
+        {
+          "shape": "cone",
+          "size": [
+            0.06,
+            0.24,
+            0.06
+          ],
+          "at": [
+            0.033,
+            1.033,
+            -0.184
+          ],
+          "color": "#E2D6A8",
+          "material": "material.finish.satin",
+          "taper": 0.2,
+          "segments": 5,
+          "rotate": [
+            10.3,
+            169.9,
+            0
+          ]
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.012,
+            1.0,
+            0.012
+          ],
+          "at": [
+            -0.103,
+            0.488,
+            -0.03
+          ],
+          "color": "#B8B070",
+          "material": "material.finish.foliage",
+          "segments": 3,
+          "rotate": [
+            12.3,
+            253.7,
+            0
+          ]
+        },
+        {
+          "shape": "cone",
+          "size": [
+            0.06,
+            0.24,
+            0.06
+          ],
+          "at": [
+            -0.215,
+            1.026,
+            -0.063
+          ],
+          "color": "#E2D6A8",
+          "material": "material.finish.satin",
+          "taper": 0.2,
+          "segments": 5,
+          "rotate": [
+            12.3,
+            253.7,
+            0
+          ]
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.012,
+            1.0,
+            0.012
+          ],
+          "at": [
+            -0.103,
+            0.486,
+            0.06
+          ],
+          "color": "#B8B070",
+          "material": "material.finish.foliage",
+          "segments": 3,
+          "rotate": [
+            13.8,
             300.0,
             0
           ]
@@ -40365,16 +40365,16 @@
             0.06
           ],
           "at": [
-            -0.166,
-            1.032,
-            0.096
+            -0.217,
+            1.02,
+            0.125
           ],
           "color": "#E2D6A8",
           "material": "material.finish.satin",
           "taper": 0.2,
           "segments": 5,
           "rotate": [
-            10.5,
+            13.8,
             300.0,
             0
           ]
@@ -40406,12 +40406,12 @@
           "size": [
             0.2,
             0.03,
-            0.306
+            0.336
           ],
           "at": [
-            0.016,
-            0.138,
-            0.147
+            0.018,
+            0.141,
+            0.162
           ],
           "color": "#5E8A5E",
           "material": "material.finish.foliage",
@@ -40428,12 +40428,12 @@
           "size": [
             0.2,
             0.03,
-            0.315
+            0.345
           ],
           "at": [
-            0.141,
-            0.125,
-            0.067
+            0.154,
+            0.128,
+            0.073
           ],
           "color": "#8EAE6C",
           "material": "material.finish.foliage",
@@ -40450,12 +40450,12 @@
           "size": [
             0.2,
             0.03,
-            0.309
+            0.339
           ],
           "at": [
-            0.142,
-            0.131,
-            -0.053
+            0.155,
+            0.134,
+            -0.059
           ],
           "color": "#6A9464",
           "material": "material.finish.foliage",
@@ -40472,12 +40472,12 @@
           "size": [
             0.2,
             0.03,
-            0.311
+            0.341
           ],
           "at": [
-            -0.014,
-            0.132,
-            -0.152
+            -0.016,
+            0.135,
+            -0.166
           ],
           "color": "#5E8A5E",
           "material": "material.finish.foliage",
@@ -40494,12 +40494,12 @@
           "size": [
             0.2,
             0.03,
-            0.333
+            0.363
           ],
           "at": [
-            -0.137,
-            0.138,
-            -0.087
+            -0.149,
+            0.142,
+            -0.095
           ],
           "color": "#8EAE6C",
           "material": "material.finish.foliage",
@@ -40516,12 +40516,12 @@
           "size": [
             0.2,
             0.03,
-            0.31
+            0.34
           ],
           "at": [
-            -0.139,
-            0.125,
-            0.064
+            -0.153,
+            0.127,
+            0.07
           ],
           "color": "#6A9464",
           "material": "material.finish.foliage",
@@ -40538,12 +40538,12 @@
           "size": [
             0.2,
             0.03,
-            0.324
+            0.354
           ],
           "at": [
-            0.021,
-            0.279,
-            0.127
+            0.023,
+            0.288,
+            0.138
           ],
           "color": "#5E8A5E",
           "material": "material.finish.foliage",
@@ -40560,12 +40560,12 @@
           "size": [
             0.2,
             0.03,
-            0.345
+            0.375
           ],
           "at": [
-            0.11,
-            0.286,
-            0.081
+            0.119,
+            0.295,
+            0.088
           ],
           "color": "#8EAE6C",
           "material": "material.finish.foliage",
@@ -40582,12 +40582,12 @@
           "size": [
             0.2,
             0.03,
-            0.312
+            0.342
           ],
           "at": [
-            0.124,
-            0.25,
-            -0.064
+            0.136,
+            0.256,
+            -0.07
           ],
           "color": "#6A9464",
           "material": "material.finish.foliage",
@@ -40604,12 +40604,12 @@
           "size": [
             0.2,
             0.03,
-            0.317
+            0.347
           ],
           "at": [
-            0.016,
-            0.269,
-            -0.131
+            0.018,
+            0.277,
+            -0.143
           ],
           "color": "#5E8A5E",
           "material": "material.finish.foliage",
@@ -40626,12 +40626,12 @@
           "size": [
             0.2,
             0.03,
-            0.315
+            0.345
           ],
           "at": [
-            -0.113,
-            0.279,
-            -0.047
+            -0.124,
+            0.289,
+            -0.051
           ],
           "color": "#8EAE6C",
           "material": "material.finish.foliage",
@@ -40648,12 +40648,12 @@
           "size": [
             0.2,
             0.03,
-            0.33
+            0.36
           ],
           "at": [
-            -0.122,
-            0.277,
-            0.053
+            -0.133,
+            0.286,
+            0.058
           ],
           "color": "#6A9464",
           "material": "material.finish.foliage",
@@ -43771,13 +43771,13 @@
         {
           "shape": "lathe",
           "size": [
-            0.44,
             0.38,
-            0.44
+            0.34,
+            0.38
           ],
           "at": [
             0,
-            0.19,
+            0.17,
             0
           ],
           "color": "#EDEBE6",
@@ -43817,13 +43817,13 @@
         {
           "shape": "cylinder",
           "size": [
-            0.378,
+            0.327,
             0.02,
-            0.378
+            0.327
           ],
           "at": [
             0,
-            0.327,
+            0.292,
             0
           ],
           "color": "#6A4C38",
@@ -43834,18 +43834,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.463,
+            0.369,
             0.016
           ],
           "at": [
-            -0.037,
-            0.482,
-            0.167
+            -0.012,
+            0.468,
+            0.054
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            47.9,
+            17.5,
             -12.5,
             0
           ],
@@ -43854,21 +43854,21 @@
         {
           "shape": "blob",
           "size": [
-            0.357,
+            0.298,
             0.03,
-            0.373
+            0.296
           ],
           "at": [
-            -0.108,
-            0.539,
-            0.49
+            -0.051,
+            0.563,
+            0.229
           ],
           "color": "#2F6B35",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            31.9,
+            33.2,
             -12.5,
             0
           ]
@@ -43877,18 +43877,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.554,
+            0.456,
             0.016
           ],
           "at": [
-            0.184,
-            0.533,
-            0.009
+            0.06,
+            0.512,
+            0.003
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            41.8,
+            15.2,
             87.3,
             0
           ],
@@ -43897,21 +43897,21 @@
         {
           "shape": "blob",
           "size": [
-            0.336,
+            0.284,
             0.03,
-            0.379
+            0.3
           ],
           "at": [
-            0.544,
-            0.667,
-            0.026
+            0.256,
+            0.669,
+            0.012
           ],
           "color": "#3B7A3C",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            22.4,
+            24.7,
             87.3,
             0
           ]
@@ -43920,18 +43920,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.642,
+            0.595,
             0.016
           ],
           "at": [
-            0.045,
-            0.62,
-            -0.121
+            0.014,
+            0.587,
+            -0.039
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            23.8,
+            8.0,
             159.7,
             0
           ],
@@ -43940,21 +43940,21 @@
         {
           "shape": "blob",
           "size": [
-            0.346,
+            0.291,
             0.03,
-            0.42
+            0.32
           ],
           "at": [
-            0.16,
-            0.854,
-            -0.432
+            0.081,
+            0.828,
+            -0.219
           ],
           "color": "#347040",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            16.7,
+            19.6,
             159.7,
             0
           ]
@@ -43963,18 +43963,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.516,
+            0.447,
             0.016
           ],
           "at": [
-            -0.153,
-            0.53,
-            -0.042
+            -0.05,
+            0.51,
+            -0.013
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            38.0,
+            13.3,
             -105.2,
             0
           ],
@@ -43983,21 +43983,21 @@
         {
           "shape": "blob",
           "size": [
-            0.333,
+            0.282,
             0.03,
-            0.384
+            0.302
           ],
           "at": [
-            -0.46,
-            0.626,
-            -0.125
+            -0.218,
+            0.64,
+            -0.059
           ],
           "color": "#2F6B35",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            34.2,
+            35.3,
             254.8,
             0
           ]
@@ -44006,18 +44006,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.622,
+            0.533,
             0.016
           ],
           "at": [
-            -0.127,
-            0.58,
-            0.129
+            -0.041,
+            0.552,
+            0.042
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            35.5,
+            12.7,
             -44.5,
             0
           ],
@@ -44026,21 +44026,21 @@
         {
           "shape": "blob",
           "size": [
-            0.341,
+            0.288,
             0.03,
-            0.429
+            0.325
           ],
           "at": [
-            -0.391,
-            0.747,
-            0.398
+            -0.185,
+            0.742,
+            0.188
           ],
           "color": "#3B7A3C",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            23.6,
+            25.8,
             315.5,
             0
           ]
@@ -44049,18 +44049,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.48,
+            0.425,
             0.016
           ],
           "at": [
-            0.083,
-            0.519,
-            0.117
+            0.027,
+            0.5,
+            0.038
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            36.8,
+            12.5,
             35.2,
             0
           ],
@@ -44069,21 +44069,21 @@
         {
           "shape": "blob",
           "size": [
-            0.35,
+            0.293,
             0.03,
-            0.431
+            0.325
           ],
           "at": [
-            0.283,
-            0.64,
-            0.401
+            0.14,
+            0.647,
+            0.199
           ],
           "color": "#347040",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            19.3,
+            21.9,
             395.2,
             0
           ]
@@ -44092,18 +44092,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.47,
+            0.338,
             0.016
           ],
           "at": [
-            0.178,
-            0.46,
-            -0.076
+            0.058,
+            0.449,
+            -0.025
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            55.6,
+            21.9,
             113.0,
             0
           ],
@@ -44112,21 +44112,21 @@
         {
           "shape": "blob",
           "size": [
-            0.323,
+            0.276,
             0.03,
-            0.365
+            0.292
           ],
           "at": [
-            0.516,
-            0.534,
-            -0.219
+            0.241,
+            0.553,
+            -0.102
           ],
           "color": "#2F6B35",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            18.7,
+            21.3,
             473.0,
             0
           ]
@@ -44135,18 +44135,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.652,
+            0.59,
             0.016
           ],
           "at": [
-            -0.028,
-            0.617,
-            -0.147
+            -0.009,
+            0.584,
+            -0.047
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            27.3,
+            9.4,
             -169.1,
             0
           ],
@@ -44155,21 +44155,21 @@
         {
           "shape": "blob",
           "size": [
-            0.35,
+            0.293,
             0.03,
-            0.411
+            0.315
           ],
           "at": [
-            -0.092,
-            0.818,
-            -0.475
+            -0.045,
+            0.802,
+            -0.232
           ],
           "color": "#3B7A3C",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            25.5,
+            27.4,
             550.9,
             0
           ]
@@ -44178,18 +44178,18 @@
           "shape": "cylinder",
           "size": [
             0.016,
-            0.615,
+            0.542,
             0.016
           ],
           "at": [
-            -0.155,
-            0.587,
-            0.055
+            -0.05,
+            0.558,
+            0.018
           ],
           "color": "#4E7A3A",
           "material": "material.finish.foliage",
           "rotate": [
-            32.3,
+            11.3,
             -70.4,
             0
           ],
@@ -44198,21 +44198,21 @@
         {
           "shape": "blob",
           "size": [
-            0.353,
+            0.295,
             0.03,
-            0.405
+            0.313
           ],
           "at": [
-            -0.478,
-            0.75,
-            0.17
+            -0.227,
+            0.745,
+            0.081
           ],
           "color": "#347040",
           "material": "material.finish.foliage",
           "noise": 0.05,
           "segments": 2,
           "rotate": [
-            28.5,
+            30.2,
             649.6,
             0
           ]
@@ -45404,7 +45404,7 @@
           ],
           "at": [
             0.004,
-            0.17,
+            0.16,
             -0.053
           ],
           "color": "#5E8F55",
@@ -45443,7 +45443,7 @@
           ],
           "at": [
             0.039,
-            0.17,
+            0.16,
             0.084
           ],
           "color": "#A8C49A",
@@ -45482,7 +45482,7 @@
           ],
           "at": [
             -0.118,
-            0.17,
+            0.16,
             -0.02
           ],
           "color": "#7EA088",
@@ -45521,7 +45521,7 @@
           ],
           "at": [
             0.132,
-            0.17,
+            0.16,
             -0.051
           ],
           "color": "#8FB5A0",
@@ -45560,7 +45560,7 @@
           ],
           "at": [
             -0.009,
-            0.17,
+            0.16,
             0.16
           ],
           "color": "#C99AA8",
@@ -45599,7 +45599,7 @@
           ],
           "at": [
             -0.086,
-            0.17,
+            0.16,
             -0.155
           ],
           "color": "#5E8F55",
@@ -45638,7 +45638,7 @@
           ],
           "at": [
             0.191,
-            0.17,
+            0.16,
             0.028
           ],
           "color": "#A8C49A",
@@ -45802,19 +45802,19 @@
           "size": [
             0.13,
             0.03,
-            0.509
+            0.453
           ],
           "at": [
-            -0.011,
-            0.734,
-            0.241
+            -0.008,
+            0.687,
+            0.185
           ],
           "color": "#5E9A3E",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            18.9,
+            34.9,
             -2.6,
             0
           ]
@@ -45824,19 +45824,19 @@
           "size": [
             0.13,
             0.03,
-            0.498
+            0.445
           ],
           "at": [
-            0.087,
-            0.686,
-            0.194
+            0.066,
+            0.662,
+            0.146
           ],
           "color": "#6FAA46",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            31.6,
+            44.0,
             24.1,
             0
           ]
@@ -45846,19 +45846,19 @@
           "size": [
             0.13,
             0.03,
-            0.403
+            0.382
           ],
           "at": [
-            0.171,
-            0.75,
-            0.083
+            0.14,
+            0.706,
+            0.068
           ],
           "color": "#558E38",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            19.3,
+            35.2,
             64.0,
             0
           ]
@@ -45868,19 +45868,19 @@
           "size": [
             0.13,
             0.03,
-            0.431
+            0.4
           ],
           "at": [
-            0.206,
-            0.754,
-            0.013
+            0.167,
+            0.706,
+            0.011
           ],
           "color": "#5E9A3E",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            16.9,
+            33.5,
             86.3,
             0
           ]
@@ -45890,19 +45890,19 @@
           "size": [
             0.13,
             0.03,
-            0.461
+            0.42
           ],
           "at": [
-            0.207,
-            0.795,
-            -0.099
+            0.172,
+            0.727,
+            -0.082
           ],
           "color": "#6FAA46",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            5.4,
+            25.3,
             115.5,
             0
           ]
@@ -45912,19 +45912,19 @@
           "size": [
             0.13,
             0.03,
-            0.518
+            0.458
           ],
           "at": [
-            0.114,
-            0.72,
-            -0.211
+            0.087,
+            0.678,
+            -0.161
           ],
           "color": "#558E38",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            21.9,
+            37.1,
             151.5,
             0
           ]
@@ -45934,19 +45934,19 @@
           "size": [
             0.13,
             0.03,
-            0.483
+            0.435
           ],
           "at": [
-            0.015,
-            0.745,
-            -0.23
+            0.012,
+            0.696,
+            -0.181
           ],
           "color": "#5E9A3E",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            17.1,
+            33.7,
             176.4,
             0
           ]
@@ -45956,19 +45956,19 @@
           "size": [
             0.13,
             0.03,
-            0.506
+            0.45
           ],
           "at": [
-            -0.131,
-            0.679,
-            -0.167
+            -0.098,
+            0.657,
+            -0.125
           ],
           "color": "#6FAA46",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            33.0,
+            45.0,
             218.2,
             0
           ]
@@ -45978,19 +45978,19 @@
           "size": [
             0.13,
             0.03,
-            0.403
+            0.382
           ],
           "at": [
-            -0.174,
-            0.791,
-            -0.099
+            -0.148,
+            0.731,
+            -0.085
           ],
           "color": "#558E38",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            7.1,
+            26.5,
             240.2,
             0
           ]
@@ -46000,19 +46000,19 @@
           "size": [
             0.13,
             0.03,
-            0.499
+            0.446
           ],
           "at": [
-            -0.237,
-            0.739,
-            -0.005
+            -0.184,
+            0.691,
+            -0.004
           ],
           "color": "#5E9A3E",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            18.0,
+            34.3,
             268.8,
             0
           ]
@@ -46022,19 +46022,19 @@
           "size": [
             0.13,
             0.03,
-            0.471
+            0.427
           ],
           "at": [
-            -0.179,
-            0.78,
-            0.148
+            -0.145,
+            0.717,
+            0.12
           ],
           "color": "#6FAA46",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            9.0,
+            27.8,
             309.6,
             0
           ]
@@ -46044,19 +46044,19 @@
           "size": [
             0.13,
             0.03,
-            0.518
+            0.458
           ],
           "at": [
-            -0.121,
-            0.747,
-            0.218
+            -0.093,
+            0.693,
+            0.169
           ],
           "color": "#558E38",
           "material": "material.finish.foliage",
           "noise": 0.15,
           "segments": 2,
           "rotate": [
-            15.6,
+            32.6,
             331.1,
             0
           ]
@@ -46264,18 +46264,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.524,
+            0.474,
             0.014
           ],
           "at": [
-            -0.017,
-            0.531,
-            0.107
+            -0.012,
+            0.518,
+            0.073
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            24.5,
+            18.1,
             -9.2,
             0
           ],
@@ -46284,21 +46284,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.434
+            0.331
           ],
           "at": [
-            -0.065,
-            0.641,
-            0.401
+            -0.046,
+            0.639,
+            0.285
           ],
           "color": "#4A8A3A",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            29.9,
+            30.9,
             -9.2,
             0
           ]
@@ -46307,18 +46307,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.458,
+            0.408,
             0.014
           ],
           "at": [
-            0.063,
-            0.508,
-            0.047
+            0.044,
+            0.489,
+            0.032
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            20.0,
+            15.6,
             53.7,
             0
           ],
@@ -46327,21 +46327,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.439
+            0.333
           ],
           "at": [
-            0.279,
-            0.592,
-            0.205
+            0.203,
+            0.579,
+            0.149
           ],
           "color": "#5A9A42",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            30.4,
+            31.3,
             53.7,
             0
           ]
@@ -46350,18 +46350,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.538,
+            0.488,
             0.014
           ],
           "at": [
-            0.052,
-            0.556,
-            -0.008
+            0.045,
+            0.532,
+            -0.007
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            11.3,
+            10.7,
             98.9,
             0
           ],
@@ -46370,21 +46370,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.417
+            0.32
           ],
           "at": [
-            0.281,
-            0.694,
-            -0.044
+            0.225,
+            0.668,
+            -0.035
           ],
           "color": "#3E7A34",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            30.5,
+            31.4,
             98.9,
             0
           ]
@@ -46393,18 +46393,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.5,
+            0.45,
             0.014
           ],
           "at": [
-            0.037,
-            0.534,
-            -0.056
+            0.028,
+            0.512,
+            -0.042
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            15.5,
+            13.1,
             146.6,
             0
           ],
@@ -46413,21 +46413,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.391
+            0.305
           ],
           "at": [
-            0.178,
-            0.705,
-            -0.269
+            0.136,
+            0.662,
+            -0.205
           ],
           "color": "#4A8A3A",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            14.7,
+            18.8,
             146.6,
             0
           ]
@@ -46436,18 +46436,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.559,
+            0.509,
             0.014
           ],
           "at": [
-            -0.041,
-            0.563,
-            -0.055
+            -0.032,
+            0.541,
+            -0.044
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            14.2,
+            12.3,
             -143.4,
             0
           ],
@@ -46456,21 +46456,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.357
+            0.284
           ],
           "at": [
-            -0.175,
-            0.729,
-            -0.236
+            -0.138,
+            0.699,
+            -0.186
           ],
           "color": "#5A9A42",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            28.7,
+            30.0,
             216.6,
             0
           ]
@@ -46479,18 +46479,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.556,
+            0.506,
             0.014
           ],
           "at": [
-            -0.049,
-            0.565,
-            -0.022
+            -0.043,
+            0.541,
+            -0.019
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            11.2,
+            10.6,
             -114.6,
             0
           ],
@@ -46499,21 +46499,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.441
+            0.334
           ],
           "at": [
-            -0.279,
-            0.723,
-            -0.127
+            -0.22,
+            0.693,
+            -0.101
           ],
           "color": "#3E7A34",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            25.5,
+            27.4,
             245.4,
             0
           ]
@@ -46522,18 +46522,18 @@
           "shape": "cylinder",
           "size": [
             0.014,
-            0.646,
+            0.596,
             0.014
           ],
           "at": [
-            -0.07,
-            0.599,
-            0.072
+            -0.052,
+            0.581,
+            0.054
           ],
           "color": "#5E7E3A",
           "material": "material.finish.foliage",
           "rotate": [
-            18.2,
+            14.5,
             -44.1,
             0
           ],
@@ -46542,21 +46542,21 @@
         {
           "shape": "blob",
           "size": [
-            0.22,
+            0.2,
             0.02,
-            0.374
+            0.294
           ],
           "at": [
-            -0.268,
-            0.852,
-            0.276
+            -0.203,
+            0.81,
+            0.209
           ],
           "color": "#4A8A3A",
           "material": "material.finish.foliage",
           "noise": 0.2,
           "segments": 2,
           "rotate": [
-            10.5,
+            15.4,
             315.9,
             0
           ]

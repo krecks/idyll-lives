@@ -43,7 +43,9 @@ whose file fails to load falls back to its placeholder at the low level of detai
 
 `check_glb.py`: 12 models, 0 failed. Warnings: four draw calls (apple, lemon tree); sizes under the placeholders'
 bounds for the oak, maple, pine, spruce and cypress (those bounds count each turned blob's or cone's whole box: the
-spruce's read 7.8 m for cones 5.4 m across). Khronos validator: 0 errors, 0 warnings on all 24 files.
+spruce's read 7.8 m for cones 5.4 m across). Since the gate measures turned parts exactly, only the oak's and maple's were still over
+10 % off; their placeholders' main crowns were drawn in a little (`spread` 0.75 to 0.71 and 0.78 to 0.74, 2026-10-15),
+the models being what the game draws. Khronos validator: 0 errors, 0 warnings on all 24 files.
 
 ## Rebuild
 

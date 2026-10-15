@@ -234,16 +234,16 @@ def plant():
 def monstera():
     """Monstera: a white pot and nine split leaves on long arching stems."""
     P = palette(body='#EDEBE6', leaf='#2F6B35', leaf_dark='#28602E', leaf_light='#3B7A3C', stem='#4E7A3A')
-    ys = pot(P, 0.21, 0.38, r_bottom=0.16, rim=0)
+    ys = pot(P, 0.18, 0.34, r_bottom=0.14, rim=0)
     rng = random.Random(91)
     for i in range(9):
         yaw = i / 9 * 720 + rng.uniform(-15, 15)
-        out = rng.uniform(0.18, 0.34)
-        h = rng.uniform(0.2, 0.5)
+        out = rng.uniform(0.07, 0.13)
+        h = rng.uniform(0.3, 0.6)
         tip = Vector(polar(out, yaw, ys + h))
         tube(f'stem{i}', arc((0, 0, ys), tip, 0.06, 3), 0.009, 0.007, P.stem, verts=5)
-        leaf(f'leaf{i}', tip, yaw, rng.uniform(20, 40), rng.uniform(0.36, 0.44), rng.uniform(0.32, 0.38),
-             [P.leaf, P.leaf_dark, P.leaf_light][i % 3], shape='heart', droop=0.35, fold=0.12, rows=19, ring=6,
+        leaf(f'leaf{i}', tip, yaw, rng.uniform(5, 25), rng.uniform(0.29, 0.33), rng.uniform(0.26, 0.3),
+             [P.leaf, P.leaf_dark, P.leaf_light][i % 3], shape='heart', droop=0.5, fold=0.12, rows=19, ring=6,
              notch=(4, 0.5))
     return G.settle([G.join_all('monstera')])
 
@@ -348,8 +348,8 @@ def boston_fern():
     cols = [P.leaf, P.leaf_dark, P.leaf_light]
     for i in range(14):
         yaw = i * 360 / 14 + rng.uniform(-10, 10)
-        leaf(f'frond{i}', (0, 0, ys + 0.02), yaw, rng.uniform(35, 60), rng.uniform(0.48, 0.56), 0.13, cols[i % 3],
-             shape='lance', droop=rng.uniform(0.75, 0.9), fold=0.15, rows=15, ring=4, notch=(2, 0.45))
+        leaf(f'frond{i}', (0, 0, ys + 0.02), yaw, rng.uniform(40, 62), rng.uniform(0.43, 0.49), 0.13, cols[i % 3],
+             shape='lance', droop=rng.uniform(0.92, 1.04), fold=0.15, rows=15, ring=4, notch=(2, 0.45))
     for i in range(6):
         yaw = i * 60 + 30
         leaf(f'crown{i}', (0, 0, ys + 0.02), yaw, 65, 0.3, 0.1, P.leaf_light, shape='lance', droop=0.5, fold=0.15,
@@ -365,11 +365,11 @@ def palm():
     cols = [P.leaf, P.leaf_dark, P.leaf_light]
     for i in range(8):
         yaw = i * 45 + rng.uniform(-15, 15)
-        up = rng.uniform(64, 80)
-        length = rng.uniform(0.28, 0.46)
+        up = rng.uniform(72, 86)
+        length = rng.uniform(0.3, 0.48)
         tip = Vector(polar(length * math.cos(math.radians(up)), yaw, ys + length * math.sin(math.radians(up))))
         tube(f'stalk{i}', [(0, 0, ys - 0.01), tip], 0.006, 0.005, P.stem, verts=4)
-        leaf(f'frond{i}', tip, yaw, up - 18, rng.uniform(0.4, 0.5), 0.26, cols[i % 3], shape='lance',
+        leaf(f'frond{i}', tip, yaw, up - 18, rng.uniform(0.3, 0.36), 0.24, cols[i % 3], shape='lance',
              droop=rng.uniform(0.75, 0.95), fold=0.1, rows=17, ring=4, notch=(2, 0.22))
     return G.settle([G.join_all('palm')])
 
@@ -750,7 +750,7 @@ def geraniums():
     P = palette(body='#C0683F', bloom='#D6283A', bloom2='#E23A48', bloom3='#C41E32')
     rng = random.Random(63)
     top = pot(P, 0.2, 0.34, r_bottom=0.15, rim=0.012)
-    for i, (x, y, _) in enumerate(spiral(5, 0.13, rng)):
+    for i, (x, y, _) in enumerate(spiral(5, 0.11, rng)):
         lump(f'leaves{i}', 0.13, (x, y, top - 0.02), [P.leaf, P.leaf_dark, P.leaf_light][i % 3], scale=(1, 1, 0.75), seed=i * 1.7)
     for i, (x, y, a) in enumerate(spiral(6, 0.15, rng)):
         h = top + rng.uniform(0.2, 0.27)
@@ -1243,13 +1243,13 @@ BED = [('bed', 'Bed')]
 FAMILY = G.Family(
     'plants', M,
     [G.Model('plant', plant, size=(0.772, 0.825, 0.791), key='model.plant', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
-     G.Model('monstera', monstera, size=(1.328, 0.922, 1.344), key='model.garden.monstera', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
+     G.Model('monstera', monstera, size=(0.784, 0.911, 0.791), key='model.garden.monstera', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('fiddleFig', fiddle_fig, size=(0.528, 1.626, 0.527), key='model.garden.fiddleFig', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('snakePlant', snake_plant, size=(0.341, 0.905, 0.32), key='model.garden.snakePlant', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('cacti', cacti, size=(0.568, 0.521, 0.465), key='model.garden.cacti', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('succulents', succulents, size=(0.62, 0.17, 0.62), key='model.garden.succulents', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
-     G.Model('bostonFern', boston_fern, size=(0.876, 0.979, 0.94), key='model.garden.bostonFern', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
-     G.Model('palm', palm, size=(1.074, 0.869, 0.982), key='model.garden.palm', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
+     G.Model('bostonFern', boston_fern, size=(0.734, 0.979, 0.792), key='model.garden.bostonFern', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
+     G.Model('palm', palm, size=(0.770, 0.893, 0.693), key='model.garden.palm', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('orchid', orchid, size=(0.431, 1.198, 0.381), key='model.garden.orchid', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('bonsai', bonsai, size=(0.62, 0.974, 0.407), key='model.garden.bonsai', tolerance=TOLERANCE, paint=[('body', 'Pot')],
              motions={'uses': {'prune': 'trim'}}),
@@ -1268,7 +1268,7 @@ FAMILY = G.Family(
      G.Model('cosmos', cosmos, size=(0.885, 0.879, 0.84), key='model.garden.cosmos', tolerance=TOLERANCE, far=far_of(cosmos), paint=BED),
      G.Model('meadow', meadow, size=(0.811, 0.517, 0.919), key='model.garden.meadow', tolerance=TOLERANCE, far=far_of(meadow),
              motions={'uses': {'pickFlower': 'pick'}}),
-     G.Model('geraniums', geraniums, size=(0.424, 0.65, 0.503), key='model.garden.geraniums', tolerance=TOLERANCE, far=far_of(geraniums), paint=[('body', 'Pot'), ('bloom', 'Flowers')]),
+     G.Model('geraniums', geraniums, size=(0.424, 0.65, 0.468), key='model.garden.geraniums', tolerance=TOLERANCE, far=far_of(geraniums), paint=[('body', 'Pot'), ('bloom', 'Flowers')]),
      G.Model('flowerBox', flower_box, size=(0.945, 0.732, 0.505), key='model.garden.flowerBox', tolerance=TOLERANCE, far=far_of(flower_box), paint=[('body', 'Box')]),
      # G3: shrubs (they dress every lot)
      G.Model('bush', bush, size=(1.043, 0.91, 1.095), key='model.bush', tolerance=TOLERANCE, far=far_of(bush)),

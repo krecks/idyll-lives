@@ -35,19 +35,25 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
 | `model.plant` | 0.77 × 0.83 × 0.79 m | 2,588 | 2 |
-| `model.garden.monstera` | 1.33 × 0.92 × 1.34 m | 2,840 | 2 |
+| `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 2,840 | 2 |
 | `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 1,924 | 3 |
 | `model.garden.snakePlant` | 0.34 × 0.91 × 0.32 m | 1,220 | 2 |
 | `model.garden.cacti` | 0.57 × 0.52 × 0.47 m | 1,860 | 1 |
 | `model.garden.succulents` | 0.62 × 0.17 × 0.62 m | 3,300 | 1 |
-| `model.garden.bostonFern` | 0.88 × 0.98 × 0.94 m | 2,796 | 3 |
-| `model.garden.palm` | 1.07 × 0.87 × 0.98 m | 1,644 | 2 |
+| `model.garden.bostonFern` | 0.73 × 0.98 × 0.79 m | 2,796 | 3 |
+| `model.garden.palm` | 0.77 × 0.89 × 0.69 m | 1,644 | 2 |
 | `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,632 | 3 |
 | `model.garden.bonsai` | 0.62 × 0.97 × 0.41 m | 1,260 | 4 |
 
-`check_glb.py`: 10 models, 0 failed; warnings: the bonsai's four draw calls, the palm 11 % shallower and the
-succulents 15 % lower than their placeholders' bounds (which count each tilted part's whole box). Khronos
-validator: 0 errors, 0 warnings each.
+`check_glb.py`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
+each.
+
+**By a wall, turned any way.** Houseplants turn freely (15° steps), so a plant's leaves stay within 44 cm of its
+middle (the wall's face, 43 cm from a tile's middle, and the gate's 1 cm), whichever way it faces; the model and its
+placeholder both. The monstera (was 1.33 m across, 24 cm into the wall), the fern on its stand (4 cm) and the parlour
+palm (6 cm) had their leaves pulled in on 2026-10-15: the monstera's stems leave the pot closer in and its leaves are
+a little smaller and hang more (its pot 36 cm across, was 42), the fern's fronds a little shorter and hanging further
+over the rim, the palm's stalks more upright with shorter fronds. All ten now reach 25–43 cm from their middles.
 
 ## The flowers (G2)
 
@@ -65,7 +71,8 @@ the flower box its box, the raised bed its boards; the meadow, all grass and mix
   call), `pick` squashes it to nothing in 0.8 s for `pickFlower`; the game brings it back after.
 
 The placeholders' mounds sink 6 cm into the ground, so their bounds read a little taller than the beds stand; the
-flowers here are set so each model is within 10 % of them, but for the geraniums' width (11 % under).
+flowers here are set so each model is within 10 % of them (the geraniums' leaves were drawn in to a rounder clump and
+their placeholder's pot narrowed to the model's 40 cm on 2026-10-15).
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
@@ -82,10 +89,10 @@ flowers here are set so each model is within 10 % of them, but for the geraniums
 | `model.garden.forgetMeNots` | 0.87 × 0.28 × 0.84 m | 2,460 | 2 |
 | `model.garden.cosmos` | 0.89 × 0.88 × 0.84 m | 2,146 | 2 |
 | `model.garden.meadow` | 0.81 × 0.52 × 0.92 m | 2,548 | 3 |
-| `model.garden.geraniums` | 0.42 × 0.65 × 0.50 m | 1,648 | 2 |
+| `model.garden.geraniums` | 0.42 × 0.65 × 0.47 m | 1,648 | 2 |
 | `model.garden.flowerBox` | 0.95 × 0.73 × 0.50 m | 2,912 | 2 |
 
-`check_glb.py`: 15 models, 0 failed (the geraniums' width warning). Khronos validator: 0 errors, 0 warnings each.
+`check_glb.py`: 15 models, 0 failed, no size warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Far versions
 
@@ -128,7 +135,8 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
 | `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,120 | 480 | 2 |
 | `model.garden.hosta` | 0.62 × 0.84 × 0.68 m | 676 | 234 | 2 |
 
-`check_glb.py`: the family's 36 models, 0 failed. Warnings: the grass 13 % wider than its placeholder's bounds.
+`check_glb.py`: the family's 36 models, 0 failed. (The grass's and hosta's placeholders were widened to their models
+on 2026-10-15: they were 13 % and 11 % narrower.)
 Khronos validator: 0 errors, 0 warnings on every new file.
 
 ## The edibles (G4)

@@ -257,7 +257,7 @@ def oak():
     rng = random.Random(11)
     p = trunk(3.4, 0.62)
     p += limbs(rng, [0, 2.9, 0], [[1.5, 4.6, 0.5], [-1.4, 4.5, -0.6], [0.3, 5.0, -1.3], [-0.4, 5.1, 1.2]], 0.3)
-    p += crown(rng, [0, 5.5, 0], [2.7, 1.8, 2.7], 10, OAK, size=0.7, spread=0.75, core=0.82)
+    p += crown(rng, [0, 5.5, 0], [2.7, 1.8, 2.7], 10, OAK, size=0.7, spread=0.71, core=0.82)
     p += crown(rng, [1.7, 4.6, 0.7], [1.4, 1.0, 1.4], 3, OAK, size=0.85, bottom=-0.6, core=0.7)
     p += crown(rng, [-1.6, 4.7, -0.8], [1.4, 1.1, 1.4], 3, OAK, size=0.85, bottom=-0.6, core=0.7)
     return p
@@ -267,7 +267,7 @@ def maple():
     rng = random.Random(12)
     p = trunk(3.2, 0.5)
     p += limbs(rng, [0, 2.8, 0], [[1.1, 4.3, 0.4], [-1.0, 4.4, -0.3], [0.1, 4.6, -1.1]], 0.24)
-    p += crown(rng, [0, 5.1, 0], [2.5, 2.4, 2.5], 14, MAPLE, size=0.6, spread=0.78, core=0.85)
+    p += crown(rng, [0, 5.1, 0], [2.5, 2.4, 2.5], 14, MAPLE, size=0.6, spread=0.74, core=0.85)
     return p
 
 
@@ -613,7 +613,7 @@ def meadow():
     cols = ['#7FA04A', '#8EAE52', '#6E9240', '#A2B45E']
     p = [blob([0.3, 0.16, 0.3], [x, 0.03, z], cols[i % 4], noise=0.3) for i, (x, z, _) in enumerate(spiral(5, 0.3, rng))]
     for i, (x, z, a) in enumerate(spiral(22, 0.42, rng)):
-        p.append(leaf_blade([x, 0, z], rng.uniform(0.28, 0.5), 0.05, rng.uniform(5, 25), rng.uniform(0, 360), cols[i % 4]))
+        p.append(leaf_blade([x, 0, z], rng.uniform(0.28, 0.5), 0.05, rng.uniform(5, 30), rng.uniform(0, 360), cols[i % 4]))
     flowers = ['#FFFFFF', '#F6C21E', '#A880E0', '#EC3A2E', '#8CB4F8', '#FFFFFF', '#F08CC4']
     for i, (x, z, a) in enumerate(spiral(16, 0.4, rng)):
         h = rng.uniform(0.26, 0.5)
@@ -624,7 +624,7 @@ def meadow():
 
 def geraniums():
     rng = random.Random(63)
-    p, top = pot(0.44, 0.34)
+    p, top = pot(0.4, 0.34)
     p += [blob([0.3, 0.2, 0.3], [x, top + 0.09, z], LEAF[i % 3], noise=0.3) for i, (x, z, _) in enumerate(spiral(4, 0.12, rng))]
     for i, (x, z, a) in enumerate(spiral(6, 0.15, rng)):
         h = top + rng.uniform(0.2, 0.3)
@@ -740,10 +740,10 @@ def ornamental_grass():
     cols = ['#9AAA5A', '#B2B86A', '#8A9E4E', '#A6B062']
     p = [blob([0.32, 0.14, 0.32], [0, 0.04, 0], '#7E8E46', noise=0.2)]
     for i, (x, z, a) in enumerate(spiral(22, 0.12, rng)):
-        p.append(leaf_blade([x, 0, z], rng.uniform(0.75, 1.1), 0.045, 8 + math.hypot(x, z) * 160 + rng.uniform(0, 8), math.degrees(math.atan2(x, z)) + rng.uniform(-20, 20), cols[i % 4]))
+        p.append(leaf_blade([x, 0, z], rng.uniform(0.75, 1.1), 0.045, 12 + math.hypot(x, z) * 170 + rng.uniform(0, 8), math.degrees(math.atan2(x, z)) + rng.uniform(-20, 20), cols[i % 4]))
     for i in range(6):
         yaw = i * 60 + rng.uniform(-15, 15)
-        r, ax = facing(rng.uniform(6, 18), yaw)
+        r, ax = facing(rng.uniform(10, 20), yaw)
         p.append(cyl([0.012, 1.0, 0.012], add([0, 0, 0], ax, 0.5), '#B8B070', 'foliage', segments=3, rotate=r))
         p.append(cone([0.06, 0.24, 0.06], add([0, 0, 0], ax, 1.05), '#E2D6A8', 'satin', taper=0.2, segments=5, rotate=r))
     return p
@@ -755,7 +755,7 @@ def hosta():
     for i in range(12):
         yaw = i / 12 * 360 * 2 + rng.uniform(-10, 10)
         up = i >= 6
-        p.append(leaf_pad([0, 0.1 + (0.08 if up else 0), 0], rng.uniform(0.3, 0.36), 0.2, -rng.uniform(25, 40) if up else -rng.uniform(5, 15), yaw,
+        p.append(leaf_pad([0, 0.1 + (0.08 if up else 0), 0], rng.uniform(0.33, 0.39), 0.2, -rng.uniform(25, 40) if up else -rng.uniform(5, 15), yaw,
                           ['#5E8A5E', '#8EAE6C', '#6A9464'][i % 3], seg=2, noise=0.08))
     for i in range(3):
         top = [rng.uniform(-0.08, 0.08), rng.uniform(0.62, 0.8), rng.uniform(-0.08, 0.08)]
@@ -890,14 +890,14 @@ WHITE_POT, CREAM_POT = '#EDEBE6', '#D9CDB4'
 
 def monstera():
     rng = random.Random(91)
-    p, top = pot(0.44, 0.38, WHITE_POT, 'satin', rim=False)
+    p, top = pot(0.38, 0.34, WHITE_POT, 'satin', rim=False)
     for i in range(9):
         yaw = i / 9 * 360 * 2 + rng.uniform(-15, 15)
-        h = top + rng.uniform(0.25, 0.6)
-        out = rng.uniform(0.22, 0.4)
+        h = top + rng.uniform(0.3, 0.6)
+        out = rng.uniform(0.07, 0.13)
         base = [out * math.sin(math.radians(yaw)), h, out * math.cos(math.radians(yaw))]
         p.append(stem([0, top, 0], base, 0.016, '#4E7A3A'))
-        p.append(leaf_pad(add(base, [0, 0, 0]), rng.uniform(0.36, 0.44), rng.uniform(0.3, 0.36), rng.uniform(15, 35), yaw, ['#2F6B35', '#3B7A3C', '#347040'][i % 3], seg=2))
+        p.append(leaf_pad(add(base, [0, 0, 0]), rng.uniform(0.29, 0.33), rng.uniform(0.26, 0.3), rng.uniform(18, 36), yaw, ['#2F6B35', '#3B7A3C', '#347040'][i % 3], seg=2))
     return p
 
 
@@ -954,7 +954,7 @@ def succulents():
     for i, (x, z, a) in enumerate(spiral(7, 0.2, rng)):
         s = rng.uniform(0.09, 0.13)
         p.append(cone([s, s * 0.55, s], [x, 0.14, z], cols[i % 5], 'satin', taper=1.7, segments=7))
-        p.append(cone([s * 0.6, s * 0.45, s * 0.6], [x, 0.17, z], cols[(i + 2) % 5], 'satin', taper=1.6, segments=5, rotate=[0, 25, 0]))
+        p.append(cone([s * 0.6, s * 0.45, s * 0.6], [x, 0.16, z], cols[(i + 2) % 5], 'satin', taper=1.6, segments=5, rotate=[0, 25, 0]))
     return p
 
 
@@ -969,7 +969,7 @@ def boston_fern():
     p += q
     for i in range(12):
         yaw = i / 12 * 360 + rng.uniform(-10, 10)
-        p.append(leaf_pad([0, top + 0.04, 0], rng.uniform(0.4, 0.52), 0.13, rng.uniform(5, 40), yaw, ['#5E9A3E', '#6FAA46', '#558E38'][i % 3], seg=2, noise=0.15))
+        p.append(leaf_pad([0, top + 0.04, 0], rng.uniform(0.38, 0.46), 0.13, rng.uniform(25, 50), yaw, ['#5E9A3E', '#6FAA46', '#558E38'][i % 3], seg=2, noise=0.15))
     for i in range(6):
         p.append(leaf_pad([0, top + 0.06, 0], 0.3, 0.11, -rng.uniform(30, 50), i * 60 + 30, '#78B24E', seg=1, noise=0.15))
     return p
@@ -980,11 +980,11 @@ def palm():
     p, top = pot(0.4, 0.34, CREAM_POT, 'matte', rim=False)
     for i in range(7):
         yaw = i / 7 * 360 + rng.uniform(-15, 15)
-        r, ax = facing(rng.uniform(10, 28), yaw)
-        length = rng.uniform(0.45, 0.65)
+        r, ax = facing(rng.uniform(10, 20), yaw)
+        length = rng.uniform(0.4, 0.6)
         tip = add([0, top, 0], ax, length)
         p.append(rod([0, top, 0], tip, 0.014, '#5E7E3A', 'foliage', seg=3))
-        p.append(leaf_pad(add(tip, [0, -0.02, 0]), rng.uniform(0.35, 0.45), 0.22, rng.uniform(10, 35), yaw, ['#4A8A3A', '#5A9A42', '#3E7A34'][i % 3], seg=2, thick=0.02, noise=0.2))
+        p.append(leaf_pad(add(tip, [0, -0.02, 0]), rng.uniform(0.28, 0.34), 0.2, rng.uniform(15, 35), yaw, ['#4A8A3A', '#5A9A42', '#3E7A34'][i % 3], seg=2, thick=0.02, noise=0.2))
     return p
 
 
