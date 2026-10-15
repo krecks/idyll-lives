@@ -13,7 +13,7 @@ at 0.45 m.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `veggieBed` | the plants (foliage), the fruit (tomatoes, carrots, courgettes) and one lettuce, origins on the soil: `grow` holds each where the crop's stage is (ripe at rest; picked: the fruit gone; growing: the plants at 0.6 height; planted: 0.25); `harvest` presses the lettuce down into the soil (0.8 s) | `growth`; `pickSnack` |
+| `veggieBed` | the plants (foliage), the fruit (tomatoes, carrots, courgettes) and one lettuce, origins on the soil: `grow` holds each where the crop's stage is (ripe at rest; picked: the fruit gone; growing: the plants at 0.6 height; planted: 0.25); `harvest` presses the lettuce down into the soil (0.8 s); `rustle` sways the plants and the fruit 3° back and forth about the soil line (0.8 s, every 2.4 s), on top of the stage | `growth`; `pickSnack`; `tendVeggies` |
 | `pottingBench` | a seedling in a pot on the worktop, built flat on its soil: `seedling` grows it up (1 s) | `potSeedlings` |
 | `birdFeeder` | a bluebird on the tray, built at full size and scaled to nothing: `bird` brings it in (0.5 s) | `birdwatch` |
 | `gardenHammock` | the sling with its spreader bars, ropes and pillow, pivoting on the line between the hooks: `sway` rocks it 8° each way and home (2.4 s), a loop; `ride` carries the resident | `swing`, `doze` (loops) |
@@ -26,10 +26,10 @@ worktop front (`bouquet`, 0.8 s), held while it is tied and gone when it ends, a
 inside the worktop, so it flattens out of sight at rest. It is a part of its own: the bench takes 4 draws (8,216
 triangles, over the 8,000 aim).
 
-`tendVeggies` still plays nothing. Every part of the veggie bed already follows the crop's growth stage
-(`growth`), and a use clip on one of them would replace that pose (one part plays one clip's pose at a time):
-tending a just-planted bed would pop its plants to full size. A new part would be a fifth draw. It needs either
-use clips that compose with the growth pose (objectMotion.ts) or a cheaper bed.
+`tendVeggies` rustles the bed (`rustle`, 0.6 s in and every 2.4 s while tended): the plants and the fruit sway
+3° back and forth about their shared origin on the soil line through the bed's middle. A use clip on a growing
+part plays on top of the growth stage (objectMotion.ts, `partPose`: the stage first), so a just-planted bed's
+seedlings sway by their own height and keep their size. No new part: still 4 draws.
 
 **Draw calls: 3 each; the veggie bed, the glasshouse and the potting bench 4.**
 - The cedar is plain satin on the veggie bed, the feeder and the glasshouse bench, so the leaves take the textured

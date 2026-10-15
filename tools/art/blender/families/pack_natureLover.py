@@ -195,6 +195,10 @@ def veggieBed():
     G.stages(lettuce, 'grow', picked=1, growing=(1, 1, 0.6), planted=(1, 1, 0.25))
     G.stages(fruit, 'grow', picked=0.001, growing=0.001, planted=0.001)
     G.squash(lettuce, 'harvest', (1, 1, 0.001), seconds=0.8)   # down into the soil (only Z: see the notes)
+    # Tending: the plants and their fruit rustle, swaying 3° back and forth about the soil line through the bed's
+    # middle (their shared origin), on top of the growth stage (objectMotion.ts plays a use clip after it).
+    for part in (plants, fruit):
+        G.rock(part, 'rustle', 3, seconds=0.8, axis='X')
     return objs
 
 
@@ -617,7 +621,8 @@ def glasshouse():
 FAMILY = G.Family(
     'pack_natureLover', M,
     [G.Model('veggieBed', veggieBed, size=(1.87, 1.3, 0.91), centre=(0, 0.025), key='model.natureLover.veggieBed',
-             motions={'uses': {'pickSnack': 'harvest'}, 'growth': 'grow'},
+             motions={'uses': {'pickSnack': 'harvest', 'tendVeggies': {'clip': 'rustle', 'delay': 0.6, 'every': 2.4}},
+                      'growth': 'grow'},
              paint=[('cedar', 'Wood'), ('cedar_dark', 'Posts & rails')]),
      G.Model('pottingBench', pottingBench, size=(1.76, 1.785, 0.6), key='model.natureLover.pottingBench',
              centre=(0, -0.13), motions={'uses': {'potSeedlings': 'seedling', 'tieBouquet': 'bouquet'}},

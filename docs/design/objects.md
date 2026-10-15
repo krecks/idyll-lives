@@ -216,7 +216,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **Several clips on one part** play together: their poses multiply, the clips of the part itself
   first, then those of the parts it is inside. So a record swings up and spins (a `uses` clip on the
   record, a loop on its label inside it). Two clips on the same node also multiply, but in no set
-  order: for a swing and a spin, put the spinning part inside the swinging one.
+  order (except a crop's growth stage, which comes first: **Growth** below): for a swing and a
+  spin, put the spinning part inside the swinging one.
 - **One clip per part**, named `<part>_open` (an NLA track of that name, made by `G.swing` or
   `G.slide`; the build exports the tracks when a model has any). Its first key is the rest pose, where
   the file has the part and where the game draws it closed: frame 1 when exporting. Add the clips after
@@ -296,9 +297,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   along (the crop gone), growing two thirds (smaller) and just planted at the end (seedlings). From
   stage to stage it plays on at the clip's pace: a harvest shrinks the crop away, replanting the
   plants, and growing goes back through picked (no crop yet) to ripe. `G.stages` makes it, a scale
-  per stage for each part. A game loaded shows each crop at its stage without playing.
+  per stage for each part. A game loaded shows each crop at its stage without playing. A use's clip on a
+  growing part plays on top of its stage: the stage's pose first, then the use clip's about the part's rest
+  origin (`partPose`), so tending a just-planted veggie bed rustles its seedlings by their own small height
+  rather than popping them to full size; a scale (the lettuce pressed into the soil) multiplies with the stage's.
   ```json
-  "motions": { "growth": "grow" }
+  "motions": { "growth": "grow", "uses": { "tendVeggies": { "clip": "rustle", "delay": 0.6, "every": 2.4 } } }
   ```
 - **Open until closed:** an object can be open (the sim's `open`, saved), set by interactions with
   `leaves` and offered by `when` ([content-packs.md](../content-packs.md)). `motions.open` names the clip

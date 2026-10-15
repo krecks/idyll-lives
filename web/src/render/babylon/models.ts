@@ -129,10 +129,12 @@ export function clipPose(clip: ModelClip, part: number, seconds: number, out: Fl
  * Where the clips playing (`playing`, each at its seconds) put `part` together, into `out` (as
  * `clipPose`): one clip's pose as it is; several multiply, the clips that move the part itself
  * before those that move a part it is inside (a record spinning on an arm that swings up: the spin
- * and then the swing), so each clip of a nested part plays as if the others did too. False (`out`
- * untouched) if none moves it.
+ * and then the swing), so each clip of a nested part plays as if the others did too. On one node, a
+ * crop's growth clip (`kind` `growth`) comes first and the others play on top of it, about the part's
+ * rest origin: a veggie bed's plants sway as they stand at their stage, seedlings by their own small
+ * height. False (`out` untouched) if none moves it.
  */
-export function partPose(playing: readonly { clip: ModelClip; time: number }[], part: number, out: Float32Array, offset = 0): boolean {
+export function partPose(playing: readonly { clip: ModelClip; time: number; kind?: string }[], part: number, out: Float32Array, offset = 0): boolean {
   let found = 0;
   let first: { clip: ModelClip; time: number } | undefined;
   for (const p of playing) {
@@ -140,16 +142,16 @@ export function partPose(playing: readonly { clip: ModelClip; time: number }[], 
     if (!found++) first = p;
   }
   if (found <= 1) return found === 1 && clipPose(first!.clip, part, first!.time, out, offset);
-  const posed: { depth: number; pose: Float32Array }[] = [];
+  const posed: { depth: number; growth: number; pose: Float32Array }[] = [];
   for (const p of playing) {
     const track = p.clip.tracks.find((t) => t.part === part);
     if (!track) continue;
     const pose = new Float32Array(16);
     clipPose(p.clip, part, p.time, pose);
-    posed.push({ depth: track.depth, pose });
+    posed.push({ depth: track.depth, growth: p.kind === 'growth' ? 1 : 0, pose });
   }
-  // Deepest first (row vectors: a vertex times the first, then the next).
-  posed.sort((a, b) => b.depth - a.depth);
+  // Deepest first, and on one node the growth stage first (row vectors: a vertex times the first, then the next).
+  posed.sort((a, b) => b.depth - a.depth || b.growth - a.growth);
   const acc = posed[0].pose;
   const tmp = new Float32Array(16);
   for (let n = 1; n < posed.length; n++) {

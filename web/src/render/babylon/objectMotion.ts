@@ -12,7 +12,8 @@
  * round all the time, but only within `ambientRange` of the camera (none on Low), without the
  * shadows being redrawn for it. A clock's hands (`clock`) show the game's time, set each game
  * minute (each five on Low) within `CLOCK_RANGE` of the camera or the ambient range. A part moved by
- * several clips at once takes all their poses (`partPose`: a record spinning as it swings up). Each
+ * several clips at once takes all their poses (`partPose`: a record spinning as it swings up; a use's clip
+ * on top of a crop's growth stage, the veggie bed's plants rustling as tall as they have grown). Each
  * instance's parts draw from buffers of their own (`MovingTarget`), written only while something moves.
  *
  * Time is the residents' animation time: it stops while the game is paused and runs faster
