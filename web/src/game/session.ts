@@ -201,6 +201,8 @@ export async function startSession(
   let focused = false;
   let viewPlot: number | null = null;
   let lastEvent = -1;
+  /** Whether the first update's story (the history, empty in a new game) has been seen. */
+  let storySeen = false;
   /** The HUD view as the worker's updates built it up. */
   const mirror = new UiMirror();
   /** The household routines last compared (they come again with every change to the household). */
@@ -857,10 +859,12 @@ export async function startSession(
     const followed = game.follow === null ? null : game.sims.find((s) => s.id === game.follow);
     if (game.follow !== null && !followed) controls.follow(null);
     else if (followed?.plot != null && followed.plot !== viewPlot) showPlot(followed.plot);
-    // New story events: the journal, the director, and the feed (only the first batch is history).
+    // New story events: the journal, the director, and the feed (only the first update's story is
+    // history; a new game's is empty, and its first event is news).
     const events = ui.events ?? [];
     const fresh = events.filter((e) => e.id > lastEvent);
-    if (lastEvent >= 0 && fresh.length) onStory(fresh);
+    if (storySeen && fresh.length) onStory(fresh);
+    storySeen = true;
     if (events.length) lastEvent = events[events.length - 1].id;
   });
   /** The newest picture of the game (a save while nothing is drawn, e.g. in a hidden tab, keeps it). */
