@@ -171,6 +171,15 @@ export interface ObjectInfo extends Shape {
   fillsWall?: boolean;
   /** Belongs over a window (content `overWindow`): only such things hang on one. */
   overWindow?: boolean;
+  /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
+  keepClear: boolean;
+}
+
+/** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
+function cooksOrWashes(o: ObjectDef): boolean {
+  const stations = o.stations ?? [];
+  const sink = stations.includes('dishes') && (o.interactions ?? []).some((i) => (i.tags ?? []).includes('handwash'));
+  return sink || stations.includes('stove') || stations.includes('grill');
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -182,7 +191,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o) });
     }
     return known.get(def);
   };
@@ -1222,8 +1231,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
 
 /**
  * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
- * in its middle, elsewhere anywhere free), facing about the way its host does, listed right
- * after its host (the simulation places it on a top that's already there).
+ * in its middle, elsewhere anywhere free; never a hob's or a sink's), facing about the way its
+ * host does, listed right after its host (the simulation places it on a top that's already there).
  */
 function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () => number, slot: TopSlot): void {
   const count = slot.count ? between(rng, slot.count) : 1;
@@ -1237,7 +1246,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     if (thing?.layer !== 'surface') continue;
     const tops = f.objects
       .map((o) => topOf(shapes, o))
-      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
     const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
     const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
     for (const { t } of order) {

@@ -25,6 +25,14 @@ use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 
+/// A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed):
+/// what housegen keeps small things off.
+fn cooks_or_washes(content: &sim_core::content::Content, def: &sim_core::content::ObjectDef) -> bool {
+    let station = |s: &str| content.cooking.station(s).is_some_and(|m| def.stations & m != 0);
+    let handwash = content.tags.iter().position(|t| t == "handwash").map_or(0, |i| 1 << i);
+    station("stove") || station("grill") || station("dishes") && def.interactions.iter().any(|i| i.tags & handwash != 0)
+}
+
 #[test]
 #[ignore]
 fn generated_houses_are_livable() {
@@ -52,8 +60,14 @@ fn generated_houses_are_livable() {
                 continue;
             }
         };
-        // Things on tops stand on one listed before them.
+        // Things on tops stand on one listed before them, never on a hob or a sink.
         common::check(&w);
+        for o in w.objects.iter().filter(|o| w.content.objects[o.def].layer == Layer::Surface) {
+            let host = surface::host_of(&w.content, &w.objects, o).map(|h| &w.content.objects[w.objects[h as usize].def]);
+            if let Some(host) = host.filter(|d| cooks_or_washes(&w.content, d)) {
+                failures.push(format!("{label}: the {} at {},{} is on the {}", w.content.objects[o.def].id, o.x, o.z, host.id));
+            }
+        }
         // Rooms as planned: no bigger than their kind may be, walled off (or open to the next).
         for r in h["rooms"].as_array().into_iter().flatten() {
             let kind = r["kind"].as_str().unwrap();
