@@ -3,7 +3,7 @@
 import math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder, turned,  # noqa: E402
                        OAK, OAKD, HONEY, WALNUT, BRASS, CHROME, TEAL, MUSTARD, SAGE, RUST, CREAM)
 from objects_extra import books  # noqa: E402
 from furniture_prims import tea_set, wing_chair, drawer_chest  # noqa: E402
@@ -128,7 +128,9 @@ def library_wall():
 E['model.bookworm.libraryWall'] = library_wall(); FOOT['model.bookworm.libraryWall'] = (2, 1)
 
 
-# ---- writingBureau (1x1, sit at the centre facing +Z): roll-top bureau in front, typewriter ------
+# ---- writingBureau (1x1): roll-top bureau, typewriter; drawn in the front half with the chair behind it, then
+# turned round (`turned`): its back on the wall's face, the chair in front, the writer facing the back (content
+# `seat.facing`; Blender's pack_bookworm.py does the same) ------
 def writing_bureau():
     p = [box([0.82, 0.04, 0.3], [0, 0.75, 0.29], WOOD, 'wood', radius=0.01),                  # writing surface (near edge 0.14)
          box([0.82, 0.42, 0.14], [0, 0.98, 0.385], WOOD, 'wood', radius=0.01),               # pigeonhole hutch (back to room)
@@ -165,7 +167,7 @@ def writing_bureau():
               cyl([0.035, 0.92, 0.035], [dx, 0.46, -0.28], HONEY, 'wood', taper=0.9, segments=10)]
     p += [box([0.4, 0.14, 0.035], [0, 0.84, -0.28], HONEY, 'wood', radius=0.03),
           box([0.4, 0.04, 0.03], [0, 0.64, -0.28], HONEY, 'wood', radius=0.01)]
-    return placeholder(p)
+    return placeholder(turned(p))
 
 
 E['model.bookworm.writingBureau'] = writing_bureau(); FOOT['model.bookworm.writingBureau'] = (1, 1)
@@ -259,7 +261,7 @@ E['model.bookworm.bedsideStack'] = bedside_stack(); FOOT['model.bookworm.bedside
 # Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
 from pack_shapes import to_wall  # noqa: E402
 to_wall('bookworm', E, ['model.bookworm.bedsideStack', 'model.bookworm.libraryWall', 'model.bookworm.readingNook',
-                        'model.bookworm.teaTrolley'])
+                        'model.bookworm.teaTrolley', 'model.bookworm.writingBureau'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('bookworm', sys.argv[1] if len(sys.argv) > 1 else None, E, FOOT) else 0)

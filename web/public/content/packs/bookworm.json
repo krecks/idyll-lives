@@ -63,6 +63,7 @@
       "id": "bookworm.writingBureau",
       "name": "Writer's bureau",
       "model": "model.bookworm.writingBureau",
+      "seat": { "height": 0.45, "forward": 0.12, "facing": "back" },
       "footprint": [1, 1],
       "price": 700,
       "category": "validate",
