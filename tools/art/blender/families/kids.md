@@ -62,16 +62,16 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.crib` | 1.86 × 1.01 × 0.94 m | 7,996 | 3 | Frame, Bedding, Mobile |
-| `model.kidsBed` | 0.97 × 0.76 × 1.93 m | 2,692 | 3 | Frame, Bedding |
-| `model.kidsBedCar` | 0.99 × 0.77 × 1.99 m | 3,744 | 3 | Car body, Bedding |
+| `model.crib` | 1.86 × 1.01 × 0.93 m | 7,996 | 3 | Frame, Bedding, Mobile |
+| `model.kidsBed` | 0.97 × 0.76 × 1.88 m | 2,692 | 3 | Frame, Bedding |
+| `model.kidsBedCar` | 0.99 × 0.77 × 1.92 m | 3,744 | 3 | Car body, Bedding |
 | `model.highChair` | 0.44 × 0.94 × 0.47 m | 1,384 | 2 | Frame, Bedding |
 | `model.toyBox` | 0.82 × 0.51 × 0.80 m | 2,560 | 2 | Body, Trim |
 | `model.toyChest` | 0.85 × 0.53 × 0.51 m | 3,780 | 2 | Body, Trim |
 | `model.dollHouse` | 0.84 × 0.91 × 0.46 m | 3,236 | 2 | Walls, Roof |
 | `model.rockingHorse` | 0.29 × 0.82 × 0.88 m | 3,528 | 3 | Body, Trim |
 | `model.playTent` | 0.95 × 1.57 × 0.83 m | 386 | 3 | Canvas, Poles |
-| `model.ballPit` | 0.95 × 0.47 × 0.95 m | 3,816 | 2 | Pit, Rim |
+| `model.ballPit` | 0.93 × 0.47 × 0.93 m | 3,816 | 2 | Pit, Rim |
 | `model.trainTable` | 1.80 × 0.68 × 0.84 m | 3,448 | 3 | Table, Train |
 | `model.playMat` | 0.92 × 0.20 × 0.92 m | 1,680 | 3 | Mat |
 | `model.teddyBear` | 0.64 × 0.91 × 0.57 m | 3,340 | 2 | Fur, Bow |
@@ -85,7 +85,11 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 
 `check_glb.py`: 20 models, 0 failed. The toy box's and the chest's placeholders drew the lid open; they're shut
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
-into it, placeholders too; all stand on the wall face now. The play tent's placeholder is centred, as the model (it stands free). The remaining warnings are expected: the high chair's
+into it, placeholders too; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat
+reached 3–7 cm into the wall, placeholders too; their backs are on the face now (2026-10-15). The crib, the pit
+and the mat stand 3–3.5 cm forward of the middle (`_place(forward=)`; the crib's post caps and the pit's rim 1 cm
+smaller, so their fronts stay on the tile). The beds' mattresses stay where the game lays children: the kids'
+bed's headboard is 4 cm thick (was 6), the car's tail and spoiler are shorter from the back. The play tent's placeholder is centred, as the model (it stands free). The remaining warnings are expected: the high chair's
 and the tent's placeholder boxes count their splayed legs and poles unturned. Khronos validator: 0 errors,
 0 warnings each.
 

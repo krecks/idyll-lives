@@ -87,8 +87,10 @@ placeholder is redrawn as the model (its seat at 0.45 m, not 0.6), so none warns
 `model.shower`, `model.showerStall`, `model.showerWalkIn` and `model.showerRain`, built 2026-10-14. They sit in
 Validate › Showers until checked in play.
 
-- **They fill their tile**, centred, as their placeholders do: the resident steps in onto the middle
-  (`inside`). Walls at the back and on the left (game -x), the open sides glass or a curtain.
+- **They fill their tile**, their backs on the wall's face (game depth -0.43; `centre=` 2–3.5 cm forward of
+  the middle, as their placeholders), so they reached 2–4 cm into the wall until 2026-10-15. The rain shower is
+  0.93 m deep (its tray and back wall 1 cm shallower), so its front is on the tile's edge. The resident steps in
+  onto the middle (`inside`). Walls at the back and on the left (game -x), the open sides glass or a curtain.
 - **The rain** is the one moving part (`water`): thin streams (`_rain`: a disc of rings, or a grid under the
   square head) built full length from the head's underside to the tray, joined with the origin on the head
   and scaled to 0.001 along their length, so they're hidden in the head at rest. `water_on` grows them down
@@ -107,7 +109,7 @@ Validate › Showers until checked in play.
 | `model.shower` | 0.90 × 2.15 × 0.90 m | 2,968 | 3 | Tray, Frame, Head & tap, Tiles |
 | `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,056 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
 | `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
-| `model.showerRain` | 0.94 × 2.19 × 0.94 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
+| `model.showerRain` | 0.94 × 2.19 × 0.93 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
 
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 

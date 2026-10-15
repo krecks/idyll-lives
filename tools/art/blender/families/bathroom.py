@@ -660,9 +660,10 @@ def showerWalkIn():
 def showerRain():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('tray', 0.94, 0.08, 0.94, (0, 0.04, 0), M.tray_stone, bevel=0.01)
+        # 0.93 deep: its back on the wall's face, its front on the tile's edge (the Model's centre)
+        F.box('tray', 0.94, 0.08, 0.93, (0, 0.04, 0.005), M.tray_stone, bevel=0.01)
         F.box('drain', 0.1, 0.006, 0.1, (0.15, 0.082, 0.15), M.fittings_dark, bevel=0.002)
-        F.box('wall_back', 0.94, 2.1, 0.06, (0, 1.13, -0.44), M.wall_stone, bevel=0.008)
+        F.box('wall_back', 0.94, 2.1, 0.05, (0, 1.13, -0.435), M.wall_stone, bevel=0.008)
         F.box('wall_left', 0.06, 2.0, 0.88, (-0.44, 1.08, 0.03), M.wall_stone, bevel=0.008)
         # glass along the right and the left half of the front: the way in is the front's right half
         F.box('glass_side', 0.012, 1.9, 0.86, (0.45, 1.03, 0.0), M.glass)
@@ -1022,15 +1023,15 @@ FAMILY = G.Family(
      G.Model('toiletWallHung', toiletWallHung, size=(0.6, 1.1, 0.665), key='model.toiletWallHung',
              centre=(0, -0.0975), motions=TOILET,
              paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('boxing', 'Cistern')]),
-     G.Model('shower', shower, size=(0.9, 2.15, 0.9), key='model.shower', motions=SHOWER,
+     G.Model('shower', shower, size=(0.9, 2.15, 0.9), key='model.shower', centre=(0, 0.02), motions=SHOWER,
              paint=[('tray', 'Tray'), ('frame', 'Frame'), ('fittings', 'Head & tap'), ('tile', 'Tiles')]),
-     G.Model('showerStall', showerStall, size=(0.9, 2.08, 0.9), key='model.showerStall', motions=SHOWER,
+     G.Model('showerStall', showerStall, size=(0.9, 2.08, 0.9), key='model.showerStall', centre=(0, 0.02), motions=SHOWER,
              paint=[('tray', 'Tray'), ('frame', 'Rail'), ('fittings', 'Head & tap'), ('curtain', 'Curtain'),
                     ('tile', 'Tiles')]),
-     G.Model('showerWalkIn', showerWalkIn, size=(0.92, 2.26, 0.92), key='model.showerWalkIn', motions=SHOWER,
+     G.Model('showerWalkIn', showerWalkIn, size=(0.92, 2.26, 0.92), key='model.showerWalkIn', centre=(0, 0.03), motions=SHOWER,
              paint=[('slate', 'Floor'), ('frame_dark', 'Frame'), ('fittings_dark', 'Head & tap'),
                     ('slate_wall', 'Wall')]),
-     G.Model('showerRain', showerRain, size=(0.94, 2.192, 0.94), key='model.showerRain', motions=SHOWER,
+     G.Model('showerRain', showerRain, size=(0.94, 2.192, 0.93), key='model.showerRain', centre=(0, 0.035), motions=SHOWER,
              paint=[('tray_stone', 'Tray'), ('frame_dark', 'Frame'), ('fittings_dark', 'Head & tap'),
                     ('wall_stone', 'Walls')]),
      G.Model('bathtub', bathtub, size=(1.82, 0.69, 0.86), key='model.bathtub', motions=BATH,

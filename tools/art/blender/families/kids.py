@@ -343,7 +343,7 @@ def crib():
     for x in (CRIB_X - 0.42, CRIB_X + 0.42):
         for z in (-0.44, 0.44):
             F.box(f'post{x}{z}', 0.05, 0.92, 0.05, (x, 0.46, z), M.crib, bevel=0.012)
-            G.sphere(f'cap{x}{z}', 0.03, at=F.at(x, 0.93, z), material=M.crib, segments=12, rings=8)
+            G.sphere(f'cap{x}{z}', 0.025, at=F.at(x, 0.93, z), material=M.crib, segments=12, rings=8)
     F.box('platform', 0.84, 0.04, 0.84, (CRIB_X, 0.44, 0), M.crib, bevel=0.008)
     F.box('mattress', 0.8, 0.1, 0.8, (CRIB_X, CRIB_TOP - 0.05, 0), M.crib_bedding, bevel=0.03, bevel_segments=3)
     F.box('blanket', 0.56, 0.035, 0.2, (CRIB_X, CRIB_TOP + 0.015, 0.25), M.crib_blanket, bevel=0.014, bevel_segments=3)
@@ -364,7 +364,7 @@ def crib():
         _crib_rails('front', 0.44)
     side = G.join(parts, 'front_rail')
     mobile = _mobile()
-    _place()
+    _place(forward=0.035)   # the back posts on the wall's face, the front ones on the tile's edge
     G.slide(side, 'side_down', (0, 0, -0.25), seconds=0.9)
     G.spin(mobile, 'mobile', turns=1, seconds=6.0, axis='Z')
     return G.meshes()
@@ -378,17 +378,17 @@ def kidsBed():
     for sx in (-1, 1):
         for sz in (-1, 1):
             F.box(f'foot{sx}{sz}', 0.06, 0.07, 0.06, (sx * 0.42, 0.035, sz * 0.88), M.kids_frame, bevel=0.01)
-    F.box('base', 0.96, 0.24, 1.9, (0, 0.18, 0), M.kids_frame, bevel=0.03)
+    F.box('base', 0.96, 0.24, 1.88, (0, 0.18, 0.01), M.kids_frame, bevel=0.03)
     F.box('mattress', 0.88, 0.16, 1.82, (0, KIDS_TOP - 0.08, 0.02), M.mattress, bevel=0.04, bevel_segments=3)
-    # a headboard with an arched top, and bunting across it
-    F.box('headboard', 0.96, 0.5, 0.06, (0, 0.32, -0.95), M.kids_frame, bevel=0.012)
-    F.cyl('arch', 0.48, 0.06, (0, 0.5, -0.95), M.kids_frame, rot=(90, 0, 0), scale=(1, 0.55, 1), verts=32)
-    G.rod('bunting', F.at(-0.4, 0.66, -0.917), F.at(0.4, 0.66, -0.917), 0.003, material=M.kids_bedding, verts=4)
+    # a headboard with an arched top, and bunting across it; its back on the wall's face (depth -0.93)
+    F.box('headboard', 0.96, 0.5, 0.04, (0, 0.32, -0.91), M.kids_frame, bevel=0.012)
+    F.cyl('arch', 0.48, 0.04, (0, 0.5, -0.91), M.kids_frame, rot=(90, 0, 0), scale=(1, 0.55, 1), verts=32)
+    G.rod('bunting', F.at(-0.4, 0.66, -0.887), F.at(0.4, 0.66, -0.887), 0.003, material=M.kids_bedding, verts=4)
     flags = (M.pennant_a, M.pennant_b, M.pennant_c, M.pennant_a, M.pennant_b)
     for k, m in enumerate(flags):
         x = -0.3 + 0.15 * k
         _slab(f'pennant{k}', [(-0.045, 0.0), (0.045, 0.0), (0.0, -0.08)],
-              _plane((x, 0.665, -0.92), (1, 0, 0), (0, 1, 0)), m, thick=0.004)
+              _plane((x, 0.665, -0.89), (1, 0, 0), (0, 1, 0)), m, thick=0.004)
     # a guard rail along the right side
     for z in (-0.6, -0.2, 0.2):
         F.box(f'rail_post{z}', 0.025, 0.38, 0.025, (0.475, 0.49, z), M.kids_frame, bevel=0.006)
@@ -409,7 +409,8 @@ CAR_TOP = 0.5     # the mattress top (the renderer's default bed height)
 
 
 def kidsBedCar():
-    F.box('chassis', 0.94, 0.3, 1.94, (0, 0.22, 0), M.car, bevel=0.1, bevel_segments=4)
+    # the tail end's back on the wall's face (depth -0.93)
+    F.box('chassis', 0.94, 0.3, 1.9, (0, 0.22, 0.02), M.car, bevel=0.1, bevel_segments=4)
     F.box('mattress', 0.84, 0.16, 1.44, (0, CAR_TOP - 0.08, -0.06), M.mattress, bevel=0.04, bevel_segments=3)
     # the bonnet at the foot: stripes, headlights, a grille
     F.box('bonnet', 0.94, 0.42, 0.32, (0, 0.38, 0.81), M.car, bevel=0.06, bevel_segments=4)
@@ -421,11 +422,11 @@ def kidsBedCar():
         F.cyl(f'roundel{s}', 0.07, 0.006, (s * 0.471, 0.22, 0.0), M.car_stripe, rot=(0, 90, 0), verts=20)
     F.box('grille', 0.36, 0.08, 0.01, (0, 0.3, 0.972), M.dark, bevel=0.004)
     # the tail and its spoiler
-    F.box('tail', 0.94, 0.26, 0.18, (0, 0.47, -0.88), M.car, bevel=0.07, bevel_segments=3)
+    F.box('tail', 0.94, 0.26, 0.14, (0, 0.47, -0.86), M.car, bevel=0.06, bevel_segments=3)
     for s in (-1, 1):
         F.box(f'strut{s}', 0.04, 0.12, 0.04, (s * 0.3, 0.66, -0.9), M.dark, bevel=0.008)
-        F.box(f'endplate{s}', 0.02, 0.09, 0.16, (s * 0.4, 0.73, -0.92), M.dark, bevel=0.006)
-    F.box('wing', 0.8, 0.03, 0.14, (0, 0.735, -0.92), M.dark, bevel=0.01)
+        F.box(f'endplate{s}', 0.02, 0.09, 0.09, (s * 0.4, 0.73, -0.885), M.dark, bevel=0.006)
+    F.box('wing', 0.8, 0.03, 0.08, (0, 0.735, -0.89), M.dark, bevel=0.01)
     # the wheels
     for sx in (-1, 1):
         for sz in (-1, 1):
@@ -711,7 +712,7 @@ def ballPit():
     balls = _balls()
     G.revolve('pit', [(0, 0), (0.45, 0), (0.46, 0.015), (0.46, 0.34), (0.42, 0.34), (0.42, 0.32), (0, 0.32)],
               at=F.at(0, 0, 0), material=M.pit, segments=32)
-    G.torus('rim', 0.44, 0.035, at=F.at(0, 0.36, 0), material=M.pit_rim, major_segments=32, minor_segments=8)
+    G.torus('rim', 0.43, 0.035, at=F.at(0, 0.36, 0), material=M.pit_rim, major_segments=32, minor_segments=8)
     for k in range(8):
         a = math.radians(45 * k + 22.5)
         F.cyl(f'dot{k}', 0.045, 0.004, (0.462 * math.cos(a), 0.17, 0.462 * math.sin(a)), balls[k % 5],
@@ -728,7 +729,7 @@ def ballPit():
         for k, (x, z) in enumerate(((-0.17, -0.1), (0.04, 0.2), (0.2, -0.12), (-0.06, -0.24), (0.24, 0.12), (-0.22, 0.14))):
             G.sphere(f'top{k}', 0.04, at=F.at(x, 0.43, z), material=balls[k % 5], segments=6, rings=4)
     balls = G.join(parts, 'balls', origin=(0, 0, 0))
-    _place()
+    _place(forward=0.035)   # its back on the wall's face, its front on the tile's edge
     G.squash(balls, 'bounce', (1, 1, 1.18), seconds=0.7, back=True)
     return G.meshes()
 
@@ -832,7 +833,7 @@ def playMat():
             F.box(f'tower{k}', 0.09, 0.09, 0.09, (0.04, y + 0.045 + 0.09 * k, 0.12), m, rot=(0, 0, r), bevel=0.012)
     tower = G.join(parts, 'tower', origin=F.at(0.04, 0.012, 0.12))   # squeezed into the mat until it grows
     tower.scale[2] = 0.001
-    _place()
+    _place(forward=0.03)    # its back on the wall's face
     G.grow(tower, 'blocks', seconds=1.5)
     return G.meshes()
 
@@ -1083,14 +1084,14 @@ FAMILY = G.Family(
     'kids', M,
     [
         # KD1
-        G.Model('crib', crib, size=(1.86, 1.008, 0.94), key='model.crib', centre=(-0.02, 0.0),
+        G.Model('crib', crib, size=(1.855, 1.008, 0.93), key='model.crib', centre=(-0.0175, 0.035),
                 motions={'uses': {'feed': 'side_down', 'change': 'side_down', 'cuddle': 'side_down'},
                          # the mobile turns for an awake baby, while someone plays with them; not all night
                          'loops': {'play': 'mobile'}},
                 paint=[('crib', 'Frame'), ('crib_bedding', 'Bedding'), ('mobile', 'Mobile')]),
-        G.Model('kidsBed', kidsBed, size=(0.97, 0.764, 1.93), key='model.kidsBed', centre=(0.005, -0.015),
+        G.Model('kidsBed', kidsBed, size=(0.97, 0.764, 1.88), key='model.kidsBed', centre=(0.005, 0.01),
                 motions=TURN_DOWN, paint=[('kids_frame', 'Frame'), ('kids_bedding', 'Bedding')]),
-        G.Model('kidsBedCar', kidsBedCar, size=(0.985, 0.775, 1.986), key='model.kidsBedCar', centre=(0.0, -0.007),
+        G.Model('kidsBedCar', kidsBedCar, size=(0.985, 0.775, 1.916), key='model.kidsBedCar', centre=(0.0, 0.028),
                 motions=TURN_DOWN, paint=[('car', 'Car body'), ('car_bedding', 'Bedding')]),
         G.Model('highChair', highChair, size=(0.444, 0.943, 0.474), key='model.highChair', centre=(0.0, 0.0599),
                 paint=[('chair_white', 'Frame'), ('chair_cushion', 'Bedding')]),
@@ -1105,11 +1106,11 @@ FAMILY = G.Family(
                 motions={'loops': {'ride': 'rock'}, 'ride': 'rock'}, paint=[('horse', 'Body'), ('saddle', 'Trim')]),
         G.Model('playTent', playTent, size=(0.952, 1.574, 0.827), key='model.playTent', centre=(0.0, 0.0),
                 motions={'uses': {'play': 'flap_open'}}, paint=[('canvas', 'Canvas'), ('poles', 'Poles')]),
-        G.Model('ballPit', ballPit, size=(0.95, 0.47, 0.95), key='model.ballPit', centre=(0.0, 0.0),
+        G.Model('ballPit', ballPit, size=(0.93, 0.47, 0.93), key='model.ballPit', centre=(0.0, 0.035),
                 motions={'loops': {'jump': 'bounce'}}, paint=[('pit', 'Pit'), ('pit_rim', 'Rim')]),
         G.Model('trainTable', trainTable, size=(1.8, 0.68, 0.84), key='model.trainTable', centre=(0.0, 0.0),
                 motions={'loops': {'trains': 'train'}}, paint=[('train_table', 'Table'), ('train', 'Train')]),
-        G.Model('playMat', playMat, size=(0.92, 0.204, 0.92), key='model.playMat', centre=(0.0, 0.0),
+        G.Model('playMat', playMat, size=(0.92, 0.204, 0.92), key='model.playMat', centre=(0.0, 0.03),
                 motions={'uses': {'blocks': 'blocks'}}, paint=[('mat', 'Mat')]),
         G.Model('teddyBear', teddyBear, size=(0.635, 0.912, 0.575), key='model.teddyBear', centre=(0.0, 0.0575),
                 motions={'uses': {'hug': 'squish'}}, paint=[('fur', 'Fur'), ('bow', 'Bow')]),
