@@ -283,6 +283,7 @@ fn generated_houses_are_livable() {
     assert!(failures.is_empty());
     assert!(dining * 10 >= houses.len() * 8, "most houses have a table to sit at");
     assert!(tops * 10 >= houses.len() * 9, "most houses have things on their tops");
-    assert!(islands * 4 >= large, "a good share of large houses have a kitchen island with stools");
+    // Over half do (30 to 43 of 60 in samples of other seeds); a third leaves room for reshuffles.
+    assert!(islands * 3 >= large, "a good share of large houses have a kitchen island with stools");
     assert!(basements * 5 >= bigger, "a good share of houses on medium and large lots have a basement");
 }
