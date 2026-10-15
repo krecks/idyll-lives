@@ -129,16 +129,49 @@ Merges `1c26a81` (worktops, potting bench), `702e57b` (play-check states), `25a3
 - **Catalog pictures:** the smallest view is 0.6 m across (was 1.1), so a mug is a third of the picture; the
   contact shadow is the model's own size, no longer cut off square at the edges (picture cache `v2`).
 
+## Decided in the fourth round (2026-10-15, review these)
+
+Merges `6ba5599` (first story event), `ec1dc41` and `71975ab` (right-click, menus), `519636f` (lantern,
+diagonal walls), `11c8399` (islands), `0b917bc` (colour studio), `be8448c` and `46d2319` (duvets, recline),
+`91e458d` (wall things while held), `184c447` and `98eff96` (finishes, metal handles), `a981691` (mirrors).
+
+- **Finishes reach the shader.** Gloss, chrome and metal never did (every plain part drew as rough metal);
+  now they do, and a tinted part keeps its finish. Metals reflect the sky just above the horizon where they
+  would reflect the ground (`SKY_FOR_GROUND = 0.3`). At night objects under lamps read white, no longer
+  cream, and steel appliances dark slate.
+- **Hardware is metal** (handles, knobs, pulls): 19 more models; the dresser, low dresser, dressing table and
+  writing bureau went to 4 draws (their handles sit on wooden parts; the gate warns). Kept non-metal: the
+  record cabinet's lid pull (5 draws), the sauna's and pizza oven's wooden handles, the party bar's tap,
+  toys and small appliances, the placeholders.
+- **Mirrors reflect on every preset:** the nearest on screen on Low (1024×512, 10 a second) and Medium
+  (4× MSAA, 30 a second), redrawn only when something it shows changes; two live on High. Each reflection
+  draws only what its glass shows (67 draws instead of 437; High got faster). Medium with a mirror in view
+  and something moving costs about 6 % fps and 1 ms CPU on the M3 (`graphics.md`). The benchmark's WebGPU
+  GPU time was wrong whenever a frame's passes changed (fixed); older shadow-map timings may share it.
+- **The colour studio opens the item as in use** once a part or colour is picked (every opening clip, the
+  fridges' freezers too); an "At rest / In use" switch; ambient clips run there on every preset.
+- **With a pie or social menu open** the camera moves (any drag, the wheel) and a click on the world closes
+  it and does what it would. The browser's right-click menu never opens over the game, except in text fields.
+- **Wall things show while one is in hand** (walls down or cut away), and a taken spot names what hangs
+  there; a mirror over a sink was refused only because generated bathrooms already have one, hidden.
+- **The beds' turned-down duvet flattens and narrows** under the sleeper's quilt (all beds, kids' too);
+  with one sleeper in a wide bed both halves still turn down. The king's runner is 5 cm narrower.
+- **`seat.recline`** (degrees): the Adirondack chair 24° (hips 10 cm back), the garden chair 18°.
+- **Islands with stools** in 34 of 60 large houses (30–43 across seeds; the check wants a third): large
+  kitchens at least 4 across, the run along a wall with room in front, the fridge beside it, `islandSmall`
+  out of the sets, a kitchen with a dining room always tries an island. Stairs keep off a room's only
+  outside wall; furniture never shuts free floor off.
+- **No offset through a diagonal wall**, in the sim and build mode (straight walls already refused it). The
+  garden lantern's hexagons turn as its placeholder's (0.47 m deep).
+- **A new game's first story event** shows in the feed and the journal.
+
 ## Still open
 
-- **Beds that model their own duvet** (`bedDouble`, `bedCanopy`, `bedKing`, `bed`, `bedSingle`) show its
-  turned-down band at the edges of a sleeper's quilt (older than round three).
-- **Islands with two stools** in the generated sample: 16 of 60 large houses; the check fails below 15. Each
-  housegen change reshuffles the random draws, so the next one may tip it.
-- **A houseplant moved off its tile's middle** (quarter tiles, Shift) can still reach the wall.
-- **The garden lantern** is 0.58 m deep against its placeholder's 0.47 (the gate warns).
-- **The Adirondack chair's sitter** sits upright instead of leaning into its slanted back.
-- **A game whose story is empty** doesn't show its first event in the feed (the first batch counts as history).
+- **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).
+- **Wall things shown while one is held** float over lowered walls (pictures on outside walls too).
+- **Small things on tops:** 3 of 1800 sample houses have none (was 1), probably kitchens whose run has no
+  plain counter.
+- **The Low preset** wasn't looked at after the finishes change.
 - **Parts still with no use:** the executive desk's drawer (residents use the desk through its chair, and a
   clip plays only on the object used: needs a seat's use to play a clip on the desk it faces); the nesting
   tables' small table (no use reads naturally, and one would need its front tile free beside a sofa); the high
