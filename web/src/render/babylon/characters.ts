@@ -830,6 +830,8 @@ export class Characters {
   private morph: MorphBinding | null = null;
   private mixer: FaceMixer | null = null;
   private readonly meshes = new Map<string, PartMesh>();
+  /** The drawn part meshes by mesh (`rowsOf`). */
+  private readonly parts = new WeakMap<object, PartMesh>();
   private readonly materials = new Map<string, PBRMaterial>();
   private readonly skeletons = new Map<string, Skeleton>();
   private sims: (SimRig | null)[] = [];
@@ -3779,7 +3781,17 @@ export class Characters {
     const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
     const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range };
     meshes.set(key, pm);
+    if (!shadow) this.parts.set(mesh, pm);
     return pm;
+  }
+
+  /**
+   * The Sim rows a part mesh draws now: one each four numbers of `rows`, `count` of them (its
+   * thin instances); null for any other mesh. (The mirrors draw only the residents they show.)
+   */
+  rowsOf(mesh: object): { rows: Float32Array; count: number } | null {
+    const pm = this.parts.get(mesh);
+    return pm ? { rows: pm.settings, count: pm.mesh.thinInstanceCount } : null;
   }
 
   /** Draws `pm` for Sim rows `ids` (thin instances). */

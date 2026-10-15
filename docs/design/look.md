@@ -3,7 +3,7 @@
 *Design notes for how Idyll Lives looks. Inspired by classic life-simulation games, described
 here on our own terms. Status: 0.2.0. This is the Medium graphics preset, everyone's default; Low
 and High change a few things (softer or sharper shadows, fewer lamps, half the lawn and no woods'
-shadows on Low, live mirrors on High), listed in
+shadows on Low, two mirrors reflecting every frame on High), listed in
 [graphics.md](graphics.md).*
 
 The world has one look: warm, painterly realism with golden-hour light and blue moonlit nights.

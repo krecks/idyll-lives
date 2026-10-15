@@ -504,6 +504,7 @@ export class BabylonRenderer implements Renderer {
   private readonly mOut = new Matrix();
   private simCount = 0;
   private readonly simInView = (x: number, z: number) => this.inView(x, z, SIM_VIEW_MARGIN);
+  private readonly residentRows = (mesh: object) => this.characters.rowsOf(mesh);
   private readonly vTmp = new Vector3();
   private readonly vScale = new Vector3();
   private readonly qTmp = new Quaternion();
@@ -624,7 +625,8 @@ export class BabylonRenderer implements Renderer {
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
-    this.mirrors = new Mirrors(scene, this.diag.has('nomirrors') ? 0 : this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    const q = this.quality;
+    this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
     this.motion.setAmbientRange(this.quality.ambientRange);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
@@ -858,14 +860,17 @@ export class BabylonRenderer implements Renderer {
     // sun's shadows aren't redrawn for those).
     const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
     if (motion.moved) this.sunShadows.moved();
-    if (motion.moved || motion.ambient) this.resetSnapshot();
+    if (motion.moved) this.resetSnapshot();
+    // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
+    else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
-    this.mirrors.update(this.camera);
+    // Held reflections are drawn again when a resident in them moved; they draw only the residents they show.
+    this.mirrors.update(this.camera, { heads: this.characters.heads, visible: this.characters.visible, count, moved: this.characters.posed, rowsOf: this.residentRows });
     this.handles.update(this.camera.globalPosition);
     this.simShadow.thinInstanceBufferUpdated('matrix');
     this.lastFrame = frame;
@@ -1800,11 +1805,21 @@ export class BabylonRenderer implements Renderer {
   private spanPasses(): void {
     type QuerySet = { readTwoValuesAndSubtract(first: number): Promise<number | null>; _getBuffer(first: number, count: number): GPUBuffer | null; _dstBuffers: GPUBuffer[]; spans?: true };
     const engine = this.webgpu!;
-    const set = (engine as unknown as { _timestampQuery: { _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery._measureDuration?._querySet;
+    const current = () => (engine as unknown as { _timestampQuery: { _enabled: boolean; _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery;
+    const set = current()._measureDuration?._querySet;
     if (!set || set.spans || typeof set._getBuffer !== 'function') return;
     set.spans = true;
-    set.readTwoValuesAndSubtract = async (first: number) => {
+    // Babylon reads a pass's two stamps as the pass ends, before the frame's commands are sent: that
+    // gets what the stamps' slots held from an earlier frame, from another pass where the passes
+    // differ from frame to frame (a reflection drawn now and then). Read once the frame is sent.
+    set.readTwoValuesAndSubtract = (first: number) => {
       const frame = engine.frameId;
+      return new Promise<number | null>((resolve) => engine.onEndFrameObservable.addOnce(() => resolve(read(first, frame))));
+    };
+    const read = async (first: number, frame: number) => {
+      // (Timing turned off meanwhile: the query set is gone.)
+      const timer = current();
+      if (!timer._enabled || timer._measureDuration?._querySet !== set) return null;
       const buffer = set._getBuffer(first, 2);
       if (!buffer) return null;
       try {
@@ -1916,6 +1931,8 @@ export class BabylonRenderer implements Renderer {
         residentsDrawn: this.characters ? this.characters.visible.subarray(0, this.simCount).reduce((n, v) => n + (v ? 1 : 0), 0) : 0,
         mirrors: this.mirrors.count,
         mirrorsLive: live,
+        mirrorSpots: this.mirrors.spots,
+        mirrorDraws: this.mirrors.draws,
         nightGrade: this.nightGrade?.amount ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
       },
@@ -3706,8 +3723,10 @@ export class BabylonRenderer implements Renderer {
     return ready;
   }
 
+  /** Something on screen changed: a WebGPU recording is made again, and held reflections are drawn again. */
   private resetSnapshot(): void {
     if (this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
+    this.mirrors?.changed();
   }
 
   /** A world or overview build starts: no snapshot recording until every build is done. */

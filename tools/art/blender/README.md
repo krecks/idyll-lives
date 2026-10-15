@@ -101,9 +101,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      steel, brass, or black iron as the piece wants. Coloured by the player it stays metal (tinted).
      On a still part with no other plain material it costs a draw call (objects.md, "Hardware is metal").
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'gloss', 'front')`. Make it a flat
-     piece, on the still body or one moving part (a cabinet's door); the game reflects the room in it
-     live on High. Keep it `gloss`, as the placeholders' mirrors: on Medium and Low nothing reflects,
-     and see-through `glass` would show what is behind it (a frame's backing, a door).
+     piece, on the still body or one moving part (a cabinet's door); the game reflects the room in the
+     nearest mirror on screen (two on High). Keep it `gloss`, as the placeholders' mirrors: the others
+     show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
@@ -337,8 +337,9 @@ never one that's already running) and drive Playwright headless with full Chrome
   footprint, so only the fallback has the placeholder's size.
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
 - **Room kind.** A `sleep` interaction turns a living room into a bedroom.
-- **Mirrors on Medium.** Only the High preset reflects live. Mirror glass mapped to see-through `glass`
-  showed the brass behind a round mirror and the door behind a cabinet's: map it to `gloss`.
+- **Mirrors past the nearest.** Only the nearest mirror on screen reflects (two on High). Mirror glass
+  mapped to see-through `glass` showed the brass behind a round mirror and the door behind a cabinet's:
+  map it to `gloss`.
 - **Exports.** They differ on every run, so commit only what you meant to change.
 - **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `build.py`
   passes it.
