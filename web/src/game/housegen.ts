@@ -171,6 +171,15 @@ export interface ObjectInfo extends Shape {
   fillsWall?: boolean;
   /** Belongs over a window (content `overWindow`): only such things hang on one. */
   overWindow?: boolean;
+  /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
+  keepClear: boolean;
+}
+
+/** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
+function cooksOrWashes(o: ObjectDef): boolean {
+  const stations = o.stations ?? [];
+  const sink = stations.includes('dishes') && (o.interactions ?? []).some((i) => (i.tags ?? []).includes('handwash'));
+  return sink || stations.includes('stove') || stations.includes('grill');
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -182,7 +191,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o) });
     }
     return known.get(def);
   };
@@ -1222,8 +1231,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
 
 /**
  * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
- * in its middle, elsewhere anywhere free), facing about the way its host does, listed right
- * after its host (the simulation places it on a top that's already there).
+ * in its middle, elsewhere anywhere free; never a hob's or a sink's), facing about the way its
+ * host does, listed right after its host (the simulation places it on a top that's already there).
  */
 function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () => number, slot: TopSlot): void {
   const count = slot.count ? between(rng, slot.count) : 1;
@@ -1237,7 +1246,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     if (thing?.layer !== 'surface') continue;
     const tops = f.objects
       .map((o) => topOf(shapes, o))
-      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
     const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
     const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
     for (const { t } of order) {
@@ -1312,6 +1321,8 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     // Only what belongs over a window (content `overWindow`: curtains) hangs on one.
     const window = !!info(def)?.overWindow;
     const backed = (e: string) => f.edges.get(e) === 'wall' || (window && f.edges.get(e) === 'window');
+    // ...and that only over one (with no free window in the room, none).
+    const hangs = (backs: string[]) => backs.every(backed) && (!window || backs.some((e) => f.edges.get(e) === 'window'));
     // Over a piece in the room: turned as it is, centred on it, its back on the same wall.
     for (const o of over ? f.objects.filter((o) => over.includes(o.def) && inside(r, o.x, o.z)) : []) {
       const [ow, od] = info(o.def)?.footprint ?? [1, 1];
@@ -1325,7 +1336,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
         : o.rot === 3 ? Array.from({ length: d }, (_, i) => `v:${o.x + pw}:${z + i}`)
         : Array.from({ length: d }, (_, i) => `v:${o.x}:${z + i}`);
       const [wx, wz] = o.rot === 2 ? [x, o.z + pd - d] : o.rot === 3 ? [o.x + pw - w, z] : o.rot === 0 ? [x, o.z] : [o.x, z];
-      if (backs.every(backed) && fits(wx, wz, w, d, o.rot) && take(wx, wz, w, d, o.rot)) return true;
+      if (hangs(backs) && fits(wx, wz, w, d, o.rot) && take(wx, wz, w, d, o.rot)) return true;
     }
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
       const rot = [0, 3, 2, 1][side];
@@ -1336,9 +1347,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x, z, Array.from({ length: d }, (_, i) => `v:${r.x}:${z + i}`)]);
       if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z, Array.from({ length: d }, (_, i) => `v:${r.x + r.w}:${z + i}`)]);
       spots.sort(() => rng() - 0.5);
-      // Curtains go over windows.
-      spots.sort((a, b) => Number(b[2].some((e) => f.edges.get(e) === 'window') === window) - Number(a[2].some((e) => f.edges.get(e) === 'window') === window));
-      for (const [x, z, backs] of spots) if (backs.every(backed) && fits(x, z, w, d, rot) && take(x, z, w, d, rot)) return true;
+      for (const [x, z, backs] of spots) if (hangs(backs) && fits(x, z, w, d, rot) && take(x, z, w, d, rot)) return true;
     }
     return false;
   }

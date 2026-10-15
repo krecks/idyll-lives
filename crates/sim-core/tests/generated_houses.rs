@@ -1,8 +1,8 @@
 //! Generated houses (web/src/game/housegen.ts) checked by the simulation: each loads, has a
 //! bed, a fridge and a toilet in rooms of their own, and everything in it can be reached from the
-//! front door, upstairs too. Chairs face tables and things on tops stand on one; most houses have
-//! somewhere to sit down at a table and small things on their tops. No room is bigger than its
-//! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
+//! front door, upstairs too. Chairs face tables, things on tops stand on one (never on a hob or
+//! a sink) and curtains hang over a window; most houses have somewhere to sit down at a table and
+//! small things on their tops. No room is bigger than its kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
 //! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
 //! room has lights enough for all of it at night (no more than four from its ceiling) and is lit well (windows enough by day where
 //! it has an outside wall), every room can be walked into, and nothing stands just inside a
@@ -25,6 +25,14 @@ use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 
+/// A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed):
+/// what housegen keeps small things off.
+fn cooks_or_washes(content: &sim_core::content::Content, def: &sim_core::content::ObjectDef) -> bool {
+    let station = |s: &str| content.cooking.station(s).is_some_and(|m| def.stations & m != 0);
+    let handwash = content.tags.iter().position(|t| t == "handwash").map_or(0, |i| 1 << i);
+    station("stove") || station("grill") || station("dishes") && def.interactions.iter().any(|i| i.tags & handwash != 0)
+}
+
 #[test]
 #[ignore]
 fn generated_houses_are_livable() {
@@ -41,6 +49,7 @@ fn generated_houses_are_livable() {
     let (mut large, mut islands) = (0, 0);
     let (mut rooms, mut bright) = (0, 0);
     let (mut lights, mut most_lights) = (0, 0);
+    let mut curtains = 0;
     let (mut bigger, mut basements, mut below) = (0, 0, 0);
     let mut dumped = false;
     for h in &houses {
@@ -52,8 +61,28 @@ fn generated_houses_are_livable() {
                 continue;
             }
         };
-        // Things on tops stand on one listed before them.
+        // Things on tops stand on one listed before them, never on a hob or a sink.
         common::check(&w);
+        for o in w.objects.iter().filter(|o| w.content.objects[o.def].layer == Layer::Surface) {
+            let host = surface::host_of(&w.content, &w.objects, o).map(|h| &w.content.objects[w.objects[h as usize].def]);
+            if let Some(host) = host.filter(|d| cooks_or_washes(&w.content, d)) {
+                failures.push(format!("{label}: the {} at {},{} is on the {}", w.content.objects[o.def].id, o.x, o.z, host.id));
+            }
+        }
+        // Curtains (`overWindow`) hang over a window, never on a plain wall.
+        for o in w.objects.iter().filter(|o| w.content.objects[o.def].over_window) {
+            let (ow, od) = o.size(&w.content);
+            let back: Vec<Edge> = match o.rot % 4 {
+                0 => (o.x..o.x + ow).map(|x| w.lot.h_edge(x as usize, o.z as usize)).collect(),
+                2 => (o.x..o.x + ow).map(|x| w.lot.h_edge(x as usize, (o.z + od) as usize)).collect(),
+                1 => (o.z..o.z + od).map(|z| w.lot.v_edge(o.x as usize, z as usize)).collect(),
+                _ => (o.z..o.z + od).map(|z| w.lot.v_edge((o.x + ow) as usize, z as usize)).collect(),
+            };
+            curtains += 1;
+            if !back.contains(&Edge::Window) {
+                failures.push(format!("{label}: the {} at {},{} hangs on a wall with no window", w.content.objects[o.def].id, o.x, o.z));
+            }
+        }
         // Rooms as planned: no bigger than their kind may be, walled off (or open to the next).
         for r in h["rooms"].as_array().into_iter().flatten() {
             let kind = r["kind"].as_str().unwrap();
@@ -246,6 +275,7 @@ fn generated_houses_are_livable() {
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
     eprintln!("  {bright} of {rooms} rooms lit well, {:.1} lamps a room, at most {most_lights} from one room's ceiling", lights as f32 / rooms.max(1) as f32);
+    eprintln!("  {curtains} curtains");
     eprintln!("  {basements} of {bigger} houses on medium and large lots with a basement, {below} rooms down there (lit by lamps alone)");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
