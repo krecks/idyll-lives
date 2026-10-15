@@ -206,7 +206,7 @@
       "group": "sofas",
       "seat": {
         "height": 0.44,
-        "forward": -0.3,
+        "forward": -0.28,
         "legs": "out"
       },
       "description": "A long seat to put your feet up, with an arm along one side.",

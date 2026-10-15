@@ -64,11 +64,11 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 | `model.tableSquare2` | 0.82 × 0.75 × 0.82 m | 1,388 | 1 | round tapered legs with collars, aprons |
 | `model.tableBistroRound` | 0.72 × 0.75 × 0.72 m | 1,196 | 1 | white gloss top, black column and cast foot |
 | `model.tableDining4` | 1.84 × 0.75 × 0.88 m | 588 | 1 | square tapered oak legs, aprons |
-| `model.tableDining6` | 2.84 × 0.75 × 0.92 m | 1,812 | 1 | walnut, six round tapered legs with collars |
-| `model.tableBanquet8` | 3.84 × 0.75 × 0.94 m | 1,728 | 1 | planked top, six legs with feet, an H-stretcher |
+| `model.tableDining6` | 2.84 × 0.75 × 0.88 m | 1,812 | 1 | walnut, six round tapered legs with collars |
+| `model.tableBanquet8` | 3.84 × 0.75 × 0.88 m | 1,728 | 1 | planked top, six legs with feet, an H-stretcher |
 | `model.tableRound4` | 1.52 × 0.75 × 1.52 m | 1,864 | 1 | birch, turned column on four splayed feet |
 | `model.tableSquare8` | 1.86 × 0.75 × 1.86 m | 1,020 | 1 | white satin top, black legs braced by a square frame |
-| `model.tableFarmhouse6` | 2.86 × 0.75 × 0.94 m | 1,980 | 1 | planked top on two braced trestles and a wedged stretcher |
+| `model.tableFarmhouse6` | 2.86 × 0.75 × 0.88 m | 1,968 | 1 | planked top on two braced trestles and a wedged stretcher |
 | `model.tableBarHigh` | 0.70 × 1.06 × 0.70 m | 1,324 | 1 | dark top at bar height, column, foot ring |
 
 ## K8 — chairs and stools

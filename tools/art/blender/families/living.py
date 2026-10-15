@@ -765,7 +765,7 @@ def coffee_table_glass():
 
 def coffee_table_marble():
     """The marble side table (catalog.py): a round marble top on a brass tulip foot, a vase and a magazine."""
-    F.cyl('top', 0.45, 0.04, (0, 0.4, 0), M.marble, verts=48, bevel=0.006)
+    F.cyl('top', 0.44, 0.04, (0, 0.4, 0), M.marble, verts=48, bevel=0.006)
     G.revolve('foot', [(0, -0.5), (0.5, -0.5), (0.5, -0.43), (0.2, -0.25), (0.11, 0.2), (0.18, 0.5), (0, 0.5)],
               at=F.at(0, 0.19, 0), material=M.brass, segments=32, scale=(0.56, 0.56, 0.38))
     for i, (x, z, l, turn) in enumerate(((-0.05, 0.06, 0.5, 32), (0.16, -0.12, 0.3, -20))):
@@ -906,7 +906,7 @@ FAMILY = G.Family(
      G.Model('sectionalCorner', sectional(backs=('back', 'right'), depth=0.89, z=0.015, pillows=[(0.1, -0.03, 'pillow_mustard', -35)]),
              key='model.sectionalCorner', size=(1.0, 0.823, 0.89), centre=(0, 0.015),
              motions={'uses': SOFA_USES}, paint=SECTIONAL + [('pillow_mustard', 'Pillow')]),
-     G.Model('chaise', chaise, key='model.chaise', size=(0.96, 0.823, 1.9), centre=(0, 0.0),
+     G.Model('chaise', chaise, key='model.chaise', size=(0.96, 0.823, 1.9), centre=(0, 0.02),
              motions={'uses': SOFA_USES}, paint=SECTIONAL + [('throw_oat', 'Throw')]),
      # L2: the armchairs and small seats
      G.Model('armchair', armchair_bergere, key='model.armchair', size=(0.74, 0.982, 0.797), centre=(0, -0.0315),
@@ -943,7 +943,7 @@ FAMILY = G.Family(
              motions={'uses': {'magazine': 'drawer_open'}, 'hold': 2.5}, paint=[('oak', 'Wood'), ('brass', 'Knob')]),
      G.Model('coffeeTableGlass', coffee_table_glass, key='model.coffeeTableGlass', size=(1.3, 0.6, 0.74),
              paint=[('chrome', 'Frame'), ('glass', 'Glass')]),
-     G.Model('coffeeTableMarble', coffee_table_marble, key='model.coffeeTableMarble', size=(0.9, 0.58, 0.9),
+     G.Model('coffeeTableMarble', coffee_table_marble, key='model.coffeeTableMarble', size=(0.88, 0.58, 0.88),
              paint=[('marble', 'Top'), ('brass', 'Base')]),
      G.Model('sideTable', side_table, key='model.sideTable', size=(0.55, 0.55, 0.45), paint=[('oak', 'Wood'), ('brass', 'Knob')]),
      G.Model('coffeeTableRound', coffee_table_round, key='model.coffeeTableRound', size=(0.84, 0.42, 0.84),

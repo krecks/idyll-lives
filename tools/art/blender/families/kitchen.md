@@ -82,7 +82,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
 | `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s, unused |
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s, unused |
-| `model.fridgeRetro` | 0.720 × 1.640 × 0.715 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
+| `model.fridgeRetro` | 0.720 × 1.640 × 0.725 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
 | `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
 
 The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no

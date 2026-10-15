@@ -73,7 +73,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 | `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 3 | Guitar, Stand |
 | `model.chessTable` | 0.46 × 0.92 × 0.85 m | 3,760 | 3 | Table, Trim |
 | `model.poolTable` | 2.50 × 0.84 × 1.40 m | 5,268 | 3 | Frame, Cloth |
-| `model.foosball` | 1.42 × 0.95 × 0.99 m | 7,928 | 3 | Table, Trim |
+| `model.foosball` | 1.42 × 0.95 × 0.94 m | 7,928 | 3 | Table, Trim |
 | `model.dartboard` | 0.62 × 0.62 × 0.07 m | 1,844 | 2 | Board, Cabinet |
 | `model.arcadeCabinet` | 0.67 × 1.82 × 0.87 m | 1,532 | 2 | Cabinet, Art |
 | `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,256 | 3 | Table, Trim |
@@ -82,7 +82,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 | `model.telescope` | 0.66 × 1.52 × 0.91 m | 1,724 | 2 | Tube, Tripod |
 | `model.sewingTable` | 0.90 × 1.08 × 0.89 m | 3,420 | 3 | Table, Machine |
 | `model.chemistrySet` | 0.92 × 1.40 × 0.50 m | 3,540 | 3 | Bench, Glassware |
-| `model.potteryWheel` | 0.70 × 0.54 × 0.95 m | 2,836 | 3 | Wheel, Stool |
+| `model.potteryWheel` | 0.70 × 0.54 × 0.92 m | 2,836 | 3 | Wheel, Stool |
 | `model.craftTable` | 1.70 × 0.90 × 0.89 m | 2,460 | 3 | Wood, Metal |
 
 `check_glb.py`: 19 models, 0 failed; the warnings are the five above (the dartboard's three, the pool table's

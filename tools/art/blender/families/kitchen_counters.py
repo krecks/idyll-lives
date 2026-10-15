@@ -538,7 +538,7 @@ def _island(F, w, body=None, top=None, handles=None):
     body, top, handles = body or M.cab, top or M.worktop, handles or M.chrome
     F.box('carcass', w - 0.16, 0.82, 0.58, (0, 0.51, -0.16), body, bevel=0.012)
     F.box('plinth', w - 0.2, 0.10, 0.52, (0, 0.05, -0.16), M.dark, bevel=0.004)
-    F.box('worktop', w - 0.04, 0.05, 0.94, (0, 0.925, 0), top, bevel=0.012)
+    F.box('worktop', w - 0.04, 0.05, 0.91, (0, 0.925, -0.015), top, bevel=0.012)
     n = max(1, round((w - 0.16) / 0.46))
     dw = (w - 0.18) / n
     for i in range(n):
@@ -571,7 +571,7 @@ def kitchenIsland():
 
 # --- the small island: 1x1, cupboards on the back and a bowl on top (static) -------------------------
 def islandSmall():
-    F = G.GameFrame(shift=0.47)
+    F = G.GameFrame(shift=0.05)                # 5 cm forward: the handles on the wall face
     with G.new_parts() as still:
         _island(F, 1.0, handles=M.brass)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
@@ -579,7 +579,7 @@ def islandSmall():
 
 # --- the long island: 3x1, six cupboards on the back and a chopping board (static) -------------------
 def islandLong():
-    F = G.GameFrame(shift=0.47)
+    F = G.GameFrame(shift=0.05)                # 5 cm forward: the handles on the wall face
     with G.new_parts() as still:
         _island(F, 3.0, handles=M.metal)       # a bare top: housegen sets things on it
     G.join(still, 'body', origin=(0, 0, 0))
@@ -687,9 +687,9 @@ FAMILY = G.Family(
              # sandwich slides the drawer out (breakfast is eaten standing, or on a stool at the island)
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandSmall', islandSmall, size=(0.96, 0.95, 0.951), key='model.islandSmall',
+     G.Model('islandSmall', islandSmall, size=(0.96, 0.95, 0.921), key='model.islandSmall', centre=(0, 0.0295),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
-     G.Model('islandLong', islandLong, size=(2.96, 0.95, 0.951), key='model.islandLong',
+     G.Model('islandLong', islandLong, size=(2.96, 0.95, 0.921), key='model.islandLong', centre=(0, 0.0295),
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop')]),
      G.Model('barSegment', barSegment, size=(1.0, 1.06, 0.89), key='model.barSegment', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),

@@ -502,7 +502,7 @@ FAMILY = G.Family(
              # both doors for a snack or a meal; the right door alone for a cold drink
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
              paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
-     G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.103),
+     G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.067),
              motions={'uses': {use: RETRO_OPEN for use in ('fetch', 'cook', 'drink')}, 'hold': HOLD},
              paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
      G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.66), key='model.wineFridge', centre=(0, -0.10),

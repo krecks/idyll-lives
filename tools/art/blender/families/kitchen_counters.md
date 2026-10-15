@@ -101,7 +101,7 @@ The kitchen island has its cupboards and drawer at the front, where residents st
 worktop overhangs the back, where housegen sets a used table's stools; it has no stools of its own (stools
 are things of their own, which residents sit on at the island) and, as the other islands, a bare top
 (housegen sets a fruit bowl, a cake stand or mugs on it). The small and long islands put their cupboards on
-the back and overhang the worktop at the front;
+the back, their handles on the wall face, and overhang the worktop 30 cm at the front;
 the bars have a slatted guest side, a top at 1.06 and a brass foot rail. The kitchen island's drawer
 is on the stools' side, between them, since residents stand at the front (+Z) to use it: it slides out
 towards them for a sandwich (a fixed drawer front on the cupboard side matches it); everything else is
@@ -110,8 +110,8 @@ static this pass.
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
 | `model.kitchenIsland` | 1.940 × 0.950 × 0.839 m | 1,404 | 2 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.islandSmall` | 0.960 × 0.950 × 0.951 m | 1,032 | 1 | — | static |
-| `model.islandLong` | 2.960 × 0.950 × 0.951 m | 1,836 | 1 | — | static |
+| `model.islandSmall` | 0.960 × 0.950 × 0.921 m | 972 | 1 | — | static |
+| `model.islandLong` | 2.960 × 0.950 × 0.921 m | 1,836 | 1 | — | static |
 | `model.barSegment` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 | `model.barEnd` | 1.000 × 1.060 × 0.890 m | 1,656 | 2 | — | static |
 
