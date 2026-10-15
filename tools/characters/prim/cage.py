@@ -36,6 +36,13 @@ def unit(v):
     return v / np.linalg.norm(v)
 
 
+def turn(a, b):
+    """The smallest rotation (3x3) taking unit vector `a` to unit vector `b` (not opposite)."""
+    v, cs = np.cross(a, b), float(np.dot(a, b))
+    K = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + K + K @ K / (1 + cs)
+
+
 class Cage:
     def __init__(self):
         self.P = []
