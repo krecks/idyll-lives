@@ -111,12 +111,27 @@
         "brass": {
           "finish": "material.finish.metal"
         },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
         "plinth": {
           "finish": "material.finish.satin"
         },
         "walnut": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "drawer_open"
+        },
+        "hold": 2.5
       },
       "paint": [
         {
@@ -217,11 +232,22 @@
         "cloth1": {
           "finish": "material.finish.satin"
         },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
         "wicker": {
           "finish": "material.finish.fabric"
         },
         "wicker2": {
           "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sortWashing": "lid_open"
         }
       },
       "paint": [

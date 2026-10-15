@@ -725,9 +725,21 @@
         "flute": {
           "finish": "material.finish.wood"
         },
+        "plate_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
         "top_sideboard": {
           "finish": "material.finish.wood"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {
@@ -757,9 +769,21 @@
         "legs_oak": {
           "finish": "material.finish.wood"
         },
+        "plate_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
         "top_oak": {
           "finish": "material.finish.wood"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {
@@ -804,6 +828,12 @@
         "top_china": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {

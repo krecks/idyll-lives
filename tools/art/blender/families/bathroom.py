@@ -895,8 +895,8 @@ def bathtubFreestanding():
 # the `mirror` material (`gloss`, `'front'`): the game reflects the room in it where the preset has live mirrors
 # (High) and draws it pale gloss elsewhere, as the placeholders' mirrors. The cabinets' doors are parts of
 # their own, hinged on their left edge. The mirror cabinet's swings open (`door_open`, the mirror with it)
-# while a resident brushes their teeth; the tall cabinet's upper door is still (no use opens it, the plan's
-# "(+use)"; a still part costs no draw call), so a swing can be added without remodelling.
+# while a resident brushes their teeth; the tall cabinet's upper door onto its towels while one takes a
+# fresh towel.
 
 
 def _carcass(F, name, w, h, d, x, y0, z0, material, t=0.016):
@@ -971,6 +971,14 @@ def bathCabinetTall():
         F.box('niche_top', w - 0.03, 0.022, d - 0.02, (0, niche[1] - 0.011, z0 + d / 2), M.cab, bevel=0.003)
         F.box('towel0', 0.3, 0.08, 0.24, (0, niche[0] + 0.065, -0.25), M.towel_blue, bevel=0.03)
         F.box('towel1', 0.3, 0.08, 0.24, (0, niche[0] + 0.14, -0.25), M.towel_cream, bevel=0.03)
+        # behind the upper door: a stack of towels, a shelf with two more and bottles on those
+        for k, m in enumerate((M.towel_cream, M.towel_blue, M.towel_cream)):
+            F.box(f'stack{k}', 0.3, 0.075, 0.24, (0, niche[1] + 0.049 + 0.075 * k, -0.26), m, bevel=0.03)
+        F.box('shelf', w - 0.03, 0.018, d - 0.03, (0, 1.36, z0 + d / 2 - 0.005), M.cab, bevel=0.003)
+        for k, m in enumerate((M.towel_blue, M.towel_cream)):
+            F.box(f'stack_top{k}', 0.28, 0.07, 0.22, (0, 1.404 + 0.07 * k, -0.27), m, bevel=0.028)
+        F.cyl('bottle0', 0.025, 0.14, (-0.08, 1.579, -0.3), M.bottle, verts=12)
+        F.cyl('bottle1', 0.022, 0.11, (0.04, 1.564, -0.31), M.sage, verts=12)
         # the lower door (still)
         F.box('door_low', 0.4, niche[0] - 0.08, 0.02, (0, (0.07 + niche[0]) / 2, front + 0.01), M.cab_door, bevel=0.008)
         F.box('pull_low', 0.02, 0.1, 0.02, (0.15, niche[0] - 0.1, front + 0.03), M.chrome, bevel=0.004)
@@ -981,8 +989,9 @@ def bathCabinetTall():
         F.box('door_panel', 0.3, top - niche[1] - 0.11, 0.01, (0, (niche[1] + top) / 2, front + 0.024), M.cab_door,
               bevel=0.004)
         F.box('pull', 0.02, 0.12, 0.02, (0.15, niche[1] + 0.1, front + 0.03), M.chrome, bevel=0.004)
-    G.hinged(G.join(parts, 'door'), F.at(-0.2, (niche[1] + top) / 2, front))
+    door = G.hinged(G.join(parts, 'door'), F.at(-0.2, (niche[1] + top) / 2, front))
     G.settle(centre=False)
+    G.swing(door, 'door_open', 100, seconds=0.8)
     return G.meshes()
 
 
@@ -1046,7 +1055,8 @@ FAMILY = G.Family(
      G.Model('mirrorRound', mirrorRound, size=(0.64, 0.772, 0.046), key='model.mirrorRound',
              centre=(0, -0.407), floor=False, paint=[('frame_brass', 'Frame'), ('leather', 'Strap')]),
      G.Model('bathCabinetTall', bathCabinetTall, size=(0.42, 1.82, 0.38), key='model.bathCabinetTall',
-             centre=(0, -0.24), paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
+             centre=(0, -0.24), motions={'uses': {'takeTowel': 'door_open'}, 'hold': 1.5},
+             paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '

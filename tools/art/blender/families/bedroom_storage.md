@@ -54,10 +54,13 @@ The blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest
 it) lifts 95° (`lid_open`, 0.9 s, held 2 s) for the content's "Take out a blanket" (`takeBlanket`, `fetch`, 3
 minutes, comfort; not autonomous). It costs the chest a third draw call.
 
-No clip yet, as no use reads naturally for them: the three-drawer nightstand's top drawer (`drawer`, origin on the
-carcass face, box behind it) and the hamper's lid (`lid`, hinged at its back; the basket is hollow; putting washing
-in would need a laundry loop in the sim). They are nodes of their own, so a clip can be added without remodelling;
-the game draws a node without a clip with the rest (`check_glb.py` counts them as still), at no draw call.
+The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it, folded clothes in it)
+slides out 30 cm (`drawer_open`, as the dressers') for the content's "Pick an outfit" (`outfit`, the dressers' use,
+but not autonomous there, so generated houses play as before), held 2.5 s: a second draw call. The hamper's lid
+(`lid`, hinged at its back; the basket is hollow with washing in it) lifts 70° (`lid_open`, 0.7 s; any further and
+it goes into the wall the hamper stands at) for the whole of the content's "Sort the washing" (`sortWashing`,
+`clean`, 5 minutes, comfort, chores; not autonomous): a third draw call. (Washing that goes from the hamper to the
+washer would need a laundry loop in the sim.)
 
 ## The models
 
@@ -66,10 +69,10 @@ the game draws a node without a clip with the rest (`check_glb.py` counts them a
 | `model.nightstand` | 0.54 × 0.66 × 0.47 m | 1,936 | 2 | Body, Handles (a book and a mug on top, books in the niche) |
 | `model.nightstandModern` | 0.58 × 0.56 × 0.63 m | 1,616 | 2 | Body, Handles (oak top and legs) |
 | `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,396 | 2 | Body, Handles |
-| `model.nightstandDrawers` | 0.58 × 0.60 × 0.63 m | 1,032 | 1 | Body, Handles |
+| `model.nightstandDrawers` | 0.58 × 0.60 × 0.63 m | 1,572 | 2 | Body, Handles |
 | `model.nightstandLamp` | 0.54 × 1.08 × 0.47 m | 2,472 | 3 | Body, Shade (glows `#FFD9A0` at night) |
 | `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 3 | Body, Handles |
-| `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,184 | 2 | Hamper |
+| `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,544 | 3 | Hamper |
 | `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 1,680 | 2 | Frame, Cushion |
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 3,420 | 3 | Body, Handles (a picture, a vase and a box on top) |
 | `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 4,428 | 3 | Body (the doors), Handles (boxes on top) |

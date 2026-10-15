@@ -81,19 +81,26 @@ A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is bu
 `settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check_glb` reports it as floating,
 which is fine on a wall. A floor thing stands where its placeholder stands, its back on the wall (below).
 
+The wall cabinets are `cupboard` stations (content `stations`): clean things are put away in the nearest cupboard or
+counter, a wall cabinet over a counter before the counter (cooking `putAwayAt`), and its doors swing open 100° in
+0.8 s while they are (`fetch`, `hold` 1.5 s), onto plates, bowls and mugs. The glazed cabinet opens only its right
+door, as each glazed door is two draw calls (frame and glass). The recycling bins' three lids lift one after another
+(0.6 s apart, each 80° in 0.5 s, held 0.9 s) for the content's "Sort the recycling" (`sortRecycling`, `clean`, 4
+minutes, comfort, chores; not autonomous, so generated houses play as before).
+
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
 | `model.pantry` | 0.940 × 2.270 × 0.630 m | 2,592 | 3 | two doors | `doors_open` 1.6 s (snack, `hold` 2.5 s) |
 | `model.pantryTall` | 0.960 × 2.390 × 0.700 m | 3,024 | 3 | two doors | `doors_open` (snack, `hold` 2.5 s) |
-| `model.wallCabinet` | 0.980 × 0.740 × 0.379 m | 1,080 | 1 | — | static (future: the doors swing up) |
-| `model.wallCabinetGlass` | 0.960 × 0.720 × 0.406 m | 2,460 | 2 | — | static; glass doors |
-| `model.wallCabinetCorner` | 0.960 × 0.723 × 0.406 m | 1,292 | 2 | — | static |
+| `model.wallCabinet` | 0.980 × 0.740 × 0.379 m | 1,880 | 3 | two doors | `doors_open` 0.8 s (putting clean things away: `fetch` at its cupboard station, `hold` 1.5 s) |
+| `model.wallCabinetGlass` | 0.960 × 0.720 × 0.406 m | 2,460 | 4 | the right glass door | `door_open` 0.8 s (as the wall cabinet) |
+| `model.wallCabinetCorner` | 0.960 × 0.723 × 0.406 m | 1,832 | 3 | the door | `door_open` 0.8 s (as the wall cabinet) |
 | `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 648 | 1 | — | static |
 | `model.spiceRack` | 0.520 × 0.440 × 0.106 m | 2,268 | 3 | — | static |
 | `model.potRail` | 0.910 × 0.547 × 0.230 m | 1,236 | 1 | — | static |
 | `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 1,476 | 3 | — | static |
 | `model.trashCan` | 0.310 × 0.685 × 0.365 m | 540 | 2 | lid | `lid_open` (scraping a plate in: `clean` at its bin station, `hold` 1 s) |
-| `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 972 | 1 | — | static (future: the lids lift) |
+| `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 972 | 4 | three lids | `lid0_open`, `lid1_open`, `lid2_open` 0.5 s, 0.6 s apart (sortRecycling, `hold` 0.9 s) |
 
 ## K6 — islands and bars
 

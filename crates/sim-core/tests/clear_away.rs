@@ -242,3 +242,33 @@ fn residents_clear_away_of_their_own_accord_the_same_way() {
     assert!(dirty.is_empty(), "the plates were cleared: {dirty:?}");
     assert!(steps.windows(2).any(|s| s == [(2, SINK), (3, COUNTER)]), "washed up and put away: {steps:?}");
 }
+
+#[test]
+fn clean_things_go_in_a_wall_cabinet_over_the_counter_and_the_nearest_cupboard_or_counter() {
+    // A wall cabinet over the counter is as near as the counter: the cupboard (`putAwayAt`'s
+    // first) has them, and its doors open (`fetch`).
+    // (The kitchen against the back wall, for the wall cabinet to hang on.)
+    let kitchen = format!(r#"{},{{"def":"wallCabinet","x":2,"z":0,"rot":0}}"#, KITCHEN.replace(r#""z":1"#, r#""z":0"#));
+    let cupboard = 4;
+    let mut w = world_with(&common::content(), &kitchen);
+    let at = table(&w);
+    let pot = put_on(&mut w, at, "mealPot", 2, 0);
+    w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+    assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, cupboard)]);
+    assert_eq!(w.sims[0].held, None, "put away");
+    // A china cabinet across the kitchen is further than the counter: the counter has them.
+    let kitchen = format!(r#"{KITCHEN},{{"def":"chinaCabinet","x":0,"z":1,"rot":0}}"#);
+    let mut w = world_with(&common::content(), &kitchen);
+    let at = table(&w);
+    let pot = put_on(&mut w, at, "mealPot", 2, 0);
+    w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+    assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, COUNTER)]);
+    // A sideboard by the sink is nearer: it has them.
+    let kitchen = format!(r#"{KITCHEN},{{"def":"sideboard","x":7,"z":1,"rot":0}}"#);
+    let sideboard = 4;
+    let mut w = world_with(&common::content(), &kitchen);
+    let at = table(&w);
+    let pot = put_on(&mut w, at, "mealPot", 2, 0);
+    w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+    assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, sideboard)]);
+}

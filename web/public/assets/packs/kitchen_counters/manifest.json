@@ -450,7 +450,16 @@
         },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "doors_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {
@@ -486,6 +495,12 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 1.5
+      },
       "paint": [
         {
           "material": "cab",
@@ -516,6 +531,12 @@
         "sage": {
           "finish": "material.finish.gloss"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 1.5
       },
       "paint": [
         {
@@ -719,6 +740,25 @@
         "lid": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "sortRecycling": [
+            {
+              "clip": "lid0_open",
+              "delay": 0.0
+            },
+            {
+              "clip": "lid1_open",
+              "delay": 0.6
+            },
+            {
+              "clip": "lid2_open",
+              "delay": 1.2
+            }
+          ]
+        },
+        "hold": 0.9
       },
       "paint": [
         {

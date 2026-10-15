@@ -731,6 +731,9 @@
       "id": "wallCabinet",
       "name": "Wall cabinets",
       "model": "model.wallCabinet",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1

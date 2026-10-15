@@ -145,7 +145,7 @@ Validate › Baths until checked in play.
 
 `model.mirrorCabinet`, `model.mirrorRound` and `model.bathCabinetTall`, built 2026-10-14. They sit in
 Validate › Bathroom Storage until checked in play. The mirror cabinet's door opens while a resident brushes
-their teeth there; the other two are still.
+their teeth there, and the tall cabinet's upper door while one takes a fresh towel; the round mirror is still.
 
 - **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
   face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check_glb.py` warns that they
@@ -156,18 +156,19 @@ their teeth there; the other two are still.
 - **Doors.** The mirror cabinet's mirrored door and the tall cabinet's upper door are parts of their own (`door`),
   hinged on their left edge. The mirror cabinet's swings open 100° (`door_open`, 0.8 s, the reflection with it)
   for the content's "Brush your teeth" (`brushTeeth`, `wash`, 4 minutes, hygiene; not autonomous, so generated
-  houses play as before), held 1.5 s. The tall cabinet's has no clip: no use for it reads naturally (the towels are
-  in the open niche), and a still part costs no draw call of its own.
+  houses play as before), held 1.5 s. The tall cabinet's swings open the same way onto its towels for "Take a
+  fresh towel" (`takeTowel`, `fetch`, 2 minutes, comfort; not autonomous), held 1.5 s: a second draw call.
 - **Against the wall.** The tall cabinet stood 2 cm into the wall, as its placeholder did; both stand on the wall
   face now.
 - The mirror cabinet is an open box with two shelves, a cup and bottles behind its door, and a light strip on top.
-  The tall cabinet has an open niche between its doors with two folded towels.
+  The tall cabinet has an open niche between its doors with two folded towels, and behind its upper door a stack
+  of three towels, a shelf with two more and two bottles on them.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 1,308 | 2 | Cabinet, Frame |
 | `model.mirrorRound` | 0.64 × 0.77 × 0.05 m | 1,528 | 1 | Frame, Strap |
-| `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 1,524 | 1 | Cabinet, Frame, Towels |
+| `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 2,260 | 2 | Cabinet, Frame, Towels |
 
 `check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
