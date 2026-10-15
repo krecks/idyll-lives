@@ -167,8 +167,13 @@ fn the_basic_pension_pays_for_a_home_of_one() {
     assert_eq!(pension, w.content.life.basic_pension);
     assert!(pension >= rent + bills);
     let funds = w.households[0].funds;
-    until(&mut w, 29, 0.0);
-    let paid = w.events.iter().filter(|e| e.kind == EventKind::PaidRent).count();
-    assert_eq!(paid, 4, "four weeks of rent and bills, all paid");
+    // Read week by week: the log keeps the town's last few hundred events, and a busy town
+    // pushes the first weeks' out of it by day 29.
+    let mut paid = std::collections::HashSet::new();
+    for day in [8, 15, 22, 29] {
+        until(&mut w, day, 0.0);
+        paid.extend(w.events.iter().filter(|e| e.kind == EventKind::PaidRent).map(|e| e.id));
+    }
+    assert_eq!(paid.len(), 4, "four weeks of rent and bills, all paid");
     assert!(w.households[0].funds >= funds, "{} after four weeks, from {funds}", w.households[0].funds);
 }
