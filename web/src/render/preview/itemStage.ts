@@ -3,12 +3,19 @@
  * like the catalog's pictures (`itemScene.ts`). It turns (drag sideways, with a little momentum;
  * arrow keys), tips (drag up and down) and comes closer (wheel, double-click, +/-). Each new set
  * of colours builds the model again; the one shown stays until the new one is ready.
+ *
+ * Its clips play as in the game (`poseParts`, as `objectMotion.ts`): the ambient one (`idle`: a fan's
+ * blades) all the time, and, while it's open (`setOpen`), those that open (`stageClips`: a fridge's
+ * doors, a hot tub's cover) opening and held open, so the parts they hide show, then back to rest,
+ * each at its pace in the game.
  */
 
 import { Engine, FreeCamera, Matrix, TransformNode, Vector3, type Mesh, type Scene } from '../babylon/core';
 import type { AssetRegistry } from '../../assets/registry';
 import { colorsKey, type PartColors } from '../../core/protocol';
-import { buildModel, painted } from '../babylon/models';
+import type { PopTarget } from '../babylon/buildFx';
+import { buildModel, motionsOf, painted, partPose, type ModelClip, type ModelTemplate, type Motions } from '../babylon/models';
+import { poseParts, restPoses } from '../babylon/objectMotion';
 import type { ItemStage } from '../types';
 import { boxCorners, contactShadow, studioScene } from './itemScene';
 
@@ -24,12 +31,28 @@ const MAX_ZOOM = 1.5;
 /** Give up waiting for a model's materials (ms). */
 const READY_TIMEOUT = 8000;
 
+/** A clip the stage plays, and how far it has played (seconds). */
+interface StageClip {
+  name: string;
+  /** Opens while the stage is open and closes again (`use`), or goes round always (`idle`). */
+  kind: 'use' | 'idle';
+  time: number;
+}
+
 export class ItemStageController implements ItemStage {
   private readonly root: TransformNode;
   private readonly camera: FreeCamera;
   private readonly shadow: Mesh;
   private readonly resize: ResizeObserver;
   private meshes: Mesh[] = [];
+  /** The model shown, and its one instance (in place) for posing its moving parts; null without any. */
+  private template: ModelTemplate | null = null;
+  private target: PopTarget | null = null;
+  /** Its clips that open (`use`) and its ambient one (`idle`), once the first model is built. */
+  private clips: StageClip[] = [];
+  private open = false;
+  readonly opens: Promise<boolean>;
+  private opened!: (opens: boolean) => void;
   /** Colours wanted next (the latest wins) while a build is under way; undefined: none waiting. */
   private next: { colors: PartColors | undefined } | undefined;
   private building = false;
@@ -59,6 +82,7 @@ export class ItemStageController implements ItemStage {
     private readonly footprint: [number, number],
   ) {
     this.root = new TransformNode('stageItem', scene);
+    this.opens = new Promise((resolve) => (this.opened = resolve));
     const cam = (this.camera = new FreeCamera('stageItemCamera', new Vector3(0, 2, 5), scene, false));
     cam.fov = FOV;
     cam.minZ = 0.05;
@@ -111,9 +135,14 @@ export class ItemStageController implements ItemStage {
     void this.build();
   }
 
+  setOpen(open: boolean): void {
+    this.open = open;
+  }
+
   detach(): void {
     if (this.detached) return;
     this.detached = true;
+    this.opened(false);
     this.engine.stopRenderLoop(this.tick);
     this.resize.disconnect();
     this.canvas.remove();
@@ -149,26 +178,90 @@ export class ItemStageController implements ItemStage {
         const first = !this.meshes.length;
         for (const mesh of this.meshes) mesh.dispose(false, false);
         this.meshes = meshes;
+        this.template = template;
+        this.target = this.instance(template, identity);
+        if (first) this.clips = stageClips(template, motionsOf(entry));
+        // Posed where the one before was (half open, say) before it shows.
+        if (this.target) poseParts(this.target, this.playing());
         for (const mesh of meshes) mesh.setEnabled(true);
         if (first) this.frameModel();
         this.restless = 2;
+        this.opened(this.clips.some((c) => c.kind === 'use'));
       }
     } catch (err) {
       console.warn(`[preview] stage of ${this.model} failed`, err);
+      this.opened(false);
     } finally {
       this.building = false;
     }
   }
 
-  /** Where to look and how far back to stand: the model's bounds, seen from any side. */
+  /** The model's one instance, in place (`placed`), its moving parts drawing from buffers of their own as in the game; null if it has none. */
+  private instance(template: ModelTemplate, placed: Float32Array): PopTarget | null {
+    const motion = template.motion;
+    const count = motion ? Math.max(-1, ...motion.parts) + 1 : 0;
+    if (!motion || !count) return null;
+    const parts = Array.from({ length: count }, (_, k) => {
+      const meshes = template.meshes.filter((_, i) => motion.parts[i] === k);
+      const matrices = placed.slice();
+      for (const mesh of meshes) mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
+      return { meshes, matrices };
+    });
+    return { meshes: template.meshes.filter((_, i) => motion.parts[i] < 0), matrices: placed, index: 0, moving: { parts, poses: restPoses(count) } };
+  }
+
+  /** The clips of the model shown, each where it has played to (`full`: those that open, fully open). */
+  private playing(full = false): { clip: ModelClip; time: number; kind: string }[] {
+    const clips = this.template?.motion?.clips;
+    if (!clips) return [];
+    return this.clips.flatMap((c) => {
+      const clip = clips.get(c.name);
+      if (!clip || (full && c.kind !== 'use')) return [];
+      return [{ clip, time: full ? clip.duration : c.time, kind: c.kind }];
+    });
+  }
+
+  /** Plays the clips on by `dt` seconds, those that open towards where `open` has them, at their pace in the game; true if any moved. */
+  private animate(dt: number): boolean {
+    const clips = this.template?.motion?.clips;
+    if (!clips || !this.target || !dt) return false;
+    let moved = false;
+    for (const c of this.clips) {
+      const d = clips.get(c.name)?.duration ?? 0;
+      if (d <= 0) continue;
+      const time = c.kind === 'idle' ? (c.time + dt) % d : Math.min(Math.max(c.time + (this.open ? dt : -dt), 0), d);
+      if (time === c.time) continue;
+      c.time = time;
+      moved = true;
+    }
+    if (moved) poseParts(this.target, this.playing());
+    return moved;
+  }
+
+  /** Where to look and how far back to stand: the model's bounds, seen from any side, closed and open (a fridge's doors out in front). */
   private frameModel(): void {
     const save = this.root.rotation.y;
     this.root.rotation.y = 0;
     const corners = boxCorners(this.meshes);
+    const lo = corners[0]?.clone();
+    const hi = corners[corners.length - 1]?.clone();
+    const parts = this.template?.motion?.parts;
+    if (lo && hi && parts) {
+      const open = this.playing(true);
+      const pose = new Float32Array(16);
+      const m = new Matrix();
+      this.meshes.forEach((mesh, i) => {
+        if (parts[i] < 0 || !mesh.getTotalVertices() || !partPose(open, parts[i], pose)) return;
+        Matrix.FromArrayToRef(pose, 0, m);
+        for (const corner of mesh.getBoundingInfo().boundingBox.vectorsWorld) {
+          const at = Vector3.TransformCoordinates(corner, m);
+          lo.minimizeInPlace(at);
+          hi.maximizeInPlace(at);
+        }
+      });
+    }
     this.root.rotation.y = save;
-    if (!corners.length) return;
-    const lo = corners[0];
-    const hi = corners[corners.length - 1];
+    if (!lo || !hi) return;
     this.centre.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2);
     const radius = Math.max(0.35, Vector3.Distance(lo, hi) / 2);
     this.reach = (radius / Math.sin(FOV / 2)) * 1.02;
@@ -188,6 +281,7 @@ export class ItemStageController implements ItemStage {
     const now = performance.now() / 1000;
     const dt = this.lastNow ? Math.min(0.1, now - this.lastNow) : 0;
     this.lastNow = now;
+    if (this.animate(dt)) this.restless = 2;
     if (!this.dragging && Math.abs(this.yawVel) > 1e-3) {
       this.yawTarget += this.yawVel * dt;
       this.yawVel *= Math.exp(-dt * 3.5);
@@ -259,4 +353,23 @@ export class ItemStageController implements ItemStage {
     else return;
     e.preventDefault();
   };
+}
+
+/**
+ * The clips the stage plays of `template`: its ambient one (`idle`), and, as those that open, every
+ * other clip of its file but those that go round (`loops`, and a use's `every`), the night's, a
+ * crop's growth and a clock's hands: what a use or being open plays (a fridge's door, a hot tub's
+ * cover) and what nothing plays yet (a fridge's freezer door), as the clips bench does.
+ */
+function stageClips(template: ModelTemplate, motions: Motions | undefined): StageClip[] {
+  const clips = template.motion?.clips;
+  if (!clips) return [];
+  const uses = Object.values(motions?.uses ?? {}).flat();
+  const once = new Set(uses.filter((u) => !u.every).map((u) => u.clip));
+  const other = new Set<string | undefined>([...Object.values(motions?.loops ?? {}), motions?.night, motions?.growth, motions?.clock?.hour, motions?.clock?.minute]);
+  for (const u of uses) if (u.every && !once.has(u.clip)) other.add(u.clip);
+  return [...clips.keys()].flatMap((name): StageClip[] => {
+    if (name === motions?.idle) return [{ name, kind: 'idle', time: 0 }];
+    return other.has(name) ? [] : [{ name, kind: 'use', time: 0 }];
+  });
 }

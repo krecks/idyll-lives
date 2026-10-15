@@ -13,7 +13,9 @@
    * The colour studio, over Build mode: the item live and turning on the left, its parts on the
    * right, each with the palette, "as made" and a colour of the player's own. Nothing changes in
    * the world until Done: then a thing at home is recoloured (one edit, one undo) or the new
-   * purchase in hand takes the colours. Cancel (or Escape) leaves it as it was.
+   * purchase in hand takes the colours. Cancel (or Escape) leaves it as it was. What its use
+   * shows (a fridge's inside, behind its doors; a hot tub under its cover) shows once the player
+   * picks a part: the item opens as it does in use, and "At rest" / "In use" switches it either way.
    */
   let { def: defId, objectId }: { def: string; objectId: number | null } = $props();
 
@@ -44,6 +46,7 @@
   }
 
   function pick(material: string, color: string | null) {
+    part = material;
     draft = withColor(draft, material, color) ?? {};
   }
 
@@ -91,6 +94,18 @@
   $effect(() => {
     stage?.setColors(Object.keys(draft).length ? $state.snapshot(draft) : undefined);
   });
+  // In use (opened) once the player picks a part, unless they've said otherwise.
+  let inUse = $state<boolean | null>(null);
+  const open = $derived(inUse ?? part !== null);
+  let opens = $state(false);
+  $effect(() => {
+    let live = true;
+    void stage?.opens.then((o) => live && (opens = o));
+    return () => (live = false);
+  });
+  $effect(() => {
+    stage?.setOpen(open);
+  });
 </script>
 
 {#if def}
@@ -102,6 +117,12 @@
         <span class="hint">↔ drag to turn · scroll to come closer</span>
       {/if}
       <button class="btn ghost small reset" disabled={!Object.keys(draft).length} title="Every part as it's made" onclick={() => (draft = {})}>Reset all</button>
+      {#if stage && opens}
+        <div class="use" role="group" aria-label="Shown">
+          <button class="btn ghost small" aria-pressed={!open} title="As it stands, closed" onclick={() => (inUse = false)}>At rest</button>
+          <button class="btn ghost small" aria-pressed={open} title="As when it's used: open, so what's inside shows" onclick={() => (inUse = true)}>In use</button>
+        </div>
+      {/if}
     </div>
 
     <aside class="panel glass">
@@ -180,11 +201,28 @@
     pointer-events: none;
     white-space: nowrap;
   }
+  /* (Over the stage's canvas, which goes in after them.) */
   .reset {
     position: absolute;
+    z-index: 1;
     left: 12px;
     top: 12px;
     background: var(--surface);
+  }
+  .use {
+    position: absolute;
+    z-index: 1;
+    right: 12px;
+    top: 12px;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--surface);
+  }
+  .use [aria-pressed='true'] {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   .panel {
     display: grid;

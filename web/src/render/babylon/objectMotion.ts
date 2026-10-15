@@ -418,11 +418,7 @@ export class ObjectMotion {
 
   /** Writes an object's parts where its clips have them (at rest where none does); `written` takes the meshes whose buffers changed (else they go up now). */
   private pose(o: MovingObject, clips: Map<string, ClipState>, written?: Set<Mesh>): void {
-    const moving = o.target.moving!;
-    const n = moving.parts.length;
-    const playing = [...clips.values()];
-    for (let part = 0; part < n; part++) if (!partPose(playing, part, moving.poses, part * 16)) identity(moving.poses, part * 16);
-    writeMoving(o.target, written);
+    poseParts(o.target, [...clips.values()], written);
   }
 
   /**
@@ -469,6 +465,17 @@ export function slotOf(o: ObjectPlacement, def: { slots?: number; bunk?: boolean
     const across = (x - o.x - o.w / 2) * Math.cos(yaw) - (z - o.z - o.d / 2) * Math.sin(yaw);
     return Math.min(n - 1, Math.max(0, Math.round(across / spread + (n - 1) / 2)));
   };
+}
+
+/**
+ * Writes an instance's moving parts where the clips playing (`playing`, each at its seconds) have
+ * them together (`partPose`; at rest where none does), after its placement (`writeMoving`, which
+ * `written` is passed on to). The game's objects, and the colour studio's stage.
+ */
+export function poseParts(target: PopTarget, playing: readonly { clip: ModelClip; time: number; kind?: string }[], written?: Set<Mesh>): void {
+  const moving = target.moving!;
+  for (let part = 0; part < moving.parts.length; part++) if (!partPose(playing, part, moving.poses, part * 16)) identity(moving.poses, part * 16);
+  writeMoving(target, written);
 }
 
 /** Poses for `parts` moving parts, all at rest. */

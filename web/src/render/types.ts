@@ -502,6 +502,10 @@ export interface ItemPreviews {
 export interface ItemStage {
   /** Shows its parts in `colors` (the latest call wins; the one shown stays until it's ready). */
   setColors(colors: PartColors | undefined): void;
+  /** Whether it has clips that open it (a fridge's doors, a hot tub's cover), once it shows: `setOpen` plays them. */
+  readonly opens: Promise<boolean>;
+  /** Plays those clips open and holds them there (true), or back to rest, at their pace in the game. */
+  setOpen(open: boolean): void;
   detach(): void;
 }
 

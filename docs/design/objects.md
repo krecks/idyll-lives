@@ -166,7 +166,10 @@ finish it uses.
   `#rrggbb` by material, saved as `objects[].colors`; a part left out is as made). The item panel's
   quick row colours the main part; its "Every part…" button opens the colour studio
   (`ui/buy/CustomiseColours.svelte`): the item live on a stage of its own (`render/preview/itemStage.ts`)
-  beside its parts, applied on Done as one edit (one undo). The renderer draws each part in its colour
+  beside its parts, applied on Done as one edit (one undo). The stage plays the model's clips as the
+  game does (`poseParts`): the ambient one always, and once the player picks a part, every clip that
+  opens (all but loops, `every`, night, growth and clock clips) opens and stays open, so what a door,
+  drawer or cover hides shows; "At rest" / "In use" switches it either way. The renderer draws each part in its colour
   with its finish (`painted` in models.ts); parts not listed keep theirs. Name the main part `body`,
   give every other part its own material named for what it is, and list in `paint` only what's worth
   colouring (not drains, water or food). Each combination of colours in use is a template of its own:
