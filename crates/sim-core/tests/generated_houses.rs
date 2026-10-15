@@ -1,7 +1,8 @@
 //! Generated houses (web/src/game/housegen.ts) checked by the simulation: each loads, has a
 //! bed, a fridge and a toilet in rooms of their own, and everything in it can be reached from the
-//! front door, upstairs too. Chairs face tables and things on tops stand on one; most houses have
-//! somewhere to sit down at a table and small things on their tops. No room is bigger than its
+//! front door, upstairs too. Chairs face tables and things on tops stand on one (never on a hob
+//! or a sink); most houses have somewhere to sit down at a table and small things on their tops.
+//! No room is bigger than its
 //! kind may be (`maxSide` in housegen.json), each is a room of its own in the simulation, and a
 //! good share of houses on large lots have a kitchen island with stools pulled up to it. Every
 //! room has lights enough for all of it at night (no more than four from its ceiling) and is lit well (windows enough by day where
