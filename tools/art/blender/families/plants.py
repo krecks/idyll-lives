@@ -1108,7 +1108,7 @@ def veg_patch():
 
     def leaves():
         for k, (x, y) in enumerate(spots[0]):                          # lettuces
-            lump(f'lettuce{k}', 0.1, (x, y, top - 0.01), [P.leaf, P.leaf_light][k % 2], scale=(1, 1, 0.65), noise=0.35, seed=k)
+            lump(f'lettuce{k}', 0.1, (x, y, top - 0.01), [P.leaf, P.leaf_light][k % 2], scale=(1, 1, 0.88), noise=0.35, seed=k)
         for k, (x, y) in enumerate(spots[1]):                          # cabbages' outer leaves
             lump(f'cabbage{k}', 0.12, (x, y, top - 0.01), P.leaf_dark, scale=(1, 1, 0.8), noise=0.2, seed=k + 3)
         for k, (x, y) in enumerate(spots[2]):                          # carrot tops

@@ -147,7 +147,8 @@ parts each: the still bed, the leaves (`plants`) and the crop (`crop`), in one g
 of their height into the soil; planted, half high and sunk a third (`SINK`), so what shows is each plant's top, small,
 where the plant stands (scaled about the bed's middle, as first built, the seedlings drew together there). The
 vegetable patch's plants are its crop: picked, they are under the soil and the bed is bare (`harvested`); its
-lettuces, the lowest, show from growing on. There is no harvest clip: harvesting moves a crop to its
+lettuces, round heads 17 cm tall (13 cm until 2026-10-15, when they stayed under the soil at the planted stage), show
+as small tops at every stage, as the cabbages and carrots do. There is no harvest clip: harvesting moves a crop to its
 picked stage, and the game plays the clip on from ripe, so the crop goes while the resident picks (seen in play:
 the tomatoes picked autonomously, stage 2 to 3, the plants left without fruit). The herb planter doesn't grow; its
 basil shrinks away for `pickHerbs` (`harvest`). The bed is the colour part ("Bed"): the boards of the raised bed and
