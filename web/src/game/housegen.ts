@@ -1299,6 +1299,13 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.add(`${layer}:${key(x + dx, z + dz)}`);
     f.objects.push({ def, x, z, rot });
     f.fronts.push(used ? [frontTile(x, z, w, d, rot)] : null);
+    // ...and a way to it.
+    if (used && !reachable(f, r)) {
+      f.objects.pop();
+      f.fronts.pop();
+      for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.delete(`${layer}:${key(x + dx, z + dz)}`);
+      return false;
+    }
     return true;
   };
   if (layer === 'wall') {
@@ -1318,7 +1325,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
         : o.rot === 3 ? Array.from({ length: d }, (_, i) => `v:${o.x + pw}:${z + i}`)
         : Array.from({ length: d }, (_, i) => `v:${o.x}:${z + i}`);
       const [wx, wz] = o.rot === 2 ? [x, o.z + pd - d] : o.rot === 3 ? [o.x + pw - w, z] : o.rot === 0 ? [x, o.z] : [o.x, z];
-      if (backs.every(backed) && fits(wx, wz, w, d, o.rot)) return take(wx, wz, w, d, o.rot);
+      if (backs.every(backed) && fits(wx, wz, w, d, o.rot) && take(wx, wz, w, d, o.rot)) return true;
     }
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
       const rot = [0, 3, 2, 1][side];
@@ -1331,7 +1338,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       spots.sort(() => rng() - 0.5);
       // Curtains go over windows.
       spots.sort((a, b) => Number(b[2].some((e) => f.edges.get(e) === 'window') === window) - Number(a[2].some((e) => f.edges.get(e) === 'window') === window));
-      for (const [x, z, backs] of spots) if (backs.every(backed) && fits(x, z, w, d, rot)) return take(x, z, w, d, rot);
+      for (const [x, z, backs] of spots) if (backs.every(backed) && fits(x, z, w, d, rot) && take(x, z, w, d, rot)) return true;
     }
     return false;
   }
