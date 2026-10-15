@@ -207,23 +207,23 @@ def farmhouseSink():
             Fk.box(f'door_panel{s}', 0.3, 0.52, 0.012, (s * 0.22, 0.42, 0.177), M.body, bevel=0.004)
             Fk.box(f'pull{s}', 0.012, 0.12, 0.02, (s * 0.06, 0.42, 0.18), M.chrome, bevel=0.004)
         # a wood worktop framing the apron basin, and the painted cabinet shoulders up to it
-        Fk.box('top_back', 1.0, 0.04, 0.15, (0, 0.94, -0.405), M.wood, bevel=0.008)
-        Fk.box('top_left', 0.17, 0.04, 0.51, (-0.415, 0.94, -0.075), M.wood, bevel=0.008)
-        Fk.box('top_right', 0.17, 0.04, 0.51, (0.415, 0.94, -0.075), M.wood, bevel=0.008)
+        Fk.box('top_back', 1.0, 0.04, 0.15, (0, 0.93, -0.405), M.wood, bevel=0.008)
+        Fk.box('top_left', 0.17, 0.04, 0.51, (-0.415, 0.93, -0.075), M.wood, bevel=0.008)
+        Fk.box('top_right', 0.17, 0.04, 0.51, (0.415, 0.93, -0.075), M.wood, bevel=0.008)
         Fk.box('shoulder_back', 1.0, 0.2, 0.15, (0, 0.82, -0.405), M.body, bevel=0.008)
         Fk.box('shoulder_left', 0.17, 0.2, 0.51, (-0.415, 0.82, -0.075), M.body, bevel=0.008)
         Fk.box('shoulder_right', 0.17, 0.2, 0.51, (0.415, 0.82, -0.075), M.body, bevel=0.008)
         # the white apron basin: a shell proud of the cabinet front
-        _rect_basin(Fk, 'apron', 0, -0.075, 0.66, 0.51, 0.72, 0.96, M.porcelain, wall=0.03)
+        _rect_basin(Fk, 'apron', 0, -0.075, 0.66, 0.51, 0.72, 0.95, M.porcelain, wall=0.03)
         Fk.box('basin_floor', 0.6, 0.01, 0.45, (0, 0.785, -0.075), M.metal, bevel=0.004)
         Fk.cyl('drain', 0.035, 0.012, (0, 0.79, -0.075), M.dark, verts=12)
         # tap, a side handle, a soap dish and a potted herb
-        Fk.cyl('tap_base', 0.05, 0.03, (0, 0.955, -0.38), M.chrome, verts=14)
-        Fk.cyl('tap_handle', 0.03, 0.05, (0.12, 0.975, -0.38), M.chrome, verts=12)
-        spout = _gooseneck(Fk, 'tap', 0, 0.94, -0.38, -0.2, 1.235, M.chrome, r=0.028, tip_y=1.17)
-        Fk.box('soap_dish', 0.2, 0.05, 0.12, (0.36, 0.985, -0.36), M.porcelain, bevel=0.02)
-        Fk.cyl('pot', 0.06, 0.14, (-0.36, 1.03, -0.38), M.plant, verts=14)
-        Fk.sphere('herb', 0.07, (-0.36, 1.14, -0.38), M.plant, segments=10, rings=6, scale=(1, 1.2, 1))
+        Fk.cyl('tap_base', 0.05, 0.03, (0, 0.945, -0.38), M.chrome, verts=14)
+        Fk.cyl('tap_handle', 0.03, 0.05, (0.12, 0.965, -0.38), M.chrome, verts=12)
+        spout = _gooseneck(Fk, 'tap', 0, 0.93, -0.38, -0.2, 1.225, M.chrome, r=0.028, tip_y=1.16)
+        Fk.box('soap_dish', 0.2, 0.05, 0.12, (0.36, 0.975, -0.36), M.porcelain, bevel=0.02)
+        Fk.cyl('pot', 0.06, 0.14, (-0.36, 1.02, -0.38), M.plant, verts=14)
+        Fk.sphere('herb', 0.07, (-0.36, 1.13, -0.38), M.plant, segments=10, rings=6, scale=(1, 1.2, 1))
     G.join(still, 'body', origin=(0, 0, 0))
     water = _water(Fk, spout, 0.79)
     G.settle()
@@ -508,7 +508,7 @@ FAMILY = G.Family(
      G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.66), key='model.wineFridge', centre=(0, -0.10),
              motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
              paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),
-     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.265, 0.67), key='model.farmhouseSink', centre=(0, -0.095),
+     G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.253, 0.67), key='model.farmhouseSink', centre=(0, -0.095),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),

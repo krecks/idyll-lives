@@ -238,11 +238,11 @@ def front(s, x, w, y0, y1, z, side=0, drawer=False, handle_y=None):
 
 
 def k_base(s, w=1.0, top=True):
-    """A base unit: carcass y 0.1..0.92 (front face z = 0.14), a dark plinth and a worktop to 0.96 (z -0.48..0.18)."""
+    """A base unit: carcass y 0.1..0.92 (front face z = 0.14), a dark plinth and a worktop to 0.95 (z -0.48..0.18), the height of every counter (catalog2.py CT)."""
     p = [box([w - 0.004, 0.82, 0.6], [0, 0.51, -0.16], s.body, s.bfin, radius=0.01),
          box([w - 0.04, 0.1, 0.56], [0, 0.05, -0.18], PLINTH, 'satin', radius=0.004)]
     if top:
-        p.append(box([w, 0.04, 0.66], [0, 0.94, -0.15], s.top, s.tfin, radius=0.006))
+        p.append(box([w, 0.04, 0.66], [0, 0.93, -0.15], s.top, s.tfin, radius=0.006))
     return p
 
 
@@ -256,10 +256,10 @@ def corner_counter(s):
     """A deep corner unit (fills its tile, for the corner of an L): doors at the front, a worktop over all."""
     p = [box([1.0, 0.82, 0.89], [0, 0.51, 0.015], s.body, s.bfin, radius=0.012),             # its back on the wall face
          box([0.96, 0.1, 0.85], [0, 0.05, -0.005], PLINTH, 'satin', radius=0.006),
-         box([1.0, 0.04, 0.93], [0, 0.94, 0.035], s.top, s.tfin, radius=0.006)]
+         box([1.0, 0.04, 0.93], [0, 0.93, 0.035], s.top, s.tfin, radius=0.006)]
     p += front(s, -0.245, 0.49, 0.12, 0.9, 0.46, side=1) + front(s, 0.245, 0.49, 0.12, 0.9, 0.46, side=-1)
-    p += [cyl([0.14, 0.18, 0.14], [-0.3, 1.05, -0.3], '#E8E6E1', 'gloss', taper=0.85),            # utensil pot
-          cyl([0.02, 0.2, 0.02], [-0.32, 1.17, -0.3], OAK, 'satin'), cyl([0.02, 0.2, 0.02], [-0.28, 1.16, -0.31], OAK, 'satin')]
+    p += [cyl([0.14, 0.18, 0.14], [-0.3, 1.04, -0.3], '#E8E6E1', 'gloss', taper=0.85),            # utensil pot
+          cyl([0.02, 0.2, 0.02], [-0.32, 1.16, -0.3], OAK, 'satin'), cyl([0.02, 0.2, 0.02], [-0.28, 1.15, -0.31], OAK, 'satin')]
     return p
 
 
@@ -286,12 +286,12 @@ def pantry(s):
 def microwave_counter(s):
     x, z = -0.18, -0.24                 # -x is the viewer's right: the controls there, the door hinged on the left
     p = counter(s)
-    p += [box([0.5, 0.3, 0.36], [x, 1.11, z], CHARCOAL, 'satin', radius=0.02),
-          box([0.36, 0.26, 0.014], [x + 0.06, 1.11, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
-          box([0.28, 0.17, 0.006], [x + 0.07, 1.11, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
-          box([0.1, 0.24, 0.01], [x - 0.19, 1.11, z + 0.183], '#22252A', 'satin', radius=0.006),
-          box([0.06, 0.02, 0.006], [x - 0.19, 1.2, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
-    p += [box([0.03, 0.02, 0.006], [x - 0.175 - (i % 2) * 0.035, 1.15 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
+    p += [box([0.5, 0.3, 0.36], [x, 1.1, z], CHARCOAL, 'satin', radius=0.02),
+          box([0.36, 0.26, 0.014], [x + 0.06, 1.1, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
+          box([0.28, 0.17, 0.006], [x + 0.07, 1.1, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
+          box([0.1, 0.24, 0.01], [x - 0.19, 1.1, z + 0.183], '#22252A', 'satin', radius=0.006),
+          box([0.06, 0.02, 0.006], [x - 0.19, 1.19, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
+    p += [box([0.03, 0.02, 0.006], [x - 0.175 - (i % 2) * 0.035, 1.14 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
     return p
 
 
@@ -299,31 +299,31 @@ def coffee_counter(s):
     x, z = -0.14, -0.26
     steel = CHROME if s.hfin == 'chrome' else STEEL
     p = counter(s)
-    p += [box([0.34, 0.3, 0.32], [x, 1.11, z], CHARCOAL, 'satin', radius=0.03),
-          box([0.26, 0.14, 0.03], [x, 1.04, z + 0.15], '#22252A', 'satin', radius=0.01),                   # cup bay
-          box([0.34, 0.03, 0.32], [x, 1.275, z], steel, s.hfin, radius=0.01),                              # warming top
-          cyl([0.08, 0.04, 0.08], [x, 1.16, z + 0.15], steel, s.hfin, segments=14),                        # group head
-          box([0.03, 0.025, 0.12], [x, 1.13, z + 0.22], '#22252A', 'satin', radius=0.01),                  # portafilter handle
-          box([0.28, 0.02, 0.1], [x, 0.975, z + 0.15], steel, s.hfin, radius=0.006),                       # drip tray
-          cyl([0.07, 0.06, 0.07], [x, 1.015, z + 0.15], '#F2F1EE', 'gloss', segments=14),                  # cup
-          cyl([0.06, 0.012, 0.06], [x + 0.08, 1.22, z + 0.162], '#F2F1EE', 'gloss', rotate=[90, 0, 0], segments=12),  # gauge
-          cyl([0.11, 0.12, 0.11], [x + 0.08, 1.35, z - 0.06], '#5A3A26', 'gloss', segments=14, taper=1.15),  # beans
-          cyl([0.08, 0.1, 0.08], [0.32, 1.01, 0.05], TEAL, 'gloss'), cyl([0.08, 0.1, 0.08], [0.42, 1.01, 0.0], CREAM, 'gloss')]
+    p += [box([0.34, 0.3, 0.32], [x, 1.1, z], CHARCOAL, 'satin', radius=0.03),
+          box([0.26, 0.14, 0.03], [x, 1.03, z + 0.15], '#22252A', 'satin', radius=0.01),                   # cup bay
+          box([0.34, 0.03, 0.32], [x, 1.265, z], steel, s.hfin, radius=0.01),                              # warming top
+          cyl([0.08, 0.04, 0.08], [x, 1.15, z + 0.15], steel, s.hfin, segments=14),                        # group head
+          box([0.03, 0.025, 0.12], [x, 1.12, z + 0.22], '#22252A', 'satin', radius=0.01),                  # portafilter handle
+          box([0.28, 0.02, 0.1], [x, 0.965, z + 0.15], steel, s.hfin, radius=0.006),                       # drip tray
+          cyl([0.07, 0.06, 0.07], [x, 1.005, z + 0.15], '#F2F1EE', 'gloss', segments=14),                  # cup
+          cyl([0.06, 0.012, 0.06], [x + 0.08, 1.21, z + 0.162], '#F2F1EE', 'gloss', rotate=[90, 0, 0], segments=12),  # gauge
+          cyl([0.11, 0.12, 0.11], [x + 0.08, 1.34, z - 0.06], '#5A3A26', 'gloss', segments=14, taper=1.15),  # beans
+          cyl([0.08, 0.1, 0.08], [0.32, 1.0, 0.05], TEAL, 'gloss'), cyl([0.08, 0.1, 0.08], [0.42, 1.0, 0.0], CREAM, 'gloss')]
     return p
 
 
 def breakfast_counter(s, toaster):
     p = counter(s)
-    p += [box([0.28, 0.18, 0.16], [0.3, 1.05, -0.3], toaster, 'gloss', radius=0.05),                     # toaster
-          box([0.18, 0.012, 0.03], [0.3, 1.137, -0.33], '#22252A', 'satin', radius=0.004),
-          box([0.18, 0.012, 0.03], [0.3, 1.137, -0.27], '#22252A', 'satin', radius=0.004),
-          box([0.02, 0.03, 0.03], [0.45, 1.06, -0.3], '#22252A', 'satin', radius=0.006),
-          box([0.16, 0.12, 0.16], [0.0, 1.02, -0.32], CHARCOAL, 'satin', radius=0.03),                     # blender
-          lathe([0.15, 0.26, 0.15], [0.0, 1.21, -0.32], '#DCE6EA', 'gloss', [[0, -0.5], [0.34, -0.5], [0.5, 0.5], [0, 0.5]], segments=16),
-          cyl([0.15, 0.03, 0.15], [0.0, 1.355, -0.32], CHARCOAL, 'satin', segments=16),
-          cyl([0.26, 0.06, 0.26], [-0.28, 0.99, 0.05], '#E9E6E0', 'gloss'),                                  # fruit bowl
-          sph([0.08, 0.07, 0.08], [-0.3, 1.04, 0.04], '#F2C14E', 'satin', segments=8),
-          sph([0.08, 0.07, 0.08], [-0.24, 1.04, 0.08], '#D9483B', 'satin', segments=8)]
+    p += [box([0.28, 0.18, 0.16], [0.3, 1.04, -0.3], toaster, 'gloss', radius=0.05),                     # toaster
+          box([0.18, 0.012, 0.03], [0.3, 1.127, -0.33], '#22252A', 'satin', radius=0.004),
+          box([0.18, 0.012, 0.03], [0.3, 1.127, -0.27], '#22252A', 'satin', radius=0.004),
+          box([0.02, 0.03, 0.03], [0.45, 1.05, -0.3], '#22252A', 'satin', radius=0.006),
+          box([0.16, 0.12, 0.16], [0.0, 1.01, -0.32], CHARCOAL, 'satin', radius=0.03),                     # blender
+          lathe([0.15, 0.26, 0.15], [0.0, 1.2, -0.32], '#DCE6EA', 'gloss', [[0, -0.5], [0.34, -0.5], [0.5, 0.5], [0, 0.5]], segments=16),
+          cyl([0.15, 0.03, 0.15], [0.0, 1.345, -0.32], CHARCOAL, 'satin', segments=16),
+          cyl([0.26, 0.06, 0.26], [-0.28, 0.98, 0.05], '#E9E6E0', 'gloss'),                                  # fruit bowl
+          sph([0.08, 0.07, 0.08], [-0.3, 1.03, 0.04], '#F2C14E', 'satin', segments=8),
+          sph([0.08, 0.07, 0.08], [-0.24, 1.03, 0.08], '#D9483B', 'satin', segments=8)]
     return p
 
 
@@ -347,7 +347,7 @@ def dishwasher(body, panel, fin='satin', handle=CHROME, top=OAK, top_fin='wood')
         box([0.9, 0.08, 0.02], [0, 0.89, 0.165], '#2F3236', 'satin', radius=0.01),                # control strip
         box([0.5, 0.02, 0.03], [0, 0.8, 0.19], handle, 'chrome' if handle == CHROME else 'metal', radius=0.008),
         sph([0.025, 0.025, 0.012], [0.32, 0.89, 0.177], '#5EC28B', 'gloss', segments=6),
-        box([1.0, 0.04, 0.66], [0, 0.94, -0.15], top, top_fin, radius=0.006),
+        box([1.0, 0.04, 0.66], [0, 0.93, -0.15], top, top_fin, radius=0.006),
     ], dz=0.05))
 
 
@@ -365,14 +365,14 @@ def farmhouse_sink(cab, top=OAK, top_fin='wood', tap=CHROME):
         box([0.4, 0.62, 0.02], [0.22, 0.42, 0.165], cab, 'satin', radius=0.01),
         box([0.012, 0.12, 0.02], [-0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
         box([0.012, 0.12, 0.02], [0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
-        box([1.0, 0.04, 0.66], [-0.0, 0.94, -0.15], top, top_fin, radius=0.006),
-        box([0.66, 0.26, 0.5], [0, 0.835, -0.08], '#F6F5F2', 'gloss', radius=0.03),                # apron basin
-        box([0.58, 0.02, 0.4], [0, 0.962, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
-        cyl([0.04, 0.3, 0.04], [0, 1.1, -0.38], tap, 'chrome'),                                      # gooseneck tap
-        rod([0, 1.25, -0.38], [0, 1.22, -0.2], 0.03, tap, 'chrome'),
-        cyl([0.05, 0.03, 0.05], [0.12, 0.975, -0.4], tap, 'chrome'),
-        box([0.2, 0.1, 0.06], [0.36, 1.01, -0.36], '#E8E6E1', 'gloss', radius=0.02),                # soap dish
-        cyl([0.06, 0.16, 0.06], [-0.36, 1.04, -0.38], TEAL, 'gloss', taper=0.8),
+        box([1.0, 0.04, 0.66], [-0.0, 0.93, -0.15], top, top_fin, radius=0.006),
+        box([0.66, 0.26, 0.5], [0, 0.825, -0.08], '#F6F5F2', 'gloss', radius=0.03),                # apron basin
+        box([0.58, 0.02, 0.4], [0, 0.952, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
+        cyl([0.04, 0.3, 0.04], [0, 1.09, -0.38], tap, 'chrome'),                                      # gooseneck tap
+        rod([0, 1.24, -0.38], [0, 1.21, -0.2], 0.03, tap, 'chrome'),
+        cyl([0.05, 0.03, 0.05], [0.12, 0.965, -0.4], tap, 'chrome'),
+        box([0.2, 0.1, 0.06], [0.36, 1.0, -0.36], '#E8E6E1', 'gloss', radius=0.02),                # soap dish
+        cyl([0.06, 0.16, 0.06], [-0.36, 1.03, -0.38], TEAL, 'gloss', taper=0.8),
     ], dz=0.05))
 
 

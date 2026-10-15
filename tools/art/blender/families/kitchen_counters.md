@@ -66,13 +66,13 @@ rest pose where it is.
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.counter` | 1.000 × 0.960 × 0.660 m | 1,404 | 2 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.counterCorner` | 1.000 × 1.270 × 0.930 m | 1,520 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counter` | 1.000 × 0.950 × 0.660 m | 1,404 | 2 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
+| `model.counterCorner` | 1.000 × 1.260 × 0.930 m | 1,520 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 | `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 1,428 | 2 | — | static |
 | `model.counterCornerOuter` | 0.810 × 1.035 × 0.660 m | 972 | 1 | — | static |
 | `model.counterDrawers` | 1.000 × 0.950 × 0.660 m | 1,620 | 2 | top drawer | `drawer_open` (putting clean dishes away: `fetch` at its prep station, `hold` 1.5 s) |
 | `model.counterOpenShelf` | 1.000 × 0.950 × 0.660 m | 1,452 | 2 | — | static |
-| `model.butcherBlock` | 0.900 × 0.945 × 0.813 m | 1,512 | 3 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.butcherBlock` | 0.900 × 0.950 × 0.819 m | 1,944 | 3 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 | `model.counterMarble` | 1.000 × 0.953 × 0.660 m | 1,620 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 
 ## K5 — tall and wall storage

@@ -69,8 +69,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 | Origin | middle of the footprint, on the floor | the same: `G.settle()` puts it there |
 
 - **Game coordinates.** `G.GameFrame(shift)` takes game numbers as they are (`F.box(name, w, h, d, (x, y, z), M.colour)`).
-  Use it to copy a placeholder's parts or content heights. `shift` moves every depth back, for a
-  placeholder built against the back of its tile.
+  Use it to copy a placeholder's parts or content heights. `shift` moves every depth forward (+z; a negative
+  one back), to draw a placeholder built against the back of its tile centred on it.
 - **Footprint.** `[w, d]` in whole 1 m tiles, before turning. A 2 × 3 object runs from −1 to +1 across and
   −1.5 to +1.5 deep.
 - **Against a wall.** Its back is on the wall's face, 7 cm into the tile: at depth −0.43 in a 1-deep

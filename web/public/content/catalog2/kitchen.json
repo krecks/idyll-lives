@@ -130,7 +130,7 @@
       "group": "counters",
       "decor": 0.2,
       "surface": {
-        "height": 0.945,
+        "height": 0.95,
         "kind": "counter",
         "size": [
           0.9,

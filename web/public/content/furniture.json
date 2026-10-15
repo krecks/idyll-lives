@@ -489,7 +489,7 @@
       "group": "appliances",
       "description": "A counter with a toaster and a blender: toast for a quick bite, a smoothie for a little energy.",
       "surface": {
-        "height": 0.96,
+        "height": 0.95,
         "kind": "bar",
         "size": [
           1.0,
@@ -585,7 +585,7 @@
       "group": "counters",
       "description": "A base cabinet with a worktop. Line them up for a proper kitchen; there's always room to make a sandwich.",
       "surface": {
-        "height": 0.96,
+        "height": 0.95,
         "kind": "counter",
         "size": [
           1.0,
@@ -624,7 +624,7 @@
       "group": "counters",
       "description": "A deep corner unit that joins two runs of counters into an L.",
       "surface": {
-        "height": 0.96,
+        "height": 0.95,
         "kind": "counter",
         "size": [
           1.0,

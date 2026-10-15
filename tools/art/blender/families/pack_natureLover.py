@@ -96,11 +96,16 @@ def _m(name):
     return getattr(M, name)
 
 
-def _pot(F, x, y, z, d=0.14, h=0.12, material=None, soil=True):
-    """A flower pot standing on `y`, `d` across the rim, with soil in it."""
+def _pot(F, x, y, z, d=0.14, h=0.12, material=None, soil=True, trim=False):
+    """A flower pot standing on `y`, `d` across the rim, with soil in it. `trim` leaves out what is never seen:
+    the underside, on the top it stands on, and with soil, the inside below it (the wall ends just under the soil)."""
     r = d / 2
-    G.revolve(_name('pot'), [(0, 0), (r * 0.72, 0), (r, h * 0.86), (r * 1.04, h * 0.88), (r * 1.04, h),
-                             (r * 0.9, h), (r * 0.66, 0.012), (0, 0.012)],
+    inside = [(r * 0.66, 0.012), (0, 0.012)]
+    if trim and soil:
+        t = (h * 0.8 - 0.012) / (h - 0.012)                     # the inner wall, 0.8 of the way up
+        inside = [(r * (0.66 + 0.24 * t), h * 0.8)]
+    G.revolve(_name('pot'), [(0, 0)] * (not trim) + [(r * 0.72, 0), (r, h * 0.86), (r * 1.04, h * 0.88), (r * 1.04, h),
+                                                    (r * 0.9, h)] + inside,
               at=F.at(x, y, z), material=material or M.terra, segments=16)
     if soil:
         F.cyl(_name('pot_soil'), r * 0.88, 0.01, (x, y + h * 0.86, z), M.soil, verts=14)
@@ -224,7 +229,7 @@ def pottingBench():
             F.box(_name('side_rail'), 0.04, 0.06, 0.45, (x, 0.12, -0.135), M.sage, bevel=0.006)
         F.box('front_rail', 1.62, 0.06, 0.04, (0, 0.12, 0.12), M.sage, bevel=0.006)
         for i, x in enumerate((-0.6, -0.3, 0.0, 0.3, 0.6)):          # pots of herbs on the top shelf
-            _pot(F, x, TOP + 0.635, -0.33, d=0.13 - (i % 2) * 0.02, h=0.11)
+            _pot(F, x, TOP + 0.635, -0.33, d=0.13 - (i % 2) * 0.02, h=0.11, trim=True)
             _bush(F, x, TOP + 0.72, -0.33, 0.055, 0.17, (M.leaf, M.leaf_light, M.leaf_pale)[i % 3], i, n=3)
         # tools hung on the back board, coiled twine
         G.rod('trowel_handle', F.at(-0.75, TOP + 0.35, -0.385), F.at(-0.75, TOP + 0.16, -0.385), 0.014,
@@ -242,7 +247,7 @@ def pottingBench():
             for j in range(2):
                 _blob(F, -0.33 + i * 0.12, TOP + 0.05, -0.2 + j * 0.13, 0.04, (M.leaf_pale, M.leaf_light)[(i + j) % 2],
                       i * 3 + j, scale=(1, 1, 0.9))
-        _pot(F, 0.25, TOP, -0.15, d=0.2, h=0.18)
+        _pot(F, 0.25, TOP, -0.15, d=0.2, h=0.18, trim=True)
         _bush(F, 0.25, TOP + 0.14, -0.15, 0.1, 0.3, M.leaf_light, 21, n=4)
         for k, m in enumerate(('pink', 'yellow', 'pink', 'lilac', 'yellow')):
             a = k * 72
@@ -252,13 +257,13 @@ def pottingBench():
         G.rod('can_spout', F.at(0.68, TOP + 0.06, -0.1), F.at(0.84, TOP + 0.2, -0.1), 0.012, material=M.can, verts=8)
         G.torus('can_handle', 0.07, 0.012, at=F.at(0.6, TOP + 0.2, -0.1), material=M.can, rot=(90, 0, 0),
                 major_segments=14, minor_segments=6)
-        _pot(F, SEEDLING[0], TOP, SEEDLING[1], d=0.14, h=0.12)
+        _pot(F, SEEDLING[0], TOP, SEEDLING[1], d=0.14, h=0.12, trim=True)
         # below: sacks of compost and a stack of pots
         for i in range(3):
             F.box(_name('sack'), 0.32, 0.3, 0.26, (-0.55 + i * 0.36, 0.385, -0.16), (M.sack, M.seed, M.sack)[i],
                   rot=(0, 0, (i - 1) * 12), bevel=0.06, bevel_segments=2)
-        _pot(F, 0.55, 0.235, -0.12, d=0.24, h=0.16, soil=False)
-        _pot(F, 0.55, 0.36, -0.12, d=0.22, h=0.12, soil=False)
+        _pot(F, 0.55, 0.235, -0.12, d=0.24, h=0.16, soil=False, trim=True)
+        _pot(F, 0.55, 0.36, -0.12, d=0.22, h=0.12, soil=False, trim=True)
         del rnd
     G.join(still, 'body', origin=(0, 0, 0))
     # The seedling: a stem, two leaves and a tuft, origin on the pot's soil: `seedling` grows it up. Plain satin:

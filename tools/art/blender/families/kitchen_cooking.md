@@ -59,8 +59,8 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 | `model.stoveGas` | 0.920 × 1.113 × 0.704 m | 2,904 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
 | `model.wallOven` | 0.700 × 2.110 × 0.706 m | 1,668 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
 | `model.rangeCooker` | 1.580 × 1.140 × 0.754 m | 3,632 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
-| `model.cooktopCounter` | 1.000 × 0.963 × 0.660 m | 2,188 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
-| `model.microwave` | 1.000 × 1.260 × 0.670 m | 2,076 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
+| `model.cooktopCounter` | 1.000 × 0.955 × 0.660 m | 2,188 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
+| `model.microwave` | 1.000 × 1.250 × 0.670 m | 2,076 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
 
 Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
 the viewer's left) and swings 100°; its glass turntable turns a full turn every 2 s
@@ -80,9 +80,9 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.coffeeMachine` | 1.000 × 1.410 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
-| `model.breakfastCounter` | 1.000 × 1.390 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
-| `model.dishwasher` | 1.000 × 0.960 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm (dishes) |
+| `model.coffeeMachine` | 1.000 × 1.400 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
+| `model.breakfastCounter` | 1.000 × 1.380 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
+| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm (dishes) |
 | `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes) |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
