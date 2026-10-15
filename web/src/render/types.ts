@@ -75,7 +75,7 @@ export interface FrameCounts {
   /** In the sun's shadow map. */
   shadowDrawCalls: number;
   shadowTriangles: number;
-  /** In the live mirrors' reflections. */
+  /** In the mirrors' reflections. */
   mirrorDrawCalls: number;
   mirrorTriangles: number;
   /** Lighting updates so far (`applyLighting`). */

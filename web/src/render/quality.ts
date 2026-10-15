@@ -1,8 +1,8 @@
 /**
  * The graphics presets: Low, Medium and High (Settings › Performance › Graphics; `?quality=low|
  * medium|high` overrides the setting for testing). Medium is everyone's default and the game's
- * intended look. High is Medium with sharper sun shadows and live mirrors. Low is Medium with
- * modest trims for older laptops (integrated Intel graphics).
+ * intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is
+ * Medium with modest trims for older laptops (integrated Intel graphics).
  *
  * Every knob is in this one table. A new knob gets a field below, with what it does and what it
  * costs, and a value in each preset.
@@ -41,17 +41,23 @@ export interface QualitySettings {
   clusteredLamps: boolean;
   /**
    * How many mirrors (the nearest the camera, on screen) reflect the room; 0: none. Each draws again
-   * what can be seen through its glass (MEASURED).
+   * only what can be seen through its glass, and only the residents in it: the village's bathroom
+   * mirror, 67 draws a reflection (was 437 with the whole world and every resident). Its render target
+   * exists only while a mirror reflects, and 10 s after.
    */
   mirrors: number;
   /**
-   * A reflection's resolution, as a share of the screen's along each side (its multisampling is
-   * `msaaSamples`'s). MEASURED.
+   * A reflection's resolution, as a share of the screen's along each side, rounded by Babylon to
+   * powers of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75); multisampled as
+   * `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
    */
   mirrorScale: number;
   /**
    * At most this many draws of a reflection a second, each only when something in it changed (the
-   * camera, a resident in it, the light, things placed); held in between. 0: every frame. MEASURED.
+   * camera, the mirror, a resident in it, the light, things placed); held in between, looked up
+   * through the camera it was drawn for. 0: every frame. Medium with the camera swinging before a
+   * mirror (the worst case, as a resident moving in front of it): −6 % fps, +1.0 ms CPU, +0.1 ms
+   * GPU (WebGPU, M3 Pro); camera still, or the orbit: within noise. High's two every frame: −20 %.
    */
   mirrorRate: number;
   /**

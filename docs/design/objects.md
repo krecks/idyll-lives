@@ -177,12 +177,12 @@ finish it uses.
   will come back for the objects it suits, decided per object.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
-  glass: its face reflects the room live, as placeholder parts with `mirror` do (the quality's
-  `mirrors`, the nearest ones). Make the glass a flat piece, on the still body or on one moving part
+  glass: its face reflects the room, as placeholder parts with `mirror` do (the quality's
+  `mirrors`: the nearest on screen, one on Low and Medium, two on High). Make the glass a flat piece, on the still body or on one moving part
   (a mirror cabinet's door: the reflection swings with it); the face is across its thinnest side,
   square or round as drawn. In gamekit, the palette takes the side: `glass=('#DCE6EA', 'gloss',
-  'front')`. Map it to `gloss`, as the placeholders' mirrors: only the High preset reflects live, and
-  see-through `glass` would show what is behind it everywhere else. `check_glb.py` fails glass split over
+  'front')`. Map it to `gloss`, as the placeholders' mirrors: the mirrors past the nearest show their
+  glass, and see-through `glass` would show what is behind it. `check_glb.py` fails glass split over
   two parts and warns of glass that isn't flat or is see-through.
 
 ## Level of detail
