@@ -2387,9 +2387,9 @@
         }
       ],
       "price": 600,
-      "category": "kitchen",
+      "category": "validate",
       "fillsWall": true,
-      "group": "appliances"
+      "group": "fridges"
     },
     {
       "id": "sink",
@@ -3982,6 +3982,11 @@
         {
           "id": "lazy",
           "label": "Lazy"
+        },
+        {
+          "id": "garden decor",
+          "label": "Garden Decor",
+          "outside": true
         }
       ]
     },

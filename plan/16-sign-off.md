@@ -27,6 +27,15 @@ The seven sinks (Validate › Sinks) are the first group. Before commit 1caf5ec 
 - `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`: bathroom / sinks;
 - `farmhouseSink`, `counterSinkDouble`: kitchen / counters.
 
+## Done before their tasks had tables
+
+Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
+into Validate › Sofas, the six garden decor models into Validate › Garden Decor. They go back to:
+- `fridge`: kitchen / appliances;
+- `wallBed`: living / seating;
+- `garden.gnome`, `garden.birdbath`, `garden.fountain`, `garden.wheelbarrow`, `garden.boulder`: outdoor / decor;
+- `garden.lantern`: outdoor / lights.
+
 ## Per category
 
 A category is signed off when all its tasks are: its file's tables are all built, back, and committed. Mark each

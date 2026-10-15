@@ -34,7 +34,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
   D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (in Validate › Textiles);
 - the nineteen hobby models: H1 `piano`, `ukulele`, `guitarElectric`, `keyboardDigital`, `drumKit`, `guitarAcoustic` (in Validate › Music); H2 `chessTable`, `poolTable`, `foosball`, `dartboard`, `arcadeCabinet`, `puzzleTable` (Validate › Games); H3 `easel`, `workbench`, `telescope`, `sewingTable`, `chemistrySet`, `potteryWheel`, `craftTable` (Validate › Crafts);
-- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`;
+- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder` (in Validate › Garden Decor);
 - the eleven OU1 patio models: `bench`, `patioSet`, `picnicTable`, `gardenChair`, `patioTableRound`, `patioTable4`, `patioChair`, `adirondackChair`, `benchGarden3`, `outdoorBar`, `parasol` (in Validate › Patio);
 - the five OU2 loungers and swings: `sunLounger`, `hammock`, `porchSwing`, `swingSet`, `hotTubCedar` (in Validate › Loungers);
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants);
