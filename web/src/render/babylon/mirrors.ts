@@ -57,8 +57,8 @@ const MARGIN = 0.3;
 /** A resident's box round their head top: half its width, and how far it reaches down (m). */
 const RESIDENT_HALF = 0.4;
 const RESIDENT_DOWN = 1.9;
-/** Share of a redraw interval that may be cut short (frames don't land on it exactly). */
-const SLACK = 0.8;
+/** Milliseconds a draw may come before it is due (frames don't land on the time exactly). */
+const EARLY = 4;
 /** The camera counts as moved past this change in any of its view × projection's numbers. */
 const STILL = 1e-5;
 /** Texture coordinates from clip space, as Babylon's projection mode has them. */
@@ -73,8 +73,8 @@ interface Reflection {
   owner: Item | null;
   drawnFace: Matrix;
   drawnViewProj: Matrix;
-  /** When it was last drawn (`performance.now()`; -Infinity: never). */
-  drawnAt: number;
+  /** When the next draw is due (`performance.now()`), held to `rate`. */
+  due: number;
   /** Who it is being drawn for now, and something in it changed since it was drawn. */
   next: Item | null;
   dirty: boolean;
@@ -111,6 +111,8 @@ export class Mirrors {
   private readonly disc: Mesh;
   private readonly overlays = new Set<AbstractMesh>();
   private items: Item[] = [];
+  /** The world's mirrors, reflecting or not. */
+  private instances: MirrorInstance[] = [];
   private readonly world = new Matrix();
   private readonly back = new Vector3();
   private readonly ranked: Item[] = [];
@@ -155,7 +157,7 @@ export class Mirrors {
       owner: null,
       drawnFace: new Matrix(),
       drawnViewProj: new Matrix(),
-      drawnAt: -Infinity,
+      due: -Infinity,
       next: null,
       dirty: true,
       planes: Array.from({ length: 5 }, () => new Plane(0, 0, 0, 0)),
@@ -174,7 +176,6 @@ export class Mirrors {
         r.drawnViewProj.copyFrom(scene.getTransformMatrix());
         r.owner = r.next;
         if (r.owner) r.drawnFace.copyFrom(r.owner.face);
-        r.drawnAt = performance.now();
         r.dirty = false;
         this.draws++;
       },
@@ -215,6 +216,7 @@ export class Mirrors {
     for (const item of this.items) for (const mesh of item.meshes) mesh.dispose();
     this.overlays.clear();
     this.items = [];
+    this.instances = instances.filter((i) => i.surfaces.length);
     for (const r of this.pool) if (r) r.owner = r.next = null;
     // A world without mirrors needs none of the reflections.
     if (!instances.some((i) => i.surfaces.length)) this.release(Infinity);
@@ -277,7 +279,7 @@ export class Mirrors {
       if (chosen.has(item) && item.slot >= 0) free.delete(item.slot);
       else item.slot = -1;
     }
-    const interval = this.quality.rate > 0 ? (1000 / this.quality.rate) * SLACK : 0;
+    const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
     const viewProj = camera.getTransformationMatrix();
     for (const item of this.items) {
       if (chosen.has(item) && item.slot < 0) {
@@ -301,14 +303,18 @@ export class Mirrors {
         // The plane faces into the glass: what is behind it is clipped from the reflection.
         if (i === 0) Plane.FromPositionAndNormalToRef(item.centre, item.normal.negateToRef(this.back), r.texture.mirrorPlane);
       });
-      if (!r || !interval) continue;
+      if (!r || !period) continue;
       // Held: drawn again at once for another mirror; when something in it changed, once it's due.
       if (r.owner !== item) {
         r.texture.resetRefreshCounter();
         continue;
       }
       if (this.stale || !same(item.face, r.drawnFace) || !same(viewProj, r.drawnViewProj) || (residents && this.seesResident(r, residents))) r.dirty = true;
-      if (r.dirty && now - r.drawnAt >= interval) r.texture.resetRefreshCounter();
+      if (r.dirty && now >= r.due - EARLY) {
+        r.texture.resetRefreshCounter();
+        // Steady at `rate` while it keeps changing; after a still spell, not two draws in a row.
+        r.due = Math.max(r.due + period, now + period * 0.75);
+      }
     }
     this.stale = false;
     this.release(now);
@@ -430,7 +436,7 @@ export class Mirrors {
   }
 
   get count(): number {
-    return this.items.length;
+    return this.instances.length;
   }
 
   get live(): number {
@@ -442,7 +448,7 @@ export class Mirrors {
     const face = new Matrix();
     const c = new Vector3();
     const n = new Vector3();
-    return this.items.map(({ instance: { matrices, index, surfaces } }) => {
+    return this.instances.map(({ matrices, index, surfaces }) => {
       Matrix.FromArrayToRef(matrices, index * 16, face);
       surfaces[0].matrix.multiplyToRef(face, face);
       Vector3.TransformCoordinatesFromFloatsToRef(0, 0, 0, face, c);
