@@ -123,7 +123,8 @@
       "outdoors": true,
       "seat": {
         "height": 0.42,
-        "forward": 0.065
+        "forward": -0.04,
+        "recline": 24
       },
       "description": "A fan-backed garden chair with wide arms for a drink.",
       "interactions": [

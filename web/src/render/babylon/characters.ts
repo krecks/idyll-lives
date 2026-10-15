@@ -138,9 +138,9 @@ const DEFAULT_FADE = 0.25;
 /**
  * Seat surface height (m) and forward offset of the hips from the object's centre, per object def;
  * `back`: the sitter faces the object's back (a dressing table's mirror against the wall), `fwd` still
- * towards its front.
+ * towards its front; `recline`: leant back against a slanted back (rad, `Seat.recline`).
  */
-const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
+const SEATS: Record<string, { h: number; fwd: number; back?: boolean; recline?: number }> = {
   sofa: { h: 0.44, fwd: -0.087 },
   armchair: { h: 0.42, fwd: -0.013 },
   bench: { h: 0.45, fwd: -0.03 },
@@ -183,7 +183,8 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean }> = {
   sewingTable: { h: 0.46, fwd: -0.22 },
   patioSet: { h: 0.44, fwd: -0.62 },
   picnicTable: { h: 0.4, fwd: -0.68 },
-  gardenChair: { h: 0.4, fwd: -0.083 },
+  // Against its back, slanted 22 degrees (as the Adirondack chair's, content `seat.recline`).
+  gardenChair: { h: 0.4, fwd: -0.083, recline: (18 * Math.PI) / 180 },
   swingSet: { h: 0.5, fwd: 0 },
 };
 const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
@@ -196,7 +197,8 @@ function seatOf(def: ObjectDef | undefined, id: string): Seat {
   const own = def?.seat;
   if (SEATS[id] || !own) return SEATS[id] ?? DEFAULT_SEAT;
   const pedals = own.pedals ? { h: own.pedals.height, fwd: own.pedals.forward ?? 0, crank: own.pedals.crank } : undefined;
-  return { h: own.height, fwd: own.forward ?? 0, back: own.facing === 'back', legsOut: own.legs === 'out', pedals };
+  const recline = own.recline !== undefined ? (own.recline * Math.PI) / 180 : undefined;
+  return { h: own.height, fwd: own.forward ?? 0, back: own.facing === 'back', legsOut: own.legs === 'out', pedals, recline };
 }
 /** A seat (see `seatOf`): its height and the hips' forward offset (m, the object's frame), and how they sit. */
 interface Seat {
@@ -206,6 +208,8 @@ interface Seat {
   back?: boolean;
   /** Legs stretched out along the seat (a chaise). */
   legsOut?: boolean;
+  /** How far back (rad, from sitting up) the back leans just sitting, relaxing, napping or watching: against a slanted back (an Adirondack chair). Default: upright sitting, a little relaxing (`activityPose`). */
+  recline?: number;
   /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
   pedals?: { h: number; fwd: number; crank: number };
 }
@@ -2865,12 +2869,21 @@ export class Characters {
       if (seat?.pedals) this.pedal(rig, seat.pedals);
       else if (seat?.legsOut) this.legsOut(rig);
       switch (rig.tag) {
+        case 'sit':
+          // Just sitting: upright, but against a slanted back (`recline`).
+          if (seat?.recline !== undefined) this.recline(seat.recline);
+          break;
         case 'relax':
         case 'nap':
         case 'watch':
-          // Sinking back into the seat, legs stretched out a little (or all the way, `legsOut`), arms on the armrests.
-          addRotation(add, B.spine_01, 1, 0, 0, -0.14);
-          addRotation(add, B.Head, 1, 0, 0, 0.1);
+          // Sinking back into the seat (or against its slanted back, `recline`, split over the spine as `legsOut`
+          // does, the head kept looking ahead), legs stretched out a little (or all the way, `legsOut`), arms on
+          // the armrests.
+          if (seat?.recline !== undefined) this.recline(seat.recline);
+          else {
+            addRotation(add, B.spine_01, 1, 0, 0, -0.14);
+            addRotation(add, B.Head, 1, 0, 0, 0.1);
+          }
           if (!seat?.legsOut) {
             addRotation(add, B.calf_l, 1, 0, 0, -0.35);
             addRotation(add, B.calf_r, 1, 0, 0, -0.3);
@@ -3078,6 +3091,14 @@ export class Characters {
       // The foot stays about as level as in the clip, its toes dipping as the pedal goes down.
       addRotation(this.add, foot, 1, 0, 0, (-(turn[0] + turn[1]) * 0.75 + 0.15 * Math.sin(a)) * w);
     }
+  }
+
+  /** Leaning back by `angle` (rad) against a seat's slanted back (`Seat.recline`), split over the spine as `legsOut` does, the head tipped forward to keep looking ahead. */
+  private recline(angle: number): void {
+    const B = this.set!.bone;
+    addRotation(this.add, B.spine_01, 1, 0, 0, -0.71 * angle);
+    addRotation(this.add, B.spine_02, 1, 0, 0, -0.29 * angle);
+    addRotation(this.add, B.Head, 1, 0, 0, 0.64 * angle);
   }
 
   /**
