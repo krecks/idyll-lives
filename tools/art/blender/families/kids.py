@@ -279,7 +279,10 @@ def _turn_down(top, half, z_top, z_foot, drape, material):
     _still('bed')
     flap = _flap(top, half, z_top, z_fold, material)
     _place()
+    # As it turns it flattens and narrows to stay under the game's quilt (0.46 m from the bed's middle,
+    # never lower than 8.5 cm over the mattress), as the bedroom family's beds do (`bedroom.py` `_turn_down`).
     G.swing(flap, 'turn_down', 180, seconds=1.0, axis='X')
+    G.squash(flap, 'turn_down', (min(1.0, (0.46 - 0.08) / (half + 0.016)), 1, 0.4), seconds=1.0)
     return G.meshes()
 
 
