@@ -8,11 +8,15 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
 
 ## Shared
 
-- **Centred, at the renderer's mattress heights.** The game lays sleepers centred on the footprint (head about
+- **Mattresses centred, at the renderer's mattress heights.** The game lays sleepers centred on the footprint (head about
   0.84 m behind the middle, feet 0.86 m in front) at characters.ts `BEDS` (`BUNKS` for the bunk's two). Each
   mattress top is that height: `bed` 0.58, `bedSingle` 0.5, `bedBunk` 0.44 and 1.38, `bedFuton` 0.4, `bedKing`
   0.59. The oak double, the queen and the four-poster are 0.52 and the daybed 0.51, as their placeholders: they
   got `BEDS` entries with those tops. Headboard faces stay behind depth -0.87, so heads don't go into them.
+- **The head end stands on the wall's face** (depth -0.93): headboards, posts, rails and the canopy's head end
+  stop there, not the mattress, so the sleepers keep their places. Each bed's bounds therefore stand 1–2.5 cm
+  forward of the middle (the Model's `centre`, printed by `_settle`); the placeholders were cut back the same way
+  (`to_wall`, the posted beds' head ends moved forward).
 - **The duvet turns down (`turn_down`).** The game lays its own quilt over each sleeper on `BLANKET_BEDS` (now
   also `bedDouble`, `bedQueenUpholstered`, `bedCanopy`), so the bed's duvet isn't a second cover over them. It is
   two parts: the lower two thirds (`_duvet`, one bevelled box draped down the sides and the foot, still) and
@@ -31,21 +35,25 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
 
 | Model | Size (w × h × d) | Triangles | Draws | Clip | Note |
 |---|---|---|---|---|---|
-| `model.bed` | 1.90 × 1.13 × 1.90 m | 2,540 | 3 | `turn_down` | upholstered linen base, four-channel headboard, teak legs, sage runner |
-| `model.bedSingle` | 0.96 × 0.95 × 1.94 m | 2,776 | 3 | `turn_down` | oak posts, five-slat headboard, low footboard |
-| `model.bedBunk` | 0.96 × 1.90 × 1.92 m | 4,260 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1) | oak; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw |
-| `model.bedFuton` | 1.96 × 0.995 × 1.97 m | 3,112 | 3 | `unfold` (held open) | ash slatted platform, low headboard; the back leans up at rest |
-| `model.bedKing` | 1.98 × 1.40 × 1.94 m | 3,360 | 3 | `turn_down` | tall five-channel headboard with wings, sage runner |
-| `model.bedDouble` | 1.62 × 0.95 × 1.92 m | 2,964 | 3 | `turn_down` | oak frame, eight teak slats, blue duvet |
-| `model.bedQueenUpholstered` | 1.76 × 1.30 × 1.92 m | 2,876 | 3 | `turn_down` | stone upholstery, five rounded channels |
-| `model.bedCanopy` | 1.73 × 2.135 × 1.93 m | 4,960 | 3 | `turn_down` | walnut posts with finials, panelled headboard, linen valance and four tied curtains (still) |
-| `model.bedDaybed` | 0.96 × 0.84 × 1.96 m | 4,720 | 2 | — | white spindle back and arms, sage fitted cover, rose cushions (static) |
+| `model.bed` | 1.90 × 1.13 × 1.88 m | 2,540 | 3 | `turn_down` | upholstered linen base, four-channel headboard, teak legs, sage runner |
+| `model.bedSingle` | 0.96 × 0.95 × 1.90 m | 2,776 | 3 | `turn_down` | oak posts, five-slat headboard, low footboard |
+| `model.bedBunk` | 0.96 × 1.90 × 1.89 m | 4,260 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1) | oak; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw |
+| `model.bedFuton` | 1.96 × 0.995 × 1.91 m | 3,112 | 3 | `unfold` (held open) | ash slatted platform, low headboard; the back leans up at rest |
+| `model.bedKing` | 1.98 × 1.40 × 1.90 m | 3,360 | 3 | `turn_down` | tall five-channel headboard with wings, sage runner |
+| `model.bedDouble` | 1.62 × 0.95 × 1.89 m | 2,964 | 3 | `turn_down` | oak frame, eight teak slats, blue duvet |
+| `model.bedQueenUpholstered` | 1.76 × 1.30 × 1.89 m | 2,876 | 3 | `turn_down` | stone upholstery, five rounded channels |
+| `model.bedCanopy` | 1.73 × 2.135 × 1.90 m | 4,960 | 3 | `turn_down` | walnut posts with finials, panelled headboard, linen valance and four tied curtains (still) |
+| `model.bedDaybed` | 0.96 × 0.84 × 1.91 m | 4,720 | 2 | — | white spindle back and arms, sage fitted cover, rose cushions (static) |
 
 `check_glb.py`: 0 failed. The futon's placeholder (`catalog.py` `futon`) was the futon lying flat (0.66 m); it
 is the folded sofa now, as the model rests (2026-10-14). Khronos validator: 0 errors, 0 warnings each.
 
-The beds fill their 2-deep tiles (1.90–1.97 m long), so their headboards reach 1–5 cm past the wall face
-(−0.93), as their placeholders do; standing them on it would push their feet past the tiles. Kept.
+The beds fill their 2-deep tiles, and their headboards reached 1–5 cm past the wall face (−0.93), as their
+placeholders did; moving them forward would have pushed their feet past the tiles or their headboards onto the
+sleepers. Since 2026-10-15 the head ends are tucked instead (above): the padded headboards are 3.5–4 cm thick
+(were 5–6), the posted ones' head ends (single, bunk, oak double, four-poster, daybed, futon frame) stand
+2.5–5 cm further forward, the king's wings 3.7 cm. Mattresses, pillows and feet are where they were, but for the
+daybed's mattress and the futon's unfolded head end, which stop 3–5 cm sooner, at the new head end.
 
 ## The futon
 

@@ -4,8 +4,10 @@
 # (`model.bedCanopy`) and the daybed (`model.bedDaybed`), over their primitive-part placeholders
 # (`furniture.py`, `catalog.py`, `catalog2.py`), which stay the fallback. Notes: bedroom.md.
 #
-# Each bed is built centred on its footprint, its mattress top at the height the renderer lays sleepers
-# at (characters.ts `BEDS`; `BUNKS` for the bunk's two). The game lays its own quilt over each sleeper on
+# Each bed's mattress is centred on its footprint, its top at the height the renderer lays sleepers
+# at (characters.ts `BEDS`; `BUNKS` for the bunk's two). Its head end stands on the wall's face (depth
+# -0.93, `WALL`): headboards, posts and rails stop there, thinner or a few cm forward, so the bed's bounds
+# stand a little forward of the middle (the Model's `centre`). The game lays its own quilt over each sleeper on
 # the beds in `BLANKET_BEDS`, so a bed's duvet isn't a second cover over them: its top third (`duvet_flap`)
 # folds back over the rest toward the foot while a resident sleeps or naps (`turn_down`), and back up as
 # they get up. The futon is a sofa at rest whose back folds down flat into the bed (`unfold`), held open
@@ -66,13 +68,15 @@ F = G.GameFrame()
 DUVET = 0.05      # the duvet's top above the mattress top (the game's quilt starts 0.1 above it)
 FLAP = 0.045      # the flap's thickness: folded over, its top is 9.5 cm above the mattress
 SECONDS = 1.0     # the duvet turns down this fast, as the resident gets in
+WALL = -0.93      # the wall's face in a 2-deep footprint: the head end's back stands on it
 
 
 def _settle():
-    """Stands the bed on the floor and centres it; it was built centred, so this only checks it."""
+    """Stands the bed on the floor where it was built (its mattress centred, its head end on the wall's
+    face) and prints the centre of its bounds, the Model's `centre`."""
     lo, hi = G.measure()
-    assert abs(lo[0] + hi[0]) < 0.03 and abs(lo[1] + hi[1]) < 0.03, f'built {(lo[0] + hi[0]) / 2:.3f}, {(lo[1] + hi[1]) / 2:.3f} off centre'
-    G.settle()
+    print(f'[bedroom] centre (game x, depth) {-(lo[0] + hi[0]) / 2:.4f}, {-(lo[1] + hi[1]) / 2:.4f}')
+    G.settle(centre=False)
 
 
 def _pillow(name, w, h, d, x, top, z, tilt=8):
@@ -136,8 +140,8 @@ def bed():
     top = 0.58  # BEDS['bed']
     _legs_round((-0.84, 0.84), (-0.82, 0.88), 0.12, M.legs_teak)
     F.box('base', 1.82, 0.28, 1.83, (0, 0.26, 0.025), M.frame_linen, bevel=0.04, bevel_segments=3)
-    # headboard: a padded back with four channels
-    F.box('headboard', 1.9, 1.03, 0.055, (0, 0.615, -0.9225), M.headboard_linen, bevel=0.025, bevel_segments=3)
+    # headboard: a padded back with four channels, its back on the wall's face
+    F.box('headboard', 1.9, 1.03, 0.035, (0, 0.615, WALL + 0.0175), M.headboard_linen, bevel=0.015, bevel_segments=3)
     for i, x in enumerate((-0.66, -0.22, 0.22, 0.66)):
         F.box(f'channel{i}', 0.42, 0.74, 0.04, (x, 0.72, -0.89), M.headboard_linen, bevel=0.018, bevel_segments=3)
     F.box('mattress', 1.72, 0.2, 1.78, (0, top - 0.1, 0.03), M.mattress, bevel=0.04, bevel_segments=3)
@@ -154,18 +158,19 @@ def bed():
 
 def bedSingle():
     top = 0.5  # BEDS['bedSingle']
+    head = WALL + 0.03  # the head end's posts and boards, their backs on the wall's face
     for s in (-1, 1):
         x = s * 0.45
-        F.box(f'post_head{s}', 0.06, 0.95, 0.06, (x, 0.475, -0.94), M.frame_oak, bevel=0.008)
+        F.box(f'post_head{s}', 0.06, 0.95, 0.06, (x, 0.475, head), M.frame_oak, bevel=0.008)
         F.box(f'post_foot{s}', 0.06, 0.62, 0.06, (x, 0.31, 0.94), M.frame_oak, bevel=0.008)
         F.box(f'rail{s}', 0.04, 0.18, 1.82, (x, 0.25, 0), M.frame_oak, bevel=0.006)
-    F.box('rail_head', 0.84, 0.18, 0.04, (0, 0.25, -0.94), M.frame_oak, bevel=0.006)
+    F.box('rail_head', 0.84, 0.18, 0.04, (0, 0.25, head), M.frame_oak, bevel=0.006)
     F.box('rail_foot', 0.84, 0.18, 0.04, (0, 0.25, 0.94), M.frame_oak, bevel=0.006)
     # headboard: a top rail over five slats; a low footboard
-    F.box('head_top', 0.9, 0.08, 0.05, (0, 0.9, -0.94), M.headboard_oak, bevel=0.012)
-    F.box('head_low', 0.84, 0.05, 0.035, (0, 0.47, -0.94), M.headboard_oak, bevel=0.006)
+    F.box('head_top', 0.9, 0.08, 0.05, (0, 0.9, head), M.headboard_oak, bevel=0.012)
+    F.box('head_low', 0.84, 0.05, 0.035, (0, 0.47, head), M.headboard_oak, bevel=0.006)
     for i in range(5):
-        F.box(f'slat{i}', 0.08, 0.38, 0.022, (-0.28 + i * 0.14, 0.67, -0.94), M.headboard_oak, bevel=0.005)
+        F.box(f'slat{i}', 0.08, 0.38, 0.022, (-0.28 + i * 0.14, 0.67, head), M.headboard_oak, bevel=0.005)
     F.box('footboard', 0.84, 0.24, 0.03, (0, 0.47, 0.94), M.headboard_oak, bevel=0.008)
     F.box('foot_top', 0.9, 0.04, 0.05, (0, 0.6, 0.94), M.headboard_oak, bevel=0.01)
     F.box('mattress', 0.84, 0.18, 1.8, (0, top - 0.09, 0), M.mattress, bevel=0.035, bevel_segments=3)
@@ -178,6 +183,7 @@ def bedSingle():
 # ---------------------------------------------------------------- the bunk bed
 
 LOWER, UPPER = 0.44, 1.38  # characters.ts BUNKS['bedBunk']
+BUNK_ENDS = {-1: WALL + 0.03, 1: 0.93}  # the depths of the posts and end boards: the head end's backs on the wall's face
 
 
 def _bunk(name, top, guard):
@@ -185,9 +191,9 @@ def _bunk(name, top, guard):
     y = top - 0.16 - 0.06
     for s in (-1, 1):
         F.box(f'{name}_rail{s}', 0.04, 0.12, 1.8, (s * 0.45, y, 0), M.frame_oak, bevel=0.006)
-        F.box(f'{name}_end{s}', 0.86, 0.12, 0.04, (0, y, s * 0.93), M.frame_oak, bevel=0.006)
+        F.box(f'{name}_end{s}', 0.86, 0.12, 0.04, (0, y, BUNK_ENDS[s]), M.frame_oak, bevel=0.006)
         h = 0.36 if guard else 0.3
-        F.box(f'{name}_board{s}', 0.84, h, 0.025, (0, top - 0.13 + h / 2, s * 0.93), M.headboard_oak, bevel=0.006)
+        F.box(f'{name}_board{s}', 0.84, h, 0.025, (0, top - 0.13 + h / 2, BUNK_ENDS[s]), M.headboard_oak, bevel=0.006)
     F.box(f'{name}_mattress', 0.84, 0.16, 1.8, (0, top - 0.08, 0), M.mattress, bevel=0.03, bevel_segments=3)
     _pillow(f'{name}_pillow', 0.56, 0.11, 0.3, 0, top, -0.71)
     if guard:
@@ -199,7 +205,7 @@ def _bunk(name, top, guard):
 def bedBunk():
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'post{sx}{sz}', 0.06, 1.9, 0.06, (sx * 0.45, 0.95, sz * 0.93), M.frame_oak, bevel=0.008)
+            F.box(f'post{sx}{sz}', 0.06, 1.9, 0.06, (sx * 0.45, 0.95, BUNK_ENDS[sz]), M.frame_oak, bevel=0.008)
     _bunk('lower', LOWER, False)
     _bunk('upper', UPPER, True)
     # the ladder on the right, at the foot end: two rails and four rungs
@@ -231,13 +237,14 @@ def bedFuton():
     top = FUTON_TOP
     # a low ash platform: a frame round slats, on a recessed plinth
     F.box('plinth', 1.8, 0.04, 1.8, (0, 0.02, 0), M.frame_ash)
+    # the frame's head end stands on the wall's face
     for s in (-1, 1):
-        F.box(f'side{s}', 0.06, 0.16, 1.96, (s * 0.95, 0.12, 0), M.frame_ash, bevel=0.008)
-        F.box(f'end{s}', 1.84, 0.16, 0.06, (0, 0.12, s * 0.95), M.frame_ash, bevel=0.008)
+        F.box(f'side{s}', 0.06, 0.16, 0.98 - WALL, (s * 0.95, 0.12, (WALL + 0.98) / 2), M.frame_ash, bevel=0.008)
+        F.box(f'end{s}', 1.84, 0.16, 0.06, (0, 0.12, 0.95 if s > 0 else WALL + 0.03), M.frame_ash, bevel=0.008)
     for i in range(14):
         F.box(f'slat{i}', 1.84, 0.025, 0.08, (0, 0.1875, -0.86 + i * 0.132), M.frame_ash, bevel=0.004)
-    F.box('headboard', 1.96, 0.46, 0.04, (0, 0.43, -0.96), M.headboard_ash, bevel=0.01)
-    F.box('headboard_cap', 1.96, 0.035, 0.07, (0, 0.665, -0.955), M.headboard_ash, bevel=0.01)
+    F.box('headboard', 1.96, 0.46, 0.04, (0, 0.43, WALL + 0.02), M.headboard_ash, bevel=0.01)
+    F.box('headboard_cap', 1.96, 0.035, 0.05, (0, 0.665, WALL + 0.025), M.headboard_ash, bevel=0.01)
     # the seat: the front of the futon
     F.box('seat', 1.86, top - 0.2, 0.93 - FUTON_HINGE, (0, (top + 0.2) / 2, (FUTON_HINGE + 0.93) / 2), M.bedding_futon,
           bevel=0.06, bevel_segments=3)
@@ -245,7 +252,7 @@ def bedFuton():
     G.join(G.meshes(), 'futon', origin=(0, 0, 0))
     # the back, built flat (the bed's head end) with the pillows on it, hinged on the seat's back edge
     with G.new_parts() as parts:
-        z0 = -0.92
+        z0 = WALL + 0.04  # in front of the headboard
         F.box('back', 1.86, top - 0.2, FUTON_HINGE - z0 - 0.01, (0, (top + 0.2) / 2, (z0 + FUTON_HINGE - 0.01) / 2),
               M.bedding_futon, bevel=0.06, bevel_segments=3)
         for s in (-1, 1):
@@ -264,12 +271,12 @@ def bedKing():
     _legs_square((-0.9, 0.9), (-0.8, 0.9), 0.1, M.legs_teak, w=0.055)
     F.box('base', 1.96, 0.3, 1.82, (0, 0.25, 0.06), M.frame_linen, bevel=0.05, bevel_segments=3)
     # a tall padded headboard with five channels
-    F.box('headboard', 1.98, 1.36, 0.06, (0, 0.72, -0.94), M.headboard_linen, bevel=0.03, bevel_segments=3)
+    F.box('headboard', 1.98, 1.36, 0.04, (0, 0.72, WALL + 0.02), M.headboard_linen, bevel=0.018, bevel_segments=3)
     for i in range(5):
         F.box(f'channel{i}', 0.37, 0.88, 0.04, (-0.74 + i * 0.37, 0.89, -0.89), M.headboard_linen, bevel=0.018, bevel_segments=3)
-    # wings each side, turned in a little round the pillows
+    # wings each side, turned in a little round the pillows, their backs on the wall's face
     for s in (-1, 1):
-        F.box(f'wing{s}', 0.08, 1.3, 0.2, (s * 0.935, 0.69, -0.86), M.headboard_linen, rot=(0, 0, s * 14),
+        F.box(f'wing{s}', 0.08, 1.3, 0.2, (s * 0.935, 0.69, -0.823), M.headboard_linen, rot=(0, 0, s * 14),
               bevel=0.035, bevel_segments=3)
     F.box('mattress', 1.86, 0.22, 1.8, (0, top - 0.11, 0.04), M.mattress, bevel=0.045, bevel_segments=3)
     for s in (-1, 1):
@@ -289,13 +296,14 @@ def bedDouble():
     top = DOUBLE_TOP
     _legs_square((-0.75, 0.75), (-0.84, 0.9), 0.1, M.frame_oak)
     F.box('frame', 1.62, 0.22, 1.84, (0, 0.21, 0.04), M.frame_oak, bevel=0.012)
-    # headboard: oak posts and rails round teak slats
+    # headboard: oak posts and rails round teak slats, their backs on the wall's face
+    head = WALL + 0.035
     for s in (-1, 1):
-        F.box(f'post{s}', 0.07, 0.95, 0.07, (s * 0.775, 0.475, -0.92), M.frame_oak, bevel=0.01)
-    F.box('head_top', 1.62, 0.08, 0.07, (0, 0.91, -0.92), M.frame_oak, bevel=0.012)
-    F.box('head_low', 1.48, 0.06, 0.05, (0, 0.35, -0.92), M.frame_oak, bevel=0.008)
+        F.box(f'post{s}', 0.07, 0.95, 0.07, (s * 0.775, 0.475, head), M.frame_oak, bevel=0.01)
+    F.box('head_top', 1.62, 0.08, 0.07, (0, 0.91, head), M.frame_oak, bevel=0.012)
+    F.box('head_low', 1.48, 0.06, 0.05, (0, 0.35, head), M.frame_oak, bevel=0.008)
     for i in range(8):
-        F.box(f'slat{i}', 0.1, 0.5, 0.025, (-0.69 + i * 0.197, 0.62, -0.92), M.headboard_teak, bevel=0.006)
+        F.box(f'slat{i}', 0.1, 0.5, 0.025, (-0.69 + i * 0.197, 0.62, head), M.headboard_teak, bevel=0.006)
     F.box('mattress', 1.56, 0.2, 1.79, (0, top - 0.1, 0.025), M.mattress, bevel=0.04, bevel_segments=3)
     for s in (-1, 1):
         _pillow(f'pillow{s}', 0.69, 0.14, 0.34, s * 0.405, top, -0.68)
@@ -311,7 +319,7 @@ def bedQueenUpholstered():
     _legs_square((-0.8, 0.8), (-0.84, 0.9), 0.08, M.legs_teak, w=0.05)
     F.box('base', 1.72, 0.24, 1.82, (0, 0.2, 0.05), M.frame_stone, bevel=0.03, bevel_segments=3)
     # a tall headboard of five rounded channels
-    F.box('headboard', 1.72, 1.28, 0.05, (0, 0.66, -0.935), M.headboard_stone, bevel=0.022, bevel_segments=3)
+    F.box('headboard', 1.72, 1.28, 0.04, (0, 0.66, WALL + 0.02), M.headboard_stone, bevel=0.018, bevel_segments=3)
     for i in range(5):
         F.box(f'channel{i}', 0.3, 0.86, 0.045, (-0.64 + i * 0.32, 0.85, -0.8925), M.headboard_stone, bevel=0.02, bevel_segments=3)
     F.box('mattress', 1.66, 0.2, 1.78, (0, top - 0.1, 0.03), M.mattress, bevel=0.04, bevel_segments=3)
@@ -335,24 +343,26 @@ def _drape(name, x, z, inward):
 
 def bedCanopy():
     top = DOUBLE_TOP
+    # the posts' depths: the head end's feet, crest and valance stand on the wall's face
+    posts = {-1: WALL + 0.045, 1: 0.92}
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'post{sx}{sz}', 0.07, 2.11, 0.07, (sx * 0.82, 1.055, sz * 0.92), M.frame_walnut, bevel=0.01)
-            F.box(f'foot{sx}{sz}', 0.09, 0.12, 0.09, (sx * 0.82, 0.06, sz * 0.92), M.frame_walnut, bevel=0.012)
-            F.box(f'finial{sx}{sz}', 0.05, 0.05, 0.05, (sx * 0.82, 2.11, sz * 0.92), M.frame_walnut, bevel=0.02, bevel_segments=3)
+            F.box(f'post{sx}{sz}', 0.07, 2.11, 0.07, (sx * 0.82, 1.055, posts[sz]), M.frame_walnut, bevel=0.01)
+            F.box(f'foot{sx}{sz}', 0.09, 0.12, 0.09, (sx * 0.82, 0.06, posts[sz]), M.frame_walnut, bevel=0.012)
+            F.box(f'finial{sx}{sz}', 0.05, 0.05, 0.05, (sx * 0.82, 2.11, posts[sz]), M.frame_walnut, bevel=0.02, bevel_segments=3)
         F.box(f'rail_top{sx}', 0.06, 0.06, 1.77, (sx * 0.82, 2.06, 0), M.frame_walnut, bevel=0.008)
-        F.box(f'rail_end{sx}', 1.57, 0.06, 0.06, (0, 2.06, sx * 0.92), M.frame_walnut, bevel=0.008)
+        F.box(f'rail_end{sx}', 1.57, 0.06, 0.06, (0, 2.06, posts[sx]), M.frame_walnut, bevel=0.008)
     F.box('frame', 1.6, 0.22, 1.78, (0, 0.21, 0), M.frame_walnut, bevel=0.012)
     # a panelled headboard under a crest rail
-    F.box('headboard', 1.57, 0.6, 0.04, (0, 0.68, -0.92), M.headboard_walnut, bevel=0.008)
-    F.box('crest', 1.64, 0.07, 0.07, (0, 1.0, -0.92), M.headboard_walnut, bevel=0.012)
+    F.box('headboard', 1.57, 0.6, 0.04, (0, 0.68, WALL + 0.02), M.headboard_walnut, bevel=0.008)
+    F.box('crest', 1.64, 0.07, 0.07, (0, 1.0, WALL + 0.035), M.headboard_walnut, bevel=0.012)
     for i, x in enumerate((-0.52, 0, 0.52)):
-        F.box(f'panel{i}', 0.42, 0.4, 0.016, (x, 0.7, -0.897), M.headboard_walnut, bevel=0.006)
+        F.box(f'panel{i}', 0.42, 0.4, 0.016, (x, 0.7, WALL + 0.043), M.headboard_walnut, bevel=0.006)
     # the canopy: a linen valance round the open top (sleepers stay in view from above), a curtain
     # gathered at each post
     for s in (-1, 1):
         F.box(f'valance_side{s}', 0.012, 0.2, 1.77, (s * 0.85, 1.99, 0), M.canopy, bevel=0.004)
-        F.box(f'valance_end{s}', 1.57, 0.2, 0.012, (0, 1.99, s * 0.95), M.canopy, bevel=0.004)
+        F.box(f'valance_end{s}', 1.57, 0.2, 0.012, (0, 1.99, 0.95 if s > 0 else WALL + 0.006), M.canopy, bevel=0.004)
     for sx in (-1, 1):
         for sz in (-1, 1):
             _drape(f'drape{sx}{sz}', sx * 0.83, sz * 0.8, -sz)
@@ -371,28 +381,32 @@ DAYBED_TOP = 0.51  # its placeholder's mattress top (characters.ts BEDS['bedDayb
 
 def bedDaybed():
     top = DAYBED_TOP
+    # the ends' depths: the head end's posts and arm stand on the wall's face, the base and the mattress
+    # between the arms
+    ends = {-1: WALL + 0.03, 1: 0.95}
+    z0, z1 = ends[-1] + 0.03, 0.92
     # four posts, the back's taller; a base between them
     for sx in (-1, 1):
         h = 0.84 if sx < 0 else 0.74
         for sz in (-1, 1):
-            F.box(f'post{sx}{sz}', 0.06, h, 0.06, (sx * 0.45, h / 2, sz * 0.95), M.frame_white, bevel=0.008)
-    F.box('base', 0.9, 0.23, 1.84, (0, 0.215, 0), M.frame_white, bevel=0.012)
+            F.box(f'post{sx}{sz}', 0.06, h, 0.06, (sx * 0.45, h / 2, ends[sz]), M.frame_white, bevel=0.008)
+    F.box('base', 0.9, 0.23, z1 - z0, (0, 0.215, (z0 + z1) / 2), M.frame_white, bevel=0.012)
     # the back along the left side: a top rail over spindles (the headboard)
-    F.box('back_rail', 0.06, 0.05, 1.86, (-0.45, 0.805, 0), M.back_white, bevel=0.01)
+    F.box('back_rail', 0.06, 0.05, 0.93 - ends[-1], (-0.45, 0.805, (ends[-1] + 0.93) / 2), M.back_white, bevel=0.01)
     for i in range(15):
         F.box(f'back_spindle{i}', 0.03, 0.47, 0.03, (-0.45, 0.565, -0.84 + i * 0.12), M.back_white, bevel=0.004)
     # an arm at each end, the same
     for s in (-1, 1):
-        F.box(f'arm_rail{s}', 0.86, 0.05, 0.06, (0, 0.705, s * 0.95), M.frame_white, bevel=0.01)
-        F.box(f'arm_low{s}', 0.86, 0.06, 0.05, (0, 0.3, s * 0.95), M.frame_white, bevel=0.006)
+        F.box(f'arm_rail{s}', 0.86, 0.05, 0.06, (0, 0.705, ends[s]), M.frame_white, bevel=0.01)
+        F.box(f'arm_low{s}', 0.86, 0.06, 0.05, (0, 0.3, ends[s]), M.frame_white, bevel=0.006)
         for i in range(5):
-            F.box(f'arm_spindle{s}{i}', 0.03, 0.37, 0.03, (-0.3 + i * 0.15, 0.495, s * 0.95), M.frame_white, bevel=0.004)
+            F.box(f'arm_spindle{s}{i}', 0.03, 0.37, 0.03, (-0.3 + i * 0.15, 0.495, ends[s]), M.frame_white, bevel=0.004)
     # the mattress in a fitted cover (the bedding), two back cushions clear of a sleeper, a pillow
-    F.box('mattress', 0.86, top - 0.33, 1.84, (0.02, (top + 0.33) / 2, 0), M.bedding_sage, bevel=0.035, bevel_segments=3)
+    F.box('mattress', 0.86, top - 0.33, z1 - z0, (0.02, (top + 0.33) / 2, (z0 + z1) / 2), M.bedding_sage, bevel=0.035, bevel_segments=3)
     for i, z in enumerate((-0.32, 0.3)):
         F.box(f'cushion{i}', 0.14, 0.34, 0.56, (-0.36, top + 0.16, z), M.cushion_rose, rot=(0, -12, 0),
               bevel=0.05, bevel_segments=3)
-    _pillow('pillow', 0.56, 0.13, 0.3, 0.06, top, -0.74)
+    _pillow('pillow', 0.56, 0.13, 0.3, 0.06, top, -0.72)
     G.join_all('bedDaybed')
     _settle()
 
@@ -411,25 +425,25 @@ BUNK_TURN_DOWN = {'uses': {'sleep': BUNKS, 'nap': BUNKS}}
 
 FAMILY = G.Family(
     'bedroom', M,
-    [G.Model('bed', bed, size=(1.9, 1.13, 1.9), key='model.bed', motions=TURN_DOWN,
+    [G.Model('bed', bed, size=(1.9, 1.13, 1.878), key='model.bed', centre=(0.0, 0.009), motions=TURN_DOWN,
              paint=_paint('frame_linen', 'headboard_linen', 'bedding_cream')),
-     G.Model('bedSingle', bedSingle, size=(0.96, 0.95, 1.94), key='model.bedSingle', motions=TURN_DOWN,
+     G.Model('bedSingle', bedSingle, size=(0.96, 0.95, 1.9), key='model.bedSingle', centre=(0.0, 0.02), motions=TURN_DOWN,
              paint=_paint('frame_oak', 'headboard_oak', 'bedding_sage')),
-     G.Model('bedBunk', bedBunk, size=(0.96, 1.9, 1.92), key='model.bedBunk', motions=BUNK_TURN_DOWN,
+     G.Model('bedBunk', bedBunk, size=(0.96, 1.9, 1.89), key='model.bedBunk', centre=(0.0, 0.015), motions=BUNK_TURN_DOWN,
              paint=_paint('frame_oak', 'headboard_oak', 'bedding_teal')),
      # Down while the futon is open (the sim's `open`), from the moment a use that opens it starts.
-     G.Model('bedFuton', bedFuton, size=(1.96, 0.995, 1.96), key='model.bedFuton',
+     G.Model('bedFuton', bedFuton, size=(1.96, 0.995, 1.91), key='model.bedFuton', centre=(0.0, 0.025),
              motions={'uses': {'sleep': 'unfold', 'nap': 'unfold', 'unfold': 'unfold'}, 'open': 'unfold'},
              paint=_paint('frame_ash', 'headboard_ash', 'bedding_futon')),
-     G.Model('bedKing', bedKing, size=(1.98, 1.4, 1.94), key='model.bedKing', motions=TURN_DOWN,
+     G.Model('bedKing', bedKing, size=(1.98, 1.4, 1.9), key='model.bedKing', centre=(0.0, 0.02), motions=TURN_DOWN,
              paint=_paint('frame_linen', 'headboard_linen', 'bedding_cream')),
-     G.Model('bedDouble', bedDouble, size=(1.62, 0.95, 1.92), key='model.bedDouble', motions=TURN_DOWN,
+     G.Model('bedDouble', bedDouble, size=(1.62, 0.95, 1.888), key='model.bedDouble', centre=(0.0, 0.014), motions=TURN_DOWN,
              paint=_paint('frame_oak', 'headboard_teak', 'bedding_blue')),
-     G.Model('bedQueenUpholstered', bedQueenUpholstered, size=(1.76, 1.3, 1.92), key='model.bedQueenUpholstered',
+     G.Model('bedQueenUpholstered', bedQueenUpholstered, size=(1.76, 1.3, 1.89), key='model.bedQueenUpholstered', centre=(0.0, 0.015),
              motions=TURN_DOWN, paint=_paint('frame_stone', 'headboard_stone', 'bedding_oat')),
-     G.Model('bedCanopy', bedCanopy, size=(1.73, 2.135, 1.93), key='model.bedCanopy', motions=TURN_DOWN,
+     G.Model('bedCanopy', bedCanopy, size=(1.73, 2.135, 1.895), key='model.bedCanopy', centre=(0.0, 0.0175), motions=TURN_DOWN,
              paint=_paint('frame_walnut', 'headboard_walnut', 'bedding_rust')),
-     G.Model('bedDaybed', bedDaybed, size=(0.96, 0.84, 1.96), key='model.bedDaybed',
+     G.Model('bedDaybed', bedDaybed, size=(0.96, 0.84, 1.91), key='model.bedDaybed', centre=(0.0, 0.025),
              paint=_paint('frame_white', 'back_white', 'bedding_sage'))],
     comment='Blender-built bedroom models (tools/art/blender/families/bedroom.py). Replaces the primitive-part '
             'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
