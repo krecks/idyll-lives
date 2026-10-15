@@ -66,7 +66,7 @@ tag covers both the `wash` and `washUp` interactions).
 
 | Model | Size (w × h × d) | Triangles | Draws | Note |
 |---|---|---|---|---|
-| `model.farmhouseSink` | 1.000 × 1.263 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
+| `model.farmhouseSink` | 1.000 × 1.253 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
 | `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
 Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings).

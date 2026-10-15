@@ -247,9 +247,9 @@ def cooktopCounter():
         F.box('plinth', 0.96, 0.10, 0.64, (0, 0.05, -0.14), M.dark, bevel=0.005)
         F.box('carcass', 1.0, 0.80, 0.70, (0, 0.50, -0.11), M.cab, bevel=0.012)
         F.box('worktop', 1.0, 0.05, 0.79, (0, 0.925, -0.085), M.worktop, bevel=0.008)
-        F.box('hob', 0.62, 0.012, 0.50, (0, 0.956, -0.10), M.hob, bevel=0.004)
+        F.box('hob', 0.62, 0.012, 0.50, (0, 0.948, -0.10), M.hob, bevel=0.004)     # 4 mm proud: a pan stands on it
         for i, (x, z) in enumerate(((-0.16, -0.24), (0.16, -0.24), (-0.16, 0.03), (0.16, 0.03))):
-            _hob_ring(F, f'ring{i}', x, z, 0.958)
+            _hob_ring(F, f'ring{i}', x, z, 0.95)
         for i, x in enumerate((-0.14, 0.14), start=1):
             _knob(F, f'knob{i}', x, 0.84, 0.252)
         for i, y in enumerate((0.28, 0.52, 0.76)):
@@ -257,7 +257,7 @@ def cooktopCounter():
             F.box(f'pull{i}', 0.30, 0.02, 0.02, (0, y + 0.07, 0.27), M.chrome, bevel=0.004)
     G.join(still, 'body', origin=(0, 0, 0))
     knob = _knob_obj(F, 'knob0', -0.42, 0.84, 0.252)
-    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9625, -0.24, 0.066)
+    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9545, -0.24, 0.066)
     G.settle()
     G.swing(knob, 'burner_on', 90, seconds=0.5, axis='Y')
     _light(flame)
@@ -269,34 +269,34 @@ def microwave():
     with G.new_parts() as still:
         F.box('plinth', 0.96, 0.10, 0.58, (0, 0.05, -0.15), M.dark, bevel=0.005)
         F.box('carcass', 1.0, 0.82, 0.62, (0, 0.51, -0.16), M.cab, bevel=0.012)
-        F.box('worktop', 1.0, 0.04, 0.66, (0, 0.94, -0.15), M.worktop, bevel=0.008)
+        F.box('worktop', 1.0, 0.04, 0.66, (0, 0.93, -0.15), M.worktop, bevel=0.008)
         F.box('door_front', 0.60, 0.52, 0.02, (0, 0.40, 0.16), M.cab, bevel=0.008)
         F.box('pull', 0.30, 0.02, 0.02, (0, 0.62, 0.18), M.chrome, bevel=0.004)
         # the microwave: a box on the worktop, seen from the front its door on the left and the controls
         # on the right (the game's -x is the viewer's right): a hollow body, the turntable inside
-        F.box('micro_floor', 0.50, 0.02, 0.36, (-0.20, 0.97, -0.28), M.charcoal, bevel=0.004)
-        F.box('micro_top', 0.50, 0.02, 0.36, (-0.20, 1.25, -0.28), M.charcoal, bevel=0.004)
-        F.box('micro_back', 0.50, 0.30, 0.02, (-0.20, 1.11, -0.45), M.charcoal, bevel=0.004)
-        F.box('micro_side', 0.02, 0.30, 0.36, (0.04, 1.11, -0.28), M.charcoal, bevel=0.004)
-        F.box('micro_column', 0.12, 0.30, 0.36, (-0.39, 1.11, -0.28), M.charcoal, bevel=0.004)
-        F.box('micro_face', 0.12, 0.28, 0.02, (-0.38, 1.11, -0.09), M.dark, bevel=0.004)
-        F.box('micro_screen', 0.08, 0.06, 0.006, (-0.38, 1.20, -0.078), M.display, bevel=0.002)
+        F.box('micro_floor', 0.50, 0.02, 0.36, (-0.20, 0.96, -0.28), M.charcoal, bevel=0.004)
+        F.box('micro_top', 0.50, 0.02, 0.36, (-0.20, 1.24, -0.28), M.charcoal, bevel=0.004)
+        F.box('micro_back', 0.50, 0.30, 0.02, (-0.20, 1.1, -0.45), M.charcoal, bevel=0.004)
+        F.box('micro_side', 0.02, 0.30, 0.36, (0.04, 1.1, -0.28), M.charcoal, bevel=0.004)
+        F.box('micro_column', 0.12, 0.30, 0.36, (-0.39, 1.1, -0.28), M.charcoal, bevel=0.004)
+        F.box('micro_face', 0.12, 0.28, 0.02, (-0.38, 1.1, -0.09), M.dark, bevel=0.004)
+        F.box('micro_screen', 0.08, 0.06, 0.006, (-0.38, 1.19, -0.078), M.display, bevel=0.002)
         for i, y in enumerate((1.05, 0.99)):
             F.box(f'button{i}', 0.05, 0.02, 0.006, (-0.38, y, -0.078), M.chrome, bevel=0.002)
-        F.cyl('micro_foot', 0.012, 0.02, (-0.05, 0.97, -0.10), M.dark, verts=8)
-        F.cyl('micro_foot2', 0.012, 0.02, (-0.35, 0.97, -0.10), M.dark, verts=8)
+        F.cyl('micro_foot', 0.012, 0.02, (-0.05, 0.96, -0.10), M.dark, verts=8)
+        F.cyl('micro_foot2', 0.012, 0.02, (-0.35, 0.96, -0.10), M.dark, verts=8)
     G.join(still, 'body', origin=(0, 0, 0))
     # the door, hinged on its left edge (seen from the front), the grip by the controls
     with G.new_parts() as parts:
-        F.box('micro_door', 0.38, 0.28, 0.02, (-0.14, 1.11, -0.09), M.charcoal, bevel=0.006)
-        F.box('micro_window', 0.28, 0.20, 0.008, (-0.14, 1.12, -0.08), M.glass, bevel=0.004)
-        F.box('micro_grip', 0.02, 0.20, 0.02, (-0.31, 1.11, -0.07), M.chrome, bevel=0.004)
-    door = G.hinged(G.join(parts, 'micro_door'), F.at(0.05, 1.11, -0.09))
+        F.box('micro_door', 0.38, 0.28, 0.02, (-0.14, 1.1, -0.09), M.charcoal, bevel=0.006)
+        F.box('micro_window', 0.28, 0.20, 0.008, (-0.14, 1.11, -0.08), M.glass, bevel=0.004)
+        F.box('micro_grip', 0.02, 0.20, 0.02, (-0.31, 1.1, -0.07), M.chrome, bevel=0.004)
+    door = G.hinged(G.join(parts, 'micro_door'), F.at(0.05, 1.1, -0.09))
     # the glass turntable inside, with a mark so its turn shows
     with G.new_parts() as parts:
-        F.cyl('turntable', 0.13, 0.012, (-0.14, 0.988, -0.27), M.plate, verts=20)
-        F.box('turntable_mark', 0.03, 0.006, 0.03, (-0.22, 0.996, -0.27), M.dark, bevel=0.002)
-    turn = G.join(parts, 'turntable', origin=F.at(-0.14, 0.988, -0.27))
+        F.cyl('turntable', 0.13, 0.012, (-0.14, 0.978, -0.27), M.plate, verts=20)
+        F.box('turntable_mark', 0.03, 0.006, 0.03, (-0.22, 0.986, -0.27), M.dark, bevel=0.002)
+    turn = G.join(parts, 'turntable', origin=F.at(-0.14, 0.978, -0.27))
     G.settle()
     G.swing(door, 'door_open', -100, seconds=1.0, axis='Z')
     G.spin(turn, 'turntable', turns=1, seconds=2.0)
@@ -305,12 +305,12 @@ def microwave():
 # --- small appliances: a coffee machine, a breakfast counter and two dishwashers ---------------------
 
 def _counter(F, w=1.0, body=None, top=None):
-    """A base unit like the placeholder's `k_base`: a plinth, a carcass and a worktop to 0.96, with a
+    """A base unit like the placeholder's `k_base`: a plinth, a carcass and a worktop to 0.95, with a
     drawer over two doors on the front (the front face at depth 0.14)."""
     body, top = body or M.cab, top or M.worktop
     F.box('plinth', w - 0.04, 0.10, 0.56, (0, 0.05, -0.18), M.dark, bevel=0.005)
     F.box('carcass', w - 0.004, 0.82, 0.60, (0, 0.51, -0.16), body, bevel=0.01)
-    F.box('worktop', w, 0.04, 0.66, (0, 0.94, -0.15), top, bevel=0.006)
+    F.box('worktop', w, 0.04, 0.66, (0, 0.93, -0.15), top, bevel=0.006)
     F.box('drawer', w - 0.10, 0.14, 0.02, (0, 0.85, 0.155), body, bevel=0.006)
     F.box('drawer_pull', 0.18, 0.02, 0.02, (0, 0.85, 0.175), M.chrome, bevel=0.004)
     for s in (-1, 1):
@@ -335,20 +335,20 @@ def coffeeMachine():
     with G.new_parts() as still:
         _counter(F)
         # the machine: a body, a warming top, a group head, a drip tray, a gauge and a bean hopper
-        F.box('machine', 0.34, 0.30, 0.32, (-0.14, 1.11, -0.26), M.charcoal, bevel=0.03)
-        F.box('warming', 0.34, 0.03, 0.32, (-0.14, 1.275, -0.26), M.steel, bevel=0.008)
-        F.cyl('group', 0.04, 0.06, (-0.14, 1.19, -0.11), M.steel, verts=14)
-        F.box('spout', 0.022, 0.022, 0.022, (-0.14, 1.155, -0.11), M.steel, bevel=0.004)
-        F.box('drip', 0.30, 0.02, 0.26, (-0.14, 0.965, -0.10), M.steel, bevel=0.004)
-        F.cyl('gauge', 0.03, 0.012, (-0.06, 1.20, -0.096), M.steel, rot=(90, 0, 0), verts=14)
-        F.cone('hopper', 0.055, 0.045, 0.12, (-0.06, 1.35, -0.30), M.bean, verts=14)
+        F.box('machine', 0.34, 0.30, 0.32, (-0.14, 1.1, -0.26), M.charcoal, bevel=0.03)
+        F.box('warming', 0.34, 0.03, 0.32, (-0.14, 1.265, -0.26), M.steel, bevel=0.008)
+        F.cyl('group', 0.04, 0.06, (-0.14, 1.18, -0.11), M.steel, verts=14)
+        F.box('spout', 0.022, 0.022, 0.022, (-0.14, 1.145, -0.11), M.steel, bevel=0.004)
+        F.box('drip', 0.30, 0.02, 0.26, (-0.14, 0.955, -0.10), M.steel, bevel=0.004)
+        F.cyl('gauge', 0.03, 0.012, (-0.06, 1.19, -0.096), M.steel, rot=(90, 0, 0), verts=14)
+        F.cone('hopper', 0.055, 0.045, 0.12, (-0.06, 1.34, -0.30), M.bean, verts=14)
     G.join(still, 'body', origin=(0, 0, 0))
     # the cup, on the drip tray's front edge, sliding back under the spout for `brew`
     with G.new_parts() as parts:
-        F.cyl('cup', 0.035, 0.05, (-0.14, 1.0, 0.0), M.cup, verts=14)
-        F.box('cup_handle', 0.012, 0.03, 0.02, (-0.095, 1.005, 0.0), M.cup, bevel=0.004)
-    cup = G.join(parts, 'cup', origin=F.at(-0.14, 0.975, 0.0))
-    stream = _stream(F, 'stream', -0.14, 1.144, -0.11, 1.0, M.coffee, r=0.012)
+        F.cyl('cup', 0.035, 0.05, (-0.14, 0.99, 0.0), M.cup, verts=14)
+        F.box('cup_handle', 0.012, 0.03, 0.02, (-0.095, 0.995, 0.0), M.cup, bevel=0.004)
+    cup = G.join(parts, 'cup', origin=F.at(-0.14, 0.965, 0.0))
+    stream = _stream(F, 'stream', -0.14, 1.134, -0.11, 0.99, M.coffee, r=0.012)
     G.settle()
     G.slide(cup, 'brew', (0, 0.11, 0), seconds=0.6)
     G.grow(stream, 'brew', seconds=0.4)
@@ -360,30 +360,30 @@ def breakfastCounter():
     with G.new_parts() as still:
         _counter(F)
         # the toaster
-        F.box('toaster', 0.28, 0.18, 0.16, (0.30, 1.05, -0.30), M.toaster, bevel=0.05)
+        F.box('toaster', 0.28, 0.18, 0.16, (0.30, 1.04, -0.30), M.toaster, bevel=0.05)
         for s in (-1, 1):
-            F.box(f'slot{s}', 0.10, 0.012, 0.03, (0.30, 1.137, -0.30 + s * 0.035), M.dark, bevel=0.004)
+            F.box(f'slot{s}', 0.10, 0.012, 0.03, (0.30, 1.127, -0.30 + s * 0.035), M.dark, bevel=0.004)
         # the blender: a base, a jug and a fruit bowl beside them
-        F.box('blender', 0.16, 0.12, 0.16, (0.0, 1.02, -0.32), M.charcoal, bevel=0.03)
-        F.cone('jug', 0.06, 0.075, 0.26, (0.0, 1.21, -0.32), M.jug, verts=16)
-        F.cyl('bowl', 0.13, 0.06, (-0.28, 0.99, 0.05), M.jug, verts=16)
-        F.sphere('fruit1', 0.04, (-0.30, 1.04, 0.02), M.fruit, segments=10, rings=8)
-        F.sphere('fruit2', 0.038, (-0.24, 1.04, 0.08), M.toaster, segments=10, rings=8)
+        F.box('blender', 0.16, 0.12, 0.16, (0.0, 1.01, -0.32), M.charcoal, bevel=0.03)
+        F.cone('jug', 0.06, 0.075, 0.26, (0.0, 1.2, -0.32), M.jug, verts=16)
+        F.cyl('bowl', 0.13, 0.06, (-0.28, 0.98, 0.05), M.jug, verts=16)
+        F.sphere('fruit1', 0.04, (-0.30, 1.03, 0.02), M.fruit, segments=10, rings=8)
+        F.sphere('fruit2', 0.038, (-0.24, 1.03, 0.08), M.toaster, segments=10, rings=8)
     G.join(still, 'body', origin=(0, 0, 0))
     # the toaster's lever and its toast, standing up at rest: both go down for toast, and coming back
     # when the use ends pops the toast up
     with G.new_parts() as parts:
-        F.box('lever', 0.02, 0.03, 0.03, (0.45, 1.06, -0.30), M.dark, bevel=0.006)
-    lever = G.join(parts, 'lever', origin=F.at(0.45, 1.06, -0.30))
+        F.box('lever', 0.02, 0.03, 0.03, (0.45, 1.05, -0.30), M.dark, bevel=0.006)
+    lever = G.join(parts, 'lever', origin=F.at(0.45, 1.05, -0.30))
     with G.new_parts() as parts:
         for s in (-1, 1):
-            F.box(f'toast{s}', 0.10, 0.12, 0.03, (0.30, 1.12, -0.30 + s * 0.035), M.fruit, bevel=0.01)
-    toast = G.join(parts, 'toast', origin=F.at(0.30, 1.06, -0.30))
+            F.box(f'toast{s}', 0.10, 0.12, 0.03, (0.30, 1.11, -0.30 + s * 0.035), M.fruit, bevel=0.01)
+    toast = G.join(parts, 'toast', origin=F.at(0.30, 1.05, -0.30))
     # the blender's lid, lifting off for `blend`
     with G.new_parts() as parts:
-        F.cyl('lid', 0.078, 0.03, (0.0, 1.355, -0.32), M.charcoal, verts=16)
-        F.cyl('lid_knob', 0.02, 0.02, (0.0, 1.38, -0.32), M.charcoal, verts=10)
-    lid = G.join(parts, 'lid', origin=F.at(0.0, 1.34, -0.32))
+        F.cyl('lid', 0.078, 0.03, (0.0, 1.345, -0.32), M.charcoal, verts=16)
+        F.cyl('lid_knob', 0.02, 0.02, (0.0, 1.37, -0.32), M.charcoal, verts=10)
+    lid = G.join(parts, 'lid', origin=F.at(0.0, 1.33, -0.32))
     G.settle()
     G.slide(lever, 'toast_down', (0, 0, -0.035), seconds=0.5)
     G.slide(toast, 'toast_down', (0, 0, -0.06), seconds=0.5)
@@ -420,7 +420,7 @@ def _dishwasher(F, w, h, top_d, top_z, front, door_h, body, panel, top):
 
 def dishwasher():
     F = G.GameFrame(shift=0.1375)
-    _dishwasher(F, w=1.0, h=0.96, top_d=0.66, top_z=-0.15, front=0.175, door_h=0.72,
+    _dishwasher(F, w=1.0, h=0.95, top_d=0.66, top_z=-0.15, front=0.175, door_h=0.72,
                 body=M.cab, panel=M.steel, top=M.cab)
 
 
@@ -450,23 +450,23 @@ FAMILY = G.Family(
              # cook and gourmet light a burner; bake drops the left oven door
              motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel2', 'Body'), ('chrome', 'Knobs & rail'), ('grate', 'Hob')]),
-     G.Model('cooktopCounter', cooktopCounter, size=(1.0, 0.962, 0.66), key='model.cooktopCounter', centre=(0, -0.10),
+     G.Model('cooktopCounter', cooktopCounter, size=(1.0, 0.955, 0.66), key='model.cooktopCounter', centre=(0, -0.10),
              # cook turns a knob and the front-right ring glows red
              motions={'uses': {'cook': 'burner_on'}},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('hob', 'Hob')]),
-     G.Model('microwave', microwave, size=(1.0, 1.26, 0.66), key='model.microwave', centre=(0, -0.095),
+     G.Model('microwave', microwave, size=(1.0, 1.25, 0.66), key='model.microwave', centre=(0, -0.095),
              # reheat opens the door and turns the plate while it heats
              motions={'uses': {'reheat': 'door_open'}, 'loops': {'reheat': 'turntable'}, 'hold': 1.2},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')]),
-     G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.41, 0.66), key='model.coffeeMachine', centre=(0, -0.097),
+     G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.40, 0.66), key='model.coffeeMachine', centre=(0, -0.097),
              # espresso slides a cup under the spout and grows a stream of coffee
              motions={'uses': {'espresso': 'brew'}, 'hold': 2.0},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Machine')]),
-     G.Model('breakfastCounter', breakfastCounter, size=(1.0, 1.37, 0.66), key='model.breakfastCounter', centre=(0, -0.097),
+     G.Model('breakfastCounter', breakfastCounter, size=(1.0, 1.38, 0.66), key='model.breakfastCounter', centre=(0, -0.097),
              # toast presses the lever and the toast down (back up, popping, after `hold`); smoothie lifts the lid
              motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'hold': 2.0},
              paint=[('cab', 'Counter'), ('toaster', 'Toaster'), ('charcoal', 'Blender')]),
-     G.Model('dishwasher', dishwasher, size=(1.0, 0.96, 0.685), key='model.dishwasher', centre=(0, -0.088),
+     G.Model('dishwasher', dishwasher, size=(1.0, 0.95, 0.685), key='model.dishwasher', centre=(0, -0.088),
              # dishes drops the door and slides the lower rack out, held while it is loaded
              motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')]),

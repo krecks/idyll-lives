@@ -294,15 +294,15 @@ p += [cyl([0.14, 0.15, 0.14], [-0.3, 0.6, -0.1], '#B9C9C4', 'gloss', taper=0.9),
       cyl([0.2, 0.05, 0.2], [0.25, 0.54, -0.1], PORCELAIN, 'gloss'), cyl([0.2, 0.05, 0.2], [0.25, 0.59, -0.1], PORCELAIN, 'gloss')]
 add('counterOpenShelf', shallow(p), top=counter_top('counterOpenShelf'))
 
-# Butcher block: a thick end-grain top on turned legs, a slatted shelf and a basket below.
+# Butcher block: a thick end-grain top (to the counters' height, CT) on turned legs, a slatted shelf and a basket below.
 p = [box([0.9, 0.1, 0.8], [0, 0.88, 0], '#B98A5A', 'wood', radius=0.012),
-     box([0.84, 0.03, 0.74], [0, 0.93, 0], '#C99A68', 'wood', radius=0.004)]
+     box([0.84, 0.035, 0.74], [0, 0.9325, 0], '#C99A68', 'wood', radius=0.004)]
 p += legs4((-0.41, 0.41), (-0.36, 0.36), 0.83, 0.07, '#9C6B43', 'wood')
 for z in (-0.24, -0.08, 0.08, 0.24):
     p.append(box([0.8, 0.025, 0.12], [0, 0.2, z], '#9C6B43', 'wood', radius=0.004))
 p += [box([0.4, 0.2, 0.3], [-0.16, 0.32, 0.0], '#C9A979', 'fabric', radius=0.03), box([0.2, 0.16, 0.2], [0.24, 0.29, 0.06], PORCELAIN, 'gloss', radius=0.03),
       handle_h(0, 0.72, 0.4, BLACKMETAL, 'metal', w=0.6)]
-add('butcherBlock', p, top=(-0.45, 0.45, -0.4, 0.4, 0.93))
+add('butcherBlock', p, top=(-0.45, 0.45, -0.4, 0.4, CT))
 
 # Marble counter: navy doors, a white marble top with a soft grey vein.
 p = counter_body(body=NAVY, top='#F4F3F0', tfin='gloss') + doors(0, 1.0, NAVY, 'satin', handle=BRASS, hfin='metal')
@@ -406,11 +406,11 @@ for i in range(7):
 p += [cyl([0.26, 0.14, 0.26], [-0.52, 1.06, -0.3], '#B9BDC1', 'chrome', segments=16)]          # stock pot
 add('rangeCooker', shift(p, dz=0.05), (2, 1))           # its back on the wall face
 
-# Hob counter: a black glass induction hob in a worktop, drawers under it.
+# Hob counter: a black glass induction hob set in the worktop, 4 mm proud (a pan stands on it), drawers under it.
 p = counter_body() + drawers(0, 1.0, CAB, 'satin', n=2)
-p += [box([0.62, 0.008, 0.5], [0, 0.954, -0.1], '#16181B', 'gloss', radius=0.01)]
+p += [box([0.62, 0.008, 0.5], [0, 0.95, -0.1], '#16181B', 'gloss', radius=0.01)]
 for x, z, r in ((-0.15, -0.22, 0.2), (0.15, -0.22, 0.16), (-0.15, 0.04, 0.16), (0.15, 0.04, 0.2)):
-    p.append(torus([r, 0.006, r], [x, 0.959, z], '#5A5E63', 'gloss', segments=20))
+    p.append(torus([r, 0.006, r], [x, 0.951, z], '#5A5E63', 'gloss', segments=20))
 add('cooktopCounter', shallow(p), top=counter_top('cooktopCounter'))
 
 
