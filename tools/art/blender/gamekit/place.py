@@ -5,8 +5,9 @@
 #   F = G.GameFrame(shift=0.094)
 #   F.box('door', 0.728, 1.146, 0.04, (0, 0.643, 0.195), M.body, bevel=0.01)   # w, h, d at (x, y, z)
 #
-# `shift` moves every depth back by that much: placeholders that stand against the back of their tile
-# (furniture_prims.BACK) are centred on the tile this way. `depths` redraws a placeholder's numbers at
+# `shift` moves every depth forward (+z, to the front) by that much, a negative one back: a placeholder
+# built against the back of its tile (furniture_prims.BACK), its parts' depths centred on -shift, is drawn
+# centred on the tile this way. `depths` redraws a placeholder's numbers at
 # another depth: pairs (game depth, drawn depth), ascending; depths between two pairs are mapped
 # linearly, beyond the ends moved as the end is. A box's back and front are mapped, so it keeps its
 # place between them; anything else moves by its middle (the 0.79-deep kitchen counters drawn 0.66
