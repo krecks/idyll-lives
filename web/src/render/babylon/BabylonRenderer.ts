@@ -502,6 +502,7 @@ export class BabylonRenderer implements Renderer {
   private readonly mOut = new Matrix();
   private simCount = 0;
   private readonly simInView = (x: number, z: number) => this.inView(x, z, SIM_VIEW_MARGIN);
+  private readonly residentRows = (mesh: object) => this.characters.rowsOf(mesh);
   private readonly vTmp = new Vector3();
   private readonly vScale = new Vector3();
   private readonly qTmp = new Quaternion();
@@ -866,8 +867,8 @@ export class BabylonRenderer implements Renderer {
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
-    // Held reflections are drawn again when a resident in them moved.
-    this.mirrors.update(this.camera, this.characters.posed ? { heads: this.characters.heads, visible: this.characters.visible, count } : null);
+    // Held reflections are drawn again when a resident in them moved; they draw only the residents they show.
+    this.mirrors.update(this.camera, { heads: this.characters.heads, visible: this.characters.visible, count, moved: this.characters.posed, rowsOf: this.residentRows });
     this.handles.update(this.camera.globalPosition);
     this.simShadow.thinInstanceBufferUpdated('matrix');
     this.lastFrame = frame;

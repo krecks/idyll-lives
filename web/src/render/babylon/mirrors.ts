@@ -41,11 +41,16 @@ export interface MirrorQuality {
   rate: number;
 }
 
-/** Residents as the characters last posed them: head tops (x, y, z per row), which are drawn, how many rows. */
+/**
+ * Residents as the characters last posed them: head tops (x, y, z per row), which are drawn, how
+ * many rows, whether any moved, and the rows a mesh of theirs draws (null: not a resident's).
+ */
 export interface MirrorResidents {
   heads: Float32Array;
   visible: Uint8Array;
   count: number;
+  moved: boolean;
+  rowsOf(mesh: AbstractMesh): { rows: Float32Array; count: number } | null;
 }
 
 /** Mirrors further from the camera than this (m) aren't worth a reflection. */
@@ -83,6 +88,9 @@ interface Reflection {
   planeCount: number;
   /** The draw list made from those (reused). */
   list: AbstractMesh[];
+  /** Per Sim row: they stand where the glass shows them; and whether anyone does. */
+  shows: Uint8Array;
+  showsAnyone: boolean;
   /** The texture lookup for the camera now (reused). */
   lookup: Matrix;
 }
@@ -124,6 +132,8 @@ export class Mirrors {
   private readonly inverse = new Matrix();
   /** Something the reflections show changed (see `changed`). */
   private stale = false;
+  /** The residents as last posed (for the draw lists). */
+  private residents: MirrorResidents | null = null;
   private readonly resize: () => void;
   /** Reflections drawn so far (the benchmark's count). */
   draws = 0;
@@ -163,6 +173,8 @@ export class Mirrors {
       planes: Array.from({ length: 5 }, () => new Plane(0, 0, 0, 0)),
       planeCount: 0,
       list: [],
+      shows: new Uint8Array(0),
+      showsAnyone: false,
       lookup: new Matrix(),
     };
     texture.renderListPredicate = (mesh) => !this.overlays.has(mesh) && this.reflected(mesh);
@@ -243,9 +255,10 @@ export class Mirrors {
 
   /**
    * Per frame: places the mirrors, gives the reflections to the nearest ones on screen facing
-   * `camera`, and says which held ones to draw again. `residents`: as just posed, if any moved.
+   * `camera`, and says which held ones to draw again. `residents`: as just posed.
    */
   update(camera: Camera, residents: MirrorResidents | null): void {
+    this.residents = residents;
     if (!this.items.length) {
       this.stale = false;
       return;
@@ -293,6 +306,7 @@ export class Mirrors {
         r.used = now;
         r.next = item;
         this.view5(item, eye, r);
+        this.seesResidents(r, residents);
       }
       item.meshes.forEach((mesh, i) => {
         if (mesh.isEnabled() !== on) mesh.setEnabled(on);
@@ -309,7 +323,7 @@ export class Mirrors {
         r.texture.resetRefreshCounter();
         continue;
       }
-      if (this.stale || !same(item.face, r.drawnFace) || !same(viewProj, r.drawnViewProj) || (residents && this.seesResident(r, residents))) r.dirty = true;
+      if (this.stale || !same(item.face, r.drawnFace) || !same(viewProj, r.drawnViewProj) || (r.showsAnyone && residents?.moved)) r.dirty = true;
       if (r.dirty && now >= r.due - EARLY) {
         r.texture.resetRefreshCounter();
         // Steady at `rate` while it keeps changing; after a still spell, not two draws in a row.
@@ -390,16 +404,28 @@ export class Mirrors {
     r.planeCount = k;
   }
 
-  /** The meshes of the list that reach into what the glass shows. */
+  /**
+   * The meshes of the list that reach into what the glass shows. Meshes the camera never culls
+   * (residents: posed on the GPU, their bounds say nothing; their shadows, quilts and markers) only
+   * with a resident they draw where the glass shows them, and the rest only with anyone there.
+   */
   private cull(r: Reflection, meshes: readonly AbstractMesh[] | null, count: number): AbstractMesh[] | null {
     if (!meshes) return null;
     const list = r.list;
     list.length = 0;
     for (let i = 0; i < count; i++) {
       const mesh = meshes[i];
-      // Meshes the camera never culls (residents: posed on the GPU, their bounds say nothing) are always drawn.
-      if (mesh.alwaysSelectAsActiveMesh) list.push(mesh);
-      else {
+      if (mesh.alwaysSelectAsActiveMesh) {
+        if (!r.showsAnyone) continue;
+        const drawn = this.residents?.rowsOf(mesh);
+        if (!drawn) list.push(mesh);
+        else
+          for (let j = 0; j < drawn.count; j++)
+            if (r.shows[drawn.rows[j * 4]]) {
+              list.push(mesh);
+              break;
+            }
+      } else {
         const box = mesh.getBoundingInfo().boundingBox;
         if (reaches(r.planes, r.planeCount, box.minimumWorld, box.maximumWorld, MARGIN)) list.push(mesh);
       }
@@ -407,8 +433,13 @@ export class Mirrors {
     return list;
   }
 
-  /** Whether a resident drawn now stands where the glass shows them. */
-  private seesResident(r: Reflection, { heads, visible, count }: MirrorResidents): boolean {
+  /** Which residents drawn now stand where the glass shows them. */
+  private seesResidents(r: Reflection, residents: MirrorResidents | null): void {
+    r.showsAnyone = false;
+    if (!residents) return;
+    const { heads, visible, count } = residents;
+    if (r.shows.length < count) r.shows = new Uint8Array(heads.length / 3);
+    r.shows.fill(0);
     for (let i = 0; i < count; i++) {
       if (!visible[i]) continue;
       const x = heads[i * 3];
@@ -416,9 +447,10 @@ export class Mirrors {
       const z = heads[i * 3 + 2];
       this.lo.set(x - RESIDENT_HALF, y - RESIDENT_DOWN, z - RESIDENT_HALF);
       this.hi.set(x + RESIDENT_HALF, y + 0.1, z + RESIDENT_HALF);
-      if (reaches(r.planes, r.planeCount, this.lo, this.hi, MARGIN)) return true;
+      if (!reaches(r.planes, r.planeCount, this.lo, this.hi, MARGIN)) continue;
+      r.shows[i] = 1;
+      r.showsAnyone = true;
     }
-    return false;
   }
 
   /** How many reflections may be live at once, the render targets of those reflecting now, mirrors in the world and those reflecting now (benchmark reports). */
