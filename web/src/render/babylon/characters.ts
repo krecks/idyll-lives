@@ -227,6 +227,8 @@ const BEDS: Record<string, Bed> = {
   bedFuton: { h: 0.4 },
   bedKing: { h: 0.59 },
   kidsBed: { h: 0.44 },
+  // The race car's mattress ends at its bonnet, 34 cm short of the footprint's end.
+  kidsBedCar: { h: 0.5, foot: 0.37 },
   sunLounger: { h: 0.35 },
   // Hammocks: lain in the sagging sling (`Bed.sling`, from their models' builds).
   hammock: { h: 0.62, sling: { low: 0.6, end: 0.86, half: 0.66, head: 0.5 } },
@@ -246,6 +248,8 @@ const DEFAULT_BED: Bed = { h: 0.5 };
 interface Bed {
   h: number;
   fwd?: number;
+  /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
+  foot?: number;
   across?: boolean;
   /**
    * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
@@ -3461,7 +3465,7 @@ export class Characters {
     const side = wide ? Math.sign((x - bed.cx) * fz - (z - bed.cz) * fx) * BLANKET_MEET : 0;
     const tx = fx > 1e-3 ? (bed.maxX - x) / fx : fx < -1e-3 ? (bed.minX - x) / fx : Infinity;
     const tz = fz > 1e-3 ? (bed.maxZ - z) / fz : fz < -1e-3 ? (bed.minZ - z) / fz : Infinity;
-    const foot = Math.min(tx, tz) - 0.05;
+    const foot = Math.min(tx, tz) - (BEDS[bed.def]?.foot ?? 0.05);
     // A body smaller than the one the quilt was made for (a child's with no quilt of its own yet): the quilt
     // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
     const zs = own ? s : s * rig.size;
