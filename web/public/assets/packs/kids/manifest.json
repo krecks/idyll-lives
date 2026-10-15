@@ -231,19 +231,16 @@
         "chest_trim": {
           "finish": "material.finish.satin"
         },
-        "plush": {
-          "finish": "material.finish.satin"
+        "handle": {
+          "finish": "material.finish.metal"
         },
-        "toy_blue": {
+        "plush": {
           "finish": "material.finish.satin"
         },
         "toy_green": {
           "finish": "material.finish.satin"
         },
         "toy_red": {
-          "finish": "material.finish.satin"
-        },
-        "toy_yellow": {
           "finish": "material.finish.satin"
         }
       },
@@ -628,6 +625,9 @@
       "materials": {
         "chalk_blue": {
           "finish": "material.finish.matte"
+        },
+        "handle": {
+          "finish": "material.finish.metal"
         },
         "kdesk": {
           "finish": "material.finish.satin"

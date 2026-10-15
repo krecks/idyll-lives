@@ -516,7 +516,7 @@ def toyChest():
     for s in (-1, 1):
         F.box(f'strap{s}', 0.05, 0.4, 0.02, (s * 0.3, 0.24, 0.056), M.chest_trim, bevel=0.006)
         F.box(f'band_side{s}', 0.02, 0.06, 0.46, (s * 0.405, 0.32, z), M.chest_trim, bevel=0.006)
-        G.torus(f'handle{s}', 0.04, 0.009, at=F.at(s * 0.415, 0.33, z), material=M.toy_blue, rot=(90, 0, 90),
+        G.torus(f'handle{s}', 0.04, 0.009, at=F.at(s * 0.415, 0.33, z), material=M.handle, rot=(90, 0, 90),
                 major_segments=16, minor_segments=6)
     _toys_inside(0.44, z)
     _still('body')
@@ -525,7 +525,7 @@ def toyChest():
         F.box('lid_band', 0.84, 0.03, 0.02, (0, 0.47, z + 0.245), M.chest_trim, bevel=0.006)
         for s in (-1, 1):
             F.box(f'lid_strap{s}', 0.05, 0.096, 0.5, (s * 0.3, 0.486, z), M.chest_trim, bevel=0.03, bevel_segments=3)
-        F.box('latch', 0.06, 0.07, 0.012, (0, 0.445, z + 0.257), M.toy_yellow, bevel=0.006)
+        F.box('latch', 0.06, 0.07, 0.012, (0, 0.445, z + 0.257), M.handle, bevel=0.006)
     lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.44, z - 0.25))
     _place()
     G.swing(lid, 'lid_open', -100, seconds=1.0, axis='X')
@@ -898,7 +898,7 @@ def kidsDesk():
     with G.new_parts() as parts:
         F.box('drawer_front', 0.4, 0.05, 0.015, (0, 0.512, 0.0025), M.kdesk, bevel=0.005)
         F.box('drawer_tray', 0.38, 0.04, 0.3, (0, 0.512, 0.15), M.kdesk)
-        G.sphere('drawer_knob', 0.012, at=F.at(0, 0.512, -0.01), material=M.toy_red, segments=10, rings=6)
+        G.sphere('drawer_knob', 0.012, at=F.at(0, 0.512, -0.01), material=M.handle, segments=10, rings=6)
         for k, m in enumerate((M.toy_red, M.toy_blue, M.toy_green, M.toy_yellow)):
             G.rod(f'pencil{k}', F.at(-0.12 + 0.07 * k, 0.536, 0.03), F.at(-0.1 + 0.07 * k, 0.536, 0.2), 0.005,
                   material=m, verts=6)

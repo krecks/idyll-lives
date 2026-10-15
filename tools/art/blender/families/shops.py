@@ -173,7 +173,7 @@ def shopCounter():
         # the back, the shopkeeper's side: two cupboard doors with knobs
         for i, x in enumerate((-0.47, 0.47)):
             F.box(f'back_door{i}', 0.86, 0.7, 0.016, (x, 0.5, Z - 0.355), M.counter, bevel=0.005)
-            F.sphere(f'back_knob{i}', 0.016, (x - 0.36 * (1 if x > 0 else -1), 0.74, Z - 0.37), M.walnut,
+            F.sphere(f'back_knob{i}', 0.016, (x - 0.36 * (1 if x > 0 else -1), 0.74, Z - 0.37), M.trim,
                      segments=8, rings=5)
         # the till: a case holding the drawer, a keypad sloping up to the back and a display on a post
         F.box('till_case', 0.38, 0.09, 0.34, (TX, TOP + 0.045, TZ), M.till, bevel=0.008)

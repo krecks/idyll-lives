@@ -243,6 +243,9 @@
         },
         "coop_trim": {
           "finish": "material.finish.satin"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
         }
       },
       "motions": {

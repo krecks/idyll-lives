@@ -526,7 +526,7 @@ def deskExecutive():
     # the middle drawer, still: no use opens it yet
     with G.new_parts() as parts:
         _box('drawer', 0.84, 0.075, 0.02, (0, DT - 0.09, 0.31), M.walnut2, bevel=0.006)
-        _box('drawer_pull', 0.18, 0.016, 0.016, (0, DT - 0.09, 0.327), M.walnut, bevel=0.006)
+        _box('drawer_pull', 0.18, 0.016, 0.016, (0, DT - 0.09, 0.327), M.brass, bevel=0.006)
         _drawer_box('drawer_box', 0.8, 0.06, 0.5, 0, DT - 0.125, -0.2, M.walnut2)
     G.join(parts, 'drawer')
     G.settle(centre=False)

@@ -286,6 +286,9 @@
       "type": "model",
       "url": "../../models/bedroom_storage/dresser.glb",
       "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
         "cloth1": {
           "finish": "material.finish.satin"
         },
@@ -329,7 +332,7 @@
           "label": "Body"
         },
         {
-          "material": "pull",
+          "material": "brass",
           "label": "Handles"
         }
       ]
@@ -451,6 +454,9 @@
         "ebony": {
           "finish": "material.finish.wood"
         },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
         "oak": {
           "finish": "material.finish.wood"
         },
@@ -470,7 +476,7 @@
           "label": "Body"
         },
         {
-          "material": "ebony",
+          "material": "iron",
           "label": "Handles"
         }
       ]
@@ -479,11 +485,11 @@
       "type": "model",
       "url": "../../models/bedroom_storage/wardrobeSingle.glb",
       "materials": {
-        "birch": {
-          "finish": "material.finish.satin"
-        },
         "box": {
           "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
         },
         "chrome": {
           "finish": "material.finish.chrome"
@@ -519,7 +525,7 @@
           "label": "Body"
         },
         {
-          "material": "birch",
+          "material": "brass",
           "label": "Handles"
         }
       ]

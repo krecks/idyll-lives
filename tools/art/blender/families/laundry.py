@@ -19,8 +19,8 @@ import gamekit as G  # noqa: E402
 M = G.Palette(
     body=('#F4F4F2', 'gloss'),       # a machine's cabinet; the main part the player colours
     panel=('#E6E6E3', 'gloss'),      # its control strip
-    door=('#C9CBCC', 'satin'),       # the washer's door ring, handle and knob
-    door_dryer=('#9AA4AB', 'satin'),  # the dryer's
+    door=('#C9CBCC', 'metal'),       # the washer's door ring, handle and knob: brushed metal
+    door_dryer=('#9AA4AB', 'metal'),  # the dryer's, and its vents
     glass=('#BFD3DA', 'glass'),      # the door's window (see-through: its own draw call)
     dark=('#3A3D41', 'satin'),       # plinths, displays, the door seal
     drum=('#2B2C2E', 'satin'),       # the drum's dark inside

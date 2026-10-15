@@ -201,7 +201,7 @@ def hotDogStand():
     # the hot plate's lid, hinged on its back edge
     with G.new_parts() as parts:
         F.box('lid', 0.6, 0.1, 0.4, (-0.35, 1.09, -0.1), M.steel, bevel=0.03)
-        F.box('lid_handle', 0.22, 0.025, 0.03, (-0.35, 1.1, 0.115), M.grill, bevel=0.008)
+        F.box('lid_handle', 0.22, 0.025, 0.03, (-0.35, 1.1, 0.115), M.steel, bevel=0.008)
     lid = G.hinged(G.join(parts, 'lid'), F.at(-0.35, 1.04, -0.3))
     G.settle(centre=False)
     G.swing(lid, 'lid_open', -75, seconds=0.9, axis='X')

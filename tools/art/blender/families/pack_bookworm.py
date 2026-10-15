@@ -296,7 +296,7 @@ def writingBureau():
     with G.new_parts() as flap:
         F.box('flap', 0.5, 0.2, 0.02, (0, 0.875, 0.265), M.panel, bevel=0.005)
         F.box('flap_inset', 0.42, 0.14, 0.006, (0, 0.875, 0.253), M.body, bevel=0.003)
-        F.box('flap_pull', 0.06, 0.015, 0.015, (0, 0.95, 0.248), M.honey, bevel=0.005)
+        F.box('flap_pull', 0.06, 0.015, 0.015, (0, 0.95, 0.248), M.brass, bevel=0.005)
     flap = G.hinged(G.join(flap, 'flap'), F.at(0, 0.775, 0.265))
     _turn_round(G.meshes())
     objs = G.settle()      # on its Model centre: the back on the wall face

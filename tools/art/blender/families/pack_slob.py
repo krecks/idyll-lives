@@ -157,7 +157,7 @@ def microwaveCart():
     with G.new_parts() as door:
         F.box('mw_door', dw, h - 0.05, 0.016, (dx0 + dw / 2, y + h / 2, zf + 0.004), M.gloss_white, bevel=0.008)
         F.box('mw_window', dw - 0.08, h - 0.11, 0.004, (dx0 + dw / 2 - 0.015, y + h / 2, zf + 0.013), M.window)
-        F.box('mw_handle', 0.02, h - 0.1, 0.02, (dx0 + dw - 0.025, y + h / 2, zf + 0.022), M.panel, bevel=0.006)
+        F.box('mw_handle', 0.02, h - 0.1, 0.02, (dx0 + dw - 0.025, y + h / 2, zf + 0.022), M.chrome, bevel=0.006)
     door = G.hinged(G.join(door, 'door'), F.at(dx0, y + h / 2, zf + 0.004))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.swing(door, 'door_open', -100, seconds=0.6)
@@ -199,7 +199,7 @@ def snackNightstand():
         F.box('cabinet', 0.56, 0.38, 0.46, (0, 0.19, -0.02), M.stand, bevel=0.015)
         F.box('pad', 0.56, 0.08, 0.46, (0, 0.41, -0.02), M.pad, bevel=0.03, bevel_segments=3)
         F.box('lower_drawer', 0.012, 0.13, 0.4, (0.284, 0.1, -0.02), M.stand_front, bevel=0.004)
-        F.box('lower_pull', 0.02, 0.03, 0.08, (0.296, 0.1, -0.02), M.white, bevel=0.006)
+        F.box('lower_pull', 0.02, 0.03, 0.08, (0.296, 0.1, -0.02), M.chrome, bevel=0.006)
         F.box('drawer_slot', 0.004, 0.13, 0.4, (0.279, 0.27, -0.02), M.dark)
         # floor clutter: cans, wrappers, a knocked-over alarm clock, a sock
         _can(F, -0.36, 0.26, 0.0, M.pop_blue, lying=True, rot=70)
@@ -215,7 +215,7 @@ def snackNightstand():
     with G.new_parts() as drawer:
         F.box('drawer_box', 0.24, 0.1, 0.38, (0.16, 0.27, -0.02), M.white, bevel=0.006)
         F.box('drawer_front', 0.012, 0.13, 0.42, (0.286, 0.27, -0.02), M.stand_front, bevel=0.005)
-        F.box('drawer_pull', 0.02, 0.02, 0.1, (0.3, 0.29, -0.02), M.white, bevel=0.006)
+        F.box('drawer_pull', 0.02, 0.02, 0.1, (0.3, 0.29, -0.02), M.chrome, bevel=0.006)
         for i, (dz, m) in enumerate(((-0.12, M.bag_red), (0.0, M.bag_orange), (0.12, M.bag_green))):
             F.box(_name('snack'), 0.16, 0.14, 0.05, (0.15, 0.33, -0.02 + dz), m, rot=(-15 + i * 12, 0, 0), bevel=0.02,
                   bevel_segments=2)

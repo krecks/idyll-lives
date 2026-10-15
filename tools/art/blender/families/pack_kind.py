@@ -204,7 +204,7 @@ def neighbourlyOven():
                 F.box(_name('grate'), 0.016, 0.012, 0.2, (bx, rh + 0.02, bz), M.grate)
         F.box('knob_panel', rw - 0.03, 0.1, 0.015, (rx, rh - 0.1, zf - 0.03 + 0.0075), M.enamel)
         for i in range(5):
-            F.cyl(_name('range_knob'), 0.02, 0.025, (rx - 0.22 + i * 0.11, rh - 0.1, zf - 0.01), M.hob, rot=(90, 0, 0),
+            F.cyl(_name('range_knob'), 0.02, 0.025, (rx - 0.22 + i * 0.11, rh - 0.1, zf - 0.01), M.chrome, rot=(90, 0, 0),
                   verts=12)
         F.box('oven_mouth', rw - 0.1, 0.42, 0.006, (rx, 0.37, zf - 0.03 + 0.003), M.oven_dark)
         F.box('oven_rack', rw - 0.14, 0.01, 0.004, (rx, 0.3, zf - 0.03 + 0.007), M.chrome)

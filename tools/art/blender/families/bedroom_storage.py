@@ -24,12 +24,12 @@ import gamekit as G  # noqa: E402
 M = G.Palette(
     oak=('#CDB08A', 'wood'),         # oak: the nightstand, the dresser and the low dresser
     oakleg=('#B08E66', 'wood'),      # the low dresser's legs
-    pull=('#7A5638', 'wood'),        # the dresser's wooden pulls
-    ebony=('#2B2C2E', 'wood'),       # the low dresser's black handles; the dark gap behind a wood drawer
-    brass=('#B8925A', 'metal'),      # brass handles, knobs, the bench's frame and the lamp's stem
-    iron=('#2B2C2E', 'metal'),       # black metal: the modern nightstand's pull, the chest's straps
+    pull=('#7A5638', 'wood'),        # the dresser's jewellery box
+    ebony=('#2B2C2E', 'wood'),       # the dark gap behind a wood drawer
+    brass=('#B8925A', 'metal'),      # brass handles, knobs and pulls, the bench's frame and the lamp's stem
+    iron=('#2B2C2E', 'metal'),       # black metal: the modern nightstand's and low dresser's pulls, the chest's straps
     white=('#F1F0EC', 'satin'),      # painted white: the modern nightstand and the two wardrobes
-    birch=('#CDB08A', 'satin'),      # the wardrobe's doors, the single wardrobe's handle
+    birch=('#CDB08A', 'satin'),      # the wardrobe's doors
     plinth=('#2F3236', 'satin'),     # plinths, and the dark gap behind a painted drawer
     clay=('#C98F6B', 'satin'),       # the drum nightstand
     clay2=('#B87D5C', 'satin'),      # its drawer band and foot
@@ -356,8 +356,8 @@ def dresser():
         F.box('top', 1.44, 0.03, 0.52, (0, 0.875, -0.17), M.oak, bevel=0.008)
         for s in (-1, 1):
             F.box(f'drawer_top{s}', 0.66, 0.2, 0.02, (s * 0.35, 0.72, front + 0.01), M.oak, bevel=0.006)
-            _bar(f'pull_top{s}', 0.12, 0.018, (s * 0.35, 0.75, front + 0.03), M.pull)
-            _bar(f'pull_low{s}', 0.12, 0.018, (s * 0.35, 0.27, front + 0.03), M.pull)
+            _bar(f'pull_top{s}', 0.12, 0.018, (s * 0.35, 0.75, front + 0.03), M.brass)
+            _bar(f'pull_low{s}', 0.12, 0.018, (s * 0.35, 0.27, front + 0.03), M.brass)
         F.box('drawer_low', 1.36, 0.2, 0.02, (0, 0.24, front + 0.01), M.oak, bevel=0.006)
         # on top: a framed picture, a turned vase and a box
         F.box('picture_frame', 0.36, 0.46, 0.03, (0.32, 1.12, -0.3), M.frame, bevel=0.008, rot=(-6, 0, 0))
@@ -368,7 +368,7 @@ def dresser():
         _gap('drawer', 1.36, 0.2, 0, 0.48, front, M.ebony)
     G.join(still, 'dresser', origin=(0, 0, 0))
     drawer = _drawer('drawer', 1.36, 0.2, 0, 0.48, front, 0.44, M.oak,
-                     pulls=[(_bar, (f'pull_mid{s}', 0.12, 0.018, (s * 0.35, 0.51, front + 0.03), M.pull))
+                     pulls=[(_bar, (f'pull_mid{s}', 0.12, 0.018, (s * 0.35, 0.51, front + 0.03), M.brass))
                             for s in (-1, 1)],
                      contents=lambda x, y, z: _drawer_clothes(x, y, z, 1.2, 0.36))
     G.settle(centre=False)
@@ -452,17 +452,17 @@ def dresserLow():
                 if (x, y) == (0.0, 0.435):
                     continue
                 F.box(f'drawer{x}{y}', 0.575, 0.1993, 0.02, (x, y, front + 0.01), M.oak, bevel=0.006)
-                _bar(f'pull{x}{y}', 0.16, 0.014, (x, y + 0.032, front + 0.03), M.ebony)
+                _bar(f'pull{x}{y}', 0.16, 0.014, (x, y + 0.032, front + 0.03), M.iron)
         _gap('drawer', 0.575, 0.1993, 0, 0.435, front, M.ebony)
     G.join(still, 'dresserLow', origin=(0, 0, 0))
     drawer = _drawer('drawer', 0.575, 0.1993, 0, 0.435, front, 0.5, M.oak,
-                     pulls=[(_bar, ('pull_mid', 0.16, 0.014, (0, 0.467, front + 0.03), M.ebony))],
+                     pulls=[(_bar, ('pull_mid', 0.16, 0.014, (0, 0.467, front + 0.03), M.iron))],
                      contents=lambda x, y, z: _drawer_clothes(x, y, z, 0.5, 0.4))
     G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, -PULL, 0), seconds=DRAWER_SECONDS)
 
 
-# --- the single wardrobe: white, one door hinged on the left with a birch bar, a rail of shirts ----------
+# --- the single wardrobe: white, one door hinged on the left with a brass bar, a rail of shirts ----------
 def wardrobeSingle():
     back, front = WALL, 0.14
     with G.new_parts() as still:
@@ -474,7 +474,7 @@ def wardrobeSingle():
     with G.new_parts() as parts:
         F.box('door', 0.88, 1.97, 0.02, (0, 1.045, front + 0.01), M.white, bevel=0.006)
         F.box('door_panel', 0.7, 1.72, 0.006, (0, 1.045, front + 0.023), M.white, bevel=0.003)
-        _bar('handle', 0.02, 0.5, (0.36, 1.1, front + 0.035), M.birch, d=0.024)
+        _bar('handle', 0.02, 0.5, (0.36, 1.1, front + 0.035), M.brass, d=0.024)
     door = G.hinged(G.join(parts, 'door'), F.at(-0.44, 1.045, front + 0.01))
     G.settle(centre=False)
     G.swing(door, 'door_open', 100, seconds=DOOR_SECONDS)
@@ -545,17 +545,17 @@ FAMILY = G.Family(
              paint=[('brass', 'Frame'), ('olive', 'Cushion')]),
      # BR3: each opens while a resident picks an outfit
      G.Model('dresser', dresser, size=(1.44, 1.349, 0.54), key=_key('dresser'), centre=(0, -0.16),
-             motions=DRAWER_USE, paint=[('oak', 'Body'), ('pull', 'Handles')]),
+             motions=DRAWER_USE, paint=[('oak', 'Body'), ('brass', 'Handles')]),
      G.Model('wardrobe', wardrobe, size=(1.84, 2.41, 0.626), key=_key('wardrobe'), centre=(0, -0.117),
              motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('birch', 'Body'), ('brass', 'Handles')]),
      G.Model('chestOfDrawers', chestOfDrawers, size=(0.88, 1.16, 0.655), key=_key('chestOfDrawers'),
              centre=(0, -0.1025), motions=DRAWER_USE, paint=[('linen', 'Body'), ('brass', 'Handles')]),
      G.Model('dresserLow', dresserLow, size=(1.82, 0.8, 0.635), key=_key('dresserLow'), centre=(0, -0.1125),
-             motions=DRAWER_USE, paint=[('oak', 'Body'), ('ebony', 'Handles')]),
+             motions=DRAWER_USE, paint=[('oak', 'Body'), ('iron', 'Handles')]),
      G.Model('wardrobeSingle', wardrobeSingle, size=(0.9, 2.28, 0.617), key=_key('wardrobeSingle'),
              centre=(0, -0.1215), motions={'uses': {'outfit': 'door_open'}, 'hold': DOOR_HOLD},
-             paint=[('white', 'Body'), ('birch', 'Handles')]),
+             paint=[('white', 'Body'), ('brass', 'Handles')]),
      G.Model('armoire', armoire, size=(1.86, 2.109, 0.628), key=_key('armoire'), centre=(0, -0.1162),
              motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('mahogany', 'Body'), ('brass', 'Handles')])],

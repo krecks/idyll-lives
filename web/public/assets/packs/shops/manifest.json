@@ -63,6 +63,9 @@
         "till": {
           "finish": "material.finish.satin"
         },
+        "trim": {
+          "finish": "material.finish.metal"
+        },
         "walnut": {
           "finish": "material.finish.wood"
         }
