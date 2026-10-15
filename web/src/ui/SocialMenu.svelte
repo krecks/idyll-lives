@@ -2,6 +2,7 @@
   import { chanceLabel, chemistryLabel, friendLabel, romanceLabel } from './relationship';
   import Icon from './Icon.svelte';
   import SimPreview from './kit/SimPreview.svelte';
+  import { closeOutside } from './kit/popup';
   import { services } from './services';
   import { game } from './state.svelte';
 
@@ -22,9 +23,8 @@
 </script>
 
 {#if menu && target}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="scrim" onclick={() => services.controls.closeMenu()}></div>
-  <div class="social glass" style="left:{left}px;top:{top}px" role="dialog" aria-label="Interact with {target.name}">
+  <!-- No backdrop: the world behind keeps its clicks and camera drags (`kit/popup.ts`). -->
+  <div class="social glass" use:closeOutside={() => services.controls.closeMenu()} style="left:{left}px;top:{top}px" role="dialog" aria-label="Interact with {target.name}">
     <header>
       <span class="face"><SimPreview appearance={target.appearance} gender={target.gender} id={target.id} size={46} /></span>
       <div>
@@ -78,11 +78,6 @@
 {/if}
 
 <style>
-  .scrim {
-    position: absolute;
-    inset: 0;
-    pointer-events: auto;
-  }
   .social {
     position: absolute;
     width: 320px;
