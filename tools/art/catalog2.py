@@ -1063,12 +1063,12 @@ def bed(w, l, frame, ffin, head, sheet, duvet, pillow, head_h=1.0, head_fin=None
 p = bed(1.62, 1.92, OAK, 'wood', OAK, '#F7F7F5', '#9DB7C9', '#F2F2F0', head_h=0.95)
 for x in (-0.6, -0.2, 0.2, 0.6):
     p.append(box([0.36, 0.5, 0.012], [x, 0.66, -0.875], OAKD, 'wood', radius=0.004))
-add('bedDouble', p, (2, 2))
+add('bedDouble', to_wall(p, -0.93), (2, 2))              # the head end on the wall's face, as the model's
 p = bed(1.72, 1.92, '#B9B2A6', 'fabric', '#B9B2A6', '#FFFFFF', '#E9DCC9', '#F6F3EE', head_h=1.3)
 for x in (-0.64, -0.32, 0.0, 0.32, 0.64):
     p.append(cushion([0.28, 0.9, 0.06], [x, 0.85, -0.89], '#C4BDB1', radius=0.03))
 p += [cushion([0.42, 0.3, 0.12], [x, 0.7, -0.62], '#8C9468', rotate=[-14, 0, 0]) for x in (-0.36, 0.36)]
-add('bedQueenUpholstered', p, (2, 2))
+add('bedQueenUpholstered', to_wall(p, -0.93), (2, 2))
 CAN = '#4A3426'
 p = bed(1.62, 1.92, CAN, 'wood', CAN, '#F7F2EA', '#B5653F', '#F2EDE4', head_h=1.0)
 for x in (-0.82, 0.82):
@@ -1082,7 +1082,7 @@ for x in (-0.82, 0.82):
     for z in (-0.86, 0.86):
         p.append(box([0.16, 1.7, 0.02], [x - math.copysign(0.05, x), 1.2, z], '#F2EBDD', 'fabric', radius=0.01))
 p.append(box([1.7, 0.1, 1.9], [0, 2.02, 0], '#F2EBDD', 'fabric', radius=0.02))
-add('bedCanopy', p, (2, 2))
+add('bedCanopy', to_wall(p, -0.93), (2, 2))
 # Daybed (1x2): low rails at both ends and a back along -X, a bolster.
 DB = '#F1F0EC'
 p = [box([0.96, 0.26, 1.94], [0, 0.2, 0], DB, 'satin', radius=0.02),
@@ -1092,7 +1092,7 @@ p = [box([0.96, 0.26, 1.94], [0, 0.2, 0], DB, 'satin', radius=0.02),
 for z in (-0.95, 0.95):
     p.append(box([0.96, 0.72, 0.05], [0, 0.36, z], DB, 'satin', radius=0.02))
 p += [cushion([0.2, 0.36, 1.2], [-0.33, 0.66, -0.1], '#E4B8AE', rotate=[0, 0, -12]), cushion([0.6, 0.14, 0.3], [0.05, 0.56, -0.74], WHITE, rotate=[-10, 0, 0])]
-add('bedDaybed', p, (1, 2))
+add('bedDaybed', to_wall(p, -0.93), (1, 2))
 
 
 def nightstand(body, fin, top_col=None, handle=BRASS, drawers_n=1, open_shelf=True, w=0.56, h=0.56, legs_col=None):
@@ -1228,7 +1228,7 @@ p = [box([0.94, 0.08, 0.94], [0, 0.04, 0], '#E8E6E1', 'matte', radius=0.01),
      rod([0, 2.12, -0.4], [0, 2.18, -0.12], 0.025, BLACKMETAL, 'metal'),
      box([0.3, 0.02, 0.3], [0, 2.17, 0.0], BLACKMETAL, 'metal', radius=0.01),
      box([0.04, 0.16, 0.04], [0.3, 1.1, -0.39], BLACKMETAL, 'metal', radius=0.01)]
-add('showerRain', p)
+add('showerRain', to_wall(forward(p, 0.03)))   # 0.93 deep, its back on the wall's face, as the model's
 p = [box([0.8, 0.52, 0.5], [0, 0.56, -0.21], '#8A5A36', 'wood', radius=0.012),
      box([0.84, 0.04, 0.54], [0, 0.84, -0.2], '#F4F3EF', 'gloss', radius=0.008),
      lathe([0.44, 0.16, 0.36], [0, 0.94, -0.18], PORCELAIN, 'gloss', BOWL, segments=24),
@@ -1340,12 +1340,12 @@ p += [torus([1.4, 0.04, 0.6], [0, 0.445, 0], '#8E6E52', 'wood', segments=36),
 p += [cone([0.1, 0.2, 0.1], [x, 0.54, z], '#3F7A4A', 'foliage', segments=8) for x, z in ((-0.7, -0.3), (-0.6, -0.32), (0.7, -0.3))]
 add('trainTable', p, (2, 1))
 p = [cyl([0.92, 0.36, 0.92], [0, 0.18, 0], '#9DC6CF', 'satin', segments=28),
-     torus([0.94, 0.08, 0.94], [0, 0.36, 0], '#F4F1EA', 'satin', segments=28)]
+     torus([0.93, 0.08, 0.93], [0, 0.36, 0], '#F4F1EA', 'satin', segments=28)]
 _rng = random.Random(7)
 for i in range(26):
     a, rr = _rng.uniform(0, 6.283), _rng.uniform(0, 0.36)
     p.append(sph([0.08, 0.08, 0.08], [math.cos(a) * rr, 0.37 + _rng.uniform(0, 0.03), math.sin(a) * rr], [RED, YELLOW, BLUE, GREEN, '#E07BC3'][i % 5], 'gloss', segments=8))
-add('ballPit', p)
+add('ballPit', forward(p, 0.035))   # its back on the wall's face, its front on the tile's edge, as the model's
 p = [sph([0.62, 0.36, 0.62], [0, 0.18, 0.02], '#5BB3C9', 'fabric', segments=20),
      sph([0.52, 0.42, 0.3], [0, 0.32, -0.15], '#5BB3C9', 'fabric', segments=20, rotate=[-12, 0, 0]),
      sph([0.14, 0.14, 0.03], [0, 0.3, 0.27], YELLOW, 'fabric', segments=10)]
@@ -1363,7 +1363,7 @@ for x in (-0.44, 0.44):
         p += [cyl([0.36, 0.08, 0.36], [x, 0.18, z], '#2B2C2E', 'satin', rotate=[0, 0, 90], segments=18),
               cyl([0.18, 0.085, 0.18], [x, 0.18, z], '#D0D3D6', 'satin', rotate=[0, 0, 90], segments=12)]
 p += [sph([0.12, 0.1, 0.04], [x, 0.5, 0.97], YELLOW, 'gloss', segments=8) for x in (-0.3, 0.3)]
-add('kidsBedCar', p, (1, 2))
+add('kidsBedCar', to_wall(p, -0.93), (1, 2))   # the tail on the wall's face, as the model's
 
 
 # =============================================================================================

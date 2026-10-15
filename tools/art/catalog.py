@@ -1032,7 +1032,7 @@ def single_bed(frame, ffin, sheet, duvet, style, accent=CREAM):
     return p
 
 
-addp('bedSingle', single_bed(OAK, 'wood', '#F7F7F5', SAGE, 'slat'), (1, 2))
+addp('bedSingle', shift(single_bed(OAK, 'wood', '#F7F7F5', SAGE, 'slat'), dz=0.04, when=lambda p: p['at'][2] < -0.9), (1, 2))   # the head end on the wall's face, as the model's
 addp('bedSingle@modern', single_bed('#F1F0EC', 'satin', '#FFFFFF', '#9AA7B0', 'panel', accent='#5F6E7A'), (1, 2))
 addp('bedSingle@cozy', single_bed(HONEY, 'wood', CREAM, RUST, 'spindle', accent=MUSTARD), (1, 2))
 addp('bedSingle@minimal', single_bed(BIRCH, 'wood', '#FFFFFF', LINEN, 'low'), (1, 2))
@@ -1057,7 +1057,7 @@ def bunk_bed(frame, ffin, sheet, cover):
     return p
 
 
-addp('bedBunk', bunk_bed(OAK, 'wood', '#F7F7F5', TEAL), (1, 2))
+addp('bedBunk', shift(bunk_bed(OAK, 'wood', '#F7F7F5', TEAL), dz=0.03, when=lambda p: p['at'][2] < -0.9), (1, 2))   # the head end on the wall's face, as the model's
 addp('bedBunk@cozy', bunk_bed(HONEY, 'wood', CREAM, RUST), (1, 2))
 addp('bedBunk@minimal', bunk_bed('#F2F2F0', 'satin', '#FFFFFF', LINEN), (1, 2))
 
@@ -1084,7 +1084,7 @@ def futon(base, mattress, cover):
     return p
 
 
-add('bedFuton', placeholder(futon(BIRCH, '#F4F2EE', LINEN)), (2, 2))
+add('bedFuton', placeholder(to_wall(futon(BIRCH, '#F4F2EE', LINEN), -0.93)), (2, 2))   # the head end on the wall's face, as the model's
 add('bedFuton@modern', placeholder(futon('#3A3D41', '#F4F2EE', '#9AA4AB')), (2, 2))
 add('bedFuton@cozy', placeholder(futon(HONEY, CREAM, RUST)), (2, 2))
 
@@ -1105,7 +1105,7 @@ def king_bed(head, frame, sheet, throw, ffin='fabric'):
     return p
 
 
-add('bedKing', placeholder(king_bed('#CFC9BD', '#D9D4CA', '#F1F0EC', SAGE)), (2, 2))
+add('bedKing', placeholder(to_wall(king_bed('#CFC9BD', '#D9D4CA', '#F1F0EC', SAGE), -0.93)), (2, 2))   # the headboard on the wall's face, as the model's
 add('bedKing@modern', placeholder(king_bed('#9AA4AB', '#B9BCBE', '#F6F6F4', COGNAC)), (2, 2))
 add('bedKing@cozy', placeholder(king_bed(RUST, '#B98F6A', CREAM, MUSTARD)), (2, 2))
 add('bedKing@minimal', placeholder(king_bed(LINEN, '#ECE7DD', '#FFFFFF', '#E3CFA8')), (2, 2))
@@ -1353,7 +1353,7 @@ def shower_stall(curtain, tray='#F6F6F4', metal=CHROME):
     ])
 
 
-add('showerStall', shower_stall('#CFE0E4'))
+add('showerStall', placeholder(shift(shower_stall('#CFE0E4')['placeholder'], dz=0.02)))    # its back on the wall's face, as the model's
 add('showerStall@cozy', shower_stall('#E8D8BE', metal=BRASS))
 add('showerStall@minimal', shower_stall('#F4F3EF'))
 
@@ -1375,7 +1375,7 @@ def walk_in(stone, metal):
     ])
 
 
-add('showerWalkIn', walk_in('#C9C6C0', BLACKMETAL))
+add('showerWalkIn', placeholder(shift(walk_in('#C9C6C0', BLACKMETAL)['placeholder'], dz=0.03)))    # its back on the wall's face, as the model's
 add('showerWalkIn@modern', walk_in('#8E8A84', BLACKMETAL))
 add('showerWalkIn@cozy', walk_in('#D9C7A7', BRASS))
 add('showerWalkIn@minimal', walk_in('#F4F3EF', CHROME))
@@ -1499,7 +1499,7 @@ def kids_bed(frame, sheet, cover, rail):
     return p
 
 
-add('kidsBed', placeholder(kids_bed('#9DC6CF', '#F7F7F5', '#F2C14E', '#F2F2F0')), (1, 2))
+add('kidsBed', placeholder(to_wall(kids_bed('#9DC6CF', '#F7F7F5', '#F2C14E', '#F2F2F0'), -0.93)), (1, 2))   # the headboard on the wall's face, as the model's
 add('kidsBed@cozy', placeholder(kids_bed('#E4B8AE', CREAM, SAGE, '#F2F2F0')), (1, 2))
 add('kidsBed@minimal', placeholder(kids_bed('#F2F2F0', '#FFFFFF', LINEN, BIRCH)), (1, 2))
 
@@ -1529,7 +1529,7 @@ def play_mat():
     return p
 
 
-add('playMat', placeholder(play_mat()))
+add('playMat', placeholder(shift(play_mat(), dz=0.03)))   # its back on the wall's face, as the model's
 def chalkboard(frame, board):
     """A standing A-frame chalkboard: two framed boards hinged at the top, a chalk tray and drawings on the front."""
     a = -14
@@ -1580,7 +1580,7 @@ def rocking_horse(body, mane, rocker):
     p = []
     for x in (-0.12, 0.12):                                                                   # curved rockers along z
         for i in range(6):
-            a0, a1 = math.radians(-16 + i * 32 / 6), math.radians(-16 + (i + 1) * 32 / 6)
+            a0, a1 = math.radians(-14 + i * 28 / 6), math.radians(-14 + (i + 1) * 28 / 6)   # the model's rockers: clear of the wall
             pa = [x, 1.62 - math.cos(a0) * 1.6, math.sin(a0) * 1.6]
             pb = [x, 1.62 - math.cos(a1) * 1.6, math.sin(a1) * 1.6]
             p.append(rod(pa, pb, 0.04, rocker, 'wood'))

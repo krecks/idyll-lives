@@ -131,7 +131,7 @@ E['model.sink@minimal'] = placeholder(OX.M['model.sink@minimal'])
 # =============================================================================================
 # Toilet (1x1): the Sim sits at the centre facing +Z (seat top ~0.44 m)
 # =============================================================================================
-E['model.toilet'] = placeholder(FP.toilet(body='#F6F6F4', seat='#EFEFEC'))
+E['model.toilet'] = placeholder(shift(FP.toilet(body='#F6F6F4', seat='#EFEFEC'), dz=0.01))   # the cistern's back on the wall's face, as the model's
 E['model.toilet@modern'] = placeholder(recolor(OX.M['model.toilet@modern'], {
     '#3A3C40': ('#D9D8D4', 'satin'), '#1E1F21': '#F6F6F4', '#2A2B2E': '#F0F0EE'}))
 E['model.toilet@cozy'] = placeholder(OX.M['model.toilet@cozy'])
@@ -140,7 +140,7 @@ E['model.toilet@minimal'] = placeholder(OX.M['model.toilet@minimal'])
 # =============================================================================================
 # Shower (1x1)
 # =============================================================================================
-E['model.shower'] = placeholder(FP.shower_cabin())                                      # white tray and tiles, chrome, glass
+E['model.shower'] = placeholder(shift(FP.shower_cabin(), dz=0.02))                       # white tray and tiles, chrome, glass; its back on the wall's face, as the model's
 E['model.shower@modern'] = placeholder(FP.shower_cabin(tray='#E4E3DF', tray_fin='satin', frame=BLACKMETAL, frame_fin='metal', wall='#D3D2CE',
                                                      joint='#BDBBB6') + [
     box([0.2, 0.012, 0.6], [x, 0.064, 0.0], OAK, 'wood', radius=0.004) for x in (-0.22, 0.0, 0.22)])   # teak duckboard
@@ -252,7 +252,7 @@ def bed_base():
     return p
 
 
-E['model.bed'] = placeholder(bed_base())
+E['model.bed'] = placeholder(to_wall(bed_base(), -0.93))                                 # the headboard's back on the wall's face, as the model's
 
 # =============================================================================================
 # Computer desk (2x1): the Sim sits at the centre facing +Z, desk in front, monitor facing the Sim
