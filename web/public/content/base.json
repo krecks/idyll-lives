@@ -2014,7 +2014,8 @@
     "deniedAgain": "{a} is cross about being told no again about the {object}",
     "babysitter": "{a}'s household paid {money} for a babysitter for {b}",
     "stayedHome": "{a} stayed home from work to look after {b}",
-    "noBed": "{a} has no bed of their own: buy one for them"
+    "noBed": "{a} has no bed of their own: buy one for them",
+    "notClosed": "{a} didn't close the {object}: someone else got in first"
   },
   "activities": [
     {

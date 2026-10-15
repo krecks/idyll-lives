@@ -146,6 +146,8 @@ pub(crate) enum News {
     Repaired(u32),
     /// An accident (index into `Content::accidents`).
     Accident(usize),
+    /// The player's order to close this object was dropped: someone else is in it now.
+    NotClosed(u32),
 }
 
 impl ObjectInstance {
@@ -160,6 +162,13 @@ impl ObjectInstance {
         inter.when.is_none_or(|w| w == self.open)
             && (!inter.ripe || self.ripe())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
+    }
+
+    /// Whether `inter` would close it on someone other than `me` using it (or on their way to):
+    /// the one reason `allows` says no that the player hears of when it comes up after an order
+    /// (an order to open or close what someone else already did is done).
+    fn closes_on_someone(&self, inter: &crate::content::Interaction, me: u32) -> bool {
+        inter.leaves == Some(false) && inter.when.is_none_or(|w| w == self.open) && self.users().any(|u| u != me)
     }
 
     /// Its crop is ripe (see `growth`).
@@ -2001,6 +2010,7 @@ impl World {
                     News::Broke(o) => (social::EventKind::Broke, self.objects[o as usize].def as i64),
                     News::Repaired(o) => (social::EventKind::Repaired, self.objects[o as usize].def as i64),
                     News::Accident(a) => (social::EventKind::Accident, a as i64),
+                    News::NotClosed(o) => (social::EventKind::NotClosed, self.objects[o as usize].def as i64),
                 };
                 self.events.push_detail(self.tick, kind, i, Some(n), None);
             }
@@ -3767,6 +3777,9 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             }
             if !obj.allows(inter, sim.id) {
+                if task.directed && obj.closes_on_someone(inter, sim.id) {
+                    sim.news.get_or_insert(News::NotClosed(object));
+                }
                 return;
             }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
@@ -4255,6 +4268,11 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
         if objects[object as usize].broken() || !objects[object as usize].allows(inter, sim.id) {
+            // (An order to close it on someone who got there first: the player is told.)
+            let directed = sim.current.as_ref().is_some_and(|a| a.task.directed);
+            if directed && !objects[object as usize].broken() && objects[object as usize].closes_on_someone(inter, sim.id) {
+                sim.news.get_or_insert(News::NotClosed(object));
+            }
             end_activity(sim, content, objects);
             return;
         }
