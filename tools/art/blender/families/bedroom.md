@@ -22,8 +22,16 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
   two parts: the lower two thirds (`_duvet`, one bevelled box draped down the sides and the foot, still) and
   the top third (`duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
   across the fold on the duvet's top 3 mm up. `turn_down` turns the flap 180° about X in 1 s, laying it over the
-  rest toward the foot: folded, its top is 9.5 cm above the mattress, under the game's quilt (10 cm and up).
-  `motions` plays it for `sleep` and `nap` with no `hold`: it turns down as they get in and back up after.
+  rest toward the foot, and flattens it as it goes (`_turn_down`). The game's quilt lies 10 cm above the mattress
+  off the body times the sleeper's size (8.5 cm for the smallest), rounding down to 6 cm over its outer 8 cm. A
+  flap folded at full thickness topped out at 10.1 cm (its sheet at 10.5) and showed through it, along the
+  sides of the single, the bunk and the king and between two sleepers in a wide bed. Folded, it is now 40 % of
+  its thickness (`FOLDED`), its sheet's top 7.5 cm above the mattress, and on the one-tile beds and the king it
+  narrows to 8 cm inside the quilt's edge (`QUILT_EDGE`: 0.46 m from a one-tile bed's middle, 1.0 m on a two-tile
+  bed's outer side); the king's runner is 1.93 m across, just round its duvet, for the same reason. Without a
+  quilt (as the resident lies down, before it comes up) the bed still shows turned down. `motions` plays it for
+  `sleep` and `nap` with no `hold`: it turns down as they get in and back up after. One sleeper in a wide bed
+  turns down both halves; the quilt's inner edge meets the fold on the empty half.
 - **Pillows** lie where the sleepers' heads go (about -0.68), under the duvet's head edge (-0.3 to -0.42);
   no scatter cushions where heads lie.
 - **Materials** are named for what and which colour they are (`frame_oak`, `headboard_linen`, `bedding_teal`):

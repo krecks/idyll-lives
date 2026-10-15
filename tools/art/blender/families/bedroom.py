@@ -9,8 +9,8 @@
 # -0.93, `WALL`): headboards, posts and rails stop there, thinner or a few cm forward, so the bed's bounds
 # stand a little forward of the middle (the Model's `centre`). The game lays its own quilt over each sleeper on
 # the beds in `BLANKET_BEDS`, so a bed's duvet isn't a second cover over them: its top third (`duvet_flap`)
-# folds back over the rest toward the foot while a resident sleeps or naps (`turn_down`), and back up as
-# they get up. The futon is a sofa at rest whose back folds down flat into the bed (`unfold`), held open
+# folds back over the rest toward the foot while a resident sleeps or naps (`turn_down`), flattening as it
+# goes so the quilt hides it, and back up as they get up. The futon is a sofa at rest whose back folds down flat into the bed (`unfold`), held open
 # like the wall bed (content `leaves` / `when`); the daybed is static (a sofa by day).
 # Sleepers lie centred, head about 0.84 m behind the middle and feet 0.86 m in front: headboards keep their
 # faces behind -0.87, pillows and the duvet fit around that.
@@ -65,8 +65,14 @@ M = G.Palette(
 
 F = G.GameFrame()
 
-DUVET = 0.05      # the duvet's top above the mattress top (the game's quilt starts 0.1 above it)
-FLAP = 0.045      # the flap's thickness: folded over, its top is 9.5 cm above the mattress
+DUVET = 0.05      # the duvet's top above the mattress top
+FLAP = 0.045      # the flap's thickness at rest
+# The game's quilt over a sleeper lies 10 cm above the mattress off the body, times the sleeper's size (8.5 cm
+# for the smallest), and rounds down to 6 cm over its outer 8 cm. Folded, the flap must stay under it, so the
+# clip also flattens it to this much of its thickness (its top, the sheet's, 7.5 cm above the mattress) and,
+# where the quilt's edge would cross it, narrows it to 8 cm inside that edge (`_turn_down`).
+FOLDED = 0.4
+QUILT_EDGE = {1: 0.46, 2: 1.0}  # the quilt's edge from the bed's middle: a one-tile bed's, a two-tile bed's outer one
 SECONDS = 1.0     # the duvet turns down this fast, as the resident gets in
 WALL = -0.93      # the wall's face in a 2-deep footprint: the head end's back stands on it
 
@@ -113,13 +119,22 @@ def _bedding(top, half, z_top, z_foot, drape, material, fold=None):
     return z_fold
 
 
-def _finish(name, flap_args):
+def _turn_down(flap, clip, half, tiles):
+    """Keys `clip`: the flap turns 180 degrees over the rest of the duvet and, as it goes, flattens to `FOLDED`
+    of its thickness (about its hinge, so it stays on the duvet) and narrows to keep 8 cm inside the edge of the
+    game's quilt (`QUILT_EDGE`), so the quilt over a sleeper hides it. `half`: the bedding's half width."""
+    narrow = min(1.0, (QUILT_EDGE[tiles] - 0.08) / (half + 0.016))
+    G.swing(flap, clip, 180, seconds=SECONDS, axis='X')
+    G.squash(flap, clip, (narrow, 1, FOLDED), seconds=SECONDS)
+
+
+def _finish(name, flap_args, tiles=2):
     """Joins what's in the scene as the still bed, builds the flap, settles, and keys `turn_down`."""
     still = G.meshes()
     G.join(still, name, origin=(0, 0, 0))
     flap = _flap(*flap_args)
     _settle()
-    G.swing(flap, 'turn_down', 180, seconds=SECONDS, axis='X')
+    _turn_down(flap, 'turn_down', flap_args[1], tiles)
 
 
 def _legs_round(xs, zs, h, material, r=0.026):
@@ -177,7 +192,7 @@ def bedSingle():
     _pillow('pillow', 0.62, 0.13, 0.34, 0, top, -0.71)
     z_top, z_foot = -0.3, 0.885
     z_fold = _bedding(top, 0.42, z_top, z_foot, 0.14, M.bedding_sage)
-    _finish('bedSingle', (top, 0.42, z_top, z_fold, M.bedding_sage))
+    _finish('bedSingle', (top, 0.42, z_top, z_fold, M.bedding_sage), tiles=1)
 
 
 # ---------------------------------------------------------------- the bunk bed
@@ -222,8 +237,8 @@ def bedBunk():
     upper = _flap(UPPER, 0.42, z_top, z_fold_upper, M.bedding_teal)
     upper.name = 'duvet_flap_upper'
     _settle()
-    G.swing(lower, 'turn_down', 180, seconds=SECONDS, axis='X')
-    G.swing(upper, 'turn_down_upper', 180, seconds=SECONDS, axis='X')
+    _turn_down(lower, 'turn_down', 0.42, 1)
+    _turn_down(upper, 'turn_down_upper', 0.42, 1)
 
 
 # ---------------------------------------------------------------- the futon
@@ -283,7 +298,8 @@ def bedKing():
         _pillow(f'pillow{s}', 0.74, 0.16, 0.4, s * 0.45, top, -0.66)
     z_top, z_foot = -0.4, 0.945
     z_fold = _bedding(top, 0.93, z_top, z_foot, 0.18, M.bedding_cream)
-    F.box('runner', 1.98, 0.23, 0.38, (0, top + DUVET + 0.015 - 0.115, 0.75), M.throw_sage, bevel=0.012, bevel_segments=2)
+    # (just round the duvet's sides: its ends stay under the edges of the quilts over sleepers)
+    F.box('runner', 1.93, 0.23, 0.38, (0, top + DUVET + 0.015 - 0.115, 0.75), M.throw_sage, bevel=0.012, bevel_segments=2)
     _finish('bedKing', (top, 0.93, z_top, z_fold, M.bedding_cream))
 
 
