@@ -53,6 +53,7 @@ interface BuildPreview {
       resize?: ObjectResize;
       front?: { x: number; z: number; out: number };
       valid: boolean;
+      wall?: boolean;
     } | null,
   ): void;
   setResizeHandles(handles: readonly ResizeHandle[] | null, hot?: string | null): void;
@@ -618,7 +619,13 @@ export class BuildBuyInput {
     // Only things on the same layer take each other's place (a picture over a sofa, a rug under it).
     const layer = this.content.layer(def);
     const takenOn = (on: string, tx: number, tz: number) => this.taken(on, tx, tz, moving);
-    for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!onPlot(tx, tz) || takenOn(layer, tx, tz)) return null;
+    for (let tz = z; tz < z + d; tz++) {
+      for (let tx = x; tx < x + w; tx++) {
+        if (!onPlot(tx, tz)) return null;
+        // What hangs there already is named (with its wall down it would be hidden but for the hold).
+        if (takenOn(layer, tx, tz)) return layer === 'wall' ? `The ${this.hangingAt(tx, tz, moving) ?? 'thing'} hangs there` : null;
+      }
+    }
     if (def.outdoors) {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.indoors(tx, tz)) return 'Goes outdoors';
     }
@@ -683,6 +690,12 @@ export class BuildBuyInput {
     return game.objects.some((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === on);
   }
 
+  /** The name (lower case) of the thing on a wall (other than `moving`) at a tile. */
+  private hangingAt(tx: number, tz: number, moving: number | null): string | undefined {
+    const o = game.objects.find((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === 'wall');
+    return o && this.content.object(o.def)?.name.toLowerCase();
+  }
+
   /** Whether something (other than `moving`) of a kind that passes `test` stands on or hangs over a tile. */
   private takenBy(tx: number, tz: number, moving: number | null, test: (def: ObjectDef) => boolean): boolean {
     return game.objects.some((o) => {
@@ -720,7 +733,7 @@ export class BuildBuyInput {
     const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
     const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: p.def.model, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: p.def.model, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
