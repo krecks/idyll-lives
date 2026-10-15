@@ -773,7 +773,8 @@ export async function startSession(
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
-    // `__addFunds(amount)`: money for the player's household.
+    // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
+    // of the object `id` at home (null: closed).
     // `__camera(pose?)`: the camera's pose, and with a (partial) pose, puts it there and stops the
     // camera watching on its own. `__controls.follow(id, view?)` also sets the radius, beta, alpha
     // or target height (`y`) it follows with.
@@ -787,6 +788,10 @@ export async function startSession(
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
       __content: content,
       __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
+      __customise: (id: number | null) => {
+        const def = game.objects.find((o) => o.id === id)?.def;
+        game.customising = def && id !== null ? { def, objectId: id } : null;
+      },
       __camera: (pose?: Partial<CameraPose> & { y?: number }) => {
         if (pose) placeCamera(pose);
         return renderer.cameraPose();
