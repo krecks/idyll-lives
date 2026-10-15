@@ -463,6 +463,8 @@ export class BabylonRenderer implements Renderer {
   private ghostArrow!: Mesh;
   private ghostArrowMaterial!: StandardMaterial;
   private ghostValid = true;
+  /** The ghost hangs on a wall (`PlacementGhost.wall`): no thing on a wall is hidden with its wall. */
+  private ghostOnWall = false;
   /** The ghost glides to its tile and turns smoothly; it floats a little, as if held. */
   private ghostShown = false;
   private readonly ghostGoal = new Vector3();
@@ -1109,6 +1111,12 @@ export class BabylonRenderer implements Renderer {
   // --- build mode ----------------------------------------------------------------------
 
   setPlacementGhost(ghost: PlacementGhost | null): void {
+    // Something for a wall in hand: the things on walls show, so what's in its way does.
+    if (!!ghost?.wall !== this.ghostOnWall) {
+      this.ghostOnWall = !!ghost?.wall;
+      this.cutWallItems(Math.max(this.cutLook, 0));
+      this.resetSnapshot();
+    }
     if (!ghost) {
       this.ghostShown = false;
       if (this.ghostRoot.position.y !== HIDDEN_Y) {
@@ -3126,13 +3134,14 @@ export class BabylonRenderer implements Renderer {
   /**
    * Things on a wall go with their wall: all of them with walls down, and in cutaway those on the
    * walls that drop (facing the way the camera looks, so their wall stands between it and them).
+   * Not while something for a wall is held: then they show, as what may be in its way.
    */
   private cutWallItems(bits: number): void {
     const down = this.wallMode === 'down';
     for (const p of this.placed) {
       if (p.wallRot === undefined || p.id === this.held?.id) continue;
       const r = p.wallRot;
-      const hide = down || (bits & 1 && r === 1) || (bits & 2 && r === 3) || (bits & 4 && r === 0) || (bits & 8 && r === 2);
+      const hide = !this.ghostOnWall && (down || (bits & 1 && r === 1) || (bits & 2 && r === 3) || (bits & 4 && r === 0) || (bits & 8 && r === 2));
       const saved = this.wallItemsHidden.get(p.id);
       if (hide && !saved) {
         const m = p.pop.matrices.slice(p.pop.index * 16, p.pop.index * 16 + 16);

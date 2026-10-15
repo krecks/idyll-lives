@@ -191,6 +191,8 @@ export interface PlacementGhost {
   /** The tile a Sim uses it from, marked with an arrow pointing `out` of it (quarter turns as `rot`; must stay clear). */
   front?: { x: number; z: number; out: number };
   valid: boolean;
+  /** It hangs on a wall: while it's held, the things on walls show even with their walls down (what's in its way shows). */
+  wall?: boolean;
 }
 
 /**

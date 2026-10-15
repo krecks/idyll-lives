@@ -3,6 +3,8 @@
 //! can't overlap; a picture needs a wall behind it, a ceiling lamp a room. Bunk beds put their
 //! two sleepers in the middle of the bed.
 
+mod common;
+
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -201,5 +203,33 @@ fn the_flags_are_for_their_own_layers() {
         let content = format!(r#"{{"needs":[{{"id":"energy","label":"Energy"}}],"objects":[{{"id":"x","name":"X","layer":"{layer}","{flag}":true,"interactions":[]}}]}}"#);
         let err = World::from_json(&content, WINDOWS, 1).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(err.contains(flag), "{flag} on the {layer}: {err}");
+    }
+}
+
+#[test]
+fn a_mirror_or_a_mirror_cabinet_hangs_over_every_sink() {
+    // The shipped content: every sink against the top wall, a mirror cabinet over it (used to
+    // brush teeth, from the tile in front of the sink) and a round mirror over a double's other half.
+    let content = common::content();
+    for (sink, wide) in [("sink", 1), ("sinkPedestal", 1), ("sinkVessel", 1), ("sinkConsole", 1), ("farmhouseSink", 1), ("vanityDouble", 2), ("counterSinkDouble", 2)] {
+        let mut w = World::from_json(&content, TOWN, 1).unwrap();
+        w.households[0].funds = 100_000;
+        buy(&mut w, sink, 3, 1, 0).unwrap_or_else(|e| panic!("{sink}: {e}"));
+        buy(&mut w, "mirrorCabinet", 3, 1, 0).unwrap_or_else(|e| panic!("a mirror cabinet over the {sink}: {e}"));
+        if wide == 2 {
+            buy(&mut w, "mirrorRound", 4, 1, 0).unwrap_or_else(|e| panic!("a mirror over the {sink}'s other half: {e}"));
+        }
+        // But not two things on the wall in one place.
+        assert!(buy(&mut w, "mirrorRound", 3, 1, 0).is_err(), "a mirror over the cabinet over the {sink}");
+    }
+    // Over furniture as tall as the wall, neither hangs.
+    let mut w = World::from_json(&content, TOWN, 1).unwrap();
+    w.households[0].funds = 100_000;
+    for (tall, x) in [("fridgeBuiltIn", 3), ("wardrobe", 6)] {
+        buy(&mut w, tall, x, 1, 0).unwrap_or_else(|e| panic!("{tall}: {e}"));
+        for mirror in ["mirrorCabinet", "mirrorRound"] {
+            let err = buy(&mut w, mirror, x, 1, 0).unwrap_err().to_string();
+            assert!(err.contains("hang into"), "a {mirror} over the {tall}: {err}");
+        }
     }
 }
