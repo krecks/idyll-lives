@@ -161,7 +161,7 @@ export interface ObjectInfo extends Shape {
   footprint: [number, number];
   /** The disc it takes on a top (m), its default and limits applied (`Content.radius`). */
   radius: number;
-  /** Whether it has interactions: someone must be able to get to it. */
+  /** Whether it has interactions or cooking stations: someone must be able to get to it. */
   used: boolean;
   /** Whether it gives light (content `light`): it counts for its room's light at night. */
   lamp: boolean;
@@ -182,7 +182,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
     }
     return known.get(def);
   };
@@ -1165,17 +1165,18 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
         const [w, d] = turned ? [fd, fw] : [fw, fd];
         for (let z = r.z; z + d <= r.z + r.d; z++) {
           for (let x = r.x; x + w <= r.x + r.w; x++) {
-            // Facing into the room (a table nobody uses still needs its front open).
-            const rot = inside(r, ...frontTile(x, z, w, d, turned)) ? turned : turned + 2;
+            // Facing into the room (a table nobody uses still needs its front open), either way if
+            // both are (an island's cook stands at the front, its stools behind).
+            const rots = [turned, turned + 2].filter((rot) => inside(r, ...frontTile(x, z, w, d, rot)));
             // Room for chairs and a way round them on every side; else as near the middle as can be.
             const gap = Math.min(x - r.x, z - r.z, r.x + r.w - x - w, r.z + r.d - z - d);
-            spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
+            for (const rot of rots) spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
           }
         }
       }
     }
     spots.sort((a, b) => b.score - a.score);
-    for (const { x, z, rot } of spots.slice(0, 24)) {
+    for (const { x, z, rot } of spots.slice(0, 48)) {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
       const mine = tilesOf(x, z, w, d);
       const front = frontTile(x, z, w, d, rot);
@@ -1263,6 +1264,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
  */
 function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number, over?: string[], near?: [number, number]): boolean {
   const layers = (f.layers ??= new Set());
+  const used = !!info(def)?.used;
   const stairs = new Set<string>();
   for (const o of f.objects) {
     if (o.def !== cfg.stairs) continue;
@@ -1290,12 +1292,13 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       }
     }
     const [frx, frz] = frontTile(x, z, w, d, rot);
-    return inside(r, frx, frz);
+    // One with a use (the mirror cabinet's "Brush your teeth") has its front tile free to stand on.
+    return inside(r, frx, frz) && !(used && f.taken.has(key(frx, frz)));
   };
   const take = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.add(`${layer}:${key(x + dx, z + dz)}`);
     f.objects.push({ def, x, z, rot });
-    f.fronts.push(null);
+    f.fronts.push(used ? [frontTile(x, z, w, d, rot)] : null);
     return true;
   };
   if (layer === 'wall') {
