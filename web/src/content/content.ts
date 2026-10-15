@@ -97,7 +97,7 @@ export interface CookingRules {
   /** Clearing away: scraping food off one thing (into a `bin`, else at the sink). */
   scrapeMinutes?: number;
   scrapeAnim?: string;
-  /** Putting an armful of clean things away, at one of `putAwayAt` (stations; default `prep`). */
+  /** Putting an armful of clean things away, at the nearest of `putAwayAt` (stations, the first listed on a tie; default `prep`). */
   putAwayMinutes?: number;
   putAwayAnim?: string;
   putAwayAt?: string[];
@@ -232,7 +232,7 @@ export interface ObjectDef {
    * the belly, strummed) or a `pole` (its foot on the floor ahead, its top in the hands: a mop).
    */
   held?: { part: string | string[]; grip: 'bar' | 'pair' | 'guitar' | 'pole' };
-  /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`). */
+  /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`, `cupboard`). */
   stations?: string[];
   /** Keeps leftovers (fridges). */
   stores?: boolean;

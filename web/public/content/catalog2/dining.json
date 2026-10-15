@@ -759,6 +759,9 @@
       "id": "sideboard",
       "name": "Walnut sideboard",
       "model": "model.sideboard",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         2,
         1
@@ -786,6 +789,9 @@
       "id": "buffet",
       "name": "Painted buffet",
       "model": "model.buffet",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         2,
         1
@@ -813,6 +819,9 @@
       "id": "chinaCabinet",
       "name": "China cabinet",
       "model": "model.chinaCabinet",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1

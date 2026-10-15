@@ -49,9 +49,15 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 - **Bar cart**: the cocktail shaker is a part of its own pivoting at its foot, in the middle of the top tray's
   front edge, before the resident who mixes from the front tile. `shake` lifts it 10 cm and tips it 30° towards
   them (one clip, both channels) in 0.6 s for `mix`; `hold` 1.5 s.
-- **Doors for later** (the plan's "+use"): the sideboard's four fluted doors, the buffet's five panelled doors and
-  the china cabinet's two glazed doors are parts of their own, hinged on their outer edges, with no clip (a still
-  part costs no draw call). The china cabinet's base doors and the buffet's drawers are in the body.
+- **Storage doors:** the sideboard's four fluted doors, the buffet's five panelled doors and the china cabinet's two
+  glazed doors are parts of their own, hinged on their outer edges. All three are `cupboard` stations (content
+  `stations`): clean things are put away in the nearest cupboard or counter (cooking `putAwayAt`), and one door
+  swings open 100° in 0.9 s while they are (`door_open`, `fetch`, `hold` 1.5 s): the sideboard's second, the
+  buffet's wide middle one, the china cabinet's left glazed one. One door each, as each opening door costs draws of
+  its own (the sideboard's walnut and fluting two). Behind the sideboard's and buffet's is a real cupboard
+  (`_cabinet(hollow=…)`) with a shelf and stacks of plates and bowls (`_crockery`); the china cabinet's opens onto
+  its plates. The other doors are still (no draw call of their own). The china cabinet's base doors and the
+  buffet's drawers are in the body.
 
 ## K7 — dining tables
 
@@ -92,9 +98,9 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 
 | Model | Size (w × h × d) | Triangles | Draws | Clips (uses) |
 |---|---|---|---|---|
-| `model.sideboard` | 1.82 × 1.10 × 0.67 m | 4,560 | 2 | static; four door parts for later |
-| `model.buffet` | 1.88 × 0.90 × 0.67 m | 2,644 | 2 | static; five door parts for later |
-| `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 5,608 | 2 | static; two glazed door parts for later |
+| `model.sideboard` | 1.82 × 1.10 × 0.67 m | 6,132 | 4 | `door_open` (putting clean things away, `fetch`) |
+| `model.buffet` | 1.88 × 0.90 × 0.67 m | 4,216 | 3 | `door_open` (putting clean things away, `fetch`) |
+| `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 5,608 | 4 | `door_open` (putting clean things away, `fetch`) |
 | `model.barCart` | 0.77 × 1.09 × 0.45 m | 4,468 | 3 | `shake` 0.6 s (mix, `hold` 1.5 s) |
 
 `check_glb.py`: 29 models, 0 failed; one warning, that the dining chair's placeholder in `catalog/manifest.json`

@@ -4132,7 +4132,8 @@
       "grill",
       "microwave",
       "dishes",
-      "bin"
+      "bin",
+      "cupboard"
     ],
     "spoilHours": 8,
     "storedSpoilHours": 72,
@@ -4175,6 +4176,7 @@
     "putAwayMinutes": 2,
     "putAwayAnim": "fetch",
     "putAwayAt": [
+      "cupboard",
       "prep"
     ]
   },

@@ -17,7 +17,8 @@
 # chairs). The sets' chairs are part of the table, as the placeholders draw them, since residents sit on them. The
 # storage stands against the wall where its placeholder stands (`centre=`, the placeholder's middle: its back about
 # 5 cm behind the tile's wall face, where the content's `surface` is). The sideboard's, buffet's and china cabinet's
-# doors are parts of their own, hinged but still: no use opens them yet (the plan's "+use").
+# doors are parts of their own, hinged; one of each (the china cabinet's left glazed door) swings open while a
+# resident puts clean things away there (they are `cupboard` stations), the others are still.
 #
 # Run:  python3 -B tools/art/blender/build.py dining [--only barStool] [--preview]
 import math
@@ -708,12 +709,26 @@ def benchDining():
 # === K9: dining storage ===============================================================================================
 WALL = -0.43   # where the storage is built from (game depth); `settle()` then moves it to its placeholder's centre
 LEG_H = 0.16   # a sideboard's legs
+DOOR_SECONDS = 0.9   # a storage door swings open in this long, while clean things are put away (a `cupboard`)
+PUT_AWAY = {'uses': {'fetch': 'door_open'}, 'hold': 1.5}
 
 
-def _cabinet(w, h, d, body, top, legs, top_t=0.03, top_over=0.01):
-    """A cabinet on four round tapered legs, its back on the wall face, a top over it; returns the front's depth."""
+def _cabinet(w, h, d, body, top, legs, top_t=0.03, top_over=0.01, hollow=None):
+    """A cabinet on four round tapered legs, its back on the wall face, a top over it; returns the front's depth.
+    `hollow`: (x0, x1, y0, y1, depth), a cupboard open at the front behind a door that opens."""
     z = WALL + d / 2
-    F.box('carcass', w, h - LEG_H - top_t, d, (0, LEG_H + (h - LEG_H - top_t) / 2, z), body, bevel=0.01)
+    yb, yt = LEG_H, h - top_t
+    if hollow is None:
+        F.box('carcass', w, yt - yb, d, (0, (yb + yt) / 2, z), body, bevel=0.01)
+    else:
+        # solid either side (their sides one piece), the cupboard between: a back, a floor and a roof
+        x0, x1, y0, y1, depth = hollow
+        for name, a, b in (('carcass_l', -w / 2, x0), ('carcass_r', x1, w / 2)):
+            F.box(name, b - a, yt - yb, d, ((a + b) / 2, (yb + yt) / 2, z), body, bevel=0.01)
+        F.box('carcass_back', x1 - x0, yt - yb, d - depth, ((x0 + x1) / 2, (yb + yt) / 2, WALL + (d - depth) / 2), body)
+        front = WALL + d - depth / 2
+        F.box('carcass_floor', x1 - x0, y0 - yb, depth, ((x0 + x1) / 2, (yb + y0) / 2, front), body, bevel=0.003)
+        F.box('carcass_roof', x1 - x0, yt - y1, depth, ((x0 + x1) / 2, (y1 + yt) / 2, front), body, bevel=0.003)
     F.box('top', w + 2 * top_over, top_t, d + top_over, (0, h - top_t / 2, z + top_over / 2), top, bevel=0.008)
     for x in (-w / 2 + 0.08, w / 2 - 0.08):
         for zz in (WALL + 0.06, WALL + d - 0.06):
@@ -723,7 +738,8 @@ def _cabinet(w, h, d, body, top, legs, top_t=0.03, top_over=0.01):
 
 def _door(name, x0, x1, y0, y1, zf, material, hinge_left, build=None, frame=0.0):
     """A door from x0 to x1 (game), `y0` to `y1`, its back on the front face `zf`: a part of its own, hinged on
-    its outer edge, still (no use opens it yet). `frame`: only a frame that wide (a glazed door)."""
+    its outer edge (one of them swings open while clean things are put away: `door_open`; the others are still).
+    `frame`: only a frame that wide (a glazed door)."""
     with G.new_parts() as parts:
         xm, ym, w, h = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0
         if frame:
@@ -740,17 +756,38 @@ def _door(name, x0, x1, y0, y1, zf, material, hinge_left, build=None, frame=0.0)
     return G.hinged(door, F.at(x0 if hinge_left else x1, (y0 + y1) / 2, zf + 0.01))
 
 
+def _crockery(cup, zf, shelf):
+    """A shelf half way up a cupboard (`_cabinet`'s `hollow`) and stacks of plates and bowls on its floor and on
+    the shelf; `zf` is the cabinet's front."""
+    x0, x1, y0, y1, depth = cup
+    xm, z = (x0 + x1) / 2, zf - depth / 2
+    ym = (y0 + y1) / 2
+    F.box('cup_shelf', x1 - x0, 0.018, depth - 0.02, (xm, ym, z - 0.01), shelf, bevel=0.003)
+    for k, base in enumerate((y0, ym + 0.009)):
+        for i in range(6):
+            F.cyl(f'cup_plate{k}{i}', 0.1, 0.012, (xm - 0.06, base + 0.006 + 0.014 * i, z),
+                  M.porcelain if i % 3 else M.plate_blue, verts=18)
+        for i in range(3):
+            F.cone(f'cup_bowl{k}{i}', 0.045, 0.065, 0.045, (xm + 0.11, base + 0.0225 + 0.02 * i, z + 0.04),
+                   M.porcelain, verts=14)
+
+
 def sideboard():
     """Walnut sideboard (catalog2, 2x1): four fluted doors with brass knobs on tapered legs, a vase on top."""
     w, h, d = 1.8, 0.8, 0.62
+    n, y0, y1 = 4, LEG_H + 0.02, h - 0.05
+    dw = (w - 0.04) / n
+    # the second door's cupboard (the door from x0 to x1), with plates and bowls in it
+    cx0 = -w / 2 + 0.02 + dw + 0.006
+    cup = (cx0 + 0.02, cx0 + dw - 0.032, y0 + 0.02, y1 - 0.02, 0.45)
     with G.new_parts() as still:
-        zf = _cabinet(w, h, d, M.body_walnut, M.top_sideboard, M.body_walnut)
+        zf = _cabinet(w, h, d, M.body_walnut, M.top_sideboard, M.body_walnut, hollow=cup)
+        _crockery(cup, zf, M.body_walnut)
         F.cyl('vase_foot', 0.05, 0.02, (-0.6, h + 0.01, -0.3), M.cream, verts=16)
         G.revolve('vase', [(0, 0), (0.06, 0), (0.07, 0.08), (0.05, 0.2), (0.035, 0.27), (0.04, 0.3), (0.033, 0.3),
                            (0, 0.28)], at=F.at(-0.6, h, -0.3), material=M.cream, segments=18)
     G.join(still, 'body', origin=(0, 0, 0))
-    n, y0, y1 = 4, LEG_H + 0.02, h - 0.05
-    dw = (w - 0.04) / n
+    doors = []
 
     def flutes(x0, x1, y0, y1, zf):
         for k in range(-3, 4):
@@ -766,8 +803,11 @@ def sideboard():
             F.sphere(f'knob{a}', 0.016, ((b - 0.05) if left else (a + 0.05), (c + e) / 2, zf + 0.012), M.brass,
                      segments=10, rings=6)
             flutes(a, b, c, e, zf)
-        _door(f'door{i}', x0, x1, y0, y1, zf, M.body_walnut, left, knob)
+        doors.append(_door(f'door{i}', x0, x1, y0, y1, zf, M.body_walnut, left, knob))
     G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    # the second door (hinged on its right) swings open while clean things are put away; one door only, as
+    # each costs draws of its own
+    G.swing(doors[1], 'door_open', -100, seconds=DOOR_SECONDS)
     return G.meshes()
 
 
@@ -775,8 +815,11 @@ def buffet():
     """Painted buffet (catalog2, 2x1): a sage cabinet, three drawers over five doors, an oak top and legs."""
     w, h, d = 1.84, 0.9, 0.62
     ym = h - 0.035 - 0.15
+    # the wide middle door's cupboard, with plates and bowls in it
+    cup = (-0.265, 0.265, LEG_H + 0.04, ym - 0.03, 0.45)
     with G.new_parts() as still:
-        zf = _cabinet(w, h, d, M.body_sage, M.top_oak, M.legs_oak, top_t=0.035, top_over=0.02)
+        zf = _cabinet(w, h, d, M.body_sage, M.top_oak, M.legs_oak, top_t=0.035, top_over=0.02, hollow=cup)
+        _crockery(cup, zf, M.body_sage)
         for x in (-0.6, 0.0, 0.6):
             F.box(f'drawer{x}', 0.56, 0.13, 0.02, (x, ym + 0.075, zf + 0.01), M.body_sage, bevel=0.006)
             F.box(f'pull{x}', 0.14, 0.014, 0.018, (x, ym + 0.075, zf + 0.028), M.brass, bevel=0.005)
@@ -792,10 +835,12 @@ def buffet():
     y0, y1 = LEG_H + 0.02, ym - 0.01
     doors = [(-0.89, -0.605, True), (-0.595, -0.31, False), (-0.285, 0.285, True), (0.31, 0.595, True),
              (0.605, 0.89, False)]
-    for i, (x0, x1, left) in enumerate(doors):
-        _door(f'door{i}', x0, x1, y0, y1, zf, M.body_sage, left,
-              lambda a, b, c, e, z, left=left: panel(a, b, c, e, z, left))
+    parts = [_door(f'door{i}', x0, x1, y0, y1, zf, M.body_sage, left,
+                   lambda a, b, c, e, z, left=left: panel(a, b, c, e, z, left))
+             for i, (x0, x1, left) in enumerate(doors)]
     G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    # the wide middle door (hinged on its left) swings open while clean things are put away
+    G.swing(parts[2], 'door_open', 100, seconds=DOOR_SECONDS)
     return G.meshes()
 
 
@@ -832,12 +877,15 @@ def chinaCabinet():
         F.box(f'pane{x0}', x1 - x0 - 0.06, y1 - y0 - 0.06, 0.006, ((x0 + x1) / 2, (y0 + y1) / 2, zf - 0.01), M.glass)
         F.box(f'bar{x0}', x1 - x0 - 0.06, 0.02, 0.012, ((x0 + x1) / 2, (y0 + y1) / 2 + 0.17, zf - 0.01),
               M.body_china, bevel=0.003)
+    glazed_doors = []
     for s, (x0, x1) in ((-1, (-0.43, -0.005)), (1, (0.005, 0.43))):
         def glazed(a, b, c, e, z, s=s):
             glazing(a, b, c, e, z)
             F.sphere(f'knob_g{s}', 0.014, (s * 0.04, 1.45, z + 0.01), M.brass, segments=10, rings=6)
-        _door(f'glass_door{s}', x0, x1, 0.93, 2.0, zf, M.body_china, s < 0, glazed, frame=0.045)
+        glazed_doors.append(_door(f'glass_door{s}', x0, x1, 0.93, 2.0, zf, M.body_china, s < 0, glazed, frame=0.045))
     G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    # the left glazed door (hinged on its left) swings open onto the plates while clean things are put away
+    G.swing(glazed_doors[0], 'door_open', 100, seconds=DOOR_SECONDS)
     return G.meshes()
 
 
@@ -951,12 +999,13 @@ FAMILY = G.Family(
      G.Model('benchDining', benchDining, size=(1.6, 0.468, 0.36), centre=(0, 0.05), key='model.benchDining',
              paint=[('legs_oakd', 'Frame'), ('seat_oak', 'Seat')]),
      # K9: dining storage
+     # putting clean dishes away (a `cupboard` station, cooking putAwayAt, anim fetch) opens a door
      G.Model('sideboard', sideboard, size=(1.82, 1.1, 0.668), centre=(0, -0.096), key='model.sideboard',
-             paint=[('body_walnut', 'Body'), ('top_sideboard', 'Top'), ('brass', 'Handles')]),
+             motions=PUT_AWAY, paint=[('body_walnut', 'Body'), ('top_sideboard', 'Top'), ('brass', 'Handles')]),
      G.Model('buffet', buffet, size=(1.88, 0.9, 0.668), centre=(0, -0.096), key='model.buffet',
-             paint=[('body_sage', 'Body'), ('top_oak', 'Top'), ('brass', 'Handles')]),
+             motions=PUT_AWAY, paint=[('body_sage', 'Body'), ('top_oak', 'Top'), ('brass', 'Handles')]),
      G.Model('chinaCabinet', chinaCabinet, size=(0.98, 2.1, 0.548), centre=(0, -0.156), key='model.chinaCabinet',
-             paint=[('body_china', 'Body'), ('top_china', 'Top'), ('brass', 'Handles')]),
+             motions=PUT_AWAY, paint=[('body_china', 'Body'), ('top_china', 'Top'), ('brass', 'Handles')]),
      G.Model('barCart', barCart, size=(0.769, 1.09, 0.45), centre=(-0.017, 0), key='model.barCart',
              motions={'uses': {'mix': 'shake'}, 'hold': 1.5},
              paint=[('frame_brass', 'Frame'), ('tray', 'Trays')])],
