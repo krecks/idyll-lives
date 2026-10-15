@@ -124,7 +124,21 @@ The game's surfaces are a dozen finishes, the `material.finish.*` entries of the
 (plain), `fabric`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour) and `glass`
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
-finish it uses.
+finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
+(`encodeFinish`, read by `PlainFinishPlugin` in `render/babylon/materials.ts`; until 2026-10-15 the
+shader never saw it and drew every plain finish as rough metal). Metals mirror the sky just above the
+horizon where they would reflect the ground: the game looks down on everything, so anything upright
+and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
+room has.
+
+- **Hardware is metal.** Handles, knobs, pulls, latches and taps take a `metal` or `chrome` palette
+  colour (chrome or brushed steel, brass, black iron as the piece's style wants), on base models and
+  packs alike. Colouring such a part keeps its finish, so a tinted handle is tinted metal (anodised),
+  not paint; "As made" is the plain metal. On a still part that has no plain material yet, metal
+  hardware costs a draw call (a wood-only dresser body): the dresser, the low dresser, the dressing
+  table and the writing bureau took their fourth for it; the record cabinet's lid would take a fifth,
+  so its pull stays wood. Left as they are: what isn't furniture hardware (mugs, pans, tools, grips,
+  toys' handles, plastic bins), and wood where heat wants wood (the sauna's and the pizza oven's doors).
 
 - **Map every material to a finish** in the entry's `materials`, by material name, with `*` for
   the rest:

@@ -409,7 +409,7 @@ def grandfatherClock():
         for s in (-1, 1):
             F.box(f'door_rail{s}', 0.36, 0.06, 0.02, (0, 1.0 + s * 0.41, door_z), M.walnut, bevel=0.005)
             F.box(f'door_stile{s}', 0.05, 0.78, 0.02, (s * 0.155, 1.0, door_z), M.walnut, bevel=0.005)
-        F.box('door_knob', 0.016, 0.03, 0.016, (0.15, 1.0, door_z + 0.016), M.walnut_dark, bevel=0.005)
+        F.box('door_knob', 0.016, 0.03, 0.016, (0.15, 1.0, door_z + 0.016), M.brass, bevel=0.005)
     G.join(still, 'body', origin=(0, 0, 0))
     hands = _clock_hands(F, DIAL_Y, dz, ('hour', 0.07, 0.012, 0.008, 0.0), ('minute', 0.11, 0.008, 0.010, 0.0))
     G.settle(centre=False)

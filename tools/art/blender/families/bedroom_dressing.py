@@ -29,7 +29,7 @@ M = G.Palette(
     mirror=('#DCE6EA', 'gloss', 'front'),       # glass that reflects to the front (+z)
     # the dressing table
     table=('#CDB08A', 'wood'),          # top, drawer cases, drawers (the main colour part)
-    table_frame=('#B8925A', 'metal'),   # legs, the mirror's ring and stand
+    table_frame=('#B8925A', 'metal'),   # legs, the mirror's ring and stand, the drawer knobs
     pouf=('#E4B8AE', 'satin'),          # the pouf (plain, not fabric: a draw call saved for the drawer)
     inside=('#3A332C', 'satin'),        # the dark behind an open drawer
     perfume=('#E8B4C0', 'gloss'),
@@ -163,7 +163,7 @@ def _drawer_front(name, x):
     """A drawer front on a case's face to the seat, with a wooden knob."""
     y = (CASE_Y0 + TOP_Y - 0.035) / 2
     F.box(f'{name}_front', 0.28, 0.118, 0.016, (x, y, CASE_Z0 - 0.009), M.table, bevel=0.005)
-    F.sphere(f'{name}_knob', 0.013, (x, y, CASE_Z0 - 0.024), M.table, segments=12, rings=7)
+    F.sphere(f'{name}_knob', 0.013, (x, y, CASE_Z0 - 0.024), M.table_frame, segments=12, rings=7)
     return y
 
 

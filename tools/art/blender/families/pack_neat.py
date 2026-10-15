@@ -153,7 +153,7 @@ def _appliance(F, y0, hh, zf, door):
         G.torus(_name('ring'), 0.21, 0.025, at=F.at(WX, cy, zf + 0.005), material=M.chrome, rot=(90, 0, 0),
                 major_segments=28, minor_segments=8)
         F.cyl(_name('porthole'), 0.2, 0.01, (WX, cy, zf + 0.002), M.porthole, rot=(90, 0, 0), verts=28)
-        F.box(_name('door_handle'), 0.04, 0.1, 0.03, (WX + 0.25, cy, zf + 0.02), M.trim, bevel=0.012)
+        F.box(_name('door_handle'), 0.04, 0.1, 0.03, (WX + 0.25, cy, zf + 0.02), M.chrome, bevel=0.012)
     return cy
 
 
@@ -205,7 +205,7 @@ def laundryCenter():
         G.torus('door_ring', 0.21, 0.025, at=F.at(WX, cy, zf + 0.005), material=M.chrome, rot=(90, 0, 0),
                 major_segments=28, minor_segments=8)
         F.cyl('door_window', 0.2, 0.01, (WX, cy, zf + 0.002), M.porthole, rot=(90, 0, 0), verts=28)
-        F.box('door_handle', 0.04, 0.1, 0.03, (WX + 0.25, cy, zf + 0.02), M.trim, bevel=0.012)
+        F.box('door_handle', 0.04, 0.1, 0.03, (WX + 0.25, cy, zf + 0.02), M.chrome, bevel=0.012)
     door = G.hinged(G.join(door, 'door'), F.at(WX - 0.235, cy, zf + 0.005))
     objs = G.settle(centre=False)
     G.swing(door, 'door_open', 100, seconds=0.8)

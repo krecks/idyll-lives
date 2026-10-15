@@ -97,6 +97,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
+   - Hardware (handles, knobs, pulls, latches, taps) takes a `metal` or `chrome` colour: chrome or
+     steel, brass, or black iron as the piece wants. Coloured by the player it stays metal (tinted).
+     On a still part with no other plain material it costs a draw call (objects.md, "Hardware is metal").
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'gloss', 'front')`. Make it a flat
      piece, on the still body or one moving part (a cabinet's door); the game reflects the room in it
      live on High. Keep it `gloss`, as the placeholders' mirrors: on Medium and Low nothing reflects,

@@ -705,7 +705,7 @@ def coop():
         # the nest box on the back, its lid sloping like the roof
         F.box('nest', 0.9, 0.36, 0.14, (0, 0.92, CB - 0.07), M.coop)
         _strut('nest_lid', (CB - 0.17, 1.08), (CB + 0.01, 1.16), 0.035, -0.48, 0.48, M.coop_roof, axis='x')
-        F.box('nest_latch', 0.06, 0.04, 0.02, (0, 1.0, CB - 0.15), M.coop_trim)
+        F.box('nest_latch', 0.06, 0.04, 0.02, (0, 1.0, CB - 0.15), M.iron)
     G.join(body, 'coop', origin=(0, 0, 0))
     # the pop-hole hatch: its own part, its origin the middle of its top edge. By day it stands up in its runners,
     # the hole open for the hens; at night `close` slides it down over the hole (`motions.night`).
@@ -713,7 +713,7 @@ def coop():
         hw, h0, h1 = HATCH
         F.box('hatch', 2 * hw + 0.02, h1 - h0 + 0.02, 0.025, (0, (h0 + h1) / 2, CF + 0.03), M.coop_trim, bevel=0.005)
         F.box('hatch_brace', 2 * hw - 0.04, 0.03, 0.012, (0, (h0 + h1) / 2, CF + 0.048), M.coop_trim)
-        G.sphere('hatch_knob', 0.016, at=F.at(0, h0 + 0.06, CF + 0.055), material=M.coop_dark, segments=8, rings=5)
+        G.sphere('hatch_knob', 0.016, at=F.at(0, h0 + 0.06, CF + 0.055), material=M.iron, segments=8, rings=5)
     hatch = G.join(hatch_parts, 'hatch', origin=F.at(0, h1 + 0.01, CF + 0.03))
     hatch.location.z += HATCH_UP
     G.settle()

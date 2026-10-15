@@ -34,7 +34,7 @@
           "finish": "material.finish.matte"
         },
         "knob": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.metal"
         },
         "pan": {
           "finish": "material.finish.satin"
