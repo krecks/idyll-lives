@@ -351,10 +351,20 @@ if (${u}digSpan.x > 0.5 && ${p}.y > ${u}digSpan.y && ${p}.x > ${u}digRect.x && $
   }
 }
 
+/** How far up a metal's reflection goes for one that would go down (1: as far up as it went down). */
+const SKY_FOR_GROUND = '0.3';
+
 /**
  * One material for every untextured opaque finish (matte, satin, gloss, metal, chrome, skin,
  * hair): metalness and roughness come from the vertex colour's alpha (see `encodeFinish`), so a
- * placeholder model with five finishes is one draw call instead of five.
+ * placeholder model with five finishes is one draw call instead of five. The alpha goes to the
+ * fragment in a varying of its own: Babylon's `vColor.a` is 1 unless the mesh has vertex alpha,
+ * and vertex alpha would make the material blend (which put every plain finish at rough metal).
+ *
+ * Metals don't reflect the ground. The game looks down on everything, so a mirror reflection off
+ * anything upright (a handle, a steel fridge) comes from the sky map's lower half, the dark field
+ * outside, which no room has: a reflection that would go down goes as far up instead, flattened
+ * towards the horizon (`SKY_FOR_GROUND`), and the low sky stands in for the room.
  */
 class PlainFinishPlugin extends MaterialPluginBase {
   constructor(material: Material) {
@@ -370,15 +380,33 @@ class PlainFinishPlugin extends MaterialPluginBase {
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
+    const wgsl = shaderLanguage === ShaderLanguage.WGSL;
+    // Matte where a mesh has no vertex colours.
+    const matte = encodeFinish(0.75, 0).toFixed(4);
+    if (shaderType === 'vertex') {
+      return wgsl
+        ? {
+            CUSTOM_VERTEX_DEFINITIONS: 'varying vFinish: f32;',
+            CUSTOM_VERTEX_MAIN_END: `#ifdef VERTEXCOLOR\nvertexOutputs.vFinish = vertexInputs.color.a;\n#else\nvertexOutputs.vFinish = ${matte};\n#endif\n`,
+          }
+        : {
+            CUSTOM_VERTEX_DEFINITIONS: 'varying float vFinish;',
+            CUSTOM_VERTEX_MAIN_END: `#ifdef VERTEXCOLOR\nvFinish = color.a;\n#else\nvFinish = ${matte};\n#endif\n`,
+          };
+    }
     if (shaderType !== 'fragment') return null;
-    if (shaderLanguage === ShaderLanguage.WGSL) {
-      const a = 'fragmentInputs.vColor.a';
+    if (wgsl) {
+      const a = 'fragmentInputs.vFinish';
       return {
+        CUSTOM_FRAGMENT_DEFINITIONS: 'varying vFinish: f32;',
+        '!(var\\s+reflectionVector\\s*:\\s*vec3f\\s*=\\s*computeReflectionCoords\\(\\s*vec4f\\(\\s*vPositionW\\s*,\\s*1\\.0\\s*\\)\\s*,\\s*normalW\\s*\\)\\s*;)': `$1\nif (${a} >= 0.5 && reflectionVector.y < 0.0) { reflectionVector.y *= -${SKY_FOR_GROUND}; }`,
         '!reflectivityBlock\\(\\s*uniforms\\.vReflectivityColor': `reflectivityBlock(vec4f(step(0.5, ${a}), clamp((${a} - 0.5 * step(0.5, ${a})) * 2.0, 0.03, 1.0), uniforms.vReflectivityColor.zw)`,
       };
     }
     return {
-      '!reflectivityBlock\\(\\s*vReflectivityColor': 'reflectivityBlock(vec4(step(0.5, vColor.a), clamp((vColor.a - 0.5 * step(0.5, vColor.a)) * 2.0, 0.03, 1.0), vReflectivityColor.ba)',
+      CUSTOM_FRAGMENT_DEFINITIONS: 'varying float vFinish;',
+      '!(vec3\\s+reflectionVector\\s*=\\s*computeReflectionCoords\\(\\s*vec4\\(\\s*vPositionW\\s*,\\s*1\\.0\\s*\\)\\s*,\\s*normalW\\s*\\)\\s*;)': `$1\nif (vFinish >= 0.5 && reflectionVector.y < 0.0) { reflectionVector.y *= -${SKY_FOR_GROUND}; }`,
+      '!reflectivityBlock\\(\\s*vReflectivityColor': `reflectivityBlock(vec4(step(0.5, vFinish), clamp((vFinish - 0.5 * step(0.5, vFinish)) * 2.0, 0.03, 1.0), vReflectivityColor.ba)`,
     };
   }
 }
