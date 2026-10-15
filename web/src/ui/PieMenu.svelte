@@ -1,5 +1,6 @@
 <script lang="ts">
   import { money } from './format';
+  import { closeOutside } from './kit/popup';
   import { services } from './services';
   import { game } from './state.svelte';
 
@@ -18,9 +19,8 @@
 </script>
 
 {#if menu}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="scrim" onclick={() => services.controls.closeMenu()}></div>
-  <div class="pie" style="left:{cx}px;top:{cy}px" role="menu" aria-label={menu.title}>
+  <!-- No backdrop: the world behind keeps its clicks and camera drags (`kit/popup.ts`). -->
+  <div class="pie" use:closeOutside={() => services.controls.closeMenu()} style="left:{cx}px;top:{cy}px" role="menu" aria-label={menu.title}>
     <div class="title">{menu.title}{#if actor}<small> · {actor.name}</small>{/if}</div>
     {#each menu.items as item, i (item.index)}
       {@const poor = item.cost !== undefined && item.cost > game.funds}
@@ -39,11 +39,6 @@
 {/if}
 
 <style>
-  .scrim {
-    position: absolute;
-    inset: 0;
-    pointer-events: auto;
-  }
   .pie {
     position: absolute;
     width: 0;
