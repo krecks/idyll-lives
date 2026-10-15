@@ -227,6 +227,8 @@ const BEDS: Record<string, Bed> = {
   bedFuton: { h: 0.4 },
   bedKing: { h: 0.59 },
   kidsBed: { h: 0.44 },
+  // The race car's mattress ends at its bonnet, 34 cm short of the footprint's end.
+  kidsBedCar: { h: 0.5, foot: 0.37 },
   sunLounger: { h: 0.35 },
   // Hammocks: lain in the sagging sling (`Bed.sling`, from their models' builds).
   hammock: { h: 0.62, sling: { low: 0.6, end: 0.86, half: 0.66, head: 0.5 } },
@@ -246,6 +248,8 @@ const DEFAULT_BED: Bed = { h: 0.5 };
 interface Bed {
   h: number;
   fwd?: number;
+  /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
+  foot?: number;
   across?: boolean;
   /**
    * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
@@ -889,8 +893,13 @@ export class Characters {
   private readonly rightProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
-  /** Blankets: one quilt mesh per body, one thin instance (matrix) per Sim row. */
-  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array }>();
+  /**
+   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`),
+   * one thin instance (matrix) per Sim row; `ext` holds two numbers a row (`writeBlanket`).
+   */
+  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; base: boolean }>();
+  /** The quilts' shared material, for the life stages' quilts made later. */
+  private quilt: PBRMaterial | null = null;
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
   /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
@@ -1045,17 +1054,9 @@ export class Characters {
     }));
     // One stretch range for both quilts (their toes are within a centimetre).
     const toeZ = Math.max(...lying.map((l) => l.feetZ)) + 0.03;
-    const quilt = blanketMaterial(this.scene, toeZ, toeZ + 0.29);
-    this.lib.adopt(quilt);
-    for (const l of lying) {
-      const shape = buildBlanket(this.scene, `simBlanket:${l.body.name}`, l.positions, l.chestZ, l.feetZ, quilt);
-      const matrices = new Float32Array(MAX_CHARACTERS * 16);
-      const ext = new Float32Array(MAX_CHARACTERS);
-      shape.mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
-      shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 1, false);
-      shape.mesh.setEnabled(false);
-      this.blankets.set(l.body.name, { ...shape, matrices, ext });
-    }
+    this.quilt = blanketMaterial(this.scene, toeZ, toeZ + 0.29);
+    this.lib.adopt(this.quilt);
+    for (const l of lying) this.addQuilt(l.body, l);
     this.ring = this.makeRing();
     if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
     return true;
@@ -1171,6 +1172,9 @@ export class Characters {
             this.sitPelvis.set(b.name, this.measureSit(b));
             this.legFits.set(b.name, this.measureLegs(b));
           }
+          // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
+          // grown-up's quilt made smaller covers (their shoes showed through it halfway down the bed).
+          if (b && !this.blankets.has(b.name) && this.quilt) this.addQuilt(b, this.lyingPose(b));
         }
       }),
     );
@@ -1339,10 +1343,13 @@ export class Characters {
       return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
-    for (const b of this.blankets.values()) {
+    const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
+    const bodies = new Set(this.sims.map((r) => r?.body.name));
+    for (const [name, b] of this.blankets) {
       b.matrices.fill(0);
       b.mesh.thinInstanceBufferUpdated('matrix');
-      b.mesh.setEnabled(world.objects.some((o) => BLANKET_BEDS.has(o.def)));
+      // (A life stage's quilt only where someone has that body: no draw call for nobody.)
+      b.mesh.setEnabled(beds && (b.base || bodies.has(name)));
     }
     this.texture.update(this.data);
     this.uploaded.set(this.data);
@@ -3423,13 +3430,19 @@ export class Characters {
 
   /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
-   * and to the bed's foot end, pulled up over ~0.5 s when the Sim lies down; zero-scaled otherwise.
+   * and to the bed's foot end, pulled up from the foot end over ~0.5 s once the Sim lies flat (and
+   * pushed back down as they get up); zero-scaled otherwise.
    */
   private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
-    const blanket = this.blankets.get(rig.body.family);
+    // The body's own quilt (a life stage's, draped over its own pose), else its family's base body's.
+    const own = this.blankets.get(rig.body.name);
+    const blanket = own ?? this.blankets.get(rig.body.family);
     if (!blanket) return;
     const bed = rig.bed;
-    const under = pose === Pose.Lie && LYING.has(rig.cur.key) && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
+    // Only once the body lies flat (the crossfade from sitting on the edge done): pulled up while the legs
+    // still swing up onto the bed, it showed the shoes through it halfway down the bed.
+    const flat = rig.w > 0.97 || rig.cover > 0;
+    const under = pose === Pose.Lie && LYING.has(rig.cur.key) && flat && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
     rig.cover = fresh ? (under ? 1 : 0) : clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
     const m = blanket.matrices;
     const o = i * 16;
@@ -3452,14 +3465,17 @@ export class Characters {
     const side = wide ? Math.sign((x - bed.cx) * fz - (z - bed.cz) * fx) * BLANKET_MEET : 0;
     const tx = fx > 1e-3 ? (bed.maxX - x) / fx : fx < -1e-3 ? (bed.minX - x) / fx : Infinity;
     const tz = fz > 1e-3 ? (bed.maxZ - z) / fz : fz < -1e-3 ? (bed.minZ - z) / fz : Infinity;
-    const foot = Math.min(tx, tz) - 0.05;
-    // A body smaller than the one the quilt was made for (a child's, shaped for its life stage): the quilt
+    const foot = Math.min(tx, tz) - (BEDS[bed.def]?.foot ?? 0.05);
+    // A body smaller than the one the quilt was made for (a child's with no quilt of its own yet): the quilt
     // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
-    const zs = s * rig.size;
+    const zs = own ? s : s * rig.size;
     const z0 = lieCentre(rig) - LIE_CENTRE * zs;
     // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale).
-    blanket.ext[i] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
+    blanket.ext[i * 2] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
     const c = smooth(rig.cover);
+    // Pulled up: the quilt from its foot end to this line (local z) at full height, the rest folded away
+    // under it (`BlanketPlugin`), so nothing shows through it on the way up or down.
+    blanket.ext[i * 2 + 1] = c >= 1 ? -9 : blanket.footZ - (blanket.footZ - blanket.topZ + 0.02) * c;
     const sx = (slot / BLANKET_WIDTH) * (0.9 + 0.1 * c);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
@@ -3469,7 +3485,7 @@ export class Characters {
     m[o + 2] = -fx * sx;
     m[o + 3] = 0;
     m[o + 4] = 0;
-    m[o + 5] = zs * c;
+    m[o + 5] = zs;
     m[o + 6] = 0;
     m[o + 7] = 0;
     m[o + 8] = fx * zs;
@@ -3480,6 +3496,17 @@ export class Characters {
     m[o + 13] = rig.bedH + lift;
     m[o + 14] = z + fx * side + fz * z0;
     m[o + 15] = 1;
+  }
+
+  /** A body's quilt (`blankets`), draped over its lying pose, every row's instance hidden. */
+  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }): void {
+    const shape = buildBlanket(this.scene, `simBlanket:${body.name}`, lying.positions, lying.chestZ, lying.feetZ, this.quilt!);
+    const matrices = new Float32Array(MAX_CHARACTERS * 16);
+    const ext = new Float32Array(MAX_CHARACTERS * 2);
+    shape.mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
+    shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 2, false);
+    shape.mesh.setEnabled(false);
+    this.blankets.set(body.name, { ...shape, matrices, ext, base: body.name === body.family });
   }
 
   /**

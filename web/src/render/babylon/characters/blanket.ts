@@ -250,9 +250,11 @@ export function blanketMaterial(scene: Scene, toeZ: number, footZ: number): PBRM
 let pendingRange: [number, number] = [0, 1];
 
 /**
- * Per-instance `blanketExt` (m, local): moves the quilt past the toes towards the bed's foot end
- * (stretching the stretch between toes and foot edge), so one mesh fits beds of any length while the
- * part over the body keeps its shape.
+ * Per-instance `blanketExt` (m, local), two numbers. The first moves the quilt past the toes towards the
+ * bed's foot end (stretching the stretch between toes and foot edge), so one mesh fits beds of any length
+ * while the part over the body keeps its shape. The second is how far up it is pulled (local z): the quilt
+ * from there to its foot end keeps its shape and the rest folds down under that line, flat on the mattress
+ * (pulled up as the Sim lies down, pushed down as they get up; far past the top edge when it's all up).
  */
 class BlanketPlugin extends MaterialPluginBase {
   private readonly range: [number, number];
@@ -284,13 +286,13 @@ class BlanketPlugin extends MaterialPluginBase {
     const [a, b] = (this.range ?? pendingRange).map((v) => v.toFixed(4));
     if (shaderLanguage === ShaderLanguage.WGSL) {
       return {
-        CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute blanketExt: f32;\n#endif\n`,
-        CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\npositionUpdated.z += vertexInputs.blanketExt * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
+        CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute blanketExt: vec2<f32>;\n#endif\n`,
+        CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\nif (positionUpdated.z < vertexInputs.blanketExt.y) { positionUpdated = vec3<f32>(positionUpdated.x, 0.0, vertexInputs.blanketExt.y); }\npositionUpdated.z += vertexInputs.blanketExt.x * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
       };
     }
     return {
-      CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute float blanketExt;\n#endif\n`,
-      CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\npositionUpdated.z += blanketExt * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
+      CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute vec2 blanketExt;\n#endif\n`,
+      CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\nif (positionUpdated.z < blanketExt.y) positionUpdated = vec3(positionUpdated.x, 0.0, blanketExt.y);\npositionUpdated.z += blanketExt.x * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
     };
   }
 }
