@@ -104,7 +104,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 | `barEnd` Bar end | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 
-## K7. Dining tables (13) — **Done** (in Validate › Tables)
+## K7. Dining tables (13) — **Done**, signed off 2026-10-16 (back in kitchen / dining)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `tables` (Validate › Tables)

@@ -10,8 +10,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "surface": {
         "height": 0.75,
         "kind": "table",
@@ -32,8 +32,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "surface": {
         "height": 0.75,
         "kind": "table",
@@ -54,8 +54,8 @@
         1
       ],
       "price": 260,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.2,
       "surface": {
         "height": 0.75,
@@ -77,8 +77,8 @@
         1
       ],
       "price": 420,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -100,8 +100,8 @@
         1
       ],
       "price": 620,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -123,8 +123,8 @@
         2
       ],
       "price": 340,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -146,8 +146,8 @@
         2
       ],
       "price": 560,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.3,
       "surface": {
         "height": 0.75,
@@ -169,8 +169,8 @@
         1
       ],
       "price": 520,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.4,
       "surface": {
         "height": 0.75,
@@ -192,8 +192,8 @@
         1
       ],
       "price": 150,
-      "category": "validate",
-      "group": "tables",
+      "category": "kitchen",
+      "group": "dining",
       "surface": {
         "height": 1.06,
         "kind": "bar",

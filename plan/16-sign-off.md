@@ -86,6 +86,16 @@ with and without a stool behind); the small and long islands as the prep station
 and bar end looked at from all four sides. Nothing needed fixing. The kitchen island back in kitchen /
 counters, the others in kitchen / islands.
 
+## The dining tables
+
+The thirteen K7 tables (Validate › Tables) were signed off on 2026-10-16, checked as the sinks were, each
+standing free and looked at in all four facings. The four with their own seats were used as they are:
+coffee at the dining table; breakfast and coffee at the bistro set and the glass table; breakfast, coffee and
+dinner at the farmhouse dining table. At the nine plain tables a snack from the fridge was eaten from a dining
+chair (a bar stool at the high café table) pushed up to it: the plate on the top, the eater sat up to it.
+Nothing needed fixing. The dining, glass and farmhouse sets' chairs take their table's "Legs" colour (they
+are one model). All back in kitchen / dining.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
