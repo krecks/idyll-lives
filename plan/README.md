@@ -4,9 +4,9 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-16):** 540 objects. **All 540 are built** (each in Validate until it's signed off):
+**Where it stands (2026-10-16):** 541 objects. **All 541 are built** (each in Validate until it's signed off):
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
-- the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
+- the seven fridges: `fridge`, and the K1 six `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
 - the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (in Validate › Appliances);
 - the eight K4 base counters: `counter`, `counterCorner`, `counterEnd`, `counterCornerOuter`, `counterDrawers`, `counterOpenShelf`, `butcherBlock`, `counterMarble` (in Validate › Counters);
@@ -48,14 +48,20 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): Validate holds all 540 items in 79 groups.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): Validate holds all 541 items in 79 groups.
+
+**No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
+placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9
+street props of the town (`families/street.py`) and the lawn's grass tufts and wildflowers, the woods' rocks and the
+selection marker (`families/ground.py`). The three unused base entries (`model.stove`, `model.plantSmall`,
+`model.ceilingLamp`) are gone. Every model key in the manifests now has a `.glb`; the placeholders stay as the fallback.
 
 ## The plan
 
 | Category | Items | Tasks |
 |---|---|---|
 | [Engine and tools first](00-engine-and-tools.md) | — | **Done** (2026-10-14): T0 clips bench and gamekit helpers, E1–E8 engine work, C1 content. Its status table says how to use each. |
-| [Kitchen](01-kitchen.md) | 68 | K1 Fridges (5, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5, **done**), K7 Dining tables (13, **done**), K8 Chairs and stools (12, **done**), K9 Dining storage (4, **done**) |
+| [Kitchen](01-kitchen.md) | 69 | K1 Fridges (6, **done**), K2 Cookers (6, **done**), K3 Small appliances and dishwashers (4, **done**), K4 Base counters (8, **done**), K5 Tall and wall storage (11, **done**), K6 Islands and bars (5, **done**), K7 Dining tables (13, **done**), K8 Chairs and stools (12, **done**), K9 Dining storage (4, **done**) |
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8, **done**), BR3 Wardrobes and drawers (6, **done**), BR4 Dressing and mirrors (4, **done**) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4, **done**), KD2 Toys (10, **done**), KD3 Kids' study and art (6, **done**) |
@@ -171,7 +177,7 @@ The engine and tools tasks (T0, E1–E8, C1) are done, so every kind of clip can
 
 ## Done means
 
-- Every one of the 540 items is a Blender `.glb` with its clips. Each passed `check_glb` and the validator, and
+- Every one of the 541 items is a Blender `.glb` with its clips. Each passed `check_glb` and the validator, and
   was looked at in play.
 - Every item is back in its own category (Validate is gone).
 - The placeholders stay as the fallback, and keys are unchanged, so saves and content need no migration.

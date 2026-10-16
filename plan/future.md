@@ -9,7 +9,7 @@ open**. Each line says where it lives.
 
 ## Next: sign-off
 
-- **Validate holds all 540 items in 79 groups**, against the plan's "about three at a time". Sign tasks off
+- **Validate holds all 541 items in 79 groups**, against the plan's "about three at a time". Sign tasks off
   (`16-sign-off.md`) after review. `python3 -B tools/content/validate.py list | out --group <g> [--dry-run]`
   moves items back to their "Back to" by id, keeps the files' formatting and drops emptied groups. Items whose
   home turns them freely carry `"freeRotation": true` (Validate itself no longer turns anything).
@@ -194,6 +194,29 @@ things and lights) are Blender models, each task in its own Validate group; noth
 - **Garden things:** the pond's koi rises when fed and every 7 s while watched; a blue tit lands on the feeder; the
   pond's reeds don't sway (a 4th draw); far versions for the planter box and lamp post.
 - **The big town test** picks its yard things by `outdoors`, not by category (everything outdoor is in Validate).
+
+## Decided in the primitives round (2026-10-16, review these)
+
+The 36 models that were still drawn from placeholder parts (none of them buyable) are Blender models; no model key is
+left without a `.glb`. Also the retro mini fridge (`fridgeMiniRetro`, K1, from another session) is in Validate › Fridges.
+
+- **Held things** (`families/held.py`, 20): food, dishes and the station tools, 240–508 triangles, 1 draw (2 for the
+  three wooden boards). The pan's handle runs to the back of the stove as the placeholder's did; the treat plate gained
+  a cupcake; the pizza slice's placeholder was a cone standing through its plate and now lies flat (`tools/art/items.py`).
+  Not seen in play: the tasting board, pizza, pie, slices, sandwich and grill platter (no recipe in the test house makes
+  them); the grill food is hard to tell from the grill's own.
+- **Street props** (`families/street.py`, 9): each has a far version; the town overview's props are 19k triangles, not
+  190k. `street.ts` now draws the night glow of the models it thin-instances, at the streetlights' level: the path
+  light's lens, and also the lamp lanterns and vending machines on public lots seen from another lot (can be limited
+  to `model.street.*`). The street-name sign's lettering is modelled blocks, not real text. `model.street.hedge` is
+  unused (the street draws `model.hedge`) but built so no placeholder is left.
+- **Ground** (`families/ground.py`, 4): the grass tuft is four ribbon blades (24 triangles, normals bent to the sky so
+  the lawn keeps its lightness); the wildflowers are 1 draw on the foliage finish, so their heads are duller than the
+  old satin ones (satin back costs a 2nd draw, as the placeholder had); the heads now sway with their stems. Their far
+  versions are built but nature.ts never asks for them. The rock is two chipped boulders; the marker is the sparkle
+  star over the selected resident. `check_glb.py` lets a model reach below the floor as far as its placeholder does.
+- **Not checked:** the production build's frame time; the overview at full night; the new fridge in play beyond the
+  gate, the validator and the content test.
 
 ## Still open
 
