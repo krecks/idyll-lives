@@ -9,7 +9,7 @@ wardrobes and drawers in `families/bedroom_storage.py` (`drawer_open`, `doors_op
 dressing table in `families/bedroom_dressing.py` (`drawer_open`). The three new beds that turn down (`bedDouble`,
 `bedQueenUpholstered`, `bedCanopy`) are in `BLANKET_BEDS`, and those four not in `BEDS` before have their mattress tops there.
 
-## BR1. Beds (9) — **Done** (in Validate › Beds)
+## BR1. Beds (9) — **Done**, signed off 2026-10-16 (back in bedroom / beds)
 
 - **Family:** `tools/art/blender/families/bedroom.py`
 - **Validate group:** `beds` (Validate › Beds)
@@ -27,7 +27,7 @@ dressing table in `families/bedroom_dressing.py` (`drawer_open`). The three new 
 | `bedCanopy` Four-poster bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`; the canopy drapes are static. |
 | `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). |
 
-## BR2. Nightstands and small storage (8) — **Done** (in Validate › Nightstands)
+## BR2. Nightstands and small storage (8) — **Done**, signed off 2026-10-16 (back in bedroom / storage and bedroom / nightstands)
 
 - **Family:** `tools/art/blender/families/bedroom_storage.py`
 - **Validate group:** `nightstands` (Validate › Nightstands)
@@ -44,7 +44,7 @@ dressing table in `families/bedroom_dressing.py` (`drawer_open`). The three new 
 | `laundryHamper` Laundry hamper | 1x1 · floor | — | bedroom / storage | Hamper | Static | Static. (+use) the lid lifts. |
 | `benchBedEnd` Bed-end bench | 2x1 · floor | sit:sit | bedroom / storage | Frame, Cushion | Static | Static. |
 
-## BR3. Wardrobes and drawers (6) — **Done** (in Validate › Wardrobes)
+## BR3. Wardrobes and drawers (6) — **Done**, signed off 2026-10-16 (back in bedroom / storage)
 
 - **Family:** `tools/art/blender/families/bedroom_storage.py`
 - **Validate group:** `wardrobes` (Validate › Wardrobes)
@@ -59,7 +59,7 @@ dressing table in `families/bedroom_dressing.py` (`drawer_open`). The three new 
 | `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. |
 | `armoire` Armoire | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `doors_open`. |
 
-## BR4. Dressing and mirrors (4) — **Done** (in Validate › Dressing)
+## BR4. Dressing and mirrors (4) — **Done**, signed off 2026-10-16 (back in bedroom / dressing)
 
 - **Family:** `tools/art/blender/families/bedroom_dressing.py`
 - **Validate group:** `dressing` (Validate › Dressing)
