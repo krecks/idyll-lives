@@ -7,7 +7,7 @@ laptop opening), add the clip then.
 All five tasks are done (2026-10-14): `families/tabletop.py` (notes: `families/tabletop.md`), in Validate. The
 kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their own, hinged for the clip to come.
 
-## TT1. Kitchenware (11) — **Done** (in Validate › Kitchenware)
+## TT1. Kitchenware (11) — **Done**, signed off 2026-10-16 (back in tabletop / kitchenware)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `kitchenware` (Validate › Kitchenware)
@@ -27,7 +27,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | `spiceJars` Spice jars | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 | `cookieJar` Cookie jar | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 
-## TT2. Tableware (7) — **Done** (in Validate › Tableware)
+## TT2. Tableware (7) — **Done**, signed off 2026-10-16 (back in tabletop / tableware)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `tableware` (Validate › Tableware)
@@ -59,7 +59,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | `potCactus` Cactus | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 | `potSmall` Small potted plant | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 
-## TT4. Small ornaments (6) — **Done** (in Validate › Small Ornaments)
+## TT4. Small ornaments (6) — **Done**, signed off 2026-10-16 (back in tabletop / ornaments)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `small ornaments` (Validate › Small Ornaments)
@@ -74,7 +74,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | `trophy` Trophy | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `sculptureSmall` Small sculpture | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 
-## TT5. Bath, desk and toys (8) — **Done** (in Validate › Desk And Bath Bits)
+## TT5. Bath, desk and toys (8) — **Done**, signed off 2026-10-16 (back in tabletop / bath, desk and toys)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `desk and bath bits` (Validate › Desk And Bath Bits)
