@@ -25,7 +25,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.grillPlatter` | an oval platter: two sausages with grill marks, a marked burger, a cob of corn | 1 | 476 |
 | `item.platterDirty` | the platter with a smear of grease and sauce, crumbs and a gnawed cob | 1 | 336 |
 | `item.pizza` | a round wooden board, a golden raised crust, tomato, cheese, pepperoni and basil | 2 | 508 |
-| `item.bakingTray` | a steel tray with a rim and six bread rolls, golden tops and paler feet | 1 | 348 |
+| `item.bakingTray` | a steel tray with a rim and six bread rolls, golden tops and paler feet | 1 | 420 |
 | `item.trayDirty` | the tray with a grease stain, burnt patches and crumbs | 1 | 236 |
 | `item.pieDish` | a cherry pie in a glazed dish: a crimped pastry rim and a lattice over red filling | 1 | 400 |
 | `item.mealPlate` | a plate of stew with mashed potato and green beans (also leftovers, takeout) | 1 | 392 |

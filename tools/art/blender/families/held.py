@@ -377,7 +377,7 @@ def bakingTray():
     for i, (x, z) in enumerate(((-0.11, -0.07), (0, -0.07), (0.11, -0.07), (-0.11, 0.07), (0, 0.07), (0.11, 0.07))):
         top = M.bun if i % 2 else M.bun_dark
         lathe(f'roll{i}', [(0, 0), (0.039, 0), (0.038, 0.014), (0.027, 0.034), (0, 0.04)],
-              [M.bun_base, M.bun_base, top, top], at=(x, 0.006, z), segments=8, scale=(1, 0.92))
+              [M.bun_base, M.bun_base, top, top], at=(x, 0.006, z), segments=10, scale=(1, 0.92))
     return done('bakingTray')
 
 
