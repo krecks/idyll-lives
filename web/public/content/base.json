@@ -2964,7 +2964,7 @@
         1
       ],
       "price": 350,
-      "category": "validate",
+      "category": "hobbies",
       "group": "games",
       "description": "Builds Intelligence and Perception.",
       "interactions": [
@@ -3114,7 +3114,7 @@
         1
       ],
       "price": 300,
-      "category": "validate",
+      "category": "hobbies",
       "group": "crafts",
       "description": "Builds Creativity.",
       "interactions": [
@@ -3176,7 +3176,7 @@
         1
       ],
       "price": 700,
-      "category": "validate",
+      "category": "hobbies",
       "group": "crafts",
       "description": "Builds Handiness — handy residents can upgrade objects.",
       "interactions": [
@@ -3208,7 +3208,7 @@
         1
       ],
       "price": 900,
-      "category": "validate",
+      "category": "hobbies",
       "group": "crafts",
       "description": "Builds Perception.",
       "interactions": [
@@ -3245,7 +3245,7 @@
         1
       ],
       "price": 1400,
-      "category": "validate",
+      "category": "hobbies",
       "group": "music",
       "description": "Builds Dexterity and Creativity.",
       "interactions": [
@@ -3819,18 +3819,6 @@
           "id": "farm",
           "label": "Farm",
           "outside": true
-        },
-        {
-          "id": "music",
-          "label": "Music"
-        },
-        {
-          "id": "games",
-          "label": "Games"
-        },
-        {
-          "id": "crafts",
-          "label": "Crafts"
         },
         {
           "id": "flowers",

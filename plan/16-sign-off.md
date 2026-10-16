@@ -199,6 +199,41 @@ Low; the four rugs flat on the floor in all four facings. Every part coloured: f
 staying. Nothing needed fixing. Seen in passing: a 2-wide curtain over the house's 1-wide windows hangs with the
 window in one half of its rail (that's the placement, not the model). All back in decor / textiles.
 
+## The music
+
+The six H1 instruments (Validate › Music) were signed off on 2026-10-16, checked as the sinks were: bought in
+all four facings (the piano against three walls and standing free), every part coloured (through `buy` and in
+the colour studio), played by day and at night, on WebGPU and WebGL2, on Medium and Low. The piano's fallboard
+lifts and its music desk tilts for play and shut when the use ends. The ukulele and the two guitars leave their
+stands (`off_stand`) for strum, jam and practise and are drawn in the player's hands (the neck in the left hand,
+the body against the belly), back on the stand when the use ends; looked at from behind the stand as well. The
+drum kit's cymbals rock in a loop (`cymbals`) for drum and practise and stop with the use. The digital piano is
+still. Nothing needed fixing. Seen in passing: the acoustic guitar's and the ukulele's colour ("Guitar",
+"Instrument") goes on the back and sides, not the soundboard, so from the front and in the hands a new colour
+shows little (the electric's whole body takes it). All back in hobbies / music.
+
+## The games
+
+The six H2 things (Validate › Games) were signed off on 2026-10-16, checked as the sinks were, each standing
+free (the dartboard on the north, west and east walls and on the north wall's outside face, the arcade cabinet
+against three walls and standing free): the chess pawn slides for chess; the pool rack lifts for pool and trick
+shots; the foosball rods kick in a loop and the arcade joystick waggles in a loop while played, both stopping
+with the use; three darts grow in the board for darts; the jigsaw patch spreads for jigsaw. The arcade's screen
+and marquee glow at night. One fix: the chess table's and jigsaw table's second colour was called "Trim" but
+coloured the chess chair and the jigsaw stool; it is "Chair" and "Stool" now, and the chessboard's rim (which
+took the chair's colour) is the table's wood. Seen in passing: the darts are thrown from the tile in front of
+the board, half a metre from the wall. All back in hobbies / games.
+
+## The crafts
+
+The seven H3 things (Validate › Crafts) were signed off on 2026-10-16, checked as the sinks were, each standing
+free (the workbench against three walls and standing free): the painting grows on the easel's canvas for paint;
+the workbench's vice shuts for tinker; the telescope's tube tilts up for stargaze and comes back down; the sewing
+table's presser foot lowers and its handwheel turns for sew and mend; the chemistry bench's flask fills for
+experiment; the pot rises and the wheel head spins for throw; the scrapbook opens for scrapbook. Every clip
+shuts when the resident moves on. Nothing needed fixing. Seen in passing: the sewing table's "Table" colours its
+top and chair but not its legs and apron (their own, darker wood). All back in hobbies / crafts.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -216,6 +251,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Kitchen** (`01-kitchen.md`, K1–K9): signed off 2026-10-16.
 - **Lighting** (`11-lighting.md`, LT1–LT4): signed off 2026-10-16.
 - **Decor** (`09-decor.md`, D1–D3): signed off 2026-10-16.
+- **Hobbies** (`08-hobbies.md`, H1–H3): signed off 2026-10-16.
 
 ## The end
 
