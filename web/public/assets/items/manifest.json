@@ -929,25 +929,20 @@
           "segments": 20
         },
         {
-          "shape": "cone",
+          "shape": "cylinder",
           "size": [
-            0.12,
-            0.02,
-            0.16
+            0.13,
+            0.012,
+            0.17
           ],
           "at": [
             0,
-            0.03,
+            0.024,
             0
           ],
           "color": "#E2B064",
           "material": "material.finish.satin",
-          "segments": 3,
-          "rotate": [
-            90,
-            0,
-            0
-          ]
+          "segments": 3
         }
       ]
     },
