@@ -353,8 +353,11 @@ def breadBin():
         box('base', (0.31, 0.19, AXIS), (0, 0, AXIS / 2), M.bread_bin, bevel=0.008)
         for s in (-1, 1):
             # the D-shaped wooden ends
-            cyl(f'end_round{s}', R + 0.006, 0.014, (s * 0.163, 0, AXIS), M.wood, verts=20, rot=(0, 90, 0))
-            box(f'end_foot{s}', (0.014, 2 * R + 0.012, AXIS), (s * 0.163, 0, AXIS / 2), M.wood)
+            # flat-shaded: smooth shading rounds a cylinder's flat face into a dome
+            G.cylinder(f'end_round{s}', R + 0.006, 0.014, at=(s * 0.163, 0, AXIS), material=M.wood, verts=20,
+                       rot=(0, 90, 0), smooth=False)
+            # a hair thinner than the round end, so their faces aren't one plane (they flickered)
+            box(f'end_foot{s}', (0.012, 2 * R + 0.012, AXIS), (s * 0.163, 0, AXIS / 2), M.wood)
     G.join(body, 'bread_bin', origin=(0, 0, 0))
     # the roll-top: a part of its own, turning about the bin's axis, for a use to come (it rolls open)
     with G.new_parts() as top:
