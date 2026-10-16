@@ -90,7 +90,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Static | Static. (+use) `lid_open`: the pedal lid lifts 70° (a "throw away" use). |
 | `recyclingBins` Recycling bins | 1x1 · floor | — | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Static | Static. (+use) the lids lift. |
 
-## K6. Islands and bars (5) — **Done** (in Validate › Islands & Bars)
+## K6. Islands and bars (5) — **Done**, signed off 2026-10-16 (back in kitchen / counters and kitchen / islands)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
 - **Validate group:** `islands` (Validate › Islands & Bars)

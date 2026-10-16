@@ -774,8 +774,8 @@
         1
       ],
       "price": 950,
-      "category": "validate",
-      "group": "islands",
+      "category": "kitchen",
+      "group": "counters",
       "slots": 2,
       "description": "A freestanding island with cupboards at the front and a worktop overhanging the back for stools: two residents can make a snack or have breakfast here at once.",
       "surface": {

@@ -248,7 +248,7 @@
         1
       ],
       "price": 180,
-      "category": "validate",
+      "category": "kitchen",
       "group": "islands",
       "surface": {
         "height": 1.06,
@@ -274,7 +274,7 @@
         1
       ],
       "price": 200,
-      "category": "validate",
+      "category": "kitchen",
       "group": "islands",
       "surface": {
         "height": 1.06,
@@ -300,7 +300,7 @@
         1
       ],
       "price": 420,
-      "category": "validate",
+      "category": "kitchen",
       "group": "islands",
       "surface": {
         "height": 0.95,
@@ -329,7 +329,7 @@
         1
       ],
       "price": 1100,
-      "category": "validate",
+      "category": "kitchen",
       "group": "islands",
       "decor": 0.3,
       "surface": {

@@ -78,6 +78,14 @@ one after another for "Sort the recycling". The hood, spice rack, pot rail and w
 at on all four walls. One fix: the recycling bins' "Left bin" and "Right bin" coloured the bins the other way
 round as seen from the front; swapped. All back in kitchen / counters.
 
+## The islands and bars
+
+The five K6 things (Validate › Islands & Bars) were signed off on 2026-10-16, checked as the sinks were, each
+standing free in the room: the kitchen island's drawer for a sandwich (and none for breakfast, eaten at it,
+with and without a stool behind); the small and long islands as the prep station of a meal; the bar counter
+and bar end looked at from all four sides. Nothing needed fixing. The kitchen island back in kitchen /
+counters, the others in kitchen / islands.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
