@@ -2640,7 +2640,7 @@
         }
       ],
       "price": 250,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves"
     },
@@ -3988,6 +3988,10 @@
           "id": "garden decor",
           "label": "Garden Decor",
           "outside": true
+        },
+        {
+          "id": "shelves",
+          "label": "Shelves"
         }
       ]
     },
