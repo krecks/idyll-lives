@@ -3924,7 +3924,7 @@
       "freeRotation": true,
       "group": "ornaments",
       "decor": 0.7,
-      "description": "A white vase on its own plinth.",
+      "description": "A blue glazed vase of white flowers on its own plinth.",
       "interactions": []
     },
     {
@@ -3979,7 +3979,7 @@
     },
     {
       "id": "statueHorse",
-      "name": "Porcelain horse",
+      "name": "Bronze horse",
       "model": "model.statueHorse",
       "footprint": [
         1,
@@ -3990,7 +3990,7 @@
       "freeRotation": true,
       "group": "ornaments",
       "decor": 1.0,
-      "description": "A rearing porcelain horse on a wooden stand.",
+      "description": "A bronze horse on an oak plinth, its head up.",
       "interactions": []
     },
     {
