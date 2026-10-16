@@ -7,7 +7,7 @@ spin (`fans`, a loop), the chairs swivel and carry the sitter (`swivel`, `ride`)
 
 Desks keep their top height (`TOPS`): things stand on them, and those don't follow a moving top.
 
-## O1. Desks (8) — **Done** (in Validate › Desks)
+## O1. Desks (8) — **Done**, signed off 2026-10-17 (back in office / desks and office)
 
 - **Family:** `tools/art/blender/families/office.py`
 - **Validate group:** `desks` (Validate › Desks)
@@ -24,7 +24,7 @@ Desks keep their top height (`TOPS`): things stand on them, and those don't foll
 | `deskLaptop` Laptop desk | 1x1 · floor | browse:type code:type write:type homework:type | office / — | Top, Frame, Drawers | Use | `lid_open`: the laptop opens from shut to 110° for browse, code, write and homework. |
 | `computerGaming` Gaming PC | 2x1 · floor | game:play code:type browse:type | office / — | Desk, Case | Loop (E1) | `fans`: the case fans spin while played (E1). Until then static. |
 
-## O2. Desk chairs (3) — **Done** (in Validate › Office Chairs)
+## O2. Desk chairs (3) — **Done**, signed off 2026-10-17 (back in office / chairs and office)
 
 - **Family:** `tools/art/blender/families/office.py`
 - **Validate group:** `office chairs` (Validate › Office Chairs)
@@ -36,7 +36,7 @@ Desks keep their top height (`TOPS`): things stand on them, and those don't foll
 | `chairTask` Desk chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`. |
 | `officeChair` Office chair | 1x1 · floor | sit:sit | office / — | Frame, Seat | Use | `swivel`. |
 
-## O3. Storage and boards (3) — **Done** (in Validate › Office Storage)
+## O3. Storage and boards (3) — **Done**, signed off 2026-10-17 (back in office)
 
 - **Family:** `tools/art/blender/families/office.py`
 - **Validate group:** `office storage` (Validate › Office Storage)
