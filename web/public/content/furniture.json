@@ -1300,6 +1300,7 @@
           "label": "Read a book",
           "anim": "read",
           "minutes": 45,
+          "pose": "sit",
           "effects": {
             "fun": 0.35
           },
