@@ -1268,6 +1268,31 @@
           "label": "Baskets"
         }
       ]
+    },
+    "model.stairs": {
+      "type": "model",
+      "url": "../../models/living/stairs.glb",
+      "materials": {
+        "railing": {
+          "finish": "material.finish.metal"
+        },
+        "risers": {
+          "finish": "material.finish.satin"
+        },
+        "treads": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "treads",
+          "label": "Treads"
+        },
+        {
+          "material": "railing",
+          "label": "Railing"
+        }
+      ]
     }
   }
 }
