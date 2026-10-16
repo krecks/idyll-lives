@@ -37,6 +37,15 @@ The seven fridges (Validate › Fridges) were signed off on 2026-10-16, checked 
 its lever first; the French-door fridge opens one door for a cold drink. Gourmet needs a stove and a counter
 (its prep and cook steps), which the check house hasn't: checked with both bought. All back in kitchen / appliances.
 
+## The cookers
+
+The six K2 cookers (Validate › Cookers) were signed off on 2026-10-16, checked as the sinks were, each use run
+as a recipe (fridge, then a counter, then the cooker): the gas range's and range cooker's flame rings and the
+electric cooker's knob for cook (and gourmet), the oven doors for bake and roast, the hob counter's heat ring, the
+microwave's door and turntable for reheat. Each shuts when the resident moves on. Seen in passing: at the
+microwave the resident's hands reach for the cabinet below, not the door (the shared "cook" pose). All back in
+kitchen / appliances.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

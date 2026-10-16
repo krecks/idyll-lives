@@ -25,7 +25,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
 | `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
 
-## K2. Cookers (6) — **Done** (in Validate › Cookers)
+## K2. Cookers (6) — **Done**, signed off 2026-10-16 (back in kitchen / appliances)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
 - **Validate group:** `cookers` (Validate › Cookers)

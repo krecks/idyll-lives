@@ -394,9 +394,9 @@
         1
       ],
       "price": 900,
-      "category": "validate",
+      "category": "kitchen",
       "fillsWall": true,
-      "group": "cookers",
+      "group": "appliances",
       "stations": [
         "oven"
       ],
@@ -449,8 +449,8 @@
         1
       ],
       "price": 1600,
-      "category": "validate",
-      "group": "cookers",
+      "category": "kitchen",
+      "group": "appliances",
       "decor": 0.4,
       "stations": [
         "stove",
@@ -526,8 +526,8 @@
         1
       ],
       "price": 520,
-      "category": "validate",
-      "group": "cookers",
+      "category": "kitchen",
+      "group": "appliances",
       "surface": {
         "height": 0.95,
         "kind": "counter",
