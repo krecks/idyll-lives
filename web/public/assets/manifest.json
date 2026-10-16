@@ -65,7 +65,8 @@
     "packs/pack_kind/manifest.json",
     "packs/pack_lazy/manifest.json",
     "packs/garden_things/manifest.json",
-    "packs/media/manifest.json"
+    "packs/media/manifest.json",
+    "packs/yard/manifest.json"
   ],
   "entries": {
     "material.wall": {

@@ -276,6 +276,13 @@ The outdoor loungers and swings (`models/outdoor/sunLounger.glb`, `hammock.glb`,
 for sunbathing, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a
 soak while the water bubbles. Their primitive-part entries stay as the fallback.
 
+The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
+`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
+`.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
+turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
+compost bin's lid lifts and the washing goes out on the line. Their primitive-part entries stay as the fallback.
+
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by
 `tools/art/blender/families/fitness.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The treadmill

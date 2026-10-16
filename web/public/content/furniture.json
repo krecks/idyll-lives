@@ -4791,8 +4791,9 @@
         2
       ],
       "price": 150,
-      "category": "outdoor",
-      "group": "play",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "yard",
       "outdoors": true,
       "description": "A wooden box of sand with a bucket and spade.",
       "interactions": [
@@ -4824,8 +4825,9 @@
         1
       ],
       "price": 140,
-      "category": "outdoor",
-      "group": "play",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "yard",
       "outdoors": true,
       "description": "A rack with a bike in it. Tuning it up trains Handiness.",
       "interactions": [

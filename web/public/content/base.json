@@ -4001,6 +4001,11 @@
         {
           "id": "media",
           "label": "Media"
+        },
+        {
+          "id": "yard",
+          "label": "Yard",
+          "outside": true
         }
       ]
     },

@@ -311,7 +311,8 @@
         1
       ],
       "price": 160,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "decor": 0.3,
@@ -371,7 +372,8 @@
         2
       ],
       "price": 900,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "decor": 0.4,
@@ -404,7 +406,8 @@
         3
       ],
       "price": 2400,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "decor": 0.6,
@@ -461,7 +464,8 @@
         1
       ],
       "price": 80,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "description": "A slatted wooden bin of kitchen scraps turning into soil.",
@@ -495,7 +499,8 @@
         1
       ],
       "price": 70,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "decor": 0.1,
@@ -511,7 +516,8 @@
         1
       ],
       "price": 90,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "description": "Three lines between two posts, washing pegged out in the sun.",
@@ -561,7 +567,8 @@
         1
       ],
       "price": 90,
-      "category": "outdoor",
+      "category": "validate",
+      "freeRotation": true,
       "group": "yard",
       "outdoors": true,
       "decor": 0.3,
