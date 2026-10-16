@@ -375,6 +375,9 @@
           "toast": "toast_down",
           "smoothie": "blend"
         },
+        "loops": {
+          "smoothie": "blades"
+        },
         "hold": 2.0
       },
       "paint": [

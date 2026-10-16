@@ -370,12 +370,10 @@ def breakfastCounter():
         F.sphere('fruit1', 0.04, (-0.30, 1.03, 0.02), M.fruit, segments=10, rings=8)
         F.sphere('fruit2', 0.038, (-0.24, 1.03, 0.08), M.toaster, segments=10, rings=8)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the toaster's lever and its toast, standing up at rest: both go down for toast, and coming back
-    # when the use ends pops the toast up
+    # the toaster's carriage, its lever and its toast standing up at rest: it goes down for toast, and
+    # coming back when the use ends pops the toast up (one part, so the smoothie's swirl has a draw call)
     with G.new_parts() as parts:
         F.box('lever', 0.02, 0.03, 0.03, (0.45, 1.05, -0.30), M.dark, bevel=0.006)
-    lever = G.join(parts, 'lever', origin=F.at(0.45, 1.05, -0.30))
-    with G.new_parts() as parts:
         for s in (-1, 1):
             F.box(f'toast{s}', 0.10, 0.12, 0.03, (0.30, 1.11, -0.30 + s * 0.035), M.fruit, bevel=0.01)
     toast = G.join(parts, 'toast', origin=F.at(0.30, 1.05, -0.30))
@@ -384,10 +382,15 @@ def breakfastCounter():
         F.cyl('lid', 0.078, 0.03, (0.0, 1.345, -0.32), M.charcoal, verts=16)
         F.cyl('lid_knob', 0.02, 0.02, (0.0, 1.37, -0.32), M.charcoal, verts=10)
     lid = G.join(parts, 'lid', origin=F.at(0.0, 1.33, -0.32))
+    # the smoothie at the jug's brim, under the lid, with a streak so its swirl shows once the lid is up
+    with G.new_parts() as parts:
+        F.cyl('smoothie', 0.07, 0.004, (0.0, 1.332, -0.32), M.fruit, verts=16)
+        F.box('smoothie_streak', 0.05, 0.002, 0.012, (0.02, 1.335, -0.32), M.toaster, bevel=0.001)
+    swirl = G.join(parts, 'smoothie', origin=F.at(0.0, 1.332, -0.32))
     G.settle()
-    G.slide(lever, 'toast_down', (0, 0, -0.035), seconds=0.5)
-    G.slide(toast, 'toast_down', (0, 0, -0.06), seconds=0.5)
+    G.slide(toast, 'toast_down', (0, 0, -0.05), seconds=0.5)
     G.slide(lid, 'blend', (0, 0, 0.10), seconds=0.8)
+    G.spin(swirl, 'blades', turns=1, seconds=1.0)
 
 
 # --- dishwashers: a door dropping open over a sliding lower rack ---------------------------------------
@@ -463,8 +466,9 @@ FAMILY = G.Family(
              motions={'uses': {'espresso': 'brew'}, 'hold': 2.0},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Machine')]),
      G.Model('breakfastCounter', breakfastCounter, size=(1.0, 1.38, 0.66), key='model.breakfastCounter', centre=(0, -0.097),
-             # toast presses the lever and the toast down (back up, popping, after `hold`); smoothie lifts the lid
-             motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'hold': 2.0},
+             # toast presses the lever and the toast down (back up, popping, after `hold`); smoothie lifts the
+             # lid and swirls the smoothie for as long as it blends
+             motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'loops': {'smoothie': 'blades'}, 'hold': 2.0},
              paint=[('cab', 'Counter'), ('toaster', 'Toaster'), ('charcoal', 'Blender')]),
      G.Model('dishwasher', dishwasher, size=(1.0, 0.95, 0.685), key='model.dishwasher', centre=(0, -0.088),
              # dishes drops the door and slides the lower rack out, held while it is loaded
