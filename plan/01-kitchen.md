@@ -10,7 +10,7 @@ Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.s
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
 
-## K1. Fridges (6) — **Done** (in Validate › Fridges)
+## K1. Fridges (6) — **Done**, signed off 2026-10-16 (back in kitchen / appliances)
 
 - **Family:** `tools/art/blender/families/kitchen.py`
 - **Validate group:** `fridges` (Validate › Fridges)

@@ -30,6 +30,13 @@ Before commit 1caf5ec they were, and are again:
 - `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`: bathroom / sinks;
 - `farmhouseSink`, `counterSinkDouble`: kitchen / counters.
 
+## The fridges
+
+The seven fridges (Validate › Fridges) were signed off on 2026-10-16, checked as the sinks were: every use
+(snack, meal, gourmet, cold drink, wine) opens its door clip and shuts it after its `hold`; the retro fridge pulls
+its lever first; the French-door fridge opens one door for a cold drink. Gourmet needs a stove and a counter
+(its prep and cook steps), which the check house hasn't: checked with both bought. All back in kitchen / appliances.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

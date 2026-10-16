@@ -2388,9 +2388,9 @@
         }
       ],
       "price": 600,
-      "category": "validate",
+      "category": "kitchen",
       "fillsWall": true,
-      "group": "fridges"
+      "group": "appliances"
     },
     {
       "id": "sink",
@@ -3697,10 +3697,6 @@
         {
           "id": "coffee tables",
           "label": "Coffee Tables"
-        },
-        {
-          "id": "fridges",
-          "label": "Fridges"
         },
         {
           "id": "cookers",

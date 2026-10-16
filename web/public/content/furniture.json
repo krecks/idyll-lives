@@ -156,8 +156,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "fridges",
+      "category": "kitchen",
+      "group": "appliances",
       "description": "A small fridge for a small kitchen (or a bedroom corner): snacks and simple meals, but no room for a gourmet spread.",
       "interactions": [
         {
@@ -207,9 +207,9 @@
         1
       ],
       "price": 1200,
-      "category": "validate",
+      "category": "kitchen",
       "fillsWall": true,
-      "group": "fridges",
+      "group": "appliances",
       "description": "A tall fridge-freezer behind cabinet doors that match the kitchen. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
       "interactions": [
         {
