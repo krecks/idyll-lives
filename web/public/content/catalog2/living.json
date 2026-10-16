@@ -817,7 +817,7 @@
         1
       ],
       "price": 520,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "description": "A low white media bench with a flat-screen TV on it.",
       "interactions": [
@@ -989,7 +989,7 @@
         1
       ],
       "price": 650,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "decor": 0.8,
       "light": {

@@ -2576,7 +2576,7 @@
         }
       ],
       "price": 400,
-      "category": "living",
+      "category": "validate",
       "group": "media"
     },
     {
@@ -3997,6 +3997,10 @@
         {
           "id": "shelves",
           "label": "Shelves"
+        },
+        {
+          "id": "media",
+          "label": "Media"
         }
       ]
     },

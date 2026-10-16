@@ -845,7 +845,7 @@ p += [rod([x * 0.42, 0, z + s * 0.17], [x * 0.38, 0.2, z + s * 0.15], 0.04, HONE
 p += [sph([0.1, 0.05, 0.1], [0.24, 0.86, z - 0.06], '#2A2C30', 'gloss', segments=10),                     # rabbit ears
       rod([0.24, 0.87, z - 0.06], [0.1, 1.12, z - 0.12], 0.008, STEEL, 'metal', segments=6),
       rod([0.24, 0.87, z - 0.06], [0.4, 1.1, z - 0.1], 0.008, STEEL, 'metal', segments=6)]
-addp('tvRetro', p)
+addp('tvRetro', shift(p, dz=0.04))                                  # its back on the wall face
 
 
 def home_cinema(unit, top, fin='wood'):
@@ -868,7 +868,7 @@ def home_cinema(unit, top, fin='wood'):
     return p
 
 
-add('homeCinema', placeholder(home_cinema(OAKD, OAK)), (2, 1))
+add('homeCinema', placeholder(shift(home_cinema(OAKD, OAK), dz=0.015)), (2, 1))   # its back on the wall face
 add('homeCinema@modern', placeholder(home_cinema('#F1F0EC', '#F1F0EC', 'gloss')), (2, 1))
 add('homeCinema@cozy', placeholder(home_cinema(WALNUT, HONEY)), (2, 1))
 add('homeCinema@minimal', placeholder(home_cinema(BIRCH, '#F2F2F0', 'wood')), (2, 1))
@@ -896,7 +896,7 @@ def stereo(wood, dark, metal, mfin):
     return p
 
 
-addp('stereo', stereo(OAK, CHARCOAL, STEEL, 'metal'))
+addp('stereo', shift(stereo(OAK, CHARCOAL, STEEL, 'metal'), dz=0.03))   # its back on the wall face
 addp('stereo@cozy', stereo(WALNUT, '#3A3530', BRASS, 'metal'))
 addp('stereo@minimal', stereo(BIRCH, '#E6E4DF', '#F2F2F0', 'satin'))
 

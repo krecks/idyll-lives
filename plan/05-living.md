@@ -64,7 +64,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `sideTableRound` Round side table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Base | Static | Static. |
 
-## L4. Media (8)
+## L4. Media (8) — **Done** (in Validate › Media)
 
 - **Family:** `tools/art/blender/families/media.py`
 - **Validate group:** `media` (Validate › Media)
@@ -72,14 +72,14 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static. A lit screen is a material question (no emissive; E8 night glow). |
-| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static. |
-| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae extend and turn 20° for watch. |
-| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case for watch and film, and rolls up at the end. |
-| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the CD tray slides out and back (`hold` 1.2 s) for listen and dance. L speaker cones pulse (E1). |
-| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door swings open and shuts for listen. |
-| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of the bench for watch, and sinks back at the end. |
-| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: the flame panel grows for relax (gloss, not emissive; the light is the content's). |
+| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static. A lit screen is a material question (no emissive; E8 night glow). **Done:** a slim set on its stand on an oak unit, a soundbar; the screen glows at night (E8). 2 draws. |
+| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static. **Done:** a thin panel on a bracket, a soundbar under it, on the wall face; the screen glows at night. 1 draw. |
+| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae extend and turn 20° for watch. **Done:** the ears turn 20° and stretch 1.6× up for watch; the tube glows at night. |
+| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case for watch and film, and rolls up at the end. **Done:** the case on the wall, a short-throw projector on the unit; the screen glows at night while down (watched). |
+| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the CD tray slides out and back (`hold` 1.2 s) for listen and dance. L speaker cones pulse (E1). **Done:** a CD player under the amplifier; the woofers `pulse` (E1 loop). 4 draws (the loop's part). |
+| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door swings open and shuts for listen. **Done:** the door tips 32° open from its foot, `hold` 1.2 s. |
+| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of the bench for watch, and sinks back at the end. **Done:** the TV sits in a lift hood at the bench's back (0.8 m high at rest, its lid closing the hood); it glows at night while up. |
+| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: the flame panel grows for relax (gloss, not emissive; the light is the content's). **Done:** five tongues grow from the log bed; the embers glow at night, the flames while lit. A floor cushion in front, and `characters.ts` `SEATS` sits the resident on it facing the fire (they sat in mid-air before). |
 
 ## L5. Shelves (9) — **Done** (in Validate › Shelves)
 

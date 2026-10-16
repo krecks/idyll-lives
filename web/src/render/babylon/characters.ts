@@ -167,6 +167,8 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean; recline?: 
   armchairLeather: { h: 0.44, fwd: -0.02 },
   armchairDesign: { h: 0.45, fwd: -0.013 },
   pouf: { h: 0.46, fwd: 0 },
+  // On the floor cushion in front of the fire, facing it.
+  fireplaceElectric: { h: 0.14, fwd: 0.3, back: true },
   dressingTable: { h: 0.45, fwd: 0.22, back: true },
   toiletCompact: { h: 0.43, fwd: -0.13 },
   toiletSmart: { h: 0.44, fwd: -0.06 },

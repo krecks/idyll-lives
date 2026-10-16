@@ -1531,7 +1531,7 @@
         1
       ],
       "price": 700,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "layer": "wall",
       "description": "A big, thin screen that hangs on the wall, with a soundbar: better TV than the old set, and it takes no floor space.",
@@ -1560,7 +1560,7 @@
         1
       ],
       "price": 150,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "description": "A little old TV on a low cabinet. It still works (mostly).",
       "interactions": [
@@ -1588,7 +1588,7 @@
         1
       ],
       "price": 1900,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "slots": 2,
       "description": "A huge screen, tower speakers and a media unit. Watching a whole film here leaves residents with a movie-night glow.",
@@ -1632,7 +1632,7 @@
         1
       ],
       "price": 380,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "description": "A radio and two speakers on a low cabinet: put a record on, or dance.",
       "interactions": [
@@ -1675,7 +1675,7 @@
         1
       ],
       "price": 90,
-      "category": "living",
+      "category": "validate",
       "group": "media",
       "description": "A cassette boombox on a crate.",
       "interactions": [
