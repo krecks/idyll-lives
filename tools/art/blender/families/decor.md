@@ -46,7 +46,7 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 | `model.photoPrint` | 0.75 × 0.50 × 0.03 m | 616 | 1 | Frame |
 | `model.paintingClassic` | 0.84 × 0.65 × 0.05 m | 1,224 | 1 | Frame |
 | `model.canvasAbstract` | 1.50 × 0.90 × 0.05 m | 716 | 2 | Frame |
-| `model.wallClock` | 0.36 × 0.36 × 0.07 m | 940 | 2 | Case, Face |
+| `model.wallClock` | 0.36 × 0.36 × 0.07 m | 928 | 3 | Case, Face |
 | `model.wallShelf` | 0.90 × 0.66 × 0.24 m | 2,220 | 3 | Shelves |
 | `model.grandfatherClock` | 0.60 × 2.12 × 0.40 m | 2,752 | 4 | Case, Face |
 | `model.vaseTall` | 0.33 × 1.27 × 0.23 m | 1,040 | 2 | Body |

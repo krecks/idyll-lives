@@ -283,8 +283,9 @@ def wallClock():
     F = G.GameFrame()
     r = 0.18
     with G.new_parts() as still:
+        # (its well's floor behind the face: at 0.056 the case's front hid the face, so "Face" coloured nothing)
         G.revolve('case', [(0, 0), (r - 0.004, 0), (r, 0.006), (r, 0.058), (r - 0.008, 0.066), (r - 0.018, 0.066),
-                           (r - 0.02, 0.056), (0, 0.056)],
+                           (r - 0.02, 0.046), (0, 0.046)],
                   at=F.at(0, CLOCK_Y, WALL), material=M.clock_case, rot=(90, 0, 0), segments=40)
         _disc(F, 'face', 0, CLOCK_Y, WALL + 0.05, r - 0.022, M.face, t=0.004, verts=40)
         z = WALL + 0.054
