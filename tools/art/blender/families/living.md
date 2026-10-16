@@ -2,7 +2,8 @@
 
 `living.py` builds the living room's models into `web/public/assets/models/living/` and their entries in
 `packs/living/manifest.json`: the fold-down wall bed (`model.wallBed`), the sofa bed (`model.sofaBed`), the ten
-L1 sofas and sectionals, the eleven L2 armchairs and small seats and the nine L3 coffee and side tables. These
+L1 sofas and sectionals, the eleven L2 armchairs and small seats, the nine L3 coffee and side tables and the L6
+staircase (`model.stairs`). These
 replace the primitive-part placeholders
 of `furniture_prims.py` (the classic sofa, the armchair), `catalog.py` and `catalog2.py`, which stay as the
 fallback. Built 2026-10-14; they sit in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
@@ -106,6 +107,33 @@ for the side, nesting and console tables). Still, but for two:
 
 `check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
 facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
+
+## The staircase (L6)
+
+Built 2026-10-16; in Validate › Stairs until signed off (back to Living › Stairs). Build mode's Stairs tool and the
+house generator place it (`cfg.stairs`), not the buy catalog, which leaves stairs out: the Validate group shows empty.
+
+- **Steps where the placeholder's are**: 14 steps of 0.2 m up and 4/14 m deep over the 1 × 4 footprint, the first
+  starting at the front edge, the top of the last (2.8 m, house.ts `WALL_HEIGHT`) level with the floor above at the
+  back edge. Residents are drawn rising evenly from the foot of the first step to the top of the last (sim-core
+  `World::sim_height`), as over the placeholder, so their feet meet the treads as before. The same flight serves
+  stairs up and stairs down to the basement, at every facing.
+- **Oak treads** (0.03 m, their tops the steps' tops; each but the first reaches 2 cm past the riser below: the first
+  stays inside the footprint) on **white risers**, between **closed strings** cut level on the floor in front and
+  with the floor above at the back; a **black iron railing** each side on the strings (x ±0.40, inside the tile's
+  wall face): a newel at the foot and the head, two balusters a step and a sloping handrail where the placeholder's
+  rails are (0.7 m above the nosings). The flight is solid underneath, as the placeholder.
+- `check_glb.py` no longer takes the stairs' back for a wall (content `stairs`): it is the top of the flight, where
+  the floor above goes on.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.stairs` | 0.86 × 3.68 × 4.00 m | 3,400 | 2 | Treads, Railing |
+
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Seen in play (WebGPU, and WebGL2 at
+night): generated houses with a flight up (facing 2) and flights down to the basement (facings 0, 1 and 3), a
+resident walking up and down each; the stairwell from the floor above and from the ground over stairs down; the
+colour studio.
 
 ## Rebuild
 

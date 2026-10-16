@@ -107,6 +107,9 @@ The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.g
 `consoleTable.glb`, same pack) are built the same way (glTF, original, CC0). The coffee table's drawer slides out
 with a magazine in it; the rest are still. Their primitive-part entries stay as the fallback.
 
+The staircase (`models/living/stairs.glb`, same pack) is built the same way (glTF, original, CC0): still, its steps
+where the placeholder's are. Its primitive-part entry stays as the fallback.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a
@@ -270,6 +273,11 @@ The outdoor loungers and swings (`models/outdoor/sunLounger.glb`, `hammock.glb`,
 `hotTubCedar.glb`, same pack and family) are built the same way (glTF, original, CC0). The lounger's back reclines
 for sunbathing, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a
 soak while the water bubbles. Their primitive-part entries stay as the fallback.
+
+The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
+are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
+and the fire pit's flames grow on its logs while they warm up by it. Their primitive-part entries stay as the
+fallback.
 
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by

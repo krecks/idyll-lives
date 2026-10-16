@@ -1,6 +1,7 @@
 # The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json), a
 # sofa bed (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals, the L2 armchairs and small
-# seats and the L3 coffee and side tables (notes: living.md).
+# seats, the L3 coffee and side tables and the L6 staircase (`model.stairs`, content `stairs` in base.json) (notes:
+# living.md).
 #
 # A cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands folded up
 # in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at the

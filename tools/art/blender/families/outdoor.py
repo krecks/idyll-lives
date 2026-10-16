@@ -7,6 +7,9 @@
 # Adirondack chair (`model.adirondackChair`), the three-seat garden bench (`model.benchGarden3`), the outdoor bar
 # (`model.outdoorBar`) and the parasol (`model.parasol`), whose canopy stirs in the wind (`stir`, ambient).
 #
+# OU3, grills and fire: the charcoal grill (`model.grill`, its lid swings up while cooking), the gas grill station
+# (`model.grillStation`, its hood swings up) and the fire pit (`model.firePit`, its flames grow while warmed by).
+#
 # Each is built in place where its placeholder stands (`F`, game axes), so the seat heights (`catalog2.py`
 # `SEATS`) and the tops things stand on (content `surface`) stay where the game has them.
 #

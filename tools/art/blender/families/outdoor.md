@@ -89,6 +89,38 @@ Built 2026-10-14; in Validate › Loungers until signed off (back to Outdoor ›
 in the hammock, riding the porch swing and the swing set (frames in a row show seat and resident moving together),
 and soaking in the hot tub (cover up, water bubbling; the cover stayed up after the soak).
 
+## OU3. Grills and fire (Validate › Grills)
+
+Built 2026-10-16; in Validate › Grills until signed off (back to Outdoor › Cooking).
+
+- **Charcoal grill** (`grill`): an enamelled kettle on three legs, wheels on the back two, a wire rack and an ash
+  catcher; inside, a bed of red coals and a grate with burgers and sausages. The lid (with a vent and a front
+  handle) is hinged at the back of the rim: `lid_open` swings it up 95° for the whole of cook. The coals don't glow
+  at night: a glow's copy of the faces showed through the shut lid.
+- **Gas grill station** (`grillStation`): a stainless cart on a plinth, two doors with bar handles and a control
+  panel's chrome knobs, under a dark counter at 0.9 m (the content's `surface`); a chopping board with a tray of
+  patties on the left, a bottle and a pepper mill at the back right, off the surface. The grill in the middle (a dark
+  firebox, a grate with burgers, sausages and corn) has a stainless barrel hood with a handle and a thermometer,
+  hinged at the back: `hood_up` swings it up 75° for cook and feast. The game puts its cooking props (the chopping
+  board, food on the grill) on the station's middle, which is the grate.
+- **Fire pit** (`firePit`): a stone bowl with a ring of ten capstones, an ash bed with embers that glow at night
+  (`glow`, with the content's light, which is always on after dark) and a teepee of logs. `flames` grows seven
+  tongues and a bright core on the logs (gloss, aglow at night) for the whole of relax, from a point under the ash
+  in all three axes (flattened, their glow showed a disc through the ash). Residents warming up sit on the front
+  capstones, facing out (content `seat`: 0.38 m high, 0.38 forward): before, they sat in the middle of the fire.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| grill | 0.64 × 1.24 × 0.63 | 4396 | 2 | Body, Lid |
+| grillStation | 1.66 × 1.20 × 0.66 | 3576 | 3 | Cart, Hood |
+| firePit | 0.93 × 0.62 × 0.91 | 2488 | 3 | Bowl, Stones |
+
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+
+**In the game** (2026-10-16, headless WebGPU and WebGL2): all three bought in a garden (the grill at all four facings, the station at three, the fire pit at three), by day
+and at night; a resident grilling dinner (lid up), grilling a feast at the station (hood up) and warming up by the
+fire pit (flames up, sitting on its rim), by day and at night; the colour studio.
+
 ## Rebuild
 
 ```
