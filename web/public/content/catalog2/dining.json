@@ -214,8 +214,8 @@
         1
       ],
       "price": 55,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "approach": "around",
       "seatAt": [
         "table"
@@ -266,8 +266,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -319,8 +319,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "approach": "around",
       "seatAt": [
         "table"
@@ -371,8 +371,8 @@
         1
       ],
       "price": 110,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -424,8 +424,8 @@
         1
       ],
       "price": 85,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.1,
       "approach": "around",
       "seatAt": [
@@ -477,8 +477,8 @@
         1
       ],
       "price": 30,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "approach": "around",
       "seatAt": [
         "table"
@@ -529,8 +529,8 @@
         1
       ],
       "price": 160,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -582,8 +582,8 @@
         1
       ],
       "price": 140,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "slots": 2,
       "approach": "around",
       "seatAt": [
@@ -635,8 +635,8 @@
         1
       ],
       "price": 70,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "approach": "around",
       "seatAt": [
         "counter",
@@ -688,8 +688,8 @@
         1
       ],
       "price": 95,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "approach": "around",
       "seatAt": [
         "bar",

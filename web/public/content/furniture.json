@@ -825,8 +825,8 @@
         1
       ],
       "price": 80,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "description": "A tall stool for the counter or the island.",
       "approach": "around",
       "seatAt": [
@@ -1064,8 +1064,8 @@
         1
       ],
       "price": 60,
-      "category": "validate",
-      "group": "chairs",
+      "category": "kitchen",
+      "group": "dining",
       "description": "A simple chair: extra seating anywhere.",
       "approach": "around",
       "seatAt": [

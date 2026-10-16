@@ -126,7 +126,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBarHigh` High café table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 
-## K8. Chairs and stools (12) — **Done** (in Validate › Chairs)
+## K8. Chairs and stools (12) — **Done**, signed off 2026-10-16 (back in kitchen / dining)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `chairs` (Validate › Chairs)

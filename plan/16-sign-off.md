@@ -96,6 +96,14 @@ chair (a bar stool at the high café table) pushed up to it: the plate on the to
 Nothing needed fixing. The dining, glass and farmhouse sets' chairs take their table's "Legs" colour (they
 are one model). All back in kitchen / dining.
 
+## The chairs and stools
+
+The twelve K8 seats (Validate › Chairs) were signed off on 2026-10-16, checked as the sinks were, each
+standing free: sat on in all four facings; the three stools swivel (`swivel`, with the sitter riding it) for
+sit and drink and shut after their `hold`; a snack eaten from each at a table, counter or high café table
+pushed up to it; coffee (or a drink, on the counter and high stools) at a table, which those uses need
+(`needsTable`: refused for a seat standing alone). Nothing needed fixing. All back in kitchen / dining.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
