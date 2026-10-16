@@ -6,7 +6,7 @@ Mostly still things. Clocks and swaying things wait for ambient clips (E2); curt
 Validate › Wall Decor, Ornaments and Textiles. The ambient clips (E2: clock hands, pendulum) and the curtains' night
 clip (E3) are built, not left static.
 
-## D1. Wall art and clocks (6) — **done** (2026-10-14)
+## D1. Wall art and clocks (6) — **Done**, signed off 2026-10-16 (back in decor / wall)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `wall decor` (Validate › Wall Decor)
@@ -21,7 +21,7 @@ clip (E3) are built, not left static.
 | `wallClock` Wall clock | 1x1 · wall | — | decor / wall | Case, Face | Ambient (E2) | `hour_hand`, `minute_hand`: the hands tell the game's time (`motions.clock`); no second hand (a game minute is a real second). |
 | `wallShelf` Floating shelves | 1x1 · wall | — | decor / wall | Shelves | Static | Static. |
 
-## D2. Ornaments (10) — **done** (2026-10-14)
+## D2. Ornaments (10) — **Done**, signed off 2026-10-16 (back in decor / ornaments)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `ornaments` (Validate › Ornaments)
@@ -35,12 +35,12 @@ clip (E3) are built, not left static.
 | `vasePedestal` Vase on a pedestal | 1x1 · floor | — | decor / ornaments | Vase, Pedestal | Static | Static. |
 | `bustMarble` Marble bust | 1x1 · floor | admire:look | decor / ornaments | Bust, Plinth | Static | Static. |
 | `statueCat` Cat statue | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
-| `statueHorse` Porcelain horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
+| `statueHorse` Bronze horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `hangingPlant` Hanging plant | 1x1 · ceiling | water:water | decor / ornaments | Pot, Cord | Use | `sway`: the pot sways 5° and settles for water. |
 | `fireplace` Fireplace | 2x1 · floor | relax:relax | decor / ornaments | Surround, Mantel | Use | `flames`: the flames grow on the logs for relax (gloss; the light is the content's). |
 
-## D3. Textiles (6) — **done** (2026-10-14)
+## D3. Textiles (6) — **Done**, signed off 2026-10-16 (back in decor / textiles)
 
 - **Family:** `tools/art/blender/families/decor.py`
 - **Validate group:** `textiles` (Validate › Textiles)
