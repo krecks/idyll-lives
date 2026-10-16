@@ -9,7 +9,7 @@ open**. Each line says where it lives.
 
 ## Next: sign-off
 
-- **Validate holds 501 items in 73 groups**, against the plan's "about three at a time". Sign tasks off
+- **Validate holds all 540 items in 79 groups**, against the plan's "about three at a time". Sign tasks off
   (`16-sign-off.md`) after review. `python3 -B tools/content/validate.py list | out --group <g> [--dry-run]`
   moves items back to their "Back to" by id, keeps the files' formatting and drops emptied groups. Items whose
   home turns them freely carry `"freeRotation": true` (Validate itself no longer turns anything).
@@ -165,9 +165,45 @@ diagonal walls), `11c8399` (islands), `0b917bc` (colour studio), `be8448c` and `
   garden lantern's hexagons turn as its placeholder's (0.47 m deep).
 - **A new game's first story event** shows in the feed and the journal.
 
+## Decided in the last build round (2026-10-16, review these)
+
+The last 39 objects (L4 Media, L5 Shelves, L6 Stairs, OU3 Grills and fire, OU4 Play and yard, OU5 Pond, small garden
+things and lights) are Blender models, each task in its own Validate group; nothing is left to build.
+
+- **New families** `media.py`, `yard.py` and `garden_things.py` (not `outdoor.py`/`living.py` as the plan says), so the
+  agents didn't share a script; the keys are `model.<id>` as before. Shelves and stairs are in `living.py`, the grills in
+  `outdoor.py`.
+- **Media:** the lift bench's TV rises out of a hood at the back (0.80 m high at rest against the placeholder's 1.33;
+  the gate warns); the electric fireplace got a floor cushion and `SEATS.fireplaceElectric` (residents floated
+  mid-air, back to the fire; 0.92 m deep, the gate warns); the stereo is 4 draws (its pulsing woofers) and gained a CD
+  player; five placeholders moved onto the wall face. Screens glow at night; the lift TV and the projector screen
+  only while up or down.
+- **Shelves:** models and placeholders moved onto the wall face (3–7 cm in before); the content `surface` rectangles
+  didn't move, so their backs are 1–4 cm behind the tops. Books are joined satin boxes (no draws of their own); one
+  book tips out while a resident reads. The low and tall bookcases got a back (their "Back" colour); the ladder
+  shelf's colours are Frame and Shelves. The display cabinet's door is its own part with no clip yet (a clip makes 4
+  draws).
+- **Stairs:** the placeholder's steps exactly (14 × 0.2 m); white risers and strings with an iron railing.
+  `check_glb.py` skips the wall-face check for `stairs: true`. Validate › Stairs looks empty in Buy (stairs are placed
+  by build mode).
+- **Grills:** the grill's lid and the station's hood swing up while cooking; the fire pit's flames grow, and it got a
+  content `seat` (residents sat in the fire, the placeholder too). No night glow on the grill's coals (it showed
+  through the shut lid).
+- **Yard:** far versions for all nine; the greenhouse is 4 draws (glass door with no handle); the shed's door is its own
+  colour part; a watering can and a chopping block were dropped (20–140 % past the placeholders).
+- **Garden things:** the pond's koi rises when fed and every 7 s while watched; a blue tit lands on the feeder; the
+  pond's reeds don't sway (a 4th draw); far versions for the planter box and lamp post.
+- **The big town test** picks its yard things by `outdoors`, not by category (everything outdoor is in Validate).
+
 ## Still open
 
 - **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).
+- **Night glow draws through other parts** of a model (the grill's coals through its shut lid).
+- **Stairs seen from some basement views** lose part of their top end (the railing, and the model's risers and
+  strings, the placeholder's too): a renderer cut-away, not the model.
+- **Cooking props** (chopping board, food) are drawn at a station's middle, which on `grillStation` is the grate.
+- **Not looked at for the new 39:** the Low preset, the colour studio screen itself (colours were set through `buy`),
+  far versions in the town overview, uses run to their natural end (the yard's were cancelled).
 - **Wall things shown while one is held** float over lowered walls (pictures on outside walls too).
 - **Small things on tops:** 3 of 1800 sample houses have none (was 1), probably kitchens whose run has no
   plain counter.

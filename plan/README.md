@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-14):** 540 objects. **465 are done**:
+**Where it stands (2026-10-16):** 540 objects. **All 540 are built** (each in Validate until it's signed off):
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
 - the six fridges: `fridge`, and the K1 five `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
@@ -29,6 +29,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the `wallBed`, and the eleven L1 sofas and sectionals: `sofa`, `loveseat`, `sofaThree`, `sofaDesign`, `sofaThreeSeat`, `sofaBed`, `sectionalMiddle`, `sectionalArmLeft`, `sectionalArmRight`, `sectionalCorner`, `chaise` (in Validate › Sofas);
 - the eleven L2 armchairs and small seats: `armchair`, `armchairLounge`, `armchairLeather`, `armchairDesign`, `armchairWingback`, `recliner`, `rockingChair`, `pouf`, `ottoman`, `floorCushion`, `beanBag` (in Validate › Armchairs);
 - the nine L3 coffee and side tables: `coffeeTable`, `coffeeTableGlass`, `coffeeTableMarble`, `sideTable`, `coffeeTableRound`, `coffeeTableLong`, `nestingTables`, `sideTableRound`, `consoleTable` (in Validate › Coffee Tables);
+- the eight L4 media things: `tv`, `tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`, `tvStandLow`, `fireplaceElectric` (in Validate › Media); the nine L5 shelves: `bookshelf`, `bookcaseLow`, `bookcaseWide`, `shelvingIndustrial`, `bookcaseTall`, `bookcaseCorner`, `cubeShelf`, `ladderShelf`, `displayCabinet` (in Validate › Shelves); the L6 `stairs` (in Validate › Stairs);
 - the fourteen office models: O1 `deskSimple`, `deskCorner`, `deskStanding`, `deskExecutive`, `computerDesk`, `deskWriting`, `deskLaptop`, `computerGaming` (in Validate › Desks); O2 `chairExecutive`, `chairTask`, `officeChair` (Validate › Office Chairs); O3 `filingCabinet`, `whiteboard`, `corkboard` (Validate › Office Storage);
 - the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
@@ -37,6 +38,8 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder` (in Validate › Garden Decor);
 - the eleven OU1 patio models: `bench`, `patioSet`, `picnicTable`, `gardenChair`, `patioTableRound`, `patioTable4`, `patioChair`, `adirondackChair`, `benchGarden3`, `outdoorBar`, `parasol` (in Validate › Patio);
 - the five OU2 loungers and swings: `sunLounger`, `hammock`, `porchSwing`, `swingSet`, `hotTubCedar` (in Validate › Loungers);
+- the three OU3 grills and fire: `grill`, `grillStation`, `firePit` (in Validate › Grills); the nine OU4 play and yard things: `sandbox`, `bikeRack`, `raisedBed`, `shedSmall`, `greenhouse`, `compostBin`, `rainBarrel`, `clothesline`, `firewoodStack` (in Validate › Yard); the nine OU5 pond, small garden things and lights: `garden.pond`, `lampPost`, `stringLights`, `planterBox`, `birdhouse`, `birdFeederPole`, `dogHouse`, `sundial`, `steppingStones` (in Validate › Garden Things);
+- the 36 community and farm things, CM1–CM5 (in Validate › Playground, Street, Stalls, Shops and Farm);
 - the ten G1 houseplants: `plant`, `garden.monstera`, `fiddleFig`, `snakePlant`, `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai` (in Validate › Houseplants);
 - the fifteen G2 flowers: `flowerbed`, `garden.tulips`, `daffodils`, `daisies`, `sunflowers`, `poppies`, `marigolds`, `pansies`, `lilies`, `lupins`, `forgetMeNots`, `cosmos`, `meadow`, `geraniums`, `flowerBox` (in Validate › Flowers);
 - the eleven G3 shrubs: `bush`, `garden.boxwood`, `topiary`, `hedge`, `hydrangea`, `roses`, `azalea`, `lavender`, `fern`, `grass`, `hosta` (in Validate › Shrubs);
@@ -45,12 +48,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**75 are to do.** All of them still draw primitive parts:
-- `tools/art/catalog.py`: 15;
-- `catalog2.py`: 20;
-- the base manifest: 4;
-- `community.py`: 36;
-- the personality packs: 0.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): Validate holds all 540 items in 79 groups.
 
 ## The plan
 
@@ -61,14 +59,14 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 | [Bathroom](02-bathroom.md) | 21 | B1 Toilets (5, **done**), B2 Showers (4, **done**), B3 Baths (3, **done**), B4 Laundry (6, **done**), B5 Bathroom storage and mirrors (3, **done**) |
 | [Bedroom](03-bedroom.md) | 27 | BR1 Beds (9, **done**), BR2 Nightstands and small storage (8, **done**), BR3 Wardrobes and drawers (6, **done**), BR4 Dressing and mirrors (4, **done**) |
 | [Kids](04-kids.md) | 20 | KD1 Baby and kids' beds (4, **done**), KD2 Toys (10, **done**), KD3 Kids' study and art (6, **done**) |
-| [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11, **done**), L2 Armchairs and small seats (11, **done**), L3 Coffee and side tables (9, **done**), L4 Media (8), L5 Shelves (9), L6 Stairs (1) |
+| [Living room](05-living.md) | 49 | L1 Sofas and sectionals (11, **done**), L2 Armchairs and small seats (11, **done**), L3 Coffee and side tables (9, **done**), L4 Media (8, **done**), L5 Shelves (9, **done**), L6 Stairs (1, **done**) |
 | [Office](06-office.md) | 14 | O1 Desks (8, **done**), O2 Desk chairs (3, **done**), O3 Storage and boards (3, **done**) |
 | [Fitness](07-fitness.md) | 5 | F1 Home gym (5, **done**) |
 | [Hobbies](08-hobbies.md) | 19 | H1 Music (6, **done**), H2 Games (6, **done**), H3 Crafts and science (7, **done**) |
 | [Decor](09-decor.md) | 22 | D1 Wall art and clocks (6, **done**), D2 Ornaments (10, **done**), D3 Textiles (6, **done**) |
 | [Tabletop](10-tabletop.md) | 39 | TT1 Kitchenware (11, **done**), TT2 Tableware (7, **done**), TT3 Books and small plants (7, **done**), TT4 Small ornaments (6, **done**), TT5 Bath, desk and toys (8, **done**) |
 | [Lighting](11-lighting.md) | 21 | LT1 Ceiling lights (7, **done**), LT2 Wall lights (3, **done**), LT3 Floor lamps (5, **done**), LT4 Table lamps (6, **done**) |
-| [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11, **done**), OU2 Loungers, swings and the hot tub (5, **done**), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9) |
+| [Outdoor](12-outdoor.md) | 37 | OU1 Patio seating and tables (11, **done**), OU2 Loungers, swings and the hot tub (5, **done**), OU3 Grills and fire (3, **done**), OU4 Play and yard (9, **done**), OU5 Pond, small garden things and lights (9, **done**) |
 | [Garden plants and trees](13-garden.md) | 53 | G1 Houseplants (10, **done**), G2 Flowers (15, **done**), G3 Shrubs (11, **done**), G4 Edibles (5, **done**), G5 Trees (12, **done**) |
 | [Community and farm](14-community.md) | 36 | CM1 Playground (8, **done**), CM2 Street furniture (10, **done**), CM3 Food stalls and vending (5, **done**), CM4 Shops and café (5, **done**), CM5 Farm (8, **done**) |
 | [Personality packs](15-personality-packs.md) | 94 | P1–P16 (**done**): one task per pack (bookworm … slob, and the example pack) |
@@ -173,7 +171,7 @@ The engine and tools tasks (T0, E1–E8, C1) are done, so every kind of clip can
 
 ## Done means
 
-- Every one of the 525 items is a Blender `.glb` with its clips. Each passed `check_glb` and the validator, and
+- Every one of the 540 items is a Blender `.glb` with its clips. Each passed `check_glb` and the validator, and
   was looked at in play.
 - Every item is back in its own category (Validate is gone).
 - The placeholders stay as the fallback, and keys are unchanged, so saves and content need no migration.
