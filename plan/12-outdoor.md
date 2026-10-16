@@ -67,20 +67,20 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `clothesline` Washing line | 3x1 · floor | washing:clean | outdoor / yard | Posts, Washing | Use | `washing`: the washing grows on the line for washing. Keeping it out after needs O (C1). |
 | `firewoodStack` Log store | 1x1 · floor | — | outdoor / yard | Shelter | Static | Static. |
 
-## OU5. Pond, small garden things and lights (9)
+## OU5. Pond, small garden things and lights (9) — **Done** (in Validate › Garden Things)
 
-- **Family:** `tools/art/blender/families/outdoor.py`
+- **Family:** `tools/art/blender/families/garden_things.py` (notes: `garden_things.md`; its own family so OU3 and OU4 could build `outdoor.py` alongside)
 - **Validate group:** `garden things` (Validate › Garden Things)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `garden.pond` Garden pond | 2x2 · floor | fish:look feedFish:garden | outdoor / decor | Stones | Use | `fish`: a koi rises to the surface for feedFish and fish, and sinks. A ripples (E2). |
-| `planterBox` Planter box | 1x1 · floor | water:water | outdoor / decor | Box | Static | Static. |
-| `birdhouse` Birdhouse | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. |
-| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a bird appears on the perch for birdwatch. |
-| `dogHouse` Dog house | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. |
-| `sundial` Sundial | 1x1 · floor | — | outdoor / decor | Plinth, Dial | Static | Static. |
-| `steppingStones` Stepping stones | 1x3 · rug | — | outdoor / decor | Stones | Static | Static, flat. |
-| `lampPost` Garden lamp post | 1x1 · floor | — | outdoor / lights | Post, Lantern | Static | Static. N glow (E8). |
-| `stringLights` String lights | 2x1 · floor | — | outdoor / lights | Posts, Bulbs | Static | Static. A a gentle sway (E2). |
+| `garden.pond` Garden pond | 2x2 · floor | fish:look feedFish:garden | outdoor / decor | Stones | Use | `fish`: a koi rises to the surface for feedFish and fish, and sinks. A ripples (E2). Built: `fish` (koi up 4 cm and turning) held for feedFish; `surface` (up and down, 2.4 s) every 7 s while watching; `ripple` ambient. Opaque gloss water, reeds still (satin): 3 draws, 4408 tris. |
+| `planterBox` Planter box | 1x1 · floor | water:water | outdoor / decor | Box | Static | Static. Built: plank trough, leaves on `foliage` (wind, tint), flowers; far version (`far_of`). 3 draws, 3752 tris. |
+| `birdhouse` Birdhouse | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. Built: 2 draws, 1028 tris. |
+| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a bird appears on the perch for birdwatch. Built: a blue tit on the second perch, held while watching; the robin always there. 3 draws, 2932 tris. |
+| `dogHouse` Dog house | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. Built: name plate REX, bowl. 2 draws, 2224 tris. |
+| `sundial` Sundial | 1x1 · floor | — | outdoor / decor | Plinth, Dial | Static | Static. Built: 1 draw, 1316 tris. |
+| `steppingStones` Stepping stones | 1x3 · rug | — | outdoor / decor | Stones | Static | Static, flat. Built: 4 cm slabs, show on the lawn. 1 draw, 320 tris. |
+| `lampPost` Garden lamp post | 1x1 · floor | — | outdoor / lights | Post, Lantern | Static | Static. N glow (E8). Built: panes at the light (2.3 m) glow at night; far version (0.25). 1 draw, 744 tris. |
+| `stringLights` String lights | 2x1 · floor | — | outdoor / lights | Posts, Bulbs | Static | Static. A a gentle sway (E2). Built: bulbs glow at night; `sway` ±4° in 3.2 s, ambient. 3 draws, 2524 tris. |
