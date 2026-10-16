@@ -699,7 +699,8 @@ def check_file(entry, finishes, path, facts=None):
     if not entry.get('fit') and not entry.get('offset'):
         # Centred on the footprint, or where its placeholder is (a wall bed at the back of its tiles).
         plo, phi = placeholder_box(entry['placeholder']) if entry.get('placeholder') else ([0] * 3, [0] * 3)
-        if lo[1] < -0.005:
+        # (Unless its placeholder reaches as far down: a rock sunk in the ground, the marker round its middle.)
+        if lo[1] < -0.005 and not (entry.get('placeholder') and lo[1] >= plo[1] - 0.01):
             errors.append(f'reaches {-lo[1] * 100:.1f} cm below the floor (origin on the floor, y = 0)')
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
