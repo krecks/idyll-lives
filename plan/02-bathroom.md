@@ -4,7 +4,7 @@ The seven sinks are done (`families/bathroom.py`, `water_on`), the five B1 toile
 0.001 and `G.grow`n for the whole use. Mirror glass stays a primitive `part` until the engine reads mirrors from
 files (E6), as the double vanity did.
 
-## B1. Toilets (5) — **Done** (in Validate › Toilets)
+## B1. Toilets (5) — **Done**, signed off 2026-10-16 (back in bathroom / toilets)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `toilets` (Validate › Toilets)
@@ -43,7 +43,7 @@ files (E6), as the double vanity did.
 | `bathtubClawfoot` Clawfoot tub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 | `bathtubFreestanding` Freestanding bath | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
 
-## B4. Laundry (6) — **Done** (in Validate › Laundry)
+## B4. Laundry (6) — **Done**, signed off 2026-10-16 (back in bathroom / laundry)
 
 - **Family:** `tools/art/blender/families/laundry.py`
 - **Validate group:** `laundry` (Validate › Laundry)
@@ -54,11 +54,11 @@ files (E6), as the double vanity did.
 | `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts. L `drum_spin` (E1). |
 | `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer. L `drum_spin` (E1). |
 | `towelRail` Towel rail | 1x1 · wall | — | bathroom / laundry | Rail, Towels | Static | Static. |
-| `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Towels | Static | Static. |
+| `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Top towel, Middle towel, Bottom towel | Static | Static. |
 | `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket | Static | Static. (+use) the lid lifts. |
 | `bathMat` Bath mat | 1x1 · rug | — | bathroom / laundry | Mat | Static | Static, flat. |
 
-## B5. Bathroom storage and mirrors (3) — **Done** (in Validate › Bathroom Storage)
+## B5. Bathroom storage and mirrors (3) — **Done**, signed off 2026-10-16 (back in bathroom / sinks)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `bathroom storage` (Validate › Bathroom Storage)
@@ -68,4 +68,4 @@ files (E6), as the double vanity did.
 |---|---|---|---|---|---|---|
 | `mirrorCabinet` Mirror cabinet | 1x1 · wall | — | bathroom / sinks | Cabinet, Frame | Static | Static; the mirror glass is in the file (E6), with silvering behind it for presets without live mirrors. The mirror door is a part of its own for the (+use) swing. |
 | `mirrorRound` Round mirror | 1x1 · wall | — | bathroom / sinks | Frame | Static | Static; the mirror glass is in the file (E6). |
-| `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | — | bathroom / sinks | Cabinet, Frame | Static | Static. The upper door is a part of its own for the (+use) swing. |
+| `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | — | bathroom / sinks | Cabinet, Doors, Towels | Static | Static. The upper door is a part of its own for the (+use) swing. |
