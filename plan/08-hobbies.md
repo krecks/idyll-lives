@@ -5,7 +5,7 @@ The nineteen hobby models are done in `families/hobbies.py` (notes: `hobbies.md`
 Instruments a resident holds (guitars, the ukulele) hide from their stand while played if the music animation draws
 them in the hands (T0 `squash` to 0).
 
-## H1. Music (6) — **Done** (in Validate › Music)
+## H1. Music (6) — **Done**, signed off 2026-10-16 (back in hobbies / music)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `music` (Validate › Music)
@@ -20,7 +20,7 @@ them in the hands (T0 `squash` to 0).
 | `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Loop (E1) | `cymbals`: the cymbals wobble while drummed (E1). Until then U: the hi-hat closes. |
 | `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Guitar, Stand | Use | `off_stand`. |
 
-## H2. Games (6) — **Done** (in Validate › Games)
+## H2. Games (6) — **Done**, signed off 2026-10-16 (back in hobbies / games)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `games` (Validate › Games)
@@ -28,14 +28,14 @@ them in the hands (T0 `squash` to 0).
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Trim | Use | `move`: a pawn slides one square for chess. |
+| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess. |
 | `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle lifts off the balls for pool and trick shots. |
 | `foosball` Foosball table | 2x1 · floor | foosball:play | hobbies / games | Table, Trim | Loop (E1) | `rods`: the rods turn while played (E1). Until then U: the rods slide in 5 cm. |
 | `dartboard` Dartboard | 1x1 · wall | darts:play | hobbies / games | Board, Cabinet | Use | `darts`: three darts grow in the board for darts. |
 | `arcadeCabinet` Arcade cabinet | 1x1 · floor | arcade:play | hobbies / games | Cabinet, Art | Loop (E1) | `joystick`: the stick waggles while played (E1). Until then static. |
-| `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Trim | Use | `pieces`: a patch of finished puzzle grows for jigsaw. |
+| `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Stool | Use | `pieces`: a patch of finished puzzle grows for jigsaw. |
 
-## H3. Crafts and science (7) — **Done** (in Validate › Crafts)
+## H3. Crafts and science (7) — **Done**, signed off 2026-10-16 (back in hobbies / crafts)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
 - **Validate group:** `crafts` (Validate › Crafts)
