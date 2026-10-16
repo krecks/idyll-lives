@@ -3355,7 +3355,7 @@
       "stairs": true,
       "interactions": [],
       "price": 900,
-      "category": "living",
+      "category": "validate",
       "group": "stairs"
     }
   ],
@@ -4005,6 +4005,15 @@
         {
           "id": "yard",
           "label": "Yard",
+          "outside": true
+        },
+        {
+          "id": "stairs",
+          "label": "Stairs"
+        },
+        {
+          "id": "grills",
+          "label": "Grills",
           "outside": true
         }
       ]

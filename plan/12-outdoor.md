@@ -37,7 +37,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Fabric | Loop (E1) | `swing`: the seat swings while played (E1). Until then U: the seat tips back 15° and holds. |
 | `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath | outdoor / seating | Cedar, Cover | Use | `cover_off`: the cover slides off and folds back for soak. L the water bubbles (E1). |
 
-## OU3. Grills and fire (3)
+## OU3. Grills and fire (3) — **Done** (in Validate › Grills)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `grills` (Validate › Grills)
@@ -45,9 +45,9 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`: the lid swings up for the whole of cook. |
-| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`: the hood swings up for cook and feast. |
-| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`: the flames grow on the logs for relax (the light is the content's). |
+| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | **Done** (in Validate › Grills): `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
+| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | **Done** (in Validate › Grills): `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
+| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | **Done** (in Validate › Grills): `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); content `seat` added so the resident sits on the front capstones, not in the fire. |
 
 ## OU4. Play and yard (9) — **Done** (in Validate › Yard)
 

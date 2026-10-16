@@ -1,6 +1,7 @@
 # The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json), a
 # sofa bed (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals, the L2 armchairs and small
-# seats and the L3 coffee and side tables (notes: living.md).
+# seats, the L3 coffee and side tables and the L6 staircase (`model.stairs`, content `stairs` in base.json) (notes:
+# living.md).
 #
 # A cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands folded up
 # in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at the
@@ -46,6 +47,10 @@ M = G.Palette(
     book_b=('#3F5E73', 'satin'),
     book_c=('#C9A65A', 'satin'),
     book_d=('#5D7A54', 'satin'),
+    # L6, the staircase: oak treads, white risers and strings, a black iron railing
+    treads=('#B98B5E', 'wood'),
+    risers=('#EFEBE3', 'satin'),
+    railing=('#3C3A38', 'metal'),
     # the sofa bed
     upholstery=('#6F7F8C', 'fabric'),   # its body: arms, back and base; the main part the player colours
     cushion=('#7A8A97', 'fabric'),      # the seat and back cushions
@@ -738,6 +743,81 @@ def bean_bag():
     G.squash(bag, 'squash', (1.06, 1.06, 0.85), seconds=0.6)
 
 
+# L6, the staircase (base manifest `model.stairs`): a flight of 14 steps up one storey (house.ts WALL_HEIGHT
+# 2.8) over its 1 × 4 footprint, climbed from the front (+depth) to the back, every step where the placeholder
+# has it: 0.2 m up and 4/14 m deep, the first starting at the footprint's front edge, the last level with the
+# floor above at the back edge. Residents are drawn rising evenly along the flight (sim-core
+# `World::sim_height`), from the foot of the first step to the top of the last, as over the placeholder.
+STEPS = 14
+RISE = 2.8 / STEPS                  # 0.2
+RUN = 4.0 / STEPS                   # 0.2857
+TREAD = 0.03                        # the oak board on each step, its top the step's top
+NOSING = 0.02                       # how far a tread reaches past the riser under it (not the first: footprint)
+STEP_W = 0.77                       # the steps, between the strings
+STRING_X, STRING_T = 0.4025, 0.035  # the closed strings each side (to x ±0.42, inside the tile's wall face)
+STRING_UP, STRING_DOWN = 0.12, 0.15  # how far the strings stand above the nosings' line and below the steps'
+RAIL = 0.58                         # the handrail's middle above the strings' top (the placeholder's rail height)
+
+
+def _string(name, x0, x1, material):
+    """A closed string: a band along the flight, cut level on the floor in front and the floor above at the
+    back, from game x0 to x1."""
+    slope = RISE / RUN
+    top, bottom = (lambda z: slope * (2 - z) + RISE + STRING_UP), (lambda z: slope * (2 - z) - STRING_DOWN)
+    z_top = 2 - (2.8 - RISE - STRING_UP) / slope   # where the top edge reaches the floor above
+    z_foot = 2 - STRING_DOWN / slope               # where the bottom edge meets the floor
+    outline = [(2.0, 0.0), (2.0, top(2.0)), (z_top, 2.8), (-2.0, 2.8), (-2.0, bottom(-2.0)), (z_foot, 0.0)]
+    n = len(outline)
+    verts = [F.at(x0, y, z) for z, y in outline] + [F.at(x1, y, z) for z, y in outline]
+    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))] + [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    G.shapes._recalc_normals(obj)
+    return obj, top
+
+
+def stairs():
+    """The staircase: oak treads with a rounded nosing on white risers, between closed white strings; a black
+    iron railing each side, a square newel at the foot and the head, two balusters a step and a sloping
+    handrail, where the placeholder's rails are."""
+    for i in range(1, STEPS + 1):
+        front, back = 2 - (i - 1) * RUN, 2 - i * RUN
+        y = i * RISE
+        F.box(f'riser{i}', STEP_W, y - TREAD, RUN, (0, (y - TREAD) / 2, (front + back) / 2), M.risers)
+        over = NOSING if i > 1 else 0.0
+        F.box(f'tread{i}', STEP_W, TREAD, RUN + over, (0, y - TREAD / 2, (front + over + back) / 2), M.treads, bevel=0.006)
+    slope = RISE / RUN
+    angle = math.degrees(math.atan(slope))
+    foot_z, head_z = 1.8, -1.86            # the newels: on the first step and the last
+    for s in (-1, 1):
+        x = s * STRING_X
+        _, top = _string(f'string{s}', x - STRING_T / 2, x + STRING_T / 2, M.risers)
+        rail_y = lambda z: top(z) + RAIL  # noqa: E731
+        # the newels, capped
+        for k, (z, y0) in enumerate(((foot_z, 0.0), (head_z, 2.8))):
+            y1 = rail_y(z) + 0.06
+            F.box(f'newel{s}{k}', 0.045, y1 - y0, 0.045, (x, (y0 + y1) / 2, z), M.railing, bevel=0.004)
+            F.box(f'newel_cap{s}{k}', 0.05, 0.02, 0.05, (x, y1 + 0.01, z), M.railing, bevel=0.006)
+        # the handrail, between the newels
+        length = (foot_z - head_z) / math.cos(math.radians(angle))
+        mid = (foot_z + head_z) / 2
+        F.box(f'handrail{s}', 0.035, 0.05, length, (x, rail_y(mid), mid), M.railing, rot=(angle, 0, 0), bevel=0.01)
+        # two balusters a step, standing on the string
+        for i in range(1, STEPS + 1):
+            for f in (0.25, 0.75):
+                z = 2 - (i - 1 + f) * RUN
+                if z > foot_z - 0.06 or z < head_z + 0.06:
+                    continue
+                y0, y1 = min(top(z), 2.8) - 0.01, rail_y(z) - 0.02
+                F.box(f'baluster{s}{i}{f}', 0.016, y1 - y0, 0.016, (x, (y0 + y1) / 2, z), M.railing)
+    G.join_all('stairs')
+    G.settle(centre=False)
+
+
 # L3, the coffee and side tables: still, but for the coffee table's drawer (`drawer_open`, a magazine in it,
 # for the magazine use). Their tops stay at the content `surface` heights (catalog2.py `TOPS`).
 def _legs4(xs, zs, h, t, mat, y0=0.0):
@@ -1295,6 +1375,8 @@ FAMILY = G.Family(
              motions={'uses': {'doze': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
              paint=[('upholstery', 'Upholstery'), ('cushion', 'Cushions'), ('legs', 'Legs'), ('bedding', 'Bedding'),
                     ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')]),
+     # L6: the staircase (placed by build mode's Stairs tool and the house generator)
+     G.Model('stairs', stairs, key='model.stairs', size=(0.855, 3.68, 4.0), paint=[('treads', 'Treads'), ('railing', 'Railing')]),
      # L1: the sofas and sectionals, their seat cushions sinking while sat or dozed on
      G.Model('sofa', sofa_classic, key='model.sofa', size=(1.88, 0.935, 0.817), centre=(0, -0.0215),
              motions={'uses': {'relax': 'sink_in'}},

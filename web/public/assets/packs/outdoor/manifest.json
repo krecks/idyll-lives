@@ -486,6 +486,160 @@
           "label": "Cover"
         }
       ]
+    },
+    "model.grill": {
+      "type": "model",
+      "url": "../../models/outdoor/grill.glb",
+      "materials": {
+        "burger": {
+          "finish": "material.finish.satin"
+        },
+        "coal_hot": {
+          "finish": "material.finish.gloss"
+        },
+        "coals": {
+          "finish": "material.finish.matte"
+        },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
+        "handle_steel": {
+          "finish": "material.finish.chrome"
+        },
+        "kettle": {
+          "finish": "material.finish.gloss"
+        },
+        "kettle_lid": {
+          "finish": "material.finish.gloss"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        },
+        "wheel": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "kettle",
+          "label": "Body"
+        },
+        {
+          "material": "kettle_lid",
+          "label": "Lid"
+        }
+      ]
+    },
+    "model.grillStation": {
+      "type": "model",
+      "url": "../../models/outdoor/grillStation.glb",
+      "materials": {
+        "board": {
+          "finish": "material.finish.wood"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "burger": {
+          "finish": "material.finish.satin"
+        },
+        "cart": {
+          "finish": "material.finish.metal"
+        },
+        "corn": {
+          "finish": "material.finish.satin"
+        },
+        "firebox": {
+          "finish": "material.finish.matte"
+        },
+        "gauge": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
+        "handle_steel": {
+          "finish": "material.finish.chrome"
+        },
+        "hood": {
+          "finish": "material.finish.metal"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "hood_up",
+          "feast": "hood_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "cart",
+          "label": "Cart"
+        },
+        {
+          "material": "hood",
+          "label": "Hood"
+        }
+      ]
+    },
+    "model.firePit": {
+      "type": "model",
+      "url": "../../models/outdoor/firePit.glb",
+      "materials": {
+        "coals": {
+          "finish": "material.finish.matte"
+        },
+        "ember": {
+          "finish": "material.finish.gloss",
+          "glow": "#FF7A2E"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFB050"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE0A0"
+        },
+        "log": {
+          "finish": "material.finish.bark"
+        },
+        "pit": {
+          "finish": "material.finish.matte"
+        },
+        "pit_stones": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "pit",
+          "label": "Bowl"
+        },
+        {
+          "material": "pit_stones",
+          "label": "Stones"
+        }
+      ]
     }
   }
 }

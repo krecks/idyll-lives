@@ -7,6 +7,9 @@
 # Adirondack chair (`model.adirondackChair`), the three-seat garden bench (`model.benchGarden3`), the outdoor bar
 # (`model.outdoorBar`) and the parasol (`model.parasol`), whose canopy stirs in the wind (`stir`, ambient).
 #
+# OU3, grills and fire: the charcoal grill (`model.grill`, its lid swings up while cooking), the gas grill station
+# (`model.grillStation`, its hood swings up) and the fire pit (`model.firePit`, its flames grow while warmed by).
+#
 # Each is built in place where its placeholder stands (`F`, game axes), so the seat heights (`catalog2.py`
 # `SEATS`) and the tops things stand on (content `surface`) stay where the game has them.
 #
@@ -15,6 +18,7 @@ import math
 import os
 import sys
 
+import bpy
 from mathutils import Matrix, Vector
 
 sys.dont_write_bytecode = True
@@ -50,6 +54,31 @@ M = G.Palette(
     handle=('#8E6E52', 'wood'),          # the basket's handle
     cup=('#F2F1EE', 'gloss'),            # cups and a jug on the tables
     jug=('#9DC6CF', 'gloss'),
+    # OU3, the grills and the fire pit
+    kettle=('#2A2C30', 'gloss'),         # the charcoal grill's enamelled bowl (Body)
+    kettle_lid=('#2A2C30', 'gloss'),     # its lid (Lid)
+    grate=('#3A3D41', 'metal'),          # cooking grates, legs, the kettle's vent and handle brackets
+    handle_steel=('#D0D3D6', 'chrome'),  # handles and knobs
+    wheel=('#2A2C30', 'satin'),
+    coals=('#3A3330', 'matte'),          # a charcoal or ash bed
+    ember=('#D9542B', 'gloss', {'glow': '#FF7A2E'}),        # the fire pit's embers: red by day, aglow at night
+    coal_hot=('#D9542B', 'gloss'),       # the kettle's coals: no glow, which would show through its shut lid
+    flame=('#FF9A3C', 'gloss', {'glow': '#FFB050'}),        # the fire pit's flames, grown while warmed by
+    flame_core=('#FFD27A', 'gloss', {'glow': '#FFE0A0'}),
+    burger=('#6B3A26', 'satin'),         # food on the grates
+    sausage=('#8E3F2E', 'satin'),
+    corn=('#E8C24A', 'satin'),
+    cart=('#C3C7CB', 'metal'),           # the grill station's stainless cart (Cart)
+    hood=('#C3C7CB', 'metal'),           # its hood (Hood)
+    worktop=('#3A3D41', 'satin'),        # its dark counter
+    firebox=('#1F2023', 'matte'),        # inside the grill and under the hood
+    gauge=('#F2F1EE', 'gloss'),          # the hood's thermometer face
+    board=('#CDB08A', 'wood'),           # the chopping board
+    tray=('#E9E6E0', 'gloss'),           # the tray of food
+    bottle=('#6FA6D9', 'gloss'),
+    pit=('#8E8A84', 'matte'),            # the fire pit's bowl (Bowl)
+    pit_stones=('#A19C94', 'matte'),     # its capstones (Stones)
+    log=('#6B4A33', 'bark'),
     # OU2
     lounger=('#CDB08A', 'wood'),         # the sun lounger's frame
     lounger_pad=('#E8E2D6', 'fabric'),   # its cushions (the back is upholstered all round)
@@ -571,6 +600,184 @@ def hotTubCedar():
     return G.meshes()
 
 
+# --- OU3: the grills and the fire pit -------------------------------------------------------------------------
+def _across(name, outline, x0, x1, material):
+    """A convex outline of game (depth, height) points, run across from game x0 to x1: a hood's barrel."""
+    n = len(outline)
+    verts = [F.at(x0, y, z) for z, y in outline] + [F.at(x1, y, z) for z, y in outline]
+    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))] + [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    G.shapes._recalc_normals(obj)
+    return obj
+
+
+def _embers(prefix, r, y, n, seed, material):
+    """`n` glowing lumps of coal scattered over a disc of radius `r` at height `y`."""
+    for k in range(n):
+        a = (k * 137.5 + seed) % 360
+        d = r * math.sqrt((k + 0.5) / n)
+        F.sphere(f'{prefix}{k}', 0.022 + 0.008 * (k % 3), (d * G.cosd(a), y, d * G.sind(a)), material,
+                 scale=(1, 1, 0.6), segments=6, rings=4)
+
+
+KETTLE_R, KETTLE_RIM = 0.3, 0.99     # the charcoal grill's bowl: its radius and its rim's height (placeholder)
+
+
+# The charcoal grill: a kettle on three legs, wheels on the back two, an ash catcher under the bowl; inside, a bed of
+# red coals and a grate with burgers and sausages. The lid is hinged at the back of the rim
+# and swings up (`lid_open`) for the whole of a cook.
+def grill():
+    with G.new_parts() as still:
+        y0, top = 0.64, KETTLE_RIM
+        G.revolve('bowl', [(0, y0), (0.15, y0 + 0.005), (0.24, y0 + 0.04), (0.29, 0.76), (KETTLE_R, 0.86),
+                           (KETTLE_R, top), (KETTLE_R - 0.014, top), (KETTLE_R - 0.014, 0.86), (0.276, 0.77),
+                           (0.226, y0 + 0.055), (0.14, y0 + 0.02), (0, y0 + 0.02)],
+                  at=F.at(0, 0, 0), material=M.kettle, segments=32)
+        G.torus('rim', KETTLE_R - 0.004, 0.007, at=F.at(0, top, 0), material=M.kettle, major_segments=32, minor_segments=6)
+        for s in (-1, 1):                                           # the bowl's side handles
+            F.box(f'side_handle{s}', 0.012, 0.025, 0.12, (s * (KETTLE_R + 0.015), 0.93, 0), M.grate, bevel=0.004)
+        # the coals, glowing, and the cooking grate over them with food
+        F.cyl('coal_bed', 0.24, 0.03, (0, 0.85, 0), M.coals, verts=20)
+        _embers('coal', 0.21, 0.875, 14, 20, M.coal_hot)
+        G.torus('grate_ring', KETTLE_R - 0.025, 0.006, at=F.at(0, 0.965, 0), material=M.grate, major_segments=28, minor_segments=5)
+        for k in range(-5, 6):
+            x = k * 0.05
+            half = math.sqrt(max((KETTLE_R - 0.025) ** 2 - x * x, 0))
+            _rod(f'grate_bar{k}', (x, 0.965, -half), (x, 0.965, half), 0.004, M.grate, verts=6)
+        for k, (x, z) in enumerate(((-0.12, 0.06), (0.02, -0.12), (0.13, 0.08))):
+            F.cyl(f'burger{k}', 0.048, 0.022, (x, 0.982, z), M.burger, verts=14, bevel=0.006)
+        for k, (x, z) in enumerate(((-0.06, -0.09), (0.06, -0.02))):
+            _rod(f'sausage{k}', (x - 0.07, 0.982, z), (x + 0.07, 0.982, z + 0.02), 0.016, M.sausage, verts=8)
+        # the legs, the ash catcher and the wheels
+        for k, a in enumerate((90, 210, 330)):
+            c, s_ = G.cosd(a), G.sind(a)
+            foot_y = 0.075 if a != 90 else 0.0
+            _rod(f'leg{k}', (c * 0.13, 0.68, s_ * 0.13), (c * 0.31, foot_y, s_ * 0.31), 0.014, M.grate, verts=8)
+        F.cyl('foot_cap', 0.02, 0.02, (0, 0.01, 0.31), M.wheel, verts=10)
+        G.torus('rack', 0.2, 0.008, at=F.at(0, 0.3, 0), material=M.grate, major_segments=24, minor_segments=5)
+        F.cyl('ash_catcher', 0.12, 0.05, (0, 0.45, 0), M.grate, verts=20, bevel=0.01)
+        _rod('axle', (-0.29, 0.075, -0.155), (0.29, 0.075, -0.155), 0.008, M.grate, verts=6)
+        for s in (-1, 1):
+            G.cylinder(f'wheel{s}', 0.075, 0.03, at=F.at(s * 0.29, 0.075, -0.155), material=M.wheel, rot=(0, 90, 0), verts=18)
+    G.join(still, 'kettle', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        G.revolve('lid', [(0, 1.215), (0.16, 1.19), (0.25, 1.125), (KETTLE_R - 0.012, 1.04), (KETTLE_R - 0.012, KETTLE_RIM + 0.002),
+                          (KETTLE_R + 0.004, KETTLE_RIM + 0.002), (KETTLE_R + 0.004, 1.045), (0.26, 1.135), (0.165, 1.205),
+                          (0, 1.23)],
+                  at=F.at(0, 0, 0), material=M.kettle_lid, segments=32)
+        F.cyl('vent', 0.04, 0.012, (0, 1.232, 0), M.grate, verts=16)
+        for s in (-1, 1):                                           # the handle, on two brackets at the lid's front
+            _rod(f'handle_post{s}', (s * 0.06, 1.14, 0.235), (s * 0.06, 1.165, 0.275), 0.007, M.grate, verts=6)
+        _rod('handle', (-0.08, 1.165, 0.277), (0.08, 1.165, 0.277), 0.013, M.handle_steel, verts=10)
+    lid = G.hinged(G.join(parts, 'lid'), F.at(0, KETTLE_RIM, -KETTLE_R))
+    G.settle(centre=False)
+    G.swing(lid, 'lid_open', -95, seconds=0.9, axis='X')
+    return G.meshes()
+
+
+# The gas grill station: a stainless cart on a plinth, two doors and the control panel's knobs below a dark
+# counter (its top at 0.9, the content's `surface`, which stands things on the right); a chopping board with a
+# tray of food on the left, a bottle and a pepper mill at the back right. The grill in the middle (food on its
+# grate) has a barrel hood hinged at the back that swings up (`hood_up`) for cook and feast.
+HOOD = (-0.39, 0.11, 0.905, 1.0)      # the hood's back and front depth, its bottom and where its barrel starts
+
+
+def grillStation():
+    back, front, bottom, spring = HOOD
+    with G.new_parts() as still:
+        F.box('plinth', 1.56, 0.06, 0.54, (0, 0.03, -0.15), M.firebox, bevel=0.005)
+        F.box('cart', 1.6, 0.8, 0.58, (0, 0.46, -0.15), M.cart, bevel=0.01)
+        F.box('top', 1.66, 0.04, 0.66, (0, 0.88, -0.125), M.worktop, bevel=0.008)
+        F.box('panel', 0.96, 0.1, 0.012, (0, 0.8, 0.146), M.firebox, bevel=0.003)
+        for k, x in enumerate((-0.3, -0.1, 0.1, 0.3)):
+            G.cylinder(f'knob{k}', 0.026, 0.03, at=F.at(x, 0.8, 0.165), material=M.handle_steel, rot=(90, 0, 0), verts=16, bevel=0.004)
+        for s in (-1, 1):
+            F.box(f'door{s}', 0.74, 0.6, 0.014, (s * 0.39, 0.4, 0.147), M.cart, bevel=0.004)
+            _rod(f'door_handle{s}', (s * 0.39 - 0.22, 0.66, 0.175), (s * 0.39 + 0.22, 0.66, 0.175), 0.009, M.handle_steel, verts=8)
+            for e in (-1, 1):
+                _rod(f'door_post{s}{e}', (s * 0.39 + e * 0.2, 0.66, 0.154), (s * 0.39 + e * 0.2, 0.66, 0.172), 0.006, M.handle_steel, verts=6)
+        # the grill: a dark firebox let into the counter, its grate with food on it
+        F.box('firebox', 0.86, 0.012, 0.46, (0, 0.898, -0.14), M.firebox)
+        for k in range(-8, 9):
+            _rod(f'grate_bar{k}', (k * 0.05, 0.909, -0.36), (k * 0.05, 0.909, 0.08), 0.005, M.grate, verts=6)
+        for k, (x, z) in enumerate(((-0.25, -0.05), (-0.1, -0.2), (0.06, -0.06))):
+            F.cyl(f'burger{k}', 0.05, 0.022, (x, 0.925, z), M.burger, verts=14, bevel=0.006)
+        for k, z in enumerate((-0.25, -0.18)):
+            _rod(f'sausage{k}', (0.12, 0.927, z), (0.3, 0.927, z + 0.02), 0.017, M.sausage, verts=8)
+        _rod('corn', (0.2, 0.93, 0.0), (0.36, 0.93, -0.04), 0.024, M.corn, verts=10)
+        # on the counter
+        F.box('board', 0.34, 0.02, 0.36, (-0.62, 0.91, -0.12), M.board, bevel=0.006)
+        F.box('tray', 0.24, 0.03, 0.16, (-0.62, 0.935, -0.12), M.tray, bevel=0.01)
+        for k, x in enumerate((-0.68, -0.6)):
+            F.cyl(f'patty{k}', 0.035, 0.016, (x, 0.958, -0.12), M.burger, verts=12, bevel=0.005)
+        G.revolve('bottle', [(0, 0), (0.035, 0), (0.035, 0.15), (0.015, 0.2), (0.012, 0.24), (0, 0.24)],
+                  at=F.at(0.72, 0.9, -0.33), material=M.bottle, segments=16)
+        F.cyl('pepper_mill', 0.022, 0.14, (0.62, 0.97, -0.36), M.board, verts=12, bevel=0.01)
+    G.join(still, 'cart', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        # the barrel: an ellipse over its upright front and back
+        mid, rz, ry = (back + front) / 2, (front - back) / 2, 0.2
+        arc = [(mid + rz * math.cos(math.radians(a)), spring + ry * math.sin(math.radians(a))) for a in range(0, 181, 12)]
+        _across('hood', [(front, bottom)] + arc + [(back, bottom)], -0.45, 0.45, M.hood)
+        F.box('hood_inside', 0.86, 0.004, rz * 2 - 0.04, (0, bottom - 0.002, mid), M.firebox)
+        for s in (-1, 1):
+            _rod(f'hood_post{s}', (s * 0.3, 1.0, front - 0.005), (s * 0.3, 1.0, front + 0.045), 0.008, M.handle_steel, verts=6)
+        _rod('hood_handle', (-0.34, 1.0, front + 0.05), (0.34, 1.0, front + 0.05), 0.013, M.handle_steel, verts=10)
+        G.cylinder('gauge_bezel', 0.038, 0.016, at=F.at(0, 1.1, front + 0.035), material=M.handle_steel, rot=(90, 0, 0), verts=20)
+        G.cylinder('gauge', 0.03, 0.004, at=F.at(0, 1.1, front + 0.044), material=M.gauge, rot=(90, 0, 0), verts=20)
+    hood = G.hinged(G.join(parts, 'hood'), F.at(0, spring, back))
+    G.settle(centre=False)
+    G.swing(hood, 'hood_up', -75, seconds=0.9, axis='X')
+    return G.meshes()
+
+
+# The fire pit: a stone bowl with a ring of capstones on its rim, an ash bed with embers that glow at night and a
+# teepee of logs. The flames grow on the logs (`flames`) while a resident warms up by it; the light is the
+# content's (`light`, at 0.5 m).
+PIT_R, PIT_TOP = 0.43, 0.3
+
+
+def firePit():
+    with G.new_parts() as still:
+        G.revolve('bowl', [(0, 0), (PIT_R - 0.03, 0), (PIT_R, 0.03), (PIT_R, PIT_TOP), (0.33, PIT_TOP), (0.31, 0.2), (0, 0.2)],
+                  at=F.at(0, 0, 0), material=M.pit, segments=32, smooth=False)
+        F.cyl('ash', 0.315, 0.1, (0, 0.255, 0), M.coals, verts=24)
+        _embers('ember', 0.2, 0.31, 12, 40, M.ember)
+        for i in range(10):
+            a = i * 36 + (7 if i % 2 else -4)
+            F.box(f'stone{i}', 0.24, 0.075, 0.14, (0.38 * G.cosd(a), 0.335, 0.38 * G.sind(a)), M.pit_stones,
+                  rot=(0, 0, a - 90 + (i % 3 - 1) * 5), bevel=0.03, bevel_segments=2)
+        for k, a in enumerate((20, 110, 200, 290)):
+            c, s_ = G.cosd(a), G.sind(a)
+            _rod(f'log{k}', (0.22 * c, 0.31, 0.22 * s_), (0.03 * c, 0.6, 0.03 * s_), 0.035, M.log, verts=8)
+        _rod('log_across', (-0.18, 0.33, -0.08), (0.18, 0.33, 0.1), 0.04, M.log, verts=8)
+    G.join(still, 'pit', origin=(0, 0, 0))
+    # the flames: tongues round the logs and a bright core, grown from the ash
+    base = 0.298   # under the ash's top
+    with G.new_parts() as parts:
+        for k, (a, d, h, r) in enumerate(((0, 0.09, 0.3, 0.08), (51, 0.11, 0.22, 0.07), (103, 0.08, 0.34, 0.08),
+                                          (154, 0.11, 0.24, 0.07), (206, 0.09, 0.32, 0.08), (257, 0.11, 0.2, 0.06),
+                                          (309, 0.09, 0.28, 0.075))):
+            # tongues leaning out a little from the middle, each flattened across the way it leans
+            F.cone(f'flame{k}', r, 0.004, h, (d * G.cosd(a), base + h / 2, d * G.sind(a)), M.flame, verts=10,
+                   scale=(1, 0.6, 1), rot=(9 * G.sind(a), -9 * G.cosd(a), -a))
+        for k, (x, z, h, r) in enumerate(((0.0, 0.0, 0.46, 0.085), (0.04, -0.03, 0.32, 0.06), (-0.04, 0.03, 0.36, 0.06))):
+            F.cone(f'flame_core{k}', r, 0.003, h, (x, base + h / 2, z), M.flame_core, verts=10, scale=(1, 0.7, 1), rot=(0, 0, 40 * k))
+    flames = G.join(parts, 'flames', origin=F.at(0, base, 0))
+    # Shrunk to a point at rest, not just flattened: the night glow's copy of the faces, drawn a hair in front,
+    # would show a flattened disc through the ash.
+    flames.scale = (0.001, 0.001, 0.001)
+    G.settle(centre=False)
+    for axis in 'XYZ':
+        G.grow(flames, 'flames', seconds=0.8, axis=axis)
+    return G.meshes()
+
+
 SLATS = [('iron', 'Frame'), ('park_slats', 'Slats')]
 
 FAMILY = G.Family(
@@ -610,7 +817,14 @@ FAMILY = G.Family(
              paint=[('swing_frame', 'Frame'), ('swing_seat', 'Seats')]),
      G.Model('hotTubCedar', hotTubCedar, size=(1.886, 0.917, 1.903), centre=(0, 0.008), key='model.hotTubCedar',
              motions={'uses': {'soak': 'cover_off'}, 'open': 'cover_off', 'loops': {'soak': 'bubbles'}},
-             paint=[('cedar', 'Cedar'), ('tub_cover', 'Cover')])],
+             paint=[('cedar', 'Cedar'), ('tub_cover', 'Cover')]),
+     # OU3: the grills and the fire pit
+     G.Model('grill', grill, size=(0.642, 1.242, 0.634), centre=(0, 0.013), key='model.grill', motions={'uses': {'cook': 'lid_open'}},
+             paint=[('kettle', 'Body'), ('kettle_lid', 'Lid')]),
+     G.Model('grillStation', grillStation, size=(1.66, 1.199, 0.66), centre=(0, -0.125), key='model.grillStation',
+             motions={'uses': {'cook': 'hood_up', 'feast': 'hood_up'}}, paint=[('cart', 'Cart'), ('hood', 'Hood')]),
+     G.Model('firePit', firePit, size=(0.927, 0.619, 0.91), centre=(-0.001, -0.009), key='model.firePit', motions={'uses': {'relax': 'flames'}},
+             paint=[('pit', 'Bowl'), ('pit_stones', 'Stones')])],
     comment='Blender-built outdoor things (tools/art/blender/families/outdoor.py). Replaces the primitive-part '
             'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
             'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '

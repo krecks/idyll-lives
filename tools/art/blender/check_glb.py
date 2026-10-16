@@ -350,7 +350,7 @@ def placeholder_box(parts):
 
 
 def content_objects():
-    """{model key: {'footprint', 'layer', 'outside'}} for the content's objects (web/public/content), for
+    """{model key: {'footprint', 'layer', 'outside', 'stairs'}} for the content's objects (web/public/content), for
     the wall checks: where the wall's face is (a footprint's back, `WALL` in) and what stands against one."""
     found, categories = {}, {}
     for root, _dirs, files in os.walk(CONTENT):
@@ -374,7 +374,7 @@ def content_objects():
         c = categories.get(o.get('category'), {})
         group = next((g for g in c.get('groups') or [] if g.get('id') == o.get('group')), {})
         out[key] = {'footprint': o.get('footprint', [1, 1]), 'layer': o.get('layer', 'floor'),
-                    'outside': group.get('outside', c.get('outside', False))}
+                    'outside': group.get('outside', c.get('outside', False)), 'stairs': bool(o.get('stairs'))}
     return out
 
 
@@ -710,8 +710,9 @@ def check_file(entry, finishes, path, facts=None):
                                 f'its placeholder on ({(plo[0] + phi[0]) / 2:.3f}, {(plo[2] + phi[2]) / 2:.3f}) (origin at the footprint centre, or its placeholder\'s)')
         # Against a wall: the wall's face is `WALL` into the footprint's back tile. A wall thing, or a floor
         # thing indoors whose placeholder stands there, has its back on it, the model's and the placeholder's.
-        # (A rug lies under the wall: it may reach in.)
-        if facts and (layer == 'wall' or (layer == 'floor' and not facts['outside'])):
+        # (A rug lies under the wall: it may reach in. Stairs reach their footprint's back edge, where the floor
+        # above goes on from the top step: no wall.)
+        if facts and (layer == 'wall' or (layer == 'floor' and not facts['outside'] and not facts.get('stairs'))):
             face = -facts['footprint'][1] / 2 + WALL
             if slo[2] < face - 0.01:
                 warnings.append(f'reaches {(face - slo[2]) * 100:.1f} cm into the wall (its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f})')
