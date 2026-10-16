@@ -728,7 +728,7 @@ FAMILY = G.Family(
              # sorting the recycling lifts the three lids one after another
              motions={'uses': {'sortRecycling': [{'clip': f'lid{i}_open', 'delay': 0.6 * i} for i in range(3)]},
                       'hold': 0.9},
-             paint=[('bin1', 'Left bin'), ('bin2', 'Middle bin'), ('bin3', 'Right bin'), ('lid', 'Handles')]),
+             paint=[('bin3', 'Left bin'), ('bin2', 'Middle bin'), ('bin1', 'Right bin'), ('lid', 'Handles')]),   # as seen from the front
      # K6: islands and bars
      G.Model('kitchenIsland', kitchenIsland, size=(1.94, 0.95, 0.839), key='model.kitchenIsland', centre=(0, 0.0495),
              # sandwich slides the drawer out (breakfast is eaten standing, or on a stool at the island)
