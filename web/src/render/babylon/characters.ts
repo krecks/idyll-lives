@@ -192,6 +192,12 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean; recline?: 
 const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
 
 /**
+ * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
+ * clip opens something across that tile: a dishwasher's door drops 0.44 m into it.
+ */
+const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15 };
+
+/**
  * Where a Sim sits on an object (`PlacedObject.seat`): the table above, else the content's `seat`
  * (with how they sit: facing the object's back, legs out along it, pedalling), else the default.
  */
@@ -2521,6 +2527,9 @@ export class Characters {
         if (tag === 'cuddle') {
           reach = rig.cuddleStep;
           reachRate = 6;
+        } else if (obj && STAND_BACK[obj.def]) {
+          // Back from the door it opens, eased like the hug's approach.
+          reach = -STAND_BACK[obj.def];
         }
         const on = obj?.stand;
         if (on && obj && tag !== 'cuddle') {
