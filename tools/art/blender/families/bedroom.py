@@ -385,7 +385,8 @@ def bedCanopy():
     F.box('mattress', 1.56, 0.2, 1.76, (0, top - 0.1, 0), M.mattress, bevel=0.04, bevel_segments=3)
     for s in (-1, 1):
         _pillow(f'pillow{s}', 0.69, 0.14, 0.34, s * 0.405, top, -0.68)
-    z_top, z_foot = -0.36, 0.855
+    # (the duvet's foot 1.5 cm past the mattress's end, not in its plane)
+    z_top, z_foot = -0.36, 0.87
     z_fold = _bedding(top, 0.775, z_top, z_foot, 0.2, M.bedding_rust)
     _finish('bedCanopy', (top, 0.775, z_top, z_fold, M.bedding_rust))
 
