@@ -57,8 +57,11 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 - **Picture-book shelf** (against the wall): three sloped tiers of face-out books; the middle one tips out 20°
   (`book_out`) for read.
 - **Chalkboard easel**: a sun drawn already; a house in the grass draws itself from left to right (`drawing`,
-  `G.grow` along x) for draw.
+  `_draw_on`) for draw.
 - **Kids' easel**: a painting (sky, sun, a flower, grass) paints itself on from the left (`painting`) for paint.
+- Both pictures grow along x from their left edge (`_draw_on`); at rest they're a speck at that edge, their
+  height and depth coming back in the clip's first frames. Squeezed along x only (until 2026-10-16) they
+  showed as a hairline of colours down the board.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
@@ -66,7 +69,7 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 | `model.kidsBed` | 0.97 × 0.76 × 1.88 m | 2,692 | 3 | Frame, Bedding |
 | `model.kidsBedCar` | 0.99 × 0.77 × 1.92 m | 3,744 | 3 | Car body, Bedding |
 | `model.highChair` | 0.44 × 0.94 × 0.47 m | 1,384 | 2 | Frame, Bedding |
-| `model.toyBox` | 0.82 × 0.51 × 0.80 m | 2,560 | 2 | Body, Trim |
+| `model.toyBox` | 0.82 × 0.51 × 0.80 m | 2,560 | 2 | Body, Lid |
 | `model.toyChest` | 0.85 × 0.53 × 0.51 m | 3,780 | 2 | Body, Trim |
 | `model.dollHouse` | 0.84 × 0.91 × 0.46 m | 3,236 | 2 | Walls, Roof |
 | `model.rockingHorse` | 0.29 × 0.82 × 0.88 m | 3,528 | 3 | Body, Trim |
@@ -78,7 +81,7 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 | `model.beanBagKids` | 0.62 × 0.53 × 0.64 m | 1,292 | 1 | Bag |
 | `model.kidsDesk` | 0.76 × 0.69 × 0.82 m | 1,692 | 3 | Frame, Top, Chair |
 | `model.kidsTable` | 0.64 × 0.50 × 0.64 m | 984 | 1 | Frame, Top |
-| `model.kidsChair` | 0.32 × 0.57 × 0.32 m | 612 | 1 | Frame, Top |
+| `model.kidsChair` | 0.32 × 0.57 × 0.32 m | 612 | 1 | Frame, Seat |
 | `model.kidsBookshelf` | 0.77 × 0.93 × 0.40 m | 1,220 | 2 | Frame, Top |
 | `model.kidsChalkboard` | 0.66 × 0.96 × 0.53 m | 916 | 3 | Frame, Board |
 | `model.kidsEasel` | 0.66 × 1.21 × 0.63 m | 1,528 | 3 | Easel |
