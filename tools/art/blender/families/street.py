@@ -87,9 +87,12 @@ def bench():
 def _tub(F):
     """The concrete tub (0.7 m square, 0.42 high) with a lip, and its soil 2 cm below the top."""
     _box(F, 'tub', 0.66, 0.38, 0.66, (0, 0.19, 0), M.concrete, bevel=0.025)
-    _box(F, 'lip', 0.7, 0.05, 0.7, (0, 0.395, 0), M.concrete, bevel=0.015)
+    # the lip is a rim of four bars, so the soil sits down inside it (a solid lip's top met the soil's and flickered)
+    for i, s in enumerate((-1, 1)):
+        _box(F, f'lip_x{i}', 0.7, 0.05, 0.05, (0, 0.395, s * 0.325), M.concrete, bevel=0.015)
+        _box(F, f'lip_z{i}', 0.05, 0.05, 0.7, (s * 0.325, 0.395, 0), M.concrete, bevel=0.015)
     _box(F, 'plinth', 0.62, 0.03, 0.62, (0, 0.015, 0), M.concrete)
-    _box(F, 'soil', 0.6, 0.02, 0.6, (0, 0.41, 0), M.soil)
+    _box(F, 'soil', 0.62, 0.02, 0.62, (0, 0.39, 0), M.soil)
 
 
 def planter():
