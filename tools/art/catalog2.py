@@ -965,7 +965,7 @@ p += [box([1.3, 0.76, 0.05], [0, 0.95, -0.3], '#1E1F22', 'satin', radius=0.01),
       box([1.26, 0.72, 0.01], [0, 0.95, -0.272], SCREEN, 'gloss', radius=0.006),
       box([0.3, 0.02, 0.16], [0, 0.5, -0.3], '#1E1F22', 'satin', radius=0.006),
       box([0.06, 0.08, 0.04], [0, 0.55, -0.31], '#1E1F22', 'satin', radius=0.006)]
-add('tvStandLow', p, (2, 1))
+add('tvStandLow', shift(p, dz=0.03), (2, 1))                     # its back on the wall face
 
 
 def bookcase(w, h, d, wood, fin, shelves, z=None, seed=1, books=True, back=None):
@@ -1038,7 +1038,8 @@ for i, x in enumerate((-0.3, -0.12, 0.06, 0.24)):
     p.append(part('blob', [0.16, 0.24 + (i % 2) * 0.08, 0.04], [x, 0.36 + (i % 2) * 0.04, -0.118], '#FF9A3C', 'gloss', noise=0.25))
 p += [part('blob', [0.5, 0.12, 0.03], [0, 0.28, -0.116], '#FFD27A', 'gloss', noise=0.2),
       cyl([0.12, 0.26, 0.12], [-0.6, 1.16, -0.32], CREAM, 'gloss', taper=0.6), box([0.22, 0.28, 0.03], [0.55, 1.17, -0.36], '#2B2C2E', 'satin', radius=0.006)]
-add('fireplaceElectric', p, (2, 1), light=0.45)
+p.append(box([0.56, 0.13, 0.4], [0, 0.075, 0.23], RUST, 'matte', radius=0.05))                     # the floor cushion (characters.ts SEATS)
+add('fireplaceElectric', shift(p, dz=0.06), (2, 1), light=0.45)   # the mantel's back on the wall face
 
 
 # =============================================================================================
