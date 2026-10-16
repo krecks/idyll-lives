@@ -444,6 +444,14 @@ shuts behind the caller, and the town fountain's water runs near the camera (`wa
 litter bin, the bus shelter, the notice board and the founder's statue are static. Their primitive-part entries stay
 as the fallback.
 
+The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tvStandLow.glb`, `homeCinema.glb`,
+`stereo.glb`, `boombox.glb`, `fireplaceElectric.glb`, override pack `packs/media/manifest.json`) are built in Blender
+by `tools/art/blender/families/media.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The screens glow
+at night; the portable TV's rabbit ears turn and extend, the low bench's TV rises out of its lift and the home
+cinema's projector screen unrolls while watched; the stereo's CD tray slides out and its woofers pulse, the boombox's
+cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion. Their
+primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

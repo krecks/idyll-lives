@@ -1,0 +1,435 @@
+{
+  "$comment": "Blender-built living room media (tools/art/blender/families/media.py): the TVs, the home cinema, the stereo, the boombox and the electric fireplace. The placeholder is drawn if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "version": 1,
+  "entries": {
+    "model.tv": {
+      "type": "model",
+      "url": "../../models/media/tv.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "pebble": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#8DB4E2"
+        },
+        "soundbar": {
+          "finish": "material.finish.satin"
+        },
+        "tv_cabinet": {
+          "finish": "material.finish.wood"
+        },
+        "tv_frame": {
+          "finish": "material.finish.satin"
+        },
+        "tv_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "tv_cabinet",
+          "label": "Body"
+        },
+        {
+          "material": "tv_oak",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.tvWall": {
+      "type": "model",
+      "url": "../../models/media/tvWall.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#8DB4E2"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "wall_bar": {
+          "finish": "material.finish.satin"
+        },
+        "wall_frame": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "wall_frame",
+          "label": "Body"
+        },
+        {
+          "material": "wall_bar",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.tvRetro": {
+      "type": "model",
+      "url": "../../models/media/tvRetro.glb",
+      "materials": {
+        "crt": {
+          "finish": "material.finish.gloss",
+          "glow": "#A8C8E0"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "retro_bezel": {
+          "finish": "material.finish.gloss"
+        },
+        "retro_wood": {
+          "finish": "material.finish.wood"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "watch": "antenna"
+        }
+      },
+      "paint": [
+        {
+          "material": "retro_wood",
+          "label": "Body"
+        },
+        {
+          "material": "retro_bezel",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.tvStandLow": {
+      "type": "model",
+      "url": "../../models/media/tvStandLow.glb",
+      "materials": {
+        "bench": {
+          "finish": "material.finish.satin"
+        },
+        "bench_oak": {
+          "finish": "material.finish.wood"
+        },
+        "bench_tv": {
+          "finish": "material.finish.satin"
+        },
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#8DB4E2"
+        }
+      },
+      "motions": {
+        "uses": {
+          "watch": "tv_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "bench",
+          "label": "Bench"
+        },
+        {
+          "material": "bench_tv",
+          "label": "TV"
+        }
+      ]
+    },
+    "model.homeCinema": {
+      "type": "model",
+      "url": "../../models/media/homeCinema.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "cinema_oak": {
+          "finish": "material.finish.wood"
+        },
+        "cinema_unit": {
+          "finish": "material.finish.wood"
+        },
+        "cone": {
+          "finish": "material.finish.satin"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "lens": {
+          "finish": "material.finish.gloss"
+        },
+        "projection": {
+          "finish": "material.finish.matte",
+          "glow": "#DCE6F5"
+        },
+        "projector": {
+          "finish": "material.finish.satin"
+        },
+        "screen_border": {
+          "finish": "material.finish.matte"
+        },
+        "tower": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "watch": "screen_down",
+          "film": "screen_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "cinema_unit",
+          "label": "Body"
+        },
+        {
+          "material": "cinema_oak",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.stereo": {
+      "type": "model",
+      "url": "../../models/media/stereo.glb",
+      "materials": {
+        "cone": {
+          "finish": "material.finish.satin"
+        },
+        "disc": {
+          "finish": "material.finish.chrome"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "label": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "rec_black": {
+          "finish": "material.finish.satin"
+        },
+        "rec_clay": {
+          "finish": "material.finish.satin"
+        },
+        "rec_cream": {
+          "finish": "material.finish.satin"
+        },
+        "rec_mustard": {
+          "finish": "material.finish.satin"
+        },
+        "rec_navy": {
+          "finish": "material.finish.satin"
+        },
+        "rec_rust": {
+          "finish": "material.finish.satin"
+        },
+        "rec_teal": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "stereo_dark": {
+          "finish": "material.finish.satin"
+        },
+        "stereo_inside": {
+          "finish": "material.finish.matte"
+        },
+        "stereo_wood": {
+          "finish": "material.finish.wood"
+        },
+        "vinyl": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "listen": "tray",
+          "dance": "tray"
+        },
+        "hold": 1.2,
+        "loops": {
+          "listen": "pulse",
+          "dance": "pulse"
+        }
+      },
+      "paint": [
+        {
+          "material": "stereo_wood",
+          "label": "Body"
+        },
+        {
+          "material": "stereo_dark",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.boombox": {
+      "type": "model",
+      "url": "../../models/media/boombox.glb",
+      "materials": {
+        "boombox_body": {
+          "finish": "material.finish.satin"
+        },
+        "boombox_trim": {
+          "finish": "material.finish.metal"
+        },
+        "cassette": {
+          "finish": "material.finish.gloss"
+        },
+        "cone": {
+          "finish": "material.finish.satin"
+        },
+        "crate": {
+          "finish": "material.finish.wood"
+        },
+        "crate_dark": {
+          "finish": "material.finish.wood"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "rec_black": {
+          "finish": "material.finish.satin"
+        },
+        "rec_clay": {
+          "finish": "material.finish.satin"
+        },
+        "rec_cream": {
+          "finish": "material.finish.satin"
+        },
+        "rec_mustard": {
+          "finish": "material.finish.satin"
+        },
+        "rec_navy": {
+          "finish": "material.finish.satin"
+        },
+        "rec_rust": {
+          "finish": "material.finish.satin"
+        },
+        "rec_teal": {
+          "finish": "material.finish.satin"
+        },
+        "stereo_inside": {
+          "finish": "material.finish.matte"
+        },
+        "window": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "listen": "cassette"
+        },
+        "hold": 1.2
+      },
+      "paint": [
+        {
+          "material": "boombox_body",
+          "label": "Body"
+        },
+        {
+          "material": "boombox_trim",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.fireplaceElectric": {
+      "type": "model",
+      "url": "../../models/media/fireplaceElectric.glb",
+      "materials": {
+        "art_print": {
+          "finish": "material.finish.matte"
+        },
+        "candle": {
+          "finish": "material.finish.gloss"
+        },
+        "ember": {
+          "finish": "material.finish.gloss",
+          "glow": "#FF8A3C"
+        },
+        "firebox": {
+          "finish": "material.finish.gloss"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFB25C"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE0A0"
+        },
+        "hearth_cushion": {
+          "finish": "material.finish.matte"
+        },
+        "hearth_piping": {
+          "finish": "material.finish.matte"
+        },
+        "logs": {
+          "finish": "material.finish.matte"
+        },
+        "mantel": {
+          "finish": "material.finish.wood"
+        },
+        "picture": {
+          "finish": "material.finish.satin"
+        },
+        "surround": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "surround",
+          "label": "Surround"
+        },
+        {
+          "material": "firebox",
+          "label": "Firebox"
+        }
+      ]
+    }
+  }
+}
