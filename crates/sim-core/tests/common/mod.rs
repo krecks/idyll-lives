@@ -829,13 +829,14 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
                 .collect()
         })
         .unwrap_or_default();
-    // One-tile garden things people can do something with, for the yards.
+    // One-tile garden things people can do something with, for the yards: by `outdoors`, not by
+    // category (a finished one is in Validate until it's signed off).
     let yard_defs: Vec<String> = content["objects"]
         .as_array()
         .unwrap()
         .iter()
         .filter(|o| {
-            matches!(o["category"].as_str(), Some("garden" | "outdoor"))
+            o["outdoors"].as_bool() == Some(true)
                 && o["interactions"].as_array().is_some_and(|i| !i.is_empty())
                 && o["footprint"].as_array().is_none_or(|f| f[0] == 1 && f[1] == 1)
         })
