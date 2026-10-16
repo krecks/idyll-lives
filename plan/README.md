@@ -31,9 +31,9 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the nine L3 coffee and side tables: `coffeeTable`, `coffeeTableGlass`, `coffeeTableMarble`, `sideTable`, `coffeeTableRound`, `coffeeTableLong`, `nestingTables`, `sideTableRound`, `consoleTable` (in Validate › Coffee Tables);
 - the eight L4 media things: `tv`, `tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`, `tvStandLow`, `fireplaceElectric` (in Validate › Media); the nine L5 shelves: `bookshelf`, `bookcaseLow`, `bookcaseWide`, `shelvingIndustrial`, `bookcaseTall`, `bookcaseCorner`, `cubeShelf`, `ladderShelf`, `displayCabinet` (in Validate › Shelves); the L6 `stairs` (in Validate › Stairs);
 - the fourteen office models: O1 `deskSimple`, `deskCorner`, `deskStanding`, `deskExecutive`, `computerDesk`, `deskWriting`, `deskLaptop`, `computerGaming` (in Validate › Desks); O2 `chairExecutive`, `chairTask`, `officeChair` (Validate › Office Chairs); O3 `filingCabinet`, `whiteboard`, `corkboard` (Validate › Office Storage);
-- the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (in Validate › Wall Decor),
-  D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (in Validate › Ornaments),
-  D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (in Validate › Textiles);
+- the 22 decor models: D1 `printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`, `wallClock`, `wallShelf` (signed off 2026-10-16),
+  D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (signed off 2026-10-16),
+  D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (signed off 2026-10-16);
 - the nineteen hobby models: H1 `piano`, `ukulele`, `guitarElectric`, `keyboardDigital`, `drumKit`, `guitarAcoustic` (in Validate › Music); H2 `chessTable`, `poolTable`, `foosball`, `dartboard`, `arcadeCabinet`, `puzzleTable` (Validate › Games); H3 `easel`, `workbench`, `telescope`, `sewingTable`, `chemistrySet`, `potteryWheel`, `craftTable` (Validate › Crafts);
 - six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder` (in Validate › Garden Decor);
 - the eleven OU1 patio models: `bench`, `patioSet`, `picnicTable`, `gardenChair`, `patioTableRound`, `patioTable4`, `patioChair`, `adirondackChair`, `benchGarden3`, `outdoorBar`, `parasol` (in Validate › Patio);
@@ -48,7 +48,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, K1–K9 and LT1–LT4 are back home (2026-10-16); Validate holds the other 443 items in 65 groups.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, K1–K9, LT1–LT4, D1–D3 are back home (2026-10-16); Validate holds the other 421 items in 62 groups.
 
 **No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
 placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9

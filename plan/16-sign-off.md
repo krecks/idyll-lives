@@ -163,6 +163,42 @@ just above the shade's top; it looks right. A top under a lit lamp is washed alm
 30–45 cm above it and the shade casts no shadow: renderer). The lantern's "Glass" tints faintly, as glass does.
 All back in lighting / table.
 
+## The wall decor
+
+The six D1 things (Validate › Wall Decor) were signed off on 2026-10-16, checked as the sinks were, each hung on
+all four walls of the living room (north 23,14; west 21,19; south 22,25; east 28,17; the 2-wide abstract canvas
+on the bathroom's and bedroom's plain walls, 17,20 and 20,18, where two plain tiles side by side are free of
+windows), with walls up and the camera in the room: the framed print, photo print and floating shelves looked at;
+a resident admiring the oil painting and the abstract canvas (the "look" pose, facing it); the wall clock's hands
+telling the game's time (ten past ten in the morning, ten to ten at night). By day and at night (lamps lit), on
+WebGPU and WebGL2, on Medium and Low; every part coloured through `buy` and in the colour studio. One fix: the
+wall clock's face sat behind the front of its case, so the clock read steel grey all over and "Face" coloured
+nothing; the case's well now ends behind the face (white by default, colourable). All back in decor / wall.
+
+## The ornaments
+
+The ten D2 things (Validate › Ornaments) were signed off on 2026-10-16, checked as the sinks were: the eight
+standing pieces (vases, urn, bust, cat, horse, coat stand) standing free in all four facings; the bust admired
+from each side; the grandfather clock wound (the "tinker" pose at its case) against all four living-room walls,
+its hands keeping the game's time; the hanging plant watered, its pot swaying out (`sway`) and settling after its
+`hold`; the fireplace on the bathroom's, bedroom's and living room's walls, a resident warming up sitting on the
+hearth bench with the flames (`flames`) growing behind her and dying down when she got up, the fire lighting
+the room at night (checked with the room's ceiling lights sold). One fix, in the content: the horse statue was
+named and described as a rearing porcelain horse on a wooden stand, from the downloaded file it once was; it has
+been a bronze horse standing on an oak plinth since the primitive placeholders, and the Blender model is that
+too, so it is now the "Bronze horse". The pedestal vase's description said white; it is blue (model and
+placeholder). All back in decor / ornaments.
+
+## The textiles
+
+The six D3 things (Validate › Textiles) were signed off on 2026-10-16, checked as the sinks were: the curtains
+and floor-length curtains over windows on all four sides (the living room's north, south and east windows, the
+bedroom's west one), open by day and drawn closed at night (`close`, the night clip), on WebGPU and WebGL2 at
+Low; the four rugs flat on the floor in all four facings. Every part coloured: fabric and rail; each rug's field
+(the patterned rug checked in teal as well, its default being close to the test colour), its border and motifs
+staying. Nothing needed fixing. Seen in passing: a 2-wide curtain over the house's 1-wide windows hangs with the
+window in one half of its rail (that's the placement, not the model). All back in decor / textiles.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -179,6 +215,7 @@ task done in the category file (strike through its heading, with the commit).
 
 - **Kitchen** (`01-kitchen.md`, K1–K9): signed off 2026-10-16.
 - **Lighting** (`11-lighting.md`, LT1–LT4): signed off 2026-10-16.
+- **Decor** (`09-decor.md`, D1–D3): signed off 2026-10-16.
 
 ## The end
 
