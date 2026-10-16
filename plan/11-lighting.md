@@ -7,7 +7,7 @@ All 21 are done in `families/lighting.py` (notes: `lighting.md`): each bulb is a
 `light.height`, the shades, diffusers and bulbs glow at night, the ceiling fan's blades turn (`blades_turn`) and
 the paper lantern sways (`sway`), both ambient (E2).
 
-## LT1. Ceiling lights (7) — **Done** (in Validate › Ceiling Lights)
+## LT1. Ceiling lights (7) — **Done**, signed off 2026-10-16 (back in lighting / ceiling)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `ceiling lights` (Validate › Ceiling Lights)
@@ -23,7 +23,7 @@ the paper lantern sways (`sway`), both ambient (E2).
 | `trackLights` Track lights | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. |
 | `paperLantern` Paper lantern | 1x1 · ceiling | — | lighting / ceiling | Paper | Ambient (E2) | `sway`: a slow sway (E2). Until then static. |
 
-## LT2. Wall lights (3) — **Done** (in Validate › Wall Lights)
+## LT2. Wall lights (3) — **Done**, signed off 2026-10-16 (back in lighting / wall)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `wall lights` (Validate › Wall Lights)
@@ -35,7 +35,7 @@ the paper lantern sways (`sway`), both ambient (E2).
 | `wallLampArm` Swing-arm wall lamp | 1x1 · wall | — | lighting / wall | Body, Shade | Static | Static. |
 | `wallLightOutdoor` Bulkhead light | 1x1 · wall | — | lighting / wall | Body, Shade | Static | Static. |
 
-## LT3. Floor lamps (5) — **Done** (in Validate › Floor Lamps)
+## LT3. Floor lamps (5) — **Done**, signed off 2026-10-16 (back in lighting / floor)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `floor lamps` (Validate › Floor Lamps)
@@ -49,7 +49,7 @@ the paper lantern sways (`sway`), both ambient (E2).
 | `lampFloorTripod` Tripod floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. |
 | `lampTorchiere` Uplighter | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. |
 
-## LT4. Table lamps (6) — **Done** (in Validate › Table Lamps)
+## LT4. Table lamps (6) — **Done**, signed off 2026-10-16 (back in lighting / table)
 
 - **Family:** `tools/art/blender/families/lighting.py`
 - **Validate group:** `table lamps` (Validate › Table Lamps)
