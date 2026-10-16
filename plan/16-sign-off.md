@@ -273,6 +273,44 @@ defaults); the green blocks, pink block and roof keep their colours. The monitor
 keyboard and mouse, not the stand. Nothing needed fixing. Back in tabletop / bath (soap set, towels, perfume tray),
 tabletop / desk (organiser, laptop, monitor) and tabletop / toys (teddy, blocks).
 
+## The desks
+
+The eight O1 desks (Validate › Desks) were signed off on 2026-10-17, checked as the sinks were, each in all
+four facings: against the north wall (23,14,0), the west wall beside the bookshelf (21,18,1), standing free
+facing north (23,17,2) and against the east wall (28,17,3); the corner desk at 23,14,0, 21,18,1, 23,16,2 and
+27,17,3. Each also with every part a distinct colour by day (WebGPU), on Low with WebGL2 at night, and coloured
+at night (WebGPU), then in the colour studio, each part coloured in turn and the desks turned round to see the
+parts at the back. The standing desk's keyboard shelf slides out for Browse; the computer desk's keyboard tray
+for Practise coding; the writing desk's drawer for Write (it shuts after its `hold`); the laptop opens for
+Browse; the gaming PC's fans go round while a game is played and finish their round when it ends. Each shuts when
+the use ends. At the four desks with their own chair the resident sits facing the wall, the screen towards them.
+The simple, corner and executive desks are still, looked at from all four sides. One fix: the executive desk's
+plinths, under its pedestals, took the "Drawers" colour; they are the case's ("Frame") now. Seen in passing: the
+desk chairs built into the computer, writing and laptop desks take the desk's "Frame" colour on their bases and
+castors ("Chair" colours the seat and back). The simple, corner, standing and executive desks back in
+office / desks; the computer, writing and laptop desks and the gaming PC in office (no group).
+
+## The office chairs
+
+The three O2 chairs (Validate › Office Chairs) were signed off on 2026-10-17, checked as the sinks were, each
+standing free (23,16) and sat on in all four facings: the seat swivels (`swivel`) and shuts after its `hold`, by
+day and at night, on WebGPU and WebGL2, on Medium and Low. Each was also pushed up to a simple desk (chair at
+23,15 facing it): Write at the desk and Do homework at the desk (the executive and desk chairs, which need a desk,
+`needsTable`) and Sit (the office chair), the sitter facing the desk, the swivel playing for each. Colour studio:
+Frame (base, lift and arms), Seat (seat and back; the desk chair's mesh back is its own "Back"). Nothing needed
+fixing. The executive and desk chairs back in office / chairs; the office chair in office (no group).
+
+## The office storage
+
+The three O3 things (Validate › Office Storage) were signed off on 2026-10-17, checked as the sinks were. The
+filing cabinet stands against the wall (north, west, east) and free facing north; its top drawer slides out
+(`drawer_open`) for File papers and shuts after its `hold` in every facing (the plan's table still calls it
+static: the use came with the model). The whiteboard and corkboard hang on the north, west and east walls and
+on the outside of the north wall (23,13,2); the whiteboard's plan grows across the board while the resident
+plans at it, and is wiped as the clip plays back. The corkboard is still. Colour studio: the cabinet and its
+handles; each board and its frame (the whiteboard's marker tray with the frame); "In use" opens the drawer and
+fills the board. Nothing needed fixing. All back in office (no group).
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -291,6 +329,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Lighting** (`11-lighting.md`, LT1–LT4): signed off 2026-10-16.
 - **Decor** (`09-decor.md`, D1–D3): signed off 2026-10-16.
 - **Hobbies** (`08-hobbies.md`, H1–H3): signed off 2026-10-16.
+- **Office** (`06-office.md`, O1–O3): signed off 2026-10-17.
 
 ## The end
 

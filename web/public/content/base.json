@@ -2997,8 +2997,7 @@
         1
       ],
       "price": 1100,
-      "category": "validate",
-      "group": "desks",
+      "category": "office",
       "description": "Builds Technology, Writing and Business.",
       "surface": {
         "height": 0.75,
@@ -3767,18 +3766,6 @@
         {
           "id": "kids study",
           "label": "Kids Study"
-        },
-        {
-          "id": "desks",
-          "label": "Desks"
-        },
-        {
-          "id": "office chairs",
-          "label": "Office Chairs"
-        },
-        {
-          "id": "office storage",
-          "label": "Office Storage"
         },
         {
           "id": "stalls",

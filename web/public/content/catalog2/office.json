@@ -10,7 +10,7 @@
         1
       ],
       "price": 180,
-      "category": "validate",
+      "category": "office",
       "group": "desks",
       "surface": {
         "height": 0.74,
@@ -36,7 +36,7 @@
         2
       ],
       "price": 420,
-      "category": "validate",
+      "category": "office",
       "group": "desks",
       "surface": {
         "height": 0.74,
@@ -58,7 +58,7 @@
         1
       ],
       "price": 650,
-      "category": "validate",
+      "category": "office",
       "group": "desks",
       "surface": {
         "height": 1.05,
@@ -116,7 +116,7 @@
         1
       ],
       "price": 1200,
-      "category": "validate",
+      "category": "office",
       "group": "desks",
       "decor": 0.5,
       "surface": {
@@ -143,8 +143,7 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "office storage",
+      "category": "office",
       "description": "Three steel drawers of paperwork, a plant on top.",
       "interactions": [
         {
@@ -170,8 +169,8 @@
         1
       ],
       "price": 450,
-      "category": "validate",
-      "group": "office chairs",
+      "category": "office",
+      "group": "chairs",
       "decor": 0.2,
       "approach": "around",
       "seatAt": [
@@ -247,8 +246,8 @@
         1
       ],
       "price": 160,
-      "category": "validate",
-      "group": "office chairs",
+      "category": "office",
+      "group": "chairs",
       "approach": "around",
       "seatAt": [
         "desk",
@@ -323,8 +322,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "office storage",
+      "category": "office",
       "layer": "wall",
       "description": "A whiteboard for plans and sums. Planning on it trains Intelligence and Business.",
       "interactions": [
@@ -355,8 +353,7 @@
         1
       ],
       "price": 40,
-      "category": "validate",
-      "group": "office storage",
+      "category": "office",
       "layer": "wall",
       "decor": 0.3,
       "description": "Notes and postcards pinned to cork.",
