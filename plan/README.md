@@ -8,7 +8,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble` (signed off 2026-10-16: back in bathroom / sinks and kitchen / counters);
 - the seven fridges: `fridge`, and the K1 six `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge` (signed off 2026-10-16: back in kitchen / appliances);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (signed off 2026-10-16: back in kitchen / appliances);
-- the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (in Validate › Appliances);
+- the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (signed off 2026-10-16: back in kitchen / appliances);
 - the eight K4 base counters: `counter`, `counterCorner`, `counterEnd`, `counterCornerOuter`, `counterDrawers`, `counterOpenShelf`, `butcherBlock`, `counterMarble` (in Validate › Counters);
 - the eleven K5 tall and wall storage: `pantry`, `pantryTall`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `rangeHood`, `spiceRack`, `potRail`, `kitchenShelfWall`, `trashCan`, `recyclingBins` (in Validate › Kitchen Storage);
 - the five K6 islands and bars: `kitchenIsland`, `islandSmall`, `islandLong`, `barSegment`, `barEnd` (in Validate › Islands & Bars);
@@ -48,7 +48,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, the fridges and the cookers are back home (2026-10-16); Validate holds the other 521 items in 76 groups.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks and K1–K3 are back home (2026-10-16); Validate holds the other 517 items in 75 groups.
 
 **No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
 placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9

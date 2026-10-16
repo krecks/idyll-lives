@@ -40,7 +40,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the flame ring grows for cook. |
 | `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat. L `turntable`: the glass plate turns while it heats (E1). |
 
-## K3. Small appliances and dishwashers (4) — **Done** (in Validate › Appliances)
+## K3. Small appliances and dishwashers (4) — **Done**, signed off 2026-10-16 (back in kitchen / appliances)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
 - **Validate group:** `appliances` (Validate › Appliances)
@@ -49,7 +49,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
-| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster lever slides down for toast, and the bread pops up at the end. `blend` for smoothie: the blender lid lifts; the blades spinning needs E1. |
+| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster lever slides down for toast, and the bread pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
 | `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
 

@@ -46,6 +46,18 @@ microwave's door and turntable for reheat. Each shuts when the resident moves on
 microwave the resident's hands reach for the cabinet below, not the door (the shared "cook" pose). All back in
 kitchen / appliances.
 
+## The small appliances and dishwashers
+
+The four K3 things (Validate › Appliances) were signed off on 2026-10-16, checked as the sinks were, after two
+fixes found in the check:
+- **The dishwashers' doors** drop 0.44 m into the tile in front, where the loader stood on them. Residents
+  now stand 15 cm further back while they use either one (`characters.ts` `STAND_BACK`).
+- **The blender** only lifted its lid: the smoothie under it now swirls while it blends (`blades`, a loop,
+  E1). The toaster's lever and toast became one part (the carriage, 5 cm down) to keep 4 draw calls.
+
+The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as
+they should. All back in kitchen / appliances.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
