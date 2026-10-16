@@ -488,6 +488,14 @@ cinema's projector screen unrolls while watched; the stereo's CD tray slides out
 cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion. Their
 primitive-part entries stay as the fallback.
 
+The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
+the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
+tray, the pie, the plates of stew, pizza, treats, pie and a sandwich, the dirty plate, and the chopping board, the
+pan and the food on the grill that stand on a station while a resident cooks; override pack
+`packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
+`tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still;
+their primitive-part entries (`tools/art/items.py`) stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

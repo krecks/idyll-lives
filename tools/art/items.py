@@ -117,7 +117,8 @@ ITEMS = {
         part('blob', [0.06, 0.04, 0.05], [-0.05, 0.035, -0.03], '#6BA33A', SATIN, noise=0.3),
     ),
     'item.pizzaSlice': on_plate(
-        part('cone', [0.12, 0.02, 0.16], [0, 0.03, 0], '#E2B064', SATIN, segments=3, rotate=[90, 0, 0]),
+        # a flat wedge on the plate (a cylinder of three sides; it was a cone stood on its edge, through the plate)
+        part('cylinder', [0.13, 0.012, 0.17], [0, 0.024, 0], '#E2B064', SATIN, segments=3),
     ),
     'item.treatPlate': on_plate(
         part('cylinder', [0.07, 0.025, 0.07], [-0.04, 0.03, 0], '#C98A45', SATIN, segments=12),
