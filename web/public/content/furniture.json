@@ -4327,8 +4327,9 @@
         1
       ],
       "price": 280,
-      "category": "outdoor",
-      "group": "cooking",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "grills",
       "outdoors": true,
       "description": "A kettle grill for the garden: dinner with smoke and a bit of fun. Trains Cooking.",
       "interactions": [
@@ -4377,8 +4378,9 @@
         1
       ],
       "price": 1300,
-      "category": "outdoor",
-      "group": "cooking",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "grills",
       "outdoors": true,
       "description": "An outdoor kitchen with a hooded grill. From Cooking 3 a barbecue feast leaves residents with that home-cooked glow.",
       "interactions": [
@@ -4433,8 +4435,9 @@
         1
       ],
       "price": 380,
-      "category": "outdoor",
-      "group": "cooking",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "grills",
       "outdoors": true,
       "light": {
         "range": 4.0,
@@ -4442,6 +4445,10 @@
         "height": 0.5,
         "tiles": 8,
         "switch": false
+      },
+      "seat": {
+        "height": 0.38,
+        "forward": 0.38
       },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [
