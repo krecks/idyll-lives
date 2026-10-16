@@ -319,7 +319,8 @@ fridge, on `gamekit`, and exported as `.glb` (glTF, original, CC0), also with a 
 primitive-part entries stay as the fallback.
 
 The other kitchen fridges (`models/kitchen/fridgeMini.glb`, `fridgeBuiltIn.glb`, `fridgeFrenchDoor.glb`,
-`fridgeRetro.glb`, `wineFridge.glb`, same pack) are built in Blender by `tools/art/blender/families/kitchen.py`
+`fridgeRetro.glb`, `fridgeMiniRetro.glb`, `wineFridge.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). Each hinges a door built closed and swings it open
 while a resident takes food or a drink, held for a few seconds; the French-door freezer and the wine fridge's
 top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet. Their

@@ -520,6 +520,17 @@ p = [box([0.72, 1.56, 0.66], [0, 0.86, -0.13], '#BFE0D2', 'gloss', radius=0.09),
      box([0.18, 0.05, 0.012], [0, 1.5, 0.205], CHROME, 'chrome', radius=0.01)]
 add('fridgeRetro', shift(p, dz=0.03))                            # its back on the wall face
 
+# Retro mini fridge: a pastel-pink cabinet with brass feet, a bar handle and a unicorn sticker on the door.
+p = [box([0.58, 0.78, 0.52], [0, 0.44, -0.17], '#F4B9CF', 'gloss', radius=0.06),
+     box([0.58, 0.06, 0.52], [0, 0.08, -0.17], '#E9A2BD', 'gloss', radius=0.01),
+     box([0.54, 0.69, 0.05], [0, 0.46, 0.095], '#F4B9CF', 'gloss', radius=0.03),
+     box([0.026, 0.3, 0.03], [0.2, 0.44, 0.135], BRASS, 'metal', radius=0.01),
+     box([0.25, 0.23, 0.008], [-0.08, 0.33, 0.126], '#FBFBFB', 'satin', radius=0.02)]
+for x in (-0.23, 0.23):
+    for z in (-0.35, 0.03):
+        p.append(cyl([0.056, 0.05, 0.056], [x, 0.025, z], BRASS, 'metal', segments=12))
+add('fridgeMiniRetro', p)                                       # its back on the wall face
+
 # Compact dishwasher: a stainless door under the worktop.
 p = counter_body()
 p += [box([0.92, 0.66, 0.03], [0, 0.46, 0.25], STEEL, 'metal', radius=0.01),

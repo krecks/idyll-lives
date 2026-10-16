@@ -489,6 +489,88 @@
           "label": "Door frame"
         }
       ]
+    },
+    "model.fridgeMiniRetro": {
+      "type": "model",
+      "url": "../../models/kitchen/fridgeMiniRetro.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "carton": {
+          "finish": "material.finish.satin"
+        },
+        "gold": {
+          "finish": "material.finish.metal"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
+        "pink": {
+          "finish": "material.finish.gloss"
+        },
+        "pink2": {
+          "finish": "material.finish.gloss"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "uni_blue": {
+          "finish": "material.finish.satin"
+        },
+        "uni_blush": {
+          "finish": "material.finish.satin"
+        },
+        "uni_dark": {
+          "finish": "material.finish.matte"
+        },
+        "uni_face": {
+          "finish": "material.finish.satin"
+        },
+        "uni_lilac": {
+          "finish": "material.finish.satin"
+        },
+        "uni_pink": {
+          "finish": "material.finish.satin"
+        },
+        "uni_rose": {
+          "finish": "material.finish.satin"
+        },
+        "uni_white": {
+          "finish": "material.finish.satin"
+        },
+        "vent": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "fridge_open",
+          "cook": "fridge_open",
+          "drink": "fridge_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "pink",
+          "label": "Body"
+        },
+        {
+          "material": "gold",
+          "label": "Handle & feet"
+        },
+        {
+          "material": "pink2",
+          "label": "Trim"
+        }
+      ]
     }
   }
 }

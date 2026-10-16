@@ -714,6 +714,71 @@
       ]
     },
     {
+      "id": "fridgeMiniRetro",
+      "name": "Retro mini fridge",
+      "model": "model.fridgeMiniRetro",
+      "stores": true,
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "validate",
+      "group": "fridges",
+      "decor": 0.45,
+      "stations": [
+        "ingredients"
+      ],
+      "description": "A pastel-pink mini fridge with brass feet and a unicorn sticker on the door: a treat for a kid's room or a corner bar.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Grab a snack",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
+          "effects": {
+            "hunger": 0.3
+          },
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "meal",
+          "label": "Make a simple meal",
+          "recipe": "meal",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.1
+          }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
       "id": "wineFridge",
       "name": "Wine fridge",
       "model": "model.wineFridge",

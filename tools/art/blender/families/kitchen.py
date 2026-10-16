@@ -6,11 +6,15 @@
 # Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py kitchen [--preview]
+import math
 import os
 import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import bmesh  # noqa: E402
+import bpy  # noqa: E402
+
 import gamekit as G  # noqa: E402
 
 M = G.Palette(
@@ -41,6 +45,18 @@ M = G.Palette(
     panel=('#EDEBE6', 'satin'),      # built-in cabinet fronts and the wine fridge's body
     mint=('#BFE0D2', 'gloss'),       # a retro fridge's rounded body
     mint2=('#A9CFC0', 'gloss'),      # its trim (the plinth and the door seam)
+    pink=('#F4B9CF', 'gloss'),       # a retro mini fridge's pastel body
+    pink2=('#E9A2BD', 'gloss'),      # its trim (the base band and the door seam)
+    gold=('#D2AE4E', 'metal'),       # its brass handle, feet and letters
+    vent=('#3A3D41', 'satin'),       # its side vents
+    uni_white=('#FFFFFF', 'satin'),  # the unicorn sticker: its die-cut border, a streak and the horn
+    uni_face=('#FCEEF3', 'satin'),   # its head and ear
+    uni_pink=('#F2A6C6', 'satin'),   # its mane and inner ear
+    uni_rose=('#E07FAA', 'satin'),   # a deep streak, the nostril and the eyelid
+    uni_blush=('#F6C6D9', 'satin'),  # the muzzle
+    uni_blue=('#B9D3EE', 'satin'),   # a streak of the mane
+    uni_lilac=('#D4C1EC', 'satin'),  # a streak and the horn's spiral
+    uni_dark=('#3A2B33', 'matte'),   # its eye
     doorframe=('#2B2C2E', 'satin'),  # the wine fridge's dark door frame
     smoked=('#3A2A2E', 'glass'),     # its smoked glass
     wine=('#5A1E2A', 'gloss'),       # red wine bottles
@@ -441,6 +457,221 @@ def _fridgeRetro():
     G.swing(door, 'fridge_open', 100, seconds=DOOR_SECONDS)
 
 
+# The retro mini fridge's die-cut unicorn sticker, drawn in the reference photo's pixels (1024² image,
+# the sticker's middle at (652, 515)), each layer a thin flat plate a little prouder than the last.
+STICKER_PX = (652, 515)
+STICKER_SCALE = (0.0012, 0.001)   # metres per pixel across (the photo sees the door at an angle) and up
+
+
+def _chaikin(pts, closed=True, passes=1):
+    """Rounds a polygon (or an open line) by cutting its corners."""
+    for _ in range(passes):
+        out = []
+        n = len(pts)
+        for i in range(n if closed else n - 1):
+            (ax, ay), (bx, by) = pts[i], pts[(i + 1) % n]
+            out += [(0.75 * ax + 0.25 * bx, 0.75 * ay + 0.25 * by), (0.25 * ax + 0.75 * bx, 0.25 * ay + 0.75 * by)]
+        pts = out if closed else [pts[0]] + out + [pts[-1]]
+    return pts
+
+
+def _ribbon(line, width):
+    """A tapered strand round a centre line (pixels): its outline, for `_plate`."""
+    line = _chaikin(line, closed=False, passes=1)
+    left, right = [], []
+    n = len(line)
+    for i, (x, y) in enumerate(line):
+        (ax, ay), (bx, by) = line[max(i - 1, 0)], line[min(i + 1, n - 1)]
+        dx, dy = bx - ax, by - ay
+        k = math.hypot(dx, dy) or 1.0
+        w = width / 2 * (0.25 + 0.75 * math.sin(math.pi * i / (n - 1)))
+        left.append((x - dy / k * w, y + dx / k * w))
+        right.append((x + dy / k * w, y - dx / k * w))
+    return left + right[::-1]
+
+
+def _oval(cx, cy, rx, ry, n=12):
+    return [(cx + rx * math.cos(2 * math.pi * k / n), cy + ry * math.sin(2 * math.pi * k / n)) for k in range(n)]
+
+
+def _plate(F, name, px, at, layer, material, round_passes=1):
+    """A flat plate of the sticker, its outline in photo pixels, `layer` × 1.2 mm proud of the door face
+    `at` (game x, height, depth of the sticker's middle). Front and edges only: its back is on the door."""
+    if round_passes:
+        px = _chaikin(px, passes=round_passes)
+    (ox, oy), (su, sv) = STICKER_PX, STICKER_SCALE
+    x0, y0, z0 = at
+    z = z0 + 0.0008 + 0.0012 * layer   # the border's back just into the door, each layer 1.2 mm on
+    pts = [(x0 - (u - ox) * su, y0 - (v - oy) * sv) for u, v in px]   # the viewer's right is game -x
+    n = len(pts)
+    verts = [F.at(x, y, z - 0.0016) for x, y in pts] + [F.at(x, y, z) for x, y in pts]
+    bm = bmesh.new()
+    vs = [bm.verts.new(v) for v in verts]
+    front = bm.faces.new(vs[n:])
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((vs[i], vs[j], vs[n + j], vs[n + i]))
+    bm.normal_update()
+    if front.normal.y > 0:   # face the front (-y), the edges outward with it
+        for f in bm.faces:
+            f.normal_flip()
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    return obj
+
+
+def _unicorn(F, at):
+    """The unicorn sticker on the mini fridge's door, as in the photo: a white die-cut border round a
+    unicorn's head in profile, facing the viewer's right, its pink mane streaked blue and lilac."""
+    _plate(F, 'uni_border', [
+        (748, 360), (738, 400), (730, 426), (744, 450), (754, 480), (762, 508), (770, 530), (766, 554),
+        (748, 568), (726, 570), (710, 566), (704, 582), (708, 610), (716, 648), (692, 666), (650, 674),
+        (610, 674), (582, 662), (558, 632), (544, 595), (540, 555), (546, 514), (558, 476), (576, 446),
+        (598, 420), (622, 400), (646, 386), (662, 396), (678, 392), (692, 410), (706, 418), (726, 384)],
+        at, 0, M.uni_white)
+    # the mane behind the head, and the head and neck
+    _plate(F, 'uni_mane', [
+        (652, 402), (668, 412), (680, 428), (668, 452), (656, 490), (648, 535), (646, 580), (652, 625),
+        (664, 656), (640, 664), (612, 664), (588, 652), (566, 624), (553, 590), (550, 555), (555, 518),
+        (566, 484), (584, 455), (604, 431), (628, 413)], at, 1, M.uni_pink)
+    _plate(F, 'uni_head', [
+        (700, 428), (726, 436), (740, 458), (749, 486), (756, 512), (761, 532), (756, 548), (742, 558),
+        (724, 559), (710, 553), (697, 561), (691, 583), (696, 613), (704, 648), (680, 657), (664, 656),
+        (652, 625), (646, 580), (648, 535), (656, 490), (668, 452), (682, 432)], at, 1, M.uni_face)
+    # streaks through the mane
+    for i, (line, w, mat) in enumerate((
+            ([(640, 420), (610, 452), (590, 492), (582, 540), (588, 590), (606, 634)], 9, M.uni_blue),
+            ([(660, 432), (636, 472), (621, 520), (619, 570), (628, 618), (642, 652)], 8, M.uni_lilac),
+            ([(624, 420), (598, 456), (576, 506), (571, 560), (582, 612)], 5, M.uni_white),
+            ([(667, 458), (650, 502), (640, 552), (641, 604), (651, 642)], 6, M.uni_rose))):
+        _plate(F, f'uni_streak{i}', _ribbon(line, w), at, 2, mat, round_passes=0)
+    # the ear, the horn with its spiral, the muzzle, nostril and eye
+    _plate(F, 'uni_ear', [(650, 392), (664, 402), (678, 398), (686, 424), (670, 434), (657, 418)], at, 2, M.uni_face)
+    _plate(F, 'uni_ear_in', [(658, 402), (667, 410), (674, 425), (664, 422)], at, 3, M.uni_pink)
+    base_l, base_r, tip = (708, 424), (731, 431), (746, 366)
+    _plate(F, 'uni_horn', [base_l, tip, base_r], at, 2, M.uni_white, round_passes=0)
+    lerp = lambda a, b, t: (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)  # noqa: E731
+    for i, t in enumerate((0.12, 0.36, 0.60)):
+        _plate(F, f'uni_horn_stripe{i}', [lerp(base_l, tip, t), lerp(base_l, tip, t + 0.07),
+                                          lerp(base_r, tip, t + 0.15), lerp(base_r, tip, t + 0.08)],
+               at, 3, M.uni_lilac, round_passes=0)
+    _plate(F, 'uni_muzzle', _oval(744, 540, 15, 13), at, 2, M.uni_blush, round_passes=0)
+    _plate(F, 'uni_nostril', _oval(752, 533, 3.5, 2.5, 8), at, 3, M.uni_rose, round_passes=0)
+    _plate(F, 'uni_eye', [(695, 481), (703, 474), (714, 475), (719, 483), (709, 489), (699, 487)], at, 2,
+           M.uni_dark, round_passes=0)
+    _plate(F, 'uni_eye_lid', _ribbon([(692, 476), (704, 469), (717, 472)], 3), at, 3, M.uni_rose, round_passes=0)
+
+
+def _soft(obj, bevel_first=True):
+    """Glossy round shading for a bevelled shell: smooth over the bevels, flat on the broad faces."""
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    for m in list(obj.modifiers):
+        bpy.ops.object.modifier_apply(modifier=m.name)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+    wn = obj.modifiers.new('weighted', 'WEIGHTED_NORMAL')
+    wn.keep_sharp = True
+    return obj
+
+
+def _letters(F, text, at, size, material):
+    """Raised metal letters on a face at game depth `at[2]`, centred on (x, height), facing the front."""
+    x, y, z = at
+    bpy.ops.object.text_add(location=F.at(x, y, z + 0.0015), rotation=(math.radians(90), 0, 0))
+    obj = bpy.context.object
+    obj.data.body = text
+    obj.data.size = size
+    obj.data.extrude = 0.0015
+    obj.data.space_character = 1.25
+    obj.data.align_x = 'CENTER'
+    obj.data.align_y = 'CENTER'
+    obj.data.resolution_u = 3
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.convert(target='MESH')
+    obj = bpy.context.object
+    obj.name = obj.data.name = 'letters'
+    bm = bmesh.new()   # the converted text's faces point every way: make them outward
+    bm.from_mesh(obj.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.materials.clear()
+    obj.data.materials.append(material)
+    return obj
+
+
+def _fridgeMiniRetro():
+    """A pastel-pink retro mini fridge, as in the reference photo: a soft rounded cabinet on tapered brass
+    feet, vents at the back of its sides, and one door over the whole front with a brass D handle, raised
+    gold letters ("MARIE") and a die-cut unicorn sticker."""
+    Fp = G.GameFrame(shift=0.0)
+    front = 0.115   # the door's face; the handle reaches the placeholder's front (0.15)
+    with G.new_parts() as still:
+        # the cabinet: one rounded shell, its inside cut out through the front and lined
+        cab = Fp.box('cabinet', 0.57, 0.81, 0.50, (0, 0.455, -0.18), M.pink, bevel=0.05, bevel_segments=4)
+        cut = Fp.box('cavity', 0.47, 0.66, 0.51, (0, 0.46, -0.135), M.liner, bevel=0.015)
+        bpy.ops.object.select_all(action='DESELECT')
+        cut.select_set(True)
+        bpy.context.view_layer.objects.active = cut
+        bpy.ops.object.modifier_apply(modifier='bevel')
+        b = cab.modifiers.new('cut', 'BOOLEAN')
+        b.operation, b.object, b.solver, b.material_mode = 'DIFFERENCE', cut, 'EXACT', 'TRANSFER'
+        _soft(cab)
+        bpy.data.objects.remove(cut)
+        # a shelf and the freezer floor; food, seen once the door opens
+        Fp.box('divider', 0.47, 0.014, 0.44, (0, 0.62, -0.16), M.shelf, bevel=0.003)
+        Fp.box('shelf', 0.47, 0.008, 0.44, (0, 0.36, -0.16), M.shelf, bevel=0.002)
+        Fp.box('milk', 0.07, 0.15, 0.07, (-0.12, 0.44, -0.20), M.carton, bevel=0.006)
+        Fp.cone('milk_top', 0.05, 0.0, 0.045, (-0.12, 0.5375, -0.20), M.carton, verts=4, rot=(0, 0, 45))
+        for i, x in enumerate((0.05, 0.13)):
+            Fp.sphere(f'apple{i}', 0.032, (x, 0.396, -0.17), M.produce, segments=10, rings=6)
+        Fp.cyl('juice', 0.026, 0.13, (0.08, 0.20, -0.20), M.bottle, verts=16, bevel=0.004)
+        Fp.box('icecream', 0.12, 0.07, 0.10, (-0.05, 0.662, -0.18), M.icecream, bevel=0.01)
+        # tapered brass feet, wide at the top
+        for x in (-0.215, 0.215):
+            for z in (-0.37, 0.02):
+                Fp.cone('foot', 0.019, 0.027, 0.05, (x, 0.025, z), M.gold, verts=12)
+        for side in (-1, 1):
+            x = side * 0.285
+            # the compressor panel's seam low on each side
+            Fp.box('side_seam', 0.003, 0.006, 0.39, (x, 0.165, -0.18), M.pink2, bevel=0.0)
+            # two groups of seven vent slots at the back of each side
+            for y0 in (0.20, 0.61):
+                for i in range(7):
+                    Fp.box('vent', 0.004, 0.006, 0.07, (x, y0 + i * 0.014, -0.33), M.vent, bevel=0.0)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the door over the whole front, hinged on the viewer's right (its handle on the left)
+    with G.new_parts() as parts:
+        door = Fp.box('door', 0.555, 0.785, 0.045, (0, 0.4525, front - 0.0225), M.pink, bevel=0.035,
+                      bevel_segments=3)
+        _soft(door)
+        Fp.box('door_liner', 0.45, 0.64, 0.008, (0, 0.46, 0.066), M.liner, bevel=0.003)
+        Fp.box('door_bin', 0.44, 0.06, 0.05, (0, 0.30, 0.045), M.shelf, bevel=0.004)
+        Fp.cyl('can', 0.03, 0.11, (0.12, 0.355, 0.04), M.produce, verts=12, bevel=0.003)
+        # the brass D handle: a bar on two curved arms into the door, a round pad under each
+        hx, y0, y1, out = 0.17, 0.35, 0.60, front + 0.025
+        pts = [(hx, y0 - 0.02, front), (hx, y0, out - 0.006), (hx, y0 + 0.025, out),
+               (hx, y1 - 0.025, out), (hx, y1, out - 0.006), (hx, y1 + 0.02, front)]
+        for i, (a, b) in enumerate(zip(pts, pts[1:])):
+            G.rod(f'handle{i}', Fp.at(*a), Fp.at(*b), 0.0095, M.gold, verts=8)
+        for i, p in enumerate(pts[1:-1]):
+            Fp.sphere(f'handle_joint{i}', 0.0095, p, M.gold, segments=8, rings=5)
+        for i, y in enumerate((y0 - 0.02, y1 + 0.02)):
+            Fp.cyl(f'handle_pad{i}', 0.016, 0.006, (hx, y, front + 0.002), M.gold, verts=16, rot=(90, 0, 0))
+        _letters(Fp, 'MARIE', (-0.04, 0.705, front), 0.064, M.gold)
+        _unicorn(Fp, (-0.06, 0.44, front))
+    door = G.hinged(G.join(parts, 'door'), Fp.at(-0.2775, 0.4525, front - 0.0225))
+    G.settle()
+    G.swing(door, 'fridge_open', 100, seconds=1.6)
+
+
 def _wineFridge():
     """A dark glass door over a bottle grid, a stack of drawer racks beside it; the top rack slides."""
     Fw = G.GameFrame(shift=0.0, depths=tuple((a + 0.085, b) for a, b in COUNTER66))   # its numbers centred
@@ -505,6 +736,10 @@ FAMILY = G.Family(
      G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.067),
              motions={'uses': {use: RETRO_OPEN for use in ('fetch', 'cook', 'drink')}, 'hold': HOLD},
              paint=[('mint', 'Body'), ('chrome', 'Handle'), ('mint2', 'Trim')]),
+     G.Model('fridgeMiniRetro', _fridgeMiniRetro, size=(0.58, 0.86, 0.58), key='model.fridgeMiniRetro',
+             centre=(0, -0.14),
+             motions={'uses': {use: 'fridge_open' for use in ('fetch', 'cook', 'drink')}, 'hold': 3.0},
+             paint=[('pink', 'Body'), ('gold', 'Handle & feet'), ('pink2', 'Trim')]),
      G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.66), key='model.wineFridge', centre=(0, -0.10),
              motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
              paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),

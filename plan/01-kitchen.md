@@ -1,6 +1,6 @@
 # Kitchen
 
-Appliances, counters, islands, dining. The fridge, the five K1 fridges and the two kitchen sinks are done
+Appliances, counters, islands, dining. The fridge, the six K1 fridges and the two kitchen sinks are done
 (`families/kitchen.py`), the six K2 cookers and the four K3 small appliances and dishwashers are done
 (`families/kitchen_cooking.py`), and the eight K4 base counters, the eleven K5 tall and wall storage
 things and the five K6 islands and bars are done (`families/kitchen_counters.py`). The thirteen K7 dining
@@ -10,7 +10,7 @@ Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.s
 while the resident is still busy. Counter and table tops must keep their heights (`tools/art/catalog2.py` `TOPS`);
 chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characters.ts`).
 
-## K1. Fridges (5) — **Done** (in Validate › Fridges)
+## K1. Fridges (6) — **Done** (in Validate › Fridges)
 
 - **Family:** `tools/art/blender/families/kitchen.py`
 - **Validate group:** `fridges` (Validate › Fridges)
@@ -22,6 +22,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below gets `freezer_open`, unused until a use takes frozen food. |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer `freezer_open` slides out 35 cm, unused for now. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
+| `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
 | `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
 
 ## K2. Cookers (6) — **Done** (in Validate › Cookers)

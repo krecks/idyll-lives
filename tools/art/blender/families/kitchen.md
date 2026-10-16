@@ -1,8 +1,8 @@
 # Kitchen — notes
 
 `kitchen.py` builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
-`packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the five **K1 fridges**
-(`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `wineFridge`) and the two **sinks**
+`packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the six **K1 fridges**
+(`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge`) and the two **sinks**
 (`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). They
 replace the primitive-part placeholders, which stay as the fallback. The fridge was first made as an
 evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
@@ -73,7 +73,7 @@ Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 er
 
 ## The K1 fridges
 
-Five more fridges match their placeholders' bounds. Each hinges a door built closed and swings it open
+Six more fridges match their placeholders' bounds. Each hinges a door built closed and swings it open
 with a `hold`, so it shuts while the resident is busy; the French-door freezer and the wine fridge's top
 rack slide instead. The clip each use plays is in the pack's `motions`:
 
@@ -83,6 +83,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s, unused |
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s, unused |
 | `model.fridgeRetro` | 0.720 × 1.640 × 0.725 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
+| `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,975 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
 | `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
 
 The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no
