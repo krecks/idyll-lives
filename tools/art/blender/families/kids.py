@@ -24,6 +24,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
 from gamekit import shapes  # noqa: E402
+from gamekit.motion import _clip, last_frame  # noqa: E402
 
 M = G.Palette(
     # toys' colours, shared
@@ -993,14 +994,22 @@ EASEL_TILT = 14
 
 def _drawing(name, pieces, frame, left):
     """A picture of flat `pieces` [(outline, material)] on `frame`, joined with its origin on its left edge
-    and squeezed to it, so `grow` draws it from left to right."""
+    and shrunk to a speck there, so `_draw_on` draws it from left to right."""
     with G.new_parts() as parts:
         for k, (pts, m) in enumerate(pieces):
             _slab(f'{name}{k}', pts, frame, m, out=0.0008 * k, thick=0.002)   # each over the last
     o, s, u, n = frame
     obj = G.join(parts, name, origin=F.at(*_add(o, _mul(s, left))))
-    obj.scale[0] = 0.001
+    obj.scale = (0.001, 0.001, 0.001)
     return obj
+
+
+def _draw_on(part, clip, seconds):
+    """The drawing's clip: it grows along x from its left edge, its height and depth back to full in the
+    first frames. Squeezed along x only, at rest it showed as a hairline of colours down the board."""
+    G.grow(part, clip, seconds=seconds, axis='X')
+    for axis in (1, 2):
+        _clip(part, clip, 'scale', axis, [(1, 0.001), (3, 1.0), (last_frame(seconds), 1.0)])
 
 
 def _rect(x0, y0, x1, y1):
@@ -1038,7 +1047,7 @@ def kidsChalkboard():
              (_rect(-0.2, -0.15, 0.22, -0.135), M.chalk_green)]
     drawing = _drawing('drawing', house, face, -0.2)
     _place()
-    G.grow(drawing, 'drawing', seconds=2.5, axis='X')
+    _draw_on(drawing, 'drawing', 2.5)
     return G.meshes()
 
 
@@ -1075,7 +1084,7 @@ def kidsEasel():
         pieces.append((circle(-0.06 + 0.055 * math.cos(a), 0.06 + 0.055 * math.sin(a), 0.03), M.paint_red))
     painting = _drawing('painting', pieces, face, -0.25)
     _place()
-    G.grow(painting, 'painting', seconds=2.5, axis='X')
+    _draw_on(painting, 'painting', 2.5)
     return G.meshes()
 
 
