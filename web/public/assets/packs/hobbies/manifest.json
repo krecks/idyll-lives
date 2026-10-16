@@ -342,7 +342,7 @@
         },
         {
           "material": "chair_wood",
-          "label": "Trim"
+          "label": "Chair"
         }
       ]
     },
@@ -612,7 +612,7 @@
         },
         {
           "material": "chair_wood",
-          "label": "Trim"
+          "label": "Stool"
         }
       ]
     },

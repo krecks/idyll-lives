@@ -706,7 +706,7 @@ def chessTable():
     F = G.GameFrame()
     with G.new_parts() as still:
         F.box('top', 0.46, 0.03, 0.4, (0, 0.725, 0.25), M.table_wood, bevel=0.006, bevel_segments=1)
-        F.box('board', 0.37, 0.004, 0.37, (0, 0.742, 0.2505), M.chair_wood, bevel=0.002)
+        F.box('board', 0.37, 0.004, 0.37, (0, 0.742, 0.2505), M.table_wood, bevel=0.002)
         F.box('board_dark', 0.344, 0.0005, 0.344, (0, 0.74425, 0.2505), M.square_dark)
         for col in range(8):
             for row in range(8):
@@ -1464,7 +1464,7 @@ FAMILY = G.Family(
      G.Model('guitarAcoustic', guitarAcoustic, size=(0.36, 1.482, 0.405), key='model.guitarAcoustic',
              centre=(0, -0.0217), motions={'uses': {'music': 'off_stand'}}, paint=[('acoustic', 'Guitar'), ('stand', 'Stand')]),
      G.Model('chessTable', chessTable, size=(0.46, 0.92, 0.85), key='model.chessTable', centre=(0, 0.025),
-             motions={'uses': {'chess': 'move'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Trim')]),
+             motions={'uses': {'chess': 'move'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
      G.Model('poolTable', poolTable, size=(2.5, 0.842, 1.4), key='model.poolTable',
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
@@ -1476,7 +1476,7 @@ FAMILY = G.Family(
              centre=(0, 0.006), motions={'loops': {'arcade': 'joystick'}},
              paint=[('arcade', 'Cabinet'), ('art', 'Art')]),
      G.Model('puzzleTable', puzzleTable, size=(0.865, 0.794, 0.891), key='model.puzzleTable', centre=(0.0025, 0.0155),
-             motions={'uses': {'jigsaw': 'pieces'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Trim')]),
+             motions={'uses': {'jigsaw': 'pieces'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Stool')]),
      G.Model('easel', easel, size=(0.704, 1.747, 0.762), key='model.easel', centre=(0.0318, -0.0347),
              motions={'uses': {'paint': 'painting'}}, paint=[('easel_wood', 'Wood'), ('easel_metal', 'Metal')]),
      G.Model('workbench', workbench, size=(1.62, 0.995, 0.665), key='model.workbench', centre=(0, -0.0975),

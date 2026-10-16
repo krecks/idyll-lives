@@ -32,7 +32,8 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 
 ## Games (H2)
 
-- **Chess table**: a black pawn is its own part and slides one square (`move`) for `chess`.
+- **Chess table**: a black pawn is its own part and slides one square (`move`) for `chess`. Its chair is coloured on
+  its own ("Chair"); the board's rim is the table's wood.
 - **Pool table**: the triangle lifts 25 cm off the fifteen racked balls (`rack_off`) for `pool` and
   `trickShots`. The cue lies on the cloth, as the placeholder's now does (it stuck out to 1.69 m).
 - **Foosball**: four rods; the two outer ones (one each side, by where the players stand) kick ±55° in a loop,
@@ -71,12 +72,12 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 | `model.keyboardDigital` | 0.90 × 1.09 × 0.75 m | 2,420 | 2 | Body, Trim |
 | `model.drumKit` | 0.98 × 1.09 × 0.89 m | 5,876 | 3 | Shells, Hardware |
 | `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 3 | Guitar, Stand |
-| `model.chessTable` | 0.46 × 0.92 × 0.85 m | 3,760 | 3 | Table, Trim |
+| `model.chessTable` | 0.46 × 0.92 × 0.85 m | 3,760 | 3 | Table, Chair |
 | `model.poolTable` | 2.50 × 0.84 × 1.40 m | 5,268 | 3 | Frame, Cloth |
 | `model.foosball` | 1.42 × 0.95 × 0.94 m | 7,928 | 3 | Table, Trim |
 | `model.dartboard` | 0.62 × 0.62 × 0.07 m | 1,844 | 2 | Board, Cabinet |
 | `model.arcadeCabinet` | 0.67 × 1.82 × 0.87 m | 1,532 | 2 | Cabinet, Art |
-| `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,256 | 3 | Table, Trim |
+| `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,256 | 3 | Table, Stool |
 | `model.easel` | 0.70 × 1.75 × 0.76 m | 2,004 | 3 | Wood, Metal |
 | `model.workbench` | 1.62 × 1.00 × 0.67 m | 5,064 | 3 | Wood, Metal |
 | `model.telescope` | 0.66 × 1.52 × 0.91 m | 1,724 | 2 | Tube, Tripod |
