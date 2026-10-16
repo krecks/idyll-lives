@@ -4099,9 +4099,9 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "ceiling lights",
+      "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.3,
       "light": {
@@ -4122,9 +4122,9 @@
         1
       ],
       "price": 50,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "ceiling lights",
+      "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.1,
       "light": {
@@ -4145,9 +4145,9 @@
         1
       ],
       "price": 800,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "ceiling lights",
+      "group": "ceiling",
       "layer": "ceiling",
       "decor": 1.5,
       "light": {
@@ -4168,9 +4168,9 @@
         1
       ],
       "price": 140,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "ceiling lights",
+      "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.4,
       "light": {
@@ -4191,9 +4191,9 @@
         1
       ],
       "price": 240,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "ceiling lights",
+      "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.2,
       "light": {
@@ -4214,8 +4214,8 @@
         1
       ],
       "price": 70,
-      "category": "validate",
-      "group": "wall lights",
+      "category": "lighting",
+      "group": "wall",
       "layer": "wall",
       "decor": 0.3,
       "light": {
@@ -4236,8 +4236,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "wall lights",
+      "category": "lighting",
+      "group": "wall",
       "layer": "wall",
       "decor": 0.3,
       "light": {
@@ -4258,8 +4258,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "wall lights",
+      "category": "lighting",
+      "group": "wall",
       "layer": "wall",
       "decor": 0.2,
       "light": {
@@ -4280,9 +4280,9 @@
         1
       ],
       "price": 55,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "floor lamps",
+      "group": "floor",
       "decor": 0.5,
       "light": {
         "range": 4.0,
@@ -4302,9 +4302,9 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "table lamps",
+      "group": "table",
       "decor": 0.6,
       "light": {
         "range": 3.5,

@@ -115,6 +115,54 @@ outside as well as in, showing when it stands free or with the wall cut away; it
 now. Seen in passing: at the china cabinet the resident reaches low (the shared "fetch" pose) while the glazed
 door above opens. All back in kitchen / cabinets.
 
+## The ceiling lights
+
+The seven LT1 lights (Validate › Ceiling Lights) were signed off on 2026-10-16, checked as above, hung at 24,17 in
+the living room (camera at 2.1 m): the pendant, ceiling light, ring chandelier, industrial pendant, ceiling fan,
+track lights and paper lantern hang from the ceiling height in all four facings, nothing floating or cut. At
+night each lights a pool on the floor under it and its shade (globes, panels, paper, the industrial pendant's and
+track heads' liners and lenses) glows; by day none glows. The fan's `blades_turn` (2.5 s) and the lantern's `sway`
+(2 s) go round all the time near the camera on WebGPU, day and night, and are off on Low, as designed (E2).
+Nothing needed fixing. Seen in passing: the industrial pendant's green dome looks black from above at night (only
+its white liner glows, inside), as the notes intend. All back in lighting / ceiling.
+
+## The wall lights
+
+The three LT2 lights (Validate › Wall Lights) were signed off on 2026-10-16, checked as above on four walls with
+the camera at 1.6 m: the living room's north (23,14,0) and east (28,19,3) walls, and, for the other two facings,
+the bedroom's west outer wall (15,19,1) and the living room's south outer wall (22,25,2), day and night. The
+sconce, swing-arm lamp and bulkhead sit with their backs on the wall face at their height; at night each throws a
+warm pool on the wall round it and its shade or lens glows. Nothing needed fixing. Seen in passing: on a wall the
+cutaway cuts (an inner wall between two rooms, or an outer wall seen from outside: 21,19,1, 20,19,2, 29,19,1,
+23,13,2 were tried first) the lamp hangs in the air over the cut wall, as anything on a cut wall does (renderer,
+not the models). The bulkhead's "Shade" is its glass lens: coloured, it tints faintly, as see-through glass does.
+All back in lighting / wall.
+
+## The floor lamps
+
+The five LT3 lamps (Validate › Floor Lamps) were signed off on 2026-10-16, checked as above standing free at 23,16
+(camera at 1.1 m), and the arc lamp also with its base against the north and east walls (23,14,0, 28,19,3), as
+its notes intend: its arc reaches out over the room. Floor lamp, simple floor lamp, arc lamp, tripod lamp and
+uplighter stand on the floor in all four facings; at night each lights the floor and wall round it, the drum,
+square and linen shades and the uplighter's bowl glow, the arc lamp's metal dome glows inside. The floor lamp's
+third part "Fittings" colours its brass collars and harp, the arc lamp's and uplighter's "Base" their foot.
+Nothing needed fixing. Seen in passing: the light is at the footprint's middle, so the arc lamp's light is 28 cm
+from its shade (the pool still reads as the lamp's, against a wall it is on the wall beside the shade); the
+uplighter's coloured glass bowl tints faintly. All back in lighting / floor.
+
+## The table lamps
+
+The six LT4 lamps (Validate › Table Lamps) were signed off on 2026-10-16, checked as above at 23,16 (camera at
+0.7–0.8 m): the table lamp (a floor object with its own oak side table; "Table" colours the table) and the five
+surface lamps (ginger-jar, square, banker's, mushroom, candle lantern) each stood on a side table bought first,
+turned to all four facings on it. They stand on the top, carried at its height (lift 0.55 m), with their light at
+the top plus `light.height`; at night the shades, the mushroom's cap, the banker's liner and the lantern's flame
+glow and the table and floor round them are lit. Nothing needed fixing. Seen in passing: the table lamp's light
+(0.95 m, content) is 14 cm above its bulb and 12 cm to the side of it (the lamp stands off-centre on its table),
+just above the shade's top; it looks right. A top under a lit lamp is washed almost white at night (the light is
+30–45 cm above it and the shade casts no shadow: renderer). The lantern's "Glass" tints faintly, as glass does.
+All back in lighting / table.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -130,6 +178,7 @@ A category is signed off when all its tasks are: its file's tables are all built
 task done in the category file (strike through its heading, with the commit).
 
 - **Kitchen** (`01-kitchen.md`, K1–K9): signed off 2026-10-16.
+- **Lighting** (`11-lighting.md`, LT1–LT4): signed off 2026-10-16.
 
 ## The end
 

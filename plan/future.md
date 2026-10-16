@@ -9,7 +9,7 @@ open**. Each line says where it lives.
 
 ## Next: sign-off
 
-- **Validate holds 464 items in 69 groups** (the sinks and K1–K9 are signed off, 2026-10-16), against the plan's "about three at a time". Sign tasks off
+- **Validate holds 443 items in 65 groups** (the sinks, K1–K9 and LT1–LT4 are signed off, 2026-10-16), against the plan's "about three at a time". Sign tasks off
   (`16-sign-off.md`) after review. `python3 -B tools/content/validate.py list | out --group <g> [--dry-run]`
   moves items back to their "Back to" by id, keeps the files' formatting and drops emptied groups. Items whose
   home turns them freely carry `"freeRotation": true` (Validate itself no longer turns anything).

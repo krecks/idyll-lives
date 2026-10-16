@@ -3322,9 +3322,9 @@
         1
       ],
       "price": 120,
-      "category": "validate",
+      "category": "lighting",
       "freeRotation": true,
-      "group": "floor lamps",
+      "group": "floor",
       "interactions": []
     },
     {
@@ -3795,22 +3795,6 @@
         {
           "id": "kids study",
           "label": "Kids Study"
-        },
-        {
-          "id": "ceiling lights",
-          "label": "Ceiling Lights"
-        },
-        {
-          "id": "wall lights",
-          "label": "Wall Lights"
-        },
-        {
-          "id": "floor lamps",
-          "label": "Floor Lamps"
-        },
-        {
-          "id": "table lamps",
-          "label": "Table Lamps"
         },
         {
           "id": "desks",
