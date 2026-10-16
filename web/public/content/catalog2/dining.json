@@ -767,8 +767,8 @@
         1
       ],
       "price": 380,
-      "category": "validate",
-      "group": "dining storage",
+      "category": "kitchen",
+      "group": "cabinets",
       "decor": 0.4,
       "surface": {
         "height": 0.8,
@@ -797,8 +797,8 @@
         1
       ],
       "price": 520,
-      "category": "validate",
-      "group": "dining storage",
+      "category": "kitchen",
+      "group": "cabinets",
       "decor": 0.5,
       "surface": {
         "height": 0.9,
@@ -827,9 +827,9 @@
         1
       ],
       "price": 650,
-      "category": "validate",
+      "category": "kitchen",
       "fillsWall": true,
-      "group": "dining storage",
+      "group": "cabinets",
       "decor": 0.8,
       "description": "A glazed hutch with the best plates on show over a cupboard.",
       "interactions": []
@@ -843,8 +843,8 @@
         1
       ],
       "price": 180,
-      "category": "validate",
-      "group": "dining storage",
+      "category": "kitchen",
+      "group": "cabinets",
       "decor": 0.4,
       "description": "Two glass tiers on brass castors with bottles and glasses.",
       "interactions": [

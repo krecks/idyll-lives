@@ -104,6 +104,17 @@ sit and drink and shut after their `hold`; a snack eaten from each at a table, c
 pushed up to it; coffee (or a drink, on the counter and high stools) at a table, which those uses need
 (`needsTable`: refused for a seat standing alone). Nothing needed fixing. All back in kitchen / dining.
 
+## The dining storage
+
+The four K9 things (Validate › Dining Storage) were signed off on 2026-10-16, checked as the sinks were: the
+sideboard's, buffet's and china cabinet's door (the china cabinet's left glazed door) when clean dishes are put
+away in them (a snack's plate cleared: bin, sink, then the cupboard), in all four facings (three against a wall,
+one standing free); the bar cart's shaker lifts and tips towards the resident (`shake`) for "Mix a drink" and
+shuts after its `hold`, standing free in all four facings. One fix: the china cabinet's hutch back was blue
+outside as well as in, showing when it stands free or with the wall cut away; it is the body's colour outside
+now. Seen in passing: at the china cabinet the resident reaches low (the shared "fetch" pose) while the glazed
+door above opens. All back in kitchen / cabinets.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -117,6 +128,8 @@ into Validate › Sofas, the six garden decor models into Validate › Garden De
 
 A category is signed off when all its tasks are: its file's tables are all built, back, and committed. Mark each
 task done in the category file (strike through its heading, with the commit).
+
+- **Kitchen** (`01-kitchen.md`, K1–K9): signed off 2026-10-16.
 
 ## The end
 

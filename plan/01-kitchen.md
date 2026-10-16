@@ -147,7 +147,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
 | `benchDining` Dining bench | 2x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
 
-## K9. Dining storage (4) — **Done** (in Validate › Dining Storage)
+## K9. Dining storage (4) — **Done**, signed off 2026-10-16 (back in kitchen / cabinets)
 
 - **Family:** `tools/art/blender/families/dining.py`
 - **Validate group:** `dining storage` (Validate › Dining Storage)
