@@ -2576,7 +2576,7 @@
         }
       ],
       "price": 400,
-      "category": "living",
+      "category": "validate",
       "group": "media"
     },
     {
@@ -3988,6 +3988,10 @@
           "id": "garden decor",
           "label": "Garden Decor",
           "outside": true
+        },
+        {
+          "id": "media",
+          "label": "Media"
         }
       ]
     },
