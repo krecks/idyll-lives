@@ -3988,6 +3988,11 @@
           "id": "garden decor",
           "label": "Garden Decor",
           "outside": true
+        },
+        {
+          "id": "garden things",
+          "label": "Garden Things",
+          "outside": true
         }
       ]
     },

@@ -4856,8 +4856,9 @@
         1
       ],
       "price": 160,
-      "category": "outdoor",
-      "group": "lights",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "garden things",
       "outdoors": true,
       "decor": 0.5,
       "light": {
@@ -4878,8 +4879,9 @@
         1
       ],
       "price": 110,
-      "category": "outdoor",
-      "group": "lights",
+      "category": "validate",
+      "freeRotation": true,
+      "group": "garden things",
       "outdoors": true,
       "decor": 0.6,
       "light": {
