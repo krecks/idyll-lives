@@ -82,6 +82,8 @@ const PROP = {
 } as const;
 /** A thin instance: x, z, scale across, scale up, yaw. */
 type Inst = [number, number, number, number, number];
+/** A template's meshes and its glows' (what hiding it hides). */
+const withGlows = (t: ModelTemplate): Mesh[] => [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)];
 /** Shop awnings: stripe colours. */
 const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
 /** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */
@@ -463,6 +465,8 @@ export class Street {
   private readonly footprints = new Map<string, [number, number]>();
   private readonly glowMat: StandardMaterial;
   private readonly poolMat: StandardMaterial;
+  /** What glows at night on the models drawn (a path light's lens: a template's `glows`), and each instance's strength. */
+  private glows: { mesh: Mesh; colors: Float32Array }[] = [];
   private lamps = -1;
   private readonly tmpQ = new Quaternion();
   private readonly tmpM = new Matrix();
@@ -889,7 +893,8 @@ export class Street {
       ...[...things].map(([key, list]): [string, Inst[], boolean] => [key, list, true]),
     ];
     // Models from the last build that aren't used now are hidden.
-    for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => t.meshes.forEach((m) => m.setEnabled(false)));
+    for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => withGlows(t).forEach((m) => m.setEnabled(false)));
+    this.glows = [];
     for (const [key, items, cast] of batches) {
       await pace?.();
       const meshes = await this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key));
@@ -920,9 +925,10 @@ export class Street {
     this.casters = [];
     this.drawn = [];
     this.key = '';
+    this.glows = [];
     for (const template of this.templates.values()) {
       void template.then((t) => {
-        if (this.key === '') for (const mesh of t.meshes) mesh.setEnabled(false);
+        if (this.key === '') for (const mesh of withGlows(t)) mesh.setEnabled(false);
       });
     }
   }
@@ -937,6 +943,12 @@ export class Street {
     // Pale glass by day, a warm glow at night.
     this.glowMat.emissiveColor.set(0.62 + g * 1.7, 0.62 + g * 0.95, 0.58 + g * 0.2);
     this.poolMat.emissiveColor.set(0.62 * g, 0.46 * g, 0.26 * g);
+    // The models' glows (the path lights' lenses) with the streetlights: nothing by day.
+    for (const { mesh, colors } of this.glows) {
+      for (let i = 0; i < colors.length; i += 4) colors.fill(g, i, i + 3);
+      mesh.thinInstanceBufferUpdated('color');
+      mesh.setEnabled(g > 0);
+    }
   }
 
   // ---- helpers ----------------------------------------------------------------------------
@@ -1063,6 +1075,19 @@ export class Street {
       if (items.length) mesh.thinInstanceRefreshBoundingInfo(false);
       mesh.setEnabled(items.length > 0);
       mesh.freezeWorldMatrix();
+    }
+    // Its glow (a still model's: one mesh), off until `setNight` lights it.
+    for (const { mesh } of t.glows ?? []) {
+      if (this.layerMask !== undefined) mesh.layerMask = this.layerMask;
+      mesh.thinInstanceSetBuffer('matrix', buf, 16, true);
+      mesh.thinInstanceCount = items.length;
+      mesh.setEnabled(false);
+      if (!items.length) continue;
+      const colors = new Float32Array(items.length * 4).fill(1);
+      mesh.thinInstanceSetBuffer('color', colors, 4, false);
+      mesh.thinInstanceRefreshBoundingInfo(false);
+      mesh.freezeWorldMatrix();
+      this.glows.push({ mesh, colors });
     }
     return items.length ? t.meshes : [];
   }
