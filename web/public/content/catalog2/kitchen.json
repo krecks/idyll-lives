@@ -202,8 +202,8 @@
         1
       ],
       "price": 520,
-      "category": "validate",
-      "group": "sinks",
+      "category": "kitchen",
+      "group": "counters",
       "slots": 2,
       "stations": [
         "dishes"

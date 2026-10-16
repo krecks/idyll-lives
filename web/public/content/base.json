@@ -2419,7 +2419,7 @@
         }
       ],
       "price": 180,
-      "category": "validate",
+      "category": "bathroom",
       "group": "sinks"
     },
     {
@@ -3686,10 +3686,6 @@
       "label": "Validate",
       "icon": "icon.category.validate",
       "groups": [
-        {
-          "id": "sinks",
-          "label": "Sinks"
-        },
         {
           "id": "sofas",
           "label": "Sofas"

@@ -23,7 +23,10 @@ A task is signed off when its items have been checked in play and look and move 
 
 ## The sinks first
 
-The seven sinks (Validate › Sinks) are the first group. Before commit 1caf5ec they were:
+The seven sinks (Validate › Sinks) were the first group, signed off on 2026-10-16: bought in all four facings,
+every part coloured (through `buy` and in the colour studio), washed at (and washed up at, the farmhouse sink) with
+`water_on` playing and stopping when the use ended, by day and at night, on WebGPU and WebGL2, on Medium and Low.
+Before commit 1caf5ec they were, and are again:
 - `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`: bathroom / sinks;
 - `farmhouseSink`, `counterSinkDouble`: kitchen / counters.
 

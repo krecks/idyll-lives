@@ -5,7 +5,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 **animations** it can show.
 
 **Where it stands (2026-10-16):** 541 objects. **All 541 are built** (each in Validate until it's signed off):
-- the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble`;
+- the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble` (signed off 2026-10-16: back in bathroom / sinks and kitchen / counters);
 - the seven fridges: `fridge`, and the K1 six `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge` (in Validate › Fridges);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (in Validate › Cookers);
 - the four K3 small appliances and dishwashers: `coffeeMachine`, `breakfastCounter`, `dishwasher`, `dishwasherCompact` (in Validate › Appliances);
@@ -48,7 +48,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (in Validate › Kitchenware); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (Validate › Tableware); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (Validate › Small Ornaments); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (Validate › Desk And Bath Bits).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, each in Validate › its trait);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): Validate holds all 541 items in 79 groups.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks are back home (2026-10-16); Validate holds the other 534 items in 78 groups.
 
 **No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
 placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9

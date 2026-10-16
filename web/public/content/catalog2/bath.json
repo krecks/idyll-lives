@@ -146,7 +146,7 @@
         1
       ],
       "price": 420,
-      "category": "validate",
+      "category": "bathroom",
       "group": "sinks",
       "decor": 0.3,
       "description": "A bowl basin on a wooden vanity, towels on the shelf below.",
@@ -175,7 +175,7 @@
         1
       ],
       "price": 260,
-      "category": "validate",
+      "category": "bathroom",
       "group": "sinks",
       "decor": 0.2,
       "description": "A basin on brass legs with a towel bar.",

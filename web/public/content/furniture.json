@@ -659,8 +659,8 @@
         1
       ],
       "price": 320,
-      "category": "validate",
-      "group": "sinks",
+      "category": "kitchen",
+      "group": "counters",
       "description": "A deep apron-front sink with a gooseneck tap: wash up after cooking, or just your hands.",
       "interactions": [
         {
@@ -2422,7 +2422,7 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "bathroom",
       "group": "sinks",
       "description": "A simple basin on a pedestal.",
       "interactions": [
@@ -2450,7 +2450,7 @@
         1
       ],
       "price": 900,
-      "category": "validate",
+      "category": "bathroom",
       "group": "sinks",
       "slots": 2,
       "decor": 0.3,

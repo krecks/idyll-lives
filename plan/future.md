@@ -9,14 +9,14 @@ open**. Each line says where it lives.
 
 ## Next: sign-off
 
-- **Validate holds all 541 items in 79 groups**, against the plan's "about three at a time". Sign tasks off
+- **Validate holds 534 items in 78 groups** (the sinks are signed off, 2026-10-16), against the plan's "about three at a time". Sign tasks off
   (`16-sign-off.md`) after review. `python3 -B tools/content/validate.py list | out --group <g> [--dry-run]`
   moves items back to their "Back to" by id, keeps the files' formatting and drops emptied groups. Items whose
   home turns them freely carry `"freeRotation": true` (Validate itself no longer turns anything).
 - **Everything done is in Validate now** (2026-10-15): the base `fridge` (Validate › Fridges), the `wallBed`
   (Validate › Sofas) and the six garden decor models (new Validate › Garden Decor) had never been put in; their
-  homes are listed in `16-sign-off.md`. The 39 items outside Validate are those of tasks not started (L4–L6,
-  OU3–OU5). Validate changes an item's buy group, and the sim treats things of one group with a use in common as
+  homes are listed in `16-sign-off.md`. The 39 items of L4–L6 and OU3–OU5 went in once those tasks were done.
+  Validate changes an item's buy group, and the sim treats things of one group with a use in common as
   the same kind (`planner::same_kind`): with all six fridges in Validate › Fridges, other households upgrade
   their fridges, as they will again once the fridges are all back in kitchen / appliances.
 - **The example pack's own "Wellness" category** is empty while its two objects are in Validate.
