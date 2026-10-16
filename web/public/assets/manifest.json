@@ -63,7 +63,8 @@
     "packs/pack_energetic/manifest.json",
     "packs/pack_hotHeaded/manifest.json",
     "packs/pack_kind/manifest.json",
-    "packs/pack_lazy/manifest.json"
+    "packs/pack_lazy/manifest.json",
+    "packs/garden_things/manifest.json"
   ],
   "entries": {
     "material.wall": {

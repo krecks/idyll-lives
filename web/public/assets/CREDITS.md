@@ -444,6 +444,14 @@ shuts behind the caller, and the town fountain's water runs near the camera (`wa
 litter bin, the bus shelter, the notice board and the founder's statue are static. Their primitive-part entries stay
 as the fallback.
 
+The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
+`birdFeederPole.glb`, `dogHouse.glb`, `sundial.glb`, `steppingStones.glb`, `lampPost.glb`, `stringLights.glb`, the
+planter box and the lamp post each with a `.far.glb`, override pack `packs/garden_things/manifest.json`) are built in
+Blender by `tools/art/blender/families/garden_things.py` on `gamekit` (the planter box's leaves and flowers with
+`families/plants.py`) and exported as `.glb` (glTF, original, CC0). The pond's ripples spread near the camera and a
+koi comes up to be fed or watched, a blue tit lands on the feeders while a resident watches, the lamp's panes and the
+festoon bulbs glow at night and the string sways. Their primitive-part entries stay as the fallback.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

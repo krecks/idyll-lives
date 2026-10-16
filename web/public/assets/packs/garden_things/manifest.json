@@ -1,0 +1,341 @@
+{
+  "$comment": "Blender-built garden things and lights (tools/art/blender/families/garden_things.py): the garden pond, the planter box, the birdhouse, the bird feeders, the dog house, the sundial, the stepping stones, the garden lamp post and the string lights. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The pond's ripples spread near the camera (`ripple`, ambient) and a koi comes up for `feedFish` (`fish`) and now and then while watched (`surface`); a blue tit lands on the feeders for `birdwatch` (`bird`); the lamp's panes and the bulbs glow at night, and the string sways near the camera (`sway`, ambient). The planter box and the lamp post have far versions.",
+  "version": 1,
+  "entries": {
+    "model.garden.pond": {
+      "type": "model",
+      "url": "../../models/garden_things/pond.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.matte"
+        },
+        "koi": {
+          "finish": "material.finish.satin"
+        },
+        "koi_white": {
+          "finish": "material.finish.satin"
+        },
+        "lily": {
+          "finish": "material.finish.satin"
+        },
+        "lily_heart": {
+          "finish": "material.finish.satin"
+        },
+        "lily_white": {
+          "finish": "material.finish.satin"
+        },
+        "pad": {
+          "finish": "material.finish.satin"
+        },
+        "pebble": {
+          "finish": "material.finish.matte"
+        },
+        "reed": {
+          "finish": "material.finish.satin"
+        },
+        "ripple": {
+          "finish": "material.finish.gloss"
+        },
+        "rush": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "water_deep": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "idle": "ripple",
+        "uses": {
+          "feedFish": "fish",
+          "fish": {
+            "clip": "surface",
+            "delay": 1.5,
+            "every": 7
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Stones"
+        }
+      ]
+    },
+    "model.planterBox": {
+      "type": "model",
+      "url": "../../models/garden_things/planterBox.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "box_trim": {
+          "finish": "material.finish.wood"
+        },
+        "eye": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Box"
+        }
+      ],
+      "far": "../../models/garden_things/planterBox.far.glb"
+    },
+    "model.birdhouse": {
+      "type": "model",
+      "url": "../../models/garden_things/birdhouse.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.satin"
+        },
+        "post": {
+          "finish": "material.finish.wood"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "House"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.birdFeederPole": {
+      "type": "model",
+      "url": "../../models/garden_things/birdFeederPole.glb",
+      "materials": {
+        "beak": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "feeder": {
+          "finish": "material.finish.satin"
+        },
+        "feeder_glass": {
+          "finish": "material.finish.glass"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "robin": {
+          "finish": "material.finish.satin"
+        },
+        "robin_breast": {
+          "finish": "material.finish.satin"
+        },
+        "seed": {
+          "finish": "material.finish.matte"
+        },
+        "tit": {
+          "finish": "material.finish.satin"
+        },
+        "tit_breast": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "birdwatch": "bird"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pole"
+        },
+        {
+          "material": "feeder",
+          "label": "Feeders"
+        }
+      ]
+    },
+    "model.dogHouse": {
+      "type": "model",
+      "url": "../../models/garden_things/dogHouse.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "bowl_water": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.matte"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "House"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.sundial": {
+      "type": "model",
+      "url": "../../models/garden_things/sundial.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.matte"
+        },
+        "dial": {
+          "finish": "material.finish.metal"
+        },
+        "dial_mark": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Plinth"
+        },
+        {
+          "material": "dial",
+          "label": "Dial"
+        }
+      ]
+    },
+    "model.steppingStones": {
+      "type": "model",
+      "url": "../../models/garden_things/steppingStones.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Stones"
+        }
+      ]
+    },
+    "model.lampPost": {
+      "type": "model",
+      "url": "../../models/garden_things/lampPost.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "lantern": {
+          "finish": "material.finish.metal"
+        },
+        "pane": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD596"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Post"
+        },
+        {
+          "material": "lantern",
+          "label": "Lantern"
+        }
+      ],
+      "far": "../../models/garden_things/lampPost.far.glb"
+    },
+    "model.stringLights": {
+      "type": "model",
+      "url": "../../models/garden_things/stringLights.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "planter": {
+          "finish": "material.finish.matte"
+        },
+        "socket": {
+          "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "wire": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "idle": "sway"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Posts"
+        },
+        {
+          "material": "bulb",
+          "label": "Bulbs"
+        }
+      ]
+    }
+  }
+}
