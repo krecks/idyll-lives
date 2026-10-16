@@ -1,0 +1,205 @@
+{
+  "$comment": "Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, the door pot, the garden path light, the street hedge and the flower clump that render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Replaces the primitive-part placeholders of tools/art/community.py and street/manifest.json by key; listed in the base manifest's packs after them. The placeholder is kept as a fallback if a file fails to load. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
+  "version": 1,
+  "entries": {
+    "model.street.bench": {
+      "type": "model",
+      "url": "../../models/street/bench.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "far": "../../models/street/bench.far.glb"
+    },
+    "model.street.planter": {
+      "type": "model",
+      "url": "../../models/street/planter.glb",
+      "materials": {
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "trunk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "far": "../../models/street/planter.far.glb"
+    },
+    "model.street.flowerTub": {
+      "type": "model",
+      "url": "../../models/street/flowerTub.glb",
+      "materials": {
+        "blue": {
+          "finish": "material.finish.foliage"
+        },
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "pink": {
+          "finish": "material.finish.foliage"
+        },
+        "red": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "violet": {
+          "finish": "material.finish.foliage"
+        },
+        "white": {
+          "finish": "material.finish.foliage"
+        },
+        "yellow": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/street/flowerTub.far.glb"
+    },
+    "model.street.sign": {
+      "type": "model",
+      "url": "../../models/street/sign.glb",
+      "materials": {
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "pole": {
+          "finish": "material.finish.metal"
+        },
+        "sign": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "far": "../../models/street/sign.far.glb"
+    },
+    "model.street.busSign": {
+      "type": "model",
+      "url": "../../models/street/busSign.glb",
+      "materials": {
+        "flag": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "pole": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "far": "../../models/street/busSign.far.glb"
+    },
+    "model.street.pot": {
+      "type": "model",
+      "url": "../../models/street/pot.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "terracotta": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "far": "../../models/street/pot.far.glb"
+    },
+    "model.street.pathLight": {
+      "type": "model",
+      "url": "../../models/street/pathLight.glb",
+      "materials": {
+        "lamp": {
+          "finish": "material.finish.metal"
+        },
+        "lens": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD9A0"
+        }
+      },
+      "far": "../../models/street/pathLight.far.glb"
+    },
+    "model.street.hedge": {
+      "type": "model",
+      "url": "../../models/street/hedge.glb",
+      "materials": {
+        "hedge": {
+          "finish": "material.finish.foliage"
+        },
+        "hedge_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "hedge_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/street/hedge.far.glb"
+    },
+    "model.street.flowers": {
+      "type": "model",
+      "url": "../../models/street/flowers.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.foliage"
+        },
+        "bed_light": {
+          "finish": "material.finish.foliage"
+        },
+        "blue": {
+          "finish": "material.finish.foliage"
+        },
+        "pink": {
+          "finish": "material.finish.foliage"
+        },
+        "red": {
+          "finish": "material.finish.foliage"
+        },
+        "rose": {
+          "finish": "material.finish.foliage"
+        },
+        "violet": {
+          "finish": "material.finish.foliage"
+        },
+        "white": {
+          "finish": "material.finish.foliage"
+        },
+        "yellow": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/street/flowers.far.glb"
+    }
+  }
+}

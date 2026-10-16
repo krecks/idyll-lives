@@ -464,6 +464,14 @@ shuts behind the caller, and the town fountain's water runs near the camera (`wa
 litter bin, the bus shelter, the notice board and the founder's statue are static. Their primitive-part entries stay
 as the fallback.
 
+The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
+`pot.glb`, `pathLight.glb`, `hedge.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
+and bus-stop signs, the door pot, the garden path light (its lens glows at night), the street hedge and the flower
+clump. All are static; their leaves and flowers sway in the wind. Their primitive-part entries (`community.py`,
+`street/manifest.json`) stay as the fallback.
+
 The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
 `birdFeederPole.glb`, `dogHouse.glb`, `sundial.glb`, `steppingStones.glb`, `lampPost.glb`, `stringLights.glb`, the
 planter box and the lamp post each with a `.far.glb`, override pack `packs/garden_things/manifest.json`) are built in
@@ -500,7 +508,7 @@ https://github.com/met4citizen/TalkingHead).
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are primitive placeholders in `street/manifest.json`. Only the sidewalk surface is third-party:
+The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are Blender-built (`packs/street`, above), over primitive placeholders in `street/manifest.json`. Only the sidewalk surface is third-party:
 
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|
