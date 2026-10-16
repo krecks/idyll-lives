@@ -10,7 +10,7 @@
         1
       ],
       "price": 260,
-      "category": "validate",
+      "category": "bathroom",
       "group": "toilets",
       "seat": {
         "height": 0.45,
@@ -43,7 +43,7 @@
         1
       ],
       "price": 600,
-      "category": "validate",
+      "category": "bathroom",
       "group": "toilets",
       "decor": 0.2,
       "seat": {
@@ -204,9 +204,9 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "bathroom",
       "fillsWall": true,
-      "group": "bathroom storage",
+      "group": "sinks",
       "decor": 0.1,
       "description": "A slim cupboard with an open shelf for towels.",
       "interactions": [
@@ -232,7 +232,7 @@
         1
       ],
       "price": 60,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "decor": 0.3,
       "description": "A birch ladder leaning on the wall, towels over its rungs.",
@@ -247,7 +247,7 @@
         1
       ],
       "price": 25,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "layer": "rug",
       "decor": 0.2,
@@ -263,8 +263,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "bathroom storage",
+      "category": "bathroom",
+      "group": "sinks",
       "layer": "wall",
       "decor": 0.4,
       "description": "A round mirror in a brass frame, hung from a strap.",
@@ -279,7 +279,7 @@
         1
       ],
       "price": 30,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "description": "A wicker basket of clean washing waiting to be folded.",
       "interactions": []

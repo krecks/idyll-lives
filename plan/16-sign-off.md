@@ -311,6 +311,38 @@ plans at it, and is wiped as the clip plays back. The corkboard is still. Colour
 handles; each board and its frame (the whiteboard's marker tray with the frame); "In use" opens the drawer and
 fills the board. Nothing needed fixing. All back in office (no group).
 
+## The toilets
+
+The five B1 toilets (Validate › Toilets) were signed off on 2026-10-16, checked as the sinks were: each bought in all
+four facings (against the north, west and east walls, and standing free facing north), used ("Use toilet") with the
+resident's bladder first let down to 0.65 so the use lasts (at 0.8 it ends in a blink, the use stopping once the need
+is full), by day and at night, on WebGPU and WebGL2, on Medium and Low, every part coloured (Bowl, Seat & lid,
+Cistern: on the wall-hung and smart toilets the Cistern is the boxing panel). `lid_up` plays in full (0.58 s; the
+smart toilet's slower 0.79 s) as the resident sits and shuts as they get up; the resident sits on the seat, leaning
+forward (the shared "toilet" pose). The colour studio's "In use" lifts the lid. Nothing needed fixing. All back in
+bathroom / toilets.
+
+## The laundry
+
+The six B4 things (Validate › Laundry) were signed off on 2026-10-16, checked as the sinks were: the washing machine
+("Do the laundry") and tumble dryer ("Fold the laundry") against the walls in all four facings, their round door
+swinging open (`door_open`, held 2.5 s) and shutting, the drum turning (`drum_spin`) round and round for the use and
+stopping after it; the towel rail on the walls in all four facings, the towel ladder leaning on them, the laundry
+basket and bath mat standing free in all four; every part coloured by day and at night, WebGPU and WebGL2, Medium and
+Low. One fix: the towel ladder's colours were "Towels" (the middle towel), "Second towel" (the top one) and "Third
+towel" (the bottom one); they are Top towel, Middle towel and Bottom towel now, listed top to bottom (manifest labels
+only; the file is unchanged). All back in bathroom / laundry.
+
+## The bathroom storage
+
+The three B5 things (Validate › Bathroom Storage) were signed off on 2026-10-16, checked as the sinks were, on the
+walls in all four facings: the mirror cabinet's mirrored door swings open (`door_open`, held 1.5 s) for "Brush your
+teeth" and shuts, the resident standing on the tile in front; the tall cabinet's upper door opens onto its towels for
+"Take a fresh towel" and shuts; the round mirror hangs on its strap. Every part coloured, day and night, WebGPU and
+WebGL2, Medium and Low; the studio's "In use" opens both doors. One fix: the tall cabinet's door colour was called
+"Frame"; it colours the two doors, and is called Doors now (manifest label only). The mirror cabinet's "Frame" (its
+door, a white frame round the mirror) stays. All back in bathroom / sinks.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

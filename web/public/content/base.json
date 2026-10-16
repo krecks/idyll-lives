@@ -2492,7 +2492,7 @@
         }
       ],
       "price": 300,
-      "category": "validate",
+      "category": "bathroom",
       "group": "toilets"
     },
     {
@@ -3698,20 +3698,12 @@
           "label": "Coffee Tables"
         },
         {
-          "id": "toilets",
-          "label": "Toilets"
-        },
-        {
           "id": "showers",
           "label": "Showers"
         },
         {
           "id": "baths",
           "label": "Baths"
-        },
-        {
-          "id": "laundry",
-          "label": "Laundry"
         },
         {
           "id": "fitness",
@@ -3732,10 +3724,6 @@
         {
           "id": "beds",
           "label": "Beds"
-        },
-        {
-          "id": "bathroom storage",
-          "label": "Bathroom Storage"
         },
         {
           "id": "books and pots",

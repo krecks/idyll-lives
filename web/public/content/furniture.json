@@ -2236,7 +2236,7 @@
         1
       ],
       "price": 150,
-      "category": "validate",
+      "category": "bathroom",
       "group": "toilets",
       "wearPerUse": 0.01,
       "description": "A basic toilet. Cheap, but it wears out faster.",
@@ -2266,7 +2266,7 @@
         1
       ],
       "price": 1100,
-      "category": "validate",
+      "category": "bathroom",
       "group": "toilets",
       "decor": 0.2,
       "description": "A wall-hung toilet with a warm seat and a bidet: a little fresher and comfier every time.",
@@ -2480,8 +2480,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "bathroom storage",
+      "category": "bathroom",
+      "group": "sinks",
       "layer": "wall",
       "decor": 0.2,
       "description": "A mirrored cabinet for above the basin.",
@@ -2510,7 +2510,7 @@
         1
       ],
       "price": 45,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "layer": "wall",
       "decor": 0.25,
@@ -2526,7 +2526,7 @@
         1
       ],
       "price": 520,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "description": "Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
       "interactions": [
@@ -2555,7 +2555,7 @@
         1
       ],
       "price": 420,
-      "category": "validate",
+      "category": "bathroom",
       "group": "laundry",
       "description": "Warm, fresh laundry to fold.",
       "interactions": [
