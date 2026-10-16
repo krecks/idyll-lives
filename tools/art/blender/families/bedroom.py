@@ -420,9 +420,10 @@ def bedDaybed():
             F.box(f'arm_spindle{s}{i}', 0.03, 0.37, 0.03, (-0.3 + i * 0.15, 0.495, ends[s]), M.frame_white, bevel=0.004)
     # the mattress in a fitted cover (the bedding), two back cushions clear of a sleeper, a pillow
     F.box('mattress', 0.86, top - 0.33, z1 - z0, (0.02, (top + 0.33) / 2, (z0 + z1) / 2), M.bedding_sage, bevel=0.035, bevel_segments=3)
+    # (thin and close to the back, leaning on it, so a sleeper's shoulder and hip stay clear of them)
     for i, z in enumerate((-0.32, 0.3)):
-        F.box(f'cushion{i}', 0.14, 0.34, 0.56, (-0.36, top + 0.16, z), M.cushion_rose, rot=(0, -12, 0),
-              bevel=0.05, bevel_segments=3)
+        F.box(f'cushion{i}', 0.11, 0.34, 0.56, (-0.385, top + 0.16, z), M.cushion_rose, rot=(0, -8, 0),
+              bevel=0.045, bevel_segments=3)
     _pillow('pillow', 0.56, 0.13, 0.3, 0.06, top, -0.72)
     G.join_all('bedDaybed')
     _settle()
