@@ -53,7 +53,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
 
-## K4. Base counters (8) — **Done** (in Validate › Counters)
+## K4. Base counters (8) — **Done**, signed off 2026-10-16 (back in kitchen / counters)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
 - **Validate group:** `counters` (Validate › Counters)
@@ -67,7 +67,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `counterCornerOuter` Outer corner counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
 | `counterDrawers` Drawer counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. (+use) the three drawers slide out in turn. |
 | `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop | Static | Static. |
-| `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
+| `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block, Top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
 ## K5. Tall and wall storage (11) — **Done** (in Validate › Kitchen Storage)

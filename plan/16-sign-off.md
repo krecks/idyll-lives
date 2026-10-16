@@ -58,6 +58,16 @@ fixes found in the check:
 The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as
 they should. All back in kitchen / appliances.
 
+## The base counters
+
+The eight K4 counters (Validate › Counters) were signed off on 2026-10-16, checked as the sinks were: the
+counter, corner counter, butcher block and marble counter open their drawer for a sandwich (fridge, then the
+counter); the drawer counter opens its top drawer when clean dishes are put away there (a snack's plate
+cleared: bin, sink, then `putAwayAt`); the end, outer corner and open-shelf counters serve as the prep station
+of a meal. Two fixes from the check: the open-shelf counter's back is the cabinet's colour outside (it was
+the shelves' dark back, showing when the counter stands free), and the butcher block's top surface has its
+own colour (`Top`; colouring "Block top" only coloured the block's rim). All back in kitchen / counters.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
