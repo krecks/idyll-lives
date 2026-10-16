@@ -343,6 +343,50 @@ WebGL2, Medium and Low; the studio's "In use" opens both doors. One fix: the tal
 "Frame"; it colours the two doors, and is called Doors now (manifest label only). The mirror cabinet's "Frame" (its
 door, a white frame round the mirror) stays. All back in bathroom / sinks.
 
+## The baby and kids' beds
+
+The four KD1 things (Validate › Baby And Beds) were signed off on 2026-10-16, checked as the sinks were, against
+the four walls of the family house's living room: the crib's front rail slides down 25 cm (`side_down`) for
+feed, change and cuddle, and back up when the use ends, with the baby lying in the crib half in every facing;
+its mobile turns (`mobile`, a loop) while a grown-up plays with the baby and finishes its round after. The kids'
+bed and race car bed turn their duvet down (`turn_down`) for sleep and nap, a child lying in them with the
+game's quilt over them, and shut when the use ends (sleep cancelled after the picture; naps end by themselves).
+The high chair is static, looked at standing free in all four facings; it has no use, and no sit interaction,
+so nobody can eat from it yet (as the plan says: a "tray slides out" use comes with the sim). Colours land on
+their parts (crib Frame, Bedding and Mobile; beds Frame / Car body and Bedding; high chair Frame and Bedding
+on the cushions). Nothing needed fixing. Seen in passing: the carer at the crib stands or kneels in different
+spots by facing, once a tile out in front of the changing table (slot positions and the shared "tend" pose);
+the plan's line says the mobile turns "while the baby lies in it", the model turns it for "play" on purpose
+(kids.md: the uses can't tell an awake baby from a sleeping one). All back in kids / —.
+
+## The toys
+
+The ten KD2 toys (Validate › Toys) were signed off on 2026-10-16, checked as the sinks were, a child (9) playing
+with each: the toy box's and chest's lids open (`lid_open`) for play and shut after; the doll house's front
+swings open (`front_open`) for dolls; the rocking horse rocks (`rock`, a loop, the rider riding it) and finishes
+its round; the tent's flap rolls up (`flap_open`); the ball pit's balls bob (`bounce`, a loop); the train goes
+round its ring (`train`, a loop; also seen at quarter turns in the clips bench); the play mat's tower of three
+blocks grows (`blocks`); the teddy squishes (`squish`) for hug and the bean bag flattens (`squash`) under the
+sitter. Free-standing toys in all four facings in the middle of the room, the doll house, ball pit and play mat
+against all four walls. One fix: the toy box's lid was labelled "Trim" (the box has no trim; the part is the whole
+lid): it is "Lid" now (labels only, b43a0e6). Seen in passing: at the teddy the child stands beside it (the shared
+"relax" pose), not hugging it; the toy box's player stands at its front corner. All back in kids / —.
+
+## The kids' study
+
+The six KD3 things (Validate › Kids Study) were signed off on 2026-10-16, checked as the sinks were: the desk's
+pencil drawer slides out (`drawer_open`, held 2 s) for homework and drawing, the child sitting at it, against
+all four walls; the picture-book shelf's middle book tips out (`book_out`) for read, against all four walls; the
+chalkboard's house draws itself (`drawing`) and the easel's painting paints itself (`painting`), each standing
+free in all four facings; the kids' chair sat on in all four facings, and pushed up to the kids' table for
+"Draw at the little table" and "Do homework at the little table" (`needsTable`); the kids' table looked at in all
+four facings. Two fixes: the chalkboard's drawing and the easel's painting showed at rest as a hairline of their
+colours down the board (a part grown along x only, squeezed to 0.001); they now rest as a speck and get their
+height and depth back in the clip's first frames (fb19592; gate 0 failed, Khronos 0 errors 0 warnings, checked
+in the studio and the clips bench and in play). The kids' chair's seat was labelled "Top": it is "Seat" now
+(b43a0e6). Seen in passing: the drawing grows from the board's right as you face it (the family's "left" is the
+object's own). All back in kids / —.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -362,6 +406,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Decor** (`09-decor.md`, D1–D3): signed off 2026-10-16.
 - **Hobbies** (`08-hobbies.md`, H1–H3): signed off 2026-10-16.
 - **Office** (`06-office.md`, O1–O3): signed off 2026-10-17.
+- **Kids** (`04-kids.md`, KD1–KD3): signed off 2026-10-17.
 
 ## The end
 

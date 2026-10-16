@@ -741,9 +741,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "kids",
       "freeRotation": true,
-      "group": "baby and beds",
       "approach": "around",
       "seatAt": [
         "table"
