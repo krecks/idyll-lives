@@ -1109,7 +1109,7 @@ FAMILY = G.Family(
                 paint=[('chair_white', 'Frame'), ('chair_cushion', 'Bedding')]),
         # KD2
         G.Model('toyBox', toyBox, size=(0.82, 0.51, 0.802), key='model.toyBox', centre=(0.0, -0.0389),
-                motions=LID, paint=[('toybox', 'Body'), ('toybox_lid', 'Trim')]),
+                motions=LID, paint=[('toybox', 'Body'), ('toybox_lid', 'Lid')]),
         G.Model('toyChest', toyChest, size=(0.846, 0.534, 0.513), key='model.toyChest', centre=(0.0, -0.1735),
                 motions=LID, paint=[('chest', 'Body'), ('chest_trim', 'Trim')]),
         G.Model('dollHouse', dollHouse, size=(0.84, 0.908, 0.456), key='model.dollHouse', centre=(0.0, -0.202),
@@ -1135,7 +1135,7 @@ FAMILY = G.Family(
         G.Model('kidsTable', kidsTable, size=(0.64, 0.5, 0.64), key='model.kidsTable', centre=(0.0, 0.0),
                 paint=[('ktable', 'Frame'), ('ktable_top', 'Top')]),
         G.Model('kidsChair', kidsChair, size=(0.32, 0.57, 0.323), key='model.kidsChair', centre=(0.0, 0.0386),
-                paint=[('kchair', 'Frame'), ('kchair_seat', 'Top')]),
+                paint=[('kchair', 'Frame'), ('kchair_seat', 'Seat')]),
         G.Model('kidsBookshelf', kidsBookshelf, size=(0.77, 0.925, 0.4), key='model.kidsBookshelf', centre=(0.0, -0.23),
                 motions={'uses': {'read': 'book_out'}}, paint=[('kshelf', 'Frame'), ('kshelf_top', 'Top')]),
         G.Model('kidsChalkboard', kidsChalkboard, size=(0.66, 0.956, 0.528), key='model.kidsChalkboard',

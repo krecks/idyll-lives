@@ -211,7 +211,7 @@
         },
         {
           "material": "toybox_lid",
-          "label": "Trim"
+          "label": "Lid"
         }
       ]
     },
@@ -716,7 +716,7 @@
         },
         {
           "material": "kchair_seat",
-          "label": "Top"
+          "label": "Seat"
         }
       ]
     },
