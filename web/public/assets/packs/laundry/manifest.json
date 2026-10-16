@@ -181,16 +181,16 @@
           "label": "Ladder"
         },
         {
-          "material": "towel",
-          "label": "Towels"
+          "material": "towel2",
+          "label": "Top towel"
         },
         {
-          "material": "towel2",
-          "label": "Second towel"
+          "material": "towel",
+          "label": "Middle towel"
         },
         {
           "material": "towel3",
-          "label": "Third towel"
+          "label": "Bottom towel"
         }
       ]
     },

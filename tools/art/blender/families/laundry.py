@@ -235,7 +235,7 @@ FAMILY = G.Family(
      G.Model('towelRail', towelRail, size=(0.73, 0.595, 0.098), key='model.towelRail', centre=(0, -0.381), floor=False,
              paint=[('chrome', 'Rail'), ('towel', 'Towels'), ('towel2', 'Hand towel')]),
      G.Model('towelLadder', towelLadder, size=(0.52, 1.707, 0.359), key='model.towelLadder', centre=(0, -0.25),
-             paint=[('birch', 'Ladder'), ('towel', 'Towels'), ('towel2', 'Second towel'), ('towel3', 'Third towel')]),
+             paint=[('birch', 'Ladder'), ('towel2', 'Top towel'), ('towel', 'Middle towel'), ('towel3', 'Bottom towel')]),
      G.Model('laundryBasket', laundryBasket, size=(0.54, 0.39, 0.421), key='model.laundryBasket', centre=(0, -0.2),
              paint=[('wicker', 'Basket'), ('wicker_rim', 'Rim & weave')]),
      G.Model('bathMat', bathMat, size=(0.76, 0.025, 0.5), key='model.bathMat',
