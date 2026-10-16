@@ -868,7 +868,7 @@ BODY = 'Body'
 FAMILY = G.Family(
     'tabletop', M,
     [  # TT1 kitchenware
-        T('kettle', kettle, (0.228, 0.238, 0.172), [('kettle', BODY), ('dark', 'Base & lid')]),
+        T('kettle', kettle, (0.228, 0.238, 0.172), [('kettle', BODY), ('dark', 'Base, handle & lid')]),
         T('toaster', toaster, (0.28, 0.23, 0.15), [('toaster', BODY)]),
         T('blender', blender, (0.18, 0.356, 0.146), [('blender_base', BODY), ('smoothie', 'Smoothie')]),
         T('standMixer', standMixer, (0.3, 0.356, 0.17), [('mixer', BODY)]),
