@@ -34,8 +34,8 @@ M = G.Palette(
     oak_panel=('#CDB08A', 'wood'),    # the corner desk's oak panels
     birch=('#E3CFA8', 'wood'),        # the standing desk's top
     walnut=('#5A3825', 'wood'),       # the executive desk's top
-    walnut_case=('#5A3825', 'wood'),  # its pedestals and modesty panel
-    walnut2=('#6B4630', 'wood'),      # its drawer fronts and plinths
+    walnut_case=('#5A3825', 'wood'),  # its pedestals, their plinths and the modesty panel
+    walnut2=('#6B4630', 'wood'),      # its drawer fronts
     laminate=('#F1F0EC', 'satin'),    # the corner desk's white top
     drawers=('#F1F0EC', 'satin'),     # painted drawer units and drawer fronts
     frame=('#2B2C2E', 'metal'),       # black steel: desk frames, legs, chair bases and arms
@@ -509,7 +509,7 @@ def deskExecutive():
         _box('inlay', 1.3, 0.004, 0.46, (0, DT + 0.001, -0.08), M.inlay, bevel=0.002)
         for s in (-1, 1):
             x = s * 0.66
-            _box(f'plinth{s}', 0.42, 0.06, 0.68, (x, 0.03, -0.07), M.walnut2, bevel=0.006)
+            _box(f'plinth{s}', 0.42, 0.06, 0.68, (x, 0.03, -0.07), M.walnut_case, bevel=0.006)
             _box(f'pedestal{s}', 0.44, DT - 0.11, 0.72, (x, 0.06 + (DT - 0.11) / 2, -0.06), M.walnut_case,
                  bevel=0.01)
             for i, (y, h) in enumerate(((0.585, 0.18), (0.385, 0.18), (0.175, 0.2))):
