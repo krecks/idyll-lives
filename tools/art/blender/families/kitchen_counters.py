@@ -220,7 +220,9 @@ def counterOpenShelf():
         F.box('plinth', 0.996, 0.10, 0.64, (0, 0.05, -0.14), M.dark, bevel=0.004)
         F.box('worktop', 1.0, 0.05, 0.79, (0, 0.925, -0.085), M.worktop, bevel=0.008)
         # an open carcass: a back, two sides, a top and a bottom, with two shelves between
-        F.box('back', 0.996, 0.8, 0.04, (0, 0.5, -0.43), M.soil, bevel=0.004)
+        # (dark inside, the cabinet's colour outside, for one standing free)
+        F.box('back', 0.996, 0.8, 0.02, (0, 0.5, -0.42), M.soil, bevel=0.004)
+        F.box('back_skin', 0.996, 0.8, 0.02, (0, 0.5, -0.44), M.cab, bevel=0.004)
         for s in (-1, 1):
             F.box(f'side{s}', 0.03, 0.8, 0.66, (s * 0.483, 0.5, -0.11), M.cab, bevel=0.004)
         F.box('top', 0.996, 0.03, 0.7, (0, 0.885, -0.11), M.cab, bevel=0.004)
@@ -682,7 +684,7 @@ FAMILY = G.Family(
      G.Model('butcherBlock', butcherBlock, size=(0.9, 0.95, 0.813), key='model.butcherBlock',
              # sandwich slides the knife drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},
-             paint=[('leg', 'Base'), ('block', 'Block top')]),
+             paint=[('leg', 'Base'), ('block', 'Block'), ('block2', 'Top')]),
      G.Model('counterMarble', counterMarble, size=(1.0, 0.953, 0.66), key='model.counterMarble', centre=(0, -0.10),
              # sandwich slides the top drawer out
              motions={'uses': {'sandwich': 'drawer_open'}, 'hold': HOLD},

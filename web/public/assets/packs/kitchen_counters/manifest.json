@@ -283,7 +283,11 @@
         },
         {
           "material": "block",
-          "label": "Block top"
+          "label": "Block"
+        },
+        {
+          "material": "block2",
+          "label": "Top"
         }
       ]
     },
