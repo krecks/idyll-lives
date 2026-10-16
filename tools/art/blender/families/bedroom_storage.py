@@ -280,7 +280,8 @@ def cedarChest():
     G.join(still, 'cedarChest', origin=(0, 0, 0))
     # the lid, hinged along its back edge: it lifts while a resident takes out a blanket (`lid_open`)
     with G.new_parts() as parts:
-        F.box('lid', 0.94, 0.045, 0.5, (0, 0.4775, 0), M.cedar, bevel=0.008)
+        # (its underside 2 mm below the edge band's, not in its plane: seen when the lid is up)
+        F.box('lid', 0.94, 0.047, 0.5, (0, 0.4765, 0), M.cedar, bevel=0.008)
         F.box('lid_edge', 0.96, 0.012, 0.52, (0, 0.461, 0), M.cedar2, bevel=0.004)
         F.box('lid_panel', 0.8, 0.006, 0.36, (0, 0.502, 0), M.cedar2, bevel=0.002)
     lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.455, -0.25))
