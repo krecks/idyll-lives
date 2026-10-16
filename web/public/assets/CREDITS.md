@@ -472,6 +472,12 @@ Blender by `tools/art/blender/families/garden_things.py` on `gamekit` (the plant
 koi comes up to be fed or watched, a blue tit lands on the feeders while a resident watches, the lamp's panes and the
 festoon bulbs glow at night and the string sways. Their primitive-part entries stay as the fallback.
 
+The ground cover, the woods' rocks and the selection marker (`models/ground/grassTuft.glb`, `flowers.glb`,
+`rock.glb`, `marker.glb`, the first three each with a `.far.glb`, override pack `packs/ground/manifest.json`) are
+built in Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The lawn's tufts and wildflowers sway in the wind and take a tint per instance (the foliage finish). Their
+primitive-part entries stay as the fallback.
+
 The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tvStandLow.glb`, `homeCinema.glb`,
 `stereo.glb`, `boombox.glb`, `fireplaceElectric.glb`, override pack `packs/media/manifest.json`) are built in Blender
 by `tools/art/blender/families/media.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The screens glow
