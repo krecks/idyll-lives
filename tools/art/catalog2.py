@@ -984,32 +984,31 @@ def bookcase(w, h, d, wood, fin, shelves, z=None, seed=1, books=True, back=None)
     return p
 
 
-add('bookcaseTall', bookcase(0.9, 2.0, 0.34, WALNUT, 'wood', 6, seed=2))
-p = bookcase(0.6, 1.9, 0.3, '#F1F0EC', 'satin', 5, z=-0.33, seed=4, back=TEAL)
-p = [dict(q, at=[q['at'][0] - 0.12, q['at'][1], q['at'][2] - 0.02]) for q in p]
-for y in (0.06, 0.43, 0.8, 1.17, 1.54, 1.87):                                                        # open end shelves on the +X side
-    p.append(box([0.38, 0.022, 0.4], [0.3, y, -0.27], '#F1F0EC', 'satin', radius=0.006))
-p += [box([0.025, 1.9, 0.4], [0.47, 0.95, -0.27], '#F1F0EC', 'satin', radius=0.004)]
-p += plant_pot(0.3, -0.27, 0.81, CLAY, d=0.14, h=0.12) + [cyl([0.12, 0.2, 0.12], [0.3, 1.28, -0.27], '#9DC6CF', 'gloss', taper=0.6)]
+add('bookcaseTall', bookcase(0.9, 2.0, 0.34, WALNUT, 'wood', 6, z=WALL + 0.17, seed=2))          # its back on the wall face, as the model's
+p = bookcase(0.56, 1.9, 0.34, '#F1F0EC', 'satin', 5, z=WALL + 0.17, seed=4, back=TEAL)          # its back on the wall face, as the model's
+p = [dict(q, at=[q['at'][0] - 0.14, q['at'][1], q['at'][2]]) for q in p]
+for y in (0.049, 0.411, 0.773, 1.135, 1.497, 1.885):                                                # open end shelves on the +X side (the model's are quarter-round)
+    p.append(box([0.32, 0.022, 0.3], [0.3, y, WALL + 0.15], '#F1F0EC', 'satin', radius=0.006))
+p += plant_pot(0.26, -0.31, 0.784, CLAY, d=0.11, h=0.1) + [cyl([0.1, 0.2, 0.1], [0.26, 1.246, -0.31], '#9DC6CF', 'gloss', taper=0.6)]
 add('bookcaseCorner', p)
 
 # Cube shelf: 2x2 open cubes with fabric bins; things stand on top.
 CUBE = '#F1F0EC'
-p = case(0.8, 0.8, 0.4, 0, 0, -0.27, CUBE, 'satin', back='#D9D6CF')
-p += [box([0.78, 0.022, 0.38], [0, 0.4, -0.27], CUBE, 'satin', radius=0.003), box([0.022, 0.78, 0.38], [0, 0.4, -0.27], CUBE, 'satin', radius=0.003)]
-p += [box([0.32, 0.3, 0.32], [-0.19, 0.18, -0.25], '#9DAF8C', 'fabric', radius=0.03), box([0.32, 0.3, 0.32], [0.19, 0.57, -0.25], '#C98F6B', 'fabric', radius=0.03)]
-p += books_row(-0.37, -0.03, 0.411, -0.27, depth=0.26, seed=3, hmax=0.3) + [box([0.2, 0.12, 0.2], [0.18, 0.08, -0.27], CREAM, 'gloss', radius=0.03)]
+p = case(0.8, 0.8, 0.36, 0, 0, -0.25, CUBE, 'satin', back='#D9D6CF')                                    # its back on the wall face, as the model's
+p += [box([0.78, 0.022, 0.34], [0, 0.4, -0.25], CUBE, 'satin', radius=0.003), box([0.022, 0.78, 0.34], [0, 0.4, -0.25], CUBE, 'satin', radius=0.003)]
+p += [box([0.32, 0.3, 0.32], [-0.19, 0.18, -0.24], '#9DAF8C', 'fabric', radius=0.03), box([0.32, 0.3, 0.32], [0.19, 0.57, -0.24], '#C98F6B', 'fabric', radius=0.03)]
+p += books_row(-0.37, -0.03, 0.411, -0.25, depth=0.26, seed=3, hmax=0.3) + [box([0.2, 0.12, 0.2], [0.18, 0.08, -0.25], CREAM, 'gloss', radius=0.03)]
 add('cubeShelf', p, top=(-0.4, 0.4, -0.47, -0.07, 0.8))
 
 p = []
-for x in (-0.3, 0.3):
-    p.append(rod([x, 0, -0.1], [x, 1.8, -0.42], 0.04, OAK, 'wood', shape='box', t2=0.03, radius=0.006))
+for x in (-0.3, 0.3):                                                                               # leaning on the wall face, as the model's
+    p.append(rod([x, 0, -0.092], [x, 1.8, -0.412], 0.035, OAK, 'wood', shape='box', t2=0.036, radius=0.006))
 for i, y in enumerate((0.36, 0.76, 1.14, 1.5)):
-    zf = -0.1 - (y / 1.8) * 0.32
-    d = 0.36 - i * 0.06
-    p.append(box([0.62, 0.025, d], [0, y, zf - d / 2 + 0.06], OAK, 'wood', radius=0.004))
-p += plant_pot(-0.12, -0.12, 0.373, PORCELAIN, d=0.14, h=0.12, soil=False) + books_row(0.02, 0.26, 0.773, -0.22, depth=0.18, seed=5, hmax=0.2)
-p += [cyl([0.1, 0.18, 0.1], [-0.15, 1.24, -0.31], CLAY, 'gloss', taper=0.7), box([0.16, 0.2, 0.03], [0.14, 1.25, -0.33], '#F2F0EA', 'gloss', radius=0.006, rotate=[-8, 0, 0])]
+    zf = -0.11 - (y / 1.8) * 0.32 + 0.096                                                          # 6 cm proud of the rails, back to the wall
+    d = min(0.36 - i * 0.06, zf - WALL - 0.004)
+    p.append(box([0.62, 0.025, d], [0, y, zf - d / 2], OAK, 'wood', radius=0.004))
+p += plant_pot(-0.12, -0.19, 0.373, PORCELAIN, d=0.14, h=0.12, soil=False) + books_row(0.0, 0.26, 0.773, -0.26, depth=0.16, seed=5, hmax=0.2)
+p += [cyl([0.1, 0.18, 0.1], [-0.15, 1.24, -0.32], CLAY, 'gloss', taper=0.7), box([0.16, 0.2, 0.03], [0.13, 1.25, -0.37], '#F2F0EA', 'gloss', radius=0.006, rotate=[-8, 0, 0])]
 add('ladderShelf', p)
 
 # Display cabinet: a glazed walnut vitrine with ornaments on glass shelves.
@@ -1027,7 +1026,7 @@ p += [lathe([0.14, 0.24, 0.14], [-0.2, 0.31, -0.25], '#3E5470', 'gloss', VASE, s
       cyl([0.12, 0.12, 0.12], [-0.18, 0.67, -0.25], CREAM, 'gloss', taper=0.7), box([0.16, 0.2, 0.03], [0.16, 0.71, -0.3], BRASS, 'metal', radius=0.006),
       lathe([0.1, 0.2, 0.1], [0.0, 1.16, -0.25], '#C25B3E', 'gloss', VASE, segments=14), sph([0.1, 0.1, 0.1], [0.2, 1.11, -0.25], '#9DC6CF', 'gloss', segments=10),
       cyl([0.2, 0.012, 0.2], [-0.15, 1.6, -0.36], PORCELAIN, 'gloss', rotate=[78, 0, 0], segments=16)]
-add('displayCabinet', p)
+add('displayCabinet', shift(p, dz=0.05))                                    # its back on the wall face, as the model's
 
 # Electric fireplace: a slim white surround with a glowing firebox.
 p = [box([1.6, 0.98, 0.32], [0, 0.49, -0.31], '#F4F3EF', 'satin', radius=0.012),

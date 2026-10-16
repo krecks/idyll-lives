@@ -1268,6 +1268,594 @@
           "label": "Baskets"
         }
       ]
+    },
+    "model.bookshelf": {
+      "type": "model",
+      "url": "../../models/living/bookshelf.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_back": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out",
+          "homework": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "shelf_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseLow": {
+      "type": "model",
+      "url": "../../models/living/bookcaseLow.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "navy_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_back": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseWide": {
+      "type": "model",
+      "url": "../../models/living/bookcaseWide.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_back": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out",
+          "homework": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.shelvingIndustrial": {
+      "type": "model",
+      "url": "../../models/living/shelvingIndustrial.glb",
+      "materials": {
+        "bin_hole": {
+          "finish": "material.finish.matte"
+        },
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "box_sand": {
+          "finish": "material.finish.matte"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak_shelf": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "black_metal",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_shelf",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.bookcaseTall": {
+      "type": "model",
+      "url": "../../models/living/bookcaseTall.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "red_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_back": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut_warm",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseCorner": {
+      "type": "model",
+      "url": "../../models/living/bookcaseCorner.glb",
+      "materials": {
+        "blue_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_teal": {
+          "finish": "material.finish.matte"
+        },
+        "shelf_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "shelf_white",
+          "label": "Frame"
+        },
+        {
+          "material": "shelf_teal",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.cubeShelf": {
+      "type": "model",
+      "url": "../../models/living/cubeShelf.glb",
+      "materials": {
+        "bin_clay": {
+          "finish": "material.finish.fabric"
+        },
+        "bin_hole": {
+          "finish": "material.finish.matte"
+        },
+        "bin_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "cube_back": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_white": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "shelf_white",
+          "label": "Frame"
+        },
+        {
+          "material": "cube_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.ladderShelf": {
+      "type": "model",
+      "url": "../../models/living/ladderShelf.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.fabric"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_shelf": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_shelf",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.displayCabinet": {
+      "type": "model",
+      "url": "../../models/living/displayCabinet.glb",
+      "materials": {
+        "blue_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cream_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "navy_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "red_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "shelf_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "vitrine": {
+          "finish": "material.finish.wood"
+        },
+        "vitrine_back": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "vitrine",
+          "label": "Frame"
+        },
+        {
+          "material": "vitrine_back",
+          "label": "Back"
+        }
+      ]
     }
   }
 }

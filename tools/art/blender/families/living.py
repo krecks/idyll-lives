@@ -24,11 +24,15 @@
 # Run:  python3 -B tools/art/blender/build.py living [--only sofaBed] [--preview]
 import math
 import os
+import random
 import sys
+
+import bpy
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
+from gamekit import shapes  # noqa: E402
 
 M = G.Palette(
     body=('#E9E4DA', 'satin'),       # the cabinet and the bed's underside; the main part the player colours
@@ -115,6 +119,33 @@ M = G.Palette(
     vase=('#E8E6E1', 'gloss'),
     pot_white=('#F2F2F0', 'gloss'),
     plant=('#5E8F4E', 'satin'),
+    # L5, the shelves: frames and backs (the colour parts), and what stands on them. The books are plain
+    # satin, so a wall of books costs no draw call of its own; the plants on them are plain too.
+    shelf_back=('#8E6A48', 'wood'),      # the bookshelf's back and kick
+    oak_back=('#B99A72', 'wood'),        # the low and library bookcases' backs
+    walnut_back=('#5A3F2C', 'wood'),     # the tall bookcase's
+    oak_shelf=('#CDB08A', 'wood'),       # the ladder shelf's boards and the industrial shelving's
+    shelf_white=('#F1F0EC', 'satin'),    # the corner bookcase and the cube shelf
+    shelf_teal=('#4E7A7F', 'matte'),     # the corner bookcase's back
+    cube_back=('#D9D6CF', 'matte'),
+    bin_sage=('#9DAF8C', 'fabric'),      # the cube shelf's fabric bins
+    bin_clay=('#C98F6B', 'fabric'),
+    bin_hole=('#3A3530', 'matte'),
+    vitrine=('#7A5234', 'wood'),         # the display cabinet
+    vitrine_back=('#E8E2D6', 'wood'),
+    shelf_glass=('#CFDCDF', 'gloss'),    # its shelves: plain, so its door is the only glass
+    book_e=('#2B2B2E', 'satin'),
+    book_f=('#D8D2C4', 'satin'),
+    book_g=('#4A3B5A', 'satin'),
+    pages=('#EFE8D8', 'satin'),
+    gilt=('#D8B86A', 'satin'),           # the bands on the spines
+    clay=('#C98F6B', 'matte'),
+    navy_gloss=('#3E5470', 'gloss'),
+    red_gloss=('#C25B3E', 'gloss'),
+    blue_gloss=('#9DC6CF', 'gloss'),
+    porcelain=('#F5F3EE', 'gloss'),
+    photo=('#F2F0EA', 'matte'),
+    leaf_light=('#7FA35A', 'satin'),
 )
 
 F = G.GameFrame()
@@ -850,6 +881,392 @@ def console_table():
     G.settle()  # on its Model's `centre`, its back on the wall face
 
 
+# L5, the shelves (notes: living.md). Each stands with its back on the wall's face (depth -0.43) and its tops
+# at the content `surface` heights (the low bookcase 0.9, the cube shelf 0.8, the industrial shelving 1.83),
+# built in place and settled there (`centre=` on its Model). The books are many small parts, joined into the
+# still body; on the bookcases one of them is a part of its own that tips out 25° from its shelf while a
+# resident reads, studies or does homework there (`book_out`), and back at the end.
+WALL = -0.43
+BOOKS = ('book_a', 'book_b', 'book_c', 'book_d', 'book_e', 'book_f', 'book_g')   # by name: made anew after each reset
+BOOK_TIP = 25
+
+
+def _book(x, y, front, t, h, d, cover, band):
+    """One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block just showing on
+    top, and a gilt band across some spines."""
+    F.box('book', t, h, d, (x, y + h / 2, front - d / 2), cover)
+    F.box('pages', t - 0.006, 0.004, d - 0.012, (x, y + h, front - d / 2 - 0.004), M.pages)
+    if band:
+        F.box('band', t - 0.004, 0.014, 0.002, (x, y + h * 0.82, front + 0.0008), M.gilt)
+
+
+def _book_row(x0, x1, y, front, depth, hmax, seed, fill=1.0, stack=False, out=None):
+    """A row of books on a shelf at height `y`, from x0 towards x1 (game), spines at `front`; the same books
+    for the same `seed`. Now and then a gap, and (`stack`) two or three lying flat at the end. `out`: the
+    index of a book built apart, returned as (its parts, its hinge: the foot of its spine) for `book_out`."""
+    rnd = random.Random(seed)
+    end = x0 + (x1 - x0) * fill - (0.24 if stack else 0.0)
+    x, k, got = x0, 0, None
+    while True:
+        t, h, d = rnd.uniform(0.022, 0.044), hmax * rnd.uniform(0.74, 1.0), depth * rnd.uniform(0.86, 1.0)
+        cover, band, gap = getattr(M, rnd.choice(BOOKS)), rnd.random() < 0.35, rnd.random() < 0.07
+        if x + t > end:
+            break
+        if gap and k != out and k:
+            x += rnd.uniform(0.03, 0.06)
+            continue
+        if k == out:
+            cover = M.book_a   # a red one, to be seen
+            with G.new_parts() as parts:
+                _book(x + t / 2, y, front, t, h, d, cover, band)
+            got = (parts, (x + t / 2, y, front))
+        else:
+            _book(x + t / 2, y, front, t, h, d, cover, band)
+        x += t + 0.0015
+        k += 1
+    if stack:
+        top, cx = y, max(x, x0) + 0.13
+        for _ in range(rnd.randint(2, 3)):
+            w, t, d = rnd.uniform(0.16, 0.21), rnd.uniform(0.024, 0.04), depth * rnd.uniform(0.8, 0.95)
+            F.box('lying', w, t, d, (cx + rnd.uniform(-0.01, 0.01), top + t / 2, front - d / 2), getattr(M, rnd.choice(BOOKS)),
+                  rot=(0, 0, rnd.uniform(-5, 5)))
+            top += t
+    return got
+
+
+def _vase(x, y, z, r, h, mat, segments=16):
+    """A vase standing on `y`: a belly, a neck and a lip."""
+    G.revolve('vase', [(0, 0), (r * 0.6, 0), (r, h * 0.38), (r * 0.5, h * 0.82), (r * 0.62, h), (0, h)],
+              at=F.at(x, y, z), material=mat, segments=segments)
+
+
+def _plant(x, y, z, r, h, pot, leaves=0.1):
+    """A pot of `r` and `h` on `y` with a round leafy plant in it (plain satin leaves)."""
+    F.cone('pot', r * 0.78, r, h, (x, y + h / 2, z), pot, verts=16)
+    for i, (dx, dy, dz, s) in enumerate(((0, 0.55, 0, 1), (0.55, 0.3, 0.2, 0.7), (-0.5, 0.35, -0.15, 0.75),
+                                         (0.1, 0.25, -0.5, 0.6), (-0.15, 0.3, 0.5, 0.62))):
+        F.sphere('leaves', leaves * s, (x + dx * leaves, y + h + dy * leaves, z + dz * leaves),
+                 M.plant if i % 2 == 0 else M.leaf_light, segments=10, rings=6)
+
+
+def _frame_photo(x, y, z, mat, w=0.16, h=0.2, lean=-8):
+    """A picture frame standing on `y`, leaning back against what is behind it."""
+    F.box('photo_frame', w, h, 0.02, (x, y + h / 2, z), mat, rot=(lean, 0, 0), bevel=0.004)
+    F.box('photo', w - 0.04, h - 0.04, 0.004, (x, y + h / 2 + 0.002, z + 0.011), M.photo, rot=(lean, 0, 0))
+
+
+def _mesh(name, verts, faces, material):
+    """A flat-shaded mesh from game points and faces, its normals made to face out."""
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata([F.at(*v) for v in verts], [], faces)
+    mesh.validate()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    shapes._recalc_normals(obj)
+    return obj
+
+
+def _prism(name, outline, a0, a1, material, axis='y'):
+    """The game outline `outline` [(p, q)] extruded: with `axis` 'y', (x, depth) points from height a0 to a1;
+    with 'x', (depth, height) points from x = a0 to a1 (a ladder's rail)."""
+    k = len(outline)
+    if axis == 'y':
+        verts = [(p, a0, q) for p, q in outline] + [(p, a1, q) for p, q in outline]
+    else:
+        verts = [(a0, q, p) for p, q in outline] + [(a1, q, p) for p, q in outline]
+    faces = [tuple(range(k)), tuple(range(2 * k - 1, k - 1, -1))] + [(i, (i + 1) % k, k + (i + 1) % k, k + i) for i in range(k)]
+    return _mesh(name, verts, faces, material)
+
+
+def _quarter(name, cx, cz, r, y0, y1, material, segments=10):
+    """A quarter-round board from y0 to y1: its corner on (cx, cz), round from +x (along the wall) to the
+    front."""
+    pts = [(cx, cz)] + [(cx + r * math.cos(math.pi / 2 * i / segments), cz + r * math.sin(math.pi / 2 * i / segments))
+                        for i in range(segments + 1)]
+    return _prism(name, pts, y0, y1, material)
+
+
+def _bookcase(w, h, d, frame, back, n, x=0.0, t=0.022, top_t=0.03, plinth=0.06):
+    """An open bookcase w × h × d at x, its back on the wall's face: two sides, a top, a bottom board on a
+    recessed kick, a back panel between the sides and n - 1 shelves, n even spaces (catalog2.py `bookcase`).
+    Returns the tops books stand on (the bottom's first), the front's depth and the space between shelves."""
+    zf, zm = WALL + d, WALL + d / 2
+    for s in (-1, 1):
+        F.box('side', t, h, d, (x + s * (w / 2 - t / 2), h / 2, zm), frame, bevel=0.003)
+    F.box('top', w, top_t, d, (x, h - top_t / 2, zm), frame, bevel=0.004)
+    F.box('kick', w - 2 * t, plinth - t, d - 0.02, (x, (plinth - t) / 2, zm - 0.01), frame)
+    F.box('bottom', w - 2 * t, t, d, (x, plinth - t / 2, zm), frame, bevel=0.002)
+    F.box('back', w - 2 * t, h - top_t - plinth, 0.01, (x, plinth + (h - top_t - plinth) / 2, WALL + 0.005), back)
+    gap = (h - plinth - top_t) / n
+    tops = [plinth]
+    for i in range(1, n):
+        y = plinth + gap * i
+        F.box('shelf', w - 2 * t, 0.022, d - 0.012, (x, y, zm + 0.004), frame, bevel=0.002)
+        tops.append(y + 0.011)
+    return tops, zf, gap
+
+
+def _tips_out(name, out):
+    """The still body joined, the book `out` (parts, hinge) a part of its own, settled in place; `book_out`
+    tips it forward about the foot of its spine."""
+    parts, hinge = out
+    G.join([o for o in G.meshes() if o not in parts], name, origin=(0, 0, 0))
+    book = G.hinged(G.join(parts, 'book'), F.at(*hinge))
+    G.settle(centre=False)
+    G.swing(book, 'book_out', BOOK_TIP, seconds=0.6, axis='X')
+
+
+def bookshelf():
+    """The bookshelf (base manifest): oak sides and top, a dark back and kick, four shelves of books and a
+    little plant on the top shelf."""
+    d = 0.375
+    zf, zm = WALL + d, WALL + d / 2
+    for s in (-1, 1):
+        F.box('side', 0.035, 1.9, d, (s * 0.4325, 0.95, zm), M.oak, bevel=0.006)
+    F.box('top', 0.9, 0.035, d, (0, 1.9, zm), M.oak, bevel=0.006)
+    F.box('back', 0.83, 1.8, 0.012, (0, 0.98, WALL + 0.006), M.shelf_back)
+    F.box('kick', 0.83, 0.075, 0.02, (0, 0.0375, zf - 0.03), M.shelf_back)
+    F.box('bottom', 0.83, 0.025, d - 0.012, (0, 0.0875, zm + 0.006), M.oak, bevel=0.003)
+    for y in (0.52, 0.94, 1.36, 1.76):
+        F.box('shelf', 0.83, 0.025, d - 0.012, (0, y - 0.0125, zm + 0.006), M.oak, bevel=0.003)
+    front = zf - 0.03
+    _book_row(-0.405, 0.405, 0.1, front, 0.22, 0.32, seed=1)
+    _book_row(-0.405, 0.405, 0.52, front, 0.22, 0.3, seed=2, fill=0.95, stack=True)
+    out = _book_row(-0.405, 0.405, 0.94, front, 0.22, 0.32, seed=3, out=9)
+    _book_row(-0.405, 0.2, 1.36, front, 0.22, 0.3, seed=4)
+    _book_row(-0.405, -0.1, 1.76, front, 0.2, 0.1, seed=5, stack=True, fill=0.9)
+    _plant(0.24, 1.76, zm, 0.045, 0.06, M.clay, leaves=0.05)
+    _tips_out('bookshelf', out)
+
+
+def bookcase_low():
+    """The low bookcase (catalog.py): oak, 0.92 wide, its top at 0.9 (content `surface`); two shelves of
+    books, a plant on top."""
+    tops, zf, _ = _bookcase(0.92, 0.9, 0.38, M.oak, M.oak_back, 2)
+    front = zf - 0.025
+    _book_row(-0.43, 0.43, tops[0], front, 0.26, 0.29, seed=11, stack=True)
+    out = _book_row(-0.43, 0.43, tops[1], front, 0.26, 0.28, seed=12, fill=0.78, out=4)
+    _vase(0.33, tops[1], WALL + 0.2, 0.05, 0.16, M.navy_gloss)
+    _plant(0.3, 0.9, -0.24, 0.06, 0.11, M.pot_white)
+    _tips_out('bookcaseLow', out)
+
+
+def bookcase_wide():
+    """The library bookcase (catalog.py): oak, 1.86 wide and 2 high, cupboards under open shelves of books,
+    plants and a vase; brass knobs."""
+    w, h, d = 1.86, 2.0, 0.42
+    zf, zm = WALL + d, WALL + d / 2
+    t = 0.022
+    for s in (-1, 1):
+        F.box('side', t, h, d, (s * (w / 2 - t / 2), h / 2, zm), M.oak, bevel=0.003)
+    F.box('top', w, 0.03, d, (0, h - 0.015, zm), M.oak, bevel=0.004)
+    F.box('kick', w - 2 * t, 0.04, d - 0.03, (0, 0.02, zm - 0.015), M.oak)
+    F.box('bottom', w - 2 * t, t, d, (0, 0.04 + t / 2, zm), M.oak, bevel=0.002)
+    F.box('back', w - 2 * t, h - 0.09, 0.01, (0, 0.06 + (h - 0.09) / 2, WALL + 0.005), M.oak_back)
+    F.box('divider', t, h - 0.09, d - 0.01, (0, 0.06 + (h - 0.09) / 2, zm + 0.005), M.oak)
+    F.box('counter', w, 0.03, d + 0.025, (0, 0.8, zm + 0.0125), M.oak, bevel=0.004)
+    for x in (-0.69, -0.23, 0.23, 0.69):
+        F.box('door', 0.445, 0.72, 0.02, (x, 0.425, zf + 0.01), M.oak, bevel=0.006)
+        F.box('door_panel', 0.36, 0.6, 0.006, (x, 0.425, zf + 0.022), M.oak, bevel=0.002)
+        kx = x + (0.18 if x in (-0.69, 0.23) else -0.18)
+        F.sphere('knob', 0.014, (kx, 0.66, zf + 0.036), M.brass, segments=10, rings=6)
+        F.cyl('knob_stem', 0.005, 0.012, (kx, 0.66, zf + 0.026), M.brass, rot=(90, 0, 0), verts=6)
+    for x0 in (-0.919, 0.011):
+        for y in (1.2, 1.6):
+            F.box('shelf', 0.908, 0.022, d - 0.012, (x0 + 0.454, y, zm + 0.004), M.oak, bevel=0.002)
+    front = zf - 0.03
+    _book_row(-0.9, -0.05, 0.815, front, 0.26, 0.3, seed=21)
+    _book_row(0.03, 0.6, 0.815, front, 0.26, 0.3, seed=22, stack=True)
+    _book_row(-0.9, -0.3, 1.211, front, 0.26, 0.3, seed=23)
+    out = _book_row(0.03, 0.9, 1.211, front, 0.26, 0.3, seed=24, out=5)
+    _book_row(-0.9, -0.05, 1.611, front, 0.26, 0.3, seed=25, fill=0.9)
+    _vase(-0.16, 1.211, zm, 0.06, 0.22, M.vase)
+    _plant(0.76, 0.815, zm, 0.06, 0.11, M.pot_white)
+    _plant(0.45, 1.611, zm, 0.07, 0.12, M.clay, leaves=0.12)
+    _frame_photo(0.75, 1.611, WALL + 0.06, M.walnut_warm)
+    _tips_out('bookcaseWide', out)
+
+
+def shelving_industrial():
+    """The industrial shelving (catalog.py): five oak boards on black steel posts and angles, its top at
+    1.83 (content `surface`); a cross brace behind, books, boxes and a plant."""
+    zb, zf = WALL, 0.10
+    zm, d = (zb + zf) / 2, zf - zb
+    for x in (-0.9125, 0.0, 0.9125):
+        for z in (zb + 0.0175, zf - 0.0175):
+            F.box('post', 0.035, 1.8, 0.035, (x, 0.9, z), M.black_metal, bevel=0.004)
+            F.cyl('foot', 0.0175, 0.012, (x, 0.006, z), M.black_metal, verts=10)
+    for y in (0.12, 0.56, 1.0, 1.44, 1.815):
+        F.box('board', 1.86, 0.03, d, (0, y, zm), M.oak_shelf, bevel=0.004)
+        for z in (zb + 0.0125, zf - 0.0125):
+            F.box('angle', 1.86, 0.03, 0.025, (0, y - 0.03, z), M.black_metal, bevel=0.003)
+        for x in (-0.9125, 0.9125):
+            F.box('end_angle', 0.035, 0.03, d - 0.05, (x, y - 0.03, zm), M.black_metal, bevel=0.003)
+    for a, b in (((-0.89, 0.15), (-0.02, 1.4)), ((-0.02, 0.15), (-0.89, 1.4))):
+        G.rod('brace', F.at(a[0], a[1], zb + 0.012), F.at(b[0], b[1], zb + 0.012), 0.0075, material=M.black_metal, verts=6)
+    front = zf - 0.07
+    _book_row(-0.86, -0.06, 0.575, front, 0.24, 0.3, seed=31)
+    _book_row(0.08, 0.6, 1.015, front, 0.24, 0.3, seed=32, stack=True)
+    _book_row(-0.5, 0.0, 1.455, front, 0.24, 0.3, seed=33)
+    for x, w, h, mat in ((-0.62, 0.38, 0.26, M.box_sand), (-0.21, 0.38, 0.26, M.photo), (0.5, 0.36, 0.24, M.box_sand)):
+        F.box('storage_box', w, h, 0.4, (x, 0.135 + h / 2, zm), mat, bevel=0.012)
+        F.box('box_handle', 0.1, 0.03, 0.004, (x, 0.135 + h * 0.75, zm + 0.2), M.bin_hole, bevel=0.001)
+    _plant(0.75, 1.015, zm, 0.07, 0.13, M.clay, leaves=0.12)
+    _vase(-0.6, 1.015, zm, 0.07, 0.14, M.vase)
+    _frame_photo(0.4, 1.455, zm - 0.1, M.black_metal, h=0.26, w=0.2)
+    G.join_all('shelvingIndustrial')
+    G.settle(centre=False)
+
+
+def bookcase_tall():
+    """The tall bookcase (catalog2.py): walnut, 0.9 wide and 2 high, six spaces of books and ornaments, a dark
+    back."""
+    tops, zf, gap = _bookcase(0.9, 2.0, 0.34, M.walnut_warm, M.walnut_back, 6)
+    front, zm = zf - 0.02, WALL + 0.17
+    out = None
+    for i, y in enumerate(tops):
+        if i in (0, 3):
+            _vase(-0.22, y, zm, 0.06, 0.2, M.vase if i == 0 else M.red_gloss)
+            F.box('storage_box', 0.2, 0.1, 0.16, (0.18, y + 0.05, zm), M.clay, bevel=0.008)
+            if i == 3:
+                _frame_photo(0.18, y + 0.1, zm - 0.02, M.brass, w=0.13, h=0.16)
+        else:
+            got = _book_row(-0.42, 0.42, y, front, 0.24, 0.26, seed=40 + i, fill=0.9 if i % 2 else 1.0, stack=i == 2,
+                         out=5 if i == 4 else None)
+            out = got or out
+    _tips_out('bookcaseTall', out)
+
+
+def bookcase_corner():
+    """The corner bookcase (catalog2.py): a white bookcase with a teal back and, round its right end,
+    quarter-round open shelves to the wall, with a plant and a vase on them."""
+    x0, x1, r = -0.42, 0.14, 0.34      # the bookcase's sides; the end shelves' radius
+    tops, zf, gap = _bookcase(x1 - x0, 1.9, r, M.shelf_white, M.shelf_teal, 5, x=(x0 + x1) / 2)
+    _quarter('end_kick', x1, WALL, r - 0.02, 0.0, 0.038, M.shelf_white)
+    for y in tops:
+        _quarter('end_shelf', x1, WALL, r, y - 0.022, y, M.shelf_white)
+    _quarter('end_top', x1, WALL, r, 1.87, 1.9, M.shelf_white)
+    F.box('end_back', r - 0.01, 1.87 - 0.06, 0.01, (x1 + (r - 0.01) / 2, 0.06 + (1.87 - 0.06) / 2, WALL + 0.005), M.shelf_teal)
+    front = zf - 0.02
+    out = None
+    for i, y in enumerate(tops):
+        got = _book_row(x0 + 0.03, x1 - 0.03, y, front, 0.22, 0.27, seed=50 + i, fill=0.95 if i != 1 else 0.7,
+                     out=3 if i == 3 else None)
+        out = got or out
+    _plant(x1 + 0.12, tops[2], WALL + 0.12, 0.055, 0.1, M.clay)
+    _vase(x1 + 0.12, tops[3], WALL + 0.12, 0.05, 0.2, M.blue_gloss)
+    _book_row(x1 + 0.03, x1 + 0.2, tops[1], WALL + 0.24, 0.16, 0.1, seed=59, fill=0.0, stack=True)
+    _tips_out('bookcaseCorner', out)
+
+
+def cube_shelf():
+    """The cube shelf (catalog2.py): four open white cubes, a pale back, two fabric bins, books and a box; its
+    top at 0.8 (content `surface`)."""
+    w, h, d, t = 0.8, 0.8, 0.36, 0.022
+    zf, zm = WALL + d, WALL + d / 2
+    for s in (-1, 1):
+        F.box('side', t, h, d, (s * (w / 2 - t / 2), h / 2, zm), M.shelf_white, bevel=0.003)
+    for y in (t / 2, h - t / 2):
+        F.box('board', w - 2 * t, t, d, (0, y, zm), M.shelf_white, bevel=0.003)
+    F.box('middle', w - 2 * t, t, d - 0.01, (0, h / 2, zm + 0.005), M.shelf_white, bevel=0.002)
+    F.box('upright', t, h - 2 * t, d - 0.01, (0, h / 2, zm + 0.005), M.shelf_white, bevel=0.002)
+    F.box('back', w - 2 * t, h - 2 * t, 0.01, (0, h / 2, WALL + 0.005), M.cube_back)
+    for x, y, mat in ((-0.19, t, M.bin_sage), (0.19, h / 2 + t / 2, M.bin_clay)):
+        F.box('bin', 0.33, 0.31, 0.31, (x, y + 0.155, zm + 0.01), mat, bevel=0.02, bevel_segments=2)
+        F.box('bin_hole', 0.1, 0.03, 0.006, (x, y + 0.25, zm + 0.166), M.bin_hole, bevel=0.002)
+    _book_row(-0.37, -0.03, h / 2 + t / 2, zf - 0.03, 0.26, 0.3, seed=61)
+    F.box('lidded_box', 0.22, 0.12, 0.24, (0.19, t + 0.06, zm), M.vase, bevel=0.012)
+    _book_row(0.1, 0.22, t + 0.12, zf - 0.07, 0.17, 0.1, seed=62, fill=0.0, stack=True)
+    G.join_all('cubeShelf')
+    G.settle(centre=False)
+
+
+LADDER_H = 1.8
+
+
+def _ladder_back(y):
+    """The depth of the ladder's back at height y: 32 cm out from the wall at the floor, on it at the top."""
+    return WALL + 0.32 * (1 - y / LADDER_H)
+
+
+def ladder_shelf():
+    """The ladder shelf (catalog2.py): two oak rails leaning on the wall, four boards through them narrowing
+    upwards, a plant and a basket, books, vases and a picture."""
+    t = 0.036   # the rails, front to back
+    outline = [(_ladder_back(0), 0.0), (_ladder_back(0) + t, 0.0), (_ladder_back(LADDER_H) + t, LADDER_H),
+               (_ladder_back(LADDER_H), LADDER_H)]
+    for x in (-0.3, 0.3):
+        _prism('rail', outline, x - 0.0175, x + 0.0175, M.oak, axis='x')
+    tops = []
+    for i, y in enumerate((0.36, 0.76, 1.14, 1.5)):
+        # through the rails, 6 cm proud of their fronts, back to the wall (or 36 cm less 6 a board)
+        zf = _ladder_back(y) + t + 0.06
+        d = min(0.36 - i * 0.06, zf - WALL - 0.004)
+        F.box('board', 0.62, 0.025, d, (0, y, zf - d / 2), M.oak_shelf, bevel=0.004)
+        tops.append((y + 0.0125, zf - d, zf))
+    y, zb, zf = tops[0]
+    _plant(-0.12, y, (zb + zf) / 2, 0.065, 0.12, M.porcelain, leaves=0.11)
+    F.box('basket', 0.18, 0.12, 0.2, (0.14, y + 0.06, (zb + zf) / 2), M.basket, bevel=0.015)
+    y, zb, zf = tops[1]
+    _book_row(0.0, 0.26, y, zf - 0.03, 0.18, 0.22, seed=71)
+    _vase(-0.16, y, (zb + zf) / 2, 0.05, 0.16, M.porcelain)
+    y, zb, zf = tops[2]
+    _vase(-0.15, y, (zb + zf) / 2, 0.05, 0.18, M.clay)
+    _frame_photo(0.13, y, zb + 0.05, M.walnut_warm)
+    y, zb, zf = tops[3]
+    _book_row(-0.22, -0.02, y, zf - 0.02, 0.11, 0.1, seed=72, fill=0.0, stack=True)
+    _plant(0.14, y, (zb + zf) / 2, 0.04, 0.06, M.clay, leaves=0.05)
+    G.join_all('ladderShelf')
+    G.settle(centre=False)
+
+
+# The display cabinet's glazed door, hinged on its left (game -x): a part of its own, still for now, for a
+# (+use) swing about DOOR_HINGE (the plan's L5).
+DOOR_HINGE = (-0.4, -0.022)    # (game x, depth)
+
+
+def display_cabinet():
+    """The display cabinet (catalog2.py): a walnut vitrine on a plinth and feet under a cornice, a pale back,
+    three glass shelves of ornaments behind a brass-framed glass door (its own part, still)."""
+    zm = WALL + 0.22
+    with G.new_parts() as body:
+        F.box('base', 0.84, 0.12, 0.44, (0, 0.12, zm), M.vitrine, bevel=0.01)
+        F.box('cornice', 0.84, 0.045, 0.44, (0, 1.8725, zm), M.vitrine, bevel=0.008)
+        F.box('cap', 0.86, 0.015, 0.45, (0, 1.9025, zm + 0.005), M.vitrine, bevel=0.005)
+        for x in (-0.37, 0.37):
+            for z in (WALL + 0.03, -0.02):
+                F.cone('foot', 0.016, 0.024, 0.06, (x, 0.03, z), M.vitrine, verts=12)
+        for s in (-1, 1):
+            F.box('side', 0.024, 1.67, 0.4, (s * 0.388, 1.015, WALL + 0.2), M.vitrine, bevel=0.003)
+        F.box('back', 0.752, 1.67, 0.012, (0, 1.015, WALL + 0.006), M.vitrine_back)
+        for y in (0.6, 1.05, 1.5):
+            F.box('shelf', 0.752, 0.01, 0.36, (0, y, WALL + 0.192), M.shelf_glass)
+        z = WALL + 0.2
+        _vase(-0.2, 0.18, z, 0.07, 0.24, M.navy_gloss)
+        F.sphere('globe', 0.07, (0.18, 0.25, z), M.brass, segments=16, rings=10)
+        F.cone('cup', 0.035, 0.05, 0.1, (-0.18, 0.655, z), M.cream_gloss, verts=16)
+        _frame_photo(0.16, 0.605, z - 0.06, M.brass)
+        _vase(0.0, 1.055, z, 0.05, 0.2, M.red_gloss)
+        F.sphere('bowl', 0.05, (0.2, 1.105, z), M.blue_gloss, segments=14, rings=8)
+        F.cyl('plate', 0.1, 0.012, (-0.12, 1.615, WALL + 0.05), M.porcelain, rot=(78, 0, 0), verts=24)
+        F.box('plate_stand', 0.06, 0.02, 0.05, (-0.12, 1.515, WALL + 0.06), M.brass)
+        F.cyl('candlestick', 0.012, 0.16, (0.18, 1.585, z), M.brass, verts=10)
+        F.cyl('candle_foot', 0.035, 0.012, (0.18, 1.511, z), M.brass, verts=14)
+    G.join(body, 'cabinet', origin=(0, 0, 0))
+    hx, hz = DOOR_HINGE
+    with G.new_parts() as parts:
+        for s in (-1, 1):
+            F.box('stile', 0.022, 1.67, 0.016, (s * 0.389, 1.015, hz), M.brass, bevel=0.003)
+        for y in (0.191, 1.839):
+            F.box('rail', 0.756, 0.022, 0.016, (0, y, hz), M.brass, bevel=0.003)
+        F.box('pane', 0.758, 1.628, 0.005, (0, 1.015, hz), M.glass)
+        F.sphere('knob', 0.013, (0.36, 1.0, hz + 0.022), M.brass, segments=12, rings=8)
+        F.cyl('knob_stem', 0.005, 0.016, (0.36, 1.0, hz + 0.012), M.brass, rot=(90, 0, 0), verts=8)
+    G.hinged(G.join(parts, 'door'), F.at(hx, 1.015, hz))
+    G.settle(centre=False)
+
+
 # The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
 _D, _MID = CAB_FRONT - BACK, (BACK + CAB_FRONT) / 2
 PLACEHOLDER = [
@@ -955,7 +1372,28 @@ FAMILY = G.Family(
      G.Model('sideTableRound', side_table_round, key='model.sideTableRound', size=(0.52, 0.56, 0.52),
              paint=[('stone_top', 'Top'), ('brass', 'Base')]),
      G.Model('consoleTable', console_table, key='model.consoleTable', size=(1.8, 0.7975, 0.56), centre=(0, -0.15),
-             paint=[('oak', 'Top'), ('black_metal', 'Legs'), ('basket', 'Baskets')])],
+             paint=[('oak', 'Top'), ('black_metal', 'Legs'), ('basket', 'Baskets')]),
+     # L5: the shelves; on the bookcases one book tips out while read at
+     G.Model('bookshelf', bookshelf, key='model.bookshelf', size=(0.9, 1.9175, 0.375), centre=(0, -0.2425),
+             motions={'uses': {'read': 'book_out', 'study': 'book_out', 'homework': 'book_out'}},
+             paint=[('oak', 'Frame'), ('shelf_back', 'Back')]),
+     G.Model('bookcaseLow', bookcase_low, key='model.bookcaseLow', size=(0.92, 1.165, 0.38), centre=(0, -0.24),
+             motions={'uses': {'read': 'book_out'}}, paint=[('oak', 'Frame'), ('oak_back', 'Back')]),
+     G.Model('bookcaseWide', bookcase_wide, key='model.bookcaseWide', size=(1.86, 2.0, 0.47), centre=(0, -0.195),
+             motions={'uses': {'read': 'book_out', 'study': 'book_out', 'homework': 'book_out'}},
+             paint=[('oak', 'Frame'), ('oak_back', 'Back')]),
+     G.Model('shelvingIndustrial', shelving_industrial, key='model.shelvingIndustrial', size=(1.86, 1.83, 0.53),
+             centre=(0, -0.165), paint=[('black_metal', 'Frame'), ('oak_shelf', 'Shelves')]),
+     G.Model('bookcaseTall', bookcase_tall, key='model.bookcaseTall', size=(0.9, 2.0, 0.34), centre=(0, -0.26),
+             motions={'uses': {'read': 'book_out', 'study': 'book_out'}}, paint=[('walnut_warm', 'Frame'), ('walnut_back', 'Back')]),
+     G.Model('bookcaseCorner', bookcase_corner, key='model.bookcaseCorner', size=(0.9, 1.9, 0.34), centre=(0.03, -0.26),
+             motions={'uses': {'read': 'book_out'}}, paint=[('shelf_white', 'Frame'), ('shelf_teal', 'Back')]),
+     G.Model('cubeShelf', cube_shelf, key='model.cubeShelf', size=(0.8, 0.8, 0.36), centre=(0, -0.25),
+             paint=[('shelf_white', 'Frame'), ('cube_back', 'Back')]),
+     G.Model('ladderShelf', ladder_shelf, key='model.ladderShelf', size=(0.635, 1.8, 0.356), centre=(0, -0.252),
+             paint=[('oak', 'Frame'), ('oak_shelf', 'Shelves')]),
+     G.Model('displayCabinet', display_cabinet, key='model.displayCabinet', size=(0.86, 1.91, 0.45), centre=(0, -0.205),
+             paint=[('vitrine', 'Frame'), ('vitrine_back', 'Back')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
             'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
             'game\'s finishes so a model costs one draw call per finish group.',

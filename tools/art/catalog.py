@@ -921,12 +921,12 @@ addp('boombox', p)
 
 for sfx, (wood, fin, back, knob) in {'': (OAK, 'wood', None, OAKD), '@modern': ('#F1F0EC', 'satin', '#3A3D41', BLACKMETAL),
                                      '@cozy': (WALNUT, 'wood', '#6B4630', HONEY), '@minimal': (BIRCH, 'wood', None, '#C9B48E')}.items():
-    p = C2.bookcase(0.92, 0.9, 0.42, wood, fin, 2, seed=3 if sfx != '@minimal' else 4, back=back)
+    p = C2.bookcase(0.92, 0.9, 0.38, wood, fin, 2, z=WALL + 0.19, seed=3 if sfx != '@minimal' else 4, back=back)   # its back on the wall face, as the model's
     p += [cyl([0.12, 0.12, 0.12], [0.3, 0.96, -0.24], '#E8E6E1', 'gloss', taper=0.8),
           sph([0.2, 0.18, 0.2], [0.3, 1.08, -0.24], FOLIAGE, 'foliage', segments=8)]
     addp('bookcaseLow' + sfx, p)
     # Wide bookcase: cupboards under open shelves of books, a plant on top.
-    d, z = 0.42, -0.25
+    d, z = 0.42, WALL + 0.21                                                               # its back on the wall face, as the model's
     p = case(1.86, 2.0, d, 0, 0, z, wood, fin, back=back)
     p += [box([0.022, 1.95, d - 0.01], [0, 1.0, z], wood, fin, radius=0.003),
           box([1.82, 0.03, d], [0, 0.8, z], wood, fin, radius=0.004)]
@@ -948,15 +948,15 @@ for sfx, (wood, fin, back, knob) in {'': (OAK, 'wood', None, OAKD), '@modern': (
     addp('bookcaseWide' + sfx, p, (2, 1))
 
 # Industrial shelving: oak boards on a black steel frame (the top at 1.83), books, boxes and a plant.
-z = -0.18
+z = WALL + 0.265                                                                                   # its back on the wall face, as the model's
 p = []
 for x in (-0.91, 0.0, 0.91):
-    p += [box([0.035, 1.82, 0.035], [x, 0.91, z + s * 0.26], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
+    p += [box([0.035, 1.82, 0.035], [x, 0.91, z + s * 0.2475], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
 for y in (0.12, 0.56, 1.0, 1.44, 1.815):
-    p += [box([1.86, 0.03, 0.56], [0, y, z], OAK, 'wood', radius=0.006),
-          box([1.86, 0.03, 0.025], [0, y - 0.03, z + 0.27], BLACKMETAL, 'metal', radius=0.006)]
-p += [rod([-0.9, 0.15, z - 0.27], [0.0, 1.4, z - 0.27], 0.015, BLACKMETAL, 'metal', segments=6),            # cross braces
-      rod([0.0, 0.15, z - 0.27], [-0.9, 1.4, z - 0.27], 0.015, BLACKMETAL, 'metal', segments=6)]
+    p += [box([1.86, 0.03, 0.53], [0, y, z], OAK, 'wood', radius=0.006),
+          box([1.86, 0.03, 0.025], [0, y - 0.03, z + 0.2525], BLACKMETAL, 'metal', radius=0.006)]
+p += [rod([-0.9, 0.15, z - 0.2525], [0.0, 1.4, z - 0.2525], 0.015, BLACKMETAL, 'metal', segments=6),        # cross braces
+      rod([0.0, 0.15, z - 0.2525], [-0.9, 1.4, z - 0.2525], 0.015, BLACKMETAL, 'metal', segments=6)]
 p += books_row(-0.86, -0.06, 0.575, z, depth=0.24, seed=7, hmax=0.3) + books_row(0.08, 0.6, 1.015, z, depth=0.24, seed=2, hmax=0.3)
 p += books_row(-0.5, 0.0, 1.455, z, depth=0.24, seed=9, hmax=0.3)
 p += [box([0.38, 0.26, 0.4], [-0.6, 0.265, z], '#C9B79C', 'matte', radius=0.02), box([0.38, 0.26, 0.4], [-0.2, 0.265, z], '#8E979E', 'matte', radius=0.02),
