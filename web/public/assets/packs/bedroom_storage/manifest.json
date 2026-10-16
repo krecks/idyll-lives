@@ -383,8 +383,12 @@
       },
       "paint": [
         {
-          "material": "birch",
+          "material": "white",
           "label": "Body"
+        },
+        {
+          "material": "birch",
+          "label": "Doors"
         },
         {
           "material": "brass",

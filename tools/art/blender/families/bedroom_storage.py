@@ -548,7 +548,8 @@ FAMILY = G.Family(
              motions=DRAWER_USE, paint=[('oak', 'Body'), ('brass', 'Handles')]),
      G.Model('wardrobe', wardrobe, size=(1.84, 2.41, 0.626), key=_key('wardrobe'), centre=(0, -0.117),
              motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
-             paint=[('birch', 'Body'), ('brass', 'Handles')]),
+             # (the white carcass is its body; the birch doors are their own part)
+             paint=[('white', 'Body'), ('birch', 'Doors'), ('brass', 'Handles')]),
      G.Model('chestOfDrawers', chestOfDrawers, size=(0.88, 1.16, 0.655), key=_key('chestOfDrawers'),
              centre=(0, -0.1025), motions=DRAWER_USE, paint=[('linen', 'Body'), ('brass', 'Handles')]),
      G.Model('dresserLow', dresserLow, size=(1.82, 0.8, 0.635), key=_key('dresserLow'), centre=(0, -0.1125),
