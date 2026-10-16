@@ -1056,7 +1056,7 @@ FAMILY = G.Family(
              centre=(0, -0.407), floor=False, paint=[('frame_brass', 'Frame'), ('leather', 'Strap')]),
      G.Model('bathCabinetTall', bathCabinetTall, size=(0.42, 1.82, 0.38), key='model.bathCabinetTall',
              centre=(0, -0.24), motions={'uses': {'takeTowel': 'door_open'}, 'hold': 1.5},
-             paint=[('cab', 'Cabinet'), ('cab_door', 'Frame'), ('towel_blue', 'Towels')])],
+             paint=[('cab', 'Cabinet'), ('cab_door', 'Doors'), ('towel_blue', 'Towels')])],
     comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
             'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
             'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
