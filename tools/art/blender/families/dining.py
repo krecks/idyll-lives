@@ -857,7 +857,9 @@ def chinaCabinet():
             F.sphere(f'knob{s}', 0.016, (s * 0.035, 0.6, z_base + 0.272), M.brass, segments=10, rings=6)
         # the hutch: sides, top, back, shelves of plates
         hy0, hy1 = 0.9, 2.04
-        F.box('hutch_back', 0.88, hy1 - hy0, 0.02, (0, (hy0 + hy1) / 2, WALL + 0.01), M.back_blue)
+        # the back: blue behind the plates, the body's colour outside (seen when it stands free)
+        F.box('hutch_back', 0.88, hy1 - hy0, 0.01, (0, (hy0 + hy1) / 2, WALL + 0.015), M.back_blue)
+        F.box('hutch_back_out', 0.88, hy1 - hy0, 0.01, (0, (hy0 + hy1) / 2, WALL + 0.005), M.body_china)
         for s in (-1, 1):
             F.box(f'hutch_side{s}', 0.03, hy1 - hy0, 0.36, (s * 0.445, (hy0 + hy1) / 2, z_hutch), M.body_china,
                   bevel=0.006)
