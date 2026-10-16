@@ -845,7 +845,7 @@
         1
       ],
       "price": 320,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
@@ -897,7 +897,7 @@
         1
       ],
       "price": 240,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
@@ -931,7 +931,7 @@
         1
       ],
       "price": 90,
-      "category": "living",
+      "category": "validate",
       "group": "shelves",
       "decor": 0.2,
       "surface": {
@@ -958,7 +958,7 @@
         1
       ],
       "price": 110,
-      "category": "living",
+      "category": "validate",
       "group": "shelves",
       "decor": 0.4,
       "description": "Shelves on a leaning ladder, for plants and books.",
@@ -973,7 +973,7 @@
         1
       ],
       "price": 480,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.9,

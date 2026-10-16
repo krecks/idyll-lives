@@ -2640,7 +2640,7 @@
         }
       ],
       "price": 250,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves"
     },
@@ -3993,6 +3993,10 @@
           "id": "garden things",
           "label": "Garden Things",
           "outside": true
+        },
+        {
+          "id": "shelves",
+          "label": "Shelves"
         }
       ]
     },

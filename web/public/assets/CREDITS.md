@@ -107,6 +107,11 @@ The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.g
 `consoleTable.glb`, same pack) are built the same way (glTF, original, CC0). The coffee table's drawer slides out
 with a magazine in it; the rest are still. Their primitive-part entries stay as the fallback.
 
+The shelves (`models/living/bookshelf.glb`, `bookcaseLow.glb`, `bookcaseWide.glb`, `shelvingIndustrial.glb`,
+`bookcaseTall.glb`, `bookcaseCorner.glb`, `cubeShelf.glb`, `ladderShelf.glb`, `displayCabinet.glb`, same pack) are
+built the same way (glTF, original, CC0). On the bookcases one book tips out while a resident reads there; the
+rest are still. Their primitive-part entries stay as the fallback.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a

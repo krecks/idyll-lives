@@ -1704,7 +1704,7 @@
         1
       ],
       "price": 140,
-      "category": "living",
+      "category": "validate",
       "group": "shelves",
       "decor": 0.2,
       "description": "Two shelves of paperbacks: a good read, but not for serious study.",
@@ -1749,7 +1749,7 @@
         1
       ],
       "price": 650,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.5,
@@ -1817,7 +1817,7 @@
         1
       ],
       "price": 260,
-      "category": "living",
+      "category": "validate",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.6,

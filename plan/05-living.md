@@ -81,23 +81,23 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of the bench for watch, and sinks back at the end. |
 | `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: the flame panel grows for relax (gloss, not emissive; the light is the content's). |
 
-## L5. Shelves (9)
+## L5. Shelves (9) — **Done** (in Validate › Shelves)
 
-- **Family:** `tools/art/blender/families/living.py`
+- **Family:** `tools/art/blender/families/living.py` (notes: `families/living.md`)
 - **Validate group:** `shelves` (Validate › Shelves)
 - **Placeholders to match:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: one book tips out 25° from its shelf for read, study and homework, and back at the end. |
-| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. |
-| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. |
-| `shelvingIndustrial` Industrial shelving | 2x1 · floor | — | living / shelves | Frame, Shelves | Static | Static. |
-| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. |
-| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. |
-| `cubeShelf` Cube shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. |
-| `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. |
-| `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; glass door. (+use) the door swings. |
+| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: one book tips out 25° from its shelf for read, study and homework, and back at the end. Done: a red book on the third shelf; its back on the wall face (the base placeholder moved 6 cm forward). |
+| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Done: top 0.9 (content `surface`); a back panel added. |
+| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Done: brass knobs on the cupboard doors. |
+| `shelvingIndustrial` Industrial shelving | 2x1 · floor | — | living / shelves | Frame, Shelves | Static | Static. Done: top 1.83 (content `surface`); boards 53 cm deep, back on the wall face. |
+| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. Done: a dark walnut back added. |
+| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Done: quarter-round open end shelves to the wall. |
+| `cubeShelf` Cube shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Done: top 0.8 (content `surface`); 36 cm deep, back on the wall face. |
+| `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Done: colour parts Frame and Shelves (no back); its top on the wall face. |
+| `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; glass door. (+use) the door swings. Done: the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. |
 
 ## L6. Stairs (1)
 

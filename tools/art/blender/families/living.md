@@ -107,6 +107,48 @@ for the side, nesting and console tables). Still, but for two:
 `check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
 facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
 
+## The shelves (L5)
+
+Built where their placeholders stand (`bookshelf` in the base manifest, `catalog.py`, `catalog2.py`), each with its
+back on the wall's face (depth -0.43); the placeholders moved 3–6 cm forward with them (they reached into the wall),
+the corner bookcase's and the ladder shelf's redrawn as the models are. Tops at the content `surface` heights: the
+low bookcase 0.90 m, the cube shelf 0.80 m, the industrial shelving 1.83 m (the content rectangles are unchanged; the
+models' tops now start at the wall's face, 1–4 cm in front of the rectangles' backs).
+
+- **Books** are rows of plain satin boxes (`_book_row`, seeded, so they rebuild the same): a cover, the page block
+  showing 2 mm above it, a gilt band on a third of the spines, the odd gap and a few lying flat at the end of some
+  rows. Joined into the still body, they cost no draw call of their own.
+- **`book_out`** (the five bookcases): one red book at reading height is a part of its own, hinged on the foot of
+  its spine, and tips out 25° in 0.6 s for read, study and homework (as each offers them), back at the end of the
+  use. 1 draw.
+- **Corner bookcase**: a white bookcase with a teal back and quarter-round open shelves round its right end, to the
+  wall (the placeholder had square ones); the placeholder draws them as boxes.
+- **Ladder shelf**: two rails leaning on the wall (on its face at the top, 32 cm out at the floor), four boards
+  through them, 6 cm proud of their fronts and back to the wall, narrowing upwards. Colour parts Frame and Shelves
+  (it has no back).
+- **Display cabinet**: walnut, solid sides, a pale back, glass-look shelves (plain `gloss`, so the door is its only
+  glass), ornaments; a brass-framed glass door with a brass knob, a node of its own (`door`, its origin on the hinge
+  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `G.swing(door, 'door_open', …)` and a use.
+  Still, it counts 3 draws; with a clip the door's brass and glass draw on their own (4).
+- Plants on the shelves are plain satin spheres, not `foliage`, so they cost no draw; the cube shelf's bins are
+  `fabric` (its second draw), the ladder shelf's basket too.
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts | Clip |
+|---|---|---|---|---|---|
+| `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 3,512 | 3 | Frame, Back | `book_out` (read, study, homework) |
+| `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,172 | 3 | Frame, Back | `book_out` (read) |
+| `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 6,056 | 3 | Frame, Back | `book_out` (read, study, homework) |
+| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 6,196 | 2 | Frame, Shelves | — |
+| `model.bookcaseTall` | 0.90 × 2.00 × 0.34 m | 3,860 | 3 | Frame, Back | `book_out` (read, study) |
+| `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 3,416 | 2 | Frame, Back | `book_out` (read) |
+| `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 1,476 | 2 | Frame, Back | — |
+| `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 2,340 | 3 | Frame, Shelves | — |
+| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own) |
+
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
+placeholders, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
+all nine bought in the house across the four facings, coloured, on WebGPU by day and WebGL with the night light.
+
 ## Rebuild
 
 ```
