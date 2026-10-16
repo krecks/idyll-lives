@@ -10,7 +10,7 @@
         1
       ],
       "price": 35,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -27,7 +27,7 @@
         1
       ],
       "price": 40,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -44,7 +44,7 @@
         1
       ],
       "price": 55,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -61,7 +61,7 @@
         1
       ],
       "price": 80,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.3,
@@ -78,7 +78,7 @@
         1
       ],
       "price": 80,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.3,
@@ -95,7 +95,7 @@
         1
       ],
       "price": 30,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -112,7 +112,7 @@
         1
       ],
       "price": 20,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -129,7 +129,7 @@
         1
       ],
       "price": 15,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -146,7 +146,7 @@
         1
       ],
       "price": 30,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
@@ -163,7 +163,7 @@
         1
       ],
       "price": 25,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.3,
@@ -180,7 +180,7 @@
         1
       ],
       "price": 20,
-      "category": "validate",
+      "category": "tabletop",
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.3,
@@ -197,7 +197,7 @@
         1
       ],
       "price": 30,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.4,
@@ -214,7 +214,7 @@
         1
       ],
       "price": 25,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.3,
@@ -231,7 +231,7 @@
         1
       ],
       "price": 35,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.4,
@@ -248,7 +248,7 @@
         1
       ],
       "price": 45,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.4,
@@ -265,7 +265,7 @@
         1
       ],
       "price": 15,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.2,
@@ -282,7 +282,7 @@
         1
       ],
       "price": 40,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.3,
@@ -299,7 +299,7 @@
         1
       ],
       "price": 35,
-      "category": "validate",
+      "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.5,
@@ -435,8 +435,8 @@
         1
       ],
       "price": 20,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.4,
       "radius": 0.1,
@@ -452,8 +452,8 @@
         1
       ],
       "price": 25,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.09,
@@ -469,8 +469,8 @@
         1
       ],
       "price": 60,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.5,
       "radius": 0.15,
@@ -486,8 +486,8 @@
         1
       ],
       "price": 15,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.3,
       "radius": 0.09,
@@ -503,8 +503,8 @@
         1
       ],
       "price": 30,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.4,
       "radius": 0.09,
@@ -520,8 +520,8 @@
         1
       ],
       "price": 70,
-      "category": "validate",
-      "group": "small ornaments",
+      "category": "tabletop",
+      "group": "ornaments",
       "layer": "surface",
       "decor": 0.5,
       "radius": 0.1,
@@ -537,8 +537,8 @@
         1
       ],
       "price": 20,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "bath",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.14,
@@ -554,8 +554,8 @@
         1
       ],
       "price": 25,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "bath",
       "layer": "surface",
       "decor": 0.3,
       "radius": 0.16,
@@ -571,8 +571,8 @@
         1
       ],
       "price": 45,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "bath",
       "layer": "surface",
       "decor": 0.4,
       "radius": 0.16,
@@ -588,8 +588,8 @@
         1
       ],
       "price": 20,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "desk",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.17,
@@ -605,8 +605,8 @@
         1
       ],
       "price": 60,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "desk",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.19,
@@ -622,8 +622,8 @@
         1
       ],
       "price": 80,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "desk",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.3,
@@ -639,8 +639,8 @@
         1
       ],
       "price": 15,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "toys",
       "layer": "surface",
       "decor": 0.3,
       "radius": 0.16,
@@ -656,8 +656,8 @@
         1
       ],
       "price": 12,
-      "category": "validate",
-      "group": "desk and bath bits",
+      "category": "tabletop",
+      "group": "toys",
       "layer": "surface",
       "decor": 0.2,
       "radius": 0.16,

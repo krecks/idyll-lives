@@ -234,6 +234,45 @@ experiment; the pot rises and the wheel head spins for throw; the scrapbook open
 shuts when the resident moves on. Nothing needed fixing. Seen in passing: the sewing table's "Table" colours its
 top and chair but not its legs and apron (their own, darker wood). All back in hobbies / crafts.
 
+## The kitchenware
+
+The eleven TT1 things (Validate › Kitchenware) were signed off on 2026-10-16. They have no uses, so each was bought
+on a square table (`tableSquare2`, its top at 0.75 m) standing free in the living room and looked at close up, from
+its front three-quarter and level from its side: in all four facings by day; with every paint slot a distinct colour
+by day (facings 0 and 2) and at night (21:30, lamps lit); at night on Low with WebGL2. Each sits on the top (lift
+0.75; every model's lowest point is at its origin), turns with its facing, and lights right at night. The colour
+studio opened for each with its labels as the manifest has them. The stand mixer and cookie jar, red by default,
+were also coloured purple to see the colour land. Two fixes:
+- **The bread bin's wooden ends** showed a flickering V where the round end and its foot were one plane, and the
+  round end's flat face shaded like a dome (a smooth-shaded cylinder). The foot is 2 mm thinner and the round end
+  flat-shaded: flat D-shaped ends now.
+- **The kettle's** second colour, "Base & lid", also colours the handle: now "Base, handle & lid".
+Seen in passing: the knife block's tilted block rests on one edge of its foot, a small gap at the other (stylised,
+left). All back in tabletop / kitchenware.
+
+## The tableware
+
+The seven TT2 things (Validate › Tableware) were signed off on 2026-10-16, checked as the kitchenware: on the
+table in all four facings, every part coloured by day and at night, Low and WebGL2 at night, and the colour studio.
+The place setting's Body, Rim and Napkin and the cake's Body and Icing land where named; the tea set's Body
+colours the cups as well as the pot (a set). Nothing needed fixing. All back in tabletop / tableware.
+
+## The small ornaments
+
+The six TT4 things (Validate › Small Ornaments) were signed off on 2026-10-16, checked as the kitchenware. The
+alarm clock's hands tell the game's time: ten o'clock at 10:01, 9:35 at night, and following it when time runs
+(12:34, 15:04, run at top speed and paused). One fix: its second colour, "Bells", also colours its legs and feet:
+now "Bells & legs" (and coloured purple and orange to tell it from its red default). All back in tabletop /
+ornaments.
+
+## The desk and bath bits
+
+The eight TT5 things (Validate › Desk And Bath Bits) were signed off on 2026-10-16, checked as the kitchenware. The
+toy blocks' Block 1–3 are the red, blue and yellow blocks (seen with a second palette, as the first matched their
+defaults); the green blocks, pink block and roof keep their colours. The monitor's Body colours its bezel,
+keyboard and mouse, not the stand. Nothing needed fixing. Back in tabletop / bath (soap set, towels, perfume tray),
+tabletop / desk (organiser, laptop, monitor) and tabletop / toys (teddy, blocks).
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
