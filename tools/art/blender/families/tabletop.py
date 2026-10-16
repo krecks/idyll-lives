@@ -898,7 +898,7 @@ FAMILY = G.Family(
         T('potSmall', potSmall, (0.16, 0.261, 0.154), [('pot_white', BODY)]),
         # TT4 small ornaments
         T('photoFrame', photoFrame, (0.18, 0.231, 0.114), [('frame', BODY)]),
-        T('tableClock', tableClock, (0.153, 0.228, 0.063), [('clock', BODY), ('brass', 'Bells')],
+        T('tableClock', tableClock, (0.153, 0.228, 0.063), [('clock', BODY), ('brass', 'Bells & legs')],
           motions={'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 10 * 60 + 10}}),
         T('globe', globe, (0.212, 0.31, 0.24), [('globe', BODY), ('wood_dark', 'Stand')]),
         T('snowGlobe', snowGlobe, (0.128, 0.176, 0.128), [('wood_dark', BODY)]),
