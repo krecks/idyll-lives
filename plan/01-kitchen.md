@@ -70,7 +70,7 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block, Top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
-## K5. Tall and wall storage (11) — **Done** (in Validate › Kitchen Storage)
+## K5. Tall and wall storage (11) — **Done**, signed off 2026-10-16 (back in kitchen / counters)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
 - **Validate group:** `kitchen storage` (Validate › Kitchen Storage)

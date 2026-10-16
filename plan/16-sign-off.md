@@ -68,6 +68,16 @@ of a meal. Two fixes from the check: the open-shelf counter's back is the cabine
 the shelves' dark back, showing when the counter stands free), and the butcher block's top surface has its
 own colour (`Top`; colouring "Block top" only coloured the block's rim). All back in kitchen / counters.
 
+## The tall and wall storage
+
+The eleven K5 things (Validate › Kitchen Storage) were signed off on 2026-10-16, checked as the sinks were:
+the pantry's and tall larder's doors for a snack; the three wall cabinets' doors when clean dishes are put
+away in them (a snack's plate cleared, the cupboard over the counter first); the pedal bin's lid when a plate
+is scraped (checked with the house's sinks sold, so the scraps go in the bin); the recycling bins' three lids
+one after another for "Sort the recycling". The hood, spice rack, pot rail and wall shelves are still, looked
+at on all four walls. One fix: the recycling bins' "Left bin" and "Right bin" coloured the bins the other way
+round as seen from the front; swapped. All back in kitchen / counters.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
