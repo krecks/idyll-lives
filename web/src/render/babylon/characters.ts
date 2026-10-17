@@ -396,6 +396,34 @@ const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean
 const CRADLE = { forward: 0.08, lift: -0.03, tilt: 0.22, roll: -0.55 };
 
 /**
+ * Hugs and kisses (`Anim.Hug`, `Anim.Kiss`): the two step in from where sim-core stands them (about 0.55 m
+ * apart, middle to middle) until their fronts meet. `chest`: how far the chest stands out in front of the
+ * body's middle, as a share of its height (grown-ups' bodies: 0.13 m of 1.77 m; times its build); `kiss`: the
+ * gap a kiss keeps between the chests (m; the faces meet, the bodies lean in); `most`: the furthest one steps
+ * (m). `shoulder`: the shoulders' height, as a share of the body's; `lower`: how much (rad) a hugger lowers the
+ * arms for each metre the other's shoulders are below theirs (a grown-up's round a child), down to `low`, and
+ * `bend`: how far (rad) they bend down over them per metre. `wrap`: the elbows' bend round the other's back
+ * (rad; `wrapSmall` more per metre lower, round a child's), with the hands behind it, not out past it;
+ * `aside`: how far (rad) each leans the head to their own right, past the other's.
+ */
+const EMBRACE = { chest: 0.074, kiss: 0.03, most: 0.45, shoulder: 0.79, lower: 1.4, low: 0.35, bend: 0.9, wrap: 1.45, wrapSmall: 1.2, aside: 0.1 };
+/** How far in front of its middle a body's chest stands out (m, `EMBRACE`). */
+function chestDepth(rig: SimRig): number {
+  return EMBRACE.chest * rig.body.height * rig.scale * rig.build;
+}
+/** How far (m) each of two stepping in to hug or kiss steps (`EMBRACE`), from the distance between them: until their chests meet (`gap` m apart). */
+function embraceStep(rig: SimRig, partner: SimRig | null, gap: number): number {
+  if (!partner) return 0;
+  const d = Math.hypot(partner.x - rig.x, partner.z - rig.z);
+  return clamp((d - chestDepth(rig) - chestDepth(partner) - gap) / 2, 0, EMBRACE.most);
+}
+/** How far (m) the other's shoulders are below a hugger's (0 when level or higher, `EMBRACE`). */
+function shoulderDrop(rig: SimRig, partner: SimRig | null): number {
+  if (!partner) return 0;
+  return Math.max(0, (rig.body.height * rig.scale - partner.body.height * partner.scale) * EMBRACE.shoulder);
+}
+
+/**
  * Pedalling (`Characters.pedal`): a turn's length (s) when the object's loop isn't playing (the bike's
  * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).
  */
@@ -2602,14 +2630,14 @@ export class Characters {
           break;
         }
         case Anim.Hug:
-          // Arms around each other: `procedural`.
+          // Arms around each other (`procedural`), stepped in until the chests meet.
           key = 'idle';
-          reach = 0.33;
+          reach = embraceStep(rig, partner, 0);
           reachRate = 6;
           break;
         case Anim.Kiss:
           key = 'idle';
-          reach = 0.22;
+          reach = embraceStep(rig, partner, EMBRACE.kiss);
           reachRate = 6;
           break;
         case Anim.Wave:
@@ -3006,10 +3034,14 @@ export class Characters {
         addRotation(add, B.Head, 1, 0, 0, 0.1);
         break;
       case Anim.Hug: {
-        addRotation(add, B.spine_02, 1, 0, 0, 0.1);
-        addRotation(add, B.Head, 0, 1, 0, role === 1 ? 0.5 : -0.5);
+        // Bent down over a smaller one (a child), the arms lowered to go round them (`EMBRACE`).
+        const drop = shoulderDrop(rig, partner);
+        addRotation(add, B.spine_02, 1, 0, 0, 0.1 + drop * EMBRACE.bend);
+        // Both heads turned and leant to their own right, so they go past each other (cheek by cheek), not into each other.
+        addRotation(add, B.spine_03, 0, 0, 1, -EMBRACE.aside);
+        addRotation(add, B.Head, 0, 1, 0, 0.5);
         // Arms around the other: one Sim over the shoulders, the other a little lower, around the back.
-        this.hugArms(role === 1 ? 1.3 : 1.05, time + role / 1.5);
+        this.hugArms(Math.max(EMBRACE.low, (role === 1 ? 1.3 : 1.05) - drop * EMBRACE.lower), time + role / 1.5, EMBRACE.wrap + drop * EMBRACE.wrapSmall);
         break;
       }
       case Anim.Argue:
@@ -3065,11 +3097,12 @@ export class Characters {
   }
 
   /**
-   * Arms round someone or something hugged: raised forward `raise` (rad), elbows wrapping in; a slow squeeze.
+   * Arms round someone or something hugged: raised forward `raise` (rad), elbows wrapping in by `wrap` (rad;
+   * the teddy's neck, the default, is held looser than a body is, `EMBRACE`); a slow squeeze.
    * (Model space: +z forward, the left arm on -x; x rotations raise / bend both sides alike. Spread first,
    * then raise: the other order would only roll the raised arm.)
    */
-  private hugArms(raise: number, time: number): void {
+  private hugArms(raise: number, time: number, wrap = 0.95): void {
     const B = this.set!.bone;
     const add = this.add;
     const squeeze = Math.sin(time * 1.5) * 0.05;
@@ -3077,8 +3110,8 @@ export class Characters {
     addRotation(add, B.upperarm_r, 0, 0, 1, 0.35);
     addRotation(add, B.upperarm_l, 1, 0, 0, -raise);
     addRotation(add, B.upperarm_r, 1, 0, 0, -raise);
-    addRotation(add, B.lowerarm_l, 0, 1, 0, 0.95 + squeeze);
-    addRotation(add, B.lowerarm_r, 0, 1, 0, -0.95 - squeeze);
+    addRotation(add, B.lowerarm_l, 0, 1, 0, wrap + squeeze);
+    addRotation(add, B.lowerarm_r, 0, 1, 0, -wrap - squeeze);
   }
 
   /**
