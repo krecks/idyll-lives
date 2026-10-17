@@ -3,7 +3,7 @@
 The garden decor (gnome, bird bath, fountain, lantern, wheelbarrow, boulders) is done (`families/garden_decor.py`); the eleven OU1 patio models and the five OU2 loungers and swings are done in `families/outdoor.py` (notes: `outdoor.md`).
 Outdoor things are seen from far: watch the budget, and street-scale props wait for LOD (E7).
 
-## OU1. Patio seating and tables (11) — **Done** (in Validate › Patio)
+## OU1. Patio seating and tables (11) — **Done**, signed off 2026-10-17 (back in outdoor / seating)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `patio` (Validate › Patio)
@@ -23,7 +23,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Frame, Slats | Static | Static. |
 | `parasol` Parasol | 1x1 · floor | — | outdoor / seating | Canopy, Pole | Static | Static, open. A it stirs in the wind (E2); (+use) it folds. |
 
-## OU2. Loungers, swings and the hot tub (5) — **Done** (in Validate › Loungers)
+## OU2. Loungers, swings and the hot tub (5) — **Done**, signed off 2026-10-17 (back in outdoor / seating; the swing set in outdoor / play)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `loungers` (Validate › Loungers)
@@ -37,7 +37,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Fabric | Loop (E1) | `swing`: the seat swings while played (E1). Until then U: the seat tips back 15° and holds. |
 | `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath | outdoor / seating | Cedar, Cover | Use | `cover_off`: the cover slides off and folds back for soak. L the water bubbles (E1). |
 
-## OU3. Grills and fire (3) — **Done** (in Validate › Grills)
+## OU3. Grills and fire (3) — **Done**, signed off 2026-10-17 (back in outdoor / cooking)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
 - **Validate group:** `grills` (Validate › Grills)
@@ -45,11 +45,11 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | **Done** (in Validate › Grills): `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
-| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | **Done** (in Validate › Grills): `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
-| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | **Done** (in Validate › Grills): `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); content `seat` added so the resident sits on the front capstones, not in the fire. |
+| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | **Done**: `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
+| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | **Done**: `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
+| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | **Done**: `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); content `seat` added so the resident sits on the front capstones, not in the fire. |
 
-## OU4. Play and yard (9) — **Done** (in Validate › Yard)
+## OU4. Play and yard (9) — **Done**, signed off 2026-10-17 (back in outdoor / play and outdoor / yard)
 
 - **Family:** `tools/art/blender/families/yard.py` (notes: `yard.md`; a family of its own rather than `outdoor.py`, so OU3–OU5 didn't all edit one script and pack)
 - **Validate group:** `yard` (Validate › Yard)
@@ -67,7 +67,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `clothesline` Washing line | 3x1 · floor | washing:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). |
 | `firewoodStack` Log store | 1x1 · floor | — | outdoor / yard | Shelter | Static | Static: the iron rack under a pent iron roof, logs ends out. Far version. |
 
-## OU5. Pond, small garden things and lights (9) — **Done** (in Validate › Garden Things)
+## OU5. Pond, small garden things and lights (9) — **Done**, signed off 2026-10-17 (back in outdoor / decor and outdoor / lights)
 
 - **Family:** `tools/art/blender/families/garden_things.py` (notes: `garden_things.md`; its own family so OU3 and OU4 could build `outdoor.py` alongside)
 - **Validate group:** `garden things` (Validate › Garden Things)
