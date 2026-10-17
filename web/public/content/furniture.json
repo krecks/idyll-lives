@@ -1249,8 +1249,8 @@
         1
       ],
       "price": 180,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "description": "A simple upholstered armchair.",
       "interactions": [
         {
@@ -1277,8 +1277,8 @@
         1
       ],
       "price": 520,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.3,
       "description": "Leather cushions on a solid wooden frame.",
       "interactions": [
@@ -1324,8 +1324,8 @@
         1
       ],
       "price": 1200,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.8,
       "description": "A mid-century swivel chair in leather and bent wood. Sinking into it leaves residents feeling at home.",
       "interactions": [
@@ -1371,8 +1371,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "description": "A footstool that doubles as a seat.",
       "interactions": [
         {
@@ -1399,8 +1399,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "description": "A low table with a few magazines on it.",
       "surface": {
         "height": 0.42,
@@ -1435,8 +1435,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.3,
       "description": "A glass-topped coffee table.",
       "surface": {
@@ -1472,8 +1472,8 @@
         1
       ],
       "price": 420,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.5,
       "description": "A round marble top on bent steel legs.",
       "surface": {
@@ -1509,8 +1509,8 @@
         1
       ],
       "price": 70,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.2,
       "description": "A small table for beside the sofa.",
       "surface": {
@@ -1532,7 +1532,7 @@
         1
       ],
       "price": 700,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "layer": "wall",
       "description": "A big, thin screen that hangs on the wall, with a soundbar: better TV than the old set, and it takes no floor space.",
@@ -1561,7 +1561,7 @@
         1
       ],
       "price": 150,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "description": "A little old TV on a low cabinet. It still works (mostly).",
       "interactions": [
@@ -1589,7 +1589,7 @@
         1
       ],
       "price": 1900,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "slots": 2,
       "description": "A huge screen, tower speakers and a media unit. Watching a whole film here leaves residents with a movie-night glow.",
@@ -1633,7 +1633,7 @@
         1
       ],
       "price": 380,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "description": "A radio and two speakers on a low cabinet: put a record on, or dance.",
       "interactions": [
@@ -1676,7 +1676,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "description": "A cassette boombox on a crate.",
       "interactions": [
@@ -1705,7 +1705,7 @@
         1
       ],
       "price": 140,
-      "category": "validate",
+      "category": "living",
       "group": "shelves",
       "decor": 0.2,
       "description": "Two shelves of paperbacks: a good read, but not for serious study.",
@@ -1750,7 +1750,7 @@
         1
       ],
       "price": 650,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.5,
@@ -1818,7 +1818,7 @@
         1
       ],
       "price": 260,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.6,

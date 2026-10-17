@@ -99,7 +99,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Done: colour parts Frame and Shelves (no back); its top on the wall face. |
 | `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; glass door. (+use) the door swings. Done: the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. |
 
-## L6. Stairs (1) — **Done**, signed off 2026-10-16 (back in living / stairs)
+## L6. Stairs (1) — **Done**, signed off 2026-10-16 (back in living / —, the category with no group)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `stairs` (Validate › Stairs)
@@ -107,4 +107,4 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `stairs` Staircase | 1x4 · floor | — | living / stairs | Treads, Railing | Static | **Done** (in Validate › Stairs): 14 steps of 0.2 × 4/14 m where the placeholder's are, oak treads on white risers between closed strings, an iron railing each side; seen climbed up and down at all four facings, up a storey and down to the basement. Placed by build mode and housegen, so the Validate group shows empty in Buy. |
+| `stairs` Staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | **Done** (in Validate › Stairs): 14 steps of 0.2 × 4/14 m where the placeholder's are, oak treads on white risers between closed strings, an iron railing each side; seen climbed up and down at all four facings, up a storey and down to the basement. Placed by build mode and housegen, so the Validate group shows empty in Buy. |

@@ -458,6 +458,58 @@ The nine OU4 things (Validate › Yard) were signed off on 2026-10-17, checked a
 
 The nine OU5 things (Validate › Garden Things) were signed off on 2026-10-17, checked as the sinks were, each in four facings: the koi comes up (`fish`) for "Feed the fish" and surfaces every 7 s while watching the fish, with the ambient ripples; the blue tit appears on the feeder (`bird`) for "Watch the birds"; the planter box is watered. The lamp post's panes and the string lights' bulbs glow at night, on WebGPU and on Low WebGL2; the birdhouse, dog house, sundial and stepping stones are still. Nothing needed fixing. Seen in passing: one stepping stone has a small dark nick on its edge (a dent in the boulder shape, a few pixels from the game camera). The pond, planter box, birdhouse, feeders, dog house, sundial and stepping stones back in outdoor / decor, the lamp post and string lights in outdoor / lights.
 
+## The armchairs
+
+The eleven L2 seats (Validate › Armchairs) were signed off on 2026-10-16, checked as the sinks were, each standing
+free (23,16): sat on in all four facings, by day and at night, on WebGPU and WebGL2, Medium and Low, every paint slot
+a colour of its own (buy colours, then the colour studio: labels, "In use"). `sink_in` plays and holds while sat on
+(sit, and read on the leather and wingback chairs) and shuts when the resident gets up; the recliner's back and seat
+tip back with her riding them and the footrest swings up for relax and doze; the rocking chair rocks (loop) with her
+for relax and read and stops; the bean bag flattens for flop; the designer lounge chair is still (relax, doze). One
+fix: the leather armchair's "Read a book" had no pose, so the reader stood beside the chair while its cushion sank;
+it is `"pose": "sit"` now, as the wingback's (`furniture.json`, commit 6c23960; rechecked at two facings: she sits
+and reads, `sink_in` plays and shuts). All back in living / seating.
+
+## The coffee tables
+
+The nine L3 tables (Validate › Coffee Tables) were signed off on 2026-10-16, checked as the sinks were, each standing
+free (the console table against a wall, and free at the 180° facing), in all four facings: the coffee table's drawer
+slides out with its magazine for "Flip through a magazine" and shuts after its `hold`; the glass and marble tables'
+magazine use runs without a clip, as planned; the six plain tables looked at by day and night, WebGPU and Low WebGL,
+coloured (the nesting tables' small table takes its own colour). Nothing needed fixing. All back in living / tables.
+
+## The media
+
+The eight L4 things (Validate › Media) were signed off on 2026-10-16, checked as the sinks were, against the north,
+west and east walls and free at the 180° facing (the wall TV on the only window-free walls the house has: the living
+room's west wall, and both sides of the bedroom/bathroom wall): watched, listened to, danced to and warmed up at.
+The portable TV's ears turn and stretch, the home cinema's screen unrolls and rolls up, the low bench's TV rises and
+sinks back, the stereo's tray slides out and back (its woofers pulse while listened and danced to), the boombox's
+cassette door opens and shuts after its `hold`, the fireplace's flames grow for relax, with the resident on its
+floor cushion facing the fire. At night every screen glows while on (the TV and wall TV while watched, the home
+cinema's screen while down, the bench TV while up) and the fire lights the room. Nothing needed fixing. Seen in
+passing: the low bench's "TV" colour lands on the set's thin bezel and the remote (the lift hood is the bench's), so
+it shows little; the TV and home cinema's "Body" is the unit's carcase and "Trim" its top and doors, as the model
+notes say. All back in living / media.
+
+## The shelves
+
+The nine L5 shelves (Validate › Shelves) were signed off on 2026-10-16, checked as the sinks were, against the
+north, west and east walls and free at the 180° facing (the corner bookcase in the living room's north-west corner at
+facings 0 and 1, its quarter-round end into the room): the five bookcases' red book tips out for read (and study)
+and back at the end; the industrial shelving, cube shelf, ladder shelf and display cabinet looked at, coloured, by
+day and night, WebGPU and Low WebGL. Nothing needed fixing. Seen in passing: standing free, the ladder shelf leans on
+nothing (it is made to lean on a wall). All back in living / shelves.
+
+## The stairs
+
+The staircase (Validate › Stairs) was signed off on 2026-10-16. Bought in the check house in all four facings and
+coloured (treads, railing; by day and night, WebGPU and Low WebGL). Climbed in new games' generated houses (the check
+house has no floor above or below): residents walked up flights at facings 0 and 2 to the floor above and back down,
+and down basement flights at facings 2 and 3 and back up; at facing 1 one started down (the goal tile was on the
+flight, so she stopped on it). The stairwells seen from the floor above, with their railings. Nothing needed fixing.
+Back in living (no group).
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

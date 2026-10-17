@@ -441,8 +441,8 @@
         1
       ],
       "price": 650,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "seat": {
         "height": 0.44,
         "forward": 0.12
@@ -490,8 +490,8 @@
         1
       ],
       "price": 340,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.3,
       "seat": {
         "height": 0.48,
@@ -543,8 +543,8 @@
         1
       ],
       "price": 90,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "seat": {
         "height": 0.3,
         "forward": 0.05
@@ -577,8 +577,8 @@
         1
       ],
       "price": 110,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.2,
       "seat": {
         "height": 0.45,
@@ -610,8 +610,8 @@
         1
       ],
       "price": 35,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.2,
       "seat": {
         "height": 0.14,
@@ -643,8 +643,8 @@
         1
       ],
       "price": 560,
-      "category": "validate",
-      "group": "armchairs",
+      "category": "living",
+      "group": "seating",
       "decor": 0.4,
       "seat": {
         "height": 0.44,
@@ -694,8 +694,8 @@
         1
       ],
       "price": 180,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.42,
@@ -717,8 +717,8 @@
         1
       ],
       "price": 220,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.42,
@@ -740,8 +740,8 @@
         1
       ],
       "price": 120,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.2,
       "surface": {
         "height": 0.51,
@@ -767,8 +767,8 @@
         1
       ],
       "price": 85,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.2,
       "surface": {
         "height": 0.56,
@@ -790,8 +790,8 @@
         1
       ],
       "price": 200,
-      "category": "validate",
-      "group": "coffee tables",
+      "category": "living",
+      "group": "tables",
       "decor": 0.3,
       "surface": {
         "height": 0.8,
@@ -817,7 +817,7 @@
         1
       ],
       "price": 520,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "description": "A low white media bench with a flat-screen TV on it.",
       "interactions": [
@@ -845,7 +845,7 @@
         1
       ],
       "price": 320,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
@@ -897,7 +897,7 @@
         1
       ],
       "price": 240,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
@@ -931,7 +931,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "living",
       "group": "shelves",
       "decor": 0.2,
       "surface": {
@@ -958,7 +958,7 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "living",
       "group": "shelves",
       "decor": 0.4,
       "description": "Shelves on a leaning ladder, for plants and books.",
@@ -973,7 +973,7 @@
         1
       ],
       "price": 480,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves",
       "decor": 0.9,
@@ -989,7 +989,7 @@
         1
       ],
       "price": 650,
-      "category": "validate",
+      "category": "living",
       "group": "media",
       "decor": 0.8,
       "light": {

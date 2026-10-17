@@ -2576,7 +2576,7 @@
         }
       ],
       "price": 400,
-      "category": "validate",
+      "category": "living",
       "group": "media"
     },
     {
@@ -2640,7 +2640,7 @@
         }
       ],
       "price": 250,
-      "category": "validate",
+      "category": "living",
       "fillsWall": true,
       "group": "shelves"
     },
@@ -2668,8 +2668,8 @@
         }
       ],
       "price": 300,
-      "category": "validate",
-      "group": "armchairs"
+      "category": "living",
+      "group": "seating"
     },
     {
       "id": "plant",
@@ -3353,8 +3353,7 @@
       "stairs": true,
       "interactions": [],
       "price": 900,
-      "category": "validate",
-      "group": "stairs"
+      "category": "living"
     }
   ],
   "skills": [
@@ -3689,14 +3688,6 @@
           "label": "Sofas"
         },
         {
-          "id": "armchairs",
-          "label": "Armchairs"
-        },
-        {
-          "id": "coffee tables",
-          "label": "Coffee Tables"
-        },
-        {
           "id": "showers",
           "label": "Showers"
         },
@@ -3828,18 +3819,6 @@
           "id": "garden decor",
           "label": "Garden Decor",
           "outside": true
-        },
-        {
-          "id": "shelves",
-          "label": "Shelves"
-        },
-        {
-          "id": "media",
-          "label": "Media"
-        },
-        {
-          "id": "stairs",
-          "label": "Stairs"
         }
       ]
     },
