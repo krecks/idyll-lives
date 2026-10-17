@@ -24,7 +24,12 @@ The light is the content's `light`; the model only shows where it comes from. `_
 asserts each bulb within 25 cm of the content's `light.height`, read from `base.json`, `furniture.json` and
 `catalog2/lighting.json`, so a remodel can't drift away from it. Most are within 8 cm. The pendant's light was
 at the top of its dome (2.1 m, as the placeholder had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
-2026-10-14), a little brighter on the floor and a little darker on the ceiling.
+2026-10-14), a little brighter on the floor and a little darker on the ceiling. Across, the light is at the
+footprint's middle unless the content's `light.at` moves it (in the game's frame, the placeholder's: the GLB's x
+mirrored, as the glTF loader turns it): the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0) put it at
+their bulbs, the nightstand lamp's (0, −0.26) at its bulb near the wall (2026-10-17; `_bulb` checks only the
+height). The wall lights keep theirs at the middle, 13–38 cm out from the bulb: tried at the bulb, the sconce and
+bulkhead lit only a small hot ring round themselves and lost the warm pool on the wall and floor.
 
 ## Night glow
 

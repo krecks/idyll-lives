@@ -180,9 +180,11 @@ export interface ObjectDef {
   stairs?: boolean;
   /**
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
-   * and the floor it lights fully as its room is scored (tiles; default `roomRules.lampTiles`).
+   * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
+   * turning; default the middle), and the floor it lights fully as its room is scored (tiles;
+   * default `roomRules.lampTiles`).
    */
-  light?: { range?: number; intensity?: number; height?: number; tiles?: number; switch?: boolean };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**

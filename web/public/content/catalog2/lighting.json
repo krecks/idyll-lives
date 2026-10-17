@@ -133,6 +133,10 @@
         "range": 4.5,
         "intensity": 1.0,
         "height": 1.5,
+        "at": [
+          0.245,
+          0.2
+        ],
         "tiles": 10
       },
       "description": "A brass arc reaching over the sofa from a marble base.",

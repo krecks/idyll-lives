@@ -200,8 +200,14 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
   const lamps: { x: number; z: number; lift: number; room: number; light: LampLight; id: number }[] = [];
   for (const o of world.objects) {
     const light = inView(o.x, o.z) ? lightOf(o.def) : undefined;
-    // A lamp on a table shines from its own height above the top.
-    if (light) lamps.push({ ...objectCentre(o), lift: o.lift ?? 0, room: roomAt(o.x, o.z), light, id: o.id });
+    if (!light) continue;
+    // A lamp on a table shines from its own height above the top, and from its shade (`at`, turned with it).
+    const { x, z } = objectCentre(o);
+    const [ax, az] = light.at ?? [0, 0];
+    const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
+    const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
+    // (Model x and z turned as the object is drawn: x -> (c, -s), z -> (s, c).)
+    lamps.push({ x: x + ax * c + az * s, z: z - ax * s + az * c, lift: o.lift ?? 0, room: roomAt(o.x, o.z), light, id: o.id });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
   const lights = [
@@ -224,6 +230,8 @@ export interface LampLight {
   range?: number;
   intensity?: number;
   height?: number;
+  /** Where the light is off the object's middle (m, x and z in its own frame, turned with it): an arc lamp's shade. */
+  at?: [number, number];
   /** False: no switch, lit every night (a fire). */
   switch?: boolean;
 }
