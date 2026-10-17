@@ -120,7 +120,9 @@ def recordCabinet():
         F.box('deck', 0.9, 0.03, d, (0, 0.545, zc), M.walnut)                        # under the turntable and the top
         for x in (-0.435, 0.435):
             F.box(_name('side'), 0.03, TOP - 0.14, d, (x, (TOP + 0.14) / 2, zc), M.walnut, bevel=0.006)
-        F.box('back', 0.84, 0.42, 0.01, (0, 0.35, WALL + 0.005), M.ink)
+        # the back: dark inside the bays, walnut outside (it shows when the cabinet stands free)
+        F.box('back', 0.84, 0.42, 0.004, (0, 0.35, WALL + 0.008), M.ink)
+        F.box('back_outside', 0.84, 0.42, 0.006, (0, 0.35, WALL + 0.003), M.walnut)
         F.box('divider', 0.02, 0.37, d - 0.02, (0, 0.355, zc - 0.01), M.walnut)
         # the left (game -x) bay: LP sleeves standing on end
         x = -0.415
