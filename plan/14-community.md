@@ -65,7 +65,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `bakeryCase` Bakery case | 2x1 · floor | pastry:eat | community / shops | Counter, Trim | Use | `door`: the back glass door slides aside for pastry. |
 | `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:eat | community / shops | Counter, Trim | Static | Static. |
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Counter, Trim | Static | Static. |
-| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Counter, Trim | Static | Static. |
+| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Counter, Trim | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 
 ## CM5. Farm (8) — **Done**, signed off 2026-10-16 (back in community / farm)
 

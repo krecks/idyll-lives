@@ -104,6 +104,7 @@ import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } fro
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
+import { tableRooms } from './tableTuck';
 import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
@@ -476,6 +477,10 @@ export class BabylonRenderer implements Renderer {
   /** The placed object in hand, hidden (its instances shrunk to nothing; their matrices kept to restore). */
   private heldId: number | null = null;
   private held: { id: number; saved: { target: PopTarget; matrix: Float32Array }[] } | null = null;
+  /** Chairs drawn pulled up to their table (`Characters.pulled`): how far each is in, and its matrices where it stands. */
+  private pulledIn = new Map<number, { by: number; saved: { target: PopTarget; matrix: Float32Array }[] }>();
+  /** The seats that face a table, and their turns (quarter turns). */
+  private seatTurns = new Map<number, number>();
   private heldRelease: ReturnType<typeof setTimeout> | null = null;
   private fx!: BuildEffects;
   /** Placed objects' moving parts, played while residents use them. */
@@ -775,6 +780,7 @@ export class BabylonRenderer implements Renderer {
     await this.pace();
     const streetCasters = await this.street.build(world, this.view, () => this.pace());
     await this.buildObjects(world);
+    this.pullUpChairs(world);
     this.hideHeld();
     await this.pace();
     await this.buildSims(world);
@@ -866,6 +872,7 @@ export class BabylonRenderer implements Renderer {
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+    this.pullChairs();
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
@@ -1202,6 +1209,42 @@ export class BabylonRenderer implements Renderer {
     if (!this.held) return;
     for (const { target, matrix } of this.held.saved) this.writeInstance(target, matrix);
     this.held = null;
+  }
+
+  /** The tables the seats in the new world face (`tableRooms`), for the residents to pull their chairs up to; none pulled in yet. */
+  private pullUpChairs(world: WorldStructure): void {
+    this.pulledIn.clear();
+    const byId = new Map(this.placed.map((p) => [p.id, p]));
+    const rooms = tableRooms(world, this.deps.content, (id) => byId.get(id)?.pop, (o) => this.storeyOf(o.z) * WALL_HEIGHT);
+    this.seatTurns = new Map(world.objects.filter((o) => rooms.has(o.id)).map((o) => [o.id, o.rot]));
+    this.characters.setTables(rooms);
+  }
+
+  /** Draws the chairs residents sit pulled up to a table where they are now (`Characters.pulled`), and those let go back where they stand. */
+  private pullChairs(): void {
+    const pulled = this.characters.pulled;
+    for (const [id, was] of this.pulledIn) {
+      if (pulled.has(id)) continue;
+      for (const { target, matrix } of was.saved) this.writeInstance(target, matrix);
+      this.pulledIn.delete(id);
+    }
+    for (const [id, by] of pulled) {
+      const was = this.pulledIn.get(id);
+      if ((was && Math.abs(was.by - by) < 0.001) || this.held?.id === id) continue;
+      const p = this.placed.find((o) => o.id === id);
+      if (!p) continue;
+      const targets = p.shadow ? [p.pop, p.shadow] : [p.pop];
+      const saved = was?.saved ?? targets.map((target) => ({ target, matrix: target.matrices.slice(target.index * 16, target.index * 16 + 16) }));
+      this.pulledIn.set(id, { by, saved });
+      // Along its facing (the turn of its placement: the model's z).
+      const yaw = ((this.seatTurns.get(id) ?? 0) * Math.PI) / 2;
+      for (const { target, matrix } of saved) {
+        const m = matrix.slice();
+        m[12] += Math.sin(yaw) * by;
+        m[14] += Math.cos(yaw) * by;
+        this.writeInstance(target, m);
+      }
+    }
   }
 
   private writeInstance(target: PopTarget, matrix: Float32Array): void {

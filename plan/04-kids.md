@@ -18,7 +18,7 @@ table's track is a ring, so the train can go round it.
 | `crib` Crib | 2x1 · floor | lie:sleep feed:tend change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while the baby lies in it (E1). |
 | `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds. |
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`; the car body is static. |
-| `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. |
+| `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 
 ## KD2. Toys (10) — **Done**, signed off 2026-10-16 (back in kids / —)
 
@@ -49,7 +49,7 @@ table's track is a ring, so the train can go round it.
 |---|---|---|---|---|---|---|
 | `kidsDesk` Kids' desk | 1x1 · floor | homework:write drawing:write | kids / — | Frame, Top | Use | `drawer_open` for homework and drawing. |
 | `kidsTable` Kids' table | 1x1 · floor | — | kids / — | Frame, Top | Static | Static. |
-| `kidsChair` Kids' chair | 1x1 · floor | sit:sit draw:write homework:write | kids / — | Frame, Seat | Static | Static. |
+| `kidsChair` Kids' chair | 1x1 · floor | sit:sit draw:write homework:write | kids / — | Frame, Seat | Static | Static. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
 | `kidsBookshelf` Picture-book shelf | 1x1 · floor | read:read | kids / — | Frame, Top | Use | `book_out`: a picture book tips out 20° for read. |
 | `kidsChalkboard` Chalkboard easel | 1x1 · floor | draw:paint | kids / — | Frame, Board | Use | `drawing`: a chalk drawing grows on the board for draw. |
 | `kidsEasel` Kids' easel | 1x1 · floor | paint:paint | kids / — | Easel | Use | `painting`: a painting grows on the paper for paint. |

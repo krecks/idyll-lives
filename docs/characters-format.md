@@ -246,6 +246,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | standUp | no | 1.07 | getting up from a seat or out of bed |
 | sitHands | yes | 1.67 | seated at a desk or keys (type, write, play, music) |
 | sitHandsNear | yes | 1.67 | the same at a shallow desk with its chair built in close (`NEAR_DESKS`) |
+| sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
 | spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |

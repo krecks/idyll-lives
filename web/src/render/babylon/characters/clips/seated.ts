@@ -110,6 +110,14 @@ function nearDeskPose(p: number): PoseSpec {
   return deskPose(p, 0.11, 0.78, 8);
 }
 
+/**
+ * At a table further off than the chair could be pulled in to (drawer pedestals or a drawer box where the knees
+ * would go: `TUCK` in characters.ts): the hands further out, leaning in more.
+ */
+function farDeskPose(p: number): PoseSpec {
+  return deskPose(p, 0.43, 0.77, 22);
+}
+
 /** Standing in front of the seat (the start of sitDown, the end of standUp). */
 function standing(): PoseSpec {
   return { ...stand(), ...hangArms() };
@@ -166,6 +174,7 @@ export function seatedClips(): ClipDef[] {
     ]),
     cycle('sitHands', { seconds: 50 / 30, loop: true }, (p) => deskPose(p)),
     cycle('sitHandsNear', { seconds: 50 / 30, loop: true }, nearDeskPose),
+    cycle('sitHandsFar', { seconds: 50 / 30, loop: true }, farDeskPose),
     clip('eat', { seconds: 40 / 30, loop: false }, [
       [0, () => eatPose(0, low, [0, 0, 0], 0)],
       [0.32, () => eatPose(0.32, mouth, [-4, 0, 0], 4), 'smooth'],

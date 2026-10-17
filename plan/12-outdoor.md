@@ -17,7 +17,7 @@ Outdoor things are seen from far: watch the budget, and street-scale props wait 
 | `gardenChair` Garden chair | 1x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
 | `patioTableRound` Round patio table | 1x1 · floor | — | outdoor / seating | Frame, Slats | Static | Static. |
 | `patioTable4` Teak patio table | 2x1 · floor | — | outdoor / seating | Frame, Slats | Static | Static. |
-| `patioChair` Patio chair | 1x1 · floor | sit:sit coffee:drink | outdoor / seating | Frame, Slats | Static | Static. |
+| `patioChair` Patio chair | 1x1 · floor | sit:sit coffee:drink | outdoor / seating | Frame, Slats | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `adirondackChair` Adirondack chair | 1x1 · floor | relax:relax | outdoor / seating | Frame, Slats | Static | Static. |
 | `benchGarden3` Garden bench | 3x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
 | `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Frame, Slats | Static | Static. |

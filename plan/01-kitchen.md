@@ -134,18 +134,18 @@ chairs and stools their seat height (`SEATS` in `web/src/render/babylon/characte
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. |
-| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. |
-| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. |
-| `diningChair` Dining chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static: the sitting pose is fitted to the seat, so the chair stays put. |
-| `chairWood` Wooden chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `chairUpholstered` Upholstered chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Upholstery | Static | Static. |
-| `chairModern` Moulded chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `chairWindsor` Windsor chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `chairBentwood` Bentwood chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `chairFolding` Folding chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
-| `benchDining` Dining bench | 2x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. |
+| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `diningChair` Dining chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static: the sitting pose is fitted to the seat, so the chair stays put. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairWood` Wooden chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairUpholstered` Upholstered chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Upholstery | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairModern` Moulded chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairWindsor` Windsor chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairBentwood` Bentwood chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairFolding` Folding chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `benchDining` Dining bench | 2x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 
 ## K9. Dining storage (4) — **Done**, signed off 2026-10-16 (back in kitchen / cabinets)
 

@@ -32,9 +32,9 @@ Desks keep their top height (`TOPS`): things stand on them, and those don't foll
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chairExecutive` Executive chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`: the seat turns 15° and back for sit, write and homework. |
-| `chairTask` Desk chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`. |
-| `officeChair` Office chair | 1x1 · floor | sit:sit | office / — | Frame, Seat | Use | `swivel`. |
+| `chairExecutive` Executive chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`: the seat turns 15° and back for sit, write and homework. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
+| `chairTask` Desk chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
+| `officeChair` Office chair | 1x1 · floor | sit:sit | office / — | Frame, Seat | Use | `swivel`. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 
 ## O3. Storage and boards (3) — **Done**, signed off 2026-10-17 (back in office)
 

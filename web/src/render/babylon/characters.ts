@@ -74,6 +74,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
 import { CLIMB, FOUNTAIN } from './characters/clips/street';
+import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
@@ -247,6 +248,20 @@ const STEP_IN: Record<string, StepIn> = {
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
+
+/**
+ * A chair pulled up to a table (`tableTuck.ts`): once seated, the sitter shuffles it in (and pushes it back
+ * rising) until the top's near edge is `edge` m ahead of the hips (for a body of the reference height: the
+ * desk-hands clip's hands then rest on the top), as far as the room under the top lets the knees (`knees` m
+ * ahead of the hips, up to `kneeUp` m over the seat, and not past the top's middle: someone may sit across)
+ * and the toes (`toes` m, up to `toeUp` m off the floor) go, `clear` m short of what is there, and `max` m at
+ * most. Not for a top more than `rise` m over the seat (an office chair at a standing desk). `rate`, `back`:
+ * the shuffle's pace in and out (1/s, game time). The top still more than `far` m ahead of the hips then (a
+ * drawer pedestal where the knees would go), the hands reach further (`sitHandsFar`).
+ */
+const TUCK = { edge: 0.24, far: 0.3, knees: 0.56, kneeUp: 0.11, toes: 0.62, toeUp: 0.12, clear: 0.02, max: 0.45, rise: 0.45, rate: 3, back: 4 };
+/** The height (m) the seated clips are made for (their reaches scale with the body). */
+const CLIP_HEIGHT = 1.77;
 
 /**
  * Where a Sim sits on an object (`PlacedObject.seat`): the table above, else the content's `seat`
@@ -833,6 +848,11 @@ interface SimRig {
   outT: number;
   /** Seconds after the use before stepping out (the entry's `out`). */
   outWait: number;
+  /** Pulled up to a table (`TUCK`): how far the chair is in now (m), and which seat (-1: none). */
+  tuck: number;
+  tuckSeat: number;
+  /** The top still further off than the desk-hands clip reaches, pulled in as far as it goes (`sitHandsFar`). */
+  tuckFar: boolean;
   cover: number;
   /** Current (smoothed) facial expression. */
   face: Face;
@@ -984,6 +1004,9 @@ export class Characters {
     return d > 0 ? z - Math.floor(z / d) * d : z;
   }
   private readonly objectById = new Map<number, PlacedObject>();
+  /** Pulled up to a table (`TUCK`): the tables the seats face, by seat id (`setTables`), and the seats' ids. */
+  private tables = new Map<number, TableRoom>();
+  private readonly seatIds = new Map<PlacedObject, number>();
   /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
   private rideOf: ((objectId: number) => Matrix | null) | null = null;
   private readonly rideM = new Matrix();
@@ -1436,6 +1459,9 @@ export class Characters {
         inDZ: 0,
         outT: -1,
         outWait: 0,
+        tuck: 0,
+        tuckSeat: -1,
+        tuckFar: false,
         cover: 0,
         face: { ...NEUTRAL },
         blinkAt: -1,
@@ -1500,6 +1526,8 @@ export class Characters {
       return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
+    this.seatIds.clear();
+    world.objects.forEach((o, j) => this.tables.has(o.id) && this.seatIds.set(this.objects[j], o.id));
     const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
     const bodies = new Set(this.sims.map((r) => r?.body.name));
     for (const [name, b] of this.blankets) {
@@ -2453,6 +2481,7 @@ export class Characters {
         if (used) mesh.thinInstanceBufferUpdated('matrix');
       }
     }
+    this.pullChairs();
     this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;
   }
@@ -2577,6 +2606,8 @@ export class Characters {
       } else if (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.3) {
         key = 'sitDown';
       }
+      rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
+      if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? act?.upper : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
@@ -2745,6 +2776,7 @@ export class Characters {
       key = 'standUp';
     }
     if (key !== 'standUp') rig.fromBed = false;
+    if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
     // Carrying something while walking or standing about (not while using a station with it).
     if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== 'standUp' && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
       upper = carry;
@@ -2897,6 +2929,67 @@ export class Characters {
     this.rideM.decompose(this.rideS, this.rideQ, this.rideT);
     [pl.x, pl.y, pl.z] = [this.rideT.x, this.rideT.y, this.rideT.z];
     [pl.qx, pl.qy, pl.qz, pl.qw] = [this.rideQ.x, this.rideQ.y, this.rideQ.z, this.rideQ.w];
+  }
+
+  /** The tables seats face, with what is in front of them (`tableRooms`), by seat id: set with each world. */
+  setTables(tables: Map<number, TableRoom>): void {
+    this.tables = tables;
+    this.seatIds.clear();
+    for (const [id] of tables) {
+      const o = this.objectById.get(id);
+      if (o) this.seatIds.set(o, id);
+    }
+  }
+
+  /** How far each chair pulled up to a table is drawn pulled in now (m, along its facing), by seat id (`TUCK`). */
+  readonly pulled = new Map<number, number>();
+
+  /**
+   * Seated on a chair that faces a table (`tables`): how far it is pulled in now (m), easing in once they
+   * are `settled` (sat down), at once when drawn afresh (`TUCK`).
+   */
+  private tuckIn(rig: SimRig, obj: PlacedObject | null, seat: Seat, settled: boolean, step: number, fresh: boolean): number {
+    const id = obj ? this.seatIds.get(obj) : undefined;
+    const room = id === undefined ? undefined : this.tables.get(id);
+    if (id !== rig.tuckSeat) rig.tuck = 0;
+    rig.tuckSeat = id ?? -1;
+    let goal = 0;
+    rig.tuckFar = false;
+    if (obj && room && settled && !seat.back && room.top > seat.h && room.top - seat.h <= TUCK.rise) {
+      const s = (rig.body.height * rig.scale) / CLIP_HEIGHT;
+      const yaw = (obj.rot * Math.PI) / 2;
+      const [dx, dz] = [rig.x - obj.cx, rig.z - obj.cz];
+      const right = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+      const hips = dx * Math.sin(yaw) + dz * Math.cos(yaw) + seat.fwd;
+      const edge = nearestAhead(room, right, 0.12 * s, room.top - 0.04, room.top + 0.01);
+      // (The knees no further than the middle of the top: someone may sit across it.)
+      const middle = (edge + furthestAhead(room, right, 0.12 * s, room.top - 0.04, room.top + 0.01)) / 2;
+      const knees = nearestAhead(room, right, 0.16 * s, TUCK.toeUp, seat.h + TUCK.kneeUp * s);
+      const toes = nearestAhead(room, right, 0.16 * s, 0, TUCK.toeUp);
+      const most = Math.min(edge - TUCK.edge * s, Math.min(knees, middle) - TUCK.knees * s - TUCK.clear, toes - TUCK.toes * s - TUCK.clear) - hips;
+      if (Number.isFinite(edge)) goal = clamp(most, 0, TUCK.max);
+      rig.tuckFar = Number.isFinite(edge) && edge - hips - goal > TUCK.far * s;
+    }
+    rig.tuck = fresh ? goal : rig.tuck + (goal - rig.tuck) * Math.min(1, step * TUCK.rate);
+    return rig.tuck;
+  }
+
+  /** Off the chair pulled up to a table: it is pushed back as they rise (`TUCK`); how far in it still is while they do. */
+  private tuckOut(rig: SimRig, key: string, step: number): number {
+    if (rig.tuckSeat < 0) return 0;
+    rig.tuck *= 1 - Math.min(1, step * TUCK.back);
+    if (rig.tuck < 0.002) [rig.tuck, rig.tuckSeat] = [0, -1];
+    return key === 'standUp' ? rig.tuck : 0;
+  }
+
+  /** The chairs pulled in now (`pulled`): each as far as the least pulled-in of those on it. */
+  private pullChairs(): void {
+    this.pulled.clear();
+    for (const rig of this.sims) {
+      if (!rig?.visible || rig.tuckSeat < 0 || rig.tuck <= 0.001) continue;
+      const was = this.pulled.get(rig.tuckSeat);
+      this.pulled.set(rig.tuckSeat, was === undefined ? rig.tuck : Math.min(was, rig.tuck));
+    }
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
