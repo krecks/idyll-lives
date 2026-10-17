@@ -510,6 +510,62 @@ and down basement flights at facings 2 and 3 and back up; at facing 1 one starte
 flight, so she stopped on it). The stairwells seen from the floor above, with their railings. Nothing needed fixing.
 Back in living (no group).
 
+## The houseplants
+
+The ten G1 houseplants (Validate › Houseplants) were signed off on 2026-10-17, checked as above in the living room:
+watered in all four facings (the resident stands in front and pours), talked to (monstera), admired (orchid); the
+bonsai pruned in all four facings, its stray twig shrinking away (`trim`, 0.79 s) and back after the use, and
+watered. "Pot" colours the pot of each (the bonsai's tray, the fern's pot on its stand, the orchid's pot on its
+pedestal). Nothing needed fixing. All back in garden / houseplants.
+
+## The flowers
+
+The fifteen G2 flowers (Validate › Flowers) were signed off on 2026-10-17, checked as above outdoors: watered
+(tended: the raised bed, kneeling at its front) and smelled or admired; the meadow's white daisy shrinks away for
+"Pick a wildflower" (`pick`) and is back after, in all four facings. "Bed" colours each mound, "Petals" the daffodils',
+daisies', sunflowers' and poppies' petals, "Box" the raised bed's boards and the flower box. One fix: the potted
+geraniums' "Flowers" coloured only two of their six clusters (the clusters cycled three reds and only the first
+was the paint slot); all clusters are the painted material now (940c678). And the pansies' faces stood 9–15 cm above
+their leaves with nothing under them (plain from the side and in the colour studio): each has a thin stem now
+(3bfa080), same size and draw calls. Seen in passing: the marigolds' back poms sit a little above the leaves too,
+but read as one mass of flowers; left as they are. All back in garden / flowers.
+
+## The shrubs
+
+The eleven G3 shrubs (Validate › Shrubs) were signed off on 2026-10-17, checked as above outdoors: trimmed (bush,
+boxwood, topiary, hedge, azalea), pruned (roses), cut (lavender) in all four facings, each clip (`trim`, `cut`) playing
+its 0.79 s and shutting after the use; watered or admired (hydrangea, azalea, fern, hosta), smelled (roses, lavender);
+the ornamental grass looked at. Two fixes:
+- **"Flowers" coloured a few flowers**: the hydrangea's three of eleven mopheads, the azalea's five of twenty, one
+  lavender spike in three (shades cycled over the heads, only the first the paint slot). Every head is the painted
+  material now, far versions too (940c678).
+- **The topiary's trim showed nothing**: the sprigs it takes off stood inside the cone. They reach out of the cone's
+  sides near the tip now, and go during "Clip the topiary" (2e6b1d3).
+The rose bush's "Roses" colours every rose. Seen in passing: from the west (facing 3) the house hides most of the
+grass at this spot (camera, not model). All back in garden / shrubs.
+
+## The edibles
+
+The five G4 edibles (Validate › Edibles) were signed off on 2026-10-17, checked as above outdoors: the four crops
+tended (kneeling at the bed) in all four facings, bought new at the planted stage; then each grown at speed through
+its stages, `grow` held at planted (1.5 s), growing (1.0) and ripe (0: tomatoes red, strawberries red, pumpkins
+orange, the veg patch's lettuces and cabbages full), and harvested: the clip plays on to picked (0.5), the crop
+shrinking away while the resident picks and the plants staying. The herb planter's basil shrinks away for "Pick fresh
+herbs" (`harvest`) and is back after, in all four facings; watered. "Bed" colours each bed (the raised bed's and the
+planter's boards). Nothing needed fixing. Seen in passing: for "Pick fresh herbs" the resident bends down to the
+ground beside the waist-high planter (the shared `harvest` pose). Growing back from picked over the days was not
+watched. All back in garden / edibles.
+
+## The trees
+
+The twelve G5 trees (Validate › Trees) were signed off on 2026-10-17, checked as above outdoors (the lemon tree also
+close up): relaxed under in the shade (standing by the trunk), admired (cherry), smelled (magnolia), watered (lemon
+tree); the apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
+for "Shape the maple" (`trim`), in all four facings, shutting after the use. The lemon tree's "Pot" colours its pot.
+Nothing needed fixing. Seen in passing: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across
+on a one-tile footprint) reach through the house's wall; the game lets a tree stand that close, and the placeholders
+were as wide. All back in garden / trees.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -531,6 +587,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Office** (`06-office.md`, O1–O3): signed off 2026-10-17.
 - **Kids** (`04-kids.md`, KD1–KD3): signed off 2026-10-17.
 - **Bedroom** (`03-bedroom.md`, BR1–BR4): signed off 2026-10-17.
+- **Garden** (`13-garden.md`, G1–G5): signed off 2026-10-17.
 
 ## The end
 

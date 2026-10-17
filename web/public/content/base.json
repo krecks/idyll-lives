@@ -2700,7 +2700,7 @@
         }
       ],
       "price": 40,
-      "category": "validate",
+      "category": "garden",
       "freeRotation": true,
       "group": "houseplants",
       "description": "A leafy plant in a terracotta pot."
@@ -2786,7 +2786,7 @@
         }
       ],
       "price": 60,
-      "category": "validate",
+      "category": "garden",
       "freeRotation": true,
       "group": "flowers",
       "description": "A wooden bed full of mixed bedding flowers. Tending it trains Gardening; a skilled gardener is proud of the result."
@@ -2817,7 +2817,7 @@
         }
       ],
       "price": 120,
-      "category": "validate",
+      "category": "garden",
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
@@ -2833,7 +2833,7 @@
       ],
       "interactions": [],
       "price": 120,
-      "category": "validate",
+      "category": "garden",
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
@@ -2873,7 +2873,7 @@
         }
       ],
       "price": 40,
-      "category": "validate",
+      "category": "garden",
       "freeRotation": true,
       "group": "shrubs",
       "outdoors": true,
@@ -3704,10 +3704,6 @@
           "label": "Books And Pots"
         },
         {
-          "id": "houseplants",
-          "label": "Houseplants"
-        },
-        {
           "id": "stalls",
           "label": "Stalls",
           "outside": true
@@ -3729,26 +3725,6 @@
         {
           "id": "farm",
           "label": "Farm",
-          "outside": true
-        },
-        {
-          "id": "flowers",
-          "label": "Flowers",
-          "outside": true
-        },
-        {
-          "id": "shrubs",
-          "label": "Shrubs",
-          "outside": true
-        },
-        {
-          "id": "edibles",
-          "label": "Edibles",
-          "outside": true
-        },
-        {
-          "id": "trees",
-          "label": "Trees",
           "outside": true
         },
         {
