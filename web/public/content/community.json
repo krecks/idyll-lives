@@ -19,7 +19,7 @@
         1
       ],
       "price": 350,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "outdoors": true,
@@ -42,7 +42,7 @@
         1
       ],
       "price": 380,
-      "category": "validate",
+      "category": "community",
       "group": "street",
       "slots": 3,
       "outdoors": true,
@@ -95,7 +95,7 @@
         1
       ],
       "price": 300,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "outdoors": true,
@@ -125,7 +125,7 @@
         1
       ],
       "price": 60,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "outdoors": true,
@@ -141,7 +141,7 @@
         1
       ],
       "price": 650,
-      "category": "validate",
+      "category": "community",
       "group": "street",
       "slots": 3,
       "outdoors": true,
@@ -189,7 +189,7 @@
         1
       ],
       "price": 220,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "outdoors": true,
@@ -221,7 +221,7 @@
         1
       ],
       "price": 180,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "decor": 0.2,
@@ -252,7 +252,7 @@
         1
       ],
       "price": 750,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "street",
       "outdoors": true,
@@ -285,7 +285,7 @@
         3
       ],
       "price": 2600,
-      "category": "validate",
+      "category": "community",
       "group": "street",
       "slots": 4,
       "outdoors": true,
@@ -337,7 +337,7 @@
         2
       ],
       "price": 1800,
-      "category": "validate",
+      "category": "community",
       "group": "street",
       "outdoors": true,
       "decor": 1.2,
@@ -366,8 +366,8 @@
         2
       ],
       "price": 520,
-      "category": "validate",
-      "group": "playground",
+      "category": "community",
+      "group": "play",
       "outdoors": true,
       "description": "Up the ladder, down the slide. And again. And again.",
       "interactions": [
@@ -396,8 +396,8 @@
         2
       ],
       "price": 900,
-      "category": "validate",
-      "group": "playground",
+      "category": "community",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "description": "A wooden fort with a rope net, a tower and a fireman's pole.",
@@ -433,8 +433,8 @@
         1
       ],
       "price": 340,
-      "category": "validate",
-      "group": "playground",
+      "category": "community",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "seat": {
@@ -470,9 +470,9 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
-      "group": "playground",
+      "group": "play",
       "outdoors": true,
       "seat": {
         "height": 0.78,
@@ -505,8 +505,8 @@
         2
       ],
       "price": 780,
-      "category": "validate",
-      "group": "playground",
+      "category": "community",
+      "group": "play",
       "slots": 4,
       "outdoors": true,
       "seat": {
@@ -542,9 +542,9 @@
         1
       ],
       "price": 420,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
-      "group": "playground",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "description": "A hoop on a steel pole with a proper backboard. Shoot around alone or with a friend.",
@@ -581,8 +581,8 @@
         1
       ],
       "price": 650,
-      "category": "validate",
-      "group": "playground",
+      "category": "community",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "description": "A weatherproof concrete table with a steel net. Fast, silly and a little social.",
@@ -617,9 +617,9 @@
         1
       ],
       "price": 480,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
-      "group": "playground",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "seat": {
@@ -659,8 +659,8 @@
         1
       ],
       "price": 900,
-      "category": "validate",
-      "group": "stalls",
+      "category": "community",
+      "group": "food",
       "outdoors": true,
       "decor": 0.4,
       "description": "A striped parasol over a freezer full of cones. Four dollars a scoop.",
@@ -692,8 +692,8 @@
         1
       ],
       "price": 1100,
-      "category": "validate",
-      "group": "stalls",
+      "category": "community",
+      "group": "food",
       "outdoors": true,
       "decor": 0.3,
       "description": "A steaming cart under an awning: hot dogs with everything for six dollars.",
@@ -724,9 +724,9 @@
         1
       ],
       "price": 800,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
-      "group": "stalls",
+      "group": "food",
       "description": "Crisps, chocolate and biscuits behind glass, four dollars each.",
       "interactions": [
         {
@@ -754,9 +754,9 @@
         1
       ],
       "price": 800,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
-      "group": "stalls",
+      "group": "food",
       "description": "Cold cans and bottles, lit up at night.",
       "interactions": [
         {
@@ -785,8 +785,8 @@
         1
       ],
       "price": 700,
-      "category": "validate",
-      "group": "stalls",
+      "category": "community",
+      "group": "food",
       "slots": 2,
       "outdoors": true,
       "decor": 0.4,
@@ -831,7 +831,7 @@
         1
       ],
       "price": 600,
-      "category": "validate",
+      "category": "community",
       "group": "shops",
       "slots": 2,
       "decor": 0.3,
@@ -862,7 +862,7 @@
         1
       ],
       "price": 900,
-      "category": "validate",
+      "category": "community",
       "group": "shops",
       "slots": 2,
       "decor": 0.4,
@@ -893,7 +893,7 @@
         1
       ],
       "price": 450,
-      "category": "validate",
+      "category": "community",
       "group": "shops",
       "slots": 2,
       "decor": 0.2,
@@ -935,7 +935,7 @@
         1
       ],
       "price": 220,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "shops",
       "decor": 0.3,
@@ -959,7 +959,7 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "shops",
       "approach": "around",
@@ -1029,7 +1029,7 @@
         6
       ],
       "price": 6400,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.9,
@@ -1045,7 +1045,7 @@
         3
       ],
       "price": 3200,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.5,
@@ -1061,7 +1061,7 @@
         4
       ],
       "price": 2800,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.4,
@@ -1077,7 +1077,7 @@
         1
       ],
       "price": 60,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "farm",
       "outdoors": true,
@@ -1094,7 +1094,7 @@
         1
       ],
       "price": 140,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.25,
@@ -1110,7 +1110,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "community",
       "freeRotation": true,
       "group": "farm",
       "outdoors": true,
@@ -1127,7 +1127,7 @@
         1
       ],
       "price": 220,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.15,
@@ -1143,7 +1143,7 @@
         2
       ],
       "price": 480,
-      "category": "validate",
+      "category": "community",
       "group": "farm",
       "outdoors": true,
       "decor": 0.4,

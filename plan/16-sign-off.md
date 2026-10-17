@@ -682,6 +682,54 @@ nightstand's drawer opens (eaten sitting on its padded top), the spritz bottle t
 while playing, the gaming recliner tips back for the marathon and its cup holder swings out for a soda. Nothing
 needed fixing. Back in kitchen, living, bedroom, bathroom and hobbies.
 
+## The playground
+
+The eight CM1 things (Validate › Playground) were signed off on 2026-10-16, checked as the sinks were, each
+standing in the west yard of the check house (10,18; outdoor things can't be bought indoors) and looked at
+from one camera outside in all four facings: the slide gone down, the frame climbed, the ping-pong table
+played at; the seesaw (`seesaw`), spring rider (`rock`) and merry-go-round (`spin`) loops go round with the
+rider on them and finish their round when the use ends; the hoop's net swishes after each shot (`swish`, every
+3.2 s); a pawn slides for chess (`move`). Every part coloured in buy (two colour sets) and the colour studio.
+Nothing needed fixing. Seen in passing: the climbing frame is "climbed" with the standing `exercise` pose by
+the net. All back in community / play.
+
+## The street furniture
+
+The ten CM2 things (Validate › Street) were signed off on 2026-10-16, checked as the sinks were, outdoors at
+10,18 (the notice board indoors at 23,16): sat on (bench, shelter), pigeons fed, the timetable read, the
+drinking fountain's water arc (`water_on`), the post box's flap and the phone box's folding door (`door_open`,
+held 1.5 s) for their uses, the statue admired, a wish made at the town fountain and its rim sat on, with its
+water running all the time (`water_run`, ambient: seen on WebGPU Medium, off on Low as designed). The
+street lamp's lantern lights at night (WebGPU and Low WebGL). Also seen on the `town-things` lot. Nothing
+needed fixing. Seen in passing: at the drinking fountain the resident drinks a step away with the shared
+`drink` pose (a cup to the mouth), not bent over the spout; at the phone box the caller stands outside on the
+front tile while the door opens and shuts (the plan says "shuts behind them"). All back in community / street.
+
+## The food stalls and vending
+
+The five CM3 things (Validate › Stalls) were signed off on 2026-10-16, checked as the sinks were (the carts
+and market stall outdoors at 10,18, the machines indoors at 23,16): the ice cream cart's lid for an ice cream
+(held 2 s), the hot dog stand's lid, a snack and a can dropping in the machines, the market stall browsed and
+fruit bought. Each clip plays its full length and shuts in every run. Nothing needed fixing. All back in
+community / food.
+
+## The shops and café
+
+The five CM4 things (Validate › Shops) were signed off on 2026-10-16, checked as the sinks were, indoors at
+23,16: the shop counter's till drawer (held 1.5 s) and the bakery case's back door (held 2 s) for their uses,
+the grocery shelves browsed and a sandwich taken, the café chair sat on in all four facings and coffee and
+cake had at the café table (two placements; refused at a chair standing alone, `needsTable`). Nothing needed
+fixing. Seen in passing: the shop counter's "Counter" colours its front panels and "Trim" the walnut top and
+frame. All back in community / shops.
+
+## The farm
+
+The eight CM5 things (Validate › Farm) were signed off on 2026-10-16, checked as the sinks were, outdoors (the
+barn at 8,16, the rest at 10,18), all still: looked at in all four facings by day, at night and on Low WebGL.
+The scarecrow sways (`sway`, ambient: off on Low as designed); the coop's hatch slides shut at night
+(`close`, held from dusk) and is open by day. Also seen together on the `town-things` lot, near and far.
+Nothing needed fixing. All back in community / farm.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -704,6 +752,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Kids** (`04-kids.md`, KD1–KD3): signed off 2026-10-17.
 - **Bedroom** (`03-bedroom.md`, BR1–BR4): signed off 2026-10-17.
 - **Garden** (`13-garden.md`, G1–G5): signed off 2026-10-17.
+- **Community** (`14-community.md`, CM1–CM5): signed off 2026-10-17.
 
 ## The end
 

@@ -3704,30 +3704,6 @@
           "label": "Books And Pots"
         },
         {
-          "id": "stalls",
-          "label": "Stalls",
-          "outside": true
-        },
-        {
-          "id": "street",
-          "label": "Street",
-          "outside": true
-        },
-        {
-          "id": "playground",
-          "label": "Playground",
-          "outside": true
-        },
-        {
-          "id": "shops",
-          "label": "Shops"
-        },
-        {
-          "id": "farm",
-          "label": "Farm",
-          "outside": true
-        },
-        {
           "id": "lazy",
           "label": "Lazy"
         },
