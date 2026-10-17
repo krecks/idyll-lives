@@ -148,6 +148,11 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Small things on tops:** 3 of 1800 sample houses have none, probably kitchens whose run has no plain counter.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
   (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it.
+- **The sofa bed can open under a sitter:** `ObjectInstance::allows` keeps a use from closing an object someone else
+  is on, but not from opening it. A second resident's doze (no `when`, `leaves: "open"`) unfolds the sofa bed while
+  another relaxes on it (`when: "closed"`). When the sitter gets up last, nothing folds it away, so relax isn't offered
+  until the player folds it or a lone doze ends. Refusing every opening under someone else would stop a couple going
+  to bed together on the wall bed or futon; the fix needs to know the other user's use.
 
 ### Models
 - **The sofa bed's mattress** is modelled at 0.44 m (`families/living.py` `SB_MATTRESS`, whose comment says it equals
