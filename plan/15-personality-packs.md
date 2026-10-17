@@ -107,7 +107,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `gloomy.cello` Nocturne cello | 1x1 · floor | practise:music lament:music | hobbies / — | Body, Trim | Use | `off_stand` if the music animation holds it. |
 | `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry. |
 | `gloomy.rainLamp` Rainfall lamp | 1x1 · floor | watchRain:look | decor / — | Body, Trim | Use | `rain`: the rain strands grow for watchRain. A rain (E2). |
-| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. |
+| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. A lone dozer lies along the cushion, head on the left pillow (`BEDS` 0.45, `across`); sharing the seat, on their own half as before. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
 ## P8. Hot-headed (6) — **Done**, signed off 2026-10-17 (back in fitness, hobbies, decor, office and bathroom, no group)
@@ -138,7 +138,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `kind.knittingRocker` Gift-knitting rocker | 1x1 · floor | knitGift:tinker rock:relax | hobbies / — | Body, Fabric | Loop (E1) | `rock` (E1). Until then static. |
 | `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric | Use | `pour`: the teapot tips for shareTea. |
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
-| `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. |
+| `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. A lone napper lies along the seat between the arms, head at the lantern's end (`BEDS` 0.44, `across`); sharing it, on their own half as before. |
 
 ## P10. Lazy (6) — **Done**, signed off 2026-10-17 (back in bedroom, living, kitchen, fitness and office, no group)
 

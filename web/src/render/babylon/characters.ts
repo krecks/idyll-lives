@@ -239,7 +239,7 @@ interface Seat {
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
  * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa. `across`: lain on
- * along its width, head to its left (a hammock slung side to side on a wide footprint).
+ * along its width, head to its left, in its middle (a hammock slung side to side on a wide footprint).
  */
 const BEDS: Record<string, Bed> = {
   bed: { h: 0.58 },
@@ -269,6 +269,9 @@ const BEDS: Record<string, Bed> = {
   bedDaybed: { h: 0.51 },
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
   sofaBed: { h: 0.42, fwd: 0.6 },
+  // The 2-wide window seat and settee: dozed on along the cushion, head to its left, whichever slot.
+  'gloomy.windowSeat': { h: 0.45, across: true },
+  'kind.hearthSettee': { h: 0.44, across: true },
 };
 const DEFAULT_BED: Bed = { h: 0.5 };
 /** What residents lie on (`BEDS`). */
@@ -712,6 +715,11 @@ interface SimRig {
   bedH: number;
   /** How far forward of the slot it lies (`BEDS` `fwd`). */
   bedFwd: number;
+  /**
+   * Lying along a bed lain on across (`BEDS` `across`), in its middle: not while someone else uses
+   * it too (a 2-wide seat has no room for that), when they lie on their own slot as on a bed.
+   */
+  lieAcross: boolean;
   /**
    * Getting out of bed: sim-core puts the Sim on the tile in front at once; the lying body
    * (fading out) and the blanket stay where it lay (`lieX`, `lieZ`: its slot, kept while lying)
@@ -1309,6 +1317,7 @@ export class Characters {
         bed: null,
         bedH: 0,
         bedFwd: 0,
+        lieAcross: false,
         fromBed: false,
         lieX: 0,
         lieZ: 0,
@@ -2145,8 +2154,12 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
-      // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
-      if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
+      // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right (unless shared, `lieAcross`).
+      rig.lieAcross =
+        pose === Pose.Lie &&
+        !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across &&
+        !(usingId >= 0 && this.sims.some((r) => r && r !== rig && r.visible && r.useId === usingId));
+      if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
       else if (pose === Pose.Sit) {
         const seat = (useObj ?? this.objectAt(rig.x, rig.z))?.seat;
         // A seat facing the object's back (`SEATS` `back`, content `seat.facing`): turned round, facing into it (a
@@ -2386,7 +2399,8 @@ export class Characters {
       const bunk = obj && BUNKS[obj.def];
       const across = obj ? (rig.x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (rig.z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0;
       rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
-      rig.bedFwd = bed.fwd ?? 0;
+      // (Lain on across, they face along it: moved back to its middle from a slot to one side.)
+      rig.bedFwd = (bed.fwd ?? 0) - (rig.lieAcross ? across : 0);
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
