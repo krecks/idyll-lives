@@ -11,6 +11,7 @@
       ],
       "price": 90,
       "category": "kids",
+      "freeRotation": true,
       "surface": {
         "height": 0.5,
         "kind": "low",
@@ -32,6 +33,7 @@
       ],
       "price": 40,
       "category": "kids",
+      "freeRotation": true,
       "approach": "around",
       "seatAt": [
         "low"
@@ -105,6 +107,7 @@
       ],
       "price": 120,
       "category": "kids",
+      "freeRotation": true,
       "decor": 0.2,
       "description": "Three slanted shelves with the covers facing out.",
       "interactions": [
@@ -138,6 +141,7 @@
       ],
       "price": 110,
       "category": "kids",
+      "freeRotation": true,
       "description": "A yellow chest with its lid open: balls, blocks and a bear.",
       "interactions": [
         {
@@ -168,6 +172,7 @@
       ],
       "price": 130,
       "category": "kids",
+      "freeRotation": true,
       "decor": 0.3,
       "description": "A canvas teepee with bunting and a soft mat inside.",
       "interactions": [
@@ -201,6 +206,7 @@
       ],
       "price": 95,
       "category": "kids",
+      "freeRotation": true,
       "description": "A double-sided easel with paper and pots of paint.",
       "interactions": [
         {
@@ -264,6 +270,7 @@
       ],
       "price": 180,
       "category": "kids",
+      "freeRotation": true,
       "description": "A round pit full of coloured balls.",
       "interactions": [
         {
@@ -292,6 +299,7 @@
       ],
       "price": 60,
       "category": "kids",
+      "freeRotation": true,
       "seat": {
         "height": 0.24,
         "forward": 0.05

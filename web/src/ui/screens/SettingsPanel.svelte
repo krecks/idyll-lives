@@ -91,7 +91,7 @@
   const GRAPHICS_HINTS: Record<GraphicsPreset, string> = {
     low: 'For older laptops: simpler shadows, edges and lamps.',
     medium: 'For most computers: the full look.',
-    high: 'For strong graphics cards: sharper shadows, and mirrors reflect the room.',
+    high: 'For strong graphics cards: sharper shadows, and two mirrors reflect the room smoothly.',
   };
 
   // Remember restart-only values when opened during a game, to show a notice if they change.
@@ -285,7 +285,7 @@
       <p class="intro">If the game stutters, pick Low or a lower resolution.</p>
       <section>
         <h3>Quality</h3>
-        <SettingRow title="Graphics" hint={GRAPHICS_HINTS[settings.graphics]} details="Low: simpler shadows, edges and lamps, for older laptops. Medium: the full look, for most computers. High: sharper shadows, and mirrors reflect the room, for strong graphics cards." badges={[NEXT_LOAD]}>
+        <SettingRow title="Graphics" hint={GRAPHICS_HINTS[settings.graphics]} details="Low: simpler shadows, edges and lamps, for older laptops. Medium: the full look, for most computers. High: sharper shadows, and two mirrors reflect the room smoothly, for strong graphics cards." badges={[NEXT_LOAD]}>
           <Segmented
             label="Graphics"
             bind:value={settings.graphics}

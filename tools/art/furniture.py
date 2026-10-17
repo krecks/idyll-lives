@@ -1,4 +1,5 @@
-# Furniture entries for the base objects and their style variants (`model.<key>[@modern|@cozy|@minimal]`).
+# Furniture entries for the base objects (`model.<key>`). Objects have no styles any more; the style
+# designs below (`@modern|@cozy|@minimal`) are kept as parts to draw from, but only plain keys are written.
 #
 # All primitive parts (box, cylinder, cone, sphere, capsule, blob, lathe, torus; see
 # render/babylon/models.ts): designs from objects_extra.py (kept, recoloured or rebuilt here) and the
@@ -72,11 +73,42 @@ def shift(parts, dx=0.0, dy=0.0, dz=0.0, when=lambda p: True):
         out.append(q)
     return out
 
+def to_wall(parts, wall=-0.43):
+    """Parts reaching past the wall face (depth `wall`: -0.43 in a 1-deep footprint) cut back to it, for a
+    placeholder whose model stands on the face: a box (unturned, or turned only about its depth) loses what
+    is behind the face, anything else (and a thin box wholly behind it) moves forward onto it."""
+    out = []
+    for p in parts:
+        q = json.loads(json.dumps(p))
+        r = p.get('rotate', [0, 0, 0])
+        lo = OX.bounds(dict(p, shape='cylinder') if p['shape'] in ('lathe', 'torus') else p)[0][2]
+        front = p['at'][2] + p['size'][2] / 2
+        if lo < wall - 0.0005:
+            if p['shape'] == 'box' and not (r[0] or r[1]) and front > wall + 0.01:
+                q['size'][2], q['at'][2] = round(front - wall, 4), round((front + wall) / 2, 4)
+                if q.get('radius'): q['radius'] = round(min(q['radius'], q['size'][2] * 0.45), 4)
+            else:
+                q['at'][2] = round(q['at'][2] + wall - lo, 4)
+        out.append(q)
+    return out
+
+
+def turned(parts, forward=0.0):
+    """Copy of parts turned half round about the footprint's middle, then moved `forward` (m, to the front).
+    (Turned parts' x and z rotations change sign; their y rotation stays.)"""
+    out = []
+    for p in parts:
+        q = json.loads(json.dumps(p))
+        q['at'] = [round(-q['at'][0], 4), q['at'][1], round(-q['at'][2] + forward, 4)]
+        if 'rotate' in q: q['rotate'] = [-q['rotate'][0], q['rotate'][1], -q['rotate'][2]]
+        out.append(q)
+    return out
+
 
 # =============================================================================================
 # Fridge (1x1): back on the wall
 # =============================================================================================
-E['model.fridge'] = placeholder(FP.fridge_classic(0.74, 1.8, 0.67))                     # white, freezer on top, chrome bars
+E['model.fridge'] = placeholder(shift(FP.fridge_classic(0.74, 1.8, 0.67), dz=0.025))    # white, freezer on top, chrome bars; its back on the wall face
 E['model.fridge@modern'] = placeholder(FP.fridge_side_by_side(0.88, 1.84, 0.69, steel=STEEL))
 E['model.fridge@cozy'] = placeholder(OX.M['model.fridge@cozy'])
 E['model.fridge@minimal'] = placeholder(FP.fridge_classic(                               # handleless white, birch pulls, freezer drawer below
@@ -85,7 +117,8 @@ E['model.fridge@minimal'] = placeholder(FP.fridge_classic(                      
 # =============================================================================================
 # Sink (1x1): a vanity / kitchen sink cabinet (used in both rooms), worktop at 0.9 m
 # =============================================================================================
-E['model.sink'] = placeholder(FP.sink_cabinet(0.86, 0.92))                              # shaker doors, steel basin, gooseneck tap
+E['model.sink'] = placeholder([dict(q, at=[q['at'][0], q['at'][1], round(q['at'][2] + 0.025, 4)])  # shaker doors, steel basin, gooseneck tap;
+                               for q in FP.sink_cabinet(0.86, 0.92)])                    # 2.5 cm forward, its back on the wall face
 E['model.sink@modern'] = placeholder(FP.sink_cabinet(                                    # grey carcass, oak slab doors, black square tap
     0.88, 0.92, cab='#C9CBCC', door=OAK, door_fin='wood', top='#F4F4F2', basin='#B9BDC1', tap=BLACKMETAL, tap_fin='metal',
     style='slab', hole=0.4, handle=BLACKMETAL, hfin='metal') + [
@@ -98,7 +131,7 @@ E['model.sink@minimal'] = placeholder(OX.M['model.sink@minimal'])
 # =============================================================================================
 # Toilet (1x1): the Sim sits at the centre facing +Z (seat top ~0.44 m)
 # =============================================================================================
-E['model.toilet'] = placeholder(FP.toilet(body='#F6F6F4', seat='#EFEFEC'))
+E['model.toilet'] = placeholder(shift(FP.toilet(body='#F6F6F4', seat='#EFEFEC'), dz=0.01))   # the cistern's back on the wall's face, as the model's
 E['model.toilet@modern'] = placeholder(recolor(OX.M['model.toilet@modern'], {
     '#3A3C40': ('#D9D8D4', 'satin'), '#1E1F21': '#F6F6F4', '#2A2B2E': '#F0F0EE'}))
 E['model.toilet@cozy'] = placeholder(OX.M['model.toilet@cozy'])
@@ -107,7 +140,7 @@ E['model.toilet@minimal'] = placeholder(OX.M['model.toilet@minimal'])
 # =============================================================================================
 # Shower (1x1)
 # =============================================================================================
-E['model.shower'] = placeholder(FP.shower_cabin())                                      # white tray and tiles, chrome, glass
+E['model.shower'] = placeholder(shift(FP.shower_cabin(), dz=0.02))                       # white tray and tiles, chrome, glass; its back on the wall's face, as the model's
 E['model.shower@modern'] = placeholder(FP.shower_cabin(tray='#E4E3DF', tray_fin='satin', frame=BLACKMETAL, frame_fin='metal', wall='#D3D2CE',
                                                      joint='#BDBBB6') + [
     box([0.2, 0.012, 0.6], [x, 0.064, 0.0], OAK, 'wood', radius=0.004) for x in (-0.22, 0.0, 0.22)])   # teak duckboard
@@ -117,7 +150,7 @@ E['model.shower@minimal'] = placeholder(FP.shower_round())                      
 # =============================================================================================
 # Sofa (2x1, 2 seats at x = +-0.5): seat ~0.44 m
 # =============================================================================================
-E['model.sofa'] = placeholder(FP.sofa_classic())                                         # camel back, walnut show-wood, cabriole legs
+E['model.sofa'] = placeholder(to_wall(FP.sofa_classic()))                                # camel back, walnut show-wood, cabriole legs
 E['model.sofa@modern'] = placeholder(recolor(OX.M['model.sofa@modern'], {
     '#3A3C40': '#B9BCBE', '#46494E': '#C9CBCC', '#8A8F96': TEAL, '#B0B4BA': COGNAC,
     '#D0D3D6': (BLACKMETAL, 'metal')}))
@@ -170,7 +203,7 @@ E['model.bookshelf@cozy'] = placeholder(OX.M['model.bookshelf@cozy'])
 # =============================================================================================
 # Armchair (1x1): one seat at the centre
 # =============================================================================================
-E['model.armchair'] = placeholder(FP.armchair_bergere())                                 # matches the sofa: bergere in a walnut frame
+E['model.armchair'] = placeholder(to_wall(FP.armchair_bergere()))                        # matches the sofa: bergere in a walnut frame
 E['model.armchair@modern'] = placeholder(recolor(OX.M['model.armchair@modern'], {
     '#1E1F22': ('#BFC2C4', 'fabric'), '#2A2B2E': ('#D2D4D5', 'fabric'), '#6B7079': COGNAC}))
 E['model.armchair@cozy'] = placeholder(OX.M['model.armchair@cozy'])
@@ -219,7 +252,7 @@ def bed_base():
     return p
 
 
-E['model.bed'] = placeholder(bed_base())
+E['model.bed'] = placeholder(to_wall(bed_base(), -0.93))                                 # the headboard's back on the wall's face, as the model's
 
 # =============================================================================================
 # Computer desk (2x1): the Sim sits at the centre facing +Z, desk in front, monitor facing the Sim
@@ -283,13 +316,15 @@ def computer_desk(top=OAK, legs=BLACKMETAL, ped=WHITE, chair='#5F6E7A', top_fin=
     return p
 
 
-E['model.computerDesk'] = placeholder(computer_desk())
+E['model.computerDesk'] = placeholder(to_wall(computer_desk()))
 E['model.computerDesk@modern'] = placeholder(computer_desk(top='#F1F0EC', top_fin='gloss', ped=OAK, chair='#8E979E'))
 E['model.computerDesk@cozy'] = placeholder(computer_desk(top=HONEY, legs=WALNUT, leg_fin='wood', ped=CREAM, chair=RUST, lamp='#2F6B4F'))
 E['model.computerDesk@minimal'] = placeholder(computer_desk(top=BIRCH, legs='#F2F2F0', leg_fin='satin', ped='#F2F2F0', chair='#E6E2DA', lamp='#F2F2F0'))
 
 # =============================================================================================
-# Piano (2x1): console upright in the front half (keys facing -Z), bench at the centre line
+# Piano (2x1): console upright, drawn in the front half (keys facing -Z) with the bench at the centre line,
+# then turned round (`turned`): its back on the wall's face, the bench in front, the pianist facing the
+# back (content `seat.facing`; Blender's hobbies.py does the same)
 # =============================================================================================
 def piano(wood=WALNUT, trim=HONEY, cushion_col='#7A2E2E'):
     p = [
@@ -330,7 +365,7 @@ def piano(wood=WALNUT, trim=HONEY, cushion_col='#7A2E2E'):
     return p
 
 
-E['model.piano'] = placeholder(piano())
+E['model.piano'] = placeholder(turned(piano(), 0.027))
 E['model.piano@modern'] = placeholder(recolor(piano(wood='#F3F2EE', trim=OAK, cushion_col='#55595F'), {'#F3F2EE': ('#F3F2EE', 'gloss')}))
 E['model.piano@cozy'] = placeholder(piano(wood=HONEY, trim=WALNUT, cushion_col=RUST))
 E['model.piano@minimal'] = placeholder(piano(wood=BIRCH, trim='#F2F2F0', cushion_col='#E6E2DA'))
@@ -439,7 +474,7 @@ def weight_bench(pad='#3E6E73', frame='#5C6168'):
     return p
 
 
-E['model.weightBench'] = placeholder(weight_bench())
+E['model.weightBench'] = placeholder(shift(weight_bench(), dz=0.02))   # its rack's back on the wall's face, as the model's
 
 # ---- lighter recolours of the gym/hobby placeholders (black bodies read as holes) -------------
 E['model.treadmill'] = placeholder(recolor(OX.M['model.treadmill'], {
@@ -469,7 +504,7 @@ def workbench():
     return p
 
 
-E['model.workbench'] = placeholder(workbench())
+E['model.workbench'] = placeholder(to_wall(workbench()))
 
 # =============================================================================================
 # Floor lamp (1x1) variants (the base model is the brass lamp from objects_extra)
@@ -530,12 +565,13 @@ def whirlpool():
 def chef_stove():
     """2x1 range cooker: six burners, double oven, backsplash and a chimney hood."""
     steel, dark = STEEL, '#3A3D41'
-    p = [box([1.6, 0.86, 0.62], [0, 0.45, -0.14], steel, 'metal', radius=0.015),               # body
-         box([1.58, 0.06, 0.6], [0, 0.03, -0.14], dark, 'satin', radius=0.008),                  # kick plate, set in
-         box([1.62, 0.04, 0.62], [0, 0.9, -0.13], '#2F3236', 'satin', radius=0.01),              # hob top
-         box([1.6, 0.5, 0.03], [0, 1.17, -0.44], '#E7E5E0', 'gloss', radius=0.006),              # backsplash tiles
-         box([1.2, 0.5, 0.44], [0, 1.82, -0.23], steel, 'metal', radius=0.015),                 # hood
-         box([0.36, 0.5, 0.28], [0, 2.3, -0.3], steel, 'metal', radius=0.01)]                    # chimney
+    # (backs on the wall face, -0.43)
+    p = [box([1.6, 0.86, 0.6], [0, 0.45, -0.13], steel, 'metal', radius=0.015),                # body
+         box([1.58, 0.06, 0.58], [0, 0.03, -0.13], dark, 'satin', radius=0.008),                 # kick plate, set in
+         box([1.62, 0.04, 0.6], [0, 0.9, -0.13], '#2F3236', 'satin', radius=0.01),               # hob top
+         box([1.6, 0.5, 0.03], [0, 1.17, -0.415], '#E7E5E0', 'gloss', radius=0.006),             # backsplash tiles
+         box([1.2, 0.5, 0.42], [0, 1.82, -0.22], steel, 'metal', radius=0.015),                 # hood
+         box([0.36, 0.5, 0.26], [0, 2.3, -0.3], steel, 'metal', radius=0.01)]                    # chimney
     for i, x in enumerate((-0.5, 0.0, 0.5)):
         for z in (-0.28, 0.0):
             p += [cyl([0.2, 0.02, 0.2], [x, 0.93, z], '#1E1F22', 'satin', segments=16),         # grates
@@ -548,22 +584,18 @@ def chef_stove():
         p.append(cyl([0.05, 0.03, 0.05], [x, 0.8, 0.19], dark, 'satin', rotate=[90, 0, 0], segments=12))
     p += [lathe([0.26, 0.18, 0.26], [-0.5, 1.03, 0.0], '#B9BDC1', 'metal',
                 [[0, -0.5], [0.46, -0.5], [0.5, -0.4], [0.5, 0.5], [0.44, 0.5], [0.44, -0.38], [0, -0.38]]),  # stock pot
-          cyl([0.34, 0.03, 0.34], [0.5, 0.96, -0.28], '#2F3236', 'satin'),                        # frying pan
+          cyl([0.34, 0.03, 0.34], [0.5, 0.96, -0.26], '#2F3236', 'satin'),                        # frying pan
           rod([0.62, 0.96, -0.2], [0.82, 0.97, -0.05], 0.03, '#2F3236', 'satin', shape='box'),
-          sph([0.12, 0.06, 0.12], [0.5, 0.98, -0.28], '#E9C46A', 'satin', segments=10)]          # omelette
+          sph([0.12, 0.06, 0.12], [0.5, 0.98, -0.26], '#E9C46A', 'satin', segments=10)]          # omelette
     return p
 
 
 E['model.whirlpoolTub'] = placeholder(whirlpool())
-E['model.chefStove'] = placeholder(chef_stove())
+E['model.chefStove'] = placeholder(to_wall(chef_stove()))
 
-# Spare keys (not placed by the base content; the catalogue overrides diningChair and sideTable) and the
-# minimal shelf, in the same boxes as the library files they replaced.
-E['model.diningChair'] = placeholder(FP.painted_chair())                                  # 0.43 x 0.96 x 0.54, seat 0.46
-E['model.sideTable'] = placeholder(FP.side_table(0.55, 0.55, 0.45))                       # top 0.55
-E['model.stove'] = placeholder(FP.stove_electric())                                       # 0.5 x 0.86 x 0.65
-E['model.plantSmall'] = placeholder(FP.potted_aloe())                                     # 0.17 x 0.27
-E['model.ceilingLamp'] = placeholder(FP.pendant_globe())                                  # 0.43 globe, 0.95 drop
+# The minimal shelf, in the same box as the library file it replaced. The dining chair and side table are the
+# catalogue's alone (catalog.py), as their models. (The spare `model.stove`, `plantSmall` and `ceilingLamp`, which
+# nothing drew, are gone; `furniture_prims.py` keeps their pieces.)
 E['model.bookshelf@minimal'] = placeholder(FP.cube_shelf())                               # birch cube shelf, 0.9 x 1.3 x 0.31
 
 # =============================================================================================
@@ -606,8 +638,9 @@ def main(path):
         print(f'{k:26s} {"glTF " + e["url"].split("/")[-1] if "url" in e else "parts"} {len(parts)} parts {",".join(fins)}')
         for s in issues: print('   !', s)
         bad += len(issues)
-    json.dump(E, open(path, 'w'), indent=2)
-    print(f'{len(E)} entries -> {path}; {bad} issue(s)')
+    plain = {k: e for k, e in E.items() if '@' not in k}
+    json.dump(plain, open(path, 'w'), indent=2)
+    print(f'{len(plain)} entries -> {path}; {bad} issue(s)')
 
 
 if __name__ == '__main__':

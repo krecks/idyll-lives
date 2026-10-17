@@ -1,0 +1,421 @@
+{
+  "$comment": "Blender-built play and yard things (tools/art/blender/families/yard.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts and the washing goes out on the line and stays out.",
+  "version": 1,
+  "entries": {
+    "model.sandbox": {
+      "type": "model",
+      "url": "../../models/yard/sandbox.glb",
+      "materials": {
+        "bucket": {
+          "finish": "material.finish.satin"
+        },
+        "flag": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.wood"
+        },
+        "haft": {
+          "finish": "material.finish.satin"
+        },
+        "sand": {
+          "finish": "material.finish.matte"
+        },
+        "sand_damp": {
+          "finish": "material.finish.matte"
+        },
+        "spade": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandcastle": "castle"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/sandbox.far.glb"
+    },
+    "model.bikeRack": {
+      "type": "model",
+      "url": "../../models/yard/bikeRack.glb",
+      "materials": {
+        "bike": {
+          "finish": "material.finish.gloss"
+        },
+        "rack": {
+          "finish": "material.finish.metal"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tuneUp": "wheel_up"
+        },
+        "loops": {
+          "tuneUp": "wheel_turn"
+        }
+      },
+      "paint": [
+        {
+          "material": "rack",
+          "label": "Rack"
+        },
+        {
+          "material": "bike",
+          "label": "Bike"
+        }
+      ],
+      "far": "../../models/yard/bikeRack.far.glb"
+    },
+    "model.raisedBed": {
+      "type": "model",
+      "url": "../../models/yard/raisedBed.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.satin"
+        },
+        "bed_post": {
+          "finish": "material.finish.satin"
+        },
+        "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "carrot_top": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "lettuce": {
+          "finish": "material.finish.foliage"
+        },
+        "lettuce_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "tomato": {
+          "finish": "material.finish.satin"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "growth": "grow",
+        "uses": {
+          "harvest": "harvest",
+          "tend": {
+            "clip": "rustle",
+            "delay": 0.6,
+            "every": 2.4
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/yard/raisedBed.far.glb"
+    },
+    "model.shedSmall": {
+      "type": "model",
+      "url": "../../models/yard/shedSmall.glb",
+      "materials": {
+        "axe": {
+          "finish": "material.finish.metal"
+        },
+        "box_wood": {
+          "finish": "material.finish.satin"
+        },
+        "flower_lilac": {
+          "finish": "material.finish.satin"
+        },
+        "flower_pink": {
+          "finish": "material.finish.satin"
+        },
+        "flower_red": {
+          "finish": "material.finish.satin"
+        },
+        "flower_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "haft": {
+          "finish": "material.finish.satin"
+        },
+        "inside": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "pane": {
+          "finish": "material.finish.gloss"
+        },
+        "plinth": {
+          "finish": "material.finish.matte"
+        },
+        "roof": {
+          "finish": "material.finish.matte"
+        },
+        "shed": {
+          "finish": "material.finish.wood"
+        },
+        "shed_door": {
+          "finish": "material.finish.satin"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "potter": "door_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "shed",
+          "label": "Wood"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        },
+        {
+          "material": "shed_door",
+          "label": "Door"
+        }
+      ],
+      "far": "../../models/yard/shedSmall.far.glb"
+    },
+    "model.greenhouse": {
+      "type": "model",
+      "url": "../../models/yard/greenhouse.glb",
+      "materials": {
+        "compost": {
+          "finish": "material.finish.matte"
+        },
+        "gh_frame": {
+          "finish": "material.finish.satin"
+        },
+        "gh_wall": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "glass_bar": {
+          "finish": "material.finish.glass"
+        },
+        "gravel": {
+          "finish": "material.finish.matte"
+        },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "haft": {
+          "finish": "material.finish.satin"
+        },
+        "paving": {
+          "finish": "material.finish.matte"
+        },
+        "staging": {
+          "finish": "material.finish.satin"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tend": "door_open",
+          "harvest": "door_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "gh_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "gh_wall",
+          "label": "Wall"
+        }
+      ],
+      "far": "../../models/yard/greenhouse.far.glb"
+    },
+    "model.compostBin": {
+      "type": "model",
+      "url": "../../models/yard/compostBin.glb",
+      "materials": {
+        "bin": {
+          "finish": "material.finish.wood"
+        },
+        "compost": {
+          "finish": "material.finish.matte"
+        },
+        "greens": {
+          "finish": "material.finish.satin"
+        },
+        "peel": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "compost": "lid_open"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "bin",
+          "label": "Bin"
+        }
+      ],
+      "far": "../../models/yard/compostBin.far.glb"
+    },
+    "model.rainBarrel": {
+      "type": "model",
+      "url": "../../models/yard/rainBarrel.glb",
+      "materials": {
+        "barrel": {
+          "finish": "material.finish.satin"
+        },
+        "barrel_dark": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "pipe": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "barrel",
+          "label": "Barrel"
+        }
+      ],
+      "far": "../../models/yard/rainBarrel.far.glb"
+    },
+    "model.clothesline": {
+      "type": "model",
+      "url": "../../models/yard/clothesline.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.fabric"
+        },
+        "denim": {
+          "finish": "material.finish.fabric"
+        },
+        "line": {
+          "finish": "material.finish.satin"
+        },
+        "peg": {
+          "finish": "material.finish.fabric"
+        },
+        "pink": {
+          "finish": "material.finish.fabric"
+        },
+        "posts": {
+          "finish": "material.finish.metal"
+        },
+        "red": {
+          "finish": "material.finish.fabric"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "washing": {
+          "finish": "material.finish.fabric"
+        },
+        "white": {
+          "finish": "material.finish.fabric"
+        },
+        "yellow": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "washing": "washing"
+        },
+        "open": "washing"
+      },
+      "paint": [
+        {
+          "material": "posts",
+          "label": "Posts"
+        },
+        {
+          "material": "washing",
+          "label": "Washing"
+        }
+      ],
+      "far": "../../models/yard/clothesline.far.glb"
+    },
+    "model.firewoodStack": {
+      "type": "model",
+      "url": "../../models/yard/firewoodStack.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "bark_dark": {
+          "finish": "material.finish.bark"
+        },
+        "bark_light": {
+          "finish": "material.finish.bark"
+        },
+        "end_grain": {
+          "finish": "material.finish.matte"
+        },
+        "end_grain_dark": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Shelter"
+        }
+      ],
+      "far": "../../models/yard/firewoodStack.far.glb"
+    }
+  }
+}

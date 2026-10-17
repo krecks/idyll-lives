@@ -1,0 +1,1141 @@
+{
+  "$comment": "Blender-built tabletop things (tools/art/blender/families/tabletop.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes, so each costs one draw call (the see-through ones and the parts kept for a use to come one more, the alarm clock's two hands two more).",
+  "version": 1,
+  "entries": {
+    "model.kettle": {
+      "type": "model",
+      "url": "../../models/tabletop/kettle.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
+        "kettle": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "kettle",
+          "label": "Body"
+        },
+        {
+          "material": "dark",
+          "label": "Base, handle & lid"
+        }
+      ]
+    },
+    "model.toaster": {
+      "type": "model",
+      "url": "../../models/tabletop/toaster.glb",
+      "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "toaster": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "toaster",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.blender": {
+      "type": "model",
+      "url": "../../models/tabletop/blender.glb",
+      "materials": {
+        "blender_base": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "jug": {
+          "finish": "material.finish.gloss"
+        },
+        "smoothie": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "blender_base",
+          "label": "Body"
+        },
+        {
+          "material": "smoothie",
+          "label": "Smoothie"
+        }
+      ]
+    },
+    "model.standMixer": {
+      "type": "model",
+      "url": "../../models/tabletop/standMixer.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "mixer": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "mixer",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.espressoMachineSmall": {
+      "type": "model",
+      "url": "../../models/tabletop/espressoMachineSmall.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "espresso": {
+          "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "espresso",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.knifeBlock": {
+      "type": "model",
+      "url": "../../models/tabletop/knifeBlock.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "knife_block": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "knife_block",
+          "label": "Body"
+        },
+        {
+          "material": "dark",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.utensilCrock": {
+      "type": "model",
+      "url": "../../models/tabletop/utensilCrock.glb",
+      "materials": {
+        "crock": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "wood": {
+          "finish": "material.finish.satin"
+        },
+        "wood_dark": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "crock",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.cuttingBoard": {
+      "type": "model",
+      "url": "../../models/tabletop/cuttingBoard.glb",
+      "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "board",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.breadBin": {
+      "type": "model",
+      "url": "../../models/tabletop/breadBin.glb",
+      "materials": {
+        "bread_bin": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "bread_bin",
+          "label": "Body"
+        },
+        {
+          "material": "wood",
+          "label": "Ends & handle"
+        }
+      ]
+    },
+    "model.spiceJars": {
+      "type": "model",
+      "url": "../../models/tabletop/spiceJars.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "rack": {
+          "finish": "material.finish.satin"
+        },
+        "spice_a": {
+          "finish": "material.finish.matte"
+        },
+        "spice_b": {
+          "finish": "material.finish.matte"
+        },
+        "spice_c": {
+          "finish": "material.finish.matte"
+        },
+        "spice_d": {
+          "finish": "material.finish.matte"
+        },
+        "spice_e": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "rack",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.cookieJar": {
+      "type": "model",
+      "url": "../../models/tabletop/cookieJar.glb",
+      "materials": {
+        "cookie": {
+          "finish": "material.finish.matte"
+        },
+        "cookie_dark": {
+          "finish": "material.finish.matte"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "jar_lid": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "jar_lid",
+          "label": "Lid"
+        }
+      ]
+    },
+    "model.fruitBowl": {
+      "type": "model",
+      "url": "../../models/tabletop/fruitBowl.glb",
+      "materials": {
+        "apple_green": {
+          "finish": "material.finish.satin"
+        },
+        "fruit_bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "orange": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        },
+        "stalk": {
+          "finish": "material.finish.matte"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "fruit_bowl",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.plateSet": {
+      "type": "model",
+      "url": "../../models/tabletop/plateSet.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
+        "napkin": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "plate_rim": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "plate",
+          "label": "Body"
+        },
+        {
+          "material": "plate_rim",
+          "label": "Rim"
+        },
+        {
+          "material": "napkin",
+          "label": "Napkin"
+        }
+      ]
+    },
+    "model.cakeStand": {
+      "type": "model",
+      "url": "../../models/tabletop/cakeStand.glb",
+      "materials": {
+        "cake_stand": {
+          "finish": "material.finish.gloss"
+        },
+        "icing": {
+          "finish": "material.finish.gloss"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        },
+        "sponge": {
+          "finish": "material.finish.matte"
+        },
+        "stalk": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "cake_stand",
+          "label": "Body"
+        },
+        {
+          "material": "icing",
+          "label": "Icing"
+        }
+      ]
+    },
+    "model.teapotSet": {
+      "type": "model",
+      "url": "../../models/tabletop/teapotSet.glb",
+      "materials": {
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "teapot": {
+          "finish": "material.finish.gloss"
+        },
+        "teapot_trim": {
+          "finish": "material.finish.gloss"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "teapot",
+          "label": "Body"
+        },
+        {
+          "material": "tray",
+          "label": "Tray"
+        }
+      ]
+    },
+    "model.mugs": {
+      "type": "model",
+      "url": "../../models/tabletop/mugs.glb",
+      "materials": {
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "mug_a": {
+          "finish": "material.finish.gloss"
+        },
+        "mug_b": {
+          "finish": "material.finish.gloss"
+        },
+        "mug_c": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "mug_a",
+          "label": "Mug 1"
+        },
+        {
+          "material": "mug_b",
+          "label": "Mug 2"
+        },
+        {
+          "material": "mug_c",
+          "label": "Mug 3"
+        }
+      ]
+    },
+    "model.wineGlasses": {
+      "type": "model",
+      "url": "../../models/tabletop/wineGlasses.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "wine": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "bottle",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.candlesticks": {
+      "type": "model",
+      "url": "../../models/tabletop/candlesticks.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Body"
+        },
+        {
+          "material": "candle",
+          "label": "Candles"
+        }
+      ]
+    },
+    "model.bookStack": {
+      "type": "model",
+      "url": "../../models/tabletop/bookStack.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.matte"
+        },
+        "book_b": {
+          "finish": "material.finish.matte"
+        },
+        "book_c": {
+          "finish": "material.finish.matte"
+        },
+        "book_d": {
+          "finish": "material.finish.matte"
+        },
+        "pages": {
+          "finish": "material.finish.matte"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "book_a",
+          "label": "Book 1"
+        },
+        {
+          "material": "book_b",
+          "label": "Book 2"
+        },
+        {
+          "material": "book_c",
+          "label": "Book 3"
+        },
+        {
+          "material": "book_d",
+          "label": "Book 4"
+        }
+      ]
+    },
+    "model.booksUpright": {
+      "type": "model",
+      "url": "../../models/tabletop/booksUpright.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.matte"
+        },
+        "book_b": {
+          "finish": "material.finish.matte"
+        },
+        "book_c": {
+          "finish": "material.finish.matte"
+        },
+        "book_d": {
+          "finish": "material.finish.matte"
+        },
+        "book_e": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Bookends"
+        },
+        {
+          "material": "book_a",
+          "label": "Book 1"
+        },
+        {
+          "material": "book_c",
+          "label": "Book 2"
+        },
+        {
+          "material": "book_b",
+          "label": "Book 3"
+        },
+        {
+          "material": "book_e",
+          "label": "Book 4"
+        },
+        {
+          "material": "book_d",
+          "label": "Book 5"
+        }
+      ]
+    },
+    "model.vaseFlowers": {
+      "type": "model",
+      "url": "../../models/tabletop/vaseFlowers.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "orange": {
+          "finish": "material.finish.satin"
+        },
+        "rose": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "vase",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.vaseSmall": {
+      "type": "model",
+      "url": "../../models/tabletop/vaseSmall.glb",
+      "materials": {
+        "bud_vase": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "bud_vase",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.potSucculent": {
+      "type": "model",
+      "url": "../../models/tabletop/potSucculent.glb",
+      "materials": {
+        "pot_pale": {
+          "finish": "material.finish.matte"
+        },
+        "succulent": {
+          "finish": "material.finish.satin"
+        },
+        "succulent_light": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "pot_pale",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.potCactus": {
+      "type": "model",
+      "url": "../../models/tabletop/potCactus.glb",
+      "materials": {
+        "cactus": {
+          "finish": "material.finish.satin"
+        },
+        "pink": {
+          "finish": "material.finish.satin"
+        },
+        "sand": {
+          "finish": "material.finish.matte"
+        },
+        "terracotta": {
+          "finish": "material.finish.matte"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "terracotta",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.potSmall": {
+      "type": "model",
+      "url": "../../models/tabletop/potSmall.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "pot_white",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.photoFrame": {
+      "type": "model",
+      "url": "../../models/tabletop/photoFrame.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "photo_hill": {
+          "finish": "material.finish.matte"
+        },
+        "photo_sky": {
+          "finish": "material.finish.matte"
+        },
+        "teapot_trim": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.tableClock": {
+      "type": "model",
+      "url": "../../models/tabletop/tableClock.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clock": {
+          "finish": "material.finish.gloss"
+        },
+        "clock_face": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "clock": {
+          "hour": "hour_hand",
+          "minute": "minute_hand",
+          "at": 610
+        }
+      },
+      "paint": [
+        {
+          "material": "clock",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Bells & legs"
+        }
+      ]
+    },
+    "model.globe": {
+      "type": "model",
+      "url": "../../models/tabletop/globe.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "globe": {
+          "finish": "material.finish.gloss"
+        },
+        "land": {
+          "finish": "material.finish.matte"
+        },
+        "wood_dark": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "globe",
+          "label": "Body"
+        },
+        {
+          "material": "wood_dark",
+          "label": "Stand"
+        }
+      ]
+    },
+    "model.snowGlobe": {
+      "type": "model",
+      "url": "../../models/tabletop/snowGlobe.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "fir": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "snow": {
+          "finish": "material.finish.satin"
+        },
+        "wood_dark": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "wood_dark",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.trophy": {
+      "type": "model",
+      "url": "../../models/tabletop/trophy.glb",
+      "materials": {
+        "trophy": {
+          "finish": "material.finish.metal"
+        },
+        "trophy_base": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "trophy",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.sculptureSmall": {
+      "type": "model",
+      "url": "../../models/tabletop/sculptureSmall.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "plinth": {
+          "finish": "material.finish.matte"
+        },
+        "sculpture": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "sculpture",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Ball"
+        }
+      ]
+    },
+    "model.soapSet": {
+      "type": "model",
+      "url": "../../models/tabletop/soapSet.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "dispenser": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "soap": {
+          "finish": "material.finish.matte"
+        },
+        "soap_tray": {
+          "finish": "material.finish.matte"
+        },
+        "tumbler": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "soap_tray",
+          "label": "Body"
+        },
+        {
+          "material": "dispenser",
+          "label": "Dispenser"
+        }
+      ]
+    },
+    "model.towelStack": {
+      "type": "model",
+      "url": "../../models/tabletop/towelStack.glb",
+      "materials": {
+        "towel_a": {
+          "finish": "material.finish.matte"
+        },
+        "towel_b": {
+          "finish": "material.finish.matte"
+        },
+        "towel_c": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "towel_a",
+          "label": "Towel 1"
+        },
+        {
+          "material": "towel_b",
+          "label": "Towel 2"
+        },
+        {
+          "material": "towel_c",
+          "label": "Towel 3"
+        }
+      ]
+    },
+    "model.perfumeTray": {
+      "type": "model",
+      "url": "../../models/tabletop/perfumeTray.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "perfume_a": {
+          "finish": "material.finish.gloss"
+        },
+        "perfume_b": {
+          "finish": "material.finish.gloss"
+        },
+        "perfume_c": {
+          "finish": "material.finish.gloss"
+        },
+        "perfume_tray": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "perfume_tray",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.deskOrganiser": {
+      "type": "model",
+      "url": "../../models/tabletop/deskOrganiser.glb",
+      "materials": {
+        "organiser": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pen_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "pen_red": {
+          "finish": "material.finish.gloss"
+        },
+        "pen_yellow": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "organiser",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.laptopClosed": {
+      "type": "model",
+      "url": "../../models/tabletop/laptopClosed.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "laptop": {
+          "finish": "material.finish.metal"
+        },
+        "logo": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "laptop",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.monitor": {
+      "type": "model",
+      "url": "../../models/tabletop/monitor.glb",
+      "materials": {
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "monitor",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.stuffedToy": {
+      "type": "model",
+      "url": "../../models/tabletop/stuffedToy.glb",
+      "materials": {
+        "bear": {
+          "finish": "material.finish.matte"
+        },
+        "bear_light": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "bear",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.toyBlocks": {
+      "type": "model",
+      "url": "../../models/tabletop/toyBlocks.glb",
+      "materials": {
+        "block_a": {
+          "finish": "material.finish.satin"
+        },
+        "block_b": {
+          "finish": "material.finish.satin"
+        },
+        "block_c": {
+          "finish": "material.finish.satin"
+        },
+        "block_d": {
+          "finish": "material.finish.satin"
+        },
+        "block_e": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "block_a",
+          "label": "Block 1"
+        },
+        {
+          "material": "block_b",
+          "label": "Block 2"
+        },
+        {
+          "material": "block_c",
+          "label": "Block 3"
+        }
+      ]
+    }
+  }
+}

@@ -132,8 +132,11 @@ def joints(family, stage):
         hs = (p['upper'] / ADULT['upper']) ** 0.5
         k1 = wr + 0.055 * hs * d
         k2 = k1 + 0.03 * hs * d
-        t1 = wr + np.array([0, -0.01, 0.02]) * hs
-        t2 = t1 + 0.025 * hs * (d + np.array([0, 0, 1])) / np.sqrt(2)
+        # The thumb's base (at the wrist end of the palm's thumb side) and its knuckle off the palm,
+        # in palm lengths along the hand, towards the palm and forward (the thumb side).
+        palm = np.array([-d[1], d[0], 0])
+        t1 = wr + 0.055 * hs * (0.12 * d + 0.12 * palm + [0, 0, 0.28])
+        t2 = wr + 0.055 * hs * (0.6 * d + 0.25 * palm + [0, 0, 0.45])
         for name, v in (('upperarm', up), ('lowerarm', el), ('hand', wr), ('fingers_01', k1), ('fingers_02', k2), ('thumb_01', t1), ('thumb_02', t2)):
             J[f'{name}_{s}'] = tuple(v * M)
         hx = -p['hip_w'] * sx

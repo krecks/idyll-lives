@@ -1,0 +1,750 @@
+{
+  "$comment": "Blender-built office models (tools/art/blender/families/office.py): the desks, the desk chairs, the filing cabinet and the boards. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
+  "version": 1,
+  "entries": {
+    "model.deskSimple": {
+      "type": "model",
+      "url": "../../models/office/deskSimple.glb",
+      "materials": {
+        "drawers": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "drawers",
+          "label": "Drawers"
+        }
+      ]
+    },
+    "model.deskCorner": {
+      "type": "model",
+      "url": "../../models/office/deskCorner.glb",
+      "materials": {
+        "drawers": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "laminate": {
+          "finish": "material.finish.satin"
+        },
+        "oak_panel": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "laminate",
+          "label": "Top"
+        },
+        {
+          "material": "oak_panel",
+          "label": "Frame"
+        },
+        {
+          "material": "drawers",
+          "label": "Drawers"
+        }
+      ]
+    },
+    "model.deskStanding": {
+      "type": "model",
+      "url": "../../models/office/deskStanding.glb",
+      "materials": {
+        "birch": {
+          "finish": "material.finish.wood"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "shelf": {
+          "finish": "material.finish.satin"
+        },
+        "wallpaper": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "browse": "tray_out",
+          "code": "tray_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "birch",
+          "label": "Top"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "shelf",
+          "label": "Shelf"
+        }
+      ]
+    },
+    "model.deskExecutive": {
+      "type": "model",
+      "url": "../../models/office/deskExecutive.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "inlay": {
+          "finish": "material.finish.satin"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut2": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_case": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Top"
+        },
+        {
+          "material": "walnut_case",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut2",
+          "label": "Drawers"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        },
+        {
+          "material": "inlay",
+          "label": "Desk pad"
+        }
+      ]
+    },
+    "model.computerDesk": {
+      "type": "model",
+      "url": "../../models/office/computerDesk.glb",
+      "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "cactus": {
+          "finish": "material.finish.satin"
+        },
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chair": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "drawers": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "lamp": {
+          "finish": "material.finish.metal"
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
+        },
+        "notebook": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        },
+        "wallpaper": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "code": "tray_out",
+          "write": "tray_out",
+          "markets": "tray_out",
+          "browse": "tray_out",
+          "homework": "tray_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "drawers",
+          "label": "Drawers"
+        },
+        {
+          "material": "tray",
+          "label": "Keyboard tray"
+        },
+        {
+          "material": "chair",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.deskWriting": {
+      "type": "model",
+      "url": "../../models/office/deskWriting.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chair_sage": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "drawers": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "lamp": {
+          "finish": "material.finish.metal"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
+        },
+        "notebook": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "write": "drawer_open",
+          "homework": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "drawers",
+          "label": "Drawers"
+        },
+        {
+          "material": "chair_sage",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.deskLaptop": {
+      "type": "model",
+      "url": "../../models/office/deskLaptop.glb",
+      "materials": {
+        "aluminium": {
+          "finish": "material.finish.metal"
+        },
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chair": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "drawers": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
+        },
+        "notebook": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "browse": "lid_open",
+          "code": "lid_open",
+          "write": "lid_open",
+          "homework": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "drawers",
+          "label": "Drawer"
+        },
+        {
+          "material": "aluminium",
+          "label": "Laptop"
+        },
+        {
+          "material": "chair",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.computerGaming": {
+      "type": "model",
+      "url": "../../models/office/computerGaming.glb",
+      "materials": {
+        "accent": {
+          "finish": "material.finish.gloss"
+        },
+        "blade": {
+          "finish": "material.finish.satin"
+        },
+        "case": {
+          "finish": "material.finish.satin"
+        },
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chair_gamer": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "desk": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "mat": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "screen2": {
+          "finish": "material.finish.gloss"
+        },
+        "side": {
+          "finish": "material.finish.gloss"
+        },
+        "wallpaper": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "game": "fans"
+        }
+      },
+      "paint": [
+        {
+          "material": "desk",
+          "label": "Desk"
+        },
+        {
+          "material": "case",
+          "label": "PC & monitors"
+        },
+        {
+          "material": "accent",
+          "label": "Lights"
+        },
+        {
+          "material": "chair_gamer",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.chairExecutive": {
+      "type": "model",
+      "url": "../../models/office/chairExecutive.glb",
+      "materials": {
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "leather2": {
+          "finish": "material.finish.satin"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel",
+          "write": "swivel",
+          "homework": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.chairTask": {
+      "type": "model",
+      "url": "../../models/office/chairTask.glb",
+      "materials": {
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "fabric": {
+          "finish": "material.finish.fabric"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "mesh": {
+          "finish": "material.finish.fabric"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel",
+          "write": "swivel",
+          "homework": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "fabric",
+          "label": "Seat"
+        },
+        {
+          "material": "mesh",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.officeChair": {
+      "type": "model",
+      "url": "../../models/office/officeChair.glb",
+      "materials": {
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "swivel"
+        },
+        "hold": 0.6,
+        "ride": "swivel"
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "upholstery",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.filingCabinet": {
+      "type": "model",
+      "url": "../../models/office/filingCabinet.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "label": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "file": "drawer_open"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "steel",
+          "label": "Cabinet"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.whiteboard": {
+      "type": "model",
+      "url": "../../models/office/whiteboard.glb",
+      "materials": {
+        "aluminium": {
+          "finish": "material.finish.metal"
+        },
+        "board": {
+          "finish": "material.finish.gloss"
+        },
+        "ink_black": {
+          "finish": "material.finish.gloss"
+        },
+        "ink_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ink_red": {
+          "finish": "material.finish.gloss"
+        },
+        "label": {
+          "finish": "material.finish.gloss"
+        },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "note2": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "plan": "scribble"
+        }
+      },
+      "paint": [
+        {
+          "material": "board",
+          "label": "Board"
+        },
+        {
+          "material": "aluminium",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.corkboard": {
+      "type": "model",
+      "url": "../../models/office/corkboard.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cork": {
+          "finish": "material.finish.matte"
+        },
+        "cork_frame": {
+          "finish": "material.finish.wood"
+        },
+        "ink_black": {
+          "finish": "material.finish.gloss"
+        },
+        "ink_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "note2": {
+          "finish": "material.finish.matte"
+        },
+        "note3": {
+          "finish": "material.finish.matte"
+        },
+        "note4": {
+          "finish": "material.finish.matte"
+        },
+        "pin": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "cork",
+          "label": "Board"
+        },
+        {
+          "material": "cork_frame",
+          "label": "Frame"
+        }
+      ]
+    }
+  }
+}

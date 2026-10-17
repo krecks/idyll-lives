@@ -58,7 +58,7 @@ import {
 import { benchDiag } from '../../debug/benchFlags';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type WallEdge, type WorldStructure } from '../../core/protocol';
+import { colorsKey, lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type PartColors, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { RenderQuality } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
 import { LOOK } from '../look';
@@ -93,8 +93,8 @@ import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
-import { Geo } from './geometry';
-import { buildAhead, buildModel, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { Geo, LOOK as CUT } from './geometry';
+import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -103,7 +103,9 @@ import { ResizeHandles } from './handles';
 import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
-import { BuildEffects, type PopTarget } from './buildFx';
+import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
+import { tableRooms } from './tableTuck';
+import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
 import { renderScale, watchPixelRatio } from './resolution';
@@ -162,6 +164,8 @@ const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
+/** Seconds a lamp takes to go off or on at its switch. */
+const LAMP_SWITCH_FADE = 0.25;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
@@ -178,8 +182,8 @@ interface PlacedObject {
   height: number;
   /** Bottom of the model above `y0` (things on a wall or the ceiling hang higher). */
   bottom: number;
-  /** Things on a wall: the way they face (`rot`), to hide them with the wall they hang on. */
-  wallRot?: number;
+  /** Things on a wall: the cutaway look bits that drop their wall (`wallCutBits`), to hide them with it. */
+  wallCut?: number;
   /** Its instance in the template's matrix buffer (for the placement pop). */
   pop: PopTarget;
   /** Its contact shadow's instance. */
@@ -301,6 +305,8 @@ export class BabylonRenderer implements Renderer {
    */
   private readonly templates = new Map<string, Promise<ModelTemplate>>();
   private readonly templatesInUse = new Set<string>();
+  /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
+  private readonly paintedTemplates = new Set<string>();
   /** Landscape shadow casters (the landscape survives lot switches; rebuilt only for a different town). */
   private natureCasters: Mesh[] = [];
   /** Landscapes by town (seed and size), and which one each layer shows. */
@@ -411,6 +417,17 @@ export class BabylonRenderer implements Renderer {
   /** Rooms where everyone is asleep (lights out), and rooms with someone awake (scratch). */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
+  /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
+  private lampsOff: ReadonlySet<number> | null = null;
+  private lampsSettled = true;
+  /** Per lamp going off, off or coming on (object id): 1 on, 0 off, eased between; unlisted lamps are on. */
+  private readonly lampOn = new Map<number, number>();
+  /** The viewed lot's lamps (all of them, also those without an interior light to go round) by room. */
+  private lotLamps: { room: number; lamp?: number }[] = [];
+  /** Rooms whose lamps are all switched off: their windows go dark as when everyone is asleep. */
+  private readonly unlitRooms = new Set<number>();
+  /** More lights than interior lights to go round (Low): lamps switched off give theirs up (`placeRoomLights`). */
+  private lightsShort = false;
   /** Indices of the snapshot layout's sleeping action tags. */
   private sleepActions: { tags: readonly string[]; ids: Set<number> } | null = null;
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`). */
@@ -449,6 +466,8 @@ export class BabylonRenderer implements Renderer {
   private ghostArrow!: Mesh;
   private ghostArrowMaterial!: StandardMaterial;
   private ghostValid = true;
+  /** The ghost hangs on a wall (`PlacementGhost.wall`): no thing on a wall is hidden with its wall. */
+  private ghostOnWall = false;
   /** The ghost glides to its tile and turns smoothly; it floats a little, as if held. */
   private ghostShown = false;
   private readonly ghostGoal = new Vector3();
@@ -460,8 +479,16 @@ export class BabylonRenderer implements Renderer {
   /** The placed object in hand, hidden (its instances shrunk to nothing; their matrices kept to restore). */
   private heldId: number | null = null;
   private held: { id: number; saved: { target: PopTarget; matrix: Float32Array }[] } | null = null;
+  /** Chairs drawn pulled up to their table (`Characters.pulled`): how far each is in, and its matrices where it stands. */
+  private pulledIn = new Map<number, { by: number; saved: { target: PopTarget; matrix: Float32Array }[] }>();
+  /** The seats that face a table, and their turns (quarter turns). */
+  private seatTurns = new Map<number, number>();
   private heldRelease: ReturnType<typeof setTimeout> | null = null;
   private fx!: BuildEffects;
+  /** Placed objects' moving parts, played while residents use them. */
+  private readonly motion = new ObjectMotion();
+  /** What glows at night (lamp shades, screens: a template's `glow`), per model: its instances' strengths and rooms. */
+  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[]; lamps: number[] }[] = [];
   private previewMeshes!: Record<'wall' | 'door' | 'window' | 'open', Mesh>;
   private previewBuffers!: Record<'wall' | 'door' | 'window' | 'open', Float32Array>;
   private previewValid = true;
@@ -484,6 +511,7 @@ export class BabylonRenderer implements Renderer {
   private readonly mOut = new Matrix();
   private simCount = 0;
   private readonly simInView = (x: number, z: number) => this.inView(x, z, SIM_VIEW_MARGIN);
+  private readonly residentRows = (mesh: object) => this.characters.rowsOf(mesh);
   private readonly vTmp = new Vector3();
   private readonly vScale = new Vector3();
   private readonly qTmp = new Quaternion();
@@ -599,10 +627,14 @@ export class BabylonRenderer implements Renderer {
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
+    this.characters.setRide((id) => this.motion.ride(id));
+    this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // Reflections show the game world (not the shadow-only copies or the overview).
-    this.mirrors = new Mirrors(scene, this.diag.has('nomirrors') ? 0 : this.quality.mirrors, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    const q = this.quality;
+    this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    this.motion.setAmbientRange(this.quality.ambientRange);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
     window.addEventListener('resize', this.onResize);
@@ -750,6 +782,7 @@ export class BabylonRenderer implements Renderer {
     await this.pace();
     const streetCasters = await this.street.build(world, this.view, () => this.pace());
     await this.buildObjects(world);
+    this.pullUpChairs(world);
     this.hideHeld();
     await this.pace();
     await this.buildSims(world);
@@ -799,15 +832,18 @@ export class BabylonRenderer implements Renderer {
       this.lastLightAt = frame.now;
       this.resetSnapshot();
     }
+    // Lamps switched off or on fade out or in.
+    const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
-    // And their windows stop glowing with them.
-    if (this.fadeWindowGlow(this.frameDt / 1000) && this.lampsLevel > 0) {
+    // And their windows (and lamp shades, screens) stop glowing with them.
+    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && this.lampsLevel > 0) {
       this.house.setWindowGlow(this.windowGlowOn);
+      this.applyGlow();
       this.resetSnapshot();
     }
     this.steerCamera(this.frameDt / 1000);
@@ -828,11 +864,22 @@ export class BabylonRenderer implements Renderer {
 
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     this.simCount = count;
+    // Doors that open while residents use what they're on, and ambient clips near the camera (the
+    // sun's shadows aren't redrawn for those).
+    const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
+    if (motion.moved) this.sunShadows.moved();
+    if (motion.moved) this.resetSnapshot();
+    // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
+    else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
+    // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
+    this.pullChairs();
+
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed) this.sunShadows.moved();
-    this.mirrors.update(this.camera);
+    // Held reflections are drawn again when a resident in them moved; they draw only the residents they show.
+    this.mirrors.update(this.camera, { heads: this.characters.heads, visible: this.characters.visible, count, moved: this.characters.posed, rowsOf: this.residentRows });
     this.handles.update(this.camera.globalPosition);
     this.simShadow.thinInstanceBufferUpdated('matrix');
     this.lastFrame = frame;
@@ -875,6 +922,48 @@ export class BabylonRenderer implements Renderer {
 
   setItems(items: readonly ItemPlacement[]): void {
     this.items.set(items);
+  }
+
+  setLampsOff(off: ReadonlySet<number>): void {
+    // The first time (a game loading) they're as they are; afterwards a lamp switched off fades out.
+    const first = !this.lampsOff;
+    for (const id of off) if (!this.lampOn.has(id)) this.lampOn.set(id, first ? 0 : 1);
+    this.lampsOff = off;
+    this.lampsSettled = false;
+    this.findUnlitRooms();
+    if (this.lightsShort && this.lastWorld) {
+      this.placeRoomLights(this.lastWorld, this.view);
+      this.applyRoomLights();
+      this.resetSnapshot();
+    }
+  }
+
+  /** Eases each lamp towards off or on (`lampsOff`); true if any changed. */
+  private fadeLamps(dt: number): boolean {
+    if (this.lampsSettled) return false;
+    let changed = false;
+    const step = Math.min(1, dt / LAMP_SWITCH_FADE);
+    for (const [id, on] of this.lampOn) {
+      const target = this.lampsOff?.has(id) ? 0 : 1;
+      if (on === target && target === 0) continue;
+      const next = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
+      if (next === 1) this.lampOn.delete(id);
+      else this.lampOn.set(id, next);
+      changed = true;
+    }
+    this.lampsSettled = !changed;
+    return changed;
+  }
+
+  /** The viewed lot's rooms with lamps, all of them switched off (and nothing else lit there, a fire). */
+  private findUnlitRooms(): void {
+    const lit = new Set<number>();
+    this.unlitRooms.clear();
+    for (const { room, lamp } of this.lotLamps) {
+      if (lamp === undefined || !this.lampsOff?.has(lamp)) lit.add(room);
+      else if (room) this.unlitRooms.add(room);
+    }
+    for (const room of lit) this.unlitRooms.delete(room);
   }
 
   /** Food and dishes for the lot and storeys in view. */
@@ -1036,6 +1125,12 @@ export class BabylonRenderer implements Renderer {
   // --- build mode ----------------------------------------------------------------------
 
   setPlacementGhost(ghost: PlacementGhost | null): void {
+    // Something for a wall in hand: the things on walls show, so what's in its way does.
+    if (!!ghost?.wall !== this.ghostOnWall) {
+      this.ghostOnWall = !!ghost?.wall;
+      this.cutWallItems(Math.max(this.cutLook, 0));
+      this.resetSnapshot();
+    }
     if (!ghost) {
       this.ghostShown = false;
       if (this.ghostRoot.position.y !== HIDDEN_Y) {
@@ -1046,7 +1141,7 @@ export class BabylonRenderer implements Renderer {
     }
     // A new thing in hand pops in; the same one resized just changes shape.
     const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
-    if (ghost.model + resizeKey(ghost.resize) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize);
+    if (ghost.model + resizeKey(ghost.resize) + colorsKey(ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize, ghost.colors);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -1118,6 +1213,42 @@ export class BabylonRenderer implements Renderer {
     this.held = null;
   }
 
+  /** The tables the seats in the new world face (`tableRooms`), for the residents to pull their chairs up to; none pulled in yet. */
+  private pullUpChairs(world: WorldStructure): void {
+    this.pulledIn.clear();
+    const byId = new Map(this.placed.map((p) => [p.id, p]));
+    const rooms = tableRooms(world, this.deps.content, (id) => byId.get(id)?.pop, (o) => this.storeyOf(o.z) * WALL_HEIGHT);
+    this.seatTurns = new Map(world.objects.filter((o) => rooms.has(o.id)).map((o) => [o.id, o.rot]));
+    this.characters.setTables(rooms);
+  }
+
+  /** Draws the chairs residents sit pulled up to a table where they are now (`Characters.pulled`), and those let go back where they stand. */
+  private pullChairs(): void {
+    const pulled = this.characters.pulled;
+    for (const [id, was] of this.pulledIn) {
+      if (pulled.has(id)) continue;
+      for (const { target, matrix } of was.saved) this.writeInstance(target, matrix);
+      this.pulledIn.delete(id);
+    }
+    for (const [id, by] of pulled) {
+      const was = this.pulledIn.get(id);
+      if ((was && Math.abs(was.by - by) < 0.001) || this.held?.id === id) continue;
+      const p = this.placed.find((o) => o.id === id);
+      if (!p) continue;
+      const targets = p.shadow ? [p.pop, p.shadow] : [p.pop];
+      const saved = was?.saved ?? targets.map((target) => ({ target, matrix: target.matrices.slice(target.index * 16, target.index * 16 + 16) }));
+      this.pulledIn.set(id, { by, saved });
+      // Along its facing (the turn of its placement: the model's z).
+      const yaw = ((this.seatTurns.get(id) ?? 0) * Math.PI) / 2;
+      for (const { target, matrix } of saved) {
+        const m = matrix.slice();
+        m[12] += Math.sin(yaw) * by;
+        m[14] += Math.cos(yaw) * by;
+        this.writeInstance(target, m);
+      }
+    }
+  }
+
   private writeInstance(target: PopTarget, matrix: Float32Array): void {
     target.matrices.set(matrix, target.index * 16);
     for (const mesh of target.meshes) {
@@ -1125,6 +1256,7 @@ export class BabylonRenderer implements Renderer {
       mesh.thinInstanceAllowAutomaticStaticBufferRecreation = true;
       mesh.thinInstanceBufferUpdated('matrix');
     }
+    writeMoving(target);
     this.sunShadows.moved();
     this.resetSnapshot();
   }
@@ -1718,11 +1850,21 @@ export class BabylonRenderer implements Renderer {
   private spanPasses(): void {
     type QuerySet = { readTwoValuesAndSubtract(first: number): Promise<number | null>; _getBuffer(first: number, count: number): GPUBuffer | null; _dstBuffers: GPUBuffer[]; spans?: true };
     const engine = this.webgpu!;
-    const set = (engine as unknown as { _timestampQuery: { _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery._measureDuration?._querySet;
+    const current = () => (engine as unknown as { _timestampQuery: { _enabled: boolean; _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery;
+    const set = current()._measureDuration?._querySet;
     if (!set || set.spans || typeof set._getBuffer !== 'function') return;
     set.spans = true;
-    set.readTwoValuesAndSubtract = async (first: number) => {
+    // Babylon reads a pass's two stamps as the pass ends, before the frame's commands are sent: that
+    // gets what the stamps' slots held from an earlier frame, from another pass where the passes
+    // differ from frame to frame (a reflection drawn now and then). Read once the frame is sent.
+    set.readTwoValuesAndSubtract = (first: number) => {
       const frame = engine.frameId;
+      return new Promise<number | null>((resolve) => engine.onEndFrameObservable.addOnce(() => resolve(read(first, frame))));
+    };
+    const read = async (first: number, frame: number) => {
+      // (Timing turned off meanwhile: the query set is gone.)
+      const timer = current();
+      if (!timer._enabled || timer._measureDuration?._querySet !== set) return null;
       const buffer = set._getBuffer(first, 2);
       if (!buffer) return null;
       try {
@@ -1834,6 +1976,8 @@ export class BabylonRenderer implements Renderer {
         residentsDrawn: this.characters ? this.characters.visible.subarray(0, this.simCount).reduce((n, v) => n + (v ? 1 : 0), 0) : 0,
         mirrors: this.mirrors.count,
         mirrorsLive: live,
+        mirrorSpots: this.mirrors.spots,
+        mirrorDraws: this.mirrors.draws,
         nightGrade: this.nightGrade?.amount ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
       },
@@ -1934,6 +2078,7 @@ export class BabylonRenderer implements Renderer {
     this.walls = this.wallsLow = null;
     this.retireTemplates(new Set());
     this.placed = [];
+    this.motion.clear();
     this.wallItemsHidden.clear();
     this.held = null;
     this.characters?.clear();
@@ -2874,16 +3019,21 @@ export class BabylonRenderer implements Renderer {
     };
     const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     // With few lights to go round, the storey in view gets them first, then the nearest below it
-    // (the sort is stable: within a storey, each room's first light still comes before any second).
+    // (the sort is stable: within a storey, each room's first light still comes before any second);
+    // lamps switched off last of all.
     const away = (z: number) => Math.abs(this.storeyOf(z) - this.storey);
-    lights.sort((a, b) => away(a.z) - away(b.z));
+    const off = (l: RoomLight) => (l.lamp !== undefined && this.lampsOff?.has(l.lamp) ? 1 : 0);
+    lights.sort((a, b) => off(a) - off(b) || away(a.z) - away(b.z));
+    this.lightsShort = lights.length > this.roomLights.length;
+    this.lotLamps = lights.filter((l) => l.kind === 'lamp');
+    this.findUnlitRooms();
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];
       if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.rowOf(this.storeyOf(l.z)));
       else light.position.y = HIDDEN_Y;
       return l ?? null;
     });
-    this.roomLightOn = this.roomLightUse.map((use) => (use && this.darkRooms.has(use.room) ? 0 : 1));
+    this.roomLightOn = this.roomLightUse.map((use) => (use?.lamp !== undefined ? (this.lampOn.get(use.lamp) ?? 1) : use && this.darkRooms.has(use.room) ? 0 : 1));
   }
 
   /** The rooms whose occupants are all asleep (at least one, nobody awake, away residents not counted). */
@@ -2918,12 +3068,18 @@ export class BabylonRenderer implements Renderer {
     for (const room of awake) dark.delete(room);
   }
 
-  /** Eases each interior light towards out (its room dark) or on; true if any changed. */
+  /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */
   private fadeRoomLights(dt: number): boolean {
     let changed = false;
     const step = Math.min(1, dt / LIGHTS_OUT_FADE);
     this.roomLightUse.forEach((use, i) => {
       const on = this.roomLightOn[i] ?? 1;
+      if (use?.lamp !== undefined) {
+        const now = this.lampOn.get(use.lamp) ?? 1;
+        if (now !== on) changed = true;
+        this.roomLightOn[i] = now;
+        return;
+      }
       const target = use && this.darkRooms.has(use.room) ? 0 : 1;
       if (on === target) return;
       this.roomLightOn[i] = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
@@ -2932,14 +3088,15 @@ export class BabylonRenderer implements Renderer {
     return changed;
   }
 
-  /** Eases each room's window glow towards out (the room dark) or on, as its lights; true if any changed. */
+  /** Eases each room's window glow towards out (the room dark, or its lamps all off) or on, as its lights; true if any changed. */
   private fadeWindowGlow(dt: number): boolean {
     let changed = false;
     const step = Math.min(1, dt / LIGHTS_OUT_FADE);
     const glow = this.windowGlowOn;
     for (const room of this.darkRooms) if (!glow.has(room)) glow.set(room, 1);
+    for (const room of this.unlitRooms) if (!glow.has(room)) glow.set(room, 1);
     for (const [room, on] of glow) {
-      const target = this.darkRooms.has(room) ? 0 : 1;
+      const target = this.darkRooms.has(room) || this.unlitRooms.has(room) ? 0 : 1;
       if (on === target && target === 0) continue;
       const next = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
       if (next === 1) glow.delete(room);
@@ -3038,14 +3195,14 @@ export class BabylonRenderer implements Renderer {
 
   /**
    * Things on a wall go with their wall: all of them with walls down, and in cutaway those on the
-   * walls that drop (facing the way the camera looks, so their wall stands between it and them).
+   * walls that drop, from either side (`wallCutBits`). Not while something for a wall is held:
+   * then they show, as what may be in its way.
    */
   private cutWallItems(bits: number): void {
     const down = this.wallMode === 'down';
     for (const p of this.placed) {
-      if (p.wallRot === undefined || p.id === this.held?.id) continue;
-      const r = p.wallRot;
-      const hide = down || (bits & 1 && r === 1) || (bits & 2 && r === 3) || (bits & 4 && r === 0) || (bits & 8 && r === 2);
+      if (p.wallCut === undefined || p.id === this.held?.id) continue;
+      const hide = !this.ghostOnWall && (down || (bits & p.wallCut) !== 0);
       const saved = this.wallItemsHidden.get(p.id);
       if (hide && !saved) {
         const m = p.pop.matrices.slice(p.pop.index * 16, p.pop.index * 16 + 16);
@@ -3060,6 +3217,30 @@ export class BabylonRenderer implements Renderer {
     }
   }
 
+  /**
+   * The cutaway look bits (geometry.ts `LOOK`) that drop the wall a thing on a wall hangs on, as
+   * house.ts `edgeMask` gives them: looking towards a room on either side of it (along any of the
+   * tiles it hangs across), and the way it faces (its wall then stands between the camera and it,
+   * even with no room behind).
+   */
+  private wallCutBits(world: WorldStructure, o: ObjectPlacement): number {
+    const W = world.width;
+    const k = this.storeyOf(o.z);
+    // A room on the thing's own storey (lot rows run on into the next storey's).
+    const room = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < world.depth && this.storeyOf(z) === k && world.rooms[z * W + x] > 0;
+    const r = o.rot % 4;
+    let bits: number = [CUT.PosZ, CUT.PosX, CUT.NegZ, CUT.NegX][r];
+    if (r % 2 === 0) {
+      // Its back on the wall along grid line `z`, between rows z - 1 and z.
+      const z = r === 0 ? o.z : o.z + o.d;
+      for (let x = o.x; x < o.x + o.w; x++) bits |= (room(x, z) ? CUT.PosZ : 0) | (room(x, z - 1) ? CUT.NegZ : 0);
+    } else {
+      const x = r === 1 ? o.x : o.x + o.w;
+      for (let z = o.z; z < o.z + o.d; z++) bits |= (room(x, z) ? CUT.PosX : 0) | (room(x - 1, z) ? CUT.NegX : 0);
+    }
+    return bits;
+  }
+
   /** How the player resized an object (undefined: as its kind comes). */
   private objectResize(o: ObjectPlacement): ObjectResize | undefined {
     const def = this.deps.content.object(o.def);
@@ -3070,15 +3251,14 @@ export class BabylonRenderer implements Renderer {
     return resizeKey(resize) ? resize : undefined;
   }
 
-  /** Model key for an object, preferring its style variant (`model.sofa@modern`) when one exists. */
+  /** Model key for an object. */
   private objectModel(o: ObjectPlacement): string {
-    const def = this.deps.content.object(o.def);
-    const base = def?.model ?? `model.${o.def}`;
-    // `style` and `styles` arrive with build/buy mode; read them defensively.
-    const style = (o as ObjectPlacement & { style?: number }).style;
-    const styles: readonly { id: string }[] = (this.deps.content as unknown as { styles?: { id: string }[] }).styles ?? [];
-    const id = typeof style === 'number' ? styles[style]?.id : undefined;
-    return id && this.deps.assets.has(`${base}@${id}`, 'model') ? `${base}@${id}` : base;
+    return this.deps.content.object(o.def)?.model ?? `model.${o.def}`;
+  }
+
+  /** The colours an object's parts are drawn in: the player's, on the parts its model paints. */
+  private objectColors(o: ObjectPlacement): PartColors | undefined {
+    return paintColors(this.deps.assets.get(this.objectModel(o), 'model'), o.colors);
   }
 
   private async buildObjects(world: WorldStructure): Promise<void> {
@@ -3087,7 +3267,7 @@ export class BabylonRenderer implements Renderer {
     const down = (o: ObjectPlacement) => this.storey >= 0 && this.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
     const shown = world.objects.filter((o) => (storeyShown(this.storeyOf(o.z), this.storey) || down(o)) && this.inView(o.x + o.w / 2, o.z - this.rowOf(this.storeyOf(o.z)) + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
-    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}`);
+    const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${colorsKey(this.objectColors(o))}`);
     // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
     const pending: Promise<ModelTemplate>[] = [];
     for (const list of byModel.values()) {
@@ -3104,9 +3284,18 @@ export class BabylonRenderer implements Renderer {
     // Soft contact shadows under every object, sized to its footprint.
     const blobs = new Float32Array(Math.max(1, shown.length) * 16);
     const mirrors: MirrorInstance[] = [];
+    const moving: MovingObject[] = [];
+    const glows: typeof this.glows = [];
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
+      // Moving parts (a fridge's doors) draw from buffers of their own, each instance posed on its own.
+      const motion = template.motion;
+      const motions = motion && motionsOf(this.deps.assets.get(this.objectModel(list[0]), 'model'));
+      const partCount = motion ? Math.max(-1, ...motion.parts) + 1 : 0;
+      // (A part's glow, if any, moves with it.)
+      const glowOf = (k: number) => (template.glows ?? []).filter((g) => g.part === k).map((g) => g.mesh);
+      const parts = Array.from({ length: partCount }, (_, k) => ({ meshes: [...template.meshes.filter((_, i) => motion!.parts[i] === k), ...glowOf(k)], matrices: new Float32Array(list.length * 16) }));
       const vary = this.deps.assets.get(this.objectModel(list[0]), 'model')?.vary ?? 0;
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
@@ -3125,10 +3314,10 @@ export class BabylonRenderer implements Renderer {
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
         // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
         // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
-        // never past its tiles.
+        // never past its tiles; something held open (a wall bed folded down) by its whole tiles.
         let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
         let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
-        const shape = template.outline;
+        const shape = o.open && motions?.open ? undefined : template.outline;
         if (layer !== 'surface' && shape) {
           const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
           const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
@@ -3154,19 +3343,45 @@ export class BabylonRenderer implements Renderer {
           maxZ: pz + pd,
           height: template.height,
           bottom,
-          wallRot: layer === 'wall' ? o.rot % 4 : undefined,
+          wallCut: layer === 'wall' ? this.wallCutBits(world, o) : undefined,
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
-          pop: { meshes: template.meshes, matrices, index: i },
+          // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
+          pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
-        if (template.mirrors) mirrors.push({ surfaces: template.mirrors, matrices, index: i });
+        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, slotOf: slotOf(o, def) });
+        // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
+        for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
+          mirrors.push({ surfaces, matrices: part >= 0 && parts[part] ? parts[part].matrices : matrices, index: i });
+        }
       });
-      for (const mesh of template.meshes) {
-        mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
+      // At rest, the parts are where the body is.
+      for (const part of parts) part.matrices.set(matrices);
+      template.meshes.forEach((mesh, j) => {
+        const part = motion ? motion.parts[j] : -1;
+        mesh.thinInstanceSetBuffer('matrix', part < 0 ? matrices : parts[part].matrices, 16, part < 0);
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
+      });
+      for (const { mesh, part } of template.glows ?? []) {
+        // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
+        const colors = new Float32Array(list.length * 4);
+        const still = part < 0 || !parts[part];
+        mesh.thinInstanceSetBuffer('matrix', still ? matrices : parts[part].matrices, 16, still);
+        mesh.thinInstanceSetBuffer('color', colors, 4, false);
+        mesh.thinInstanceRefreshBoundingInfo(false);
+        const W = world.width;
+        const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
+        // A lamp's shade glows with the lamp (switched on or off), anything else's with its room's lights.
+        const light = this.deps.content.object(list[0].def)?.light;
+        const lamps = list.map((o) => (light && light.switch !== false ? o.id : -1));
+        glows.push({ mesh, colors, rooms: list.map(roomOf), lamps });
       }
     });
+    for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
+    this.glows = glows;
+    this.applyGlow();
     this.mirrors.set(mirrors);
+    this.motion.set(moving);
     shown.forEach((o, i) => {
       const k = i * 16;
       const s = this.storeyOf(o.z);
@@ -3206,7 +3421,10 @@ export class BabylonRenderer implements Renderer {
     const def = this.deps.content.object(o.def);
     const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
     const resize = this.objectResize(o);
-    return [`object:${key}${resizeKey(resize)}`, () => buildModel(this.scene, key, this.deps.assets.get(key, 'model'), def?.footprint ?? [1, 1], { radius, resize })];
+    const colors = this.objectColors(o);
+    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
+    if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { radius, resize })];
   }
 
   /** Bumped by each world build: an older pass of `warmTemplates` stops. */
@@ -3253,12 +3471,20 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  /** Disables cached templates the current world doesn't use. */
+  /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
   private retireTemplates(keep: Set<string>): void {
     for (const [key, t] of this.templates) {
       if (keep.has(key)) continue;
       void t.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
+        if (this.templatesInUse.has(key)) return;
+        const meshes = [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)];
+        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
+          for (const mesh of meshes) mesh.setEnabled(false);
+          return;
+        }
+        this.templates.delete(key);
+        this.paintedTemplates.delete(key);
+        for (const mesh of meshes) mesh.dispose(false, false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -3315,8 +3541,8 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
-  private loadGhost(model: string, resize?: ObjectResize): void {
-    const key = model + resizeKey(resize);
+  private loadGhost(model: string, resize?: ObjectResize, colors?: PartColors): void {
+    const key = model + resizeKey(resize) + colorsKey(colors);
     this.ghostKey = key;
     // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
     if (model !== this.ghostModel) {
@@ -3325,7 +3551,7 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
-    void buildModel(this.scene, `ghost:${key}`, this.deps.assets.get(model, 'model'), resize?.from ?? [1, 1], { resize }).then((template) => {
+    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), colors), resize?.from ?? [1, 1], { resize }).then((template) => {
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
@@ -3458,6 +3684,9 @@ export class BabylonRenderer implements Renderer {
     // Warm lamps inside, glowing windows outside at night; cool daylight in the panes by day.
     this.lampsLevel = l.lamps;
     this.applyRoomLights();
+    // Curtains drawn from dusk to dawn; lamp shades and screens glowing.
+    this.motion.setLamps(l.lamps);
+    this.applyGlow();
     const glass = this.lib.surface('material.window', { vertexColors: true, cutaway: true }) as PBRMaterial;
     // Windows light up only once it is getting dark outside.
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
@@ -3468,6 +3697,28 @@ export class BabylonRenderer implements Renderer {
     this.lib.setEmissive(inner, this.emissiveTmp.scaleInPlace((1 - l.lamps) * 0.9 + 0.05));
     this.street?.setNight(l.lamps, this.glowColor);
     this.overview?.setNight(l.lamps, this.glowColor);
+  }
+
+  /**
+   * Lamp shades and screens glow as the windows do: from dusk, as the lamps come up, and out with
+   * their room's lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp
+   * (`lampOn`: off, no glow). By day nothing is drawn.
+   */
+  private applyGlow(): void {
+    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    for (const g of this.glows) {
+      let lit = false;
+      g.rooms.forEach((room, i) => {
+        const lamp = g.lamps[i];
+        const f = level * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
+        g.colors.fill(f, i * 4, i * 4 + 3);
+        g.colors[i * 4 + 3] = 1;
+        lit ||= f > 0;
+      });
+      if (g.mesh.isDisposed()) continue;
+      g.mesh.thinInstanceBufferUpdated('color');
+      g.mesh.setEnabled(lit);
+    }
   }
 
   /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */
@@ -3550,8 +3801,10 @@ export class BabylonRenderer implements Renderer {
     return ready;
   }
 
+  /** Something on screen changed: a WebGPU recording is made again, and held reflections are drawn again. */
   private resetSnapshot(): void {
     if (this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
+    this.mirrors?.changed();
   }
 
   /** A world or overview build starts: no snapshot recording until every build is done. */

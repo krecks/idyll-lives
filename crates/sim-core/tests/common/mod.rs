@@ -710,7 +710,7 @@ pub fn reload(w: &World, content: &str) -> World {
     same("the households", homes(w), homes(&loaded));
     // (Loading puts what stands on tops in last, so the order, and the ids, can change.)
     let things = |w: &World| {
-        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits())).collect();
+        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits(), o.open, o.growth.to_bits())).collect();
         list.sort();
         list
     };
@@ -829,13 +829,14 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
                 .collect()
         })
         .unwrap_or_default();
-    // One-tile garden things people can do something with, for the yards.
+    // One-tile garden things people can do something with, for the yards: by `outdoors`, not by
+    // category (a finished one is in Validate until it's signed off).
     let yard_defs: Vec<String> = content["objects"]
         .as_array()
         .unwrap()
         .iter()
         .filter(|o| {
-            matches!(o["category"].as_str(), Some("garden" | "outdoor"))
+            o["outdoors"].as_bool() == Some(true)
                 && o["interactions"].as_array().is_some_and(|i| !i.is_empty())
                 && o["footprint"].as_array().is_none_or(|f| f[0] == 1 && f[1] == 1)
         })

@@ -36,7 +36,13 @@
 //! saved, nor is joining in on a conversation (`Join` tasks); 22 = basements (`basement`: the
 //! block of the lot's rows holding storey -1, after the storeys above; absent: none, and the lot
 //! grows one on the end if the content allows it, so nothing already built moves); 23 = the seed
-//! the game started from (`seed`, for bug reports; absent: 0, unknown). Older files load. Saves
+//! the game started from (`seed`, for bug reports; absent: 0, unknown); 24 = objects have a colour
+//! the player chose (`objects[].color`, `#rrggbb`; absent: as made) instead of a style (older
+//! files' object and household `style` is ignored); 25 = objects can be open (`objects[].open`: a
+//! wall bed folded down; absent: closed); 26 = a colour per part (`objects[].colors`, `#rrggbb` by
+//! the model's material name; an older file's `color` goes on the `body`); 27 = crops grow
+//! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
+//! switched off (`objects[].off`; absent: on). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -54,7 +60,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 23;
+pub const SAVE_VERSION: u32 = 28;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -241,8 +247,12 @@ pub struct ObjectSave {
     pub rot: u8,
     #[serde(default)]
     pub quality: u8,
-    #[serde(default)]
-    pub style: u8,
+    /// The colours the player chose, `#rrggbb` by part (absent: as made).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub colors: BTreeMap<String, String>,
+    /// Before v26: its one colour, on the `body`.
+    #[serde(default, skip_serializing)]
+    pub color: Option<String>,
     /// Money put into it; defaults to the price.
     #[serde(default)]
     pub value: Option<i64>,
@@ -262,6 +272,15 @@ pub struct ObjectSave {
     /// Centimetres taller (negative: shorter) than its kind (absent before v20: 0).
     #[serde(default, skip_serializing_if = "is_level")]
     pub tall: i16,
+    /// Open (a wall bed folded down; absent before v25, or closed).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub open: bool,
+    /// A crop's growth (see `ObjectInstance::growth`; absent before v27, or not a crop: ripe).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub growth: Option<f32>,
+    /// A lamp switched off (absent before v28, or on).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub off: bool,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -559,8 +578,6 @@ pub struct HouseholdSave {
     pub player: bool,
     #[serde(default)]
     pub funds: Option<i64>,
-    #[serde(default)]
-    pub style: u8,
     /// Absent before v8, when free will was one switch for the whole town (`autonomy`).
     #[serde(default, rename = "freeWill", skip_serializing_if = "Option::is_none")]
     pub free_will: Option<bool>,
@@ -613,13 +630,17 @@ impl World {
                 z: o.z,
                 rot: o.rot,
                 quality: o.quality,
-                style: o.style,
+                colors: crate::world::colors_hex(&o.colors),
+                color: None,
                 value: Some(o.value),
                 turn: o.turn,
                 offset: o.offset,
                 wear: finite(o.wear, 0.0),
                 size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
                 tall: o.tall,
+                open: o.open,
+                growth: content.objects[o.def].grows.is_some().then_some(o.growth),
+                off: o.off && content.objects[o.def].switch,
             })
             .collect();
         let sims = self
@@ -767,7 +788,6 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: Some(h.funds),
-                    style: h.style,
                     free_will: Some(h.free_will),
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
@@ -923,7 +943,6 @@ impl World {
                 plot: None,
                 player: true,
                 funds: starting_funds,
-                style: 0,
                 free_will: save.autonomy,
                 routines: Vec::new(),
                 expecting: None,
@@ -939,7 +958,6 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: h.funds.unwrap_or(starting_funds),
-                    style: h.style,
                     free_will: h
                         .free_will
                         .unwrap_or(!h.player || save.autonomy || !legacy_free_will),
@@ -970,12 +988,12 @@ impl World {
                     let value = o
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
-                    let style = world.check_style(o.style).unwrap_or(0);
+                    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
                     // A size the content no longer allows goes back to its kind's.
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
                     let (size, tall) = world.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
                     let layout = crate::world::Layout { offset: o.offset, extent: Some(size), tall };
-                    world.place(def, o.x, o.z, o.rot, layout, style, o.quality, value)
+                    world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value)
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };
@@ -989,6 +1007,9 @@ impl World {
                 world.objects[id as usize].turn = turn;
                 world.objects[id as usize].offset = offset;
                 world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
+                world.objects[id as usize].open = o.open;
+                world.objects[id as usize].off = o.off && world.content.objects[world.objects[id as usize].def].switch;
+                world.objects[id as usize].growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
                 object_ids.insert(i as u32, id);
             }
         }

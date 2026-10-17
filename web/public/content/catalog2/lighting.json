@@ -20,7 +20,7 @@
         "height": 0.42,
         "tiles": 6
       },
-      "radius": 0.23,
+      "radius": 0.17,
       "description": "A blue ceramic lamp with a linen drum shade. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -43,7 +43,7 @@
         "height": 0.4,
         "tiles": 6
       },
-      "radius": 0.29,
+      "radius": 0.15,
       "description": "A white block lamp with a square shade. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -89,7 +89,7 @@
         "height": 0.22,
         "tiles": 4
       },
-      "radius": 0.21,
+      "radius": 0.15,
       "description": "A little dome lamp in coral. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -112,7 +112,7 @@
         "height": 0.15,
         "tiles": 3
       },
-      "radius": 0.18,
+      "radius": 0.12,
       "description": "A black metal lantern with a candle inside. It stands on a table, desk or nightstand and lights the room at night.",
       "interactions": []
     },
@@ -126,12 +126,17 @@
       ],
       "price": 260,
       "category": "lighting",
+      "freeRotation": true,
       "group": "floor",
       "decor": 0.7,
       "light": {
         "range": 4.5,
         "intensity": 1.0,
         "height": 1.5,
+        "at": [
+          0.245,
+          0.2
+        ],
         "tiles": 10
       },
       "description": "A brass arc reaching over the sofa from a marble base.",
@@ -147,6 +152,7 @@
       ],
       "price": 160,
       "category": "lighting",
+      "freeRotation": true,
       "group": "floor",
       "decor": 0.6,
       "light": {
@@ -168,6 +174,7 @@
       ],
       "price": 110,
       "category": "lighting",
+      "freeRotation": true,
       "group": "floor",
       "decor": 0.4,
       "light": {
@@ -189,6 +196,7 @@
       ],
       "price": 150,
       "category": "lighting",
+      "freeRotation": true,
       "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.3,
@@ -211,6 +219,7 @@
       ],
       "price": 45,
       "category": "lighting",
+      "freeRotation": true,
       "group": "ceiling",
       "layer": "ceiling",
       "decor": 0.4,

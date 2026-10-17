@@ -19,7 +19,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), style: None, turn: Some(turn), offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), colors: Default::default(), turn: Some(turn), offset: None, size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -52,7 +52,7 @@ fn decor_turns_freely_and_keeps_its_angle() {
 }
 
 fn buy_at(w: &mut World, household: u32, def: &str, x: i32, z: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: Some(offset), size: None, tall: None })?;
+    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: Some(offset), size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -125,4 +125,25 @@ fn nothing_stands_off_its_tile_through_a_wall() {
     let wall = |x| Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::V, x, 1, EdgeKind::Wall)] };
     assert!(w.apply(wall(7)).is_err());
     w.apply(wall(6)).unwrap();
+}
+
+#[test]
+fn nothing_stands_off_its_tile_through_a_diagonal_wall() {
+    use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let wall = |axis, x, z| Command::Build { household: 0, edits: vec![EdgeEdit::new(axis, x, z, EdgeKind::Wall)] };
+    // `/` across (4, 3), from corner (4, 3) to (5, 4).
+    w.apply(wall(EdgeAxis::Dp, 4, 3)).unwrap();
+    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [25, -25]).is_err(), "reaching into its tile, through it");
+    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [1, 0]).is_err(), "by a centimetre, at its corner");
+    assert!(buy_at(&mut w, 0, "chair", 4, 4, [0, -25]).is_err(), "from below");
+    assert!(buy_at(&mut w, 0, "lamp", 3, 2, [25, 25]).is_err(), "from the corner tile it points at");
+    assert!(buy_at(&mut w, 0, "lamp", 5, 2, [-25, 25]).is_ok(), "the corner it doesn't reach is fine");
+    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [0, 50]).is_ok(), "and along its side");
+    assert!(buy_at(&mut w, 0, "lamp", 3, 4, [-50, 0]).is_ok(), "and away from it");
+
+    // Nor a diagonal wall built through something standing off its tile.
+    buy_at(&mut w, 0, "chair", 7, 5, [25, 0]).unwrap();
+    assert!(w.apply(wall(EdgeAxis::Dn, 8, 5)).unwrap_err().to_string().contains("through furniture"));
+    assert!(w.apply(wall(EdgeAxis::Dp, 8, 6)).is_ok(), "a tile it doesn't reach into");
 }

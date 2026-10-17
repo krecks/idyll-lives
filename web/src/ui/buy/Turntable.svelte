@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { PartColors } from '../../core/protocol';
   import Icon from '../Icon.svelte';
   import { services } from '../services';
 
@@ -11,11 +12,14 @@
     model,
     footprint,
     glyph,
+    colors,
     compact = false,
   }: {
     model: string;
     footprint: [number, number];
     glyph: string;
+    /** Its parts' colours (a placed object, or the one in hand); absent: as made. */
+    colors?: PartColors;
     /** A shorter stage (owned things: their upgrade and sell buttons come first). */
     compact?: boolean;
   } = $props();
@@ -34,10 +38,11 @@
   $effect(() => {
     const key = model;
     const fp = footprint;
+    const painted = colors;
     index = 0;
     failed = false;
     // A local, not `frames`: reading what the effect writes would make it depend on itself.
-    const hit = services.items?.cachedTurntable(key, FRAMES) ?? null;
+    const hit = services.items?.cachedTurntable(key, FRAMES, painted) ?? null;
     frames = hit;
     if (hit) return;
     if (!services.items) {
@@ -46,7 +51,7 @@
     }
     let live = true;
     const timer = setTimeout(() => {
-      void services.items.turntable(key, fp, FRAMES).then((urls) => {
+      void services.items.turntable(key, fp, FRAMES, painted).then((urls) => {
         if (!live) return;
         if (urls?.length) frames = urls;
         else failed = true;

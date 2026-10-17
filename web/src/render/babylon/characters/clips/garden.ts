@@ -1,5 +1,5 @@
 /**
- * Gardening: watering, harvesting, planting, kneeling to weed, crouching to smell flowers. Feet
+ * Gardening: watering, harvesting, picking herbs from a planter, planting, kneeling to weed, crouching to smell flowers. Feet
  * stay planted (leg IK); hands are placed by arm IK at the plants and the soil in front.
  */
 
@@ -41,6 +41,23 @@ function harvestPose(p: number): PoseSpec {
   const body = stand({ breath: p, lean: 22 + 10 * pick, sink: 0.04 + 0.04 * pick, fwd: -0.02, shift: 0.3 - 0.2 * pick, twist: 6 * pick - 4, head: [14 + 6 * pick, -6 * pick, 0] });
   const reach: Vec = [0.16 - 0.05 * pick, 0.8 - 0.12 * pick + 0.03 * twist, 0.3 + 0.16 * pick];
   return hands(body, { at: [-0.12, 0.96, 0.2], pronate: -30, hand: wrist('l', 30, 0) }, { at: reach, pronate: 30 + 50 * twist, hand: wrist('r', 20 - 10 * pick + 25 * twist, 0) });
+}
+
+/**
+ * Picking herbs from a waist-high planter (soil at 0.73 m, the plants' tops about 0.85 m, half a metre
+ * ahead): leaning in over it, the left hand steadying the plant, the right pinching off a sprig and
+ * drawing it up, twice a loop.
+ */
+function pickPose(p: number): PoseSpec {
+  const n = (p * 2) % 1;
+  const pinch = bump(n, 0.08, 0.5, 0.14);
+  const draw = bump(n, 0.42, 0.88, 0.14);
+  const body = stand({ breath: p, lean: 24 + 4 * pinch, sink: 0.015, fwd: 0.04, shift: -0.25, twist: 5, head: [18 + 4 * pinch, 6, 0] });
+  return hands(
+    body,
+    { at: [-0.2, 0.88, 0.46], pronate: 70, hand: wrist('l', 5, 0) },
+    { at: [-0.08 + 0.02 * draw, 0.86 - 0.03 * pinch + 0.09 * draw, 0.5 - 0.06 * draw], pronate: 40 + 30 * pinch, hand: wrist('r', 10 + 15 * draw, 0) },
+  );
 }
 
 /** Kneeling on both knees, sitting back a little; hands pull weeds in turn and toss them aside. */
@@ -102,6 +119,7 @@ export function gardenClips(): ClipDef[] {
   return [
     cycle('water', { seconds: 114 / 30, loop: true }, waterPose),
     cycle('harvest', { seconds: 2.5, loop: true }, harvestPose),
+    cycle('pick', { seconds: 3, loop: true }, pickPose),
     clip('plant', { seconds: 83 / 30, loop: false }, [
       [0, rest],
       [0.14, () => plantKey(0.14, 0.42, knee(-1), knee(1), 30), 'smooth'],

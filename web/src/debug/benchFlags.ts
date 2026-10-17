@@ -6,7 +6,7 @@
  * measure what each costs, or freezes time for screenshots that compare pixel for pixel.
  */
 
-export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk';
+export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still';
 
 export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
@@ -59,7 +59,7 @@ function parse(): BenchFlags | null {
   const cam = params.get('cam');
   const diag = benchDiag();
   const res = params.get('res');
-  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' ? cam : 'orbit';
+  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' || cam === 'mirror' || cam === 'mirror-still' ? cam : 'orbit';
   const frozen = diag.has('freeze');
   return {
     scene,

@@ -840,6 +840,9 @@ pub enum EventKind {
     /// `a` is out of the crib (or came to live here) and there's no bed for them at home: fewer
     /// bed places than people past the crib (told to the player's household, which buys its own).
     NoBed,
+    /// `a` was told to close the `n` (object kind: put the hot tub's cover on, fold up a bed) and
+    /// didn't, as someone else got in or set off for it first (whoever is last out closes it).
+    NotClosed,
 }
 
 impl EventKind {
@@ -852,7 +855,7 @@ impl EventKind {
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
-            | DeniedAgain | StayedHome | NoBed => 1,
+            | DeniedAgain | StayedHome | NoBed | NotClosed => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
             | Declined | Babysitter => 0,
         }

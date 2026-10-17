@@ -2014,7 +2014,8 @@
     "deniedAgain": "{a} is cross about being told no again about the {object}",
     "babysitter": "{a}'s household paid {money} for a babysitter for {b}",
     "stayedHome": "{a} stayed home from work to look after {b}",
-    "noBed": "{a} has no bed of their own: buy one for them"
+    "noBed": "{a} has no bed of their own: buy one for them",
+    "notClosed": "{a} didn't close the {object}: someone else got in first"
   },
   "activities": [
     {
@@ -2388,6 +2389,7 @@
       ],
       "price": 600,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "appliances"
     },
     {
@@ -2518,6 +2520,7 @@
       ],
       "price": 650,
       "category": "bathroom",
+      "fillsWall": true,
       "group": "bathing"
     },
     {
@@ -2638,6 +2641,7 @@
       ],
       "price": 250,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves"
     },
     {
@@ -2697,6 +2701,7 @@
       ],
       "price": 40,
       "category": "garden",
+      "freeRotation": true,
       "group": "houseplants",
       "description": "A leafy plant in a terracotta pot."
     },
@@ -2782,6 +2787,7 @@
       ],
       "price": 60,
       "category": "garden",
+      "freeRotation": true,
       "group": "flowers",
       "description": "A wooden bed full of mixed bedding flowers. Tending it trains Gardening; a skilled gardener is proud of the result."
     },
@@ -2812,6 +2818,7 @@
       ],
       "price": 120,
       "category": "garden",
+      "freeRotation": true,
       "group": "trees",
       "outdoors": true,
       "description": "A broad, rounded shade tree. Its crown spreads about five metres across."
@@ -2827,6 +2834,7 @@
       "interactions": [],
       "price": 120,
       "category": "garden",
+      "freeRotation": true,
       "group": "trees",
       "outdoors": true,
       "description": "A tall evergreen pine."
@@ -2866,6 +2874,7 @@
       ],
       "price": 40,
       "category": "garden",
+      "freeRotation": true,
       "group": "shrubs",
       "outdoors": true,
       "description": "A rounded green shrub for borders and corners."
@@ -2874,6 +2883,9 @@
       "id": "treadmill",
       "name": "Treadmill",
       "model": "model.treadmill",
+      "stand": {
+        "height": 0.156
+      },
       "footprint": [
         1,
         2
@@ -2907,6 +2919,10 @@
       "id": "weightBench",
       "name": "Weight bench",
       "model": "model.weightBench",
+      "held": {
+        "part": "bar",
+        "grip": "bar"
+      },
       "footprint": [
         1,
         2
@@ -3216,6 +3232,11 @@
       "id": "piano",
       "name": "Piano",
       "model": "model.piano",
+      "seat": {
+        "height": 0.47,
+        "forward": 0.227,
+        "facing": "back"
+      },
       "footprint": [
         2,
         1
@@ -3299,6 +3320,7 @@
       ],
       "price": 120,
       "category": "lighting",
+      "freeRotation": true,
       "group": "floor",
       "interactions": []
     },
@@ -3329,8 +3351,7 @@
       "stairs": true,
       "interactions": [],
       "price": 900,
-      "category": "living",
-      "group": "stairs"
+      "category": "living"
     }
   ],
   "skills": [
@@ -3494,19 +3515,20 @@
     "storeys": 3,
     "basement": true
   },
-  "styles": [
-    {
-      "id": "modern",
-      "label": "Modern"
-    },
-    {
-      "id": "cozy",
-      "label": "Cozy"
-    },
-    {
-      "id": "minimal",
-      "label": "Minimal"
-    }
+  "objectColors": [
+    {"id": "white", "label": "Snow white", "color": "#F3F3F1"},
+    {"id": "cream", "label": "Cream", "color": "#EFE2BF"},
+    {"id": "butter", "label": "Butter yellow", "color": "#F2C94C"},
+    {"id": "peach", "label": "Peach", "color": "#F2A27E"},
+    {"id": "tomato", "label": "Tomato red", "color": "#D9483B"},
+    {"id": "rose", "label": "Rose", "color": "#E58FA6"},
+    {"id": "lavender", "label": "Lavender", "color": "#A99BD8"},
+    {"id": "sky", "label": "Sky blue", "color": "#7FB8E0"},
+    {"id": "teal", "label": "Teal", "color": "#4E9C9A"},
+    {"id": "mint", "label": "Mint", "color": "#A8D8B9"},
+    {"id": "sage", "label": "Sage", "color": "#8FA37A"},
+    {"id": "slate", "label": "Slate grey", "color": "#6B7178"},
+    {"id": "charcoal", "label": "Charcoal", "color": "#2F3236"}
   ],
   "wallCoverings": [
     {"id": "paint.white", "label": "White paint", "finish": "plaster", "color": "#F4F1EA", "price": 0},
@@ -3801,7 +3823,8 @@
       "grill",
       "microwave",
       "dishes",
-      "bin"
+      "bin",
+      "cupboard"
     ],
     "spoilHours": 8,
     "storedSpoilHours": 72,
@@ -3844,6 +3867,7 @@
     "putAwayMinutes": 2,
     "putAwayAnim": "fetch",
     "putAwayAt": [
+      "cupboard",
       "prep"
     ]
   },

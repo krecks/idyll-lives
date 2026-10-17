@@ -5,7 +5,8 @@
  *
  * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
  * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
- * ~1-1.5k triangles per tree near the town and `*.far` LODs (~100-250) for the distant woods.
+ * ~1-1.5k triangles per tree, drawn over by Blender-built files (each tree and shrub with a far
+ * version for the distant woods: tools/art/blender/families/plants.py, trees.py).
  * `installNature` adds vertex-shader wind and per-instance tint variation to those two finishes;
  * `natureDecor` turns the house builder's garden dressing into species (hedges or mixed borders,
  * mixed lot trees kept clear of the street and paths).
@@ -422,8 +423,8 @@ export class Landscape {
 
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
-   * near the town are the full models and cast shadows; further ones use the `*.far` models (a few
-   * blobs each, built at the low level of detail), which don't.
+   * near the town are the full models and cast shadows; further ones use the low level of detail
+   * (a file's own far version; a placeholder built coarser), which don't.
    */
   private async forests(scene: Scene, assets: AssetRegistry): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -472,9 +473,8 @@ export class Landscape {
           new Vector3(x, this.heightAt(x, z) - 0.05, z),
         );
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
-        const key = !close && assets.has(`${kind}.far`, 'model') ? `${kind}.far` : kind;
         const bucket = close ? near : far;
-        bucket.set(key, [...(bucket.get(key) ?? []), m]);
+        bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
       }
     }
     const out: (Instanced & { casts: boolean })[] = [];
@@ -842,8 +842,10 @@ class NatureWindPlugin extends MaterialPluginBase {
     const effect = subMesh.effect;
     if (!effect) return;
     const k = this.kind;
+    // A model's part grown from nothing (`windStill`, models.ts) bends but doesn't flutter: flat at rest, it stays hidden.
+    const still = (subMesh.getMesh().metadata as { windStill?: boolean } | null)?.windStill;
     effect.setFloat4('natureWind', this.state.time, this.state.strength, 0.8, 0.6);
-    effect.setFloat4('natureWindKind', k[0], k[1], k[2], k[3]);
+    effect.setFloat4('natureWindKind', k[0], still ? 0 : k[1], k[2], k[3]);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
@@ -862,10 +864,14 @@ class NatureWindPlugin extends MaterialPluginBase {
 {
   ${decl('inst', 'vec3')} = ${f3}(0.0);
   ${decl('lw', 'vec3')} = ${f3}(${u('natureWind')}.z, 0.0, ${u('natureWind')}.w);
+  // The instance's scale along each axis: flutter is in world metres, however far a moving part is scaled
+  // (a part grown from nothing is 1000x along its height once grown).
+  ${decl('scl', 'vec3')} = ${f3}(1.0);
 #ifdef INSTANCES
   inst = ${v('world3')}.xyz;
   ${decl('s2', 'float')} = max(dot(${v('world0')}.xyz, ${v('world0')}.xyz), 0.0001);
   lw = ${f3}(dot(lw, ${v('world0')}.xyz), 0.0, dot(lw, ${v('world2')}.xyz)) / s2;
+  scl = max(${f3}(length(${v('world0')}.xyz), length(${v('world1')}.xyz), length(${v('world2')}.xyz)), ${f3}(0.0001));
 #endif
   ${decl('t', 'float')} = ${u('natureWind')}.x;
   ${decl('ph', 'float')} = dot(inst.xz, ${f2}(0.21, 0.17));
@@ -875,7 +881,7 @@ class NatureWindPlugin extends MaterialPluginBase {
   ${decl('kind', 'vec4f')} = ${u('natureWindKind')};
   ${decl('fp', 'float')} = dot(positionUpdated, ${f3}(3.1, 1.7, 2.3)) + ph * 3.0;
   ${decl('fl', 'float')} = kind.y * min(h * kind.w, 1.0) * gust;
-  positionUpdated = positionUpdated + lw * (sway * kind.x * h * h) + ${f3}(sin(t * kind.z + fp), 0.6 * sin(t * kind.z * 1.3 + fp * 1.3), cos(t * kind.z * 0.9 + fp)) * fl;
+  positionUpdated = positionUpdated + lw * (sway * kind.x * h * h) + ${f3}(sin(t * kind.z + fp), 0.6 * sin(t * kind.z * 1.3 + fp * 1.3), cos(t * kind.z * 0.9 + fp)) * fl / scl;
 #if defined(NATURETINT) && defined(VERTEXCOLOR)
   ${decl('rnd', 'float')} = fract(sin(dot(inst.xz, ${f2}(12.9898, 78.233))) * 43758.5453);
   colorUpdated = ${wgsl ? 'vec4f' : 'vec4'}(colorUpdated.rgb * mix(${f3}(1.07, 1.02, 0.84), ${f3}(0.9, 0.98, 1.04), rnd) * (0.92 + 0.14 * fract(rnd * 7.31)), colorUpdated.a);

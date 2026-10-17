@@ -6,6 +6,12 @@
 
 export type Vec3 = [number, number, number];
 
+/** A part of a model the player may colour: a material of the file, and its name in the game. */
+export interface PaintSlot {
+  material: string;
+  label: string;
+}
+
 export interface PlaceholderPart {
   /** `blob` is a lumpy sphere for foliage and rocks. */
   shape: 'box' | 'cylinder' | 'cone' | 'sphere' | 'capsule' | 'blob';
@@ -48,6 +54,11 @@ export interface ModelEntry {
   type: 'model';
   /** glTF/GLB file. When missing or failing to load, `placeholder` is used. */
   url?: string;
+  /**
+   * Its far version (`<id>.far.glb`, about a quarter of the triangles, no moving parts), drawn
+   * where it is only seen from afar: the town overview, the far woods (`BuildOptions.far`, `lod` 1).
+   */
+  far?: string;
   scale?: number;
   /** Degrees. */
   rotationY?: number;
@@ -58,6 +69,13 @@ export interface ModelEntry {
    * ±`vary` (0.1 = 10%) larger or smaller, fixed by where it stands.
    */
   vary?: number;
+  /**
+   * The parts the player may colour: the file's materials by name, each with what the player
+   * calls it (the double vanity's `body` is its Cabinet, `stone` its Worktop). The first is the
+   * main part, the one the quick colour row paints. A bare name is its own label. Absent: it
+   * comes as made.
+   */
+  paint?: (string | PaintSlot)[];
 }
 
 export interface MaterialEntry {

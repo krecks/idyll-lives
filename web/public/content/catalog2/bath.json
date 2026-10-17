@@ -80,10 +80,6 @@
       "category": "bathroom",
       "group": "bathing",
       "decor": 0.6,
-      "seat": {
-        "height": 0.28,
-        "forward": 0.0
-      },
       "description": "A deep oval tub with a floor-standing tap. A long soak leaves residents pampered.",
       "interactions": [
         {
@@ -115,6 +111,7 @@
       ],
       "price": 950,
       "category": "bathroom",
+      "fillsWall": true,
       "group": "bathing",
       "decor": 0.3,
       "description": "A glass enclosure with a big square rain head. Leaves residents refreshed.",
@@ -204,10 +201,23 @@
       ],
       "price": 160,
       "category": "bathroom",
+      "fillsWall": true,
       "group": "sinks",
       "decor": 0.1,
       "description": "A slim cupboard with an open shelf for towels.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "takeTowel",
+          "label": "Take a fresh towel",
+          "anim": "fetch",
+          "minutes": 2,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "towelLadder",

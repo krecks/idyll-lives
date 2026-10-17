@@ -1377,7 +1377,7 @@ pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, 
     let h = w.sims[i].household;
     let id = w.content.objects[object].id.clone();
     let old = replaces(w, h as usize, object);
-    let bought = match w.buy_at(h, &id, None, None, Default::default()) {
+    let bought = match w.buy_at(h, &id, None, Default::default(), Default::default()) {
         Ok(new) => {
             // The old one goes (ids after it shift down).
             match old {
@@ -1407,15 +1407,15 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     w.sell(h, old).ok()?;
     let refund = w.households[hh].funds - before;
     let placed = w
-        .buy_at(h, id, Some([o.x, o.z, o.rot as i32]), None, Default::default())
-        .or_else(|_| w.buy_at(h, id, None, None, Default::default()));
+        .buy_at(h, id, Some([o.x, o.z, o.rot as i32]), Default::default(), Default::default())
+        .or_else(|_| w.buy_at(h, id, None, Default::default(), Default::default()));
     if let Ok(new) = placed {
         return Some(new);
     }
     // Put it back (and the money).
-    if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.style, o.quality, o.value) {
+    if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.colors.clone(), o.quality, o.value) {
         let b = &mut w.objects[back as usize];
-        (b.turn, b.wear) = (o.turn, o.wear);
+        (b.turn, b.wear, b.open, b.off, b.growth) = (o.turn, o.wear, o.open, o.off, o.growth);
     }
     w.households[hh].funds -= refund;
     None

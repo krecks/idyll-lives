@@ -1,0 +1,487 @@
+{
+  "$comment": "Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each cooker is a box on the floor with a hob on top and an oven below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave swings its door (`door_open`) and turns its turntable (`turntable`).",
+  "version": 1,
+  "entries": {
+    "model.stoveElectric": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/stoveElectric.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "enamel": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "knob_on",
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "enamel",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Knobs"
+        },
+        {
+          "material": "hob",
+          "label": "Hob"
+        }
+      ]
+    },
+    "model.stoveGas": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/stoveGas.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "enamel": {
+          "finish": "material.finish.gloss"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "pan": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "burner_on",
+          "gourmet": "burner_on",
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "enamel",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Knobs"
+        },
+        {
+          "material": "grate",
+          "label": "Hob"
+        }
+      ]
+    },
+    "model.wallOven": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/wallOven.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "roast": "oven_open",
+          "bake": "oven_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Tower"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.rangeCooker": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/rangeCooker.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "enamel2": {
+          "finish": "material.finish.gloss"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "pot": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "burner_on",
+          "gourmet": "burner_on",
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "enamel2",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Knobs & rail"
+        },
+        {
+          "material": "grate",
+          "label": "Hob"
+        }
+      ]
+    },
+    "model.cooktopCounter": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/cooktopCounter.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "heat": {
+          "finish": "material.finish.gloss"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "burner_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "hob",
+          "label": "Hob"
+        }
+      ]
+    },
+    "model.microwave": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/microwave.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "reheat": "door_open"
+        },
+        "loops": {
+          "reheat": "turntable"
+        },
+        "hold": 1.2
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "charcoal",
+          "label": "Microwave"
+        }
+      ]
+    },
+    "model.coffeeMachine": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/coffeeMachine.glb",
+      "materials": {
+        "bean": {
+          "finish": "material.finish.gloss"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "espresso": "brew"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "worktop",
+          "label": "Worktop"
+        },
+        {
+          "material": "charcoal",
+          "label": "Machine"
+        }
+      ]
+    },
+    "model.breakfastCounter": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/breakfastCounter.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "fruit": {
+          "finish": "material.finish.gloss"
+        },
+        "jug": {
+          "finish": "material.finish.gloss"
+        },
+        "toaster": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toast": "toast_down",
+          "smoothie": "blend"
+        },
+        "loops": {
+          "smoothie": "blades"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Counter"
+        },
+        {
+          "material": "toaster",
+          "label": "Toaster"
+        },
+        {
+          "material": "charcoal",
+          "label": "Blender"
+        }
+      ]
+    },
+    "model.dishwasher": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/dishwasher.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "dishes": "door_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handle"
+        },
+        {
+          "material": "steel",
+          "label": "Panel"
+        }
+      ]
+    },
+    "model.dishwasherCompact": {
+      "type": "model",
+      "url": "../../models/kitchen_cooking/dishwasherCompact.glb",
+      "materials": {
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "dishes": "door_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handle"
+        },
+        {
+          "material": "steel",
+          "label": "Panel"
+        }
+      ]
+    }
+  }
+}

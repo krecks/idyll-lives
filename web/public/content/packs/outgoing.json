@@ -150,6 +150,8 @@
       "footprint": [1, 1],
       "price": 120,
       "category": "decor",
+      "fillsWall": true,
+      "freeRotation": true,
       "slots": 1,
       "description": "A board of snapshots and string lights: a quick look at good times takes the edge off loneliness.",
       "interactions": [

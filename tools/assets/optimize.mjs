@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { Worker, isMainThread, parentPort } from 'node:worker_threads';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import zlib from 'node:zlib';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
@@ -79,7 +79,8 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
     const bytes = fs.readFileSync(path.join(SRC, rel));
     const key = createHash('sha256').update(settings).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
     const cached = path.join(CACHE, key + path.extname(p.out));
-    tasks.push({ rel, ...p, size: bytes.length, cached, bytes });
+    // Only the gzip pass below reads the bytes again (the workers read their own file): keep no others.
+    tasks.push({ rel, ...p, size: bytes.length, cached, ...(p.kind === 'gzip' ? { bytes } : {}) });
   }
   fs.mkdirSync(CACHE, { recursive: true });
   const todo = tasks.filter((t) => force || !fs.existsSync(t.cached));
@@ -88,8 +89,9 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   // Gzip is quick: here. Textures and models: on workers (the Basis encoder is single-threaded WASM).
   for (const t of todo.filter((t) => t.kind === 'gzip')) fs.writeFileSync(t.cached, zlib.gzipSync(t.bytes, { level: 9 }));
   const heavy = todo.filter((t) => t.kind !== 'gzip').sort((a, b) => b.size - a.size);
-  const converted = new Set(tasks.filter((t) => t.kind === 'texture').map((t) => t.rel));
-  await runOnWorkers(heavy, jobs, (t) => ({ kind: t.kind, role: t.role, src: path.join(SRC, t.rel), rel: t.rel, converted: [...converted] }), (t, out) => {
+  // The textures that get a KTX2 copy: given to each worker once, not with every model.
+  const converted = tasks.filter((t) => t.kind === 'texture').map((t) => t.rel);
+  await runOnWorkers(heavy, jobs, { converted }, (t) => ({ kind: t.kind, role: t.role, src: path.join(SRC, t.rel), rel: t.rel }), (t, out) => {
     fs.writeFileSync(t.cached, out);
     log(`[assets]   ${t.rel}: ${kb(t.size)} -> ${kb(out.length)}`);
   });
@@ -127,12 +129,12 @@ function walk(dir) {
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
-async function runOnWorkers(tasks, jobs, message, done) {
+async function runOnWorkers(tasks, jobs, data, message, done) {
   if (!tasks.length) return;
   const queue = [...tasks];
   const workers = Array.from({ length: Math.min(jobs, tasks.length) }, () => {
     // The Basis encoder prints its progress; drop it.
-    const worker = new Worker(fileURLToPath(import.meta.url), { stdout: true });
+    const worker = new Worker(fileURLToPath(import.meta.url), { stdout: true, workerData: data });
     worker.stdout.resume();
     return worker;
   });
@@ -165,6 +167,8 @@ async function runOnWorkers(tasks, jobs, message, done) {
 // ---- workers: encode one texture or model per message --------------------------------------
 
 async function workerMain() {
+  /** The textures that get a KTX2 copy, to point a model's shared texture at (from the main thread). */
+  const converted = new Set(workerData.converted);
   // The packages are web/'s dev dependencies.
   const require = (await import('node:module')).createRequire(path.join(WEB, 'package.json'));
   const load = async (id) => import(pathToFileURL(require.resolve(id)).href);
@@ -195,7 +199,7 @@ async function workerMain() {
     return 'data';
   };
 
-  async function model(src, rel, converted) {
+  async function model(src, rel) {
     const doc = await io.read(src);
     doc.setLogger(new Logger(Logger.Verbosity.WARN));
     const root = doc.getRoot();
@@ -207,7 +211,7 @@ async function workerMain() {
       // A shared texture next to the model (the foliage atlas): point at its KTX2 copy.
       const file = uri && !uri.startsWith('data:') ? path.posix.join(path.posix.dirname(rel), uri) : null;
       if (file) {
-        const ktx = converted.includes(file);
+        const ktx = converted.has(file);
         shared.set(i, ktx ? uri.replace(IMAGE, '.ktx2') : uri);
         texture.setImage(new Uint8Array(4));
         if (ktx) texture.setMimeType('image/ktx2');
@@ -232,7 +236,7 @@ async function workerMain() {
 
   parentPort.on('message', async (msg) => {
     try {
-      const bytes = msg.kind === 'texture' ? await ktx2(fs.readFileSync(msg.src), msg.role) : await model(msg.src, msg.rel, msg.converted);
+      const bytes = msg.kind === 'texture' ? await ktx2(fs.readFileSync(msg.src), msg.role) : await model(msg.src, msg.rel);
       parentPort.postMessage({ bytes }, [bytes.buffer]);
     } catch (err) {
       parentPort.postMessage({ error: String(err?.stack ?? err) });

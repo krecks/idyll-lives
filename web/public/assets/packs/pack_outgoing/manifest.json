@@ -1,0 +1,419 @@
+{
+  "$comment": "Blender-built outgoing pack models (tools/art/blender/families/pack_outgoing.py). Replaces the primitive-part placeholders of packs/outgoing by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light swings up, the dance floor's tiles pulse and a new photo grows.",
+  "version": 1,
+  "entries": {
+    "model.outgoing.partyBar": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/partyBar.glb",
+      "materials": {
+        "beer": {
+          "finish": "material.finish.gloss"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_a": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_b": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_c": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_d": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_e": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_f": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glassy": {
+          "finish": "material.finish.gloss"
+        },
+        "label": {
+          "finish": "material.finish.satin"
+        },
+        "lime": {
+          "finish": "material.finish.satin"
+        },
+        "magenta": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "plum": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sunny": {
+          "finish": "material.finish.satin"
+        },
+        "turq": {
+          "finish": "material.finish.gloss"
+        },
+        "vinyl": {
+          "finish": "material.finish.satin"
+        },
+        "wine_a": {
+          "finish": "material.finish.gloss"
+        },
+        "wine_b": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "mixDrinks": "tap",
+          "soda": "tap"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "vinyl",
+          "label": "Upholstery"
+        },
+        {
+          "material": "wood",
+          "label": "Back bar"
+        }
+      ]
+    },
+    "model.outgoing.conversationSectional": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/conversationSectional.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.fabric"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "magenta": {
+          "finish": "material.finish.gloss"
+        },
+        "oak_plain": {
+          "finish": "material.finish.satin"
+        },
+        "plum": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
+        },
+        "pouf": {
+          "finish": "material.finish.fabric"
+        },
+        "sunny": {
+          "finish": "material.finish.satin"
+        },
+        "turq": {
+          "finish": "material.finish.gloss"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "hangOut": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame",
+          "label": "Body"
+        },
+        {
+          "material": "upholstery",
+          "label": "Upholstery"
+        }
+      ]
+    },
+    "model.outgoing.karaokeStage": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/karaokeStage.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "lyric": {
+          "finish": "material.finish.gloss"
+        },
+        "magenta": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "speaker": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "sunny": {
+          "finish": "material.finish.satin"
+        },
+        "turq": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "practise": "mic_up",
+          "perform": "mic_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "speaker",
+          "label": "Speakers"
+        }
+      ]
+    },
+    "model.outgoing.videoCallNook": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/videoCallNook.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "face": {
+          "finish": "material.finish.gloss"
+        },
+        "laptop": {
+          "finish": "material.finish.metal"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
+        },
+        "ring": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "sunny": {
+          "finish": "material.finish.satin"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "call": "ring_light"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "cushion",
+          "label": "Upholstery"
+        },
+        {
+          "material": "wood",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.outgoing.danceFloor": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/danceFloor.glb",
+      "materials": {
+        "base": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "magenta": {
+          "finish": "material.finish.gloss"
+        },
+        "mirror": {
+          "finish": "material.finish.chrome"
+        },
+        "speaker": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tile_a": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_b": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_c": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_d": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_e": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_f": {
+          "finish": "material.finish.gloss"
+        },
+        "turq": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "dance": "tiles"
+        }
+      },
+      "paint": [
+        {
+          "material": "base",
+          "label": "Body"
+        },
+        {
+          "material": "speaker",
+          "label": "Speakers"
+        }
+      ]
+    },
+    "model.outgoing.photoWall": {
+      "type": "model",
+      "url": "../../models/pack_outgoing/photoWall.glb",
+      "materials": {
+        "beer": {
+          "finish": "material.finish.gloss"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "cork": {
+          "finish": "material.finish.matte"
+        },
+        "magenta": {
+          "finish": "material.finish.gloss"
+        },
+        "paper": {
+          "finish": "material.finish.satin"
+        },
+        "photo_a": {
+          "finish": "material.finish.gloss"
+        },
+        "photo_b": {
+          "finish": "material.finish.gloss"
+        },
+        "photo_c": {
+          "finish": "material.finish.gloss"
+        },
+        "pin_a": {
+          "finish": "material.finish.gloss"
+        },
+        "pin_b": {
+          "finish": "material.finish.gloss"
+        },
+        "string": {
+          "finish": "material.finish.satin"
+        },
+        "sunny": {
+          "finish": "material.finish.satin"
+        },
+        "turq": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "reminisce": "photo"
+        }
+      },
+      "paint": [
+        {
+          "material": "wood",
+          "label": "Body"
+        },
+        {
+          "material": "cork",
+          "label": "Board"
+        }
+      ]
+    }
+  }
+}

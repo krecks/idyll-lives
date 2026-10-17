@@ -14,10 +14,11 @@ import { BENCH } from '../debug/benchFlags';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
+import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
-import type { Renderer, WallMode } from '../render/types';
+import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { services, type GameControls } from '../ui/services';
@@ -33,7 +34,7 @@ import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
-import { styledModel } from '../ui/buy/catalog';
+import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
@@ -200,6 +201,8 @@ export async function startSession(
   let focused = false;
   let viewPlot: number | null = null;
   let lastEvent = -1;
+  /** Whether the first update's story (the history, empty in a new game) has been seen. */
+  let storySeen = false;
   /** The HUD view as the worker's updates built it up. */
   const mirror = new UiMirror();
   /** The household routines last compared (they come again with every change to the household). */
@@ -236,7 +239,7 @@ export async function startSession(
   }
   const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
   const worldSound = new WorldSound(renderer, content);
-  const buildBuy = new BuildBuyInput(renderer, content, assets, (command) => bridge.send(command));
+  const buildBuy = new BuildBuyInput(renderer, content, (command) => bridge.send(command));
   buildBuy.showStorey = (storey) => {
     storeyChosenAt = performance.now();
     setStorey(storey);
@@ -324,6 +327,8 @@ export async function startSession(
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
+  /** The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy` holds). */
+  let autonomy: boolean | null = null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -482,6 +487,11 @@ export async function startSession(
       bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
       game.menu = null;
     },
+    switchLamp(objectId) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
+      game.menu = null;
+    },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
     },
@@ -501,6 +511,7 @@ export async function startSession(
       // Creation is the new game's: in a game, only a family moving into an empty home.
       if (game.mode === mode || (mode === 'create' && game.occupied)) return;
       takeBack();
+      game.customising = null;
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
@@ -622,8 +633,13 @@ export async function startSession(
       buildBuy.clearPreviews();
       bridge.send({ type: 'redo', household: game.home });
     },
-    restyle(objectId, style) {
-      bridge.send({ type: 'restyle', household: game.home, object: objectId, style, seen: seenAt(game.objects, objectId) });
+    recolor(objectId, colors) {
+      bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors), seen: seenAt(game.objects, objectId) });
+    },
+    colorPlacing(colors) {
+      if (!game.placing || game.placing.objectId !== null) return;
+      game.placing = { ...game.placing, colors };
+      buildBuy.rehover();
     },
     resetSize(objectId) {
       const obj = game.objects.find((o) => o.id === objectId);
@@ -633,10 +649,6 @@ export async function startSession(
       const [w, d] = def.footprint ?? [1, 1];
       bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0, seen: seenAt(game.objects, obj.id) });
       buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: obj.rot });
-    },
-    setHouseholdStyle(style) {
-      bridge.send({ type: 'setStyle', household: game.home, style });
-      game.householdStyle = style;
     },
     /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
@@ -759,6 +771,38 @@ export async function startSession(
   // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
   if (params.has('debug')) {
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
+    // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
+    // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
+    // of the object `id` at home (null: closed).
+    // `__camera(pose?)`: the camera's pose, and with a (partial) pose, puts it there and stops the
+    // camera watching on its own. `__controls.follow(id, view?)` also sets the radius, beta, alpha
+    // or target height (`y`) it follows with.
+    const placeCamera = (pose: Partial<CameraPose> & { y?: number }) => {
+      takeBack();
+      const now = renderer.cameraPose();
+      const target = pose.target ?? [now.target[0], pose.y ?? now.target[1], now.target[2]];
+      renderer.setCameraPose({ ...now, ...pose, target });
+    };
+    Object.assign(window, {
+      __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
+      __content: content,
+      __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
+      __customise: (id: number | null) => {
+        const def = game.objects.find((o) => o.id === id)?.def;
+        game.customising = def && id !== null ? { def, objectId: id } : null;
+      },
+      __camera: (pose?: Partial<CameraPose> & { y?: number }) => {
+        if (pose) placeCamera(pose);
+        return renderer.cameraPose();
+      },
+      __controls: Object.assign(Object.create(controls) as GameControls, {
+        follow(id: number | null, view?: Partial<Omit<CameraPose, 'target'>> & { y?: number }) {
+          controls.follow(id);
+          if (view) placeCamera(view);
+        },
+      }),
+    });
     // `__crash(what)`: fails on purpose, to see how the game copes. 'panic': the simulation panics;
     // 'throw': an error its worker doesn't catch; 'hang': its worker hangs; 'render': every frame fails.
     Object.assign(window, { __crash: (what: 'panic' | 'throw' | 'hang' | 'render') => (what === 'render' ? (failFrames = true) : bridge.debugCrash(what)) });
@@ -804,7 +848,6 @@ export async function startSession(
     game.funds = mine?.funds ?? 0;
     game.rent = mine?.rent ?? null;
     game.bills = mine?.bills ?? null;
-    game.householdStyle = mine?.style ?? 0;
     game.expecting = mine?.expecting ?? null;
     game.undoSteps = mine?.undo ?? 0;
     game.redoSteps = mine?.redo ?? 0;
@@ -821,10 +864,12 @@ export async function startSession(
     const followed = game.follow === null ? null : game.sims.find((s) => s.id === game.follow);
     if (game.follow !== null && !followed) controls.follow(null);
     else if (followed?.plot != null && followed.plot !== viewPlot) showPlot(followed.plot);
-    // New story events: the journal, the director, and the feed (only the first batch is history).
+    // New story events: the journal, the director, and the feed (only the first update's story is
+    // history; a new game's is empty, and its first event is news).
     const events = ui.events ?? [];
     const fresh = events.filter((e) => e.id > lastEvent);
-    if (lastEvent >= 0 && fresh.length) onStory(fresh);
+    if (storySeen && fresh.length) onStory(fresh);
+    storySeen = true;
     if (events.length) lastEvent = events[events.length - 1].id;
   });
   /** The newest picture of the game (a save while nothing is drawn, e.g. in a hidden tab, keeps it). */
@@ -888,6 +933,9 @@ export async function startSession(
     itemsSeen = items;
     if (!disposed) renderer.setItems(items);
   });
+  bridge.onLamps((off) => {
+    if (!disposed) renderer.setLampsOff(off);
+  });
   bridge.onWorld((w) => {
     if (disposed) return;
     // Newcomers and babies the simulation made up carry an appearance seed: give them their
@@ -934,7 +982,7 @@ export async function startSession(
       household = game.household = mine.name;
     }
     game.objects = w.objects;
-    // Something restyled while in hand: the ghost takes the new look.
+    // Something recoloured while in hand: the ghost takes the new colour.
     if (game.placing?.objectId != null) buildBuy.rehover();
     if (game.buySelection !== null && !w.objects.some((o) => o.id === game.buySelection)) game.buySelection = null;
     buildBuy.objectsChanged();
@@ -1048,11 +1096,16 @@ export async function startSession(
     const def = placement && content.object(placement.def);
     if (!placement || !def) return;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
-    // Dining at a table only at a chair pulled up to one.
+    // Dining at a table only at a chair pulled up to one; folding down only what's folded up.
     const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
+    const state = placement.open ? 'open' : 'closed';
+    // A crop is harvested only ripe (growth stage 2).
+    const offered = (when: string | undefined) => !when || (when === 'ripe' ? placement.growth === undefined || placement.growth === 2 : when === state);
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      it.needsTable && !atTable ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
+      (it.needsTable && !atTable) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
+    // A lamp: its switch (not a fire's).
+    if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
@@ -1156,7 +1209,7 @@ export async function startSession(
     play('pick');
     if (p.kind === 'tool') return controls.setBuildTool(p.tool);
     controls.startPlacing(p.def);
-    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, style: p.style, size: p.size, tall: p.tall };
+    if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, colors: p.colors, size: p.size, tall: p.tall };
   }
 
   const onKey = (e: KeyboardEvent) => {
@@ -1167,6 +1220,11 @@ export async function startSession(
     // A held key repeats only what's worth repeating (turning, storeys, undo and redo); toggles happen once.
     if (e.repeat && !REPEATING.has(e.key)) {
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
+      return;
+    }
+    // The colour studio: its keys are its own (Escape closes it, as Cancel).
+    if (game.customising) {
+      if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
       return;
     }
     // Creation: its keys are its own (Escape goes back to Live).
@@ -1381,7 +1439,7 @@ export async function startSession(
       prefetchTimer = setTimeout(() => {
         // (Not while benchmarking: drawing the pictures would show in the measurements.)
         if (disposed || BENCH) return;
-        services.items.prefetch(content.shop.map((def) => ({ model: styledModel(content, assets, def, game.householdStyle), footprint: def.footprint ?? [1, 1] })));
+        services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
       }, PREFETCH_PICTURES_MS);
     },
     save(name, slotId) {
@@ -1394,7 +1452,7 @@ export async function startSession(
         fpsCap: s.fpsCap,
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
-      bridge.send({ type: 'setAutonomy', enabled: s.autonomy });
+      if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
       if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
       if (s.autosaveMinutes !== autosaveMinutes) {

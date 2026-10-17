@@ -249,7 +249,7 @@ fn vacant_plot(w: &World, n: usize) -> Option<u32> {
 }
 
 /// A household for the house on `plot`: the empty one already there, else a new one.
-fn household_for(w: &mut World, plot: u32, name: &str, style: u8) -> usize {
+fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
     if let Some(h) = w.households.iter().position(|hh| hh.plot == Some(plot)) {
         let hh = &mut w.households[h];
         hh.name = name.to_string();
@@ -264,7 +264,6 @@ fn household_for(w: &mut World, plot: u32, name: &str, style: u8) -> usize {
         plot: Some(plot),
         player: false,
         funds: 0,
-        style,
         free_will: true,
         routines: Vec::new(),
         expecting: None,
@@ -331,8 +330,7 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
                 w.events.push(tick, EventKind::MovedInWith, m, partner, None);
             } else if let Some(plot) = vacant_plot(w, 2) {
                 let name = w.households[ha].name.clone();
-                let style = w.households[ha].style;
-                let h = household_for(w, plot, &name, style);
+                let h = household_for(w, plot, &name);
                 move_to(w, a, h);
                 move_to(w, b, h);
                 w.events.push(tick, EventKind::MovedInWith, a, b, None);
@@ -356,8 +354,7 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
         let going = 1 + usize::from(partner.is_some());
         if let Some(plot) = vacant_plot(w, going) {
             let name = w.households[h].name.clone();
-            let style = w.households[h].style;
-            let new = household_for(w, plot, &name, style);
+            let new = household_for(w, plot, &name);
             move_to(w, i, new);
             if let Some(p) = partner {
                 move_to(w, p, new);
@@ -454,8 +451,7 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     } else if size >= 2 && w.rng.next_f32() < 0.4 {
         bonds.push((0, 1, "siblings"));
     }
-    let style = (w.rng.next_u32() as usize % w.content.styles.len().max(1)) as u8;
-    let h = household_for(w, plot, &surname, style);
+    let h = household_for(w, plot, &surname);
     w.households[h].funds = w.content.starting_funds;
     w.households[h].free_will = true;
     let mut ids = Vec::new();

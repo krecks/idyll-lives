@@ -85,7 +85,7 @@
         "kind": "table",
         "size": [
           2.84,
-          0.92
+          0.88
         ]
       },
       "description": "A long walnut table on tapered legs for family dinners. Chairs are sold separately: put them round it.",
@@ -108,7 +108,7 @@
         "kind": "table",
         "size": [
           3.84,
-          0.94
+          0.88
         ]
       },
       "description": "Four metres of table on six legs: room for the whole family, and then some. Chairs are sold separately: put them round it.",
@@ -177,7 +177,7 @@
         "kind": "table",
         "size": [
           2.86,
-          0.94
+          0.88
         ]
       },
       "description": "Thick planks on trestle legs: a table that has seen a lot of Sunday lunches. Chairs are sold separately: put them round it.",
@@ -742,6 +742,7 @@
       ],
       "price": 90,
       "category": "kids",
+      "freeRotation": true,
       "approach": "around",
       "seatAt": [
         "table"
@@ -757,6 +758,9 @@
       "id": "sideboard",
       "name": "Walnut sideboard",
       "model": "model.sideboard",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         2,
         1
@@ -774,7 +778,7 @@
         ],
         "at": [
           0.0,
-          -0.16
+          -0.11
         ]
       },
       "description": "A long, low sideboard with slatted doors: things stand on top.",
@@ -784,6 +788,9 @@
       "id": "buffet",
       "name": "Painted buffet",
       "model": "model.buffet",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         2,
         1
@@ -801,7 +808,7 @@
         ],
         "at": [
           0.0,
-          -0.16
+          -0.1
         ]
       },
       "description": "A sage buffet with drawers over cupboards and an oak top.",
@@ -811,12 +818,16 @@
       "id": "chinaCabinet",
       "name": "China cabinet",
       "model": "model.chinaCabinet",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1
       ],
       "price": 650,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "cabinets",
       "decor": 0.8,
       "description": "A glazed hutch with the best plates on show over a cupboard.",

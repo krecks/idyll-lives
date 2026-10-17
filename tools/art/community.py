@@ -50,8 +50,11 @@ def street_lamp():
         cyl([0.18, 0.08, 0.18], [0, 3.5, 0], IRON, 'metal', segments=10),
         box([0.3, 0.42, 0.3], [0, 3.75, 0], BULB, 'glass', radius=0.01),
         sph([0.16, 0.2, 0.16], [0, 3.74, 0], BULB, 'gloss', segments=10),
-        cone([0.46, 0.22, 0.46], [0, 4.07, 0], IRON, 'metal', taper=0.15, segments=4, rotate=[0, 45, 0]),
+        cone([0.66, 0.22, 0.66], [0, 4.07, 0], IRON, 'metal', taper=0.15, segments=4, rotate=[0, 45, 0]),   # 0.47 square
         sph([0.07, 0.07, 0.07], [0, 4.2, 0], IRON, 'metal', segments=8),
+        rod([-0.29, 3.12, 0], [0.29, 3.12, 0], 0.032, IRON, 'metal'),                                       # ladder bar
+        sph([0.06, 0.06, 0.06], [-0.3, 3.12, 0], IRON, 'metal', segments=8),
+        sph([0.06, 0.06, 0.06], [0.3, 3.12, 0], IRON, 'metal', segments=8),
     ]
 
 
@@ -259,7 +262,7 @@ def slide():
     p += [box([0.48, 0.04, 0.24], [0, 0.3, 0.84], chute, 'gloss', radius=0.01),
           box([0.06, 0.28, 0.06], [-0.18, 0.14, 0.8], frame, 'metal'),
           box([0.06, 0.28, 0.06], [0.18, 0.14, 0.8], frame, 'metal'),
-          cone([0.66, 0.4, 0.46], [0, 2.12, -0.5], RED, 'gloss', taper=0.05, segments=4, rotate=[0, 45, 0])]   # roof
+          cone([1.06, 0.4, 1.06], [0, 2.12, -0.5], RED, 'gloss', taper=0.05, segments=4, rotate=[0, 45, 0])]   # roof, 0.75 square
     return p
 
 
@@ -295,19 +298,20 @@ add('climbingFrame', climbing_frame(), (2, 2))
 def seesaw():
     p = [box([0.3, 0.4, 0.42], [0, 0.2, 0], BLUE, 'metal', radius=0.02),
          cyl([0.12, 0.46, 0.12], [0, 0.44, 0], '#5C6168', 'metal', rotate=[90, 0, 0], segments=10)]
-    pivot, r = [0, 0.48, 0], [0, 0, 7]
-    p.append(box([1.92, 0.07, 0.24], pivot, YELLOW, 'gloss', radius=0.02, rotate=r))
+    # a 2.5 m plank, level at rest, its seats on the content's two slots (x = +-0.75 m across 3 tiles)
+    pivot, r = [0, 0.46, 0], [0, 0, 0]
+    p.append(box([2.5, 0.07, 0.24], pivot, YELLOW, 'gloss', radius=0.02, rotate=r))
     for s in (-1, 1):
-        p.append(box([0.32, 0.06, 0.3], on(pivot, r, [s * 0.66, 0.06, 0]), RED, 'gloss', radius=0.02, rotate=r))
-        a = on(pivot, r, [s * 0.42, 0.04, 0])
-        b = on(pivot, r, [s * 0.42, 0.34, 0])
+        p.append(box([0.32, 0.06, 0.3], on(pivot, r, [s * 0.75, 0.06, 0]), RED, 'gloss', radius=0.02, rotate=r))
+        a = on(pivot, r, [s * 0.5, 0.04, 0])
+        b = on(pivot, r, [s * 0.5, 0.34, 0])
         p.append(rod(a, b, 0.04, '#5C6168', 'metal'))
         p.append(rod([b[0], b[1], -0.12], [b[0], b[1], 0.12], 0.04, '#5C6168', 'metal'))
-    p.append(cyl([0.26, 0.12, 0.26], [-0.84, 0.06, 0], '#26282A', 'matte', segments=12))                     # tyre under the low end
+        p.append(cyl([0.26, 0.12, 0.26], [s * 1.1, 0.06, 0], '#26282A', 'matte', segments=12))                # bumper tyres under the ends
     return p
 
 
-add('seesaw', seesaw(), (2, 1))
+add('seesaw', seesaw(), (3, 1))
 
 
 def spring_rider():
@@ -524,6 +528,11 @@ add('marketStall', market_stall(), (2, 1))
 # =============================================================================================
 # Shop and café
 # =============================================================================================
+def forward(parts, dz):
+    """`parts` moved `dz` towards the front: a counter whose worktop reached past the wall face (-0.43)."""
+    return [dict(q, at=[q['at'][0], q['at'][1], q['at'][2] + dz]) for q in parts]
+
+
 def shop_counter():
     p = [box([1.9, 0.92, 0.7], [0, 0.46, -0.08], OAK, 'wood', radius=0.015),
          box([1.96, 0.05, 0.78], [0, 0.945, -0.08], WALNUT, 'wood', radius=0.01),
@@ -542,7 +551,7 @@ def shop_counter():
     return p
 
 
-add('shopCounter', shop_counter(), (2, 1))
+add('shopCounter', forward(shop_counter(), 0.04), (2, 1))
 
 
 def bakery_case():
@@ -572,7 +581,7 @@ def bakery_case():
     return p + goods
 
 
-add('bakeryCase', bakery_case(), (2, 1))
+add('bakeryCase', forward(bakery_case(), 0.04), (2, 1))
 
 
 def grocery_shelf():
@@ -877,6 +886,17 @@ ICONS = {'icon.category.community': {'type': 'icon', 'url': '../icons/landmark.s
 OVERHANG = set()
 
 
+def _bounds(q):
+    """OX.bounds, but a four-sided cone or cylinder turned 45° about y (a pyramid roof, square to the axes) by its
+    corners, not by its turned box (which counts its diagonal)."""
+    lo, hi = OX.bounds(q)
+    if q['shape'] in ('cone', 'cylinder') and q.get('segments') == 4 and list(q.get('rotate', [])) == [0, 45, 0]:
+        half = max(q['size'][0], q['size'][2]) / 2 / math.sqrt(2)
+        for k in (0, 2):
+            lo[k], hi[k] = q['at'][k] - half, q['at'][k] + half
+    return lo, hi
+
+
 def main(path):
     bad = 0
     for k, e in E.items():
@@ -889,7 +909,7 @@ def main(path):
             q = dict(p, shape='cylinder') if p['shape'] in ('lathe', 'torus') else p
             issues += [i for i in OX.validate(k, [q], fp) if 'exceeds' not in i and 'below floor' not in i and 'finishes (max 4)' not in i]
             if p.get('material') not in FINISHES: issues.append(f'bad finish {p.get("material")}')
-            lo, hi = OX.bounds(q)
+            lo, hi = _bounds(q)
             if lo[1] < -0.015: issues.append(f'part {p["shape"]} at {p["at"]} below the ground')
             if k not in OVERHANG and (lo[0] < -fp[0] / 2 - 0.02 or hi[0] > fp[0] / 2 + 0.02 or lo[2] < -fp[1] / 2 - 0.02 or hi[2] > fp[1] / 2 + 0.02):
                 issues.append(f'part {p["shape"]} at {p["at"]} leaves the {fp} footprint ({lo[0]:.2f}..{hi[0]:.2f}, {lo[2]:.2f}..{hi[2]:.2f})')

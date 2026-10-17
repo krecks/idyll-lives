@@ -1,8 +1,8 @@
 /**
  * The graphics presets: Low, Medium and High (Settings › Performance › Graphics; `?quality=low|
  * medium|high` overrides the setting for testing). Medium is everyone's default and the game's
- * intended look. High is Medium with sharper sun shadows and live mirrors. Low is Medium with
- * modest trims for older laptops (integrated Intel graphics).
+ * intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is
+ * Medium with modest trims for older laptops (integrated Intel graphics).
  *
  * Every knob is in this one table. A new knob gets a field below, with what it does and what it
  * costs, and a value in each preset.
@@ -40,10 +40,26 @@ export interface QualitySettings {
    */
   clusteredLamps: boolean;
   /**
-   * How many mirrors (the nearest the camera) reflect the room live; 0: none. Each draws the world
-   * once more, about 50 MB of memory traffic a frame (P1-09); the live cost wasn't measured.
+   * How many mirrors (the nearest the camera, on screen) reflect the room; 0: none. Each draws again
+   * only what can be seen through its glass, and only the residents in it: the village's bathroom
+   * mirror, 67 draws a reflection (was 437 with the whole world and every resident). Its render target
+   * exists only while a mirror reflects, and 10 s after.
    */
   mirrors: number;
+  /**
+   * A reflection's resolution, as a share of the screen's along each side, rounded by Babylon to
+   * powers of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75); multisampled as
+   * `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
+   */
+  mirrorScale: number;
+  /**
+   * At most this many draws of a reflection a second, each only when something in it changed (the
+   * camera, the mirror, a resident in it, the light, things placed); held in between, looked up
+   * through the camera it was drawn for. 0: every frame. Medium with the camera swinging before a
+   * mirror (the worst case, as a resident moving in front of it): −6 % fps, +1.0 ms CPU, +0.1 ms
+   * GPU (WebGPU, M3 Pro); camera still, or the orbit: within noise. High's two every frame: −20 %.
+   */
+  mirrorRate: number;
   /**
    * Game minutes between lighting updates at speed 3 and up (slower speeds: every half minute).
    * Each update re-colours the sun, sky and lamps and thaws the materials for a few frames: at
@@ -63,6 +79,16 @@ export interface QualitySettings {
   landscapeShadows: boolean;
   /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
   snapshotRendering: boolean;
+  /**
+   * Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a
+   * fountain's water: model `motions.idle`); 0: none, all at rest. Each moving thing rewrites its
+   * model's part buffers every frame (one upload per model, not per thing); shadows aren't redrawn
+   * for them, and no draw calls are added (moving parts have their meshes anyway). 94 at once on a
+   * lot, M3 Pro headless: 0.09 ms of CPU for the clips and +0.15–0.3 ms for the frame; with the CPU
+   * throttled 4× (a stand-in for an old laptop's): 0.2–0.35 ms and +0.4–0.6 ms. Not measured on
+   * Intel graphics hardware.
+   */
+  ambientRange: number;
 }
 
 /** What the renderer is built with: a preset's knobs, and which preset (the F3 overlay shows it). */
@@ -71,9 +97,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 0, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true, ambientRange: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 40 },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 60 },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

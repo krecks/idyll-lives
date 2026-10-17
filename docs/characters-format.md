@@ -245,6 +245,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
 | standUp | no | 1.07 | getting up from a seat or out of bed |
 | sitHands | yes | 1.67 | seated at a desk or keys (type, write, play, music) |
+| sitHandsNear | yes | 1.67 | the same at a shallow desk with its chair built in close (`NEAR_DESKS`) |
+| sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
 | spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |
@@ -259,9 +261,12 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | rail | yes | 2.5 | the telescope |
 | push | yes | 2.67 | mopping, vacuuming |
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
+| pick | yes | 3.0 | picking herbs from a waist-high planter |
 | dance | yes | 1.0 | dancing, fitness games |
 | punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
 | wave | no | 2.2 | the household creator's greetings |
+| fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
+| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 

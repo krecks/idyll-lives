@@ -9,7 +9,7 @@
 # `render/babylon/nature.ts` gives the `foliage` and `bark` finishes wind sway and a per-instance tint.
 #
 # Budgets: at most four material groups per model (textured finishes each, plain finishes together). Trees ~1-1.6k
-# triangles; the `*.far` LODs (distant forest instances, built at lod 1: 20-triangle blobs) ~100-250; the lawn's
+# triangles (the far woods draw the Blender trees' far versions; with no file, these at lod 1); the lawn's
 # grass tuft and wildflowers (thousands of instances) a few dozen. `vary` (placed plants get their own turn and
 # size) is kept per key. Same conventions as the other scripts: 1 unit = 1 m, origin at the footprint centre on the
 # ground, front +Z; trees overhang their tile.
@@ -141,7 +141,7 @@ WOOD = '#8A6446'
 def crown(rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0.3, seg=3, bottom=-0.45, core=0.0):
     """Leaf clumps over an ellipsoid crown (centre c, radii r): n blobs of about `size` x the mean radius,
     `spread` x the radius out from the centre, lighter towards the top; `core` adds a dark filling blob.
-    Clumps are finely tessellated (`seg` 3) for round silhouettes; far LODs pass seg=None (lod 1: 20 triangles)."""
+    Clumps are finely tessellated (`seg` 3) for round silhouettes; seg=None leaves them at lod's (lod 1: 20 triangles)."""
     out = []
     m = (r[0] + r[1] + r[2]) / 3
     if core:
@@ -253,34 +253,26 @@ def model(key, parts, vary=None):
 # Trees (forest, lot and garden)
 # =========================================================================================================
 
-def oak(far=False):
+def oak():
     rng = random.Random(11)
-    if far:
-        return (trunk(3.2, 0.6, seg=6, flare=False)
-                + crown(rng, [0, 5.3, 0], [2.7, 1.9, 2.7], 5, OAK, size=0.95, spread=0.6, seg=None, core=0.75))
     p = trunk(3.4, 0.62)
     p += limbs(rng, [0, 2.9, 0], [[1.5, 4.6, 0.5], [-1.4, 4.5, -0.6], [0.3, 5.0, -1.3], [-0.4, 5.1, 1.2]], 0.3)
-    p += crown(rng, [0, 5.5, 0], [2.7, 1.8, 2.7], 10, OAK, size=0.7, spread=0.75, core=0.82)
+    p += crown(rng, [0, 5.5, 0], [2.7, 1.8, 2.7], 10, OAK, size=0.7, spread=0.71, core=0.82)
     p += crown(rng, [1.7, 4.6, 0.7], [1.4, 1.0, 1.4], 3, OAK, size=0.85, bottom=-0.6, core=0.7)
     p += crown(rng, [-1.6, 4.7, -0.8], [1.4, 1.1, 1.4], 3, OAK, size=0.85, bottom=-0.6, core=0.7)
     return p
 
 
-def maple(far=False):
+def maple():
     rng = random.Random(12)
-    if far:
-        return trunk(3.0, 0.5, seg=6, flare=False) + crown(rng, [0, 5.0, 0], [2.4, 2.3, 2.4], 5, MAPLE, size=0.95, spread=0.6, seg=None, core=0.75)
     p = trunk(3.2, 0.5)
     p += limbs(rng, [0, 2.8, 0], [[1.1, 4.3, 0.4], [-1.0, 4.4, -0.3], [0.1, 4.6, -1.1]], 0.24)
-    p += crown(rng, [0, 5.1, 0], [2.5, 2.4, 2.5], 14, MAPLE, size=0.6, spread=0.78, core=0.85)
+    p += crown(rng, [0, 5.1, 0], [2.5, 2.4, 2.5], 14, MAPLE, size=0.6, spread=0.74, core=0.85)
     return p
 
 
-def birch(far=False):
+def birch():
     rng = random.Random(13)
-    if far:
-        return ([cyl([0.28, 7.0, 0.28], [0, 3.5, 0], BIRCH_BARK, 'matte', taper=0.45, segments=5)]
-                + crown(rng, [0, 5.6, 0], [1.5, 2.4, 1.5], 5, BIRCH, size=0.9, spread=0.6, seg=None, core=0.7))
     p = [cyl([0.3, 7.2, 0.3], [0, 3.6, 0], BIRCH_BARK, 'matte', taper=0.42, segments=8),
          cone([0.46, 0.4, 0.46], [0, 0.2, 0], '#5A524A', 'bark', taper=0.6, segments=8)]
     for i in range(9):
@@ -293,11 +285,8 @@ def birch(far=False):
     return p
 
 
-def blossom(far=False):
+def blossom():
     rng = random.Random(14)
-    if far:
-        return (trunk(2.0, 0.42, BARK_DARK, seg=6, flare=False)
-                + crown(rng, [0, 3.8, 0], [2.6, 1.5, 2.6], 5, CHERRY, size=1.0, spread=0.6, seg=None, squash=0.75, core=0.75))
     p = trunk(1.9, 0.45, BARK_DARK, taper=0.7)
     p += limbs(rng, [0, 1.7, 0], [[1.6, 3.2, 0.5], [-1.5, 3.1, -0.4], [0.3, 3.4, -1.5], [-0.4, 3.3, 1.4]], 0.22, BARK_DARK)
     p += crown(rng, [0, 3.9, 0], [2.7, 1.45, 2.7], 14, CHERRY, size=0.6, squash=0.75, noise=0.32, spread=0.78, core=0.8, bottom=-0.55)
@@ -305,11 +294,8 @@ def blossom(far=False):
     return p
 
 
-def apple(far=False):
+def apple():
     rng = random.Random(15)
-    if far:
-        return (trunk(2.2, 0.4, seg=6, flare=False) + crown(rng, [0, 3.6, 0], [2.2, 1.6, 2.2], 5, APPLE, size=0.95, spread=0.6, seg=None, core=0.75)
-                + surface_dots(rng, [0, 3.6, 0], [2.2, 1.6, 2.2], 5, 0.24, ['#C8352B'], out=0.95, seg=None))
     p = trunk(2.1, 0.4, taper=0.7)
     p += limbs(rng, [0, 1.9, 0], [[1.3, 3.1, 0.4], [-1.2, 3.0, -0.4], [0.2, 3.3, -1.3], [-0.2, 3.2, 1.2]], 0.2)
     p += crown(rng, [0, 3.6, 0], [2.2, 1.65, 2.2], 12, APPLE, size=0.64, spread=0.76, core=0.84)
@@ -317,11 +303,8 @@ def apple(far=False):
     return p
 
 
-def japanese_maple(far=False):
+def japanese_maple():
     rng = random.Random(16)
-    if far:
-        return ([rod([0, 0, 0], [0.3, 1.8, 0.1], 0.2, BARK_DARK, seg=5)]
-                + crown(rng, [0, 2.4, 0], [1.9, 0.85, 1.9], 5, JMAPLE, size=1.0, spread=0.6, seg=None, squash=0.65, core=0.75))
     p = limbs(rng, [0, 0, 0], [[0.7, 1.7, 0.3], [-0.6, 1.6, -0.4], [0.1, 1.9, -0.7], [-0.2, 1.5, 0.7]], 0.17, BARK_DARK)
     p.append(cone([0.42, 0.3, 0.42], [0, 0.15, 0], BARK_DARK, 'bark', taper=0.5, segments=7))
     p += crown(rng, [0, 2.0, 0], [1.95, 0.6, 1.95], 9, JMAPLE, size=0.66, squash=0.68, noise=0.32, spread=0.8, core=0.75)
@@ -330,10 +313,8 @@ def japanese_maple(far=False):
     return p
 
 
-def magnolia(far=False):
+def magnolia():
     rng = random.Random(17)
-    if far:
-        return trunk(1.7, 0.36, BARK_GREY, seg=6, flare=False) + crown(rng, [0, 3.3, 0], [1.9, 1.5, 1.8], 5, MAGNOLIA, size=0.95, spread=0.6, seg=None, core=0.72)
     p = trunk(1.6, 0.36, BARK_GREY, taper=0.7)
     p += limbs(rng, [0, 1.4, 0], [[1.2, 3.0, 0.3], [-1.1, 3.1, -0.4], [0.2, 3.5, -1.0], [-0.3, 3.3, 1.0], [0.1, 3.9, 0.1]], 0.16, BARK_GREY)
     p += crown(rng, [0, 3.4, 0], [1.9, 1.5, 1.8], 11, MAGNOLIA, size=0.58, spread=0.8, noise=0.3, core=0.7)
@@ -343,11 +324,8 @@ def magnolia(far=False):
     return p
 
 
-def willow(far=False):
+def willow():
     rng = random.Random(18)
-    if far:
-        return (trunk(2.6, 0.6, seg=6, flare=False) + crown(rng, [0, 4.4, 0], [2.4, 1.4, 2.4], 4, WILLOW, size=1.0, spread=0.55, seg=None, squash=0.7, core=0.75)
-                + [blob([1.4, 3.2, 1.4], [2.0 * math.cos(a), 3.0, 2.0 * math.sin(a)], WILLOW[2], noise=0.25) for a in (0.4, 2.5, 4.6)])
     p = trunk(2.7, 0.62, taper=0.65)
     tips = [[2.0 * math.cos(a), 4.3, 2.0 * math.sin(a)] for a in (0.3, 1.6, 2.9, 4.2, 5.4)]
     p += limbs(rng, [0, 2.4, 0], tips, 0.24)
@@ -367,7 +345,7 @@ def willow(far=False):
 
 
 
-def conifer(rng, tiers, base_d, y0, step, h, cols, far, top_d=0.5, tilt=4.0, offset=0.12, seg=11):
+def conifer(rng, tiers, base_d, y0, step, h, cols, top_d=0.5, tilt=4.0, offset=0.12, seg=11):
     """Stacked cones from y0 (the first tier's bottom), each `step` above the last, shrinking to top_d."""
     p = []
     for i in range(tiers):
@@ -375,39 +353,29 @@ def conifer(rng, tiers, base_d, y0, step, h, cols, far, top_d=0.5, tilt=4.0, off
         d = base_d + (top_d - base_d) * t ** 0.9
         hh = h * (1 - 0.35 * t)
         y = y0 + i * step + hh / 2
-        if far:
-            p.append(cone([d, hh, d], [0, y, 0], cols[i % len(cols)], 'foliage', segments=6))
-        else:
-            p.append(cone([d * rng.uniform(0.94, 1.06), hh, d * rng.uniform(0.94, 1.06)], [rng.uniform(-offset, offset), y, rng.uniform(-offset, offset)],
-                          cols[(i + rng.randint(0, 1)) % len(cols)], 'foliage', segments=seg, rotate=[rng.uniform(-tilt, tilt), rng.uniform(0, 360), rng.uniform(-tilt, tilt)]))
+        p.append(cone([d * rng.uniform(0.94, 1.06), hh, d * rng.uniform(0.94, 1.06)], [rng.uniform(-offset, offset), y, rng.uniform(-offset, offset)],
+                      cols[(i + rng.randint(0, 1)) % len(cols)], 'foliage', segments=seg, rotate=[rng.uniform(-tilt, tilt), rng.uniform(0, 360), rng.uniform(-tilt, tilt)]))
     return p
 
 
-def pine(far=False):
+def pine():
     rng = random.Random(19)
-    if far:
-        return [cyl([0.34, 3.0, 0.34], [0, 1.5, 0], '#B59A82', 'bark', taper=0.6, segments=5)] + conifer(rng, 4, 5.2, 1.5, 1.7, 2.6, PINE, True, top_d=1.0)
     p = trunk(3.4, 0.38, '#B59A82', taper=0.55, seg=8)
-    p += conifer(rng, 6, 5.6, 1.4, 1.12, 2.1, PINE, False, top_d=0.9, tilt=6, offset=0.2)
+    p += conifer(rng, 6, 5.6, 1.4, 1.12, 2.1, PINE, top_d=0.9, tilt=6, offset=0.2)
     p.append(cone([0.5, 1.3, 0.5], [0, 8.2, 0], PINE[2], 'foliage', segments=8))
     return p
 
 
-def spruce(far=False):
+def spruce():
     rng = random.Random(20)
-    if far:
-        return conifer(rng, 5, 5.2, 0.3, 1.8, 2.8, SPRUCE, True, top_d=0.9)
     p = trunk(1.2, 0.36, '#8E7A6A', seg=7, flare=False)
-    p += conifer(rng, 9, 5.4, 0.35, 0.98, 1.85, SPRUCE, False, top_d=0.7, tilt=3, offset=0.08)
+    p += conifer(rng, 9, 5.4, 0.35, 0.98, 1.85, SPRUCE, top_d=0.7, tilt=3, offset=0.08)
     p.append(cone([0.42, 1.2, 0.42], [0, 9.6, 0], SPRUCE[3], 'foliage', segments=8))
     return p
 
 
-def cypress(far=False):
+def cypress():
     rng = random.Random(21)
-    if far:
-        return [blob([1.9, 3.6, 1.9], [0, 2.3, 0], CYPRESS[1], noise=0.15), blob([1.4, 3.4, 1.4], [0, 4.9, 0], CYPRESS[2], noise=0.15),
-                cone([0.9, 2.0, 0.9], [0, 6.9, 0], CYPRESS[3], 'foliage', segments=6)]
     p = [cyl([0.28, 0.8, 0.28], [0, 0.4, 0], '#8E7A6A', 'bark', taper=0.8, segments=7)]
     for i, (d, h, y) in enumerate([(2.0, 2.4, 1.6), (1.9, 2.4, 2.9), (1.7, 2.3, 4.1), (1.4, 2.1, 5.3), (1.05, 1.8, 6.3)]):
         p.append(blob([d * rng.uniform(0.95, 1.05), h, d * rng.uniform(0.95, 1.05)], [rng.uniform(-0.06, 0.06), y, rng.uniform(-0.06, 0.06)],
@@ -425,7 +393,6 @@ for key, fn in [('model.tree', oak), ('model.tree.maple', maple), ('model.tree.b
                 ('model.tree.fruit', apple), ('model.tree.japaneseMaple', japanese_maple), ('model.tree.magnolia', magnolia),
                 ('model.tree.willow', willow), ('model.pine', pine), ('model.spruce', spruce), ('model.cypress', cypress)]:
     model(key, fn(), 0.12)
-    model(key + '.far', fn(far=True))
 
 
 # =========================================================================================================
@@ -646,7 +613,7 @@ def meadow():
     cols = ['#7FA04A', '#8EAE52', '#6E9240', '#A2B45E']
     p = [blob([0.3, 0.16, 0.3], [x, 0.03, z], cols[i % 4], noise=0.3) for i, (x, z, _) in enumerate(spiral(5, 0.3, rng))]
     for i, (x, z, a) in enumerate(spiral(22, 0.42, rng)):
-        p.append(leaf_blade([x, 0, z], rng.uniform(0.28, 0.5), 0.05, rng.uniform(5, 25), rng.uniform(0, 360), cols[i % 4]))
+        p.append(leaf_blade([x, 0, z], rng.uniform(0.28, 0.5), 0.05, rng.uniform(5, 30), rng.uniform(0, 360), cols[i % 4]))
     flowers = ['#FFFFFF', '#F6C21E', '#A880E0', '#EC3A2E', '#8CB4F8', '#FFFFFF', '#F08CC4']
     for i, (x, z, a) in enumerate(spiral(16, 0.4, rng)):
         h = rng.uniform(0.26, 0.5)
@@ -657,7 +624,7 @@ def meadow():
 
 def geraniums():
     rng = random.Random(63)
-    p, top = pot(0.44, 0.34)
+    p, top = pot(0.4, 0.34)
     p += [blob([0.3, 0.2, 0.3], [x, top + 0.09, z], LEAF[i % 3], noise=0.3) for i, (x, z, _) in enumerate(spiral(4, 0.12, rng))]
     for i, (x, z, a) in enumerate(spiral(6, 0.15, rng)):
         h = top + rng.uniform(0.2, 0.3)
@@ -773,10 +740,10 @@ def ornamental_grass():
     cols = ['#9AAA5A', '#B2B86A', '#8A9E4E', '#A6B062']
     p = [blob([0.32, 0.14, 0.32], [0, 0.04, 0], '#7E8E46', noise=0.2)]
     for i, (x, z, a) in enumerate(spiral(22, 0.12, rng)):
-        p.append(leaf_blade([x, 0, z], rng.uniform(0.75, 1.1), 0.045, 8 + math.hypot(x, z) * 160 + rng.uniform(0, 8), math.degrees(math.atan2(x, z)) + rng.uniform(-20, 20), cols[i % 4]))
+        p.append(leaf_blade([x, 0, z], rng.uniform(0.75, 1.1), 0.045, 12 + math.hypot(x, z) * 170 + rng.uniform(0, 8), math.degrees(math.atan2(x, z)) + rng.uniform(-20, 20), cols[i % 4]))
     for i in range(6):
         yaw = i * 60 + rng.uniform(-15, 15)
-        r, ax = facing(rng.uniform(6, 18), yaw)
+        r, ax = facing(rng.uniform(10, 20), yaw)
         p.append(cyl([0.012, 1.0, 0.012], add([0, 0, 0], ax, 0.5), '#B8B070', 'foliage', segments=3, rotate=r))
         p.append(cone([0.06, 0.24, 0.06], add([0, 0, 0], ax, 1.05), '#E2D6A8', 'satin', taper=0.2, segments=5, rotate=r))
     return p
@@ -788,7 +755,7 @@ def hosta():
     for i in range(12):
         yaw = i / 12 * 360 * 2 + rng.uniform(-10, 10)
         up = i >= 6
-        p.append(leaf_pad([0, 0.1 + (0.08 if up else 0), 0], rng.uniform(0.3, 0.36), 0.2, -rng.uniform(25, 40) if up else -rng.uniform(5, 15), yaw,
+        p.append(leaf_pad([0, 0.1 + (0.08 if up else 0), 0], rng.uniform(0.33, 0.39), 0.2, -rng.uniform(25, 40) if up else -rng.uniform(5, 15), yaw,
                           ['#5E8A5E', '#8EAE6C', '#6A9464'][i % 3], seg=2, noise=0.08))
     for i in range(3):
         top = [rng.uniform(-0.08, 0.08), rng.uniform(0.62, 0.8), rng.uniform(-0.08, 0.08)]
@@ -923,14 +890,14 @@ WHITE_POT, CREAM_POT = '#EDEBE6', '#D9CDB4'
 
 def monstera():
     rng = random.Random(91)
-    p, top = pot(0.44, 0.38, WHITE_POT, 'satin', rim=False)
+    p, top = pot(0.38, 0.34, WHITE_POT, 'satin', rim=False)
     for i in range(9):
         yaw = i / 9 * 360 * 2 + rng.uniform(-15, 15)
-        h = top + rng.uniform(0.25, 0.6)
-        out = rng.uniform(0.22, 0.4)
+        h = top + rng.uniform(0.3, 0.6)
+        out = rng.uniform(0.07, 0.13)
         base = [out * math.sin(math.radians(yaw)), h, out * math.cos(math.radians(yaw))]
         p.append(stem([0, top, 0], base, 0.016, '#4E7A3A'))
-        p.append(leaf_pad(add(base, [0, 0, 0]), rng.uniform(0.36, 0.44), rng.uniform(0.3, 0.36), rng.uniform(15, 35), yaw, ['#2F6B35', '#3B7A3C', '#347040'][i % 3], seg=2))
+        p.append(leaf_pad(add(base, [0, 0, 0]), rng.uniform(0.29, 0.33), rng.uniform(0.26, 0.3), rng.uniform(18, 36), yaw, ['#2F6B35', '#3B7A3C', '#347040'][i % 3], seg=2))
     return p
 
 
@@ -987,7 +954,7 @@ def succulents():
     for i, (x, z, a) in enumerate(spiral(7, 0.2, rng)):
         s = rng.uniform(0.09, 0.13)
         p.append(cone([s, s * 0.55, s], [x, 0.14, z], cols[i % 5], 'satin', taper=1.7, segments=7))
-        p.append(cone([s * 0.6, s * 0.45, s * 0.6], [x, 0.17, z], cols[(i + 2) % 5], 'satin', taper=1.6, segments=5, rotate=[0, 25, 0]))
+        p.append(cone([s * 0.6, s * 0.45, s * 0.6], [x, 0.16, z], cols[(i + 2) % 5], 'satin', taper=1.6, segments=5, rotate=[0, 25, 0]))
     return p
 
 
@@ -1002,7 +969,7 @@ def boston_fern():
     p += q
     for i in range(12):
         yaw = i / 12 * 360 + rng.uniform(-10, 10)
-        p.append(leaf_pad([0, top + 0.04, 0], rng.uniform(0.4, 0.52), 0.13, rng.uniform(5, 40), yaw, ['#5E9A3E', '#6FAA46', '#558E38'][i % 3], seg=2, noise=0.15))
+        p.append(leaf_pad([0, top + 0.04, 0], rng.uniform(0.38, 0.46), 0.13, rng.uniform(25, 50), yaw, ['#5E9A3E', '#6FAA46', '#558E38'][i % 3], seg=2, noise=0.15))
     for i in range(6):
         p.append(leaf_pad([0, top + 0.06, 0], 0.3, 0.11, -rng.uniform(30, 50), i * 60 + 30, '#78B24E', seg=1, noise=0.15))
     return p
@@ -1013,11 +980,11 @@ def palm():
     p, top = pot(0.4, 0.34, CREAM_POT, 'matte', rim=False)
     for i in range(7):
         yaw = i / 7 * 360 + rng.uniform(-15, 15)
-        r, ax = facing(rng.uniform(10, 28), yaw)
-        length = rng.uniform(0.45, 0.65)
+        r, ax = facing(rng.uniform(10, 20), yaw)
+        length = rng.uniform(0.4, 0.6)
         tip = add([0, top, 0], ax, length)
         p.append(rod([0, top, 0], tip, 0.014, '#5E7E3A', 'foliage', seg=3))
-        p.append(leaf_pad(add(tip, [0, -0.02, 0]), rng.uniform(0.35, 0.45), 0.22, rng.uniform(10, 35), yaw, ['#4A8A3A', '#5A9A42', '#3E7A34'][i % 3], seg=2, thick=0.02, noise=0.2))
+        p.append(leaf_pad(add(tip, [0, -0.02, 0]), rng.uniform(0.28, 0.34), 0.2, rng.uniform(15, 35), yaw, ['#4A8A3A', '#5A9A42', '#3E7A34'][i % 3], seg=2, thick=0.02, noise=0.2))
     return p
 
 

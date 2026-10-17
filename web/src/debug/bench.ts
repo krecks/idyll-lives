@@ -8,7 +8,9 @@
  * - `quality=low|medium|high`: the graphics presets (`render/quality.ts`); without it, the player's setting.
  * - `hour=13|21`: the lighting held at that hour; without it, the game's clock (the scene's evening).
  * - `cam=orbit` (24 m round the home lot, a turn in 40 s), `wide` (80 m, 90 s), `build` (orbit in
- *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame).
+ *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame),
+ *   `mirror` (6 m in front of the home lot's first mirror, swinging 30° either side every 20 s),
+ *   `mirror-still` (the same, held straight in front of it).
  * - `res=1` the full resolution (or 0.5–1); `res=auto` (default) what the game picks.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
@@ -34,6 +36,8 @@ const PATHS = {
   orbit: { radius: 24, beta: 0.9, period: 40 },
   wide: { radius: 80, beta: 0.95, period: 90 },
 } as const;
+/** The mirror camera: distance, height angle, how far it swings either side (rad) and in how long (s). */
+const MIRROR_PATH = { radius: 6, beta: 0.99, swing: 0.52, period: 20 };
 /** Where every path starts (the game's own opening angle). */
 const START_ALPHA = -Math.PI * 0.62;
 /** Longest wait for the game to start (loading, shaders). */
@@ -74,6 +78,8 @@ export interface BenchResult {
   targetBytes: number;
   residentsMs: number;
   lightingPerSecond: number;
+  /** Reflections drawn a second (all mirrors). */
+  reflectionsPerSecond: number;
   longTasks: { count: number; maxMs: number; totalMs: number };
   render: Record<string, unknown>;
   /** Scene counts at the start: equal fingerprints mean two runs drew the same scene. */
@@ -148,6 +154,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const centre: [number, number, number] = plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
   const path = PATHS[b.cam === 'wide' ? 'wide' : 'orbit'];
   const frozen = b.diag.has('freeze');
+  const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
 
   const intervals: number[] = [];
   const cpuFrame: number[] = [];
@@ -162,7 +169,10 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   renderer.setFrameProbe({
     before(now) {
       const t = frozen ? b.at : (now - t0) / 1000;
-      renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: path.beta, radius: path.radius, target: centre });
+      if (mirror) {
+        const swing = b.cam === 'mirror' ? MIRROR_PATH.swing * Math.sin((2 * Math.PI * t) / MIRROR_PATH.period) : 0;
+        renderer.setCameraPose({ alpha: mirror.alpha + swing, beta: MIRROR_PATH.beta, radius: MIRROR_PATH.radius, target: mirror.target });
+      } else renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: path.beta, radius: path.radius, target: centre });
     },
     after(start, updated, end, c: FrameCounts) {
       if (!measuring) return;
@@ -191,6 +201,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     const info = renderer.benchInfo();
     renderer.gpuPasses(true);
     const lighting0 = (info.scene as { lightingUpdates: number }).lightingUpdates;
+    const reflections0 = (info.scene as { mirrorDraws: number }).mirrorDraws;
     const long: number[] = [];
     const observer = typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')
       ? new PerformanceObserver((list) => list.getEntries().forEach((e) => long.push(e.duration)))
@@ -238,6 +249,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       targetBytes: info.passes.reduce((n, p) => n + p.width * p.height * p.samples * (p.colorBytes + p.depthBytes), 0),
       residentsMs: per(sums.residents),
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
+      reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
       render: { ...info, end: end.scene },
       fingerprint,
@@ -247,6 +259,17 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     if (!frozen) renderer.setFrameProbe(null);
     renderer.measureGpu(false, 'bench');
   }
+}
+
+type Spot = { x: number; y: number; z: number; nx: number; ny: number; nz: number };
+
+/** The mirror camera's aim: the first mirror on the home lot (or anywhere), from in front of it. */
+function mirrorView(scene: { mirrorSpots?: Spot[] }, plot: { x: number; z: number; w: number; d: number } | null): { alpha: number; target: [number, number, number] } {
+  const spots = scene.mirrorSpots ?? [];
+  const home = spots.find((s) => !plot || (s.x >= plot.x && s.x <= plot.x + plot.w && s.z >= plot.z && s.z <= plot.z + plot.d)) ?? spots[0];
+  if (!home) throw new Error('No mirror in the scene');
+  // The arc camera sits at target + radius × (cos α sin β, cos β, sin α sin β): α along the mirror's normal.
+  return { alpha: Math.atan2(home.nz, home.nx), target: [home.x + home.nx * 0.8, home.y - 0.3, home.z + home.nz * 0.8] };
 }
 
 /**
@@ -290,6 +313,7 @@ function emptyResult(b: BenchFlags, startedAt: string): BenchResult {
     targetBytes: 0,
     residentsMs: 0,
     lightingPerSecond: 0,
+    reflectionsPerSecond: 0,
     longTasks: { count: 0, maxMs: 0, totalMs: 0 },
     render: {},
     fingerprint: '',

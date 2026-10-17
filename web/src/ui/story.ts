@@ -50,6 +50,7 @@ const ICONS: Record<string, string> = {
   babysitter: 'icon.ui.funds',
   stayedHome: 'icon.ui.home',
   noBed: 'icon.need.energy',
+  notClosed: 'icon.ui.home',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);

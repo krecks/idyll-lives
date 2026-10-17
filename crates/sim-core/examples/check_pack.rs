@@ -238,7 +238,7 @@ fn live_three_days(
     let mut w = World::from_json(merged, &lot.to_string(), 1).map_err(|e| e.to_string())?;
     let mut bought = Vec::new();
     for id in ids.iter().filter(|id| price(id) > 0) {
-        match w.buy(0, id, None, None) {
+        match w.buy(0, id, None, Default::default()) {
             Ok(_) => bought.push(id.as_str()),
             Err(e) => println!("starter lot: skipped {id} ({e})"),
         }

@@ -19,7 +19,7 @@ import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import objects_extra as OX                                          # noqa: E402
 from objects_extra import box, cyl, cone, sph, rod, part            # noqa: E402
-from furniture import (placeholder, cushion, lathe, torus, office_chair,  # noqa: E402
+from furniture import (placeholder, shift, to_wall, cushion, lathe, torus, office_chair,  # noqa: E402
                        OAK, OAKD, BIRCH, HONEY, WALNUT, BLACKMETAL, STEEL,
                        CHROME, BRASS, TEAL, COGNAC, MUSTARD, SAGE, RUST, CREAM, SCREEN)
 import catalog2 as C2                                               # noqa: E402
@@ -62,6 +62,11 @@ def facing_back(parts):
         q['rotate'] = [r[0], round(r[1] + 180, 2), r[2]]
         out.append(q)
     return out
+
+
+def forward(parts, dz):
+    """The parts moved `dz` towards the front: a thing built reaching into the wall, moved onto its face (WALL)."""
+    return [dict(q, at=[q['at'][0], q['at'][1], round(q['at'][2] + dz, 4)]) for q in parts]
 
 
 def on_plane(centre, rx, dx, dy, dz=0.0):
@@ -109,10 +114,10 @@ p = [box([0.6, 0.82, 0.56], [0, 0.43, -0.18], '#F3F3F1', 'gloss', radius=0.03),
      box([0.018, 0.24, 0.03], [0.24, 0.48, 0.125], CHROME, 'chrome', radius=0.008),
      box([0.12, 0.012, 0.03], [0.2, 0.765, 0.125], CHROME, 'chrome', radius=0.006),
      box([0.36, 0.04, 0.012], [0, 0.06, 0.1], '#C9CBCC', 'satin', radius=0.004),                         # vent
-     box([0.5, 0.02, 0.4], [0, 0.87, -0.12], OAK, 'wood', radius=0.006),                                 # board on top
+     box([0.5, 0.02, 0.4], [0, 0.87, -0.12], OAK, 'satin', radius=0.006),                                # board on top
      cyl([0.1, 0.12, 0.1], [-0.14, 0.94, -0.14], '#E9E6E0', 'gloss', taper=0.8),                         # jar
      sph([0.09, 0.08, 0.09], [0.12, 0.92, -0.1], '#D9483B', 'satin', segments=8)]                        # apple
-addp('fridgeMini', p)
+addp('fridgeMini', shift(p, dz=0.03))                  # its back on the wall face (WALL)
 
 
 def builtin_fridge(cab, cfin, door, dfin, handle, hfin):
@@ -130,7 +135,7 @@ def builtin_fridge(cab, cfin, door, dfin, handle, hfin):
     return p
 
 
-addp('fridgeBuiltIn', builtin_fridge('#EDEBE6', 'satin', '#E2DFD8', 'satin', CHROME, 'chrome'))
+addp('fridgeBuiltIn', shift(builtin_fridge('#EDEBE6', 'satin', '#E2DFD8', 'satin', CHROME, 'chrome'), dz=0.03))
 addp('fridgeBuiltIn@modern', builtin_fridge('#F4F4F2', 'gloss', OAK, 'wood', BLACKMETAL, 'metal'))
 addp('fridgeBuiltIn@cozy', builtin_fridge(SAGE, 'satin', '#8FA27E', 'satin', BRASS, 'metal'))
 addp('fridgeBuiltIn@minimal', builtin_fridge(BIRCH, 'wood', '#F2F1EE', 'satin', '#C9C6BE', 'satin'))
@@ -164,7 +169,7 @@ def gas_range(body, fin='satin', steel=STEEL, knob='#3A3D41'):
     return p
 
 
-addp('stoveGas', gas_range('#EDEBE6'))
+addp('stoveGas', shift(gas_range('#EDEBE6'), dz=0.04))
 addp('stoveGas@modern', gas_range('#F4F4F2', 'gloss', knob=BLACKMETAL))
 addp('stoveGas@cozy', gas_range('#C9B79C', steel='#D8C9A6', knob=WALNUT))
 addp('stoveGas@minimal', gas_range(BIRCH, 'wood', knob='#E8E6E1'))
@@ -185,7 +190,7 @@ for x, z, r in ((-0.14, -0.3, 0.2), (0.14, -0.3, 0.16), (-0.14, -0.04, 0.16), (0
 for i in range(4):
     p.append(cyl([0.04, 0.025, 0.04], [-0.18 + i * 0.12, 0.95, -0.355], CHROME, 'chrome', rotate=[90, 0, 0], segments=12))
 p.append(sph([0.015, 0.015, 0.01], [0.24, 0.86, 0.155], '#E9853B', 'gloss', segments=6))
-addp('stoveElectric', p)
+addp('stoveElectric', shift(p, dz=0.03))
 
 
 class Kit:
@@ -233,11 +238,11 @@ def front(s, x, w, y0, y1, z, side=0, drawer=False, handle_y=None):
 
 
 def k_base(s, w=1.0, top=True):
-    """A base unit: carcass y 0.1..0.92 (front face z = 0.14), a dark plinth and a worktop to 0.96 (z -0.48..0.18)."""
+    """A base unit: carcass y 0.1..0.92 (front face z = 0.14), a dark plinth and a worktop to 0.95 (z -0.48..0.18), the height of every counter (catalog2.py CT)."""
     p = [box([w - 0.004, 0.82, 0.6], [0, 0.51, -0.16], s.body, s.bfin, radius=0.01),
          box([w - 0.04, 0.1, 0.56], [0, 0.05, -0.18], PLINTH, 'satin', radius=0.004)]
     if top:
-        p.append(box([w, 0.04, 0.66], [0, 0.94, -0.15], s.top, s.tfin, radius=0.006))
+        p.append(box([w, 0.04, 0.66], [0, 0.93, -0.15], s.top, s.tfin, radius=0.006))
     return p
 
 
@@ -249,12 +254,12 @@ def counter(s):
 
 def corner_counter(s):
     """A deep corner unit (fills its tile, for the corner of an L): doors at the front, a worktop over all."""
-    p = [box([1.0, 0.82, 0.96], [0, 0.51, -0.02], s.body, s.bfin, radius=0.012),
-         box([0.96, 0.1, 0.92], [0, 0.05, -0.04], PLINTH, 'satin', radius=0.006),
-         box([1.0, 0.04, 1.0], [0, 0.94, 0.0], s.top, s.tfin, radius=0.006)]
+    p = [box([1.0, 0.82, 0.89], [0, 0.51, 0.015], s.body, s.bfin, radius=0.012),             # its back on the wall face
+         box([0.96, 0.1, 0.85], [0, 0.05, -0.005], PLINTH, 'satin', radius=0.006),
+         box([1.0, 0.04, 0.93], [0, 0.93, 0.035], s.top, s.tfin, radius=0.006)]
     p += front(s, -0.245, 0.49, 0.12, 0.9, 0.46, side=1) + front(s, 0.245, 0.49, 0.12, 0.9, 0.46, side=-1)
-    p += [cyl([0.14, 0.18, 0.14], [-0.3, 1.05, -0.3], '#E8E6E1', 'gloss', taper=0.85),            # utensil pot
-          cyl([0.02, 0.2, 0.02], [-0.32, 1.17, -0.3], OAK, 'wood'), cyl([0.02, 0.2, 0.02], [-0.28, 1.16, -0.31], OAK, 'wood')]
+    p += [cyl([0.14, 0.18, 0.14], [-0.3, 1.04, -0.3], '#E8E6E1', 'gloss', taper=0.85),            # utensil pot
+          cyl([0.02, 0.2, 0.02], [-0.32, 1.16, -0.3], OAK, 'satin'), cyl([0.02, 0.2, 0.02], [-0.28, 1.15, -0.31], OAK, 'satin')]
     return p
 
 
@@ -279,14 +284,14 @@ def pantry(s):
 
 
 def microwave_counter(s):
-    x, z = 0.18, -0.24
+    x, z = -0.18, -0.24                 # -x is the viewer's right: the controls there, the door hinged on the left
     p = counter(s)
-    p += [box([0.5, 0.3, 0.36], [x, 1.11, z], CHARCOAL, 'satin', radius=0.02),
-          box([0.36, 0.26, 0.014], [x - 0.06, 1.11, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
-          box([0.28, 0.17, 0.006], [x - 0.07, 1.11, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
-          box([0.1, 0.24, 0.01], [x + 0.19, 1.11, z + 0.183], '#22252A', 'satin', radius=0.006),
-          box([0.06, 0.02, 0.006], [x + 0.19, 1.2, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
-    p += [box([0.03, 0.02, 0.006], [x + 0.175 + (i % 2) * 0.035, 1.15 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
+    p += [box([0.5, 0.3, 0.36], [x, 1.1, z], CHARCOAL, 'satin', radius=0.02),
+          box([0.36, 0.26, 0.014], [x + 0.06, 1.1, z + 0.186], '#2A2C30', 'satin', radius=0.01),          # door
+          box([0.28, 0.17, 0.006], [x + 0.07, 1.1, z + 0.195], '#1D2228', 'gloss', radius=0.008),         # window
+          box([0.1, 0.24, 0.01], [x - 0.19, 1.1, z + 0.183], '#22252A', 'satin', radius=0.006),
+          box([0.06, 0.02, 0.006], [x - 0.19, 1.19, z + 0.19], '#5EC28B', 'gloss', radius=0.003)]           # display
+    p += [box([0.03, 0.02, 0.006], [x - 0.175 - (i % 2) * 0.035, 1.14 - (i // 2) * 0.035, z + 0.19], '#C9CBCC', 'satin', radius=0.004) for i in range(6)]
     return p
 
 
@@ -294,56 +299,56 @@ def coffee_counter(s):
     x, z = -0.14, -0.26
     steel = CHROME if s.hfin == 'chrome' else STEEL
     p = counter(s)
-    p += [box([0.34, 0.3, 0.32], [x, 1.11, z], CHARCOAL, 'satin', radius=0.03),
-          box([0.26, 0.14, 0.03], [x, 1.04, z + 0.15], '#22252A', 'satin', radius=0.01),                   # cup bay
-          box([0.34, 0.03, 0.32], [x, 1.275, z], steel, s.hfin, radius=0.01),                              # warming top
-          cyl([0.08, 0.04, 0.08], [x, 1.16, z + 0.15], steel, s.hfin, segments=14),                        # group head
-          box([0.03, 0.025, 0.12], [x, 1.13, z + 0.22], '#22252A', 'satin', radius=0.01),                  # portafilter handle
-          box([0.28, 0.02, 0.1], [x, 0.975, z + 0.15], steel, s.hfin, radius=0.006),                       # drip tray
-          cyl([0.07, 0.06, 0.07], [x, 1.015, z + 0.15], '#F2F1EE', 'gloss', segments=14),                  # cup
-          cyl([0.06, 0.012, 0.06], [x + 0.08, 1.22, z + 0.162], '#F2F1EE', 'gloss', rotate=[90, 0, 0], segments=12),  # gauge
-          cyl([0.11, 0.12, 0.11], [x + 0.08, 1.35, z - 0.06], '#5A3A26', 'gloss', segments=14, taper=1.15),  # beans
-          cyl([0.08, 0.1, 0.08], [0.32, 1.01, 0.05], TEAL, 'gloss'), cyl([0.08, 0.1, 0.08], [0.42, 1.01, 0.0], CREAM, 'gloss')]
+    p += [box([0.34, 0.3, 0.32], [x, 1.1, z], CHARCOAL, 'satin', radius=0.03),
+          box([0.26, 0.14, 0.03], [x, 1.03, z + 0.15], '#22252A', 'satin', radius=0.01),                   # cup bay
+          box([0.34, 0.03, 0.32], [x, 1.265, z], steel, s.hfin, radius=0.01),                              # warming top
+          cyl([0.08, 0.04, 0.08], [x, 1.15, z + 0.15], steel, s.hfin, segments=14),                        # group head
+          box([0.03, 0.025, 0.12], [x, 1.12, z + 0.22], '#22252A', 'satin', radius=0.01),                  # portafilter handle
+          box([0.28, 0.02, 0.1], [x, 0.965, z + 0.15], steel, s.hfin, radius=0.006),                       # drip tray
+          cyl([0.07, 0.06, 0.07], [x, 1.005, z + 0.15], '#F2F1EE', 'gloss', segments=14),                  # cup
+          cyl([0.06, 0.012, 0.06], [x + 0.08, 1.21, z + 0.162], '#F2F1EE', 'gloss', rotate=[90, 0, 0], segments=12),  # gauge
+          cyl([0.11, 0.12, 0.11], [x + 0.08, 1.34, z - 0.06], '#5A3A26', 'gloss', segments=14, taper=1.15),  # beans
+          cyl([0.08, 0.1, 0.08], [0.32, 1.0, 0.05], TEAL, 'gloss'), cyl([0.08, 0.1, 0.08], [0.42, 1.0, 0.0], CREAM, 'gloss')]
     return p
 
 
 def breakfast_counter(s, toaster):
     p = counter(s)
-    p += [box([0.28, 0.18, 0.16], [0.3, 1.05, -0.3], toaster, 'gloss', radius=0.05),                     # toaster
-          box([0.18, 0.012, 0.03], [0.3, 1.137, -0.33], '#22252A', 'satin', radius=0.004),
-          box([0.18, 0.012, 0.03], [0.3, 1.137, -0.27], '#22252A', 'satin', radius=0.004),
-          box([0.02, 0.03, 0.03], [0.45, 1.06, -0.3], '#22252A', 'satin', radius=0.006),
-          box([0.16, 0.12, 0.16], [0.0, 1.02, -0.32], CHARCOAL, 'satin', radius=0.03),                     # blender
-          lathe([0.15, 0.26, 0.15], [0.0, 1.21, -0.32], '#DCE6EA', 'gloss', [[0, -0.5], [0.34, -0.5], [0.5, 0.5], [0, 0.5]], segments=16),
-          cyl([0.15, 0.03, 0.15], [0.0, 1.355, -0.32], CHARCOAL, 'satin', segments=16),
-          cyl([0.26, 0.06, 0.26], [-0.28, 0.99, 0.05], '#E9E6E0', 'gloss'),                                  # fruit bowl
-          sph([0.08, 0.07, 0.08], [-0.3, 1.04, 0.04], '#F2C14E', 'satin', segments=8),
-          sph([0.08, 0.07, 0.08], [-0.24, 1.04, 0.08], '#D9483B', 'satin', segments=8)]
+    p += [box([0.28, 0.18, 0.16], [0.3, 1.04, -0.3], toaster, 'gloss', radius=0.05),                     # toaster
+          box([0.18, 0.012, 0.03], [0.3, 1.127, -0.33], '#22252A', 'satin', radius=0.004),
+          box([0.18, 0.012, 0.03], [0.3, 1.127, -0.27], '#22252A', 'satin', radius=0.004),
+          box([0.02, 0.03, 0.03], [0.45, 1.05, -0.3], '#22252A', 'satin', radius=0.006),
+          box([0.16, 0.12, 0.16], [0.0, 1.01, -0.32], CHARCOAL, 'satin', radius=0.03),                     # blender
+          lathe([0.15, 0.26, 0.15], [0.0, 1.2, -0.32], '#DCE6EA', 'gloss', [[0, -0.5], [0.34, -0.5], [0.5, 0.5], [0, 0.5]], segments=16),
+          cyl([0.15, 0.03, 0.15], [0.0, 1.345, -0.32], CHARCOAL, 'satin', segments=16),
+          cyl([0.26, 0.06, 0.26], [-0.28, 0.98, 0.05], '#E9E6E0', 'gloss'),                                  # fruit bowl
+          sph([0.08, 0.07, 0.08], [-0.3, 1.03, 0.04], '#F2C14E', 'satin', segments=8),
+          sph([0.08, 0.07, 0.08], [-0.24, 1.03, 0.08], '#D9483B', 'satin', segments=8)]
     return p
 
 
-for sfx, s in KITCHEN.items():
-    addp('counter' + sfx, counter(s))
+for sfx, s in KITCHEN.items():                    # the base units' backs on the wall face (WALL)
+    addp('counter' + sfx, shift(counter(s), dz=0.05))
     add('counterCorner' + sfx, placeholder(corner_counter(s)))
     addp('wallCabinet' + sfx, wall_cabinet(s))
-    addp('pantry' + sfx, pantry(s))
-    addp('microwave' + sfx, microwave_counter(s))
-    addp('coffeeMachine' + sfx, coffee_counter(s))
-    addp('breakfastCounter' + sfx, breakfast_counter(s, {'': CREAM, '@modern': '#F4F4F2', '@cozy': RUST, '@minimal': '#F2F1EE'}[sfx]))
+    addp('pantry' + sfx, shift(pantry(s), dz=0.03))
+    addp('microwave' + sfx, shift(microwave_counter(s), dz=0.05))
+    addp('coffeeMachine' + sfx, shift(coffee_counter(s), dz=0.05))
+    addp('breakfastCounter' + sfx, shift(breakfast_counter(s, {'': CREAM, '@modern': '#F4F4F2', '@cozy': RUST, '@minimal': '#F2F1EE'}[sfx]), dz=0.05))
 
 
 
 
 def dishwasher(body, panel, fin='satin', handle=CHROME, top=OAK, top_fin='wood'):
-    return placeholder([
+    return placeholder(shift([                                                                   # its back on the wall face
         box([0.98, 0.84, 0.58], [0, 0.48, -0.13], body, fin, radius=0.012),
         box([0.98, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),               # plinth
         box([0.9, 0.72, 0.02], [0, 0.48, 0.165], panel, 'metal' if fin == 'metal' else fin, radius=0.012),  # door
         box([0.9, 0.08, 0.02], [0, 0.89, 0.165], '#2F3236', 'satin', radius=0.01),                # control strip
         box([0.5, 0.02, 0.03], [0, 0.8, 0.19], handle, 'chrome' if handle == CHROME else 'metal', radius=0.008),
         sph([0.025, 0.025, 0.012], [0.32, 0.89, 0.177], '#5EC28B', 'gloss', segments=6),
-        box([1.0, 0.04, 0.66], [0, 0.94, -0.15], top, top_fin, radius=0.006),
-    ])
+        box([1.0, 0.04, 0.66], [0, 0.93, -0.15], top, top_fin, radius=0.006),
+    ], dz=0.05))
 
 
 add('dishwasher', dishwasher('#EDEBE6', STEEL, 'satin', CHROME, '#E8E6E1', 'gloss'))
@@ -353,22 +358,22 @@ add('dishwasher@minimal', dishwasher('#F2F2F0', BIRCH, 'satin', '#F2F2F0', '#F2F
 
 
 def farmhouse_sink(cab, top=OAK, top_fin='wood', tap=CHROME):
-    return placeholder([
+    return placeholder(shift([                                                                   # its back on the wall face
         box([0.98, 0.84, 0.58], [0, 0.48, -0.13], cab, 'satin', radius=0.012),
         box([0.96, 0.08, 0.56], [0, 0.04, -0.14], '#2F3236', 'satin', radius=0.006),
         box([0.4, 0.62, 0.02], [-0.22, 0.42, 0.165], cab, 'satin', radius=0.01),                    # doors
         box([0.4, 0.62, 0.02], [0.22, 0.42, 0.165], cab, 'satin', radius=0.01),
         box([0.012, 0.12, 0.02], [-0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
         box([0.012, 0.12, 0.02], [0.04, 0.62, 0.18], tap, 'chrome', radius=0.004),
-        box([1.0, 0.04, 0.66], [-0.0, 0.94, -0.15], top, top_fin, radius=0.006),
-        box([0.66, 0.26, 0.5], [0, 0.835, -0.08], '#F6F5F2', 'gloss', radius=0.03),                # apron basin
-        box([0.58, 0.02, 0.4], [0, 0.962, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
-        cyl([0.04, 0.3, 0.04], [0, 1.1, -0.38], tap, 'chrome'),                                      # gooseneck tap
-        rod([0, 1.25, -0.38], [0, 1.22, -0.2], 0.03, tap, 'chrome'),
-        cyl([0.05, 0.03, 0.05], [0.12, 0.975, -0.4], tap, 'chrome'),
-        box([0.2, 0.1, 0.06], [0.36, 1.01, -0.36], '#E8E6E1', 'gloss', radius=0.02),                # soap dish
-        cyl([0.06, 0.16, 0.06], [-0.36, 1.04, -0.38], TEAL, 'gloss', taper=0.8),
-    ])
+        box([1.0, 0.04, 0.66], [-0.0, 0.93, -0.15], top, top_fin, radius=0.006),
+        box([0.66, 0.26, 0.5], [0, 0.825, -0.08], '#F6F5F2', 'gloss', radius=0.03),                # apron basin
+        box([0.58, 0.02, 0.4], [0, 0.952, -0.1], '#D9DEE0', 'gloss', radius=0.02),                 # water/basin floor
+        cyl([0.04, 0.3, 0.04], [0, 1.09, -0.38], tap, 'chrome'),                                      # gooseneck tap
+        rod([0, 1.24, -0.38], [0, 1.21, -0.2], 0.03, tap, 'chrome'),
+        cyl([0.05, 0.03, 0.05], [0.12, 0.965, -0.4], tap, 'chrome'),
+        box([0.2, 0.1, 0.06], [0.36, 1.0, -0.36], '#E8E6E1', 'gloss', radius=0.02),                # soap dish
+        cyl([0.06, 0.16, 0.06], [-0.36, 1.03, -0.38], TEAL, 'gloss', taper=0.8),
+    ], dz=0.05))
 
 
 add('farmhouseSink', farmhouse_sink('#EDEBE6'))
@@ -403,21 +408,12 @@ addp('rangeHood@cozy', range_hood('#E8DFCF', 'satin', HONEY, 'wood', stepped=Tru
 
 
 def island(body, top, top_fin, stool, legs):
-    p = [box([1.84, 0.86, 0.56], [0, 0.47, -0.16], body, 'satin', radius=0.014),
-         box([1.82, 0.08, 0.54], [0, 0.04, -0.16], '#2F3236', 'satin', radius=0.006),
-         box([1.94, 0.05, 0.82], [0, 0.925, -0.04], top, top_fin, radius=0.01)]            # worktop with overhang at the front
+    p = [box([1.84, 0.86, 0.56], [0, 0.47, 0.16], body, 'satin', radius=0.014),
+         box([1.82, 0.08, 0.54], [0, 0.04, 0.16], '#2F3236', 'satin', radius=0.006),
+         box([1.94, 0.05, 0.82], [0, 0.925, 0.04], top, top_fin, radius=0.01)]             # worktop overhanging the back, for stools
     for x in (-0.68, -0.23, 0.23, 0.68):
-        p.append(box([0.42, 0.6, 0.02], [x, 0.5, -0.45], body, 'satin', radius=0.01))     # (back doors, seen from the room behind)
-    p += [cyl([0.3, 0.02, 0.3], [-0.45, 0.96, -0.1], '#F2F1EE', 'gloss'),                   # fruit bowl
-          sph([0.08, 0.07, 0.08], [-0.48, 1.0, -0.1], '#F2C14E', 'satin', segments=8),
-          sph([0.08, 0.07, 0.08], [-0.42, 1.0, -0.06], '#D9483B', 'satin', segments=8),
-          box([0.4, 0.03, 0.28], [0.4, 0.965, -0.2], OAK, 'wood', radius=0.01)]              # chopping board
-    for x in (-0.5, 0.5):                                                                   # two stools at the front
-        p += [cyl([0.36, 0.05, 0.36], [x, 0.7, 0.28], stool, 'fabric', segments=16),
-              cyl([0.05, 0.66, 0.05], [x, 0.36, 0.28], legs, 'metal'),
-              torus([0.3, 0.02, 0.3], [x, 0.26, 0.28], legs, 'metal'),
-              cyl([0.32, 0.02, 0.32], [x, 0.01, 0.28], legs, 'metal')]
-    return p
+        p.append(box([0.42, 0.6, 0.02], [x, 0.5, 0.45], body, 'satin', radius=0.01))      # doors at the front, where residents stand
+    return p                    # no stools, a bare top: stools and a fruit bowl are things of their own (housegen)
 
 
 add('kitchenIsland', placeholder(island('#EDEBE6', '#E8E6E1', 'gloss', SAGE, CHROME)), (2, 1))
@@ -631,7 +627,7 @@ def sofa(w, fabric, legs, leg_fin='wood', arm='box', n=2, depth=0.84, z=-0.04, b
     return p
 
 
-addp('loveseat', sofa(1.84, SAGE, OAK, pillows=[(-0.55, CREAM, 10)]), (2, 1))
+addp('loveseat', shift(sofa(1.84, SAGE, OAK, pillows=[(-0.55, CREAM, 10)]), dz=0.03), (2, 1))   # its back on the wall face
 addp('loveseat@modern', sofa(1.84, '#B9BCBE', BLACKMETAL, 'metal', 'slim', back_h=0.76, leg='post', pillows=[(-0.55, COGNAC, 8)], soft=False), (2, 1))
 addp('loveseat@cozy', sofa(1.84, RUST, WALNUT, arm='roll', back_h=0.86, leg='bun', pillows=[(-0.55, MUSTARD, 12), (0.55, CREAM, -12)]), (2, 1))
 addp('loveseat@minimal', sofa(1.84, LINEN, BIRCH, arm='low', back_h=0.78), (2, 1))
@@ -655,7 +651,7 @@ def sofa3(fabric, base, cushion_col, base_fin='wood', legs=None):
     return p
 
 
-add('sofaThree', placeholder(sofa3('#C9C6BE', OAKD, SAGE)), (3, 1))
+add('sofaThree', placeholder(shift(sofa3('#C9C6BE', OAKD, SAGE), dz=0.03)), (3, 1))
 add('sofaThree@modern', placeholder(sofa3('#9AA4AB', BLACKMETAL, COGNAC, 'metal')), (3, 1))
 add('sofaThree@cozy', placeholder(sofa3('#B98F6A', WALNUT, MUSTARD)), (3, 1))
 add('sofaThree@minimal', placeholder(sofa3(LINEN, BIRCH, '#F2F0EA')), (3, 1))
@@ -678,12 +674,12 @@ def design_sofa(fabric, frame, ffin):
     return p
 
 
-addp('sofaDesign', design_sofa(TEAL, BRASS, 'metal'), (2, 1))
+addp('sofaDesign', shift(design_sofa(TEAL, BRASS, 'metal'), dz=0.037), (2, 1))
 addp('sofaDesign@modern', design_sofa('#D2D4D5', BLACKMETAL, 'metal'), (2, 1))
 addp('sofaDesign@cozy', design_sofa(COGNAC, WALNUT, 'wood'), (2, 1))
 addp('sofaDesign@minimal', design_sofa('#ECE7DD', BIRCH, 'wood'), (2, 1))
 
-addp('armchairLounge', sofa(0.82, SAGE, OAK, n=1))
+addp('armchairLounge', shift(sofa(0.82, SAGE, OAK, n=1), dz=0.03))
 addp('armchairLounge@modern', sofa(0.82, '#B9BCBE', BLACKMETAL, 'metal', 'slim', n=1, back_h=0.76, leg='post', soft=False))
 addp('armchairLounge@cozy', sofa(0.82, RUST, WALNUT, arm='roll', n=1, back_h=0.86, leg='bun', pillows=[(0, MUSTARD, 0)]))
 addp('armchairLounge@minimal', sofa(0.82, LINEN, BIRCH, arm='low', n=1, back_h=0.78))
@@ -702,7 +698,7 @@ for s in (-1, 1):
           box([0.07, 0.035, 0.64], [x, 0.635, -0.01], TEAKF, 'wood', radius=0.012),                         # arm rest
           box([0.04, 0.05, 0.68], [x, 0.3, 0.0], TEAKF, 'wood', radius=0.01)]
 p.append(box([0.66, 0.05, 0.04], [0, 0.92, -0.435], TEAKF, 'wood', radius=0.012))
-addp('armchairLeather', p)
+addp('armchairLeather', shift(p, dz=0.03))
 
 # Design lounge chair: walnut shells with leather cushions on a five-star swivel base.
 PLY, HIDE, ALU = '#6B4630', '#5A3A2A', '#C9CBCC'
@@ -722,7 +718,7 @@ for i in range(5):
     tip = [math.cos(a) * 0.36, 0.03, math.sin(a) * 0.36]
     p += [rod([0, 0.08, 0], tip, 0.04, ALU, 'metal', shape='box', t2=0.03, radius=0.01),
           cyl([0.05, 0.02, 0.05], [tip[0], 0.01, tip[2]], '#2B2C2E', 'satin', segments=8)]
-addp('armchairDesign', p)
+addp('armchairDesign', shift(p, dz=0.04))
 
 # Ottoman (a pouf to sit on): buttoned dark leather on short legs.
 p = [cushion([0.72, 0.34, 0.5], [0, 0.26, 0], '#3A2E2A', 'satin', radius=0.06),
@@ -757,10 +753,7 @@ def coffee_table(top, tfin, legc, lfin, style):
                 p.append(rod([sx * 0.6, 0, sz * 0.32], [sx * 0.54, h, sz * 0.27], 0.035, legc, lfin, segments=10))
     if style == 'splay':
         p += [lathe([0.26, 0.08, 0.26], [-0.32, 0.46, 0.0], '#E9E6E0', 'gloss', BOWL, segments=20)]
-    else:
-        p += [box([0.3, 0.03, 0.22], [0.3, 0.435, 0.05], TEAL, 'matte', radius=0.004, rotate=[0, 10, 0]),   # magazines
-              box([0.3, 0.02, 0.22], [0.31, 0.46, 0.04], CREAM, 'matte', radius=0.004, rotate=[0, -6, 0]),
-              cyl([0.18, 0.06, 0.18], [-0.32, 0.45, 0.0], '#E9E6E0', 'gloss')]
+    # the others' tops are bare, as the model's (it keeps its magazines in the drawer)
     return p
 
 
@@ -790,7 +783,7 @@ addp('coffeeTableGlass@modern', glass_table(BLACKMETAL, 'metal', [
     box([0.24, 0.03, 0.18], [0.3, 0.475, 0.05], COGNAC, 'matte', radius=0.004, rotate=[0, -5, 0])]), (2, 1))
 
 # Round marble table on a brass tulip foot.
-p = [cyl([0.9, 0.04, 0.9], [0, 0.4, 0], '#EEECE8', 'gloss', segments=36),
+p = [cyl([0.88, 0.04, 0.88], [0, 0.4, 0], '#EEECE8', 'gloss', segments=36),
      lathe([0.56, 0.38, 0.56], [0, 0.19, 0], BRASS, 'metal', [[0, -0.5], [0.5, -0.5], [0.5, -0.43], [0.2, -0.25], [0.11, 0.2], [0.18, 0.5], [0, 0.5]], segments=28),
      box([0.5, 0.003, 0.02], [-0.05, 0.4215, 0.06], '#C9CBCC', 'gloss', radius=0.001, rotate=[0, 32, 0]),        # veins
      box([0.3, 0.003, 0.012], [0.16, 0.4215, -0.12], '#C9CBCC', 'gloss', radius=0.001, rotate=[0, -20, 0]),
@@ -852,7 +845,7 @@ p += [rod([x * 0.42, 0, z + s * 0.17], [x * 0.38, 0.2, z + s * 0.15], 0.04, HONE
 p += [sph([0.1, 0.05, 0.1], [0.24, 0.86, z - 0.06], '#2A2C30', 'gloss', segments=10),                     # rabbit ears
       rod([0.24, 0.87, z - 0.06], [0.1, 1.12, z - 0.12], 0.008, STEEL, 'metal', segments=6),
       rod([0.24, 0.87, z - 0.06], [0.4, 1.1, z - 0.1], 0.008, STEEL, 'metal', segments=6)]
-addp('tvRetro', p)
+addp('tvRetro', shift(p, dz=0.04))                                  # its back on the wall face
 
 
 def home_cinema(unit, top, fin='wood'):
@@ -875,7 +868,7 @@ def home_cinema(unit, top, fin='wood'):
     return p
 
 
-add('homeCinema', placeholder(home_cinema(OAKD, OAK)), (2, 1))
+add('homeCinema', placeholder(shift(home_cinema(OAKD, OAK), dz=0.015)), (2, 1))   # its back on the wall face
 add('homeCinema@modern', placeholder(home_cinema('#F1F0EC', '#F1F0EC', 'gloss')), (2, 1))
 add('homeCinema@cozy', placeholder(home_cinema(WALNUT, HONEY)), (2, 1))
 add('homeCinema@minimal', placeholder(home_cinema(BIRCH, '#F2F2F0', 'wood')), (2, 1))
@@ -903,7 +896,7 @@ def stereo(wood, dark, metal, mfin):
     return p
 
 
-addp('stereo', stereo(OAK, CHARCOAL, STEEL, 'metal'))
+addp('stereo', shift(stereo(OAK, CHARCOAL, STEEL, 'metal'), dz=0.03))   # its back on the wall face
 addp('stereo@cozy', stereo(WALNUT, '#3A3530', BRASS, 'metal'))
 addp('stereo@minimal', stereo(BIRCH, '#E6E4DF', '#F2F2F0', 'satin'))
 
@@ -928,12 +921,12 @@ addp('boombox', p)
 
 for sfx, (wood, fin, back, knob) in {'': (OAK, 'wood', None, OAKD), '@modern': ('#F1F0EC', 'satin', '#3A3D41', BLACKMETAL),
                                      '@cozy': (WALNUT, 'wood', '#6B4630', HONEY), '@minimal': (BIRCH, 'wood', None, '#C9B48E')}.items():
-    p = C2.bookcase(0.92, 0.9, 0.42, wood, fin, 2, seed=3 if sfx != '@minimal' else 4, back=back)
+    p = C2.bookcase(0.92, 0.9, 0.38, wood, fin, 2, z=WALL + 0.19, seed=3 if sfx != '@minimal' else 4, back=back)   # its back on the wall face, as the model's
     p += [cyl([0.12, 0.12, 0.12], [0.3, 0.96, -0.24], '#E8E6E1', 'gloss', taper=0.8),
           sph([0.2, 0.18, 0.2], [0.3, 1.08, -0.24], FOLIAGE, 'foliage', segments=8)]
     addp('bookcaseLow' + sfx, p)
     # Wide bookcase: cupboards under open shelves of books, a plant on top.
-    d, z = 0.42, -0.25
+    d, z = 0.42, WALL + 0.21                                                               # its back on the wall face, as the model's
     p = case(1.86, 2.0, d, 0, 0, z, wood, fin, back=back)
     p += [box([0.022, 1.95, d - 0.01], [0, 1.0, z], wood, fin, radius=0.003),
           box([1.82, 0.03, d], [0, 0.8, z], wood, fin, radius=0.004)]
@@ -955,15 +948,15 @@ for sfx, (wood, fin, back, knob) in {'': (OAK, 'wood', None, OAKD), '@modern': (
     addp('bookcaseWide' + sfx, p, (2, 1))
 
 # Industrial shelving: oak boards on a black steel frame (the top at 1.83), books, boxes and a plant.
-z = -0.18
+z = WALL + 0.265                                                                                   # its back on the wall face, as the model's
 p = []
 for x in (-0.91, 0.0, 0.91):
-    p += [box([0.035, 1.82, 0.035], [x, 0.91, z + s * 0.26], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
+    p += [box([0.035, 1.82, 0.035], [x, 0.91, z + s * 0.2475], BLACKMETAL, 'metal', radius=0.006) for s in (-1, 1)]
 for y in (0.12, 0.56, 1.0, 1.44, 1.815):
-    p += [box([1.86, 0.03, 0.56], [0, y, z], OAK, 'wood', radius=0.006),
-          box([1.86, 0.03, 0.025], [0, y - 0.03, z + 0.27], BLACKMETAL, 'metal', radius=0.006)]
-p += [rod([-0.9, 0.15, z - 0.27], [0.0, 1.4, z - 0.27], 0.015, BLACKMETAL, 'metal', segments=6),            # cross braces
-      rod([0.0, 0.15, z - 0.27], [-0.9, 1.4, z - 0.27], 0.015, BLACKMETAL, 'metal', segments=6)]
+    p += [box([1.86, 0.03, 0.53], [0, y, z], OAK, 'wood', radius=0.006),
+          box([1.86, 0.03, 0.025], [0, y - 0.03, z + 0.2525], BLACKMETAL, 'metal', radius=0.006)]
+p += [rod([-0.9, 0.15, z - 0.2525], [0.0, 1.4, z - 0.2525], 0.015, BLACKMETAL, 'metal', segments=6),        # cross braces
+      rod([0.0, 0.15, z - 0.2525], [-0.9, 1.4, z - 0.2525], 0.015, BLACKMETAL, 'metal', segments=6)]
 p += books_row(-0.86, -0.06, 0.575, z, depth=0.24, seed=7, hmax=0.3) + books_row(0.08, 0.6, 1.015, z, depth=0.24, seed=2, hmax=0.3)
 p += books_row(-0.5, 0.0, 1.455, z, depth=0.24, seed=9, hmax=0.3)
 p += [box([0.38, 0.26, 0.4], [-0.6, 0.265, z], '#C9B79C', 'matte', radius=0.02), box([0.38, 0.26, 0.4], [-0.2, 0.265, z], '#8E979E', 'matte', radius=0.02),
@@ -976,21 +969,24 @@ addp('shelvingIndustrial', p, (2, 1))
 
 
 def fireplace(stone, mantel, fin='satin', mantel_fin='wood'):
-    p = [box([1.84, 1.25, 0.42], [0, 0.625, -0.27], stone, fin, radius=0.015),          # chimney breast
-         box([1.84, 1.55, 0.3], [0, 2.025, -0.33], stone, fin, radius=0.015),           # flue up to the ceiling
-         box([1.96, 0.07, 0.52], [0, 1.27, -0.22], mantel, mantel_fin, radius=0.01),    # mantel shelf
-         box([1.96, 0.1, 0.62], [0, 0.05, -0.17], '#8E8A84', 'matte', radius=0.01),     # hearth
-         box([0.92, 0.7, 0.2], [0, 0.46, -0.155], '#2A2624', 'matte', radius=0.02),     # firebox
-         box([0.8, 0.6, 0.02], [0, 0.44, -0.05], '#1B1716', 'matte', radius=0.01)]
+    """Against the wall: a chimney breast round a dark firebox over a raised hearth bench (content `seat` 0.42),
+    as the model (families/decor.py) stands."""
+    hearth, top = 0.42, 1.08                                                             # the bench's top, the opening's
+    p = [box([0.48, 1.25, 0.4], [x, 0.625, -0.23], stone, fin, radius=0.015) for x in (-0.68, 0.68)]    # chimney breast
+    p += [box([0.9, 1.25 - top, 0.4], [0, (1.25 + top) / 2, -0.23], stone, fin, radius=0.015),
+          box([1.6, 1.55, 0.28], [0, 2.025, -0.29], stone, fin, radius=0.015),              # flue up to the ceiling
+          box([1.96, 0.07, 0.48], [0, 1.285, -0.19], mantel, mantel_fin, radius=0.01),      # mantel shelf
+          box([1.96, hearth, 0.57], [0, hearth / 2, -0.145], '#8E8A84', 'matte', radius=0.01),   # raised hearth bench
+          box([0.88, top - hearth, 0.3], [0, (top + hearth) / 2, -0.28], '#1B1716', 'matte', radius=0.01)]  # firebox
     for x, r in ((-0.18, 12), (0.12, -18), (0.0, 80)):                                   # logs
-        p.append(cyl([0.1, 0.5, 0.1], [x, 0.2, -0.12], '#6B4A33', 'bark', rotate=[0, r, 90]))
-    p += [part('blob', [0.42, 0.28, 0.16], [0, 0.34, -0.1], '#FF9A3C', 'gloss', noise=0.25),       # flames
-          part('blob', [0.26, 0.36, 0.1], [0.04, 0.42, -0.09], '#FFD27A', 'gloss', noise=0.3)]
-    p += [cyl([0.1, 0.24, 0.1], [-0.65, 1.42, -0.25], '#E8E6E1', 'gloss', taper=0.7),            # mantel things
-          box([0.3, 0.38, 0.03], [0.55, 1.5, -0.38], '#F2F0EA', 'satin', radius=0.006),
-          box([0.24, 0.3, 0.005], [0.55, 1.5, -0.364], TEAL, 'matte', radius=0.004),
-          cyl([0.06, 0.12, 0.06], [-0.4, 1.36, -0.25], CREAM, 'satin'),
-          cyl([0.06, 0.18, 0.06], [-0.3, 1.39, -0.25], CREAM, 'satin')]
+        p.append(cyl([0.1, 0.5, 0.1], [x, hearth + 0.06, -0.1], '#6B4A33', 'bark', rotate=[0, r, 90]))
+    p += [part('blob', [0.42, 0.28, 0.16], [0, hearth + 0.14, -0.09], '#FF9A3C', 'gloss', noise=0.25),       # flames
+          part('blob', [0.26, 0.36, 0.1], [0.04, hearth + 0.22, -0.08], '#FFD27A', 'gloss', noise=0.3)]
+    p += [cyl([0.1, 0.24, 0.1], [-0.65, 1.44, -0.25], '#E8E6E1', 'gloss', taper=0.7),            # mantel things
+          box([0.3, 0.38, 0.03], [0.55, 1.51, -0.13], '#F2F0EA', 'satin', radius=0.006, rotate=[-6, 0, 0]),
+          box([0.24, 0.3, 0.005], [0.55, 1.51, -0.113], TEAL, 'matte', radius=0.004, rotate=[-6, 0, 0]),
+          cyl([0.06, 0.12, 0.06], [-0.4, 1.38, -0.25], CREAM, 'satin'),
+          cyl([0.06, 0.18, 0.06], [-0.3, 1.41, -0.25], CREAM, 'satin')]
     return p
 
 
@@ -1036,7 +1032,7 @@ def single_bed(frame, ffin, sheet, duvet, style, accent=CREAM):
     return p
 
 
-addp('bedSingle', single_bed(OAK, 'wood', '#F7F7F5', SAGE, 'slat'), (1, 2))
+addp('bedSingle', shift(single_bed(OAK, 'wood', '#F7F7F5', SAGE, 'slat'), dz=0.04, when=lambda p: p['at'][2] < -0.9), (1, 2))   # the head end on the wall's face, as the model's
 addp('bedSingle@modern', single_bed('#F1F0EC', 'satin', '#FFFFFF', '#9AA7B0', 'panel', accent='#5F6E7A'), (1, 2))
 addp('bedSingle@cozy', single_bed(HONEY, 'wood', CREAM, RUST, 'spindle', accent=MUSTARD), (1, 2))
 addp('bedSingle@minimal', single_bed(BIRCH, 'wood', '#FFFFFF', LINEN, 'low'), (1, 2))
@@ -1061,24 +1057,34 @@ def bunk_bed(frame, ffin, sheet, cover):
     return p
 
 
-addp('bedBunk', bunk_bed(OAK, 'wood', '#F7F7F5', TEAL), (1, 2))
+addp('bedBunk', shift(bunk_bed(OAK, 'wood', '#F7F7F5', TEAL), dz=0.03, when=lambda p: p['at'][2] < -0.9), (1, 2))   # the head end on the wall's face, as the model's
 addp('bedBunk@cozy', bunk_bed(HONEY, 'wood', CREAM, RUST), (1, 2))
 addp('bedBunk@minimal', bunk_bed('#F2F2F0', 'satin', '#FFFFFF', LINEN), (1, 2))
 
 
 def futon(base, mattress, cover):
-    """Low double platform: mattress top ~0.4 m, two sleepers at x = +-0.5."""
+    """Low double platform, as the model rests (blender/families/bedroom.py): folded up as a sofa, the seat's top
+    ~0.4 m, the mattress's head end leaning back 66 degrees from its fold at depth -0.2 with the pillows on it.
+    Unfolded (the model's `unfold`), two sleepers lie at x = +-0.5."""
+    lean = math.radians(66)
+
+    def up(y, z):
+        """A point of the flat mattress's head end, folded up about the fold (height 0.3, depth -0.2)."""
+        dy, dz = y - 0.3, z + 0.2
+        return [round(0.3 + dy * math.cos(lean) - dz * math.sin(lean), 4), round(-0.2 + dz * math.cos(lean) + dy * math.sin(lean), 4)]
+
     p = [box([1.96, 0.18, 1.96], [0, 0.11, 0.0], base, 'wood', radius=0.01),
-         box([1.86, 0.2, 1.86], [0, 0.3, 0.02], mattress, 'fabric', radius=0.06),
-         box([1.88, 0.06, 1.2], [0, 0.42, 0.34], cover, 'fabric', radius=0.03),
+         box([1.86, 0.2, 1.13], [0, 0.3, 0.365], mattress, 'fabric', radius=0.06),                # the seat
+         box([1.86, 0.2, 0.71], [0, *up(0.3, -0.565)], mattress, 'fabric', radius=0.06, rotate=[66, 0, 0]),   # the back
+         box([1.5, 0.06, 0.32], [0, 0.42, 0.7], cover, 'fabric', radius=0.03),                    # a quilt, folded
          box([1.96, 0.5, 0.06], [0, 0.42, -0.95], base, 'wood', radius=0.01)]                # low headboard
     for s in (-1, 1):
-        p += [cushion([0.66, 0.14, 0.36], [s * 0.45, 0.46, -0.7], '#FFFFFF'),
+        p += [cushion([0.66, 0.14, 0.36], [s * 0.45, *up(0.465, -0.71)], '#FFFFFF', rotate=[66, 0, 0]),
               box([0.02, 0.04, 1.96], [s * 0.97, 0.03, 0], base, 'wood', radius=0.005)]
     return p
 
 
-add('bedFuton', placeholder(futon(BIRCH, '#F4F2EE', LINEN)), (2, 2))
+add('bedFuton', placeholder(to_wall(futon(BIRCH, '#F4F2EE', LINEN), -0.93)), (2, 2))   # the head end on the wall's face, as the model's
 add('bedFuton@modern', placeholder(futon('#3A3D41', '#F4F2EE', '#9AA4AB')), (2, 2))
 add('bedFuton@cozy', placeholder(futon(HONEY, CREAM, RUST)), (2, 2))
 
@@ -1099,7 +1105,7 @@ def king_bed(head, frame, sheet, throw, ffin='fabric'):
     return p
 
 
-add('bedKing', placeholder(king_bed('#CFC9BD', '#D9D4CA', '#F1F0EC', SAGE)), (2, 2))
+add('bedKing', placeholder(to_wall(king_bed('#CFC9BD', '#D9D4CA', '#F1F0EC', SAGE), -0.93)), (2, 2))   # the headboard on the wall's face, as the model's
 add('bedKing@modern', placeholder(king_bed('#9AA4AB', '#B9BCBE', '#F6F6F4', COGNAC)), (2, 2))
 add('bedKing@cozy', placeholder(king_bed(RUST, '#B98F6A', CREAM, MUSTARD)), (2, 2))
 add('bedKing@minimal', placeholder(king_bed(LINEN, '#ECE7DD', '#FFFFFF', '#E3CFA8')), (2, 2))
@@ -1150,12 +1156,12 @@ def bedside_lamp(base, bfin, shade, stem, sfin, square=False, x=0.0, z=-0.26, y=
 NIGHT = {'': (OAK, 'wood', BRASS, 'metal', 'classic'), '@modern': ('#F1F0EC', 'gloss', BLACKMETAL, 'metal', 'legs'),
          '@cozy': (WALNUT, 'wood', BRASS, 'metal', 'two'), '@minimal': (BIRCH, 'wood', '#F2F2F0', 'satin', 'open')}
 for sfx, (wood, fin, knob, kfin, style) in NIGHT.items():
-    addp('nightstand' + sfx, night(wood, fin, knob, kfin, style) + [
+    addp('nightstand' + sfx, forward(night(wood, fin, knob, kfin, style) + [
         box([0.16, 0.03, 0.22], [0.1, 0.575, -0.16], TEAL, 'matte', radius=0.004, rotate=[0, -12, 0]),
-        cyl([0.08, 0.1, 0.08], [-0.12, 0.61, -0.12], '#E8E6E1', 'gloss')])
+        cyl([0.08, 0.1, 0.08], [-0.12, 0.61, -0.12], '#E8E6E1', 'gloss')], 0.035))
     lamp = {'': ('#E8E2D6', 'gloss', '#F4EBD8', BRASS, 'metal', False), '@modern': ('#F4F4F2', 'gloss', '#FAF8F3', BLACKMETAL, 'metal', True),
             '@cozy': (CLAY, 'gloss', '#EFD9B4', BRASS, 'metal', False), '@minimal': (BIRCH, 'wood', '#FAF8F3', '#F2F2F0', 'satin', True)}[sfx]
-    addp('nightstandLamp' + sfx, night(wood, fin, knob, kfin, style) + bedside_lamp(*lamp[:5], square=lamp[5]))
+    addp('nightstandLamp' + sfx, forward(night(wood, fin, knob, kfin, style) + bedside_lamp(*lamp[:5], square=lamp[5]), 0.035))
 
 
 def dresser(wood, fin, knob):
@@ -1214,7 +1220,12 @@ def dressing_table(wood, fin, seat, frame):
     return p
 
 
-add('dressingTable', placeholder(dressing_table(OAK, 'wood', BLUSH, BRASS)))
+# Turned round: the mirror against the wall, the pouf at the front (characters.ts SEATS faces the sitter to the mirror).
+p = forward(facing_back(dressing_table(OAK, 'wood', BLUSH, BRASS)), -0.005)
+for q in p:
+    if q.get('mirror'):
+        q['mirror'] = 'front'
+add('dressingTable', placeholder(p))
 add('dressingTable@modern', placeholder(dressing_table('#F1F0EC', 'gloss', '#9AA4AB', BLACKMETAL)))
 add('dressingTable@cozy', placeholder(dressing_table(WALNUT, 'wood', RUST, BRASS)))
 add('dressingTable@minimal', placeholder(dressing_table(BIRCH, 'wood', LINEN, BIRCH)))
@@ -1264,7 +1275,7 @@ p = [box([0.4, 0.4, 0.17], [0, 0.58, -0.355], PORCELAIN, 'gloss', radius=0.03), 
      box([0.36, 0.38, 0.03], [0, 0.6, -0.255], PORCELAIN, 'gloss', radius=0.014, rotate=[-6, 0, 0]),   # lid, up
      cyl([0.11, 0.1, 0.11], [0.3, 0.62, -0.4], '#FFFFFF', 'gloss', rotate=[0, 0, 90], segments=14),     # paper on its holder
      cyl([0.02, 0.14, 0.02], [0.3, 0.62, -0.42], CHROME, 'chrome', rotate=[0, 0, 90], segments=8)]
-addp('toiletCompact', p)
+addp('toiletCompact', forward(p, 0.025))
 
 
 def smart_toilet(panel, fin):
@@ -1303,7 +1314,7 @@ p = [box([1.82, 0.44, 0.86], [0, 0.22, z], PORCELAIN, 'gloss', radius=0.03),    
      sph([0.07, 0.06, 0.08], [0.2, 0.525, z + 0.05], '#F2C14E', 'gloss', segments=10),                   # duck
      sph([0.045, 0.045, 0.045], [0.2, 0.57, z + 0.08], '#F2C14E', 'gloss', segments=10),
      cone([0.025, 0.02, 0.03], [0.2, 0.565, z + 0.11], '#E9853B', 'gloss', rotate=[90, 0, 0], segments=8)]
-addp('bathtub', p, (2, 1))
+addp('bathtub', forward(p, 0.035), (2, 1))
 
 
 def clawfoot(body, outer, feet):
@@ -1342,7 +1353,7 @@ def shower_stall(curtain, tray='#F6F6F4', metal=CHROME):
     ])
 
 
-add('showerStall', shower_stall('#CFE0E4'))
+add('showerStall', placeholder(shift(shower_stall('#CFE0E4')['placeholder'], dz=0.02)))    # its back on the wall's face, as the model's
 add('showerStall@cozy', shower_stall('#E8D8BE', metal=BRASS))
 add('showerStall@minimal', shower_stall('#F4F3EF'))
 
@@ -1364,7 +1375,7 @@ def walk_in(stone, metal):
     ])
 
 
-add('showerWalkIn', walk_in('#C9C6C0', BLACKMETAL))
+add('showerWalkIn', placeholder(shift(walk_in('#C9C6C0', BLACKMETAL)['placeholder'], dz=0.03)))    # its back on the wall's face, as the model's
 add('showerWalkIn@modern', walk_in('#8E8A84', BLACKMETAL))
 add('showerWalkIn@cozy', walk_in('#D9C7A7', BRASS))
 add('showerWalkIn@minimal', walk_in('#F4F3EF', CHROME))
@@ -1382,7 +1393,7 @@ p = [lathe([0.24, 0.72, 0.2], [0, 0.36, z - 0.03], PORCELAIN, 'gloss', [[0, -0.5
      cyl([0.02, 0.03, 0.02], [0.17, 1.03, -0.41], CHROME, 'chrome', segments=8),
      cyl([0.06, 0.09, 0.06], [-0.17, 0.945, -0.41], '#F2F1EE', 'gloss', segments=12, taper=1.1),
      cyl([0.012, 0.12, 0.012], [-0.165, 1.0, -0.41], MUSTARD, 'gloss', segments=6, rotate=[0, 0, 10])]
-addp('sinkPedestal', p)
+addp('sinkPedestal', forward(p, 0.024))
 
 
 def double_vanity(cab, top, fin, tap):
@@ -1396,8 +1407,7 @@ def double_vanity(cab, top, fin, tap):
         p += [part('lathe', [0.5, 0.14, 0.38], [x, 0.94, -0.12], '#F6F6F4', 'gloss',
                    profile=[[0, -0.5], [0.4, -0.45], [0.5, 0.5], [0.46, 0.5], [0.36, -0.3], [0, -0.3]], segments=24),
               cyl([0.03, 0.22, 0.03], [x, 0.98, -0.36], tap, 'metal'),
-              rod([x, 1.08, -0.36], [x, 1.06, -0.24], 0.02, tap, 'metal'),
-              box([0.66, 0.76, 0.03], [x, 1.5, -0.42], '#CFDCE2', 'gloss', radius=0.04, mirror='front')]  # mirrors
+              rod([x, 1.08, -0.36], [x, 1.06, -0.24], 0.02, tap, 'metal')]  # no mirrors: the player hangs their own
     p += [cyl([0.06, 0.16, 0.06], [0.0, 0.96, -0.3], TEAL, 'gloss'), cyl([0.07, 0.1, 0.07], [0.1, 0.93, -0.32], '#F2F1EE', 'gloss')]
     return p
 
@@ -1468,8 +1478,8 @@ def laundry(dryer=False):
     return p
 
 
-addp('laundryWasher', laundry())
-addp('laundryDryer', laundry(dryer=True))
+addp('laundryWasher', forward(laundry(), 0.03))
+addp('laundryDryer', forward(laundry(dryer=True), 0.03))
 
 # =============================================================================================
 # Kids
@@ -1489,16 +1499,14 @@ def kids_bed(frame, sheet, cover, rail):
     return p
 
 
-add('kidsBed', placeholder(kids_bed('#9DC6CF', '#F7F7F5', '#F2C14E', '#F2F2F0')), (1, 2))
+add('kidsBed', placeholder(to_wall(kids_bed('#9DC6CF', '#F7F7F5', '#F2C14E', '#F2F2F0'), -0.93)), (1, 2))   # the headboard on the wall's face, as the model's
 add('kidsBed@cozy', placeholder(kids_bed('#E4B8AE', CREAM, SAGE, '#F2F2F0')), (1, 2))
 add('kidsBed@minimal', placeholder(kids_bed('#F2F2F0', '#FFFFFF', LINEN, BIRCH)), (1, 2))
 
 
 def toy_box():
     p = [box([0.8, 0.46, 0.5], [0, 0.23, -0.18], '#F2C14E', 'satin', radius=0.03),
-         box([0.82, 0.05, 0.52], [0, 0.6, -0.36], '#E9A23B', 'satin', radius=0.02, rotate=[-60, 0, 0]),  # open lid
-         box([0.1, 0.1, 0.1], [-0.2, 0.5, -0.15], '#D9483B', 'satin', radius=0.02),
-         sph([0.16, 0.16, 0.16], [0.15, 0.52, -0.12], '#3E8EDE', 'gloss', segments=10),        # ball
+         box([0.82, 0.05, 0.52], [0, 0.485, -0.18], '#E9A23B', 'satin', radius=0.02),         # the lid, shut
          box([0.1, 0.1, 0.1], [0.32, 0.05, 0.25], '#5EC28B', 'satin', radius=0.02),             # blocks spilled
          box([0.1, 0.1, 0.1], [0.2, 0.05, 0.3], '#D9483B', 'satin', radius=0.02, rotate=[0, 30, 0]),
          box([0.1, 0.1, 0.1], [0.26, 0.15, 0.28], '#3E8EDE', 'satin', radius=0.02)]
@@ -1521,7 +1529,7 @@ def play_mat():
     return p
 
 
-add('playMat', placeholder(play_mat()))
+add('playMat', placeholder(shift(play_mat(), dz=0.03)))   # its back on the wall's face, as the model's
 def chalkboard(frame, board):
     """A standing A-frame chalkboard: two framed boards hinged at the top, a chalk tray and drawings on the front."""
     a = -14
@@ -1563,7 +1571,7 @@ def doll_house(wall, roof, trim):
     return p
 
 
-add('dollHouse', placeholder(doll_house('#F4EBD8', '#D9483B', HONEY)))
+add('dollHouse', placeholder(forward(doll_house('#F4EBD8', '#D9483B', HONEY), -0.06)))
 add('dollHouse@modern', placeholder(doll_house('#F4F4F2', '#3A3D41', OAK)))
 
 
@@ -1572,7 +1580,7 @@ def rocking_horse(body, mane, rocker):
     p = []
     for x in (-0.12, 0.12):                                                                   # curved rockers along z
         for i in range(6):
-            a0, a1 = math.radians(-16 + i * 32 / 6), math.radians(-16 + (i + 1) * 32 / 6)
+            a0, a1 = math.radians(-14 + i * 28 / 6), math.radians(-14 + (i + 1) * 28 / 6)   # the model's rockers: clear of the wall
             pa = [x, 1.62 - math.cos(a0) * 1.6, math.sin(a0) * 1.6]
             pb = [x, 1.62 - math.cos(a1) * 1.6, math.sin(a1) * 1.6]
             p.append(rod(pa, pb, 0.04, rocker, 'wood'))
@@ -1654,11 +1662,11 @@ def desk(top, legs, chair, top_fin='wood', leg_fin='metal', w=1.54, laptop=False
     return p
 
 
-add('deskWriting', placeholder(desk(OAK, BLACKMETAL, SAGE, lamp=BLACKMETAL)), (2, 1))
+add('deskWriting', placeholder(to_wall(desk(OAK, BLACKMETAL, SAGE, lamp=BLACKMETAL))), (2, 1))
 add('deskWriting@modern', placeholder(desk('#F1F0EC', BLACKMETAL, '#8E979E', 'gloss', lamp=BLACKMETAL)), (2, 1))
 add('deskWriting@cozy', placeholder(desk(HONEY, WALNUT, RUST, leg_fin='wood', lamp='#2F6B4F')), (2, 1))
 add('deskWriting@minimal', placeholder(desk(BIRCH, '#F2F2F0', '#E6E2DA', leg_fin='satin', lamp='#F2F2F0')), (2, 1))
-add('deskLaptop', placeholder(desk(OAK, BLACKMETAL, '#5F6E7A', w=0.9, laptop=True)))
+add('deskLaptop', placeholder(to_wall(desk(OAK, BLACKMETAL, '#5F6E7A', w=0.9, laptop=True))))
 add('deskLaptop@modern', placeholder(desk('#F1F0EC', BLACKMETAL, '#8E979E', 'gloss', w=0.9, laptop=True)))
 add('deskLaptop@cozy', placeholder(desk(HONEY, WALNUT, RUST, leg_fin='wood', w=0.9, laptop=True)))
 add('deskLaptop@minimal', placeholder(desk(BIRCH, '#F2F2F0', '#E6E2DA', leg_fin='satin', w=0.9, laptop=True)))
@@ -1686,7 +1694,7 @@ def gaming_pc(accent):
     return p
 
 
-add('computerGaming', placeholder(gaming_pc('#6E5CE6')), (2, 1))
+add('computerGaming', placeholder(to_wall(gaming_pc('#6E5CE6'))), (2, 1))
 add('computerGaming@cozy', placeholder(gaming_pc('#F2A23C')), (2, 1))
 def desk_chair(fabric, frame, ffin, back_h=0.62, arms=True, head=False):
     """A swivel desk chair (seat 0.47, centred): padded seat and back, a gas lift on five castors."""
@@ -1822,7 +1830,8 @@ def pool_table(felt, wood, fin='wood'):
              ('#FFFFFF', -0.6, 0.0)]
     for c, x, z in balls:
         p.append(sph([0.057, 0.057, 0.057], [x, 0.815, z], c, 'gloss', segments=10))
-    p += [cyl([0.025, 1.45, 0.025], [-0.2, 0.8, 0.3], '#C9A27A', 'wood', rotate=[0, 70, 88]),   # cue on the table
+    p += [rod([-1.02, 0.8, 0.42], [-0.5, 0.798, 0.38], 0.028, '#3B2A20', 'satin'),           # the cue lying on the cloth, as the model's
+          rod([-0.5, 0.798, 0.38], [0.36, 0.794, 0.3], 0.018, '#D9B98A', 'satin'),
           box([0.2, 0.06, 0.03], [0, 0.11, 0.66], wood, fin, radius=0.01)]
     return p
 
@@ -1840,7 +1849,7 @@ def foosball(body, men_a, men_b):
             p.append(box([0.08, 0.7, 0.08], [x, 0.35, z], body, 'wood', radius=0.01))
     for i, x in enumerate((-0.45, -0.15, 0.15, 0.45)):                                        # rods with players
         c = men_a if i % 2 == 0 else men_b
-        p.append(cyl([0.02, 0.96, 0.02], [x, 0.84, 0], CHROME, 'chrome', rotate=[90, 0, 0]))
+        p.append(cyl([0.02, 0.87, 0.02], [x, 0.84, 0.005], CHROME, 'chrome', rotate=[90, 0, 0]))    # its end on the wall face
         p.append(cyl([0.05, 0.08, 0.05], [x, 0.84, 0.46], '#2A2C30', 'satin', rotate=[90, 0, 0]))
         for z in (-0.18, 0.0, 0.18):
             p.append(box([0.04, 0.12, 0.05], [x, 0.8, z], c, 'gloss', radius=0.01))
@@ -1890,13 +1899,13 @@ def chemistry(top, legs):
     return p
 
 
-add('chemistrySet', placeholder(chemistry('#E4E3DF', BLACKMETAL)))
+add('chemistrySet', placeholder(shift(chemistry('#E4E3DF', BLACKMETAL), dz=-0.03)))      # back to the wall face
 
 # =============================================================================================
 # Fitness
 # =============================================================================================
 def exercise_bike(frame, accent):
-    p = [box([0.16, 0.06, 0.9], [0, 0.03, 0.0], frame, 'satin', radius=0.02),
+    p = [box([0.16, 0.06, 0.88], [0, 0.03, 0.01], frame, 'satin', radius=0.02),   # its back on the wall face, as the model
          box([0.5, 0.05, 0.08], [0, 0.03, -0.38], frame, 'satin', radius=0.02),
          box([0.5, 0.05, 0.08], [0, 0.03, 0.38], frame, 'satin', radius=0.02),
          cyl([0.42, 0.06, 0.42], [0, 0.3, 0.22], '#3A3D41', 'metal', rotate=[0, 0, 90], segments=24),   # flywheel
@@ -1918,10 +1927,11 @@ add('exerciseBike', placeholder(exercise_bike('#D8D9D7', '#3C8DBF')))
 
 
 def yoga_mat(color):
-    p = [box([0.62, 0.012, 0.9], [0, 0.006, 0.0], color, 'fabric', radius=0.004),
-         cyl([0.14, 0.62, 0.14], [0, 0.07, -0.38], color, 'fabric', rotate=[0, 0, 90]),       # rolled end
-         box([0.24, 0.12, 0.14], [0.36, 0.06, -0.3], '#E8E2D6', 'fabric', radius=0.04),        # block
-         cyl([0.07, 0.24, 0.07], [-0.36, 0.12, -0.3], '#9DC6CF', 'gloss')]                     # bottle
+    # (its back on the wall face, as the model's)
+    p = [box([0.62, 0.012, 0.88], [0, 0.006, 0.01], color, 'fabric', radius=0.004),
+         cyl([0.14, 0.62, 0.14], [0, 0.07, -0.36], color, 'fabric', rotate=[0, 0, 90]),       # rolled end
+         box([0.24, 0.12, 0.14], [0.36, 0.06, -0.28], '#E8E2D6', 'fabric', radius=0.04),       # block
+         cyl([0.07, 0.24, 0.07], [-0.36, 0.12, -0.28], '#9DC6CF', 'gloss')]                    # bottle
     return p
 
 
@@ -2057,7 +2067,7 @@ for k in range(12):
     p.append(box([0.01, 0.03, 0.003], [math.sin(a) * 0.135, 1.77 + math.cos(a) * 0.135, z + 0.187], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, -k * 30]))
 p += [box([0.012, 0.08, 0.003], [-0.03, 1.79, z + 0.19], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, 40]),
       box([0.008, 0.12, 0.003], [0.03, 1.81, z + 0.192], '#2A2C30', 'metal', radius=0.001, rotate=[0, 0, -30])]
-addp('grandfatherClock', p)
+addp('grandfatherClock', forward(p, 0.04))
 
 
 def plinth(h, color, fin='matte', w=0.36):
@@ -2265,7 +2275,7 @@ def curtains(color, rod_col, w=0.86, top=2.45, bottom=1.0):
             x = s * (w / 2 - 0.04 - i * 0.055)
             p.append(cyl([0.07, h, 0.06], [x, bottom + h / 2, z + 0.08 + (i % 2) * 0.01], color, 'fabric', segments=10))
     p += [box([0.24, 0.04, 0.03], [s * (w / 2 - 0.12), bottom + h * 0.42, z + 0.12], color, 'fabric', radius=0.015) for s in (-1, 1)]
-    return placeholder(p)
+    return placeholder(forward(p, -0.05))                                                  # the panels' backs on the wall face
 
 
 add('curtains', curtains(LINEN, BLACKMETAL))
@@ -2738,9 +2748,9 @@ def garden_chair(wood):
     return p
 
 
-add('gardenChair', placeholder(garden_chair('#F2F0EA')))
-add('gardenChair@modern', placeholder(garden_chair('#5C6168')))
-add('gardenChair@cozy', placeholder(garden_chair('#4E7A7F')))
+add('gardenChair', placeholder(shift(garden_chair('#F2F0EA'), dz=0.011)))           # its back on the wall face
+add('gardenChair@modern', placeholder(shift(garden_chair('#5C6168'), dz=0.011)))
+add('gardenChair@cozy', placeholder(shift(garden_chair('#4E7A7F'), dz=0.011)))
 
 
 def lamp_post(metal):
@@ -2802,7 +2812,11 @@ def main(path):
         for s in issues: print(f'  ! {k}: {s}')
         bad += len(issues)
     lines = []
+    # Objects have no styles any more (a player gives some a colour of their own): only each model's
+    # plain entry is written; the `@style` designs above stay as parts to draw from.
     for k, e in E.items():
+        if '@' in k:
+            continue
         lines.append(f'    {json.dumps(k)}: {json.dumps(e, separators=(",", ":"))}')
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
@@ -2810,7 +2824,7 @@ def main(path):
                 'written by tools/art/catalog.py. Listed in the base manifest\'s packs.",\n  "version": 1,\n  "entries": {\n')
         f.write(',\n'.join(lines) + '\n  }\n}\n')
     json.load(open(path))
-    print(f'{len(E)} entries ({len({k.split("@")[0] for k in E})} models) -> {path}; {bad} issue(s)')
+    print(f'{len(lines)} entries -> {path}; {bad} issue(s)')
     return bad
 
 

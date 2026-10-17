@@ -75,7 +75,6 @@ struct FundsView<'a> {
     rent: Option<i64>,
     /// Weekly bills, which grow with what the household owns.
     bills: Option<i64>,
-    style: u8,
     /// Build and buy edits that can be undone, and undone edits that can be made again.
     undo: usize,
     redo: usize,
@@ -726,7 +725,6 @@ impl UiSync {
                 funds: h.funds,
                 rent: costs.map(|c| c.0),
                 bills: costs.map(|c| c.1),
-                style: h.style,
                 undo: world.undo_steps(i),
                 redo: world.redo_steps(i),
                 routines: h.player.then(|| h.routines.iter().map(|r| routine_view(content, r)).collect()),
@@ -1416,10 +1414,18 @@ struct ObjectView<'a> {
     lift: Option<f32>,
     /// Wear 0..1 (broken at 1).
     wear: f32,
+    /// Open (a wall bed folded down): see `ObjectInstance::open`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    open: bool,
+    /// A crop's stage (`GrowthStage`: 0 planted, 1 growing, 2 ripe, 3 picked); none for other things.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    growth: Option<u8>,
     w: i32,
     d: i32,
     quality: u8,
-    style: u8,
+    /// The colours the player chose, `#rrggbb` by part (the model's material); absent: as made.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    colors: std::collections::BTreeMap<String, String>,
     /// What selling it returns (None if it can't be sold).
     sell_value: Option<i64>,
     /// What the quick fix costs (worn things; as of the last structure change, so exact for
@@ -1632,10 +1638,12 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 tall: o.tall,
                 lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
+                open: o.open,
+                growth: world.content.objects[o.def].grows.is_some().then(|| o.growth_stage() as u8),
                 w,
                 d,
                 quality: o.quality,
-                style: o.style,
+                colors: crate::world::colors_hex(&o.colors),
                 sell_value: content.objects[o.def].price.map(|_| {
                     let broken = if o.broken() { 0.5 } else { 1.0 };
                     (o.value as f32 * content.object_rules.resale * broken).round() as i64

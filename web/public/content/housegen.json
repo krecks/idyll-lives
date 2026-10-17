@@ -59,7 +59,7 @@
   "$margins": "Garden around the house: in front (towards the street, a range), at the back and at the sides (at least).",
   "margins": { "front": [3, 5], "back": 2, "side": 1 },
 
-  "$rooms": "weight: share of the floor a room wants; minSide: its narrowest width. A kitchen's `run` comes first: counter pieces side by side along one wall, one of each `with` slot (sink, stove, maybe a dishwasher) among plain `segments`, `length` tiles in all. Furniture is placed against the walls in this order (the pieces that must come first, then `dining`, then the rest): `one` picks one of the ids, `chance` (default 1) whether it comes at all, `count` how many, `opposite` puts it across the room from another (a TV facing the sofa). `dining`: a table standing free in the room with `seats` chairs (one kind, picked from `chairs`) round it, each facing it; with `wall`, against a wall with its chairs at its front (a desk). `surfaces`: small things put on tops of the kinds in `on` (counter, table, low, desk, shelf), the emptiest top first (`minSide`: only tops at least so wide, m). Then `wall`, `ceiling` and `rug` slots add things that take no floor space (content `layer`; only things nobody uses): pictures and curtains on walls (curtains over windows; `over`: on the wall behind one of those pieces if the room has one, like a mirror over the basin), lamps from the ceiling, a rug in the middle of the room. Rooms short of light get more ceiling lights (`lights` below).",
+  "$rooms": "weight: share of the floor a room wants; minSide: its narrowest width (`minSideOn`: per lot size instead; a large house's kitchen is wider, room for an island). A kitchen's `run` comes first: counter pieces side by side along one wall, one of each `with` slot (sink, stove, maybe a dishwasher) among plain `segments`, `length` tiles in all, along a wall with `clear` rows of room in front of it if one has them (an island and its stools). Furniture is placed against the walls in this order (the pieces that must come first, then `dining`, then the rest): `one` picks one of the ids, `chance` (default 1) whether it comes at all, `count` how many, `opposite` puts it across the room from another (a TV facing the sofa), `beside` on the same wall as another if there's room (`run`: the counter run; the fridge at its end). `dining`: a table standing free in the room with `seats` chairs (one kind, picked from `chairs`) round it, each facing it; with `wall`, against a wall with its chairs at its front (a desk). `surfaces`: small things put on tops of the kinds in `on` (counter, table, low, desk, shelf), the emptiest top first (`minSide`: only tops at least so wide, m). Then `wall`, `ceiling` and `rug` slots add things that take no floor space (content `layer`; only things nobody uses): pictures and curtains on walls (curtains over windows; `over`: on the wall behind one of those pieces if the room has one, like a mirror over the basin), lamps from the ceiling, a rug in the middle of the room. Rooms short of light get more ceiling lights (`lights` below).",
   "rooms": {
     "bedroom": {
       "weight": 3,
@@ -89,21 +89,23 @@
     "kitchen": {
       "weight": 3,
       "minSide": 3,
+      "minSideOn": { "large": 4 },
       "maxSide": [5, 6],
       "run": {
         "segments": ["counter", "counter", "counterDrawers", "counterOpenShelf"],
         "with": [{ "one": ["sink", "sink", "sink", "counterSinkDouble"] }, { "one": ["stoveElectric", "stoveElectric", "stoveGas", "cooktopCounter"] }, { "one": ["dishwasher", "dishwasherCompact"], "chance": 0.4 }],
-        "length": [3, 4]
+        "length": [3, 4],
+        "clear": 4
       },
       "furniture": [
-        { "one": ["fridge"] },
+        { "one": ["fridge"], "beside": "run" },
         { "one": ["microwave", "coffeeMachine", "pantry", "pantryTall", "trashCan", "recyclingBins", "breakfastCounter", "counter"], "count": [0, 1] },
         { "one": ["plant", "lamp", "sideboard", "trashCan"], "chance": 0.4 }
       ],
       "dining": [
-        { "tables": ["islandSmall", "islandSmall", "kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "ifRoom": "dining", "chance": 0.9 },
+        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "ifRoom": "dining" },
         { "tables": ["tableDining4", "tableDining4", "tableSquare2", "tableRound4", "tableDining6", "tableFarmhouse6", "tableBistroRound"], "chairs": ["chairWood", "chairUpholstered", "chairModern", "chairWindsor", "chairBentwood", "diningChair"], "seats": [2, 6], "unlessRoom": "dining", "chance": 0.95 },
-        { "tables": ["islandSmall", "islandSmall", "kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "unlessRoom": "dining", "chance": 0.4 }
+        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "unlessRoom": "dining", "chance": 0.4 }
       ],
       "surfaces": [
         { "on": ["counter"], "of": ["kitchenIsland", "islandLong", "islandSmall"], "one": ["fruitBowl", "cakeStand", "mugs"], "count": [1, 2] },

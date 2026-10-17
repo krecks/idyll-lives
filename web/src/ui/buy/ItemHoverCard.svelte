@@ -4,13 +4,13 @@
   import { money } from '../format';
   import { services } from '../services';
   import { game } from '../state.svelte';
-  import { collectionOf, percent, summarize } from './catalog';
+  import { collectionOf, paintable, percent, summarize } from './catalog';
 
   /**
    * What a catalog item is worth to the household, at a glance: floats above the card pointed at.
    * (The whole story, with the turntable, upgrades and things to do, is `ItemDetail`'s, for things owned.)
    */
-  let { def, at, lovers = [], owned = 0, styles = 0 }: { def: ObjectDef; /** Horizontal position over the dock, 0..1. */ at: number; lovers?: string[]; owned?: number; styles?: number } = $props();
+  let { def, at, lovers = [], owned = 0 }: { def: ObjectDef; /** Horizontal position over the dock, 0..1. */ at: number; lovers?: string[]; owned?: number } = $props();
 
   const content = services.content;
   const info = $derived(summarize(content, def));
@@ -30,7 +30,7 @@
     [
       info.slots > 1 ? `Fits ${info.slots} at once` : '',
       info.useCost ? `+${money(info.useCost.min)} per use` : '',
-      styles > 0 ? `${styles} styles` : '',
+      paintable(services.assets, def) ? 'Any colour' : '',
       owned > 0 ? `You have ${owned}` : '',
       addedBills > 0 ? `~${money(addedBills)}/wk bills` : '',
     ].filter(Boolean),

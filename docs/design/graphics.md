@@ -6,7 +6,7 @@ Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolut
 
 ## The presets
 
-Settings › Performance › Graphics. Medium is everyone's default and the game's intended look. High is Medium with sharper sun shadows and live mirrors. Low is Medium with modest trims for older laptops (integrated Intel graphics). A preset applies the next time a game starts or loads. `?quality=low|medium|high` overrides the setting for testing.
+Settings › Performance › Graphics. Medium is everyone's default and the game's intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is Medium with modest trims for older laptops (integrated Intel graphics). A preset applies the next time a game starts or loads. `?quality=low|medium|high` overrides the setting for testing.
 
 Every knob is in one table, `QUALITY` in `quality.ts`; a new knob gets a field there with what it does and what it costs, and a value in each preset.
 
@@ -16,10 +16,13 @@ Every knob is in one table, `QUALITY` in `quality.ts`; a new knob gets a field t
 | `msaaSamples` | 1 (FXAA) | 4 | 4 | 4× multisampling of the HDR scene: 3.0 ms of Medium's 10.6 ms by day, about 100 MB of memory traffic a frame at 1080p (about 4.5 ms on an Intel HD 620 by P1's bandwidth model). 1 means FXAA instead, a cheap filter pass with slightly softer edges. |
 | `anisotropy` | 4 | 8 | 8 | Anisotropic filtering of floor, wall, road and ground textures. Not measured on its own. |
 | `clusteredLamps` | false | true | true | Every lamp lights (clustered lighting, up to 32), rather than the four nearest the biggest rooms. P1 measured 3.1 ms by day (every lamp dark) and 4.3 ms at night on WebGPU, 0.8 and 1.6 ms on WebGL2. Since a dark lamp leaves the cluster, the cost by day is mostly gone (G2: 8.87 → 6.49 ms by day; the night is unchanged). Low's four lamps stay in the shader by day, dark. |
-| `mirrors` | 0 | 0 | 2 | How many mirrors (the nearest the camera) reflect the room live. Each draws the world once more, about 50 MB of memory traffic a frame. In the village with the benchmark's default 20 s window, High's mirror averages 50–64 extra draws and 0.5 M triangles a frame; its GPU cost was within noise except +3 ms on WebGL2 at night (it reflects for only part of the window, so inconclusive). Before 0.2.0 Medium had 1 live mirror: A/B runs against that base need `diag=nomirrors`. Each reflection target, about 56 MB of GPU memory at 1080p (0.75 of the screen, 4× MSAA), exists only while a mirror reflects, and for 10 s after. |
+| `mirrors` | 1 | 1 | 2 | How many mirrors reflect the room: the nearest ones on screen that face the camera, within 40 m; the others show their glossy glass. A reflection draws again only what can be seen through its glass (the pyramid from the eye's mirror image through the glass's edges) and only the residents in it: the village's bathroom mirror, 437 draws and 6.9 M triangles a reflection before, 67 and 1.7 M now (63 with nobody in front of it). Its render target exists only while a mirror reflects, and for 10 s after. Costs below, with `mirrorRate`. |
+| `mirrorScale` | 0.4 | 0.5 | 0.75 | A reflection's size as a share of the screen's along each side, which Babylon rounds to powers of two: at 1920×1080, 1024×512 on Low and Medium, 1024×1024 on High (at 1366×768: 512×256, 512×512, 1024×512). Multisampled as `msaaSamples` says (Low none, Medium and High 4×). Measured memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB a mirror. |
+| `mirrorRate` | 10 | 30 | 0 (every frame) | On Low and Medium a reflection is held and drawn again only when something in it changed: the camera moved, the mirror moved (a cabinet's door), a resident it shows moved, or the light, lamps or things placed changed. Then at most this many times a second. A held reflection is looked up through the camera it was drawn for, so it stays on the glass while the camera moves on (only its parallax lags until the next draw). Ambient clips alone (a fan in the mirror) don't draw it again. Medium, a mirror in view and the camera swinging in front of it all the time (27–30 draws a second, the worst case; a resident moving in front of it is the same): −6 % fps on WebGPU (112 → 106) and WebGL2 (152 → 142), +1.0 ms CPU and +0.1 ms GPU a frame on WebGPU; with the camera still, within noise (1.6 draws a second). Low: −1 to −2 % fps. The orbit: within noise. |
 | `lightingStep` | 10 | 0.5 | 0.5 | Game minutes between lighting updates at speed 3 and up and in quiet hours (slower speeds: every half minute). Each update re-colours the sun, sky and lamps and can thaw the materials for a few frames: at speed 5 that was 20 updates a second, CPU p95 4.7–6 ms against 0.3–0.4 ms. On every preset the lighting also changes at most every 100 ms of real time, 10 times a second. |
 | `lawnDensity` | 0.5 | 1 | 1 | Share of the lawn's grass tufts and flowers drawn: 0.5 keeps every other one, always the same ones, standing where they did (24,245 of the landscape's 44,655 plants). With `landscapeShadows`, on Low by day: −0.29 M triangles, −6 shadow draws, −0.5 ms of GPU (WebGPU, orbit view). |
 | `landscapeShadows` | false | true | true | The woods round the town cast shadows. The lot's own garden trees, the street and the house always do. |
+| `ambientRange` | 0 | 40 | 60 | Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a fountain's water: a model's `motions.idle`); further off, and on Low, they rest. Each moving thing rewrites its model's part buffers each frame (one upload per model, however many move); the sun's shadows aren't redrawn for them, their culling boxes stay the rest pose's, and no draw calls are added. 94 at once on a lot (a stress case: 94 scratch rocking chairs, each with a fan turning; WebGPU, M3 Pro, headless, 2026-10-14): 0.09 ms of CPU a frame for the clips and +0.15–0.3 ms for the frame's CPU; with Chrome's CPU throttled 4× (a stand-in for an older laptop's CPU): 0.2–0.35 ms and +0.4–0.6 ms. Not measured on Intel graphics hardware; Low keeps them off. |
 | `snapshotRendering` | true | true | true | WebGPU only: the menus' town records its draw commands once and replays them each frame. The game itself draws live. `?snapshot=0` turns it off. |
 
 Costs are what leaving the feature out saved on Medium: GPU time on an M3 Pro at 1920×1080, WebGPU, no vsync, median of 3 runs (P1's benchmark, `?bench=village`). "Intel" figures come from P1's bandwidth model, not from measurements.
@@ -35,26 +38,15 @@ The same on every preset:
 - **The sun's shadow map** draws only the casters that can reach its square round the lot, and is drawn again only when something in it changed: the light, a thing placed or moved, walls, roofs or storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame (P1-04).
 - **Only the residents in view** have their pose rows uploaded each frame (P1-14).
 - **Nothing is drawn behind full-screen menus:** the pause menu, Settings, Load game, Credits, the planner and the crash screen get 2 more frames, then none until they close; the frosted glass keeps blurring the last frame.
-- **Mirrors' memory on demand** (High), the **lighting at most 10 times a second**, and a **100 ms limit on every frame step**, Babylon's particle clock included.
+- **Mirrors' memory on demand**, the **lighting at most 10 times a second**, and a **100 ms limit on every frame step**, Babylon's particle clock included.
 
 Removed in 0.2.0: Ultra, Custom and the fine-tune toggles, and ambient occlusion with them (SSAO2 and the multiple-render-target code left the main chunk).
 
-**Settings from 0.1** (`migrateGraphics`): a stored Low stays Low, whether it was the old quality preset or its parts as the old Low set them. Anything else becomes Medium. The old defaults were High's, with live mirrors, so players who never changed them now get Medium without live mirrors. The old resolution slider isn't carried over: everyone starts on Auto. The old graphics keys are dropped.
+**Settings from 0.1** (`migrateGraphics`): a stored Low stays Low, whether it was the old quality preset or its parts as the old Low set them. Anything else becomes Medium. The old defaults were High's, with live mirrors, so players who never changed them now get Medium, whose nearest mirror reflects on demand (live mirrors on Medium came back on 2026-10-15). The old resolution slider isn't carried over: everyone starts on Auto. The old graphics keys are dropped.
 
 ## Targets
 
-The owner's target machines are laptops with an i7-7500U, i7-8550U or i5-6500 and Intel HD 620, UHD 620 or HD 530 graphics, at 1920×1080:
-
-| Preset | 0.2.0 target | Estimate for 0.2.0, by day / at night | Estimate before 0.2.0 (P1, §2.5.1) | Status |
-|---|---|---|---|---|
-| Medium | 30 fps or more | about 10–21 / 8–13 fps | about 6–10 fps | Probably falls short; not measured on Intel hardware; not a release gate |
-| Low | none: best effort | about 14–41 / 13–39 fps | about 9–27 fps | The owner made Low at 60 fps not a 0.2.0 target |
-| High | none | about 9–17 / 7–11 fps | about 6 fps | – |
-
-- **The estimates aren't measurements.** No Intel hardware was available, so P1 scaled the M3 Pro's GPU time by two models that differ by 2–3×; at sign-off it applied the same models to 0.2.0 (on AC power, `render.mjs --throughput`, median of 3). Only a run on a real Intel laptop settles it; the owner does that with the benchmark (the release review's §5).
-- **Medium misses 30 fps on both models.** At night it barely improved (8.84 → 7.39 ms of GPU on the M3), because lit lamps still cost: the night range cap for the lamp cluster (P1-02) wasn't done.
-- **Not a priority for 0.2.0** (the owner's decision; best effort, not promised): detecting a weak GPU and picking Low or WebGL2 on its own, Auto resolution stepping down when the game runs slowly, 60 fps for Low on an HD 620, and generated LOD models. They are future work (the release review's §4, and PLAN.md's roadmap).
-- **The GPU is the limit on those laptops.** At 3× CPU slow-down on the M3 Pro, standing in for the target CPUs, 0.2.0 allows 47–57 fps on WebGPU and 78–98 fps on WebGL2, above every GPU estimate (P1's sign-off). Before 0.2.0 WebGPU spent 21–31 ms a frame of CPU (32–47 fps) submitting the same 493 draws, so on WebGPU the CPU alone also kept Low from 60 fps there (P1-07).
+There is no hardware target (the owner, 2026-10-15): no frame-rate goal for particular machines. Low is for older laptops, best effort. 0.2.0's estimates for Intel HD 620/530 laptops, the old target, are in the release review's §2.5.1.
 
 ## Resolution
 
@@ -121,7 +113,7 @@ Opening the game with `?bench=<scene>` plays a saved game state, `web/public/ben
 | `bench` | `village`, `forest` | The scene to play. |
 | `quality` | `low`, `medium`, `high` | The preset; without it, the player's setting. Works without `bench` too. |
 | `hour` | e.g. `13`, `21` | Holds the lighting at that hour; without it, the game's clock. Works without `bench` too. |
-| `cam` | `orbit` (default), `wide`, `build`, `dusk` | `orbit`: 24 m round the home lot, a turn in 40 s. `wide`: 80 m, 90 s. `build`: the orbit in Build mode, paused. `dusk`: the orbit at speed 5 from the scene's 18:00, the light changing every frame. |
+| `cam` | `orbit` (default), `wide`, `build`, `dusk`, `mirror`, `mirror-still` | `orbit`: 24 m round the home lot, a turn in 40 s. `wide`: 80 m, 90 s. `build`: the orbit in Build mode, paused. `dusk`: the orbit at speed 5 from the scene's 18:00, the light changing every frame. `mirror`: 6 m in front of the home lot's first mirror (the village's bathroom cabinet), swinging 30° either side every 20 s; `mirror-still`: held straight in front of it. |
 | `res` | `auto` (default), `1`, `0.5`–`1` | The render scale; `auto` is what the game picks. |
 | `secs`, `warmup` | 20, 5 | Seconds measured, after the warm-up. |
 | `cap` | 0 (default) | Frames per second at most; 0 draws every refresh. |
@@ -131,7 +123,7 @@ Opening the game with `?bench=<scene>` plays a saved game state, `web/public/ben
 | `diag` | `noshadows`, `noaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight`, `freeze` | Leaves features out, to measure what each costs (a comma list). `freeze` stops time for screenshots that compare pixel for pixel, at `at=<s>` along the path. Works without `bench` too. |
 | `renderer` | `webgl` | WebGL2 instead of WebGPU. |
 
-The result has the frame interval (average, p50, p95, p99), the main thread's work split into the game's update and Babylon's `scene.render`, the GPU time (WebGPU timestamp queries: from the start of a frame's first pass to the end of its last; WebGL2 timer queries where offered), draw calls and triangles (all passes, shadow map, mirrors), the render passes with their pixels and bytes, the residents' posing time, lighting updates a second, long tasks, the adapter, and a fingerprint of scene counts that shows two runs drew the same scene. Its `fps` counts its own `requestAnimationFrame` ticks, which is right without a cap and misleading with one.
+The result has the frame interval (average, p50, p95, p99), the main thread's work split into the game's update and Babylon's `scene.render`, the GPU time (WebGPU timestamp queries: from the start of a frame's first pass to the end of its last; WebGL2 timer queries where offered), draw calls and triangles (all passes, shadow map, mirrors), the render passes with their pixels and bytes, the residents' posing time, lighting updates and reflections drawn a second, long tasks, the adapter, and a fingerprint of scene counts that shows two runs drew the same scene. Its `fps` counts its own `requestAnimationFrame` ticks, which is right without a cap and misleading with one.
 
 Other debug flags: `?lights=clustered|forward` forces the lamps' mode, and `?snapshot=0` turns off WebGPU snapshot rendering.
 
@@ -139,7 +131,7 @@ Other debug flags: `?lights=clustered|forward` forces the lamps' mode, and `?sna
 
 ## Measured costs
 
-All on a MacBook Pro M3 Pro (18-core GPU), Chrome for Testing 153 headed, 1920×1080 at device pixel ratio 1, production build, the `village` scene. GPU time on WebGPU is the span from a frame's first pass to its last; on WebGL2, whose timer reads too high, the frame time without vsync is used instead. Runs vary by about ±1 ms; the tables are medians of 3, without vsync.
+All on a MacBook Pro M3 Pro (18-core GPU), Chrome for Testing 153 headed, 1920×1080 at device pixel ratio 1, production build, the `village` scene. GPU time on WebGPU is the span from a frame's first pass to its last (since 2026-10-15 read once the frame is sent: before, Babylon's reads got what an earlier frame left in the stamps' slots, which went wrong where the passes differ from frame to frame); on WebGL2, whose timer reads too high, the frame time without vsync is used instead. Runs vary by about ±1 ms; the tables are medians of 3, without vsync.
 
 **Before 0.2.0 (P1, at 4cde174):**
 - Medium: 10.3–10.5 ms of GPU a frame. Low: 6.6–7.0 ms, and 6.7 ms at 75 % scale. On the M3 Low is limited by geometry, not pixels.
@@ -200,6 +192,27 @@ The HD 620 estimate scales these: T_gpu ≈ k × T_mac + 0.5 × B / 22 GB/s, wit
 | Low, WebGL2 | 6.78 → 4.47 → 4.58 | 95 % | 494 (242) → 422 (146) → 399 (146) | 6.03 → 3.44 → 3.58 |
 
 The table above this one (P1's sign-off) is 5f72a7c, before G3; G3 gives back about 0.2–0.4 ms of Medium's GPU saving on the M3 for the CPU it saves. Shots against dee213f, headless on both sides: Medium at most 0.095 % of pixels off by more than 2 (the far road, P1-17); Low and High against `main` at most 0.136 %.
+
+**Mirrors on every preset** (2026-10-15, `render.mjs --preview --throughput`, median of 3; scenarios `orbit-day`, `orbit-night`, `mirror-day`, `mirror-still`; Low and Medium before are `diag=nomirrors`, the same code as before for them; High before is the build before, 519636f, with this change's benchmark; WebGPU GPU ms (pass span) and fps, WebGL2 frame p50 and fps; draws all passes / in reflections):
+
+| Preset, scene | WebGPU fps | WebGPU GPU ms | WebGPU CPU ms | WebGL2 fps | WebGL2 frame ms | Draws (mirror) | Reflections /s | Targets MB |
+|---|---|---|---|---|---|---|---|---|
+| Low, orbit by day | 165.9 → 165.1 | 4.68 → 4.73 | 5.47 → 5.55 | 207.8 → 206.3 | 4.7 → 4.8 | 442 → 443 (1) | 1.9 | 64 |
+| Low, mirror swinging | 151.7 → 150.4 | 5.23 → 5.32 | 6.00 → 6.05 | 190.8 → 186.7 | 5.5 → 5.5 | 463 → 468 (4) | 9.9 | 64 → 71 |
+| Low, mirror still | 152.2 → 151.9 | 5.23 → 5.21 | 6.13 → 6.10 | 191.1 → 190.2 | 5.5 → 5.5 | 462 → 464 (1) | 2.0 | 64 → 71 |
+| Medium, orbit by day | 138.6 → 137.3 | 5.83 → 5.90 | 6.54 → 6.67 | 170.9 → 168.3 | 5.7 → 5.7 | 452 → 455 (3) | 5.2 | 141 |
+| Medium, orbit at night | 101.0 → 100.0 | 8.39 → 8.58 | 9.02 → 9.13 | 149.1 → 147.3 | 6.8 → 6.8 | 470 → 474 (4) | 4.9 | 150 |
+| Medium, mirror swinging | 112.3 → 106.1 | 7.64 → 7.77 | 7.64 → 8.61 | 152.4 → 142.3 | 6.7 → 6.8 | 473 → 491 (17) | 27.0 | 141 → 166 |
+| Medium, mirror still | 111.2 → 110.2 | 7.84 → 7.89 | 8.36 → 8.44 | 150.1 → 149.0 | 6.8 → 6.8 | 472 → 475 (1) | 1.6 | 141 → 166 |
+| High, orbit by day | 125.7 → 132.8 | 6.33 → 6.04 | 7.27 → 6.88 | 147.1 → 154.6 | 6.1 → 6.1 | 498 (46) → 465 (13) | 13.3 → 21.4 | 217 |
+| High, orbit at night | 91.8 → 96.1 | 9.09 → 8.88 | 9.89 → 9.49 | 129.7 → 136.2 | 7.1 → 7.1 | 522 (52) → 483 (13) | 10.8 → 16.0 | 225 |
+| High, mirror swinging | 61.8 → 89.6 | 12.63 → 9.33 | 15.27 → 10.40 | 80.4 → 113.2 | 12.3 → 8.6 | 911 (437) → 540 (67) | every frame | 267 |
+| High, mirror still | 61.2 → 91.6 | 12.45 → 9.15 | 15.82 → 10.36 | 79.6 → 116.0 | 12.5 → 8.6 | 911 (437) → 537 (64) | every frame | 267 |
+
+- High without any mirror (`diag=nomirrors`), mirror swinging: 112.2 fps, 7.62 ms GPU, 7.67 ms CPU on WebGPU; 146.2 fps on WebGL2. A reflection every frame still costs High about a fifth of its frame rate with a mirror in view; Medium's held one, a third of that at worst.
+- A reflection costs the main thread more than the GPU (each draw is encoded on the CPU): about 3 ms each on WebGPU on the M3.
+- High's orbit reflects more often now (21 a second, was 13) because its two reflections go to mirrors on screen, not to the nearest ones behind the camera.
+- Screenshots of a mirror cabinet over a basin and a standing mirror, each with a resident in front, on all three presets and both backends: every one reflects the resident; Low's is softer (no multisampling, half the texels).
 
 **G2, step by step** (each change against the one before, production build, median of 3 interleaved runs; each change's own tables are in its commit body, and in the release review's §3.5.1):
 

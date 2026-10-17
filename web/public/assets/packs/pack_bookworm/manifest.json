@@ -1,0 +1,441 @@
+{
+  "$comment": "Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Replaces the primitive-part placeholders of packs/bookworm by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each has one moving part its use plays: the nook's cushion sinks, the ladder rolls, the bureau's flap drops, the teapot pours, the fire grows and the top book opens.",
+  "version": 1,
+  "entries": {
+    "model.bookworm.readingNook": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/readingNook.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "fabric": {
+          "finish": "material.finish.fabric"
+        },
+        "lamp_amber": {
+          "finish": "material.finish.satin"
+        },
+        "mug_a": {
+          "finish": "material.finish.gloss"
+        },
+        "panel": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_a": {
+          "finish": "material.finish.satin"
+        },
+        "pillow_b": {
+          "finish": "material.finish.satin"
+        },
+        "throw": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "curlUp": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Wood"
+        },
+        {
+          "material": "fabric",
+          "label": "Fabric"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushions"
+        }
+      ]
+    },
+    "model.bookworm.libraryWall": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/libraryWall.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bust": {
+          "finish": "material.finish.satin"
+        },
+        "globe": {
+          "finish": "material.finish.gloss"
+        },
+        "honey": {
+          "finish": "material.finish.wood"
+        },
+        "panel": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "research": "ladder",
+          "browse": "ladder"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Wood"
+        },
+        {
+          "material": "honey",
+          "label": "Ladder"
+        }
+      ]
+    },
+    "model.bookworm.writingBureau": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/writingBureau.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "honey": {
+          "finish": "material.finish.wood"
+        },
+        "lamp_amber": {
+          "finish": "material.finish.satin"
+        },
+        "mug_b": {
+          "finish": "material.finish.gloss"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "panel": {
+          "finish": "material.finish.wood"
+        },
+        "seatpad": {
+          "finish": "material.finish.satin"
+        },
+        "shade": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "draft": "fall_front",
+          "letter": "fall_front"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Wood"
+        },
+        {
+          "material": "seatpad",
+          "label": "Fabric"
+        },
+        {
+          "material": "honey",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.bookworm.teaTrolley": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/teaTrolley.glb",
+      "materials": {
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cake": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glaze": {
+          "finish": "material.finish.gloss"
+        },
+        "honey": {
+          "finish": "material.finish.wood"
+        },
+        "icing": {
+          "finish": "material.finish.satin"
+        },
+        "linen": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "brew": "pour"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "honey",
+          "label": "Wood"
+        },
+        {
+          "material": "linen",
+          "label": "Fabric"
+        },
+        {
+          "material": "brass",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.bookworm.firesideLounge": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/firesideLounge.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "ember": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "log": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_inner": {
+          "finish": "material.finish.fabric"
+        },
+        "shade": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.satin"
+        },
+        "velvet": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "readByFire": "flames",
+          "readAloud": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Wood"
+        },
+        {
+          "material": "velvet",
+          "label": "Fabric"
+        },
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.bookworm.bedsideStack": {
+      "type": "model",
+      "url": "../../models/pack_bookworm/bedsideStack.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "mug_a": {
+          "finish": "material.finish.gloss"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "panel": {
+          "finish": "material.finish.wood"
+        },
+        "shade": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "chapter": "book_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Wood"
+        },
+        {
+          "material": "shade",
+          "label": "Fabric"
+        },
+        {
+          "material": "panel",
+          "label": "Drawers"
+        }
+      ]
+    }
+  }
+}

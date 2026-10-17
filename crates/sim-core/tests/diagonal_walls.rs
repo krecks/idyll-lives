@@ -123,12 +123,12 @@ fn furniture_and_residents_keep_clear_of_diagonals() {
     assert!(err.to_string().contains("standing"), "{err}");
     // No furniture on a tile with a diagonal.
     w.build(0, &diamond(EdgeKind::Wall)).unwrap();
-    let err = w.buy(0, "weights", Some([1, 6, 1]), None).unwrap_err();
+    let err = w.buy(0, "weights", Some([1, 6, 1]), Default::default()).unwrap_err();
     assert!(err.to_string().contains("diagonal"), "{err}");
     // Inside the closed room nothing can be reached yet; with a door, it can.
     w.build(0, &[edit(EdgeAxis::Dn, 4, 7, EdgeKind::Door)])
         .unwrap();
-    let weights = w.buy(0, "weights", Some([2, 7, 1]), None).unwrap();
+    let weights = w.buy(0, "weights", Some([2, 7, 1]), Default::default()).unwrap();
     assert_eq!(w.objects[weights as usize].x, 2);
     // Walling the door up again would shut the weights in.
     let err = w

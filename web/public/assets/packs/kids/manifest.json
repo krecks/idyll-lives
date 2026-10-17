@@ -1,0 +1,873 @@
+{
+  "$comment": "Blender-built kids' things (tools/art/blender/families/kids.py): the crib, the beds and the high chair, the toys, and the kids' study and art things. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "version": 1,
+  "entries": {
+    "model.crib": {
+      "type": "model",
+      "url": "../../models/kids/crib.glb",
+      "materials": {
+        "crib": {
+          "finish": "material.finish.satin"
+        },
+        "crib_bedding": {
+          "finish": "material.finish.matte"
+        },
+        "crib_blanket": {
+          "finish": "material.finish.matte"
+        },
+        "crib_wood": {
+          "finish": "material.finish.satin"
+        },
+        "mobile": {
+          "finish": "material.finish.satin"
+        },
+        "mobile_blue": {
+          "finish": "material.finish.satin"
+        },
+        "mobile_pink": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "feed": "side_down",
+          "change": "side_down",
+          "cuddle": "side_down"
+        },
+        "loops": {
+          "play": "mobile"
+        }
+      },
+      "paint": [
+        {
+          "material": "crib",
+          "label": "Frame"
+        },
+        {
+          "material": "crib_bedding",
+          "label": "Bedding"
+        },
+        {
+          "material": "mobile",
+          "label": "Mobile"
+        }
+      ]
+    },
+    "model.kidsBed": {
+      "type": "model",
+      "url": "../../models/kids/kidsBed.glb",
+      "materials": {
+        "kids_bedding": {
+          "finish": "material.finish.fabric"
+        },
+        "kids_frame": {
+          "finish": "material.finish.satin"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "pennant_a": {
+          "finish": "material.finish.satin"
+        },
+        "pennant_b": {
+          "finish": "material.finish.satin"
+        },
+        "pennant_c": {
+          "finish": "material.finish.satin"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        },
+        "teddy_small": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "kids_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "kids_bedding",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.kidsBedCar": {
+      "type": "model",
+      "url": "../../models/kids/kidsBedCar.glb",
+      "materials": {
+        "car": {
+          "finish": "material.finish.gloss"
+        },
+        "car_bedding": {
+          "finish": "material.finish.fabric"
+        },
+        "car_stripe": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "headlight": {
+          "finish": "material.finish.gloss"
+        },
+        "hub": {
+          "finish": "material.finish.satin"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "sheet": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "turn_down",
+          "nap": "turn_down"
+        }
+      },
+      "paint": [
+        {
+          "material": "car",
+          "label": "Car body"
+        },
+        {
+          "material": "car_bedding",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.highChair": {
+      "type": "model",
+      "url": "../../models/kids/highChair.glb",
+      "materials": {
+        "chair_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "chair_legs": {
+          "finish": "material.finish.satin"
+        },
+        "chair_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "chair_white",
+          "label": "Frame"
+        },
+        {
+          "material": "chair_cushion",
+          "label": "Bedding"
+        }
+      ]
+    },
+    "model.toyBox": {
+      "type": "model",
+      "url": "../../models/kids/toyBox.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "plush": {
+          "finish": "material.finish.satin"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toybox": {
+          "finish": "material.finish.satin"
+        },
+        "toybox_inside": {
+          "finish": "material.finish.satin"
+        },
+        "toybox_lid": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "play": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "toybox",
+          "label": "Body"
+        },
+        {
+          "material": "toybox_lid",
+          "label": "Lid"
+        }
+      ]
+    },
+    "model.toyChest": {
+      "type": "model",
+      "url": "../../models/kids/toyChest.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "chest": {
+          "finish": "material.finish.satin"
+        },
+        "chest_inside": {
+          "finish": "material.finish.satin"
+        },
+        "chest_trim": {
+          "finish": "material.finish.satin"
+        },
+        "handle": {
+          "finish": "material.finish.metal"
+        },
+        "plush": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "play": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "chest",
+          "label": "Body"
+        },
+        {
+          "material": "chest_trim",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.dollHouse": {
+      "type": "model",
+      "url": "../../models/kids/dollHouse.glb",
+      "materials": {
+        "house": {
+          "finish": "material.finish.satin"
+        },
+        "house_door": {
+          "finish": "material.finish.satin"
+        },
+        "house_floor": {
+          "finish": "material.finish.satin"
+        },
+        "house_trim": {
+          "finish": "material.finish.satin"
+        },
+        "house_window": {
+          "finish": "material.finish.satin"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_pink": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "wallpaper": {
+          "finish": "material.finish.satin"
+        },
+        "wallpaper_up": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "dolls": "front_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "house",
+          "label": "Walls"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.rockingHorse": {
+      "type": "model",
+      "url": "../../models/kids/rockingHorse.glb",
+      "materials": {
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "handle": {
+          "finish": "material.finish.metal"
+        },
+        "horse": {
+          "finish": "material.finish.satin"
+        },
+        "mane": {
+          "finish": "material.finish.fabric"
+        },
+        "rocker": {
+          "finish": "material.finish.wood"
+        },
+        "saddle": {
+          "finish": "material.finish.fabric"
+        },
+        "spot": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "ride": "rock"
+        },
+        "ride": "rock"
+      },
+      "paint": [
+        {
+          "material": "horse",
+          "label": "Body"
+        },
+        {
+          "material": "saddle",
+          "label": "Trim"
+        }
+      ]
+    },
+    "model.playTent": {
+      "type": "model",
+      "url": "../../models/kids/playTent.glb",
+      "materials": {
+        "canvas": {
+          "finish": "material.finish.fabric"
+        },
+        "flap": {
+          "finish": "material.finish.fabric"
+        },
+        "poles": {
+          "finish": "material.finish.satin"
+        },
+        "tent_door": {
+          "finish": "material.finish.matte"
+        },
+        "tent_mat": {
+          "finish": "material.finish.fabric"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "play": "flap_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "canvas",
+          "label": "Canvas"
+        },
+        {
+          "material": "poles",
+          "label": "Poles"
+        }
+      ]
+    },
+    "model.ballPit": {
+      "type": "model",
+      "url": "../../models/kids/ballPit.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_green": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_pink": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "pit": {
+          "finish": "material.finish.satin"
+        },
+        "pit_fill": {
+          "finish": "material.finish.satin"
+        },
+        "pit_rim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "jump": "bounce"
+        }
+      },
+      "paint": [
+        {
+          "material": "pit",
+          "label": "Pit"
+        },
+        {
+          "material": "pit_rim",
+          "label": "Rim"
+        }
+      ]
+    },
+    "model.trainTable": {
+      "type": "model",
+      "url": "../../models/kids/trainTable.glb",
+      "materials": {
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "grass": {
+          "finish": "material.finish.satin"
+        },
+        "house_door": {
+          "finish": "material.finish.satin"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "track": {
+          "finish": "material.finish.wood"
+        },
+        "track_groove": {
+          "finish": "material.finish.satin"
+        },
+        "train": {
+          "finish": "material.finish.gloss"
+        },
+        "train_table": {
+          "finish": "material.finish.satin"
+        },
+        "tree": {
+          "finish": "material.finish.satin"
+        },
+        "trunk": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "trains": "train"
+        }
+      },
+      "paint": [
+        {
+          "material": "train_table",
+          "label": "Table"
+        },
+        {
+          "material": "train",
+          "label": "Train"
+        }
+      ]
+    },
+    "model.playMat": {
+      "type": "model",
+      "url": "../../models/kids/playMat.glb",
+      "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "mat": {
+          "finish": "material.finish.fabric"
+        },
+        "mat_green": {
+          "finish": "material.finish.fabric"
+        },
+        "mat_pink": {
+          "finish": "material.finish.fabric"
+        },
+        "mat_white": {
+          "finish": "material.finish.fabric"
+        },
+        "mat_yellow": {
+          "finish": "material.finish.fabric"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "blocks": "blocks"
+        }
+      },
+      "paint": [
+        {
+          "material": "mat",
+          "label": "Mat"
+        }
+      ]
+    },
+    "model.teddyBear": {
+      "type": "model",
+      "url": "../../models/kids/teddyBear.glb",
+      "materials": {
+        "bow": {
+          "finish": "material.finish.satin"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "fur": {
+          "finish": "material.finish.fabric"
+        },
+        "fur_light": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "hug": "squish"
+        }
+      },
+      "paint": [
+        {
+          "material": "fur",
+          "label": "Fur"
+        },
+        {
+          "material": "bow",
+          "label": "Bow"
+        }
+      ]
+    },
+    "model.beanBagKids": {
+      "type": "model",
+      "url": "../../models/kids/beanBagKids.glb",
+      "materials": {
+        "bag": {
+          "finish": "material.finish.fabric"
+        },
+        "bag_patch": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "flop": "squash"
+        }
+      },
+      "paint": [
+        {
+          "material": "bag",
+          "label": "Bag"
+        }
+      ]
+    },
+    "model.kidsDesk": {
+      "type": "model",
+      "url": "../../models/kids/kidsDesk.glb",
+      "materials": {
+        "chalk_blue": {
+          "finish": "material.finish.matte"
+        },
+        "handle": {
+          "finish": "material.finish.metal"
+        },
+        "kdesk": {
+          "finish": "material.finish.satin"
+        },
+        "kdesk_chair": {
+          "finish": "material.finish.satin"
+        },
+        "kdesk_top": {
+          "finish": "material.finish.wood"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "homework": "drawer_open",
+          "drawing": "drawer_open"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "kdesk",
+          "label": "Frame"
+        },
+        {
+          "material": "kdesk_top",
+          "label": "Top"
+        },
+        {
+          "material": "kdesk_chair",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.kidsTable": {
+      "type": "model",
+      "url": "../../models/kids/kidsTable.glb",
+      "materials": {
+        "ktable": {
+          "finish": "material.finish.gloss"
+        },
+        "ktable_top": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "ktable",
+          "label": "Frame"
+        },
+        {
+          "material": "ktable_top",
+          "label": "Top"
+        }
+      ]
+    },
+    "model.kidsChair": {
+      "type": "model",
+      "url": "../../models/kids/kidsChair.glb",
+      "materials": {
+        "kchair": {
+          "finish": "material.finish.gloss"
+        },
+        "kchair_seat": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "kchair",
+          "label": "Frame"
+        },
+        {
+          "material": "kchair_seat",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.kidsBookshelf": {
+      "type": "model",
+      "url": "../../models/kids/kidsBookshelf.glb",
+      "materials": {
+        "book_blue": {
+          "finish": "material.finish.matte"
+        },
+        "book_ochre": {
+          "finish": "material.finish.matte"
+        },
+        "book_rose": {
+          "finish": "material.finish.matte"
+        },
+        "book_rust": {
+          "finish": "material.finish.matte"
+        },
+        "book_sage": {
+          "finish": "material.finish.matte"
+        },
+        "book_teal": {
+          "finish": "material.finish.matte"
+        },
+        "kshelf": {
+          "finish": "material.finish.satin"
+        },
+        "kshelf_top": {
+          "finish": "material.finish.satin"
+        },
+        "toy_blue": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_pink": {
+          "finish": "material.finish.satin"
+        },
+        "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "kshelf",
+          "label": "Frame"
+        },
+        {
+          "material": "kshelf_top",
+          "label": "Top"
+        }
+      ]
+    },
+    "model.kidsChalkboard": {
+      "type": "model",
+      "url": "../../models/kids/kidsChalkboard.glb",
+      "materials": {
+        "chalk_blue": {
+          "finish": "material.finish.matte"
+        },
+        "chalk_frame": {
+          "finish": "material.finish.wood"
+        },
+        "chalk_green": {
+          "finish": "material.finish.matte"
+        },
+        "chalk_pink": {
+          "finish": "material.finish.matte"
+        },
+        "chalk_white": {
+          "finish": "material.finish.matte"
+        },
+        "chalk_yellow": {
+          "finish": "material.finish.matte"
+        },
+        "slate": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "draw": "drawing"
+        }
+      },
+      "paint": [
+        {
+          "material": "chalk_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "slate",
+          "label": "Board"
+        }
+      ]
+    },
+    "model.kidsEasel": {
+      "type": "model",
+      "url": "../../models/kids/kidsEasel.glb",
+      "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_green": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "easel": {
+          "finish": "material.finish.wood"
+        },
+        "paint_blue": {
+          "finish": "material.finish.matte"
+        },
+        "paint_green": {
+          "finish": "material.finish.matte"
+        },
+        "paint_red": {
+          "finish": "material.finish.matte"
+        },
+        "paint_yellow": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "paint": "painting"
+        }
+      },
+      "paint": [
+        {
+          "material": "easel",
+          "label": "Easel"
+        }
+      ]
+    }
+  }
+}

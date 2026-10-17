@@ -90,16 +90,32 @@ function sitTalkPose(p: number): PoseSpec {
   return out;
 }
 
-/** Forearms on a desk at 0.72 m, fingers busy on keys: small alternating hand bobs, an occasional look down. */
-function deskPose(p: number): PoseSpec {
+/**
+ * Forearms on a desk at 0.72 m, fingers busy on keys: small alternating hand bobs, an occasional look down.
+ * The hands `z` m ahead of the standing place (0.48 m ahead of the hips) and `y` m high, leaning in `lean` degrees.
+ */
+function deskPose(p: number, z = 0.29, y = 0.76, lean = 10): PoseSpec {
   const glance = bump(p, 0.55, 0.9, 0.12);
-  const body = seatedBody({ breath: p, depth: 0.6, lean: 10, head: [4 + 8 * glance, 3 * Math.sin(p * TAU), 0], tilt: -2 });
+  const body = seatedBody({ breath: p, depth: 0.6, lean, head: [4 + 8 * glance, 3 * Math.sin(p * TAU), 0], tilt: -2 });
   const tap = (k: number) => 0.006 * Math.max(0, Math.sin(p * TAU * 5 + k));
   return {
     ...body,
-    ...armIK('l', [-0.15 + 0.01 * Math.sin(p * TAU), 0.76 + tap(0), 0.29], body, { pole: [-0.5, -1, -0.4], pronate: 85, hand: wrist('l', -8 + 8 * Math.sin(p * TAU * 5), 0) }),
-    ...armIK('r', [0.15 + 0.012 * Math.sin(p * TAU + 2), 0.76 + tap(2.4), 0.29], body, { pole: [0.5, -1, -0.4], pronate: 85, hand: wrist('r', -8 + 8 * Math.sin(p * TAU * 5 + 2.4), 0) }),
+    ...armIK('l', [-0.15 + 0.01 * Math.sin(p * TAU), y + tap(0), z], body, { pole: [-0.5, -1, -0.4], pronate: 85, hand: wrist('l', -8 + 8 * Math.sin(p * TAU * 5), 0) }),
+    ...armIK('r', [0.15 + 0.012 * Math.sin(p * TAU + 2), y + tap(2.4), z], body, { pole: [0.5, -1, -0.4], pronate: 85, hand: wrist('r', -8 + 8 * Math.sin(p * TAU * 5 + 2.4), 0) }),
   };
+}
+
+/** At a shallow desk with its chair built in close (a writing desk's top 0.3 m ahead of the hips, about 0.77 m high): the hands nearer and a little higher. */
+function nearDeskPose(p: number): PoseSpec {
+  return deskPose(p, 0.11, 0.78, 8);
+}
+
+/**
+ * At a table further off than the chair could be pulled in to (drawer pedestals or a drawer box where the knees
+ * would go: `TUCK` in characters.ts): the hands further out, leaning in more.
+ */
+function farDeskPose(p: number): PoseSpec {
+  return deskPose(p, 0.43, 0.77, 22);
 }
 
 /** Standing in front of the seat (the start of sitDown, the end of standUp). */
@@ -156,7 +172,9 @@ export function seatedClips(): ClipDef[] {
       [0.88, () => ({ ...stand({ lean: -2, head: [-2, 0, 0] }), ...hangArms(6, 8, 18) }), 'smooth'],
       [1, standing, 'smooth'],
     ]),
-    cycle('sitHands', { seconds: 50 / 30, loop: true }, deskPose),
+    cycle('sitHands', { seconds: 50 / 30, loop: true }, (p) => deskPose(p)),
+    cycle('sitHandsNear', { seconds: 50 / 30, loop: true }, nearDeskPose),
+    cycle('sitHandsFar', { seconds: 50 / 30, loop: true }, farDeskPose),
     clip('eat', { seconds: 40 / 30, loop: false }, [
       [0, () => eatPose(0, low, [0, 0, 0], 0)],
       [0.32, () => eatPose(0.32, mouth, [-4, 0, 0], 4), 'smooth'],

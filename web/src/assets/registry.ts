@@ -12,7 +12,7 @@ import { withBuild, withoutBuild } from './build';
 import { bundled } from './bundle';
 import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
 
-const URL_FIELDS = ['url', 'texture'] as const;
+const URL_FIELDS = ['url', 'far', 'texture'] as const;
 
 export class AssetRegistry {
   private readonly entries = new Map<string, AssetEntry>();
@@ -27,7 +27,7 @@ export class AssetRegistry {
       loadOptimized(base),
     ]);
     for (const [url, manifest] of manifests.flat()) {
-      for (const [key, entry] of Object.entries(manifest.entries)) registry.entries.set(key, resolveUrls(entry, url));
+      for (const [key, entry] of Object.entries(manifest.entries)) registry.entries.set(key, extended(registry.entries.get(key), resolveUrls(entry, url)));
     }
     return registry;
   }
@@ -42,6 +42,11 @@ export class AssetRegistry {
   /** Whether `key` exists with type `type` (no warning; for optional variants such as `model.sofa@modern`). */
   has(key: string, type: AssetType): boolean {
     return this.entries.get(key)?.type === type;
+  }
+
+  /** Every key with type `type` (the dev benches list models with it). */
+  keys(type: AssetType): string[] {
+    return [...this.entries].flatMap(([key, entry]) => (entry.type === type ? [key] : []));
   }
 
   /** Icons never fail: a missing key yields a neutral placeholder so the UI stays intact. */
@@ -94,6 +99,15 @@ async function readJson<T>(url: URL, check: (res: Response) => void): Promise<T>
 export function optimizedUrl(url: string): string {
   const copy = optimized.get(withoutBuild(new URL(url, location.href).href));
   return copy ? withBuild(copy) : url;
+}
+
+/**
+ * A pack's model entry over the one it overrides: it keeps that one's `placeholder` (the fallback)
+ * and `vary` unless it gives its own, so packs needn't copy primitive parts (or let them go stale).
+ */
+function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry {
+  if (below?.type !== 'model' || entry.type !== 'model') return entry;
+  return { ...entry, placeholder: entry.placeholder ?? below.placeholder, ...((entry.vary ?? below.vary) !== undefined ? { vary: entry.vary ?? below.vary } : {}) };
 }
 
 /** Makes file references absolute relative to the manifest that declared them, with this build's query. */

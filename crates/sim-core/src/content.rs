@@ -102,6 +102,9 @@ pub struct Interaction {
     /// Only offered while the seat faces a table it tucks under (content `needsTable`; see
     /// `ObjectDef::seat_at` and `surface.rs`): dining at a table.
     pub needs_table: bool,
+    /// Takes every slot of the object (content `whole`): only started with nobody else on it,
+    /// and while it lasts nobody else gets on (a nap along a 2-seat window seat).
+    pub whole: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
     /// Starts this recipe (index into `Content::recipes`): the resident goes round the
@@ -119,6 +122,23 @@ pub struct Interaction {
     /// `Content::recipes`, a hidden recipe made for it): `minutes` is the fetching, and what
     /// it gives (its `total_gain`) comes from eating, at a table if there is one.
     pub eats: Option<usize>,
+    /// Only offered while the object is open (`Some(true)`) or closed (`Some(false)`) (content
+    /// `when`: "open" / "closed"; see `ObjectInstance::open`).
+    pub when: Option<bool>,
+    /// Opens (`Some(true)`) or closes (`Some(false)`) the object as the use starts, and leaves it
+    /// so (content `leaves`): folding a wall bed down, going to sleep in it. Nothing closes an
+    /// object someone else is using.
+    pub leaves: Option<bool>,
+    /// Opening it is for this use only (content `closeAfter`, with `leaves`: "open"): when it
+    /// ends, the last one done closes it again, as after a night's sleep (a hot tub's cover goes
+    /// back on after a soak).
+    pub close_after: bool,
+    /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
+    /// `ObjectInstance::growth`).
+    pub ripe: bool,
+    /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
+    /// planted again and grows (see `ObjectDef::grows`).
+    pub picks: bool,
 }
 
 impl Interaction {
@@ -146,6 +166,14 @@ impl Interaction {
     }
 }
 
+/// How a crop grows (content `grows`): game days from planted to ripe, and lying fallow after
+/// it is picked, before it is planted again.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Growth {
+    pub days: f32,
+    pub fallow_days: f32,
+}
+
 #[derive(Debug)]
 pub struct ObjectDef {
     pub id: String,
@@ -171,6 +199,9 @@ pub struct ObjectDef {
     /// `roomRules.lampTiles`): a chandelier lights more of a room than a table lamp. 0: it gives
     /// no light (no `light`).
     pub lamp: f32,
+    /// A lamp that can be switched on and off (a `light` without `"switch": false`, which fires
+    /// have; see `lights.rs`).
+    pub switch: bool,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -202,6 +233,21 @@ pub struct ObjectDef {
     /// Buy catalog group (`""`: none): things of one group with a use in common are the same
     /// kind of thing (see `planner::wanted_object`).
     pub group: String,
+    /// A crop that grows (content `grows`): bought just planted (ripe in a lot's or a house's
+    /// file), picked by interactions that leave it "picked", then fallow, planted again and
+    /// growing (see `ObjectInstance::growth`).
+    pub grows: Option<Growth>,
+    /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
+    /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
+    /// plain wall behind it.
+    pub over_window: bool,
+    /// Furniture that fills the wall's height (content `fillsWall`: a wardrobe, a tall bookcase,
+    /// a fireplace's chimney breast): nothing hangs on the wall or from the ceiling over its
+    /// tiles.
+    pub fills_wall: bool,
+    /// Things from the ceiling that hang low enough to walk into (content `hangsLow`: a hanging
+    /// plant): it takes the floor under it as furniture does.
+    pub hangs_low: bool,
 }
 
 impl ObjectDef {
@@ -1209,13 +1255,6 @@ impl BuildRules {
     }
 }
 
-/// A look the player can pick for objects. Purely visual: price and effects never change.
-#[derive(Debug)]
-pub struct StyleDef {
-    pub id: String,
-    pub label: String,
-}
-
 #[derive(Debug)]
 pub struct Content {
     pub needs: Vec<NeedDef>,
@@ -1251,7 +1290,6 @@ pub struct Content {
     pub life: LifeRules,
     pub names: Names,
     pub build: BuildRules,
-    pub styles: Vec<StyleDef>,
     /// Animation tags (`"animations"`): what a Sim can be shown doing. Interactions refer
     /// to them by `anim`; the render snapshot sends indices into this list.
     pub animations: Vec<String>,
@@ -1348,8 +1386,6 @@ struct ContentFile {
     roof_colors: Vec<BuildStyleRaw>,
     #[serde(default)]
     floor_coverings: Vec<BuildStyleRaw>,
-    #[serde(default)]
-    styles: Vec<StyleRaw>,
     /// Extra tags that no interaction or social uses (yet), so traits and emotions can refer to them.
     #[serde(default)]
     tags: Vec<String>,
@@ -1814,12 +1850,6 @@ struct BuildStyleRaw {
     price: i64,
 }
 
-#[derive(Deserialize)]
-struct StyleRaw {
-    id: String,
-    label: String,
-}
-
 fn one() -> f32 {
     1.0
 }
@@ -1970,7 +2000,7 @@ struct ObjectRaw {
     #[serde(default, rename = "wearPerUse")]
     wear_per_use: Option<f32>,
     /// Lamps: the renderer reads the light's look; the simulation only its `tiles`, the floor it
-    /// lights (default `roomRules.lampTiles`).
+    /// lights (default `roomRules.lampTiles`), and `switch` (false: always lit at night, a fire).
     #[serde(default)]
     light: Option<serde_json::Value>,
     /// `wall`, `ceiling` or `rug` (default `floor`: furniture).
@@ -1993,6 +2023,27 @@ struct ObjectRaw {
     stations: Vec<String>,
     #[serde(default)]
     stores: bool,
+    /// A crop that grows (see `ObjectDef::grows`).
+    #[serde(default)]
+    grows: Option<GrowsRaw>,
+    #[serde(default, rename = "overWindow")]
+    over_window: bool,
+    #[serde(default, rename = "fillsWall")]
+    fills_wall: bool,
+    #[serde(default, rename = "hangsLow")]
+    hangs_low: bool,
+}
+
+/// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
+#[derive(Deserialize)]
+struct GrowsRaw {
+    days: f32,
+    #[serde(default = "half_a_day")]
+    fallow: f32,
+}
+
+fn half_a_day() -> f32 {
+    0.5
 }
 
 #[derive(Deserialize)]
@@ -2033,6 +2084,8 @@ struct InteractionRaw {
     #[serde(default)]
     needs_table: bool,
     #[serde(default)]
+    whole: bool,
+    #[serde(default)]
     homework: f32,
     #[serde(default)]
     care: HashMap<String, f32>,
@@ -2069,6 +2122,25 @@ struct InteractionRaw {
     /// Food to eat sitting down once fetched (see `Interaction::eats`).
     #[serde(default)]
     eat: Option<EatRaw>,
+    /// Only offered while the object is so (see `Interaction::when`).
+    #[serde(default)]
+    when: Option<OpenState>,
+    /// What the use leaves the object (see `Interaction::leaves`).
+    #[serde(default)]
+    leaves: Option<OpenState>,
+    #[serde(default)]
+    close_after: bool,
+}
+
+/// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
+/// (`when`: "ripe", `leaves`: "picked"; see `ObjectInstance::growth`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OpenState {
+    Open,
+    Closed,
+    Ripe,
+    Picked,
 }
 
 /// An interaction's `eat`: the item handed over and how long eating it takes.
@@ -2519,12 +2591,38 @@ impl Content {
                     dirt: it.dirt.unwrap_or(-1.0),
                     baby: it.baby,
                     needs_table: it.needs_table,
+                    whole: it.whole,
                     homework: it.homework.max(0.0),
                     care,
                     recipe,
                     after,
                     eats,
+                    when: match it.when {
+                        Some(OpenState::Open) => Some(true),
+                        Some(OpenState::Closed) => Some(false),
+                        _ => None,
+                    },
+                    leaves: match it.leaves {
+                        Some(OpenState::Open) => Some(true),
+                        Some(OpenState::Closed) => Some(false),
+                        _ => None,
+                    },
+                    close_after: it.close_after,
+                    ripe: it.when == Some(OpenState::Ripe),
+                    picks: it.leaves == Some(OpenState::Picked),
                 });
+                if it.close_after
+                    && (it.leaves != Some(OpenState::Open)
+                        || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
+                {
+                    return Err(Error::new(format!("{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed")));
+                }
+                if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
+                    return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
+                }
+                if (it.when == Some(OpenState::Ripe) || it.leaves == Some(OpenState::Picked)) && obj.grows.is_none() {
+                    return Err(Error::new(format!("{ctx}: \"ripe\" and \"picked\" are a crop's: give the object `grows`")));
+                }
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
                 return Err(Error::new(format!("duplicate object id '{}'", obj.id)));
@@ -2553,6 +2651,16 @@ impl Content {
                     )));
                 }
             };
+            for (set, flag, on) in [(obj.over_window, "overWindow", Layer::Wall), (obj.fills_wall, "fillsWall", Layer::Floor), (obj.hangs_low, "hangsLow", Layer::Ceiling)] {
+                if set && layer != on {
+                    let on = match on {
+                        Layer::Wall => "a wall",
+                        Layer::Floor => "the floor",
+                        _ => "the ceiling",
+                    };
+                    return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
+                }
+            }
             if layer == Layer::Surface
                 && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
             {
@@ -2653,6 +2761,7 @@ impl Content {
                 lamp: obj.light.as_ref().map_or(0.0, |l| {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
+                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0
@@ -2673,6 +2782,16 @@ impl Content {
                 stations,
                 stores: obj.stores,
                 group: obj.group.clone().unwrap_or_default(),
+                grows: match &obj.grows {
+                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
+                    Some(_) => {
+                        return Err(Error::new(format!("object '{}': `grows` needs days > 0 and fallow >= 0", obj.id)));
+                    }
+                    None => None,
+                },
+                over_window: obj.over_window,
+                fills_wall: obj.fills_wall,
+                hangs_low: obj.hangs_low,
             });
         }
 
@@ -3237,14 +3356,6 @@ impl Content {
             storeys: raw.build.storeys.unwrap_or(1).clamp(1, 4),
             basement: raw.build.basement,
         };
-        let styles = raw
-            .styles
-            .iter()
-            .map(|s| StyleDef {
-                id: s.id.clone(),
-                label: s.label.clone(),
-            })
-            .collect();
         let schedule = raw
             .schedule
             .iter()
@@ -3392,7 +3503,6 @@ impl Content {
             life,
             names: raw.names.clone(),
             build,
-            styles,
             animations,
             talk_anim,
             buff_feelings,

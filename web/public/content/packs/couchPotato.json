@@ -39,6 +39,7 @@
       "id": "couchPotato.cinemaWall",
       "name": "Grand cinema wall",
       "model": "model.couchPotato.cinemaWall",
+      "seat": { "height": 0.45, "forward": 0.05, "facing": "back" },
       "footprint": [2, 1],
       "price": 2900,
       "category": "living",
@@ -73,6 +74,7 @@
       "id": "couchPotato.gameConsole",
       "name": "Pixel Arcade console",
       "model": "model.couchPotato.gameConsole",
+      "seat": { "height": 0.45, "forward": 0.12, "facing": "back" },
       "footprint": [1, 1],
       "price": 520,
       "category": "hobbies",
@@ -204,6 +206,7 @@
       "footprint": [1, 1],
       "price": 90,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "Slow, glowing blobs of wax on a little side table. Watching them is a cheap bit of fun and comfort.",
       "interactions": [

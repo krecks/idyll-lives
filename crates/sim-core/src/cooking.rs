@@ -88,9 +88,11 @@ pub struct CookingRules {
     pub scrape_anim: Option<usize>,
     pub put_away_anim: Option<usize>,
     /// Stations food is scraped into (`"bin"`), and clean things are put away at (`putAwayAt`:
-    /// the counters' cupboards).
+    /// the cupboards, the counters' cupboards), the nearest, on a tie the first listed (a wall
+    /// cabinet over a counter): `put_away_order`, as station indices.
     pub bin: StationMask,
     pub put_away: StationMask,
+    pub put_away_order: Vec<u8>,
 }
 
 impl CookingRules {
@@ -317,11 +319,13 @@ pub(crate) fn parse(
     };
     let station_bit = |name: &str| stations.iter().position(|s| s == name).map(|i| 1 << i).unwrap_or(0);
     let mut put_away = 0;
+    let mut put_away_order = Vec::new();
     for name in raw.put_away_at.clone().unwrap_or_else(|| vec!["prep".into()]) {
-        if !stations.contains(&name) {
+        let Some(i) = stations.iter().position(|s| *s == name) else {
             return Err(Error::new(format!("cooking.putAwayAt: unknown station '{name}'")));
-        }
+        };
         put_away |= station_bit(&name);
+        put_away_order.push(i as u8);
     }
     let rules = CookingRules {
         spoil_minutes: raw.spoil_hours.unwrap_or(8.0).max(0.1) * 60.0,
@@ -355,6 +359,7 @@ pub(crate) fn parse(
         put_away_anim: anim(&raw.put_away_anim, "fetch", "cooking.putAwayAnim")?,
         bin: station_bit("bin"),
         put_away,
+        put_away_order,
         stations: stations.clone(),
     };
 
@@ -578,7 +583,10 @@ enum Found {
 
 /// The station to go to for `mask`: a working one they may use with a free slot, the one the
 /// recipe was started from first, then (for outdoor recipes) outdoor ones or (otherwise)
-/// indoor ones, then by the step's order of stations, then the nearest.
+/// indoor ones, then by the step's order of stations, then the nearest (`nearest`: the nearest
+/// before the order, which only settles a tie). A station nobody uses otherwise (no
+/// interactions: a wall cabinet) needs the tile in front of it free.
+#[allow(clippy::too_many_arguments)]
 fn find_station(
     sim: &Sim,
     ctx: &Ctx,
@@ -587,10 +595,13 @@ fn find_station(
     order: &[u8],
     origin: Option<u32>,
     outdoor: bool,
+    nearest: bool,
 ) -> Found {
     let content = ctx.content;
     let lot = ctx.nav.lot;
-    let mut best: Option<((u8, u8, usize), f32, u32)> = None;
+    // (Started from it, indoors or out, rank), distance, tie, the object.
+    type Rank = (u8, u8, usize);
+    let mut best: Option<(Rank, f32, usize, u32)> = None;
     let mut busy = false;
     if sim.visiting.is_some() {
         return Found::Missing;
@@ -606,16 +617,20 @@ fn find_station(
             continue;
         }
         let (fx, fz) = approach(ctx, obj);
+        if def.interactions.is_empty() && !ctx.nav.tile_free(fx, fz) {
+            continue;
+        }
         let outside = lot.in_bounds(fx, fz) && lot.room_at(fx, fz) == crate::lot::OUTDOORS;
         let rank = order.iter().position(|&i| def.stations & (1 << i) != 0).unwrap_or(order.len());
+        let (rank, tie) = if nearest { (0, rank) } else { (rank, 0) };
         let key = ((origin != Some(o)) as u8, (outside != outdoor) as u8, rank);
         let distance = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
-        if best.is_none_or(|(k, d, _)| key < k || (key == k && distance < d)) {
-            best = Some((key, distance, o));
+        if best.is_none_or(|(k, d, t, _)| key < k || (key == k && (distance < d || (distance == d && tie < t)))) {
+            best = Some((key, distance, tie, o));
         }
     }
     match best {
-        Some((_, _, o)) => Found::At(o),
+        Some((_, _, _, o)) => Found::At(o),
         None if busy => Found::Busy,
         None => Found::Missing,
     }
@@ -736,7 +751,7 @@ fn cook_next(
     let (mut step, mut skipped, mut carried) = (step, skipped, carried);
     while let Some(s) = r.steps.get(step as usize) {
         task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: carried };
-        match find_station(sim, ctx, objects, s.mask, &s.at, origin, r.outdoor) {
+        match find_station(sim, ctx, objects, s.mask, &s.at, origin, r.outdoor, false) {
             Found::At(o) => {
                 let at = Task { kind: TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried }, ..task };
                 if go_to(sim, at, ctx, objects, o, tags) {
@@ -1207,7 +1222,7 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
             let no_sink = station_mask(sim, ctx, objects) & rules.dishes == 0;
             let scraps = if no_sink && sim.held.is_some() { scraps.max(1) } else { scraps };
             if scraps > 0
-                && let Found::At(o) = find_station(sim, ctx, objects, rules.bin, &[], None, false)
+                && let Found::At(o) = find_station(sim, ctx, objects, rules.bin, &[], None, false, false)
                 && go_to(sim, Task { kind: TaskKind::Dishes { item, station: Some(o), stage: 1, scraps }, ..task }, ctx, objects, o, tags)
             {
                 return;
@@ -1219,7 +1234,7 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
         2 if sim.held.is_none() && scraps == 0 => {}
         2 => {
             let give_up = waited.is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= rules.station_wait_minutes);
-            match find_station(sim, ctx, objects, rules.dishes, &[], None, false) {
+            match find_station(sim, ctx, objects, rules.dishes, &[], None, false, false) {
                 Found::At(o) => {
                     go_to(sim, at(o, 2), ctx, objects, o, tags);
                 }
@@ -1231,7 +1246,8 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
             }
         }
         _ => {
-            if let Found::At(o) = find_station(sim, ctx, objects, rules.put_away, &[], None, false) {
+            // The nearest cupboard or counter; a cupboard over a counter first.
+            if let Found::At(o) = find_station(sim, ctx, objects, rules.put_away, &rules.put_away_order, None, false, true) {
                 go_to(sim, at(o, 3), ctx, objects, o, tags);
             }
         }

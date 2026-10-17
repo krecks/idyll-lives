@@ -1,0 +1,294 @@
+{
+  "$comment": "Blender-built food stalls and vending machines (tools/art/blender/families/stalls.py). Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The ice cream cart slides its freezer lid open and the hot dog stand lifts its hot-plate lid (`lid_open`); a snack and a can drop to the machines' trays (`drop`). Each has a far version for the town overview.",
+  "version": 1,
+  "entries": {
+    "model.iceCreamCart": {
+      "type": "model",
+      "url": "../../models/stalls/iceCreamCart.glb",
+      "materials": {
+        "cart": {
+          "finish": "material.finish.gloss"
+        },
+        "cream_choc": {
+          "finish": "material.finish.satin"
+        },
+        "cream_mint": {
+          "finish": "material.finish.satin"
+        },
+        "cream_pink": {
+          "finish": "material.finish.satin"
+        },
+        "cream_vanilla": {
+          "finish": "material.finish.satin"
+        },
+        "parasol": {
+          "finish": "material.finish.fabric"
+        },
+        "parasol_white": {
+          "finish": "material.finish.fabric"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "stripe": {
+          "finish": "material.finish.gloss"
+        },
+        "tyre": {
+          "finish": "material.finish.matte"
+        },
+        "wafer": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "iceCream": "lid_open"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "cart",
+          "label": "Body"
+        },
+        {
+          "material": "parasol",
+          "label": "Parasol"
+        },
+        {
+          "material": "stripe",
+          "label": "Bands"
+        }
+      ],
+      "far": "../../models/stalls/iceCreamCart.far.glb"
+    },
+    "model.hotDogStand": {
+      "type": "model",
+      "url": "../../models/stalls/hotDogStand.glb",
+      "materials": {
+        "awning": {
+          "finish": "material.finish.fabric"
+        },
+        "awning_white": {
+          "finish": "material.finish.fabric"
+        },
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "grill": {
+          "finish": "material.finish.satin"
+        },
+        "ketchup": {
+          "finish": "material.finish.gloss"
+        },
+        "mustard": {
+          "finish": "material.finish.gloss"
+        },
+        "sausage": {
+          "finish": "material.finish.gloss"
+        },
+        "sign": {
+          "finish": "material.finish.gloss"
+        },
+        "stand": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tyre": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "hotDog": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "stand",
+          "label": "Body"
+        },
+        {
+          "material": "awning",
+          "label": "Awning"
+        }
+      ],
+      "far": "../../models/stalls/hotDogStand.far.glb"
+    },
+    "model.vendingSnack": {
+      "type": "model",
+      "url": "../../models/stalls/vendingSnack.glb",
+      "materials": {
+        "button": {
+          "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "inside": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.satin"
+        },
+        "lit_sign": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE2A6"
+        },
+        "snack_a": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_b": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_c": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_d": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_e": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_f": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_g": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_red": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "snack": "drop"
+        }
+      },
+      "paint": [
+        {
+          "material": "snack_red",
+          "label": "Body"
+        }
+      ],
+      "far": "../../models/stalls/vendingSnack.far.glb"
+    },
+    "model.vendingDrink": {
+      "type": "model",
+      "url": "../../models/stalls/vendingDrink.glb",
+      "materials": {
+        "band": {
+          "finish": "material.finish.gloss"
+        },
+        "button": {
+          "finish": "material.finish.satin"
+        },
+        "can_green": {
+          "finish": "material.finish.gloss"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
+        "drink_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "inside": {
+          "finish": "material.finish.satin"
+        },
+        "lit_panel": {
+          "finish": "material.finish.gloss",
+          "glow": "#CFE8FF"
+        },
+        "lit_sign": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE2A6"
+        },
+        "snack_a": {
+          "finish": "material.finish.gloss"
+        },
+        "snack_c": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "drink": "drop"
+        }
+      },
+      "paint": [
+        {
+          "material": "drink_blue",
+          "label": "Body"
+        }
+      ],
+      "far": "../../models/stalls/vendingDrink.far.glb"
+    },
+    "model.marketStall": {
+      "type": "model",
+      "url": "../../models/stalls/marketStall.glb",
+      "materials": {
+        "apple": {
+          "finish": "material.finish.gloss"
+        },
+        "awning_green": {
+          "finish": "material.finish.fabric"
+        },
+        "awning_white": {
+          "finish": "material.finish.fabric"
+        },
+        "board": {
+          "finish": "material.finish.wood"
+        },
+        "chalk": {
+          "finish": "material.finish.matte"
+        },
+        "crate": {
+          "finish": "material.finish.wood"
+        },
+        "lemon": {
+          "finish": "material.finish.gloss"
+        },
+        "orange": {
+          "finish": "material.finish.gloss"
+        },
+        "slate": {
+          "finish": "material.finish.matte"
+        },
+        "timber": {
+          "finish": "material.finish.wood"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "timber",
+          "label": "Body"
+        },
+        {
+          "material": "awning_green",
+          "label": "Awning"
+        }
+      ],
+      "far": "../../models/stalls/marketStall.far.glb"
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "$comment": "Blender-built example pack models (tools/art/blender/families/pack_example.py). Replaces the primitive-part placeholders of the chef's stove and the whirlpool tub (base manifest) by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The stove's oven door drops and its front burner lights; the tub fills and bubbles while residents soak.",
+  "version": 1,
+  "entries": {
+    "model.chefStove": {
+      "type": "model",
+      "url": "../../models/pack_example/chefStove.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "cap": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.satin"
+        },
+        "grout": {
+          "finish": "material.finish.matte"
+        },
+        "knob": {
+          "finish": "material.finish.metal"
+        },
+        "pan": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.metal"
+        },
+        "tile": {
+          "finish": "material.finish.gloss"
+        },
+        "window": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": [
+            {
+              "clip": "oven_open",
+              "hold": 3.0
+            },
+            "burner_on"
+          ],
+          "practise": [
+            {
+              "clip": "oven_open",
+              "hold": 3.0
+            },
+            "burner_on"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles & knobs"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.whirlpoolTub": {
+      "type": "model",
+      "url": "../../models/pack_example/whirlpoolTub.glb",
+      "materials": {
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "foam": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "pillow": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
+          "finish": "material.finish.gloss"
+        },
+        "terracotta": {
+          "finish": "material.finish.satin"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "towel2": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        },
+        "wood_dark": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "soak": "fill"
+        },
+        "loops": {
+          "soak": "bubbles"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Tub"
+        },
+        {
+          "material": "wood",
+          "label": "Surround"
+        },
+        {
+          "material": "pillow",
+          "label": "Headrests"
+        }
+      ]
+    }
+  }
+}

@@ -46,6 +46,8 @@ export interface InteractionDef {
   anim?: string;
   /** Only offered while the seat faces a table it tucks under (`seatAt`): dining at a table. */
   needsTable?: boolean;
+  /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
+  whole?: boolean;
   /**
    * Starts this recipe (`recipes` id): the resident goes round its stations (fridge, counter,
    * stove) instead of using this object alone, and a dish is served. `effects` are then what
@@ -57,6 +59,10 @@ export interface InteractionDef {
    * `items` id) at a table if there is one, for `eat.minutes`.
    */
   eat?: { item: string; minutes: number };
+  /** Only offered while the object is open or closed (a wall bed's "Fold up" while it's down), or its crop ripe. */
+  when?: 'open' | 'closed' | 'ripe';
+  /** Opens or closes the object as the use starts, and leaves it so (sleeping in a wall bed folds it down); or picks its crop. */
+  leaves?: 'open' | 'closed' | 'picked';
   /** A tag: what follows when it finishes (toilets: `handwash`, washing hands at a sink). */
   after?: string;
 }
@@ -93,7 +99,7 @@ export interface CookingRules {
   /** Clearing away: scraping food off one thing (into a `bin`, else at the sink). */
   scrapeMinutes?: number;
   scrapeAnim?: string;
-  /** Putting an armful of clean things away, at one of `putAwayAt` (stations; default `prep`). */
+  /** Putting an armful of clean things away, at the nearest of `putAwayAt` (stations, the first listed on a tie; default `prep`). */
   putAwayMinutes?: number;
   putAwayAnim?: string;
   putAwayAt?: string[];
@@ -176,9 +182,11 @@ export interface ObjectDef {
   stairs?: boolean;
   /**
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
-   * and the floor it lights fully as its room is scored (tiles; default `roomRules.lampTiles`).
+   * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
+   * turning; default the middle), and the floor it lights fully as its room is scored (tiles;
+   * default `roomRules.lampTiles`).
    */
-  light?: { range?: number; intensity?: number; height?: number; tiles?: number };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**
@@ -188,6 +196,12 @@ export interface ObjectDef {
    * it stands on another object's top (a vase on a table).
    */
   layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
+  /** On a wall: it belongs over a window (curtains, blinds); everything else on a wall needs plain wall behind it. */
+  overWindow?: boolean;
+  /** On the floor: as tall as the wall (a wardrobe, a fireplace): nothing hangs on the wall or from the ceiling over it. */
+  fillsWall?: boolean;
+  /** From the ceiling: hangs low enough to walk into (a hanging plant): it takes the floor under it. */
+  hangsLow?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
   /**
@@ -202,9 +216,29 @@ export interface ObjectDef {
   approach?: 'front' | 'around';
   /** Seats: the kinds of surface they tuck under; facing one, they are a seat at that table. */
   seatAt?: SurfaceKind[];
-  /** Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m). */
-  seat?: { height: number; forward?: number };
-  /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`). */
+  /**
+   * Seats (renderer only): height of the seat (m) and how far forward of the object's middle the hips sit (m);
+   * `facing: 'back'` turns the sitter to face the object's back (a pianist at an upright with its back to the
+   * wall), `legs: 'out'` stretches the legs out along the seat (a chaise), `recline` is how far back (degrees,
+   * from sitting up) the sitter leans relaxing, napping or watching (against a slanted back: an Adirondack
+   * chair; default a little, about 8), and `pedals` are what the feet turn (an exercise bike: the crank axle's
+   * height and forward offset, and the cranks' length, m).
+   */
+  seat?: { height: number; forward?: number; facing?: 'front' | 'back'; legs?: 'down' | 'out'; recline?: number; pedals?: { height: number; forward?: number; crank: number } };
+  /**
+   * Used standing up on it (renderer only): the height (m) of what residents stand on (a treadmill's belt, a
+   * trampoline's mat), who step up onto its middle from the tile in front; `motion` bounces them on it or
+   * buzzes them.
+   */
+  stand?: { height: number; motion?: 'bounce' | 'buzz' };
+  /**
+   * What residents hold while they use it (renderer only): a moving part of its model (by node name; the
+   * model hides it while used, `motions`), held by `grip`: a `bar` across both hands (a barbell), a `pair`
+   * (two parts, one in each hand: dumbbells), a `guitar` (its neck in the left hand, its body against
+   * the belly, strummed) or a `pole` (its foot on the floor ahead, its top in the hands: a mop).
+   */
+  held?: { part: string | string[]; grip: 'bar' | 'pair' | 'guitar' | 'pole' };
+  /** Cooking stations it is (`cooking.stations`: `ingredients`, `prep`, `stove`, `oven`, `grill`, `microwave`, `dishes`, `bin`, `cupboard`). */
   stations?: string[];
   /** Keeps leftovers (fridges). */
   stores?: boolean;
@@ -217,10 +251,11 @@ export interface SkillDef {
   description: string;
 }
 
-/** A look for objects. Visual only: price and effects are the same in every style. */
-export interface StyleDef {
+/** A colour the player can give an object (the parts its model paints). Visual only: price and effects stay the same. */
+export interface ObjectColorDef {
   id: string;
   label: string;
+  color: string;
 }
 
 export interface BuyCategory {
@@ -473,7 +508,8 @@ interface ContentFile {
   events: Record<string, string>;
   objects: ObjectDef[];
   skills?: SkillDef[];
-  styles?: StyleDef[];
+  /** The palette of object colours; any other colour can be chosen too. */
+  objectColors?: ObjectColorDef[];
   buyCategories?: BuyCategory[];
   wallCoverings?: WallCoveringDef[];
   floorCoverings?: FloorCoveringDef[];
@@ -516,7 +552,7 @@ export class Content {
   readonly socials: readonly SocialDef[];
   readonly careerCategories: readonly CareerCategory[];
   readonly skills: readonly SkillDef[];
-  readonly styles: readonly StyleDef[];
+  readonly objectColors: readonly ObjectColorDef[];
   readonly buyCategories: readonly BuyCategory[];
   /** Build mode looks; a wall face's covering is an index into `wallCoverings` + 1 (0: automatic). */
   readonly wallCoverings: readonly WallCoveringDef[];
@@ -580,7 +616,7 @@ export class Content {
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
     this.skills = file.skills ?? [];
-    this.styles = file.styles ?? [];
+    this.objectColors = file.objectColors ?? [];
     this.buyCategories = file.buyCategories ?? [];
     this.wallCoverings = file.wallCoverings ?? [];
     this.floorCoverings = file.floorCoverings ?? [];

@@ -44,12 +44,464 @@ parts in the manifests (original, CC0), drawn by `tools/art/furniture.py`, `furn
 models are used.
 
 The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
-`tools/art/blender/garden_decor.py` on the shared `tools/art/blender/gamekit.py` toolkit and exported as `.glb`
+`tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`
 (glTF, original, CC0). The other primitive-part entries stay as the fallback.
 
+The houseplants (`models/plants/plant.glb`, `monstera.glb`, `fiddleFig.glb`, `snakePlant.glb`, `cacti.glb`,
+`succulents.glb`, `bostonFern.glb`, `palm.glb`, `orchid.glb`, `bonsai.glb`, override pack
+`packs/plants/manifest.json`) are built in Blender by `tools/art/blender/families/plants.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Their leaves sway in the nature shader's wind; the bonsai's stray sprig
+shrinks away while a resident prunes it. Their primitive-part entries stay as the fallback.
+
+The flower beds (`models/plants/flowerbed.glb`, `tulips.glb`, `daffodils.glb`, `daisies.glb`, `sunflowers.glb`,
+`poppies.glb`, `marigolds.glb`, `pansies.glb`, `lilies.glb`, `lupins.glb`, `forgetMeNots.glb`, `cosmos.glb`,
+`meadow.glb`, `geraniums.glb`, `flowerBox.glb`, in the same pack) are built by the same script, also original and
+CC0. A flower in the wildflower meadow shrinks away while a resident picks it. Their primitive-part entries stay as
+the fallback.
+
+The shrubs (`models/plants/bush.glb`, `boxwood.glb`, `topiaryCone.glb`, `hedge.glb`, `hydrangea.glb`, `rosebush.glb`,
+`azalea.glb`, `lavender.glb`, `fern.glb`, `grass.glb`, `hosta.glb`, the lot dressing's `bushSmall.glb` and
+`bushFlowering.glb` and the streets' `streetHedge.glb`, in the same pack) are built by the same script,
+also original and CC0, each with a far version (`<id>.far.glb`), as are the flower beds. A trim takes the clipped
+shrubs' stray sprigs off, a prune cuts a rose and a cut a few lavender stems. Their primitive-part entries stay as
+the fallback.
+
+The edibles (`models/plants/vegPatch.glb`, `tomatoes.glb`, `strawberries.glb`, `herbs.glb`, `pumpkins.glb`, each
+with its far version, in the same pack) are built by the same script, also original and CC0. The four crops grow
+from seedlings to ripe and lose their crop when harvested (`grow`); the herb planter's basil shrinks while herbs are
+picked; a harvested vegetable patch is bare. Their primitive-part entries stay as the fallback.
+
+The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `apple.glb`, `japaneseMaple.glb`,
+`magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
+override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
+versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.
+Their primitive-part entries stay as the fallback.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
-Blender by `tools/art/blender/kitchen.py` on `gamekit.py` and exported as `.glb` (glTF, original, CC0).
+Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 Its primitive-part entry stays as the fallback.
+
+The fold-down wall bed (`models/living/wallBed.glb`, pack `packs/living/manifest.json`) is built in Blender by
+`tools/art/blender/families/living.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A new object:
+its pack entry carries a simple primitive-part placeholder as the fallback.
+
+The sofa bed (`models/living/sofaBed.glb`, same pack) is built in Blender by `tools/art/blender/families/living.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0), with a `bed_out` clip (the mattress pulling out) held
+while it's open. Its primitive-part entry stays as the fallback.
+
+The sofas and sectionals (`models/living/sofa.glb`, `loveseat.glb`, `sofaThree.glb`, `sofaDesign.glb`,
+`sofaThreeSeat.glb`, `sectionalMiddle.glb`, `sectionalArmLeft.glb`, `sectionalArmRight.glb`, `sectionalCorner.glb`,
+`chaise.glb`, same pack) are built in Blender by `tools/art/blender/families/living.py` on `gamekit` and exported as
+`.glb` (glTF, original, CC0). Their seat cushions sink in while they're sat or dozed on (`sink_in`). Their
+primitive-part entries stay as the fallback.
+
+The armchairs and small seats (`models/living/armchair.glb`, `armchairLounge.glb`, `armchairLeather.glb`,
+`armchairDesign.glb`, `armchairWingback.glb`, `recliner.glb`, `rockingChair.glb`, `pouf.glb`, `ottoman.glb`,
+`floorCushion.glb`, `beanBag.glb`, same pack) are built the same way (glTF, original, CC0). Their seats sink in, the
+recliner tips back with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
+the designer lounge chair is still. Their primitive-part entries stay as the fallback.
+
+The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.glb`, `coffeeTableMarble.glb`,
+`sideTable.glb`, `coffeeTableRound.glb`, `coffeeTableLong.glb`, `nestingTables.glb`, `sideTableRound.glb`,
+`consoleTable.glb`, same pack) are built the same way (glTF, original, CC0). The coffee table's drawer slides out
+with a magazine in it; the rest are still. Their primitive-part entries stay as the fallback.
+
+The shelves (`models/living/bookshelf.glb`, `bookcaseLow.glb`, `bookcaseWide.glb`, `shelvingIndustrial.glb`,
+`bookcaseTall.glb`, `bookcaseCorner.glb`, `cubeShelf.glb`, `ladderShelf.glb`, `displayCabinet.glb`, same pack) are
+built the same way (glTF, original, CC0). On the bookcases one book tips out while a resident reads there; the
+rest are still. Their primitive-part entries stay as the fallback.
+
+The staircase (`models/living/stairs.glb`, same pack) is built the same way (glTF, original, CC0): still, its steps
+where the placeholder's are. Its primitive-part entry stays as the fallback.
+
+The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
+`sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
+`tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a
+`water_on` clip (the tap stream) played while a resident washes. The double vanity keeps its mirror glass as a
+primitive `part` (a file can't reflect yet); its cabinet and mirror frames are in the file. The primitive-part
+entries stay as the fallback.
+
+The bathroom toilets (`models/bathroom/toilet.glb`, `toiletCompact.glb`, `toiletSmart.glb`, `toiletClassic.glb`,
+`toiletWallHung.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
+`tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each lifts
+its lid (`lid_up`) while a resident uses it. Their primitive-part entries stay as the fallback.
+
+The bathroom showers (`models/bathroom/shower.glb`, `showerStall.glb`, `showerWalkIn.glb`, `showerRain.glb`, override
+pack `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers. Their
+primitive-part entries stay as the fallback.
+
+The bathroom baths (`models/bathroom/bathtub.glb`, `bathtubClawfoot.glb`, `bathtubFreestanding.glb`, override pack
+`packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Each runs its tap and fills with water (`tap_on`, `fill`) while a resident
+bathes, and drains after. Their primitive-part entries stay as the fallback.
+
+The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.glb`, `writingBureau.glb`,
+`teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
+drops, the teapot pours, the fire grows and the top book opens. Their primitive-part entries stay as the fallback.
+
+The outgoing pack models (`models/pack_outgoing/partyBar.glb`, `conversationSectional.glb`, `karaokeStage.glb`,
+`videoCallNook.glb`, `danceFloor.glb`, `photoWall.glb`, override pack `packs/pack_outgoing/manifest.json`) are built in
+Blender by `tools/art/blender/families/pack_outgoing.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light
+swings up, the dance floor's tiles pulse and a new photo grows. Their primitive-part entries stay as the fallback.
+
+The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
+`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
+while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
+onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. Their primitive-part
+entries stay as the fallback.
+
+The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
+`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_slob.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
+waggles, and the recliner reclines and swings its cup holder out. Their primitive-part entries stay as the fallback.
+
+The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
+`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
+cooks; the tub fills and bubbles while residents soak. Their primitive-part entries stay as the fallback.
+
+The foodie pack models (`models/pack_foodie/herbGarden.glb`, `deliPantry.glb`, `espressoBar.glb`,
+`cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_foodie.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door comes off for the peel as the
+fire grows, and the island's drawer pulls out. Their primitive-part entries stay as the fallback.
+
+The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `journalDesk.glb`, `rainLamp.glb`,
+`windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_gloomy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The cabinet's
+lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
+rippling pool, the window seat's cushion sinks and the tub fills. Their primitive-part entries stay as the fallback.
+
+The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
+`bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_loner.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
+patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
+Their primitive-part entries stay as the fallback.
+
+The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
+`gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
+`packs/pack_natureLover/manifest.json`) are built in Blender by `tools/art/blender/families/pack_natureLover.py` on
+`gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
+veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
+runs, the cloche lifts and the glasshouse's door and roof vent open. Their primitive-part entries stay as the
+fallback.
+
+The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
+`organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
+slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their primitive-part
+entries stay as the fallback.
+
+The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
+`rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_cheerful.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
+sways with its sleeper, the sun rises and the booth's curtain is drawn. Their primitive-part entries stay as the
+fallback.
+
+The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
+`snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
+in Blender by `tools/art/blender/families/pack_couchPotato.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The cinema's curtains are drawn apart, the console's disc tray slides out, the recliner reclines, the fridge
+door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
+Their primitive-part entries stay as the fallback.
+
+The energetic pack models (`models/pack_energetic/boulderingWall.glb`, `spinBike.glb`, `trampoline.glb`,
+`streetballHoop.glb`, `powerBlender.glb`, `contrastShower.glb`, `recoveryPod.glb`, override pack
+`packs/pack_energetic/manifest.json`) are built in Blender by `tools/art/blender/families/pack_energetic.py` on
+`gamekit` and exported as `.glb` (glTF, original, CC0). The bike's cranks turn and the trampoline's mat dips while
+they are used, the hoop's net sways, the blender's lid lifts, the shower's rain grows and the recovery pod's canopy
+lowers; the bouldering wall is still. Their primitive-part entries stay as the fallback.
+
+The hot-headed pack models (`models/pack_hotHeaded/heavyBag.glb`, `smashBin.glb`, `thunderDrums.glb`,
+`coolDownCushion.glb`, `grudgeJournal.glb`, `coldPlunge.glb`, override pack `packs/pack_hotHeaded/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_hotHeaded.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). Each moves while it is used: the bag swings, the crate's lid flips up, the cymbals rock, the zafu
+sinks, the desk drawer slides out and the plunge cover rolls back. Their primitive-part entries stay as the fallback.
+
+The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
+`welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
+built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. Their primitive-part entries stay as the
+fallback.
+
+The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
+`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
+plate's deck shakes and the tablet tilts up. Their primitive-part entries stay as the fallback.
+
+The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
+`laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
+`tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
+the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
+are still. Their primitive-part entries stay as the fallback.
+
+The hobby models (`models/hobbies/piano.glb`, `ukulele.glb`, `guitarElectric.glb`, `keyboardDigital.glb`,
+`drumKit.glb`, `guitarAcoustic.glb`, `chessTable.glb`, `poolTable.glb`, `foosball.glb`, `dartboard.glb`,
+`arcadeCabinet.glb`, `puzzleTable.glb`, `easel.glb`, `workbench.glb`, `telescope.glb`, `sewingTable.glb`,
+`chemistrySet.glb`, `potteryWheel.glb`, `craftTable.glb`, override pack `packs/hobbies/manifest.json`) are built in
+Blender by `tools/art/blender/families/hobbies.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+piano lifts its fallboard, the drums' cymbals, the foosball rods and the arcade joystick move while played, darts,
+a painting, a jigsaw patch, a pot and a flask's liquid grow, and the chess pawn, the pool rack, the vice, the
+telescope, the sewing machine's presser and handwheel, the pottery wheel and the scrapbook's cover move while a
+resident uses them; the guitars, the ukulele and the digital piano are still. Their primitive-part entries stay as
+the fallback.
+
+The kids' things (`models/kids/*.glb`: the crib, `kidsBed`, `kidsBedCar`, `highChair`, the toys `toyBox`, `toyChest`,
+`dollHouse`, `rockingHorse`, `playTent`, `ballPit`, `trainTable`, `playMat`, `teddyBear`, `beanBagKids`, and
+`kidsDesk`, `kidsTable`, `kidsChair`, `kidsBookshelf`, `kidsChalkboard`, `kidsEasel`, override pack
+`packs/kids/manifest.json`) are built in Blender by `tools/art/blender/families/kids.py` on `gamekit` and exported as
+`.glb` (glTF, original, CC0). The crib lowers its front rail for feeding, changing and cuddles and turns its mobile
+over a sleeping baby; the beds turn their duvet down; the boxes, the chest and the doll house open; the horse rocks
+its rider, the train goes round its track, the ball pit's balls bob; the tent's flap rolls up, a tower of blocks,
+a chalk drawing and a painting appear, a picture book tips out, and the teddy and the bean bag squash. Their
+primitive-part entries stay as the fallback.
+
+The outdoor patio models (`models/outdoor/bench.glb`, `patioSet.glb`, `picnicTable.glb`, `gardenChair.glb`,
+`patioTableRound.glb`, `patioTable4.glb`, `patioChair.glb`, `adirondackChair.glb`, `benchGarden3.glb`,
+`outdoorBar.glb`, `parasol.glb`, override pack `packs/outdoor/manifest.json`) are built in Blender by
+`tools/art/blender/families/outdoor.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The parasol's
+canopy stirs in the wind (`stir`); the rest are still. Their primitive-part entries stay as the fallback.
+
+The outdoor loungers and swings (`models/outdoor/sunLounger.glb`, `hammock.glb`, `porchSwing.glb`, `swingSet.glb`,
+`hotTubCedar.glb`, same pack and family) are built the same way (glTF, original, CC0). The lounger's back reclines
+for sunbathing, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a
+soak while the water bubbles. Their primitive-part entries stay as the fallback.
+
+The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
+`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
+`.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
+turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
+compost bin's lid lifts and the washing goes out on the line. Their primitive-part entries stay as the fallback.
+
+The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
+are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
+and the fire pit's flames grow on its logs while they warm up by it. Their primitive-part entries stay as the
+fallback.
+
+The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
+`dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by
+`tools/art/blender/families/fitness.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The treadmill
+runs its belt and the bike turns its pedals while used, and the yoga mat unrolls for yoga; the bench and the
+dumbbell rack are still. Their primitive-part entries stay as the fallback.
+
+The lamps (`models/lighting/*.glb`: the seven ceiling lights, three wall lights, five floor lamps and six table
+lamps, override pack `packs/lighting/manifest.json`) are built in Blender by `tools/art/blender/families/lighting.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night; the ceiling fan's blades turn
+and the paper lantern sways. Their primitive-part entries stay as the fallback.
+
+The decor models (`models/decor/*.glb`: the D1 wall art and clocks, D2 ornaments and D3 curtains and rugs, override
+pack `packs/decor/manifest.json`) are built in Blender by `tools/art/blender/families/decor.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go
+round near the camera, the clock's door opens to wind it, the hanging plant sways when watered, the fire burns while
+a resident warms up by it, and the curtains are drawn at night. Their primitive-part entries stay as the fallback.
+
+The bathroom mirror cabinet, round mirror and tall cabinet (`models/bathroom/mirrorCabinet.glb`, `mirrorRound.glb`,
+`bathCabinetTall.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
+`tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The mirrors'
+glass is in the files and reflects the room live on High. Their primitive-part entries stay as the fallback.
+
+The kitchen farmhouse and double counter sinks (`models/kitchen/farmhouseSink.glb`, `counterSinkDouble.glb`, pack
+`packs/kitchen/manifest.json`) are built in Blender by `tools/art/blender/families/kitchen.py` alongside the
+fridge, on `gamekit`, and exported as `.glb` (glTF, original, CC0), also with a `water_on` clip. Their
+primitive-part entries stay as the fallback.
+
+The other kitchen fridges (`models/kitchen/fridgeMini.glb`, `fridgeBuiltIn.glb`, `fridgeFrenchDoor.glb`,
+`fridgeRetro.glb`, `fridgeMiniRetro.glb`, `wineFridge.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen.py`
+on `gamekit` and exported as `.glb` (glTF, original, CC0). Each hinges a door built closed and swings it open
+while a resident takes food or a drink, held for a few seconds; the French-door freezer and the wine fridge's
+top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet. Their
+primitive-part entries stay as the fallback.
+
+The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`, `wallOven.glb`,
+`rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
+are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
+(glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
+while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+microwave swings its door and turns its turntable. Their primitive-part entries stay as the fallback.
+
+The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
+`breakfastCounter.glb`, `dishwasher.glb`, `dishwasherCompact.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
+lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
+out. Their primitive-part entries stay as the fallback.
+
+The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
+`counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
+`counterMarble.glb`, override pack `packs/kitchen_counters/manifest.json`) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The plain, corner, marble and butcher-block counters slide their top (or knife) drawer out 25 cm
+while a resident makes a sandwich; the others are static base units with doors, drawers or open shelves.
+Their primitive-part entries stay as the fallback.
+
+The kitchen tall and wall storage (`models/kitchen_counters/pantry.glb`, `pantryTall.glb`, `wallCabinet.glb`,
+`wallCabinetGlass.glb`, `wallCabinetCorner.glb`, `rangeHood.glb`, `spiceRack.glb`, `potRail.glb`,
+`kitchenShelfWall.glb`, `trashCan.glb`, `recyclingBins.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The pantry and the tall larder swing both doors open 100° while a resident fetches a snack; the wall
+cabinets, cooker hood, spice rack, pot rail and wall shelves are static, and the pedal and recycling bins
+are static this pass. Their primitive-part entries stay as the fallback.
+
+The kitchen islands and bars (`models/kitchen_counters/kitchenIsland.glb`, `islandSmall.glb`,
+`islandLong.glb`, `barSegment.glb`, `barEnd.glb`, same pack) are built in Blender by
+`tools/art/blender/families/kitchen_counters.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The kitchen island slides a drawer out between its stools while a resident makes a sandwich; the small and
+long islands and the bars are static. Their primitive-part entries stay as the fallback.
+
+The dining tables (`models/dining/diningTable.glb`, `bistroSet.glb`, `diningGlass.glb`, `diningOak.glb`,
+`tableSquare2.glb`, `tableBistroRound.glb`, `tableDining4.glb`, `tableDining6.glb`, `tableBanquet8.glb`,
+`tableRound4.glb`, `tableSquare8.glb`, `tableFarmhouse6.glb`, `tableBarHigh.glb`, override pack
+`packs/dining/manifest.json`) are built in Blender by `tools/art/blender/families/dining.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). They are static; the four sets keep the chairs residents sit on.
+Their primitive-part entries stay as the fallback.
+
+The dining chairs and stools (`models/dining/barStool.glb`, `stoolCounter.glb`, `stoolBarHigh.glb`,
+`diningChair.glb`, `chairWood.glb`, `chairUpholstered.glb`, `chairModern.glb`, `chairWindsor.glb`,
+`chairBentwood.glb`, `chairFolding.glb`, `chairArm.glb`, `benchDining.glb`, same pack) are built in Blender by
+`tools/art/blender/families/dining.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The three
+stools' seats swivel 20° and back as a resident sits or drinks, carrying them; the chairs and the bench are
+static. Their primitive-part entries stay as the fallback.
+
+The dining storage (`models/dining/sideboard.glb`, `buffet.glb`, `chinaCabinet.glb`, `barCart.glb`, same
+pack) is built in Blender by `tools/art/blender/families/dining.py` on `gamekit` and exported as `.glb`
+(glTF, original, CC0). The bar cart's cocktail shaker lifts and tips while a resident mixes a drink; the
+sideboard, buffet and china cabinet are static (their doors are parts of their own, for a later use). Their
+primitive-part entries stay as the fallback.
+
+The bedroom mirrors and dressing table (`models/bedroom_dressing/mirror.glb`, `dressingTable.glb`, `mirrorWall.glb`,
+`mirrorFloor.glb`, override pack `packs/bedroom_dressing/manifest.json`) are built in Blender by
+`tools/art/blender/families/bedroom_dressing.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Their
+glass is mirror glass the game reflects the room in; the dressing table slides its drawer out while a resident
+gets ready. Their primitive-part entries stay as the fallback.
+
+The bedroom nightstands and small storage (`models/bedroom_storage/nightstand.glb`, `nightstandModern.glb`,
+`nightstandRound.glb`, `nightstandDrawers.glb`, `nightstandLamp.glb`, `cedarChest.glb`, `laundryHamper.glb`,
+`benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are built in Blender by
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are
+static; the nightstand lamp's shade glows at night. Their primitive-part entries stay as the fallback.
+
+The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardrobe.glb`, `chestOfDrawers.glb`,
+`dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are built in Blender by
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each
+slides its middle drawer out (`drawer_open`) or swings its doors open onto a rail of clothes (`doors_open`,
+`door_open`) while a resident picks an outfit. Their primitive-part entries stay as the fallback.
+
+The bedroom beds (`models/bedroom/bed.glb`, `bedSingle.glb`, `bedBunk.glb`, `bedFuton.glb`, `bedKing.glb`,
+`bedDouble.glb`, `bedQueenUpholstered.glb`, `bedCanopy.glb`, `bedDaybed.glb`, override pack
+`packs/bedroom/manifest.json`) are built in Blender by `tools/art/blender/families/bedroom.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). Each turns the top of its duvet down (`turn_down`) while a resident sleeps
+or naps; the futon's back folds down flat into a bed (`unfold`) and stays down until it is folded away; the daybed is
+static. Their primitive-part entries stay as the fallback.
+
+The office models (`models/office/deskSimple.glb`, `deskCorner.glb`, `deskStanding.glb`, `deskExecutive.glb`,
+`computerDesk.glb`, `deskWriting.glb`, `deskLaptop.glb`, `computerGaming.glb`, `chairExecutive.glb`, `chairTask.glb`,
+`officeChair.glb`, `filingCabinet.glb`, `whiteboard.glb`, `corkboard.glb`, override pack `packs/office/manifest.json`)
+are built in Blender by `tools/art/blender/families/office.py` on `gamekit` and exported as `.glb` (glTF, original,
+CC0). The standing and computer desks slide their keyboard shelf out while a resident types, the writing desk opens
+its drawer, the laptop opens, the gaming PC's fans spin while a game is played, the desk chairs swivel as a resident
+sits down and the whiteboard fills with a plan; the other desks, the filing cabinet and the corkboard are static.
+Their primitive-part entries stay as the fallback.
+
+The tabletop things (`models/tabletop/*.glb`: the kitchenware `kettle`, `toaster`, `blender`, `standMixer`,
+`espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar`; the
+tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks`; the books and pots
+`bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall`; the ornaments
+`photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall`; and `soapSet`, `towelStack`,
+`perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
+`packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
+exported as `.glb` (glTF, original, CC0). The alarm clock's second hand goes round once a minute (`hands`, ambient);
+the rest are static. Their primitive-part entries stay as the fallback.
+
+The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
+`merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
+town overview, override pack `packs/playground/manifest.json`) is built in Blender by
+`tools/art/blender/families/playground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The seesaw's
+plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
+riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
+ping-pong table are static. Their primitive-part entries stay as the fallback.
+
+The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
+`trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is
+built in Blender by `tools/art/blender/families/farm.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The scarecrow sways slowly on its post near the camera (`sway`, ambient); the coop's pop-hole hatch is a part of its
+own for a later use; the rest are static. Their primitive-part entries stay as the fallback.
+
+The shop fittings and café furniture (`models/shops/shopCounter.glb`, `bakeryCase.glb`, `groceryShelf.glb`,
+`cafeTable.glb`, `cafeChair.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/shops/manifest.json`) are built in Blender by `tools/art/blender/families/shops.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0). The till's cash drawer slides out while a resident buys a treat and the bakery case's
+back glass door slides aside for a pastry; the grocery shelves, the café table and the bentwood café chair are static.
+Their primitive-part entries stay as the fallback.
+
+The food stalls and vending machines (`models/stalls/iceCreamCart.glb`, `hotDogStand.glb`, `vendingSnack.glb`,
+`vendingDrink.glb`, `marketStall.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/stalls/manifest.json`) are built in Blender by `tools/art/blender/families/stalls.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0). The ice cream cart's freezer lid slides open and the hot dog stand's hot-plate lid
+lifts while a resident buys from them; a snack slides down to the snack machine's tray and a can drops to the drinks
+machine's; the machines' signs and the drinks machine's front glow at night; the market stall is static. Their
+primitive-part entries stay as the fallback.
+
+The street furniture (`models/street_furniture/streetLamp.glb`, `parkBench.glb`, `drinkingFountain.glb`,
+`litterBin.glb`, `busStop.glb`, `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
+`townStatue.glb`, each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
+is built in Blender by `tools/art/blender/families/street_furniture.py` on `gamekit` and exported as `.glb` (glTF,
+original, CC0). The street lamp's lantern and the phone box's signs glow at night; the drinking fountain's arc of
+water grows while a resident drinks, the post box's slot flap swings in for a card, the phone box's door opens and
+shuts behind the caller, and the town fountain's water runs near the camera (`water_run`, ambient); the bench, the
+litter bin, the bus shelter, the notice board and the founder's statue are static. Their primitive-part entries stay
+as the fallback.
+
+The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
+`pot.glb`, `pathLight.glb`, `hedge.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
+`packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
+as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
+and bus-stop signs, the door pot, the garden path light (its lens glows at night), the street hedge and the flower
+clump. All are static; their leaves and flowers sway in the wind. Their primitive-part entries (`community.py`,
+`street/manifest.json`) stay as the fallback.
+
+The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
+`birdFeederPole.glb`, `dogHouse.glb`, `sundial.glb`, `steppingStones.glb`, `lampPost.glb`, `stringLights.glb`, the
+planter box and the lamp post each with a `.far.glb`, override pack `packs/garden_things/manifest.json`) are built in
+Blender by `tools/art/blender/families/garden_things.py` on `gamekit` (the planter box's leaves and flowers with
+`families/plants.py`) and exported as `.glb` (glTF, original, CC0). The pond's ripples spread near the camera and a
+koi comes up to be fed or watched, a blue tit lands on the feeders while a resident watches, the lamp's panes and the
+festoon bulbs glow at night and the string sways. Their primitive-part entries stay as the fallback.
+
+The ground cover, the woods' rocks and the selection marker (`models/ground/grassTuft.glb`, `flowers.glb`,
+`rock.glb`, `marker.glb`, the first three each with a `.far.glb`, override pack `packs/ground/manifest.json`) are
+built in Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+The lawn's tufts and wildflowers sway in the wind and take a tint per instance (the foliage finish). Their
+primitive-part entries stay as the fallback.
+
+The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tvStandLow.glb`, `homeCinema.glb`,
+`stereo.glb`, `boombox.glb`, `fireplaceElectric.glb`, override pack `packs/media/manifest.json`) are built in Blender
+by `tools/art/blender/families/media.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The screens glow
+at night; the portable TV's rabbit ears turn and extend, the low bench's TV rises out of its lift and the home
+cinema's projector screen unrolls while watched; the stereo's CD tray slides out and its woofers pulse, the boombox's
+cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion. Their
+primitive-part entries stay as the fallback.
+
+The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
+the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
+tray, the pie, the plates of stew, pizza, treats, pie and a sandwich, the dirty plate, and the chopping board, the
+pan and the food on the grill that stand on a station while a resident cooks; override pack
+`packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
+`tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still;
+their primitive-part entries (`tools/art/items.py`) stay as the fallback.
 
 ## Generated art (original, CC0)
 
@@ -71,7 +523,7 @@ https://github.com/met4citizen/TalkingHead).
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are primitive placeholders in `street/manifest.json`. Only the sidewalk surface is third-party:
+The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are Blender-built (`packs/street`, above), over primitive placeholders in `street/manifest.json`. Only the sidewalk surface is third-party:
 
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|

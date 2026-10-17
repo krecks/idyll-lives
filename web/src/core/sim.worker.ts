@@ -31,6 +31,7 @@ let memory: WebAssembly.Memory;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
+let lastLamps = '';
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
@@ -215,6 +216,12 @@ function publish(): void {
     scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
   const version = g.structure_version();
+  // (Before the world, which the renderer builds with them; ids shift as objects go.)
+  const lamps = `${version}:${g.lights_version()}`;
+  if (lamps !== lastLamps) {
+    lastLamps = lamps;
+    scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
+  }
   if (version !== lastStructure) {
     lastStructure = version;
     postWorld();

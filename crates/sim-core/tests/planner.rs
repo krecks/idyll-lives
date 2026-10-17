@@ -47,7 +47,7 @@ fn a_planned_workout_happens_most_days() {
                 s.spawn(move || {
                     let mut w = town(seed);
                     homebody(&mut w);
-                    w.buy(0, "weightBench", None, None)
+                    w.buy(0, "weightBench", None, Default::default())
                         .expect("room for a weight bench");
                     routines(
                         &mut w,
@@ -107,7 +107,7 @@ fn nowhere_to_do_it_becomes_a_wish_until_it_is_bought() {
         .position(|a| a.id == "train")
         .unwrap();
     assert!(w.sims[0].planner.wishes.contains(&(train, Some(piano))));
-    w.buy(0, "piano", None, None).expect("room for a piano");
+    w.buy(0, "piano", None, Default::default()).expect("room for a piano");
     w.tick_once();
     assert!(w.sims[0].planner.wishes.is_empty(), "the wish came true");
 }

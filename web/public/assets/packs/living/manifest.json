@@ -1,0 +1,1886 @@
+{
+  "$comment": "Blender-built living room models (tools/art/blender/families/living.py). New objects with a Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "version": 1,
+  "entries": {
+    "model.wallBed": {
+      "type": "model",
+      "url": "../../models/living/wallBed.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.satin"
+        },
+        "inside": {
+          "finish": "material.finish.matte"
+        },
+        "mattress": {
+          "finish": "material.finish.fabric"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "throw": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sleep": "bed_down",
+          "nap": "bed_down",
+          "foldDown": "bed_down"
+        },
+        "open": "bed_down"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "frame",
+          "label": "Bed frame"
+        },
+        {
+          "material": "mattress",
+          "label": "Mattress"
+        },
+        {
+          "material": "pillow",
+          "label": "Pillows"
+        },
+        {
+          "material": "throw",
+          "label": "Throw"
+        },
+        {
+          "material": "inside",
+          "label": "Inside & shelves"
+        },
+        {
+          "material": "metal",
+          "label": "Handle"
+        }
+      ],
+      "placeholder": [
+        {
+          "shape": "box",
+          "size": [
+            1.66,
+            2.17,
+            0.49
+          ],
+          "at": [
+            0,
+            1.085,
+            -1.185
+          ],
+          "color": "#E9E4DA",
+          "material": "material.finish.satin"
+        },
+        {
+          "shape": "box",
+          "size": [
+            1.98,
+            0.05,
+            0.52
+          ],
+          "at": [
+            0,
+            2.195,
+            -1.1700000000000002
+          ],
+          "color": "#E9E4DA",
+          "material": "material.finish.satin"
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.15,
+            2.17,
+            0.49
+          ],
+          "at": [
+            -0.905,
+            1.085,
+            -1.185
+          ],
+          "color": "#D8D1C4",
+          "material": "material.finish.matte"
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.15,
+            2.17,
+            0.49
+          ],
+          "at": [
+            0.905,
+            1.085,
+            -1.185
+          ],
+          "color": "#D8D1C4",
+          "material": "material.finish.matte"
+        },
+        {
+          "shape": "box",
+          "size": [
+            1.36,
+            0.12,
+            0.12
+          ],
+          "at": [
+            0,
+            2.0,
+            -0.8999999999999999
+          ],
+          "color": "#E9E4DA",
+          "material": "material.finish.satin"
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.5,
+            0.03,
+            0.04
+          ],
+          "at": [
+            0,
+            1.45,
+            -0.8999999999999999
+          ],
+          "color": "#8D8F92",
+          "material": "material.finish.metal"
+        }
+      ]
+    },
+    "model.sofaBed": {
+      "type": "model",
+      "url": "../../models/living/sofaBed.glb",
+      "materials": {
+        "bedding": {
+          "finish": "material.finish.fabric"
+        },
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "legs": {
+          "finish": "material.finish.metal"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_rose": {
+          "finish": "material.finish.fabric"
+        },
+        "upholstery": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "doze": "bed_out",
+          "pullOut": "bed_out"
+        },
+        "open": "bed_out"
+      },
+      "paint": [
+        {
+          "material": "upholstery",
+          "label": "Upholstery"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "legs",
+          "label": "Legs"
+        },
+        {
+          "material": "bedding",
+          "label": "Bedding"
+        },
+        {
+          "material": "pillow_rose",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Second pillow"
+        }
+      ]
+    },
+    "model.sofa": {
+      "type": "model",
+      "url": "../../models/living/sofa.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "linen_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_rust": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_legs": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Upholstery"
+        },
+        {
+          "material": "linen_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_rust",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Second pillow"
+        }
+      ]
+    },
+    "model.loveseat": {
+      "type": "model",
+      "url": "../../models/living/loveseat.glb",
+      "materials": {
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        },
+        "sage_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "sage",
+          "label": "Upholstery"
+        },
+        {
+          "material": "sage_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.sofaThree": {
+      "type": "model",
+      "url": "../../models/living/sofaThree.glb",
+      "materials": {
+        "oak_dark_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "stone": {
+          "finish": "material.finish.fabric"
+        },
+        "stone_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_sage": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Upholstery"
+        },
+        {
+          "material": "stone_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_dark_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Pillows"
+        },
+        {
+          "material": "throw_sage",
+          "label": "Throw"
+        }
+      ]
+    },
+    "model.sofaDesign": {
+      "type": "model",
+      "url": "../../models/living/sofaDesign.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "brass_legs": {
+          "finish": "material.finish.metal"
+        },
+        "teal": {
+          "finish": "material.finish.fabric"
+        },
+        "teal_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "teal",
+          "label": "Upholstery"
+        },
+        {
+          "material": "teal_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "brass",
+          "label": "Frame"
+        },
+        {
+          "material": "brass_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sofaThreeSeat": {
+      "type": "model",
+      "url": "../../models/living/sofaThreeSeat.glb",
+      "materials": {
+        "moss": {
+          "finish": "material.finish.fabric"
+        },
+        "moss_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "pillow_cream": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_mustard": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "moss",
+          "label": "Upholstery"
+        },
+        {
+          "material": "moss_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_cream",
+          "label": "Pillow"
+        },
+        {
+          "material": "pillow_mustard",
+          "label": "Second pillow"
+        }
+      ]
+    },
+    "model.sectionalMiddle": {
+      "type": "model",
+      "url": "../../models/living/sectionalMiddle.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalArmLeft": {
+      "type": "model",
+      "url": "../../models/living/sectionalArmLeft.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalArmRight": {
+      "type": "model",
+      "url": "../../models/living/sectionalArmRight.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sectionalCorner": {
+      "type": "model",
+      "url": "../../models/living/sectionalCorner.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_mustard": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_mustard",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.chaise": {
+      "type": "model",
+      "url": "../../models/living/chaise.glb",
+      "materials": {
+        "espresso_legs": {
+          "finish": "material.finish.wood"
+        },
+        "greige": {
+          "finish": "material.finish.fabric"
+        },
+        "greige_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "throw_oat": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "sink_in",
+          "doze": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "greige",
+          "label": "Upholstery"
+        },
+        {
+          "material": "greige_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "espresso_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "throw_oat",
+          "label": "Throw"
+        }
+      ]
+    },
+    "model.armchair": {
+      "type": "model",
+      "url": "../../models/living/armchair.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "linen_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_legs": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Upholstery"
+        },
+        {
+          "material": "linen_cushion",
+          "label": "Cushion"
+        },
+        {
+          "material": "walnut",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_legs",
+          "label": "Legs"
+        },
+        {
+          "material": "pillow_sage",
+          "label": "Pillow"
+        }
+      ]
+    },
+    "model.armchairLounge": {
+      "type": "model",
+      "url": "../../models/living/armchairLounge.glb",
+      "materials": {
+        "oak_legs": {
+          "finish": "material.finish.wood"
+        },
+        "sage": {
+          "finish": "material.finish.fabric"
+        },
+        "sage_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "sage",
+          "label": "Upholstery"
+        },
+        {
+          "material": "sage_cushion",
+          "label": "Cushions"
+        },
+        {
+          "material": "oak_legs",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.armchairLeather": {
+      "type": "model",
+      "url": "../../models/living/armchairLeather.glb",
+      "materials": {
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "teak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in",
+          "read": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "teak",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Upholstery"
+        }
+      ]
+    },
+    "model.armchairDesign": {
+      "type": "model",
+      "url": "../../models/living/armchairDesign.glb",
+      "materials": {
+        "alu": {
+          "finish": "material.finish.metal"
+        },
+        "black_satin": {
+          "finish": "material.finish.satin"
+        },
+        "hide": {
+          "finish": "material.finish.satin"
+        },
+        "ply": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "ply",
+          "label": "Frame"
+        },
+        {
+          "material": "hide",
+          "label": "Upholstery"
+        },
+        {
+          "material": "alu",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.armchairWingback": {
+      "type": "model",
+      "url": "../../models/living/armchairWingback.glb",
+      "materials": {
+        "forest": {
+          "finish": "material.finish.fabric"
+        },
+        "forest_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in",
+          "read": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "forest",
+          "label": "Upholstery"
+        },
+        {
+          "material": "forest_cushion",
+          "label": "Cushion"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.recliner": {
+      "type": "model",
+      "url": "../../models/living/recliner.glb",
+      "materials": {
+        "tan": {
+          "finish": "material.finish.fabric"
+        },
+        "tan_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": [
+            "recline",
+            "footrest_up"
+          ],
+          "doze": [
+            "recline",
+            "footrest_up"
+          ]
+        },
+        "ride": "recline"
+      },
+      "paint": [
+        {
+          "material": "tan",
+          "label": "Upholstery"
+        },
+        {
+          "material": "tan_cushion",
+          "label": "Cushions & footrest"
+        }
+      ]
+    },
+    "model.rockingChair": {
+      "type": "model",
+      "url": "../../models/living/rockingChair.glb",
+      "materials": {
+        "rocker": {
+          "finish": "material.finish.wood"
+        },
+        "rocker_cushion": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "loops": {
+          "relax": "rock",
+          "read": "rock"
+        },
+        "ride": "rock"
+      },
+      "paint": [
+        {
+          "material": "rocker",
+          "label": "Wood"
+        },
+        {
+          "material": "rocker_cushion",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.pouf": {
+      "type": "model",
+      "url": "../../models/living/pouf.glb",
+      "materials": {
+        "pouf_button": {
+          "finish": "material.finish.satin"
+        },
+        "pouf_leather": {
+          "finish": "material.finish.satin"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "pouf_leather",
+          "label": "Leather"
+        },
+        {
+          "material": "pouf_button",
+          "label": "Buttons"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.ottoman": {
+      "type": "model",
+      "url": "../../models/living/ottoman.glb",
+      "materials": {
+        "navy": {
+          "finish": "material.finish.fabric"
+        },
+        "navy_button": {
+          "finish": "material.finish.fabric"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "navy",
+          "label": "Upholstery"
+        },
+        {
+          "material": "navy_button",
+          "label": "Buttons"
+        },
+        {
+          "material": "walnut_warm",
+          "label": "Feet"
+        }
+      ]
+    },
+    "model.floorCushion": {
+      "type": "model",
+      "url": "../../models/living/floorCushion.glb",
+      "materials": {
+        "mustard": {
+          "finish": "material.finish.fabric"
+        },
+        "mustard_button": {
+          "finish": "material.finish.fabric"
+        },
+        "mustard_piping": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "mustard",
+          "label": "Cushion"
+        },
+        {
+          "material": "mustard_piping",
+          "label": "Piping"
+        },
+        {
+          "material": "mustard_button",
+          "label": "Button"
+        }
+      ]
+    },
+    "model.beanBag": {
+      "type": "model",
+      "url": "../../models/living/beanBag.glb",
+      "materials": {
+        "bag": {
+          "finish": "material.finish.fabric"
+        },
+        "bag_seat": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "flop": "squash"
+        }
+      },
+      "paint": [
+        {
+          "material": "bag",
+          "label": "Bag"
+        },
+        {
+          "material": "bag_seat",
+          "label": "Seat"
+        }
+      ]
+    },
+    "model.coffeeTable": {
+      "type": "model",
+      "url": "../../models/living/coffeeTable.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "magazine_teal": {
+          "finish": "material.finish.matte"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "magazine": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "brass",
+          "label": "Knob"
+        }
+      ]
+    },
+    "model.coffeeTableGlass": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableGlass.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "chrome",
+          "label": "Frame"
+        },
+        {
+          "material": "glass",
+          "label": "Glass"
+        }
+      ]
+    },
+    "model.coffeeTableMarble": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableMarble.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "magazine_navy": {
+          "finish": "material.finish.matte"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "marble_vein": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "marble",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.sideTable": {
+      "type": "model",
+      "url": "../../models/living/sideTable.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "brass",
+          "label": "Knob"
+        }
+      ]
+    },
+    "model.coffeeTableRound": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableRound.glb",
+      "materials": {
+        "cream_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "cream_gloss",
+          "label": "Top"
+        },
+        {
+          "material": "oak",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.coffeeTableLong": {
+      "type": "model",
+      "url": "../../models/living/coffeeTableLong.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "box_sand": {
+          "finish": "material.finish.matte"
+        },
+        "magazine_teal": {
+          "finish": "material.finish.matte"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut_warm",
+          "label": "Top"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.nestingTables": {
+      "type": "model",
+      "url": "../../models/living/nestingTables.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "white_gloss": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "white_gloss",
+          "label": "Top"
+        },
+        {
+          "material": "oak",
+          "label": "Small table"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        }
+      ]
+    },
+    "model.sideTableRound": {
+      "type": "model",
+      "url": "../../models/living/sideTableRound.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "stone_top": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone_top",
+          "label": "Top"
+        },
+        {
+          "material": "brass",
+          "label": "Base"
+        }
+      ]
+    },
+    "model.consoleTable": {
+      "type": "model",
+      "url": "../../models/living/consoleTable.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.fabric"
+        },
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Top"
+        },
+        {
+          "material": "black_metal",
+          "label": "Legs"
+        },
+        {
+          "material": "basket",
+          "label": "Baskets"
+        }
+      ]
+    },
+    "model.bookshelf": {
+      "type": "model",
+      "url": "../../models/living/bookshelf.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_back": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out",
+          "homework": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "shelf_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseLow": {
+      "type": "model",
+      "url": "../../models/living/bookcaseLow.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "navy_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_back": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseWide": {
+      "type": "model",
+      "url": "../../models/living/bookcaseWide.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_back": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot_white": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out",
+          "homework": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.shelvingIndustrial": {
+      "type": "model",
+      "url": "../../models/living/shelvingIndustrial.glb",
+      "materials": {
+        "bin_hole": {
+          "finish": "material.finish.matte"
+        },
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "box_sand": {
+          "finish": "material.finish.matte"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak_shelf": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "black_metal",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_shelf",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.bookcaseTall": {
+      "type": "model",
+      "url": "../../models/living/bookcaseTall.glb",
+      "materials": {
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "red_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_back": {
+          "finish": "material.finish.wood"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out",
+          "study": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut_warm",
+          "label": "Frame"
+        },
+        {
+          "material": "walnut_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.bookcaseCorner": {
+      "type": "model",
+      "url": "../../models/living/bookcaseCorner.glb",
+      "materials": {
+        "blue_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "book_g": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_teal": {
+          "finish": "material.finish.matte"
+        },
+        "shelf_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "read": "book_out"
+        }
+      },
+      "paint": [
+        {
+          "material": "shelf_white",
+          "label": "Frame"
+        },
+        {
+          "material": "shelf_teal",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.cubeShelf": {
+      "type": "model",
+      "url": "../../models/living/cubeShelf.glb",
+      "materials": {
+        "bin_clay": {
+          "finish": "material.finish.fabric"
+        },
+        "bin_hole": {
+          "finish": "material.finish.matte"
+        },
+        "bin_sage": {
+          "finish": "material.finish.fabric"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_e": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "cube_back": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "shelf_white": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "shelf_white",
+          "label": "Frame"
+        },
+        {
+          "material": "cube_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.ladderShelf": {
+      "type": "model",
+      "url": "../../models/living/ladderShelf.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.fabric"
+        },
+        "book_a": {
+          "finish": "material.finish.satin"
+        },
+        "book_b": {
+          "finish": "material.finish.satin"
+        },
+        "book_c": {
+          "finish": "material.finish.satin"
+        },
+        "book_d": {
+          "finish": "material.finish.satin"
+        },
+        "book_f": {
+          "finish": "material.finish.satin"
+        },
+        "clay": {
+          "finish": "material.finish.matte"
+        },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_shelf": {
+          "finish": "material.finish.wood"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "walnut_warm": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Frame"
+        },
+        {
+          "material": "oak_shelf",
+          "label": "Shelves"
+        }
+      ]
+    },
+    "model.displayCabinet": {
+      "type": "model",
+      "url": "../../models/living/displayCabinet.glb",
+      "materials": {
+        "blue_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cream_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "navy_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "photo": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "red_gloss": {
+          "finish": "material.finish.gloss"
+        },
+        "shelf_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "vitrine": {
+          "finish": "material.finish.wood"
+        },
+        "vitrine_back": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "vitrine",
+          "label": "Frame"
+        },
+        {
+          "material": "vitrine_back",
+          "label": "Back"
+        }
+      ]
+    },
+    "model.stairs": {
+      "type": "model",
+      "url": "../../models/living/stairs.glb",
+      "materials": {
+        "railing": {
+          "finish": "material.finish.metal"
+        },
+        "risers": {
+          "finish": "material.finish.satin"
+        },
+        "treads": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "treads",
+          "label": "Treads"
+        },
+        {
+          "material": "railing",
+          "label": "Railing"
+        }
+      ]
+    }
+  }
+}

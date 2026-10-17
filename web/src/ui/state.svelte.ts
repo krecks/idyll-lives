@@ -1,6 +1,6 @@
 /** Reactive UI state. Written by the game layer at ~10 Hz, read by components. */
 
-import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
+import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
 
@@ -12,7 +12,7 @@ export interface MenuState {
   /** Canvas-relative CSS pixels. */
   x: number;
   y: number;
-  /** `cost` is charged when chosen (shown, and checked against funds). */
+  /** `cost` is charged when chosen (shown, and checked against funds). Index -1: a lamp's "Turn on" / "Turn off". */
   items: { label: string; index: number; disabled?: boolean; cost?: number }[];
 }
 
@@ -41,8 +41,8 @@ export interface Placing {
   rot: number;
   /** Degrees past `rot`, for objects that turn freely. */
   turn: number;
-  /** Style for a new purchase (picked up with the eyedropper); default: the household's favourite. */
-  style?: number;
+  /** Colours for a new purchase (chosen while in hand, or picked up with the eyedropper); absent: as made. */
+  colors?: PartColors;
   /** Set when moving an object the household already owns. */
   objectId: number | null;
   /** Its own size (centimetres across and deep, before turning), resized by the player; absent: its kind's. */
@@ -129,8 +129,6 @@ class GameState {
   rent = $state<number | null>(null);
   /** Weekly bills of the player's home: they grow with what the household owns. */
   bills = $state<number | null>(null);
-  /** The household's favourite object style (index into content styles). */
-  householdStyle = $state(0);
   /** A baby on the way in the player's household. */
   expecting = $state.raw<{ parents: [number, number]; due: number } | null>(null);
   /** Careers and build/buy rules from the simulation. */
@@ -140,6 +138,11 @@ class GameState {
   placing = $state.raw<Placing | null>(null);
   /** Owned object picked in Build mode's catalog. */
   buySelection = $state<number | null>(null);
+  /**
+   * The colour studio, open over Build mode: the item whose parts are being coloured, a thing at
+   * home (`objectId`) or the new purchase in hand (null).
+   */
+  customising = $state<{ def: string; objectId: number | null } | null>(null);
   /**
    * The storey in view (0: the ground, -1: the basement), how many the lot has at and above the
    * ground and the lowest (-1 with a basement); higher storeys are hidden, and in the basement

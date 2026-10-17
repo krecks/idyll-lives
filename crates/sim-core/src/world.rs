@@ -1,6 +1,6 @@
 //! World state and the per-tick update.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
@@ -92,8 +92,9 @@ pub struct ObjectInstance {
     /// Degrees turned past `rot` (0..90), for objects that turn freely; only for looks.
     pub turn: u8,
     /// Centimetres (x, z) its middle stands off the middle of its footprint (within
-    /// `MAX_OFFSET`), for objects that turn freely: they can stand anywhere on their tile.
-    /// Only for looks, like `turn`; the footprint stays on tiles.
+    /// `MAX_OFFSET`), for anything but stairs, things on a wall only along it: they can stand
+    /// anywhere on their tiles. The footprint stays on tiles; its body (`extent` about its
+    /// middle) may reach past them, but no wall may run through it (`body_edges`, `body_crosses`).
     pub offset: [i8; 2],
     /// Tiles it takes across and deep, before turning: its `extent` rounded up to whole tiles
     /// (`MAX_SIZE` at most).
@@ -108,13 +109,36 @@ pub struct ObjectInstance {
     pub users: [Option<u32>; MAX_SLOTS],
     /// Upgrade level: higher quality objects satisfy needs and teach skills faster.
     pub quality: u8,
-    /// Index into `Content::styles` (visual only).
-    pub style: u8,
+    /// The colours the player gave its parts (visual only): see `Colors`. Empty: as it's made.
+    pub colors: Colors,
     /// Money put into this object (price plus upgrades), for resale.
     pub value: i64,
     /// Wear from use, 0..1; at 1 it is broken until repaired.
     pub wear: f32,
+    /// Open (a wall bed folded down, a door or lid open): set by the interactions that open or
+    /// close it (`Interaction::leaves`), and what some are offered for (`Interaction::when`).
+    pub open: bool,
+    /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
+    /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
+    pub growth: f32,
+    /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
+    pub off: bool,
 }
+
+/// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer
+/// shows (the model's `motions.growth` clip). The numbers are the view's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrowthStage {
+    Planted = 0,
+    Growing = 1,
+    Ripe = 2,
+    Picked = 3,
+}
+
+/// Share of the way to ripe at which a crop shows as growing rather than just planted.
+const GROWING_FROM: f32 = 1.0 / 3.0;
+/// Game minutes between crops' growth steps.
+const GROWTH_STEP_MINUTES: u64 = 15;
 
 /// Something that happened while a resident stepped, for the story (applied after the step).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -123,12 +147,44 @@ pub(crate) enum News {
     Repaired(u32),
     /// An accident (index into `Content::accidents`).
     Accident(usize),
+    /// The player's order to close this object was dropped: someone else is in it now.
+    NotClosed(u32),
 }
 
 impl ObjectInstance {
     /// Worn out: its interactions don't work until it is repaired.
     pub fn broken(&self) -> bool {
         self.wear >= 1.0
+    }
+
+    /// Whether its state lets resident `me` do `inter` now: open or closed as the interaction
+    /// wants (`when`), and nothing closed on someone else using it (or on their way to).
+    pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
+        inter.when.is_none_or(|w| w == self.open)
+            && (!inter.ripe || self.ripe())
+            && (inter.leaves != Some(false) || self.users().all(|u| u == me))
+    }
+
+    /// Whether `inter` would close it on someone other than `me` using it (or on their way to):
+    /// the one reason `allows` says no that the player hears of when it comes up after an order
+    /// (an order to open or close what someone else already did is done).
+    fn closes_on_someone(&self, inter: &crate::content::Interaction, me: u32) -> bool {
+        inter.leaves == Some(false) && inter.when.is_none_or(|w| w == self.open) && self.users().any(|u| u != me)
+    }
+
+    /// Its crop is ripe (see `growth`).
+    pub fn ripe(&self) -> bool {
+        self.growth >= 1.0
+    }
+
+    /// Its crop's stage (for a kind that `grows`).
+    pub fn growth_stage(&self) -> GrowthStage {
+        match self.growth {
+            g if g < 0.0 => GrowthStage::Picked,
+            g if g >= 1.0 => GrowthStage::Ripe,
+            g if g >= GROWING_FROM => GrowthStage::Growing,
+            _ => GrowthStage::Planted,
+        }
     }
 
     pub fn users(&self) -> impl Iterator<Item = u32> + '_ {
@@ -147,6 +203,18 @@ impl ObjectInstance {
     /// Whether one of the slots in `range` is free for `sim` (or already theirs).
     pub fn can_use_in(&self, sim: u32, range: std::ops::Range<usize>) -> bool {
         self.users[range].iter().any(|u| u.is_none_or(|u| u == sim))
+    }
+
+    /// Whether `sim` can start interaction `i` of `def` here: one of its slots
+    /// (`ObjectDef::slots_for`) free or theirs already; all of them for one that takes the whole
+    /// object (`Interaction::whole`).
+    pub fn can_use_for(&self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
+        let range = def.slots_for(i);
+        if def.interactions[i].whole {
+            self.users[range].iter().all(|u| u.is_none_or(|u| u == sim))
+        } else {
+            self.can_use_in(sim, range)
+        }
     }
 
     pub fn has_free_slot(&self, slots: u8) -> bool {
@@ -175,6 +243,20 @@ impl ObjectInstance {
             }
             None => false,
         }
+    }
+
+    /// Takes a place for `sim` for interaction `i` of `def` (see `can_use_for`): one of its
+    /// slots, or every one for a use that takes the whole object (`slot_of` is then the first).
+    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
+        let range = def.slots_for(i);
+        if !def.interactions[i].whole {
+            return self.reserve_in(sim, range);
+        }
+        if !self.can_use_for(sim, def, i) {
+            return false;
+        }
+        self.users[range].fill(Some(sim));
+        true
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
@@ -250,18 +332,52 @@ impl ObjectInstance {
         (0..d).flat_map(move |dz| (0..w).map(move |dx| (x0 + dx, z0 + dz)))
     }
 
-    /// Pairs of neighbouring tiles its body stands across: off the middle of its footprint
-    /// (`offset`), it can reach past the footprint's side, and no wall may run through it there.
-    pub(crate) fn body_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+    /// Its body's sides, `(x0, x1, z0, z1)` in half centimetres (tile lines every 200): its own
+    /// size (`extent`, turned) about its middle, `offset` off the middle of its footprint.
+    fn body_box(&self, content: &Content) -> (i32, i32, i32, i32) {
         let (w, d) = self.size(content);
         let [ex, ez] = if self.rot.is_multiple_of(2) { self.extent } else { [self.extent[1], self.extent[0]] };
-        // Its sides along one axis, in half centimetres (tile lines every 200).
         let span = |at: i32, tiles: i32, off: i8, size: u16| {
             let mid = 2 * (at * 100 + off as i32) + tiles * 100;
             (mid - size as i32, mid + size as i32)
         };
         let (x0, x1) = span(self.x, w, self.offset[0], ex);
         let (z0, z1) = span(self.z, d, self.offset[1], ez);
+        (x0, x1, z0, z1)
+    }
+
+    /// The tiles its body overlaps (more than touches): its footprint's, and those it reaches
+    /// into off the footprint's middle.
+    pub(crate) fn body_tiles(&self, content: &Content) -> impl Iterator<Item = (i32, i32)> + use<> {
+        let (x0, x1, z0, z1) = self.body_box(content);
+        let (xs, zs) = (x0.div_euclid(200)..(x1 + 199).div_euclid(200), z0.div_euclid(200)..(z1 + 199).div_euclid(200));
+        zs.flat_map(move |tz| xs.clone().map(move |tx| (tx, tz)))
+    }
+
+    /// Whether a diagonal wall across tile `(tx, tz)` would run through its body (touching its
+    /// side or corner is fine, as a wall on a tile line along its side).
+    pub(crate) fn body_crosses(&self, content: &Content, tx: i32, tz: i32, dir: crate::lot::DiagDir) -> bool {
+        let (x0, x1, z0, z1) = self.body_box(content);
+        // The part of the body on that tile.
+        let (tx0, tz0) = (tx * 200, tz * 200);
+        let (a0, a1) = (x0.max(tx0), x1.min(tx0 + 200));
+        let (b0, b1) = (z0.max(tz0), z1.min(tz0 + 200));
+        if a0 >= a1 || b0 >= b1 {
+            return false;
+        }
+        match dir {
+            // `/`: x - z is that of the corner (x, z) all along it; strictly between the least
+            // and the most of the body's, it runs through.
+            crate::lot::DiagDir::Dp => (a0 - b1 + 1..a1 - b0).contains(&(tx0 - tz0)),
+            // `\`: x + z is that of the corners (x, z + 1) and (x + 1, z).
+            crate::lot::DiagDir::Dn => (a0 + b0 + 1..a1 + b1).contains(&(tx0 + tz0 + 200)),
+        }
+    }
+
+    /// Pairs of neighbouring tiles its body stands across: off the middle of its footprint
+    /// (`offset`), it can reach past the footprint's side, and no wall may run through it there.
+    pub(crate) fn body_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+        let (x0, x1, z0, z1) = self.body_box(content);
         // The tiles it overlaps, and the tile lines strictly inside it.
         let tiles = |lo: i32, hi: i32| lo.div_euclid(200)..(hi + 199).div_euclid(200);
         let lines = |lo: i32, hi: i32| lo.div_euclid(200) + 1..=(hi - 1).div_euclid(200);
@@ -513,6 +629,9 @@ pub struct Sim {
     pub(crate) conceived: Option<u32>,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
+    /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
+    /// changed (applied after the step).
+    pub(crate) reshaped: bool,
     /// When they last woke someone crying (a baby), or were woken by a crying baby (a
     /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
     pub(crate) night_woken: u64,
@@ -842,8 +961,6 @@ pub struct Household {
     pub player: bool,
     /// Money earned from jobs.
     pub funds: i64,
-    /// Preferred object style for purchases (index into `Content::styles`).
-    pub style: u8,
     /// "Free will": whether this household's residents choose what to do on their own.
     pub free_will: bool,
     /// Routine blocks every member follows (each may skip some; their own blocks win).
@@ -994,6 +1111,10 @@ pub struct World {
     pub(crate) view: Option<[i32; 4]>,
     /// Per plot: watched this tick (see `lod::plan`).
     pub(crate) watched: Vec<bool>,
+    /// Bumped when a lamp is switched on or off (see `lights.rs`); not a structure change.
+    pub(crate) lights_version: u32,
+    /// What residents switching lights saw last (see `lights::update`).
+    pub(crate) light_watch: crate::lights::Watch,
 }
 
 /// Read-only context for one Sim's update.
@@ -1098,7 +1219,6 @@ impl World {
                 plot: None,
                 player: true,
                 funds: starting_funds,
-                style: 0,
                 free_will: true,
                 routines: Vec::new(),
                 expecting: None,
@@ -1115,7 +1235,6 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: h.funds.unwrap_or(starting_funds),
-                    style: 0,
                     free_will: true,
                     routines: Vec::new(),
                     expecting: None,
@@ -1143,7 +1262,7 @@ impl World {
             let turn = world.check_turn(def, p.turn).map_err(at)?;
             let layout = world.check_layout(def, p.rot, Layout { offset: p.offset, extent: p.size, tall: p.tall }).map_err(at)?;
             let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(def, p.x, p.z, p.rot, layout, 0, 0, value)?;
+            let id = world.place(def, p.x, p.z, p.rot, layout, Default::default(), 0, value)?;
             world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
@@ -1208,12 +1327,19 @@ impl World {
             lod: true,
             view: None,
             watched: Vec::new(),
+            lights_version: 0,
+            light_watch: Default::default(),
         }
     }
 
     /// Bumped whenever walls or objects change, so renderers know to rebuild.
     pub fn structure_version(&self) -> u32 {
         self.structure_version
+    }
+
+    /// Bumped whenever a lamp is switched (see `lights::lamps_off`).
+    pub fn lights_version(&self) -> u32 {
+        self.lights_version
     }
 
     /// Changes whenever the lot does (see `lot_version`); never while only objects move.
@@ -1261,7 +1387,7 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, Layout::default(), 0, 0, value)
+        self.place(def, x, z, rot, Layout::default(), Default::default(), 0, value)
     }
 
     /// Checks that object `def` fits at `x, z, rot` (laid out as `layout`, unchecked: see
@@ -1289,29 +1415,59 @@ impl World {
             tall: layout.tall,
             users: [None; MAX_SLOTS],
             quality: 0,
-            style: 0,
+            colors: Colors::new(),
             value: 0,
             wear: 0.0,
+            open: false,
+            // A crop comes ripe with a lot (bought, it is just planted: `buy_at`).
+            growth: 1.0,
+            off: false,
         };
-        let name = &self.content.objects[def].id;
-        let layer = self.content.objects[def].layer;
+        let d = &self.content.objects[def];
+        let name = &d.id;
+        let layer = d.layer;
         if layer == Layer::Surface {
             return self.check_surface_fit(obj);
         }
+        let on = |o: &ObjectInstance, t: (i32, i32)| o.tiles(&self.content).any(|q| q == t);
+        let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
-            // on their own layer.
+            // on their own layer (and a hanging plant that hangs low the floor as well).
+            let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
             let taken = if layer.mounted() {
-                self.objects.iter().any(|o| {
-                    self.content.objects[o.def].layer == layer && o.tiles(&self.content).any(|t| t == (tx, tz))
-                })
+                self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
+                    || (d.hangs_low && floor && !self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz))))
             } else {
-                self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)]
+                floor && !self.objects.iter().any(|o| self.content.objects[o.def].hangs_low && on(o, (tx, tz)))
             };
             if !self.lot.in_bounds(tx, tz) || taken {
                 return Err(Error::new(format!(
                     "'{name}' at {x},{z} overlaps or leaves the lot"
                 )));
+            }
+            // Furniture as tall as the wall leaves no room on the wall or the ceiling over it; a
+            // thing hanging low from the ceiling none under it.
+            let clash = self.objects.iter().find(|o| {
+                let other = &self.content.objects[o.def];
+                on(o, (tx, tz))
+                    && match (layer, other.layer) {
+                        (Layer::Wall, Layer::Floor) => other.fills_wall,
+                        (Layer::Ceiling, Layer::Floor) => other.fills_wall || d.hangs_low,
+                        (Layer::Floor, Layer::Wall) => d.fills_wall,
+                        (Layer::Floor, Layer::Ceiling) => d.fills_wall || other.hangs_low,
+                        _ => false,
+                    }
+            });
+            if let Some(o) = clash {
+                let other = &self.content.objects[o.def];
+                let why = match layer {
+                    Layer::Floor if other.hangs_low => format!("is under the {}, which hangs too low", called(o)),
+                    Layer::Floor => format!("is too tall for the {} hanging there", called(o)),
+                    Layer::Ceiling if d.hangs_low && !other.fills_wall => format!("would hang too low over the {}", called(o)),
+                    _ => format!("would hang into the {}", called(o)),
+                };
+                return Err(Error::new(format!("'{name}' at {x},{z} {why}")));
             }
             if layer == Layer::Ceiling && self.lot.room_at(tx, tz) == crate::lot::OUTDOORS {
                 return Err(Error::new(format!("'{name}' at {x},{z} needs a ceiling")));
@@ -1331,13 +1487,20 @@ impl World {
         // the footprint, or between the object and where it's used from.
         let in_lot = |(a, b): &((i32, i32), (i32, i32))| self.lot.in_bounds(a.0, a.1) && self.lot.in_bounds(b.0, b.1);
         let body = obj.body_edges(&self.content).into_iter().filter(in_lot);
+        // Nor a diagonal wall across a tile it reaches into.
+        let diagonal = |(tx, tz): (i32, i32)| self.lot.diag(tx, tz).is_some_and(|g| obj.body_crosses(&self.content, tx, tz, g.dir));
         if obj.wall_edges(&self.content).chain(body).any(|(a, b)| {
             self.lot.edge_between(a.0, a.1, b.0, b.1) != crate::lot::Edge::Open
-        }) {
+        }) || obj.body_tiles(&self.content).any(diagonal)
+        {
             return Err(Error::new(format!("'{name}' at {x},{z} is blocked by a wall")));
         }
-        if layer == Layer::Wall && !self.backed_by_wall(&obj) {
-            return Err(Error::new(format!("'{name}' at {x},{z} has no wall to hang on")));
+        if layer == Layer::Wall {
+            match self.wall_behind(&obj) {
+                None => return Err(Error::new(format!("'{name}' at {x},{z} has no wall to hang on"))),
+                Some(true) if !d.over_window => return Err(Error::new(format!("'{name}' at {x},{z} can't hang over a window"))),
+                _ => {}
+            }
         }
         self.check_storey_fit(&obj)?;
         Ok(obj)
@@ -1378,25 +1541,35 @@ impl World {
         NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs }
     }
 
-    /// Whether a wall (plain or with a window) runs along the whole back edge of `obj`.
-    fn backed_by_wall(&self, obj: &ObjectInstance) -> bool {
+    /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
+    /// all along, else whether a window is part of it.
+    fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
-        obj.back_edges(&self.content).into_iter().all(|(horizontal, x, z)| {
+        obj.back_edges(&self.content).into_iter().try_fold(false, |window, (horizontal, x, z)| {
             let e = if horizontal {
                 (x >= 0 && (x as usize) < lot.width && z >= 0 && (z as usize) <= lot.depth).then(|| lot.h_edge(x as usize, z as usize))
             } else {
                 (x >= 0 && (x as usize) <= lot.width && z >= 0 && (z as usize) < lot.depth).then(|| lot.v_edge(x as usize, z as usize))
             };
-            matches!(e, Some(Edge::Wall | Edge::Window))
+            match e? {
+                Edge::Wall => Some(window),
+                Edge::Window => Some(true),
+                _ => None,
+            }
+        })
+    }
+
+    /// What hangs on the wall at this grid edge (`horizontal`: an `h` edge).
+    pub(crate) fn hung_on(&self, horizontal: bool, x: i32, z: i32) -> impl Iterator<Item = &ObjectInstance> {
+        self.objects.iter().filter(move |o| {
+            self.content.objects[o.def].layer == Layer::Wall && o.back_edges(&self.content).contains(&(horizontal, x, z))
         })
     }
 
     /// Whether something hangs on the wall at this grid edge (`horizontal`: an `h` edge).
     pub(crate) fn hangs_on(&self, horizontal: bool, x: i32, z: i32) -> bool {
-        self.objects.iter().any(|o| {
-            self.content.objects[o.def].layer == Layer::Wall && o.back_edges(&self.content).contains(&(horizontal, x, z))
-        })
+        self.hung_on(horizontal, x, z).next().is_some()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1407,12 +1580,12 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        style: u8,
+        colors: Colors,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
         let mut obj = self.check_fit(def, x, z, rot, layout)?;
-        obj.style = style;
+        obj.colors = colors;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
         for (tx, tz) in self.blocking_tiles(&obj) {
@@ -1558,6 +1731,7 @@ impl World {
             job_search_from: 0,
             planner: Default::default(),
             mess: None,
+            reshaped: false,
             care_out: None,
             night_woken: 0,
             conceived: None,
@@ -1889,6 +2063,10 @@ impl World {
                     b.needs[n] = (b.needs[n] + g).min(1.0);
                 }
             }
+            if std::mem::take(&mut self.sims[i].reshaped) {
+                // An object opened or closed: how it looks changes.
+                self.structure_version = self.structure_version.wrapping_add(1);
+            }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
                 self.structure_version = self.structure_version.wrapping_add(1);
@@ -1896,6 +2074,7 @@ impl World {
                     News::Broke(o) => (social::EventKind::Broke, self.objects[o as usize].def as i64),
                     News::Repaired(o) => (social::EventKind::Repaired, self.objects[o as usize].def as i64),
                     News::Accident(a) => (social::EventKind::Accident, a as i64),
+                    News::NotClosed(o) => (social::EventKind::NotClosed, self.objects[o as usize].def as i64),
                 };
                 self.events.push_detail(self.tick, kind, i, Some(n), None);
             }
@@ -2228,6 +2407,7 @@ impl World {
         crate::lifecycle::update(self);
         crate::planner::update(self);
         crate::cooking::after_step(self);
+        crate::lights::update(self);
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }
@@ -2240,6 +2420,33 @@ impl World {
         }
         if tick.is_multiple_of(TICKS_PER_DAY) {
             self.relationships.decay(&self.content.social_rules);
+        }
+        if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
+            self.grow(GROWTH_STEP_MINUTES as f32);
+        }
+    }
+
+    /// Crops grow by `minutes`: fallow ground is planted again, what's planted ripens. A crop
+    /// that shows another stage changes how the lot looks.
+    fn grow(&mut self, minutes: f32) {
+        let mut changed = false;
+        for o in &mut self.objects {
+            let Some(g) = self.content.objects[o.def].grows else { continue };
+            if o.growth >= 1.0 {
+                continue;
+            }
+            let before = o.growth_stage();
+            o.growth = if o.growth < 0.0 {
+                // Fallow, then planted afresh (from nothing: 0).
+                let fallow = o.growth + minutes / (g.fallow_days.max(1.0 / 1440.0) * 1440.0);
+                if fallow >= 0.0 { 0.0 } else { fallow }
+            } else {
+                (o.growth + minutes / (g.days * 1440.0)).min(1.0)
+            };
+            changed |= o.growth_stage() != before;
+        }
+        if changed {
+            self.structure_version = self.structure_version.wrapping_add(1);
         }
     }
 
@@ -2262,6 +2469,7 @@ impl World {
             Command::SetSpeed { .. }
                 | Command::SetLifespan { .. }
                 | Command::SetPlayerMoves { .. }
+                | Command::AddFunds { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -2400,6 +2608,10 @@ impl World {
             }
             Command::SetLifespan { lifespan } => self.lifespan = lifespan,
             Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
+            Command::AddFunds { household, amount } => {
+                let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
+                h.funds = (h.funds + amount).max(0);
+            }
             Command::Adopt { household, child } => {
                 crate::lifecycle::adopt(self, household, child)?;
             }
@@ -2414,6 +2626,13 @@ impl World {
                         h.free_will = enabled;
                     }
                 }
+            }
+            Command::SwitchLamp { object, on } => {
+                let obj = self.objects.get(object as usize).ok_or_else(|| Error::new(format!("unknown object {object}")))?;
+                if !crate::lights::switchable(self, obj.def) {
+                    return Err(Error::new(format!("the {} has no switch", self.content.objects[obj.def].name.to_lowercase())));
+                }
+                crate::lights::set(self, object, on);
             }
             Command::Use {
                 sim,
@@ -2435,6 +2654,20 @@ impl World {
                         "the {} is broken — repair it first",
                         self.content.objects[obj.def].name
                     )));
+                }
+                if !obj.allows(inter, sim) {
+                    let name = self.content.objects[obj.def].name.to_lowercase();
+                    return Err(Error::new(match inter.when {
+                        Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
+                        Some(w) if w != obj.open => format!("the {name} is closed"),
+                        _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
+                        _ => format!("someone is using the {name}"),
+                    }));
+                }
+                // (Lying along the whole window seat: not with someone else on it.)
+                if inter.whole && !obj.can_use_for(sim, &self.content.objects[obj.def], interaction) {
+                    let name = self.content.objects[obj.def].name.to_lowercase();
+                    return Err(Error::new(format!("someone is using the {name}")));
                 }
                 if inter.needs_table && crate::surface::faced_table(&self.content, &self.objects, &self.nav(), object).is_none() {
                     return Err(Error::new(format!(
@@ -2600,7 +2833,7 @@ impl World {
                 household,
                 object,
                 at,
-                style,
+                colors,
                 turn,
                 offset,
                 size,
@@ -2611,7 +2844,8 @@ impl World {
                 let rot = at.map_or(0, |a| a[2] as u8);
                 let layout = Layout { offset: offset.unwrap_or([0, 0]), extent: size, tall: tall.unwrap_or(0) };
                 let layout = def.map(|d| self.check_layout(d, rot, layout)).transpose()?;
-                let id = self.buy_at(household, &object, at, style, layout.unwrap_or_default())?;
+                let colors = check_colors(colors)?;
+                let id = self.buy_at(household, &object, at, colors, layout.unwrap_or_default())?;
                 self.objects[id as usize].turn = turn.unwrap_or(0);
             }
             Command::Sell { household, object } => self.sell(household, object)?,
@@ -2645,15 +2879,7 @@ impl World {
                 let (offset, size, tall) = (layout.map(|l| l.offset), layout.and_then(|l| l.extent), layout.map(|l| l.tall));
                 self.move_object_to(household, object, x, z, rot, turn, offset, size, tall)?;
             }
-            Command::Restyle {
-                household,
-                object,
-                style,
-            } => self.restyle(household, object, style)?,
-            Command::SetStyle { household, style } => {
-                let h = self.home_of(household)?.0;
-                self.households[h].style = self.check_style(style)?;
-            }
+            Command::Recolor { household, object, colors } => self.recolor(household, object, check_colors(colors)?)?,
             Command::Upgrade { household, object } => {
                 self.upgrade(household, object)?;
             }
@@ -3177,7 +3403,8 @@ fn pick_autonomous(
             // a baby in it, the more the baby needs it.
             let mut care = 0.0;
             // Dining at a table only with a table to dine at.
-            if inter.baby || (inter.needs_table && !at_table) {
+            // (Nor one that takes the whole thing while someone else is on it.)
+            if inter.baby || (inter.needs_table && !at_table) || !obj.allows(inter, sim.id) || !obj.can_use_for(sim.id, &content.objects[obj.def], i) {
                 continue;
             }
             // Costing a need about to run out, or planned with one it doesn't fill: it would stop
@@ -3296,7 +3523,6 @@ fn pick_autonomous(
         let attracted = other
             .gender_ix
             .is_none_or(|g| sim.attraction & (1 << g) != 0);
-        // Partner lookups scan everyone: only when a goal asks for it.
         let single = !sim.planner.goals.is_empty() && ctx.rels.partner_of(j).is_none();
         let grown_ups = ctx.briefs[me].adult && other.adult;
         // A guest keeps the hosts company, even with nothing in particular to talk about.
@@ -3607,7 +3833,13 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             let Some(inter) = content.objects[obj.def].interactions.get(interaction) else {
                 return;
             };
-            if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
+            // An order to close it on someone who got in (or set off for it) after it was given:
+            // the player is told.
+            if task.directed && obj.closes_on_someone(inter, sim.id) {
+                sim.news.get_or_insert(News::NotClosed(object));
+                return;
+            }
+            if !obj.can_use_for(sim.id, &content.objects[obj.def], interaction) || obj.broken() {
                 return;
             }
             // Never other people's things; what the player asks a guest to do, only what guests
@@ -3618,6 +3850,9 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             }
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {
+                return;
+            }
+            if !obj.allows(inter, sim.id) {
                 return;
             }
             let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
@@ -3722,7 +3957,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
-        if !obj.reserve_in(sim.id, content.objects[obj.def].slots_for(interaction)) {
+        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction) {
             return;
         }
         // Off to bed (they can get there): the toilet first, out of habit, and then they
@@ -3963,9 +4198,20 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if !given_up {
                         sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
                     }
-                } else if inter.tags & content.day_rhythm.sleep_tags != 0 {
-                    // Up: the toilet first, out of habit.
-                    sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
+                } else if inter.close_after || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0 {
+                    // Up from a night's sleep: the toilet first, out of habit.
+                    if inter.tags & content.day_rhythm.sleep_tags != 0 {
+                        sim.follow_up = habit(sim, ctx, objects, HabitTime::Wake, ctx.object_plot[object as usize]);
+                    }
+                    // Then what sleeping or napping opened is closed again (a wall bed folded
+                    // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
+                    // `close_after`), unless someone is still in it: whoever gets up last does it.
+                    if let Some(close) = closing(sim, content, o, object) {
+                        match sim.follow_up {
+                            None => sim.follow_up = Some(close),
+                            Some(_) => sim.queue.push_front(close),
+                        }
+                    }
                 }
             }
         }
@@ -4092,11 +4338,18 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         interaction,
     }) = sim.current.as_ref().map(|a| a.task.kind)
     {
-        if objects[object as usize].broken() {
+        // Nor is something opened that someone opened on the way, or closed on someone in it.
+        let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+        if objects[object as usize].broken() || !objects[object as usize].allows(inter, sim.id) {
+            // (An order to close it on someone who got there first: the player is told.)
+            let directed = sim.current.as_ref().is_some_and(|a| a.task.directed);
+            if directed && !objects[object as usize].broken() && objects[object as usize].closes_on_someone(inter, sim.id) {
+                sim.news.get_or_insert(News::NotClosed(object));
+            }
             end_activity(sim, content, objects);
             return;
         }
-        let cost = content.objects[objects[object as usize].def].interactions[interaction].cost;
+        let cost = inter.cost;
         let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
         if !affordable(cost, funds) {
             end_activity(sim, content, objects);
@@ -4170,6 +4423,18 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             }
             sim.pose = inter.pose;
             act.phase = Phase::Using { elapsed: 0.0 };
+            // Opened or closed as the use starts (a wall bed folds down as they lie down).
+            if let Some(open) = inter.leaves
+                && objects[object as usize].open != open
+            {
+                objects[object as usize].open = open;
+                sim.reshaped = true;
+            }
+            // A crop picked as the harvest starts: it lies fallow, then grows again.
+            if inter.picks && objects[object as usize].growth >= 0.0 {
+                objects[object as usize].growth = -1.0;
+                sim.reshaped = true;
+            }
         }
     }
 }
@@ -4225,7 +4490,9 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
     let possible = |r: usize| ctx.content.recipes[r].possible(stations);
     let mut found = 0;
     for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken() && usable(o)) {
-        for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares() && i.recipe.is_none_or(possible)) {
+        let def = &ctx.content.objects[o.def];
+        let startable = |&(n, _): &(usize, &crate::content::Interaction)| !free || o.can_use_for(sim.id, def, n);
+        for (_, i) in def.interactions.iter().enumerate().filter(startable).filter(|(_, i)| i.autonomous && !i.cares() && i.recipe.is_none_or(possible)) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
         if found == mask {
@@ -4354,6 +4621,17 @@ fn filling(sim: &Sim, content: &Content, objects: &[ObjectInstance], items: &cra
     }
 }
 
+/// Closing `o` again after sleeping or napping in it, if that opened it (`Interaction::leaves`):
+/// its interaction that closes it, if `sim` may do it now. A routine, like washing hands.
+fn closing(sim: &Sim, content: &Content, o: &ObjectInstance, object: u32) -> Option<Task> {
+    if !o.open {
+        return None;
+    }
+    let interactions = &content.objects[o.def].interactions;
+    let interaction = interactions.iter().position(|i| i.leaves == Some(false) && o.allows(i, sim.id))?;
+    Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
+}
+
 /// What follows using `object` when its interaction has an `after` (`tags`): the nearest
 /// working object on the same plot with an interaction of those tags, one they may use and can
 /// get to (a guest washes their hands at the host's sink). None: there's nothing like it.
@@ -4387,7 +4665,8 @@ fn nearest(
         .filter(|o| Some(o.id) != except && ctx.object_plot[o.id as usize] == plot)
         .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
         .filter_map(|o| {
-            let i = content.objects[o.def].interactions.iter().position(&fits)?;
+            let def = &content.objects[o.def];
+            let i = (0..def.interactions.len()).find(|&i| fits(&def.interactions[i]) && o.allows(&def.interactions[i], sim.id) && o.can_use_for(sim.id, def, i))?;
             let (fx, fz) = approach(o);
             Some((ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos), o.id, i))
         })
@@ -4467,7 +4746,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
         let def = &content.objects[o.def];
         let i = def.interactions.iter().position(|it| it.baby)?;
         let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
-        (!o.broken() && !taken && o.can_use_in(sim.id, def.slots_for(i))).then_some((o.id, i))
+        (!o.broken() && !taken && o.can_use_for(sim.id, def, i)).then_some((o.id, i))
     })?;
     let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
     sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
@@ -4485,6 +4764,59 @@ fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
     fits(x) && fits(y) && y.household == x.household && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
         && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
+}
+
+/// The colours a player gives an object's parts, 0xRRGGBB by the name of the model's material
+/// they go on (`body`, `stone`, `chrome`); a part not named is as it's made. The sim doesn't know
+/// the parts: the renderer colours only those the model lets the player paint.
+pub type Colors = BTreeMap<String, u32>;
+
+/// Parts one object may colour at most.
+pub const MAX_COLORS: usize = 16;
+
+/// An object's colours as a command gives them: at most `MAX_COLORS` parts, each named by a
+/// material (`[a-z0-9_]`, up to 32 characters), each 0xRRGGBB.
+pub(crate) fn check_colors(colors: Colors) -> Result<Colors, Error> {
+    if colors.len() > MAX_COLORS {
+        return Err(Error::new(format!("too many colours: {} (at most {MAX_COLORS})", colors.len())));
+    }
+    for (part, &color) in &colors {
+        if !part_name(part) {
+            return Err(Error::new(format!("no such part: {part:?}")));
+        }
+        if color > 0xFF_FFFF {
+            return Err(Error::new(format!("no such colour: {color:#x}")));
+        }
+    }
+    Ok(colors)
+}
+
+fn part_name(part: &str) -> bool {
+    (1..=32).contains(&part.len()) && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// An object's colours as saves and the view write them: `#rrggbb` by part.
+pub fn colors_hex(colors: &Colors) -> BTreeMap<String, String> {
+    colors.iter().map(|(part, &c)| (part.clone(), color_hex(c))).collect()
+}
+
+/// `colors_hex` read back, with an older file's one `color` on the `body` (the part every
+/// paintable model's colour went on); what isn't a part or a colour is left out.
+pub fn parse_colors(colors: &BTreeMap<String, String>, color: Option<&str>) -> Colors {
+    let old = color.and_then(parse_color).filter(|_| colors.is_empty()).map(|c| ("body".to_string(), c));
+    let parts = colors.iter().filter(|(part, _)| part_name(part)).filter_map(|(part, hex)| Some((part.clone(), parse_color(hex)?)));
+    old.into_iter().chain(parts).take(MAX_COLORS).collect()
+}
+
+/// An object's colour as saves and the view write it: `#rrggbb`.
+pub fn color_hex(color: u32) -> String {
+    format!("#{color:06x}")
+}
+
+/// `color_hex` read back; None if it isn't one.
+pub fn parse_color(hex: &str) -> Option<u32> {
+    let digits = hex.strip_prefix('#')?;
+    if digits.len() == 6 { u32::from_str_radix(digits, 16).ok() } else { None }
 }
 
 #[cfg(test)]

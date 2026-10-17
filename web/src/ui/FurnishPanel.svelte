@@ -5,7 +5,7 @@
   import ItemCard from './buy/ItemCard.svelte';
   import ItemDetail from './buy/ItemDetail.svelte';
   import ItemHoverCard from './buy/ItemHoverCard.svelte';
-  import { loversOf, styledModel, styleOptions, summarize } from './buy/catalog';
+  import { loversOf, paintable, summarize } from './buy/catalog';
   import { services } from './services';
   import { play } from './sfx';
   import { game } from './state.svelte';
@@ -64,9 +64,6 @@
     }
     return map;
   });
-  /** How many styles each item comes in (most have one design: 0). */
-  const styleCounts = new Map(content.shop.map((d) => [d.id, styleOptions(content, services.assets, d).length]));
-  const styledItems = [...styleCounts.values()].filter((n) => n > 0).length;
   /** How many of each item stand on the home lot. */
   const owned = $derived.by(() => {
     const plot = game.households.find((h) => h.player)?.plot;
@@ -123,12 +120,14 @@
 
   const folded = $derived(!!game.placing && !over);
   const selected = $derived(game.buySelection === null ? null : (game.objects.find((o) => o.id === game.buySelection) ?? null));
-  /** Something already owned, in hand, else the owned object picked on the lot: its card restyles, upgrades or sells it. */
+  /** Something already owned, in hand, else the owned object picked on the lot: its card recolours, upgrades or sells it; a new purchase in hand that takes a colour, its colour. */
   const moving = $derived(game.placing?.objectId == null ? null : (game.objects.find((o) => o.id === game.placing!.objectId) ?? null));
   const pinned = $derived.by(() => {
     const obj = moving ?? selected;
     const def = obj && content.object(obj.def);
-    return obj && def ? { def, owned: obj } : null;
+    if (obj && def) return { def, owned: obj };
+    const buying = game.placing?.objectId === null ? content.object(game.placing.def) : undefined;
+    return buying && paintable(services.assets, buying) ? { def: buying, owned: null } : null;
   });
   const hoveredDef = $derived(hovered && !folded ? content.object(hovered.id) : undefined);
 
@@ -185,7 +184,7 @@
   <BuildDock label="Furnish" bind:over tipId="furnish">
     {#snippet tip()}
       <b>Make it home.</b> Pick something to buy, then click on your lot to place it. Point at an item to see what it does for your household;
-      <span class="heart">♥</span> marks what suits someone's personality. Click something you own to move, restyle, upgrade or sell it.
+      <span class="heart">♥</span> marks what suits someone's personality. Click something you own to move, recolour, upgrade or sell it.
     {/snippet}
 
     {#snippet head()}
@@ -227,15 +226,6 @@
                 >
               {/if}
             </div>
-            {#if content.styles.length > 1 && styledItems > 0}
-              <span class="eyebrow">Style of new purchases</span>
-              <div class="row">
-                {#each content.styles as st, i (st.id)}
-                  <button class="chip" class:active={game.householdStyle === i} onclick={() => (play('tab'), services.controls.setHouseholdStyle(i))}>{st.label}</button>
-                {/each}
-              </div>
-              <p class="muted">{styledItems} items come in several designs. Styles never change price or quality.</p>
-            {/if}
           </div>
         {/if}
       </div>
@@ -269,7 +259,7 @@
               <li style="--i:{Math.min(i, 16)}">
                 <ItemCard
                   {def}
-                  model={styledModel(content, services.assets, def, game.householdStyle)}
+                  model={def.model}
                   affordable={game.affords(def.price ?? 0)}
                   active={game.placing?.def === def.id && game.placing.objectId === null}
                   owned={owned.get(def.id) ?? 0}
@@ -293,11 +283,11 @@
 
     {#snippet above()}
       {#if hoveredDef && hovered}
-        <ItemHoverCard def={hoveredDef} at={hovered.at} lovers={lovers.get(hoveredDef.id) ?? []} owned={owned.get(hoveredDef.id) ?? 0} styles={styleCounts.get(hoveredDef.id) ?? 0} />
+        <ItemHoverCard def={hoveredDef} at={hovered.at} lovers={lovers.get(hoveredDef.id) ?? []} owned={owned.get(hoveredDef.id) ?? 0} />
       {/if}
       {#if pinned}
-        <section class="pinned glass" aria-label={moving ? 'In hand' : 'Picked'}>
-          {#if !moving}
+        <section class="pinned glass" aria-label={moving || !pinned.owned ? 'In hand' : 'Picked'}>
+          {#if !moving && pinned.owned}
             <button class="close" aria-label="Put down" title="Done (Esc)" onclick={() => (game.buySelection = null)}><Icon name="icon.ui.close" size={12} /></button>
           {/if}
           <ItemDetail def={pinned.def} owned={pinned.owned} />
@@ -423,9 +413,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-  }
-  .popover p {
-    margin: 0;
   }
   .body {
     display: flex;

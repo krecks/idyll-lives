@@ -55,6 +55,7 @@
       "footprint": [2, 1],
       "price": 1500,
       "category": "kitchen",
+      "fillsWall": true,
       "description": "Six burners and a proper oven. The better the cook, the better the meal; good cooks (Cooking 4+) make delicious meals.",
       "interactions": [
         {

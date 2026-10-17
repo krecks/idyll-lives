@@ -51,7 +51,7 @@ fn build(w: &mut World, edits: Vec<EdgeEdit>) -> Result<(), sim_core::Error> {
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), style: None, turn: None, offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
@@ -180,7 +180,7 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
         w.apply(Command::Build { household: 1, edits }).unwrap();
     }
     let buy = |w: &mut World, def: &str, x: i32, z: i32| {
-        w.apply(Command::Buy { household: 1, object: def.into(), at: Some([x, z, 0]), style: None, turn: None, offset: None, size: None, tall: None }).unwrap();
+        w.apply(Command::Buy { household: 1, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
         w.objects.len() as u32 - 1
     };
     buy(&mut w, "stairs", 29, 3);

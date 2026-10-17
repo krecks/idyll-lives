@@ -29,7 +29,7 @@ from functools import lru_cache
 
 import numpy as np
 
-from cage import Cage, se, unit
+from cage import Cage, se, turn, unit
 from head import head_cage, youth
 from meshops import smooth_normals
 from rig import B, BASE_STAGE, BONES, joints, proportions
@@ -302,19 +302,23 @@ def body_cage(family, stage):
                 c.band(prev_f, cur)
                 prev_f = cur
             c.cap(prev_f)
-        # Thumb: from the palm's thumb side between the two rings, forward and along the hand.
+        # Thumb: from the palm's thumb side between the two rings, a ring at its knuckle (thumb_02)
+        # and one before the tip, narrowing like a finger. Each ring is the base quad turned from
+        # facing forward to facing along the thumb (its corners keep their sides: wrist / tip of the
+        # hand, back / palm), so the bands don't twist.
         tl = [p1[8], p1[9], p2[9], p2[8]]
         base = np.array([c.P[i] for i in tl])
         m = base.mean(0)
-        t1, t2 = P[f'thumb_01_{s}'], P[f'thumb_02_{s}']
-        dirt = unit(unit(t2 - t1) + 0.35 * Z - 0.15 * u)
-        Lt = 0.85 * Lf
+        side_d, side_u = np.sign((base - m) @ d), np.sign((base - m) @ u)
+        t2 = P[f'thumb_02_{s}']
+        tip = unit(0.8 * d - 0.35 * u + 0.4 * Z)
         prev_t = tl
-        for t, sc, w in ((0.78, 0.9, {'thumb_02_' + s: 0.8, 'thumb_01_' + s: 0.2}),):
-            cc = m + dirt * Lt * t
-            q = base - m
-            q = q - np.outer(q @ dirt, dirt)
-            cur = c.ring(cc + q * sc, w, 'hand', arm=1.0)
+        for cc, ax, hw, ht, w in (
+            (t2, unit(unit(t2 - m) + tip), 0.15, 0.14, {'thumb_01_' + s: 0.5, 'thumb_02_' + s: 0.5}),
+            (t2 + 0.42 * Lp * tip, tip, 0.11, 0.105, {'thumb_02_' + s: 1.0}),
+        ):
+            R = turn(Z, ax)
+            cur = c.ring(cc + Lp * (np.outer(side_d * hw, R @ d) + np.outer(side_u * ht, R @ u)), w, 'hand', arm=1.0)
             c.band(prev_t, cur)
             prev_t = cur
         c.cap(prev_t)

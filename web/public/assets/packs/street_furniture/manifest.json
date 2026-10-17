@@ -1,0 +1,291 @@
+{
+  "$comment": "Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, the notice board, the phone box, the town fountain and the founder's statue. Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far version for the town overview. The lamp's lantern and the phone box's signs glow at night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water runs near the camera (`water_run`, ambient).",
+  "version": 1,
+  "entries": {
+    "model.streetLamp": {
+      "type": "model",
+      "url": "../../models/street_furniture/streetLamp.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "lantern": {
+          "finish": "material.finish.satin",
+          "glow": "#FFD596"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Lamp post"
+        }
+      ],
+      "far": "../../models/street_furniture/streetLamp.far.glb"
+    },
+    "model.parkBench": {
+      "type": "model",
+      "url": "../../models/street_furniture/parkBench.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/street_furniture/parkBench.far.glb"
+    },
+    "model.drinkingFountain": {
+      "type": "model",
+      "url": "../../models/street_furniture/drinkingFountain.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "granite": {
+          "finish": "material.finish.matte"
+        },
+        "spray": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "drink": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pillar"
+        }
+      ],
+      "far": "../../models/street_furniture/drinkingFountain.far.glb"
+    },
+    "model.litterBin": {
+      "type": "model",
+      "url": "../../models/street_furniture/litterBin.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Bin"
+        }
+      ],
+      "far": "../../models/street_furniture/litterBin.far.glb"
+    },
+    "model.busStop": {
+      "type": "model",
+      "url": "../../models/street_furniture/busStop.glb",
+      "materials": {
+        "blue": {
+          "finish": "material.finish.gloss"
+        },
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/street_furniture/busStop.far.glb"
+    },
+    "model.postBox": {
+      "type": "model",
+      "url": "../../models/street_furniture/postBox.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "post": "flap"
+        },
+        "hold": 1
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Box"
+        }
+      ],
+      "far": "../../models/street_furniture/postBox.far.glb"
+    },
+    "model.noticeBoard": {
+      "type": "model",
+      "url": "../../models/street_furniture/noticeBoard.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "cork": {
+          "finish": "material.finish.matte"
+        },
+        "note_blue": {
+          "finish": "material.finish.satin"
+        },
+        "note_green": {
+          "finish": "material.finish.satin"
+        },
+        "note_pink": {
+          "finish": "material.finish.satin"
+        },
+        "note_white": {
+          "finish": "material.finish.satin"
+        },
+        "note_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "pin": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/street_furniture/noticeBoard.far.glb"
+    },
+    "model.phoneBooth": {
+      "type": "model",
+      "url": "../../models/street_furniture/phoneBooth.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "sign": {
+          "finish": "material.finish.matte",
+          "glow": "#FFF1D2"
+        }
+      },
+      "motions": {
+        "uses": {
+          "call": {
+            "clip": "door_open",
+            "delay": 0.3,
+            "hold": 2.4,
+            "out": 1.6
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Kiosk"
+        }
+      ],
+      "far": "../../models/street_furniture/phoneBooth.far.glb"
+    },
+    "model.fountainTown": {
+      "type": "model",
+      "url": "../../models/street_furniture/fountainTown.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.matte"
+        },
+        "granite": {
+          "finish": "material.finish.matte"
+        },
+        "spray": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "idle": "water_run"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Stone"
+        }
+      ],
+      "far": "../../models/street_furniture/fountainTown.far.glb"
+    },
+    "model.townStatue": {
+      "type": "model",
+      "url": "../../models/street_furniture/townStatue.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "granite": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Statue"
+        }
+      ],
+      "far": "../../models/street_furniture/townStatue.far.glb"
+    }
+  }
+}

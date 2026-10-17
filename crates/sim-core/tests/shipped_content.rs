@@ -259,7 +259,7 @@ fn every_personality_lives_well_with_all_packs() {
             items.sort();
             if let Some((_, id)) = items
                 .into_iter()
-                .find(|(_, id)| world.buy(0, id, None, None).is_ok())
+                .find(|(_, id)| world.buy(0, id, None, Default::default()).is_ok())
             {
                 let _ = id;
                 bought += 1;
@@ -346,10 +346,14 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
     world.households[0].funds = 10_000;
     // Garden things find a spot outdoors on their own.
     let patch = world
-        .buy(0, "garden.vegPatch", None, None)
+        .buy(0, "garden.vegPatch", None, Default::default())
         .expect("a vegetable patch fits in the garden");
     let o = &world.objects[patch as usize];
     assert_eq!(world.lot.room_at(o.x, o.z), sim_core::lot::OUTDOORS);
+    assert!(!o.ripe(), "bought, it's just planted");
+    // Days later, it's ripe.
+    world.objects[patch as usize].growth = 1.0;
+    let o = &world.objects[patch as usize];
     let def = &world.content.objects[o.def];
     let harvest = def.interactions.iter().position(|i| i.id == "harvest").unwrap();
     let hunger = world.content.needs.iter().position(|n| n.id == "hunger").unwrap();

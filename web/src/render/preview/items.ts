@@ -11,31 +11,15 @@
  * preview. The engine is released a few seconds after the queue empties.
  */
 
-import {
-  Camera,
-  Color3,
-  Color4,
-  DirectionalLight,
-  DynamicTexture,
-  Engine,
-  FreeCamera,
-  HemisphericLight,
-  ImageProcessingConfiguration,
-  Matrix,
-  MeshBuilder,
-  Scene,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-  type Mesh,
-} from '../babylon/core';
+import { Camera, Engine, FreeCamera, Matrix, TransformNode, Vector3, type Mesh, type Scene } from '../babylon/core';
 import { withoutBuild } from '../../assets/build';
 import type { AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
-import { MaterialLibrary } from '../babylon/materials';
-import { buildModel } from '../babylon/models';
-import { installNature } from '../babylon/nature';
-import type { ItemPreviews } from '../types';
+import { colorsKey, type PartColors } from '../../core/protocol';
+import { buildModel, painted } from '../babylon/models';
+import type { ItemPreviews, ItemStage } from '../types';
+import { boxCorners, contactShadow, studioScene } from './itemScene';
+import { ItemStageController } from './itemStage';
 
 /** Picture sizes in pixels (cards show ~80 CSS px; the detail's turntable ~200). */
 const THUMB_PX = 192;
@@ -48,8 +32,11 @@ const TURNTABLE_CACHE = 24;
 /** Three-quarter view from the front, a little to the side and above (radians). */
 const YAW = -0.62;
 const PITCH = 0.5;
-/** Smallest half-height of the view (m), so a pot plant doesn't fill the frame like a bed. */
-const MIN_HALF = 0.55;
+/**
+ * Smallest half-height of the view (m), so a pot plant doesn't fill the frame like a bed; small
+ * enough that a mug on a top still shows (about a third of the picture).
+ */
+const MIN_HALF = 0.3;
 
 /** `now`: on screen (drawn first, in request order); `idle`: drawn ahead of time when nothing else waits. */
 export type Priority = 'now' | 'idle';
@@ -58,6 +45,8 @@ interface Job {
   key: string;
   model: string;
   footprint: [number, number];
+  /** Its parts' colours (turntables of a placed object). */
+  colors?: PartColors;
   frames: number;
   size: number;
   priority: Priority;
@@ -71,7 +60,7 @@ const turntables = new Map<string, string[]>();
  * are deleted when it opens. Bump `v1` to drop old pictures after a look change.
  */
 const STORE_PREFIX = 'littlelives-item-pictures-';
-const STORE = `${STORE_PREFIX}v1-${__APP_VERSION__}`;
+const STORE = `${STORE_PREFIX}v2-${__APP_VERSION__}`;
 
 export function createItemPreviews(assets: AssetRegistry): ItemPreviews {
   return new ItemThumbnails(assets);
@@ -109,19 +98,29 @@ class ItemThumbnails implements ItemPreviews {
     for (const m of models) void this.thumbnail(m.model, m.footprint, 'idle');
   }
 
-  cachedTurntable(model: string, frames: number): string[] | null {
-    return turntables.get(`${model}|${frames}`) ?? null;
+  cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null {
+    return turntables.get(`${model}|${frames}|${colorsKey(colors)}`) ?? null;
   }
 
-  turntable(model: string, footprint: [number, number], frames: number): Promise<string[] | null> {
-    const key = `${model}|${frames}`;
+  turntable(model: string, footprint: [number, number], frames: number, colors?: PartColors): Promise<string[] | null> {
+    const key = `${model}|${frames}|${colorsKey(colors)}`;
     const hit = turntables.get(key);
     if (hit) {
       turntables.delete(key);
       turntables.set(key, hit);
       return Promise.resolve(hit);
     }
-    return this.request(key, model, footprint, frames, TURN_PX, 'now');
+    return this.request(key, model, footprint, frames, TURN_PX, 'now', undefined, colors);
+  }
+
+  async stage(host: HTMLElement, model: string, footprint: [number, number]): Promise<ItemStage | null> {
+    if (this.unavailable) return null;
+    try {
+      return await ItemStageController.create(host, this.assets, model, footprint);
+    } catch (err) {
+      console.warn('[preview] item stage unavailable', err);
+      return null;
+    }
   }
 
   /** Keeps what was drawn, even if whoever asked has gone meanwhile. */
@@ -148,12 +147,13 @@ class ItemThumbnails implements ItemPreviews {
     size: number,
     priority: Priority,
     signal?: AbortSignal,
+    colors?: PartColors,
   ): Promise<string[] | null> {
     if (this.unavailable) return Promise.resolve(null);
     return new Promise((resolve) => {
       let job = this.queue.find((j) => j.key === key);
       if (!job) {
-        job = { key, model, footprint, frames, size, priority, waiters: [] };
+        job = { key, model, footprint, colors, frames, size, priority, waiters: [] };
         this.queue.push(job);
       } else if (priority === 'now' && job.priority === 'idle') {
         // Wanted on screen now: ahead of everything drawn ahead of time.
@@ -196,7 +196,7 @@ class ItemThumbnails implements ItemPreviews {
         if (studio) {
           try {
             // The images are encoded while the next model is built.
-            encoded = (await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size))?.encoded ?? encoded;
+            encoded = (await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size, job.colors))?.encoded ?? encoded;
           } catch (err) {
             console.warn(`[preview] thumbnail of ${job.model} failed`, err);
           }
@@ -313,22 +313,7 @@ class ItemStudio {
     canvas.width = canvas.height = TURN_PX;
     const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, premultipliedAlpha: true, alpha: true, stencil: false, adaptToDeviceRatio: false });
     try {
-      const scene = new Scene(engine);
-      scene.clearColor = new Color4(0, 0, 0, 0);
-      scene.skipPointerMovePicking = true;
-      // Foliage cards turn to face the camera here too (and sway a little in the turntable).
-      installNature(scene);
-      const ip = scene.imageProcessingConfiguration;
-      ip.toneMappingEnabled = true;
-      ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-      ip.exposure = 1.2;
-      ip.contrast = 1.1;
-      const lib = MaterialLibrary.for(scene).setAssets(assets);
-      const env = assets.get('environment.sky', 'image');
-      if (env) await lib.loadEnvironment(env.url);
-      lib.setEnvironmentIntensity(0.75);
-      lights(scene);
-      return new ItemStudio(engine, scene, canvas);
+      return new ItemStudio(engine, await studioScene(engine, assets), canvas);
     } catch (err) {
       engine.dispose();
       throw err;
@@ -339,9 +324,9 @@ class ItemStudio {
    * Builds `model` and draws it from `frames` angles around it. Resolves once drawn; `encoded`
    * (the image URLs, one per angle) settles later, so the next model can be built meanwhile.
    */
-  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number): Promise<{ encoded: Promise<string[]> } | null> {
+  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]> } | null> {
     const entry = assets.has(model, 'model') ? assets.get(model, 'model') : undefined;
-    const template = await buildModel(this.scene, `thumb:${model}`, entry, footprint);
+    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint);
     const meshes = template.meshes;
     try {
       const identity = Matrix.Identity().asArray() as unknown as Float32Array;
@@ -355,9 +340,12 @@ class ItemStudio {
       const corners = boxCorners(meshes);
       if (!corners.length || !(await this.whenReady(meshes))) return null;
 
-      // The contact shadow follows the footprint (it turns with the model).
-      const [fw, fd] = footprint;
-      this.shadow.scaling.set(fw * 1.25 + 0.2, 1, fd * 1.25 + 0.2);
+      // The contact shadow is the model's own ground size, under its middle (it turns with the
+      // model), not its footprint's: a mug's tile-sized shadow ran off the picture's edges.
+      let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+      for (const v of corners) [x0, x1, z0, z1] = [Math.min(x0, v.x), Math.max(x1, v.x), Math.min(z0, v.z), Math.max(z1, v.z)];
+      const [sx, sz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+      this.shadow.scaling.set((x1 - x0) * 1.3 + 0.08, 1, (z1 - z0) * 1.3 + 0.08);
 
       const angles = Array.from({ length: frames }, (_, i) => (i * Math.PI * 2) / frames);
       this.frame(corners, angles);
@@ -366,6 +354,9 @@ class ItemStudio {
       for (const angle of angles) {
         this.root.rotation.y = angle;
         this.shadow.rotation.y = angle;
+        // Babylon's rotation.y turns +x towards -z.
+        this.shadow.position.x = sx * Math.cos(angle) + sz * Math.sin(angle);
+        this.shadow.position.z = -sx * Math.sin(angle) + sz * Math.cos(angle);
         this.scene.render();
         urls.push(this.capture(size));
       }
@@ -434,65 +425,4 @@ class ItemStudio {
     const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/webp', 0.9));
     return URL.createObjectURL(blob);
   }
-}
-
-/** The 8 corners of the meshes' combined bounding box (model space). */
-function boxCorners(meshes: Mesh[]): Vector3[] {
-  const min = new Vector3(Infinity, Infinity, Infinity);
-  const max = new Vector3(-Infinity, -Infinity, -Infinity);
-  for (const mesh of meshes) {
-    if (!mesh.getTotalVertices()) continue;
-    mesh.computeWorldMatrix(true);
-    const box = mesh.getBoundingInfo().boundingBox;
-    min.minimizeInPlace(box.minimumWorld);
-    max.maximizeInPlace(box.maximumWorld);
-  }
-  if (!Number.isFinite(min.x)) return [];
-  const out: Vector3[] = [];
-  for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) out.push(new Vector3(x, y, z));
-  return out;
-}
-
-/** A soft round shade under the model, so it stands on something. */
-function contactShadow(scene: Scene): Mesh {
-  const n = 128;
-  const tex = new DynamicTexture('itemShadow', n, scene, true);
-  const ctx = tex.getContext() as CanvasRenderingContext2D;
-  const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-  g.addColorStop(0, 'rgba(0,0,0,0.42)');
-  g.addColorStop(0.55, 'rgba(0,0,0,0.2)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, n, n);
-  tex.update();
-  tex.hasAlpha = true;
-  const mat = new StandardMaterial('itemShadow', scene);
-  mat.disableLighting = true;
-  mat.diffuseColor = Color3.Black();
-  mat.specularColor = Color3.Black();
-  mat.emissiveColor = Color3.Black();
-  mat.opacityTexture = tex;
-  mat.disableDepthWrite = true;
-  const mesh = MeshBuilder.CreateGround('itemShadow', { width: 1, height: 1 }, scene);
-  mesh.material = mat;
-  mesh.position.y = 0.004;
-  mesh.isPickable = false;
-  return mesh;
-}
-
-/** Product-shot lighting: a warm key from the upper front, a cool fill, a rim and the sky. */
-function lights(scene: Scene): void {
-  const key = new DirectionalLight('itemKey', new Vector3(0.45, -0.75, -0.5), scene);
-  key.intensity = 2.6;
-  key.diffuse = new Color3(1, 0.96, 0.9);
-  const fill = new DirectionalLight('itemFill', new Vector3(-0.8, -0.3, -0.4), scene);
-  fill.intensity = 0.9;
-  fill.diffuse = new Color3(0.86, 0.91, 1);
-  fill.specular = new Color3(0.1, 0.1, 0.12);
-  const rim = new DirectionalLight('itemRim', new Vector3(-0.2, -0.4, 0.9), scene);
-  rim.intensity = 1.6;
-  const sky = new HemisphericLight('itemSky', new Vector3(0, 1, 0), scene);
-  sky.intensity = 0.45;
-  sky.groundColor = new Color3(0.5, 0.46, 0.42);
-  sky.specular = Color3.Black();
 }

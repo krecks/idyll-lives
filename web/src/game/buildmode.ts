@@ -20,11 +20,10 @@
  * them up again (the wall stays); a run that takes in walls tears everything on it down.
  */
 
-import type { AssetRegistry } from '../assets/registry';
 import type { Content, ObjectDef } from '../content/content';
-import { groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, seenAt, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { colorValues } from '../ui/buy/catalog';
+import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, seenAt, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
-import { styledModel } from '../ui/buy/catalog';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachTile, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
@@ -41,6 +40,8 @@ interface BuildPreview {
   setPlacementGhost(
     ghost: {
       model: string;
+      /** Its parts' colours; absent: as made. */
+      colors?: PartColors;
       x: number;
       z: number;
       rot: number;
@@ -52,6 +53,7 @@ interface BuildPreview {
       resize?: ObjectResize;
       front?: { x: number; z: number; out: number };
       valid: boolean;
+      wall?: boolean;
     } | null,
   ): void;
   setResizeHandles(handles: readonly ResizeHandle[] | null, hot?: string | null): void;
@@ -95,7 +97,7 @@ const MAX_DOOR_RUN = 2;
 const DOOR_HEAD = 210;
 
 /** What the eyedropper picked up: a build tool with its look set, or an object to buy again. */
-export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; style: number; rot: number; turn: number; size?: [number, number]; tall?: number };
+export type Picked = { kind: 'tool'; tool: BuildTool } | { kind: 'object'; def: string; colors?: PartColors; rot: number; turn: number; size?: [number, number]; tall?: number };
 
 /**
  * Things stand anywhere on their tiles (all but stairs): their middle snaps to quarter tiles (the
@@ -116,6 +118,12 @@ const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
 
 /** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
 const HANDLE_OUT = 0.3;
+/**
+ * Whether things can be resized in Buy mode (the arrows). Off for now: a Blender model's moving parts
+ * (a fridge's doors, a wall bed) don't follow a resize well. It comes back for the objects it suits.
+ * Things resized before keep their size, and "Reset size" still takes them back to their own.
+ */
+const RESIZING = false;
 
 type Point2 = { x: number; y: number };
 
@@ -152,22 +160,39 @@ function offsetKey(offset: [number, number] | undefined): string {
  * `offset` off their middle and `extent` (cm, before turning) in size, as sim-core `body_edges`.
  */
 function bodyEdges(x: number, z: number, w: number, d: number, rot: number, offset: readonly [number, number], extent: readonly [number, number]): [[number, number], [number, number]][] {
+  const [x0, x1, z0, z1] = bodyBox(x, z, w, d, rot, offset, extent);
+  // The tiles it overlaps, and the tile lines strictly inside it.
+  const lines = (lo: number, hi: number) => range(Math.floor(lo / 200) + 1, Math.floor((hi - 1) / 200) + 1);
+  const edges: [[number, number], [number, number]][] = [];
+  for (const lx of lines(x0, x1)) for (const tz of boxTiles(z0, z1)) edges.push([[lx - 1, tz], [lx, tz]]);
+  for (const lz of lines(z0, z1)) for (const tx of boxTiles(x0, x1)) edges.push([[tx, lz - 1], [tx, lz]]);
+  return edges;
+}
+
+const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
+/** The tiles a body's sides `lo`..`hi` (half centimetres) overlap along one axis. */
+const boxTiles = (lo: number, hi: number) => range(Math.floor(lo / 200), Math.floor((hi + 199) / 200));
+
+/** A body's sides `[x0, x1, z0, z1]` in half centimetres (tile lines every 200), as sim-core `body_box`. */
+function bodyBox(x: number, z: number, w: number, d: number, rot: number, offset: readonly [number, number], extent: readonly [number, number]): [number, number, number, number] {
   const [ex, ez] = rot % 2 === 0 ? extent : [extent[1], extent[0]];
-  // Its sides along one axis, in half centimetres (tile lines every 200).
   const span = (at: number, tiles: number, off: number, size: number) => {
     const mid = 2 * (at * 100 + off) + tiles * 100;
     return [mid - size, mid + size];
   };
-  const [x0, x1] = span(x, w, offset[0], ex);
-  const [z0, z1] = span(z, d, offset[1], ez);
-  // The tiles it overlaps, and the tile lines strictly inside it.
-  const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
-  const tiles = (lo: number, hi: number) => range(Math.floor(lo / 200), Math.floor((hi + 199) / 200));
-  const lines = (lo: number, hi: number) => range(Math.floor(lo / 200) + 1, Math.floor((hi - 1) / 200) + 1);
-  const edges: [[number, number], [number, number]][] = [];
-  for (const lx of lines(x0, x1)) for (const tz of tiles(z0, z1)) edges.push([[lx - 1, tz], [lx, tz]]);
-  for (const lz of lines(z0, z1)) for (const tx of tiles(x0, x1)) edges.push([[tx, lz - 1], [tx, lz]]);
-  return edges;
+  return [...span(x, w, offset[0], ex), ...span(z, d, offset[1], ez)] as [number, number, number, number];
+}
+
+/** Whether a diagonal wall `axis` across tile `tx, tz` runs through a body (`bodyBox`), as sim-core `body_crosses`. */
+function bodyCrosses([x0, x1, z0, z1]: readonly [number, number, number, number], tx: number, tz: number, axis: 'dp' | 'dn'): boolean {
+  // The part of the body on that tile; the wall runs through it when it passes strictly inside.
+  const [a0, a1] = [Math.max(x0, tx * 200), Math.min(x1, tx * 200 + 200)];
+  const [b0, b1] = [Math.max(z0, tz * 200), Math.min(z1, tz * 200 + 200)];
+  if (a0 >= a1 || b0 >= b1) return false;
+  // `dp` (/): x - z is that of corner (x, z) all along it; `dn` (\): x + z that of (x, z + 1).
+  const on = axis === 'dp' ? 200 * (tx - tz) : 200 * (tx + tz + 1);
+  const [lo, hi] = axis === 'dp' ? [a0 - b1, a1 - b0] : [a0 + b0, a1 + b1];
+  return lo < on && on < hi;
 }
 
 export class BuildBuyInput {
@@ -243,7 +268,6 @@ export class BuildBuyInput {
   constructor(
     renderer: Renderer,
     private readonly content: Content,
-    private readonly assets: AssetRegistry,
     private readonly send: (command: Command) => void,
   ) {
     this.preview = renderer as unknown as Partial<BuildPreview>;
@@ -357,10 +381,6 @@ export class BuildBuyInput {
     game.placeHint = null;
   }
 
-  /** Model key for an object in a style, falling back to the plain model. */
-  styledModel(def: ObjectDef, style: number): string {
-    return styledModel(this.content, this.assets, def, style);
-  }
 
   /** Build mode's Build tab: walls, rooms, paint, doors, windows and removing them. */
   private building(): boolean {
@@ -427,7 +447,7 @@ export class BuildBuyInput {
   /**
    * The eyedropper: what's under the pointer, as something to build or buy again. A wall gives
    * its covering and form (a door or window, its style), a floor its covering; an object, another
-   * of it in the same style and at the same angle. Null: nothing to pick there.
+   * of it in the same colour and at the same angle. Null: nothing to pick there.
    */
   pick(ground: Point | null, objectId: number | null, apply = true): Picked | null {
     const look = game.buildLook;
@@ -435,7 +455,7 @@ export class BuildBuyInput {
     const def = obj && this.content.object(obj.def);
     if (obj && def?.stairs) return { kind: 'tool', tool: 'stairs' };
     if (obj && def?.price !== undefined) {
-      return { kind: 'object', def: obj.def, style: obj.style, rot: obj.rot, turn: obj.turn ?? 0, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
+      return { kind: 'object', def: obj.def, colors: obj.colors, rot: obj.rot, turn: obj.turn ?? 0, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
     }
     if (!ground) return null;
     const e = this.nearestEdge(ground);
@@ -599,18 +619,36 @@ export class BuildBuyInput {
     // Only things on the same layer take each other's place (a picture over a sofa, a rug under it).
     const layer = this.content.layer(def);
     const takenOn = (on: string, tx: number, tz: number) => this.taken(on, tx, tz, moving);
-    for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!onPlot(tx, tz) || takenOn(layer, tx, tz)) return null;
+    for (let tz = z; tz < z + d; tz++) {
+      for (let tx = x; tx < x + w; tx++) {
+        if (!onPlot(tx, tz)) return null;
+        // What hangs there already is named (with its wall down it would be hidden but for the hold).
+        if (takenOn(layer, tx, tz)) return layer === 'wall' ? `The ${this.hangingAt(tx, tz, moving) ?? 'thing'} hangs there` : null;
+      }
+    }
     if (def.outdoors) {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.indoors(tx, tz)) return 'Goes outdoors';
     }
     if (layer === 'ceiling') {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!this.indoors(tx, tz)) return 'Hangs from a ceiling';
     }
+    // As the simulation (`check_fit`): furniture as tall as the wall leaves no room on the wall or
+    // the ceiling over it, and a thing hanging low from the ceiling none under it.
+    const over = (test: (o: ObjectDef) => boolean) => {
+      for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.takenBy(tx, tz, moving, test)) return true;
+      return false;
+    };
+    const on = (o: ObjectDef, ...layers: string[]) => layers.includes(this.content.layer(o));
+    if ((layer === 'wall' || layer === 'ceiling') && over((o) => on(o, 'floor') && !!o.fillsWall)) return 'The furniture there is as tall as the wall';
+    if (layer === 'ceiling' && def.hangsLow && over((o) => on(o, 'floor'))) return 'Hangs too low over the furniture there';
+    if (layer === 'floor' && def.fillsWall && over((o) => on(o, 'wall', 'ceiling'))) return 'Too tall for what hangs there';
+    if (layer === 'floor' && over((o) => !!o.hangsLow)) return 'Something hangs too low there';
     if (layer === 'wall') {
       const backs: { axis: Axis; x: number; z: number }[] = [];
       for (let tx = x; tx < x + w; tx++) if (rot % 4 === 0 || rot % 4 === 2) backs.push({ axis: 'h', x: tx, z: rot % 4 === 0 ? z : z + d });
       for (let tz = z; tz < z + d; tz++) if (rot % 4 === 1 || rot % 4 === 3) backs.push({ axis: 'v', x: rot % 4 === 1 ? x : x + w, z: tz });
       if (!backs.every((e) => ['wall', 'window'].includes(this.edgeState(e)))) return 'Hangs on a wall';
+      if (!def.overWindow && backs.some((e) => this.edgeState(e) === 'window')) return 'Not over a window';
     }
     // Something nobody uses needn't be reached (a picture, a rug, a table chairs go all round);
     // a chair pulled up to a table is used from any free side.
@@ -627,6 +665,15 @@ export class BuildBuyInput {
     }
     // Nor through its body where it stands off its tiles (sim-core `body_edges`).
     if (offset && extent && bodyEdges(x, z, w, d, rot, offset, extent).some(([[ax, az], [bx, bz]]) => this.wallBetween(ax, az, bx, bz))) return 'Blocked by a wall';
+    if (offset && extent) {
+      const box = bodyBox(x, z, w, d, rot, offset, extent);
+      for (const tz of boxTiles(box[2], box[3])) {
+        for (const tx of boxTiles(box[0], box[1])) {
+          const axis = this.diagonals.get(`${tx}:${tz}`);
+          if (axis && bodyCrosses(box, tx, tz, axis)) return 'Blocked by a wall';
+        }
+      }
+    }
     const [fx, fz] = front;
     const back = [
       [fx, fz - 1],
@@ -643,6 +690,20 @@ export class BuildBuyInput {
     return game.objects.some((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === on);
   }
 
+  /** The name (lower case) of the thing on a wall (other than `moving`) at a tile. */
+  private hangingAt(tx: number, tz: number, moving: number | null): string | undefined {
+    const o = game.objects.find((o) => o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d && this.content.layer(this.content.object(o.def)) === 'wall');
+    return o && this.content.object(o.def)?.name.toLowerCase();
+  }
+
+  /** Whether something (other than `moving`) of a kind that passes `test` stands on or hangs over a tile. */
+  private takenBy(tx: number, tz: number, moving: number | null, test: (def: ObjectDef) => boolean): boolean {
+    return game.objects.some((o) => {
+      const def = o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d ? this.content.object(o.def) : undefined;
+      return !!def && test(def);
+    });
+  }
+
   /**
    * Whether a resident can stand on a tile beside a thing to use it, as the simulation has it
    * (`approach_tiles`): on the home plot, nothing on its floor (bar `moving`), no diagonal wall
@@ -652,7 +713,7 @@ export class BuildBuyInput {
     const home = this.home();
     return ({ tile: [tx, tz], inner: [ix, iz] }) =>
       !!home && tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d &&
-      !this.taken('floor', tx, tz, moving) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
   }
 
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */
@@ -665,14 +726,14 @@ export class BuildBuyInput {
   private hoverBuy(ground: Point): void {
     const p = this.placement(ground);
     if (!p) return this.preview.setPlacementGhost?.(null);
-    const style = p && game.placing?.objectId != null ? (game.objects.find((o) => o.id === game.placing!.objectId)?.style ?? 0) : (game.placing?.style ?? game.householdStyle);
+    const colors = game.placing?.objectId != null ? game.objects.find((o) => o.id === game.placing!.objectId)?.colors : game.placing?.colors;
     // The arrow marks where it'll be used from (the other middle tile in front when the front is
     // taken; nowhere free, the front, red as the rest of it): nothing for things nobody uses (or on a top).
     const used = p.def.interactions.length > 0 && p.def.layer !== 'surface';
     const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
     const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: this.styledModel(p.def, style), x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid });
+    this.preview.setPlacementGhost?.({ model: p.def.model, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -699,7 +760,7 @@ export class BuildBuyInput {
       } else {
         // New purchases stay on the cursor so several can be placed in a row.
         const resized = this.resizeOf(p.def, p.size, p.tall);
-        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], style: placing.style ?? game.householdStyle, ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}), ...(resized ? { size: resized.size, tall: resized.tall } : {}) });
+        this.send({ type: 'buy', household: game.home, object: p.def.id, at: [p.x, p.z, p.rot], ...(placing.colors ? { colors: colorValues(placing.colors) } : {}), ...(p.turn ? { turn: p.turn } : {}), ...(offsetKey(p.offset) !== '0:0' ? { offset: p.offset } : {}), ...(resized ? { size: resized.size, tall: resized.tall } : {}) });
       }
       return true;
     }
@@ -738,13 +799,14 @@ export class BuildBuyInput {
 
   /**
    * The resize arrows for an object as it is (or as a resize would make it): one per side it
-   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs)
+   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs,
+   * and none at all while `RESIZING` is off)
    * and one for its height (none for rugs). `f`: its middle (tiles), its size along x and z (m),
    * facing, and top and bottom (m above its floor).
    */
   private handlesFor(def: ObjectDef, f: { cx: number; cz: number; ex: number; ez: number; rot: number; top: number; bottom: number }): ResizeHandle[] {
     const layer = this.content.layer(def);
-    if (def.stairs) return [];
+    if (!RESIZING || def.stairs) return [];
     const out: ResizeHandle[] = [];
     const [x0, x1, z0, z1] = [f.cx - f.ex / 2, f.cx + f.ex / 2, f.cz - f.ez / 2, f.cz + f.ez / 2];
     if (layer === 'wall') {
@@ -930,8 +992,7 @@ export class BuildBuyInput {
     const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
     r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
     const obj = game.objects.find((o) => o.id === r.id);
-    const model = this.styledModel(r.def, obj?.style ?? 0);
-    this.preview.setPlacementGhost?.({ model, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
+    this.preview.setPlacementGhost?.({ model: r.def.model, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
     if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
     const hint = fit === true ? null : (fit ?? "There's no room for it that size");
     if (game.placeHint !== hint) game.placeHint = hint;
@@ -1335,7 +1396,9 @@ export class BuildBuyInput {
       if ((e.axis !== 'dp' && e.axis !== 'dn') || e.kind === 'open') return true;
       const other = this.diagonals.get(`${e.x}:${e.z}`);
       if (other && other !== e.axis) return false;
-      return !game.objects.some((o) => e.x >= o.x && e.z >= o.z && e.x < o.x + o.w && e.z < o.z + o.d);
+      // Nor through the body of something standing off its tiles.
+      const body = (o: ObjectPlacement) => bodyBox(o.x, o.z, o.w, o.d, o.rot, o.offset ?? [0, 0], ownSize(this.content, o));
+      return !game.objects.some((o) => (e.x >= o.x && e.z >= o.z && e.x < o.x + o.w && e.z < o.z + o.d) || bodyCrosses(body(o), e.x, e.z, e.axis as 'dp' | 'dn'));
     });
   }
 
@@ -1810,10 +1873,10 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   // An object's id is its place in the list, and edits reorder it (selling shifts later ids
   // down, moving re-adds an object at the end, undo puts things back), so match objects by what
   // they are: first those unchanged (same look, same place), then the same kind of object among
-  // the rest (moved, turned, restyled or upgraded); the same id wins a tie.
+  // the rest (moved, turned, recoloured or upgraded); the same id wins a tie.
   const before = new Map<number, ObjectPlacement>();
   const left = new Set(prev.objects);
-  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${o.style}:${o.quality}`;
+  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${colorsKey(o.colors)}:${o.quality}`;
   const byKey = Map.groupBy(prev.objects, key);
   for (const o of next.objects) {
     const same = byKey.get(key(o));
@@ -1849,7 +1912,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
       if (o.quality > old.quality) {
         effects.push({ kind: 'upgrade', ...rect(o), objectId: o.id });
         sounds.add('upgrade');
-      } else if (o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) || o.rot !== old.rot || o.turn !== old.turn || o.style !== old.style) {
+      } else if (o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) || o.rot !== old.rot || o.turn !== old.turn || colorsKey(o.colors) !== colorsKey(old.colors)) {
         effects.push({ kind: 'place', ...rect(o), objectId: o.id });
         sounds.add(o.x !== old.x || o.z !== old.z || offsetKey(o.offset) !== offsetKey(old.offset) ? 'place' : 'rotate');
       }

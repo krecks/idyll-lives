@@ -31,13 +31,15 @@ E['model.lazy.snoozecloudBed'] = {'type': 'model', 'placeholder': p}
 # ---- Nap pod (1x1): egg chair opening to the front, seat top 0.45 ------------------------------
 SHELL = [[0.0, -0.5], [0.32, -0.42], [0.46, -0.22], [0.5, 0.0], [0.49, 0.12], [0.45, 0.12], [0.46, 0.0], [0.42, -0.2],
          [0.3, -0.36], [0.0, -0.43]]           # half-egg shell, open at the top (rotated to face the front)
-p = [lathe([0.9, 0.86, 1.08], [0, 0.72, 0.0], '#F4F4F2', 'gloss', SHELL, rotate=[72, 0, 0], segments=32),  # shell
+HOOD = [[0.5 * math.sin(math.radians(t)), 0.5 * math.cos(math.radians(t))] for t in range(75, -1, -15)]   # a cap
+p = [lathe([0.88, 0.84, 1.12], [0, 0.78, 0.02], '#F4F4F2', 'gloss', SHELL, rotate=[90, 0, 0], segments=32),  # shell (as the model's egg)
+     lathe([0.92, 0.98, 0.84], [0, 0.95, -0.02], '#8FA6C6', 'fabric', HOOD, segments=24),         # the hood, folded back on top
      cushion([0.62, 0.12, 0.52], [0, 0.39, 0.02], '#7E95B8', radius=0.05),                       # seat (top 0.45)
      cushion([0.6, 0.62, 0.14], [0, 0.72, -0.3], '#8FA6C6', rotate=[-10, 0, 0], radius=0.06),   # back cushion
      cushion([0.26, 0.2, 0.14], [0.18, 0.56, -0.12], '#F2C6CF', rotate=[-20, 20, 0], radius=0.05),
-     cyl([0.12, 0.2, 0.12], [0, 0.12, -0.04], CHROME, 'chrome', taper=0.7),                       # stem
-     cyl([0.56, 0.04, 0.56], [0, 0.02, -0.04], CHROME, 'chrome', segments=28),                    # base disc
-     part('blob', [0.5, 0.05, 0.3], [0, 0.03, 0.24], '#E6DCCB', 'fabric', noise=0.08)]          # shaggy rug
+     cyl([0.12, 0.2, 0.12], [0, 0.12, 0.04], CHROME, 'chrome', taper=0.7),                        # stem
+     cyl([0.56, 0.04, 0.56], [0, 0.02, 0.04], CHROME, 'chrome', segments=28),                     # base disc
+     part('blob', [0.54, 0.03, 0.26], [0, 0.015, 0.3], '#E6DCCB', 'fabric', noise=0.08)]        # shaggy rug
 E['model.lazy.napPod'] = {'type': 'model', 'placeholder': p}
 
 # ---- Heated quilt table (2x1): kotatsu in front, two poufs at the centre line (seat top 0.45) -----
@@ -107,6 +109,10 @@ parts = [cyl([0.13, 0.2, 0.13], [-0.12, 0.7, -0.22], '#BFC3C7', 'fabric', segmen
          cyl([0.2, 0.06, 0.2], [0.0, 0.03, 0.26], '#F2F2F0', 'gloss', segments=24),             # robot vacuum
          cyl([0.06, 0.012, 0.06], [0.0, 0.066, 0.26], '#4FD1C5', 'gloss', segments=12)]
 E['model.lazy.smartHub'] = {'type': 'model', 'placeholder': side_table(0.6, 0.6, 0.44, z=-0.235, wood='#B07A4E') + parts}
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('lazy', E, ['model.lazy.deliveryLocker', 'model.lazy.smartHub', 'model.lazy.napPod', 'model.lazy.quiltTable'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('lazy', E) else 0)

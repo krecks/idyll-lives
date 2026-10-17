@@ -1,0 +1,348 @@
+{
+  "$comment": "Blender-built playground (tools/art/blender/families/playground.py): a slide, a climbing frame, a seesaw, a spring rider, a merry-go-round, a basketball hoop, a ping-pong table and a park chess table. Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The seesaw's plank, the spring rider's horse and the merry-go-round's platform go round while played on, carrying their riders (`ride`); the hoop's net swishes after a shot and a pawn moves on the chess table. Each has a far version for the town overview.",
+  "version": 1,
+  "entries": {
+    "model.slide": {
+      "type": "model",
+      "url": "../../models/playground/slide.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "chute": {
+          "finish": "material.finish.gloss"
+        },
+        "roof": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tread": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "chute",
+          "label": "Slide"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ],
+      "far": "../../models/playground/slide.far.glb"
+    },
+    "model.climbingFrame": {
+      "type": "model",
+      "url": "../../models/playground/climbingFrame.glb",
+      "materials": {
+        "flag": {
+          "finish": "material.finish.satin"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        },
+        "rope": {
+          "finish": "material.finish.fabric"
+        },
+        "shingle": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "timber": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "timber",
+          "label": "Frame"
+        },
+        {
+          "material": "shingle",
+          "label": "Roof"
+        },
+        {
+          "material": "rope",
+          "label": "Net"
+        }
+      ],
+      "far": "../../models/playground/climbingFrame.far.glb"
+    },
+    "model.seesaw": {
+      "type": "model",
+      "url": "../../models/playground/seesaw.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "plank": {
+          "finish": "material.finish.gloss"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "seesaw": "seesaw"
+        },
+        "ride": "seesaw"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "seat",
+          "label": "Seats"
+        },
+        {
+          "material": "plank",
+          "label": "Plank"
+        }
+      ],
+      "far": "../../models/playground/seesaw.far.glb"
+    },
+    "model.springRider": {
+      "type": "model",
+      "url": "../../models/playground/springRider.glb",
+      "materials": {
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "grip": {
+          "finish": "material.finish.gloss"
+        },
+        "horse": {
+          "finish": "material.finish.gloss"
+        },
+        "mane": {
+          "finish": "material.finish.matte"
+        },
+        "saddle": {
+          "finish": "material.finish.gloss"
+        },
+        "spring": {
+          "finish": "material.finish.metal"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "ride": "rock"
+        },
+        "ride": "rock"
+      },
+      "paint": [
+        {
+          "material": "horse",
+          "label": "Horse"
+        },
+        {
+          "material": "saddle",
+          "label": "Saddle"
+        },
+        {
+          "material": "spring",
+          "label": "Spring"
+        }
+      ],
+      "far": "../../models/playground/springRider.far.glb"
+    },
+    "model.merryGoRound": {
+      "type": "model",
+      "url": "../../models/playground/merryGoRound.glb",
+      "materials": {
+        "deck": {
+          "finish": "material.finish.gloss"
+        },
+        "platform": {
+          "finish": "material.finish.gloss"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "spin": "spin"
+        },
+        "ride": "spin"
+      },
+      "paint": [
+        {
+          "material": "platform",
+          "label": "Platform"
+        },
+        {
+          "material": "rail",
+          "label": "Rails"
+        },
+        {
+          "material": "deck",
+          "label": "Stripes"
+        }
+      ],
+      "far": "../../models/playground/merryGoRound.far.glb"
+    },
+    "model.basketballHoop": {
+      "type": "model",
+      "url": "../../models/playground/basketballHoop.glb",
+      "materials": {
+        "ball": {
+          "finish": "material.finish.matte"
+        },
+        "board": {
+          "finish": "material.finish.gloss"
+        },
+        "board_mark": {
+          "finish": "material.finish.gloss"
+        },
+        "net": {
+          "finish": "material.finish.fabric"
+        },
+        "post": {
+          "finish": "material.finish.metal"
+        },
+        "rim": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shoot": {
+            "clip": "swish",
+            "delay": 1.4,
+            "every": 3.2
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "post",
+          "label": "Frame"
+        },
+        {
+          "material": "board",
+          "label": "Backboard"
+        },
+        {
+          "material": "rim",
+          "label": "Hoop"
+        }
+      ],
+      "far": "../../models/playground/basketballHoop.far.glb"
+    },
+    "model.pingPongTable": {
+      "type": "model",
+      "url": "../../models/playground/pingPongTable.glb",
+      "materials": {
+        "bat": {
+          "finish": "material.finish.gloss"
+        },
+        "bat_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "bat_handle": {
+          "finish": "material.finish.satin"
+        },
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "lines": {
+          "finish": "material.finish.satin"
+        },
+        "ping": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "table_top": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "table_top",
+          "label": "Table"
+        },
+        {
+          "material": "concrete",
+          "label": "Legs"
+        }
+      ],
+      "far": "../../models/playground/pingPongTable.far.glb"
+    },
+    "model.parkChessTable": {
+      "type": "model",
+      "url": "../../models/playground/parkChessTable.glb",
+      "materials": {
+        "piece_black": {
+          "finish": "material.finish.gloss"
+        },
+        "piece_white": {
+          "finish": "material.finish.gloss"
+        },
+        "square_dark": {
+          "finish": "material.finish.satin"
+        },
+        "square_light": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stool": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "chess": "move"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Table"
+        },
+        {
+          "material": "stool",
+          "label": "Stools"
+        }
+      ],
+      "far": "../../models/playground/parkChessTable.far.glb"
+    }
+  }
+}

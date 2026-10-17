@@ -1,1269 +1,141 @@
 {
-  "$comment": "Blender-built garden decor (tools/art/blender/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one per finish group) and lights like the rest of the garden.",
+  "$comment": "Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one per finish group) and lights like the rest of the garden.",
   "version": 1,
   "entries": {
     "model.garden.gnome": {
       "type": "model",
-      "placeholder": [
-        {
-          "shape": "box",
-          "size": [
-            0.07,
-            0.04,
-            0.09
-          ],
-          "at": [
-            -0.045,
-            0.02,
-            0.01
-          ],
-          "color": "#3A2A20",
-          "material": "material.finish.satin",
-          "radius": 0.015
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.07,
-            0.04,
-            0.09
-          ],
-          "at": [
-            0.045,
-            0.02,
-            0.01
-          ],
-          "color": "#3A2A20",
-          "material": "material.finish.satin",
-          "radius": 0.015
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.2,
-            0.24,
-            0.18
-          ],
-          "at": [
-            0,
-            0.16,
-            0
-          ],
-          "color": "#3E63B0",
-          "material": "material.finish.satin",
-          "taper": 0.6,
-          "segments": 12
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.15,
-            0.03,
-            0.14
-          ],
-          "at": [
-            0,
-            0.22,
-            0
-          ],
-          "color": "#5A3A20",
-          "material": "material.finish.satin",
-          "segments": 12
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.045,
-            0.116,
-            0.045
-          ],
-          "at": [
-            -0.085,
-            0.22,
-            0.025
-          ],
-          "color": "#3E63B0",
-          "material": "material.finish.satin",
-          "rotate": [
-            149.8,
-            -31.0,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.045,
-            0.116,
-            0.045
-          ],
-          "at": [
-            0.085,
-            0.22,
-            0.025
-          ],
-          "color": "#3E63B0",
-          "material": "material.finish.satin",
-          "rotate": [
-            149.8,
-            31.0,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.04,
-            0.04,
-            0.04
-          ],
-          "at": [
-            -0.1,
-            0.16,
-            0.06
-          ],
-          "color": "#F2C6A6",
-          "material": "material.finish.satin",
-          "segments": 3
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.04,
-            0.04,
-            0.04
-          ],
-          "at": [
-            0.1,
-            0.16,
-            0.06
-          ],
-          "color": "#F2C6A6",
-          "material": "material.finish.satin",
-          "segments": 3
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.12,
-            0.11,
-            0.11
-          ],
-          "at": [
-            0,
-            0.34,
-            0.0
-          ],
-          "color": "#F2C6A6",
-          "material": "material.finish.satin",
-          "segments": 6
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.035,
-            0.03,
-            0.035
-          ],
-          "at": [
-            0,
-            0.34,
-            0.06
-          ],
-          "color": "#E8A08A",
-          "material": "material.finish.satin",
-          "segments": 3
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.12,
-            0.12,
-            0.08
-          ],
-          "at": [
-            0,
-            0.27,
-            0.04
-          ],
-          "color": "#F4F2EE",
-          "material": "material.finish.satin",
-          "segments": 8,
-          "rotate": [
-            180,
-            0,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.14,
-            0.2,
-            0.14
-          ],
-          "at": [
-            0,
-            0.47,
-            -0.01
-          ],
-          "color": "#D3322B",
-          "material": "material.finish.satin",
-          "segments": 12,
-          "rotate": [
-            -8,
-            0,
-            0
-          ]
-        }
-      ],
       "url": "../../models/garden/gnome.glb",
       "materials": {
-        "*": {
+        "beard": {
+          "finish": "material.finish.satin"
+        },
+        "hat": {
+          "finish": "material.finish.satin"
+        },
+        "nose": {
+          "finish": "material.finish.satin"
+        },
+        "skin": {
+          "finish": "material.finish.satin"
+        },
+        "tunic": {
+          "finish": "material.finish.satin"
+        },
+        "wood_dark": {
           "finish": "material.finish.satin"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "hat",
+          "label": "Hat"
+        },
+        {
+          "material": "tunic",
+          "label": "Tunic"
+        },
+        {
+          "material": "wood_dark",
+          "label": "Belt"
+        }
+      ]
     },
     "model.garden.birdbath": {
       "type": "model",
-      "placeholder": [
-        {
-          "shape": "cylinder",
-          "size": [
-            0.34,
-            0.06,
-            0.34
-          ],
-          "at": [
-            0,
-            0.03,
-            0
-          ],
-          "color": "#A9A39A",
-          "material": "material.finish.matte",
-          "segments": 12
-        },
-        {
-          "shape": "lathe",
-          "size": [
-            0.22,
-            0.66,
-            0.22
-          ],
-          "at": [
-            0,
-            0.39,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "profile": [
-            [
-              0,
-              -0.5
-            ],
-            [
-              0.5,
-              -0.5
-            ],
-            [
-              0.32,
-              -0.38
-            ],
-            [
-              0.24,
-              0.0
-            ],
-            [
-              0.3,
-              0.38
-            ],
-            [
-              0.5,
-              0.5
-            ],
-            [
-              0,
-              0.5
-            ]
-          ],
-          "segments": 12
-        },
-        {
-          "shape": "lathe",
-          "size": [
-            0.68,
-            0.12,
-            0.68
-          ],
-          "at": [
-            0,
-            0.78,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "profile": [
-            [
-              0,
-              -0.5
-            ],
-            [
-              0.2,
-              -0.5
-            ],
-            [
-              0.5,
-              0.3
-            ],
-            [
-              0.5,
-              0.5
-            ],
-            [
-              0.44,
-              0.5
-            ],
-            [
-              0.4,
-              0.2
-            ],
-            [
-              0,
-              0.2
-            ]
-          ],
-          "segments": 20
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.56,
-            0.01,
-            0.56
-          ],
-          "at": [
-            0,
-            0.8,
-            0
-          ],
-          "color": "#7FB2C6",
-          "material": "material.finish.gloss",
-          "segments": 20
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.07,
-            0.06,
-            0.11
-          ],
-          "at": [
-            0.26,
-            0.87,
-            0.02
-          ],
-          "color": "#7A5A40",
-          "material": "material.finish.satin",
-          "noise": 0.1,
-          "segments": 1
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.05,
-            0.05,
-            0.05
-          ],
-          "at": [
-            0.26,
-            0.91,
-            0.07
-          ],
-          "color": "#7A5A40",
-          "material": "material.finish.satin",
-          "segments": 3
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.02,
-            0.03,
-            0.02
-          ],
-          "at": [
-            0.26,
-            0.91,
-            0.105
-          ],
-          "color": "#E8A23A",
-          "material": "material.finish.satin",
-          "segments": 4,
-          "rotate": [
-            90,
-            0,
-            0
-          ]
-        }
-      ],
       "url": "../../models/garden/birdbath.glb",
       "materials": {
-        "*": {
-          "finish": "material.finish.matte"
-        },
-        "water": {
-          "finish": "material.finish.gloss"
+        "beak": {
+          "finish": "material.finish.satin"
         },
         "bird_brown": {
           "finish": "material.finish.satin"
         },
-        "beak": {
-          "finish": "material.finish.satin"
-        }
-      }
-    },
-    "model.garden.fountain": {
-      "type": "model",
-      "placeholder": [
-        {
-          "shape": "lathe",
-          "size": [
-            0.92,
-            0.34,
-            0.92
-          ],
-          "at": [
-            0,
-            0.17,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "profile": [
-            [
-              0,
-              -0.5
-            ],
-            [
-              0.5,
-              -0.5
-            ],
-            [
-              0.5,
-              0.4
-            ],
-            [
-              0.47,
-              0.5
-            ],
-            [
-              0.43,
-              0.5
-            ],
-            [
-              0.42,
-              0.25
-            ],
-            [
-              0,
-              0.25
-            ]
-          ],
-          "segments": 24
+        "stone": {
+          "finish": "material.finish.matte"
         },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.84,
-            0.01,
-            0.84
-          ],
-          "at": [
-            0,
-            0.26,
-            0
-          ],
-          "color": "#7FB2C6",
-          "material": "material.finish.gloss",
-          "segments": 24
-        },
-        {
-          "shape": "lathe",
-          "size": [
-            0.18,
-            0.56,
-            0.18
-          ],
-          "at": [
-            0,
-            0.54,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "profile": [
-            [
-              0,
-              -0.5
-            ],
-            [
-              0.5,
-              -0.5
-            ],
-            [
-              0.34,
-              -0.3
-            ],
-            [
-              0.3,
-              0.3
-            ],
-            [
-              0.5,
-              0.5
-            ],
-            [
-              0,
-              0.5
-            ]
-          ],
-          "segments": 12
-        },
-        {
-          "shape": "lathe",
-          "size": [
-            0.5,
-            0.12,
-            0.5
-          ],
-          "at": [
-            0,
-            0.86,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "profile": [
-            [
-              0,
-              -0.5
-            ],
-            [
-              0.2,
-              -0.5
-            ],
-            [
-              0.5,
-              0.3
-            ],
-            [
-              0.5,
-              0.5
-            ],
-            [
-              0.44,
-              0.5
-            ],
-            [
-              0.4,
-              0.2
-            ],
-            [
-              0,
-              0.2
-            ]
-          ],
-          "segments": 18
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.42,
-            0.01,
-            0.42
-          ],
-          "at": [
-            0,
-            0.885,
-            0
-          ],
-          "color": "#7FB2C6",
-          "material": "material.finish.gloss",
-          "segments": 18
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.08,
-            0.14,
-            0.08
-          ],
-          "at": [
-            0,
-            0.96,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 8,
-          "taper": 0.7
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.08,
-            0.08,
-            0.08
-          ],
-          "at": [
-            0,
-            1.05,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.025,
-            0.1,
-            0.025
-          ],
-          "at": [
-            0,
-            1.12,
-            0
-          ],
-          "color": "#DCEBF0",
-          "material": "material.finish.glass",
-          "segments": 6
-        }
-      ],
-      "url": "../../models/garden/fountain.glb",
-      "materials": {
-        "*": {
+        "stone_dark": {
           "finish": "material.finish.matte"
         },
         "water": {
           "finish": "material.finish.gloss"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Bowl & column"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.garden.fountain": {
+      "type": "model",
+      "url": "../../models/garden/fountain.glb",
+      "materials": {
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Fountain"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Plinth"
+        }
+      ]
     },
     "model.garden.lantern": {
       "type": "model",
-      "placeholder": [
-        {
-          "shape": "cylinder",
-          "size": [
-            0.44,
-            0.08,
-            0.44
-          ],
-          "at": [
-            0,
-            0.04,
-            0
-          ],
-          "color": "#A9A39A",
-          "material": "material.finish.matte",
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.16,
-            0.42,
-            0.16
-          ],
-          "at": [
-            0,
-            0.29,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.36,
-            0.06,
-            0.36
-          ],
-          "at": [
-            0,
-            0.53,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 6
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.2,
-            0.18,
-            0.2
-          ],
-          "at": [
-            0,
-            0.65,
-            0
-          ],
-          "color": "#FFE6A8",
-          "material": "material.finish.satin",
-          "radius": 0
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.045,
-            0.2,
-            0.045
-          ],
-          "at": [
-            -0.11,
-            0.66,
-            -0.11
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "radius": 0
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.045,
-            0.2,
-            0.045
-          ],
-          "at": [
-            -0.11,
-            0.66,
-            0.11
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "radius": 0
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.045,
-            0.2,
-            0.045
-          ],
-          "at": [
-            0.11,
-            0.66,
-            -0.11
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "radius": 0
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.045,
-            0.2,
-            0.045
-          ],
-          "at": [
-            0.11,
-            0.66,
-            0.11
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "radius": 0
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.54,
-            0.16,
-            0.54
-          ],
-          "at": [
-            0,
-            0.84,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "taper": 0.22,
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.1,
-            0.05,
-            0.1
-          ],
-          "at": [
-            0,
-            0.94,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 6
-        },
-        {
-          "shape": "sphere",
-          "size": [
-            0.08,
-            0.09,
-            0.08
-          ],
-          "at": [
-            0,
-            0.99,
-            0
-          ],
-          "color": "#CFC9BE",
-          "material": "material.finish.matte",
-          "segments": 4
-        }
-      ],
       "url": "../../models/garden/lantern.glb",
       "materials": {
-        "*": {
-          "finish": "material.finish.matte"
-        },
         "glow": {
           "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Lantern"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Base"
+        }
+      ]
     },
     "model.garden.wheelbarrow": {
       "type": "model",
-      "placeholder": [
-        {
-          "shape": "box",
-          "size": [
-            0.46,
-            0.04,
-            0.58
-          ],
-          "at": [
-            0,
-            0.4,
-            0.02
-          ],
-          "color": "#3E7A6A",
-          "material": "material.finish.metal",
-          "radius": 0.01
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.03,
-            0.24,
-            0.62
-          ],
-          "at": [
-            -0.25,
-            0.52,
-            0.02
-          ],
-          "color": "#3E7A6A",
-          "material": "material.finish.metal",
-          "radius": 0.008,
-          "rotate": [
-            0,
-            0,
-            14
-          ]
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.03,
-            0.24,
-            0.62
-          ],
-          "at": [
-            0.25,
-            0.52,
-            0.02
-          ],
-          "color": "#3E7A6A",
-          "material": "material.finish.metal",
-          "radius": 0.008,
-          "rotate": [
-            0,
-            0,
-            -14
-          ]
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.52,
-            0.24,
-            0.03
-          ],
-          "at": [
-            0,
-            0.52,
-            -0.3
-          ],
-          "color": "#3E7A6A",
-          "material": "material.finish.metal",
-          "radius": 0.008,
-          "rotate": [
-            -22,
-            0,
-            0
-          ]
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.5,
-            0.22,
-            0.03
-          ],
-          "at": [
-            0,
-            0.51,
-            0.33
-          ],
-          "color": "#3E7A6A",
-          "material": "material.finish.metal",
-          "radius": 0.008,
-          "rotate": [
-            14,
-            0,
-            0
-          ]
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.44,
-            0.03,
-            0.52
-          ],
-          "at": [
-            0,
-            0.6,
-            0.02
-          ],
-          "color": "#6A4C38",
-          "material": "material.finish.matte",
-          "radius": 0
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.04,
-            0.879,
-            0.04
-          ],
-          "at": [
-            -0.19,
-            0.47,
-            0.065
-          ],
-          "color": "#A8835A",
-          "material": "material.finish.wood",
-          "rotate": [
-            75.5,
-            -2.7,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.03,
-            0.385,
-            0.03
-          ],
-          "at": [
-            -0.18,
-            0.19,
-            0.23
-          ],
-          "color": "#2E3236",
-          "material": "material.finish.metal",
-          "rotate": [
-            170.6,
-            -18.4,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.04,
-            0.879,
-            0.04
-          ],
-          "at": [
-            0.19,
-            0.47,
-            0.065
-          ],
-          "color": "#A8835A",
-          "material": "material.finish.wood",
-          "rotate": [
-            75.5,
-            2.7,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.03,
-            0.385,
-            0.03
-          ],
-          "at": [
-            0.18,
-            0.19,
-            0.23
-          ],
-          "color": "#2E3236",
-          "material": "material.finish.metal",
-          "rotate": [
-            170.6,
-            18.4,
-            0
-          ],
-          "segments": 6
-        },
-        {
-          "shape": "torus",
-          "size": [
-            0.32,
-            0.07,
-            0.32
-          ],
-          "at": [
-            0,
-            0.16,
-            -0.38
-          ],
-          "color": "#24272A",
-          "material": "material.finish.matte",
-          "segments": 16,
-          "rotate": [
-            0,
-            0,
-            90
-          ]
-        },
-        {
-          "shape": "cylinder",
-          "size": [
-            0.12,
-            0.08,
-            0.12
-          ],
-          "at": [
-            0,
-            0.16,
-            -0.38
-          ],
-          "color": "#8A9096",
-          "material": "material.finish.metal",
-          "segments": 10,
-          "rotate": [
-            0,
-            0,
-            90
-          ]
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.2,
-            0.14,
-            0.2
-          ],
-          "at": [
-            -0.1,
-            0.66,
-            -0.1
-          ],
-          "color": "#4A7A36",
-          "material": "material.finish.foliage",
-          "noise": 0.3
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.2,
-            0.14,
-            0.2
-          ],
-          "at": [
-            0.1,
-            0.66,
-            0.05
-          ],
-          "color": "#5A8A3C",
-          "material": "material.finish.foliage",
-          "noise": 0.3
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.2,
-            0.14,
-            0.2
-          ],
-          "at": [
-            -0.05,
-            0.66,
-            0.18
-          ],
-          "color": "#6A9A44",
-          "material": "material.finish.foliage",
-          "noise": 0.3
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            -0.12,
-            0.725,
-            -0.125
-          ],
-          "color": "#E85A9A",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            0.072,
-            0.724,
-            -0.031
-          ],
-          "color": "#F2C14E",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            0.04,
-            0.723,
-            -0.181
-          ],
-          "color": "#F4F0F2",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            0.01,
-            0.725,
-            0.029
-          ],
-          "color": "#E85A9A",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            0.129,
-            0.729,
-            -0.034
-          ],
-          "color": "#F2C14E",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            -0.093,
-            0.705,
-            0.156
-          ],
-          "color": "#F4F0F2",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.06,
-            0.045,
-            0.06
-          ],
-          "at": [
-            0.065,
-            0.724,
-            -0.006
-          ],
-          "color": "#E85A9A",
-          "material": "material.finish.satin",
-          "noise": 0.2,
-          "segments": 1
-        }
-      ],
       "url": "../../models/garden/wheelbarrow.glb",
       "materials": {
-        "*": {
+        "flower_pink": {
           "finish": "material.finish.satin"
         },
-        "paint": {
-          "finish": "material.finish.metal"
+        "flower_white": {
+          "finish": "material.finish.satin"
+        },
+        "flower_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
         },
         "metal": {
           "finish": "material.finish.metal"
@@ -1271,334 +143,65 @@
         "metal_dark": {
           "finish": "material.finish.matte"
         },
+        "paint": {
+          "finish": "material.finish.metal"
+        },
         "soil": {
           "finish": "material.finish.matte"
         },
         "wood": {
           "finish": "material.finish.wood"
-        },
-        "leaf": {
-          "finish": "material.finish.foliage"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "paint",
+          "label": "Tray"
+        },
+        {
+          "material": "wood",
+          "label": "Handles"
+        },
+        {
+          "material": "metal_dark",
+          "label": "Legs & tyre"
+        }
+      ]
     },
     "model.garden.boulder": {
       "type": "model",
-      "placeholder": [
-        {
-          "shape": "blob",
-          "size": [
-            0.78,
-            0.5,
-            0.7
-          ],
-          "at": [
-            0,
-            0.17,
-            0
-          ],
-          "color": "#8F8B82",
-          "material": "material.finish.matte",
-          "noise": 0.3
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.36,
-            0.26,
-            0.32
-          ],
-          "at": [
-            0.33,
-            0.08,
-            0.2
-          ],
-          "color": "#9A958C",
-          "material": "material.finish.matte",
-          "noise": 0.3
-        },
-        {
-          "shape": "blob",
-          "size": [
-            0.42,
-            0.07,
-            0.32
-          ],
-          "at": [
-            -0.06,
-            0.4,
-            -0.04
-          ],
-          "color": "#6E8A44",
-          "material": "material.finish.foliage",
-          "noise": 0.25
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.177,
-            0.012
-          ],
-          "at": [
-            0.15,
-            0.08,
-            0.393
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            24.4,
-            19.2,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.199,
-            0.012
-          ],
-          "at": [
-            0.162,
-            0.096,
-            0.359
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            14.3,
-            89.2,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.188,
-            0.012
-          ],
-          "at": [
-            0.301,
-            0.092,
-            0.292
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            12.4,
-            43.1,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.171,
-            0.012
-          ],
-          "at": [
-            0.324,
-            0.075,
-            0.262
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            27.8,
-            113.1,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.149,
-            0.012
-          ],
-          "at": [
-            0.308,
-            0.073,
-            -0.279
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            11.6,
-            134.9,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.158,
-            0.012
-          ],
-          "at": [
-            0.283,
-            0.071,
-            -0.3
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            26.6,
-            204.9,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.158,
-            0.012
-          ],
-          "at": [
-            0.142,
-            0.077,
-            -0.375
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            12.1,
-            161.0,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.15,
-            0.012
-          ],
-          "at": [
-            0.116,
-            0.07,
-            -0.376
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            20.5,
-            231.0,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.173,
-            0.012
-          ],
-          "at": [
-            -0.335,
-            0.078,
-            -0.282
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            24.7,
-            227.3,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.198,
-            0.012
-          ],
-          "at": [
-            -0.336,
-            0.094,
-            -0.243
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            18.3,
-            297.3,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.186,
-            0.012
-          ],
-          "at": [
-            -0.346,
-            0.083,
-            0.279
-          ],
-          "color": "#6E8E3C",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            26.5,
-            311.4,
-            0
-          ]
-        },
-        {
-          "shape": "cone",
-          "size": [
-            0.035,
-            0.16,
-            0.012
-          ],
-          "at": [
-            -0.306,
-            0.076,
-            0.274
-          ],
-          "color": "#7E9C44",
-          "material": "material.finish.foliage",
-          "segments": 3,
-          "rotate": [
-            17.4,
-            381.4,
-            0
-          ]
-        }
-      ],
-      "vary": 0.1,
       "url": "../../models/garden/boulder.glb",
       "materials": {
-        "*": {
-          "finish": "material.finish.matte"
+        "leaf": {
+          "finish": "material.finish.foliage"
         },
         "moss": {
           "finish": "material.finish.foliage"
         },
-        "leaf": {
-          "finish": "material.finish.foliage"
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "stone_warm": {
+          "finish": "material.finish.matte"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Large boulder"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Middle boulder"
+        },
+        {
+          "material": "stone_warm",
+          "label": "Small boulder"
+        }
+      ]
     }
   }
 }

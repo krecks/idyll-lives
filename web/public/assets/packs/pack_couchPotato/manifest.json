@@ -1,0 +1,381 @@
+{
+  "$comment": "Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). Replaces the primitive-part placeholders of packs/couchPotato by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The cinema's curtains are drawn apart, the console's tray slides out, the recliner reclines, the fridge door swings, the balance board tilts and the lava lamp's wax rises and drifts.",
+  "version": 1,
+  "entries": {
+    "model.couchPotato.cinemaWall": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/cinemaWall.glb",
+      "materials": {
+        "bezel": {
+          "finish": "material.finish.gloss"
+        },
+        "cinema_frame": {
+          "finish": "material.finish.satin"
+        },
+        "curtain": {
+          "finish": "material.finish.fabric"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "graphite": {
+          "finish": "material.finish.metal"
+        },
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "pelmet": {
+          "finish": "material.finish.satin"
+        },
+        "picture": {
+          "finish": "material.finish.gloss"
+        },
+        "picture_b": {
+          "finish": "material.finish.gloss"
+        },
+        "popcorn": {
+          "finish": "material.finish.matte"
+        },
+        "screen_back": {
+          "finish": "material.finish.satin"
+        },
+        "slat": {
+          "finish": "material.finish.satin"
+        },
+        "soda": {
+          "finish": "material.finish.gloss"
+        },
+        "speaker_cone": {
+          "finish": "material.finish.satin"
+        },
+        "speaker_grey": {
+          "finish": "material.finish.satin"
+        },
+        "straw": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "marathon": "curtains",
+          "channelSurf": "curtains"
+        }
+      },
+      "paint": [
+        {
+          "material": "cinema_frame",
+          "label": "Body"
+        },
+        {
+          "material": "leather",
+          "label": "Upholstery"
+        },
+        {
+          "material": "curtain",
+          "label": "Curtains"
+        }
+      ]
+    },
+    "model.couchPotato.gameConsole": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/gameConsole.glb",
+      "materials": {
+        "bezel": {
+          "finish": "material.finish.gloss"
+        },
+        "box_blue": {
+          "finish": "material.finish.satin"
+        },
+        "box_red": {
+          "finish": "material.finish.satin"
+        },
+        "console": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "disc": {
+          "finish": "material.finish.chrome"
+        },
+        "gamer": {
+          "finish": "material.finish.fabric"
+        },
+        "graphite": {
+          "finish": "material.finish.metal"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "picture": {
+          "finish": "material.finish.gloss"
+        },
+        "picture_b": {
+          "finish": "material.finish.gloss"
+        },
+        "screen_back": {
+          "finish": "material.finish.satin"
+        },
+        "slat": {
+          "finish": "material.finish.satin"
+        },
+        "soda": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "play": "tray",
+          "speedrun": "tray"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "console",
+          "label": "Body"
+        },
+        {
+          "material": "gamer",
+          "label": "Upholstery"
+        },
+        {
+          "material": "mustard",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.couchPotato.recliner": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/recliner.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "plush": {
+          "finish": "material.finish.satin"
+        },
+        "slat": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "throw": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "recline": "recline",
+          "doze": "recline"
+        },
+        "ride": "recline"
+      },
+      "paint": [
+        {
+          "material": "plinth",
+          "label": "Body"
+        },
+        {
+          "material": "plush",
+          "label": "Upholstery"
+        },
+        {
+          "material": "throw",
+          "label": "Throw"
+        }
+      ]
+    },
+    "model.couchPotato.snackFridge": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/snackFridge.glb",
+      "materials": {
+        "bezel": {
+          "finish": "material.finish.gloss"
+        },
+        "bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "can_a": {
+          "finish": "material.finish.gloss"
+        },
+        "can_b": {
+          "finish": "material.finish.gloss"
+        },
+        "can_c": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "crisps": {
+          "finish": "material.finish.matte"
+        },
+        "graphite": {
+          "finish": "material.finish.metal"
+        },
+        "inside": {
+          "finish": "material.finish.satin"
+        },
+        "lid": {
+          "finish": "material.finish.fabric"
+        },
+        "menu": {
+          "finish": "material.finish.gloss"
+        },
+        "mint": {
+          "finish": "material.finish.gloss"
+        },
+        "mint_trim": {
+          "finish": "material.finish.satin"
+        },
+        "takeout": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "snack": "fridge_open",
+          "takeout": "fridge_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "mint",
+          "label": "Body"
+        },
+        {
+          "material": "lid",
+          "label": "Upholstery"
+        }
+      ]
+    },
+    "model.couchPotato.fitnessGame": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/fitnessGame.glb",
+      "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "fit_mat": {
+          "finish": "material.finish.fabric"
+        },
+        "fit_stand": {
+          "finish": "material.finish.satin"
+        },
+        "grip": {
+          "finish": "material.finish.matte"
+        },
+        "mat_inner": {
+          "finish": "material.finish.fabric"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "picture_b": {
+          "finish": "material.finish.gloss"
+        },
+        "soda": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "tv_floor": {
+          "finish": "material.finish.gloss"
+        },
+        "tv_frame": {
+          "finish": "material.finish.satin"
+        },
+        "tv_orange": {
+          "finish": "material.finish.gloss"
+        },
+        "tv_screen": {
+          "finish": "material.finish.gloss"
+        },
+        "tv_white": {
+          "finish": "material.finish.gloss"
+        },
+        "weight": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "workout": "board"
+        }
+      },
+      "paint": [
+        {
+          "material": "fit_stand",
+          "label": "Body"
+        },
+        {
+          "material": "fit_mat",
+          "label": "Mat"
+        },
+        {
+          "material": "board",
+          "label": "Board"
+        }
+      ]
+    },
+    "model.couchPotato.lavaLamp": {
+      "type": "model",
+      "url": "../../models/pack_couchPotato/lavaLamp.glb",
+      "materials": {
+        "lamp_metal": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "pouf": {
+          "finish": "material.finish.satin"
+        },
+        "rug": {
+          "finish": "material.finish.satin"
+        },
+        "table_white": {
+          "finish": "material.finish.satin"
+        },
+        "vessel": {
+          "finish": "material.finish.glass"
+        },
+        "wax": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "zoneOut": "blobs"
+        },
+        "idle": "drift"
+      },
+      "paint": [
+        {
+          "material": "lamp_metal",
+          "label": "Body"
+        },
+        {
+          "material": "pouf",
+          "label": "Upholstery"
+        },
+        {
+          "material": "vessel",
+          "label": "Glass"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,455 @@
+{
+  "$comment": "Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). Replaces the primitive-part placeholders of packs/natureLover by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: a lettuce is picked from the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower runs, the cloche lifts and the glasshouse's door and vent open.",
+  "version": 1,
+  "entries": {
+    "model.natureLover.veggieBed": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/veggieBed.glb",
+      "materials": {
+        "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "cedar": {
+          "finish": "material.finish.satin"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "courgette": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_pale": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pickSnack": "harvest",
+          "tendVeggies": {
+            "clip": "rustle",
+            "delay": 0.6,
+            "every": 2.4
+          }
+        },
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Wood"
+        },
+        {
+          "material": "cedar_dark",
+          "label": "Posts & rails"
+        }
+      ]
+    },
+    "model.natureLover.pottingBench": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/pottingBench.glb",
+      "materials": {
+        "bench": {
+          "finish": "material.finish.satin"
+        },
+        "can": {
+          "finish": "material.finish.metal"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "green_dark": {
+          "finish": "material.finish.satin"
+        },
+        "green_light": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_pale": {
+          "finish": "material.finish.foliage"
+        },
+        "lilac": {
+          "finish": "material.finish.satin"
+        },
+        "pink": {
+          "finish": "material.finish.satin"
+        },
+        "sack": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.satin"
+        },
+        "seed": {
+          "finish": "material.finish.matte"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "potSeedlings": "seedling",
+          "tieBouquet": "bouquet"
+        }
+      },
+      "paint": [
+        {
+          "material": "bench",
+          "label": "Wood"
+        },
+        {
+          "material": "sage",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.natureLover.birdFeeder": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/birdFeeder.glb",
+      "materials": {
+        "beak": {
+          "finish": "material.finish.satin"
+        },
+        "bird_blue": {
+          "finish": "material.finish.satin"
+        },
+        "bird_breast": {
+          "finish": "material.finish.satin"
+        },
+        "bird_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "cedar": {
+          "finish": "material.finish.satin"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "house": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "lilac": {
+          "finish": "material.finish.satin"
+        },
+        "pink": {
+          "finish": "material.finish.satin"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        },
+        "seed": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tube": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "birdwatch": "bird"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Wood"
+        },
+        {
+          "material": "roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.natureLover.gardenHammock": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/gardenHammock.glb",
+      "materials": {
+        "canvas": {
+          "finish": "material.finish.fabric"
+        },
+        "cedar_wood": {
+          "finish": "material.finish.wood"
+        },
+        "cedar_wood_dark": {
+          "finish": "material.finish.wood"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "rope": {
+          "finish": "material.finish.fabric"
+        },
+        "stripe": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "loops": {
+          "swing": "sway",
+          "doze": "sway"
+        },
+        "ride": "sway"
+      },
+      "paint": [
+        {
+          "material": "cedar_wood",
+          "label": "Wood"
+        },
+        {
+          "material": "canvas",
+          "label": "Fabric"
+        },
+        {
+          "material": "stripe",
+          "label": "Stripes"
+        }
+      ]
+    },
+    "model.natureLover.cedarShower": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/cedarShower.glb",
+      "materials": {
+        "cedar_wood": {
+          "finish": "material.finish.wood"
+        },
+        "cedar_wood_dark": {
+          "finish": "material.finish.wood"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "green_light": {
+          "finish": "material.finish.satin"
+        },
+        "pebble": {
+          "finish": "material.finish.satin"
+        },
+        "pebble_b": {
+          "finish": "material.finish.satin"
+        },
+        "soap": {
+          "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "rinse": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar_wood",
+          "label": "Wood"
+        },
+        {
+          "material": "copper",
+          "label": "Copper"
+        }
+      ]
+    },
+    "model.natureLover.mossTerrarium": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/mossTerrarium.glb",
+      "materials": {
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "mister": {
+          "finish": "material.finish.gloss"
+        },
+        "moss": {
+          "finish": "material.finish.foliage"
+        },
+        "pebble": {
+          "finish": "material.finish.satin"
+        },
+        "rug": {
+          "finish": "material.finish.matte"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "toadstool": {
+          "finish": "material.finish.satin"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "mist": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.natureLover.glasshouse": {
+      "type": "model",
+      "url": "../../models/pack_natureLover/glasshouse.glb",
+      "materials": {
+        "cedar": {
+          "finish": "material.finish.satin"
+        },
+        "cedar_dark": {
+          "finish": "material.finish.satin"
+        },
+        "cushion": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "gravel": {
+          "finish": "material.finish.matte"
+        },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "green_dark": {
+          "finish": "material.finish.satin"
+        },
+        "green_light": {
+          "finish": "material.finish.satin"
+        },
+        "orchid": {
+          "finish": "material.finish.satin"
+        },
+        "orchid_b": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.satin"
+        },
+        "terra": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "unwind": "door_open",
+          "orchids": "door_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Wood"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushions"
+        }
+      ]
+    }
+  }
+}

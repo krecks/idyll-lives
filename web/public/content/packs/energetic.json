@@ -8,6 +8,7 @@
       "footprint": [2, 1],
       "price": 1100,
       "category": "fitness",
+      "fillsWall": true,
       "slots": 1,
       "description": "A slightly overhanging plywood wall studded with colourful holds over a thick crash mat. Builds Strength and Dexterity.",
       "interactions": [
@@ -54,6 +55,7 @@
       "id": "energetic.trampoline",
       "name": "Rebound trampoline",
       "model": "model.energetic.trampoline",
+      "stand": {"height": 0.5, "motion": "bounce"},
       "outdoors": true,
       "footprint": [2, 2],
       "price": 480,
@@ -82,6 +84,7 @@
       "footprint": [1, 1],
       "price": 340,
       "category": "outdoor",
+      "freeRotation": true,
       "slots": 2,
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",
       "interactions": [
@@ -132,6 +135,7 @@
       "footprint": [1, 1],
       "price": 1050,
       "category": "bathroom",
+      "fillsWall": true,
       "slots": 1,
       "description": "A wide rain head that alternates hot and cold. Rinses off a workout faster than a normal shower and leaves residents Refreshed.",
       "interactions": [

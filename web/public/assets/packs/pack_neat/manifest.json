@@ -1,0 +1,419 @@
+{
+  "$comment": "Blender-built neat pack models (tools/art/blender/families/pack_neat.py). Replaces the primitive-part placeholders of packs/neat by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves one part while it is used: the mop leaves its dock for the resident's hands, the washer's door opens, the rain falls, a bin slides out, the robot rolls out and the key tray drawer opens.",
+  "version": 1,
+  "entries": {
+    "model.neat.steamMopDock": {
+      "type": "model",
+      "url": "../../models/pack_neat/steamMopDock.glb",
+      "materials": {
+        "birch_plain": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_a": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_b": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "pad": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_a": {
+          "finish": "material.finish.satin"
+        },
+        "porthole": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "towel_c": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_w": {
+          "finish": "material.finish.fabric"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "mop": "mop_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "teal",
+          "label": "Mop"
+        }
+      ]
+    },
+    "model.neat.laundryCenter": {
+      "type": "model",
+      "url": "../../models/pack_neat/laundryCenter.glb",
+      "materials": {
+        "appliance": {
+          "finish": "material.finish.gloss"
+        },
+        "birch_plain": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_a": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_b": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "drum": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "porthole": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "screen_glow": {
+          "finish": "material.finish.gloss"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "towel_a": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_b": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_c": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_d": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_f": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_w": {
+          "finish": "material.finish.fabric"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        },
+        "wicker_b": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "laundry": "door_open",
+          "fold": "door_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "appliance",
+          "label": "Washer & dryer"
+        }
+      ]
+    },
+    "model.neat.rainShowerTower": {
+      "type": "model",
+      "url": "../../models/pack_neat/rainShowerTower.glb",
+      "materials": {
+        "appliance": {
+          "finish": "material.finish.gloss"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_b": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_c": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "joint": {
+          "finish": "material.finish.satin"
+        },
+        "pad": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_a": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "teak": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "steamShower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tile",
+          "label": "Body"
+        },
+        {
+          "material": "teak",
+          "label": "Bench"
+        }
+      ]
+    },
+    "model.neat.organizerDesk": {
+      "type": "model",
+      "url": "../../models/pack_neat/organizerDesk.glb",
+      "materials": {
+        "birch": {
+          "finish": "material.finish.wood"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "ledger": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pastel_a": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_b": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_c": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_d": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_e": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_f": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sort": "drawer_open",
+          "ledger": "drawer_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "birch",
+          "label": "Wood"
+        },
+        {
+          "material": "pastel_c",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.neat.robotVacuumDock": {
+      "type": "model",
+      "url": "../../models/pack_neat/robotVacuumDock.glb",
+      "materials": {
+        "appliance": {
+          "finish": "material.finish.gloss"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "porthole": {
+          "finish": "material.finish.gloss"
+        },
+        "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_inner": {
+          "finish": "material.finish.fabric"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "program": "vacuum_out"
+        },
+        "hold": 2
+      },
+      "paint": [
+        {
+          "material": "appliance",
+          "label": "Body"
+        },
+        {
+          "material": "teal",
+          "label": "Trim"
+        },
+        {
+          "material": "rug",
+          "label": "Rug"
+        }
+      ]
+    },
+    "model.neat.entryConsole": {
+      "type": "model",
+      "url": "../../models/pack_neat/entryConsole.glb",
+      "materials": {
+        "appliance": {
+          "finish": "material.finish.gloss"
+        },
+        "birch": {
+          "finish": "material.finish.wood"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "bottle_b": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "mirror": {
+          "finish": "material.finish.chrome"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "pad": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_b": {
+          "finish": "material.finish.satin"
+        },
+        "pastel_e": {
+          "finish": "material.finish.satin"
+        },
+        "shoe_a": {
+          "finish": "material.finish.satin"
+        },
+        "shoe_b": {
+          "finish": "material.finish.satin"
+        },
+        "shoe_c": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "tidy": "tray"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "birch",
+          "label": "Wood"
+        }
+      ]
+    }
+  }
+}

@@ -268,7 +268,21 @@
         ]
       },
       "description": "A walnut bedside chest with three drawers.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "outfit",
+          "label": "Pick an outfit",
+          "anim": "clean",
+          "minutes": 10,
+          "effects": {
+            "comfort": 0.05
+          },
+          "tags": [
+            "lounge"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "chestOfDrawers",
@@ -287,11 +301,11 @@
         "kind": "shelf",
         "size": [
           0.88,
-          0.68
+          0.63
         ],
         "at": [
           0.0,
-          -0.14
+          -0.115
         ]
       },
       "description": "Five drawers with brass pulls; things stand on top.",
@@ -328,11 +342,11 @@
         "kind": "low",
         "size": [
           1.82,
-          0.66
+          0.61
         ],
         "at": [
           0.0,
-          -0.15
+          -0.125
         ]
       },
       "description": "Nine oak drawers on short legs, long enough for a mirror and a lamp on top.",
@@ -362,6 +376,7 @@
       ],
       "price": 240,
       "category": "bedroom",
+      "fillsWall": true,
       "group": "storage",
       "description": "A narrow white wardrobe for a small room.",
       "interactions": [
@@ -390,6 +405,7 @@
       ],
       "price": 900,
       "category": "bedroom",
+      "fillsWall": true,
       "group": "storage",
       "decor": 0.6,
       "description": "A grand two-door wardrobe in dark wood with a cornice and turned feet.",
@@ -430,7 +446,19 @@
         ]
       },
       "description": "A cedar chest with iron straps for the foot of the bed.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "takeBlanket",
+          "label": "Take out a blanket",
+          "anim": "fetch",
+          "minutes": 3,
+          "effects": {
+            "comfort": 0.1
+          },
+          "tags": [],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "benchBedEnd",
@@ -510,7 +538,21 @@
       "group": "storage",
       "decor": 0.1,
       "description": "A wicker hamper with a lid.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sortWashing",
+          "label": "Sort the washing",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores"
+          ],
+          "autonomous": false
+        }
+      ]
     }
   ]
 }

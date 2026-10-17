@@ -1,0 +1,265 @@
+{
+  "$comment": "Blender-built shop fittings and caf\u00e9 furniture for the town (tools/art/blender/families/shops.py). Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each has a far version for the town overview. The till's cash drawer slides out (`till`) while a resident buys a treat; the bakery case's back glass door slides aside (`door`) for a pastry.",
+  "version": 1,
+  "entries": {
+    "model.shopCounter": {
+      "type": "model",
+      "url": "../../models/shops/shopCounter.glb",
+      "materials": {
+        "coin": {
+          "finish": "material.finish.metal"
+        },
+        "counter": {
+          "finish": "material.finish.wood"
+        },
+        "jar": {
+          "finish": "material.finish.gloss"
+        },
+        "jarLid": {
+          "finish": "material.finish.gloss"
+        },
+        "key2": {
+          "finish": "material.finish.gloss"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "mag1": {
+          "finish": "material.finish.gloss"
+        },
+        "mag2": {
+          "finish": "material.finish.gloss"
+        },
+        "mag3": {
+          "finish": "material.finish.gloss"
+        },
+        "mag4": {
+          "finish": "material.finish.gloss"
+        },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "sweet1": {
+          "finish": "material.finish.gloss"
+        },
+        "sweet2": {
+          "finish": "material.finish.gloss"
+        },
+        "sweet3": {
+          "finish": "material.finish.gloss"
+        },
+        "sweet4": {
+          "finish": "material.finish.gloss"
+        },
+        "sweet5": {
+          "finish": "material.finish.gloss"
+        },
+        "till": {
+          "finish": "material.finish.satin"
+        },
+        "trim": {
+          "finish": "material.finish.metal"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "treat": "till"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "counter",
+          "label": "Counter"
+        },
+        {
+          "material": "walnut",
+          "label": "Trim"
+        }
+      ],
+      "far": "../../models/shops/shopCounter.far.glb"
+    },
+    "model.bakeryCase": {
+      "type": "model",
+      "url": "../../models/shops/bakeryCase.glb",
+      "materials": {
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "case": {
+          "finish": "material.finish.satin"
+        },
+        "choc": {
+          "finish": "material.finish.gloss"
+        },
+        "cream": {
+          "finish": "material.finish.gloss"
+        },
+        "crust": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "icing": {
+          "finish": "material.finish.gloss"
+        },
+        "jam": {
+          "finish": "material.finish.gloss"
+        },
+        "lemon": {
+          "finish": "material.finish.gloss"
+        },
+        "pastry": {
+          "finish": "material.finish.satin"
+        },
+        "rim": {
+          "finish": "material.finish.satin"
+        },
+        "sponge": {
+          "finish": "material.finish.satin"
+        },
+        "stripe": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pastry": "door"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "case",
+          "label": "Counter"
+        },
+        {
+          "material": "rim",
+          "label": "Trim"
+        }
+      ],
+      "far": "../../models/shops/bakeryCase.far.glb"
+    },
+    "model.groceryShelf": {
+      "type": "model",
+      "url": "../../models/shops/groceryShelf.glb",
+      "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "filling": {
+          "finish": "material.finish.matte"
+        },
+        "good1": {
+          "finish": "material.finish.gloss"
+        },
+        "good2": {
+          "finish": "material.finish.gloss"
+        },
+        "good3": {
+          "finish": "material.finish.gloss"
+        },
+        "good4": {
+          "finish": "material.finish.gloss"
+        },
+        "good5": {
+          "finish": "material.finish.gloss"
+        },
+        "good6": {
+          "finish": "material.finish.gloss"
+        },
+        "good7": {
+          "finish": "material.finish.gloss"
+        },
+        "good8": {
+          "finish": "material.finish.gloss"
+        },
+        "good9": {
+          "finish": "material.finish.gloss"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "shelf": {
+          "finish": "material.finish.metal"
+        },
+        "tinLid": {
+          "finish": "material.finish.metal"
+        },
+        "trim": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "shelf",
+          "label": "Shelves"
+        },
+        {
+          "material": "trim",
+          "label": "Trim"
+        }
+      ],
+      "far": "../../models/shops/groceryShelf.far.glb"
+    },
+    "model.cafeTable": {
+      "type": "model",
+      "url": "../../models/shops/cafeTable.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "marble": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "marble",
+          "label": "Top"
+        },
+        {
+          "material": "iron",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/shops/cafeTable.far.glb"
+    },
+    "model.cafeChair": {
+      "type": "model",
+      "url": "../../models/shops/cafeChair.glb",
+      "materials": {
+        "bentwood": {
+          "finish": "material.finish.wood"
+        },
+        "cane": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "bentwood",
+          "label": "Frame"
+        },
+        {
+          "material": "cane",
+          "label": "Seat"
+        }
+      ],
+      "far": "../../models/shops/cafeChair.far.glb"
+    }
+  }
+}

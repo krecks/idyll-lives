@@ -163,7 +163,7 @@ fn lamps_light_as_much_floor_as_they_say() {
 #[test]
 fn lamps_keep_out_of_doorways() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    let buy = |w: &mut World, x: i32, z: i32, rot: i32| w.apply(Command::Buy { household: 0, object: "lamp".into(), at: Some([x, z, rot]), style: None, turn: None, offset: None, size: None, tall: None });
+    let buy = |w: &mut World, x: i32, z: i32, rot: i32| w.apply(Command::Buy { household: 0, object: "lamp".into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None });
     // The living room's door is on its bottom wall at x 6: (6, 4) inside, (6, 5) outside.
     for (x, z, rot) in [(6, 4, 2), (6, 5, 0)] {
         let err = buy(&mut w, x, z, rot).unwrap_err().to_string();

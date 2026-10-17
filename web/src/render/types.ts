@@ -6,7 +6,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import type { ItemPlacement, WorldStructure } from '../core/protocol';
+import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -75,7 +75,7 @@ export interface FrameCounts {
   /** In the sun's shadow map. */
   shadowDrawCalls: number;
   shadowTriangles: number;
-  /** In the live mirrors' reflections. */
+  /** In the mirrors' reflections. */
   mirrorDrawCalls: number;
   mirrorTriangles: number;
   /** Lighting updates so far (`applyLighting`). */
@@ -169,8 +169,10 @@ export interface ResizeHandle {
 }
 
 export interface PlacementGhost {
-  /** Asset key of the model (style variant already resolved by the caller, or a base key). */
+  /** Asset key of the model. */
   model: string;
+  /** Its parts' colours; absent: as made. */
+  colors?: PartColors;
   /** Min corner (tiles) of the rotated footprint `w`×`d`. */
   x: number;
   z: number;
@@ -189,6 +191,8 @@ export interface PlacementGhost {
   /** The tile a Sim uses it from, marked with an arrow pointing `out` of it (quarter turns as `rot`; must stay clear). */
   front?: { x: number; z: number; out: number };
   valid: boolean;
+  /** It hangs on a wall: while it's held, the things on walls show even with their walls down (what's in its way shows). */
+  wall?: boolean;
 }
 
 /**
@@ -290,6 +294,8 @@ export interface Renderer {
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void>;
   /** Food and dishes (sent apart from the world: they change far more often). */
   setItems(items: readonly ItemPlacement[]): void;
+  /** The lamps switched off (object ids): no light, no glow (sim-core `lights.rs`). */
+  setLampsOff(off: ReadonlySet<number>): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /** Canvas-relative CSS pixel coordinates. */
@@ -477,7 +483,7 @@ export interface Wardrobe {
 /** Catalog pictures of furniture models (see `render/preview/items.ts`). */
 export interface ItemPreviews {
   /**
-   * Picture of a model (asset key, style variant resolved), cached for the page and between
+   * Picture of a model (asset key), cached for the page and between
    * visits. `now` requests (on screen) come first, `idle` ones are drawn ahead of time; aborting
    * withdraws a request. Null when 3D is unavailable (or aborted).
    */
@@ -487,9 +493,22 @@ export interface ItemPreviews {
   /** The cached picture, if it has been drawn. */
   cachedThumbnail(model: string): string | null;
   /** The cached turntable, if it has been drawn. */
-  cachedTurntable(model: string, frames: number): string[] | null;
-  /** The model seen from `frames` angles, turning once around (the catalog's drag-to-turn preview). */
-  turntable(model: string, footprint: [number, number], frames: number): Promise<string[] | null>;
+  cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null;
+  /** The model (its parts in `colors`) seen from `frames` angles, turning once around (the catalog's drag-to-turn preview). */
+  turntable(model: string, footprint: [number, number], frames: number, colors?: PartColors): Promise<string[] | null>;
+  /** The colour studio's live stage for `model`, in `host`; null when 3D is unavailable. */
+  stage(host: HTMLElement, model: string, footprint: [number, number]): Promise<ItemStage | null>;
+}
+
+/** One item, live and turning, as the colour studio shows it. */
+export interface ItemStage {
+  /** Shows its parts in `colors` (the latest call wins; the one shown stays until it's ready). */
+  setColors(colors: PartColors | undefined): void;
+  /** Whether it has clips that open it (a fridge's doors, a hot tub's cover), once it shows: `setOpen` plays them. */
+  readonly opens: Promise<boolean>;
+  /** Plays those clips open and holds them there (true), or back to rest, at their pace in the game. */
+  setOpen(open: boolean): void;
+  detach(): void;
 }
 
 export interface SimPreviews {

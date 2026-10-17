@@ -1,11 +1,13 @@
 # Couch Potato pack models (web/public/assets/packs/couchPotato/manifest.json). Conventions: see
 # pack_foodie.py. Seated items put their seat on the footprint centre line (characters.ts DEFAULT_SEAT:
-# seat top 0.45 m, facing +Z); screens the Sim watches stand at the front edge facing -Z (toward it).
+# seat top 0.45 m, facing +Z). The screens the Sim watches (cinemaWall, gameConsole) are drawn at the front edge
+# facing -Z (the seats), then turned round (`turned`): the screen on the wall, the seats in front, the sitter facing
+# the object's back (content `seat.facing`; Blender's pack_couchPotato.py does the same).
 # Run: python3 -I pack_couchPotato.py [out.json] && python3 -I apply_pack.py couchPotato out.json
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder, turned,  # noqa: E402
                        OAK, OAKD, HONEY, BRASS, TEAL, MUSTARD, SAGE, RUST, CREAM)
 from pack_foodie import run  # noqa: E402
 from furniture_prims import mini_fridge, flat_tv  # noqa: E402
@@ -50,7 +52,8 @@ def recliner_seat(x, w=0.74, color=CORD, arm=True, foot=False):
     return p
 
 
-# ---- cinemaWall (2x1, 2 seats): twin recliners with a cup console, big screen at the front edge -
+# ---- cinemaWall (2x1, 2 seats): twin recliners with a cup console, big screen; drawn with the screen at the front
+# edge, then turned round (the screen on the wall) -
 def cinema_wall():
     p = recliner_seat(-0.5, 0.78, '#7A2E2E') + recliner_seat(0.5, 0.78, '#7A2E2E')
     p += [box([0.2, 0.5, 0.6], [0, 0.25, -0.06], FRAME, 'satin', radius=0.03),                   # centre console
@@ -66,13 +69,14 @@ def cinema_wall():
               cyl([0.1, 0.01, 0.1], [x, 0.6, 0.235], '#3A3D41', 'satin', rotate=[90, 0, 0], segments=12),
               cyl([0.06, 0.01, 0.06], [x, 0.76, 0.235], '#3A3D41', 'satin', rotate=[90, 0, 0], segments=12)]
     p += [box([0.4, 0.02, 0.12], [-0.25, 0.465, 0.12], '#2B2C2E', 'satin', radius=0.01, rotate=[0, 20, 0])]  # remote
-    return placeholder(p)
+    return placeholder(turned(p))
 
 
 E['model.couchPotato.cinemaWall'] = cinema_wall(); FOOT['model.couchPotato.cinemaWall'] = (2, 1)
 
 
-# ---- gameConsole (1x1, 2 players at x = +-0.25): gaming loveseat + screen and console in front --
+# ---- gameConsole (1x1, 2 players at x = +-0.25): gaming loveseat, screen and console; drawn with the screen at
+# the front edge, then turned round (the screen on the wall) --
 def game_console():
     C = '#3F6E9E'
     p = [cushion([0.88, 0.28, 0.56], [0, 0.15, -0.12], C, radius=0.08),
@@ -91,7 +95,7 @@ def game_console():
           box([0.1, 0.008, 0.002], [0.05, 0.67, 0.339], '#3BA3E0', 'gloss', radius=0.002),     # power light
           box([0.14, 0.18, 0.02], [-0.2, 0.73, 0.43], '#B33A32', 'satin', radius=0.004),       # game box
           box([0.14, 0.18, 0.02], [-0.17, 0.73, 0.41], '#3E8EDE', 'satin', radius=0.004)]
-    return placeholder(p)
+    return placeholder(turned(p))
 
 
 E['model.couchPotato.gameConsole'] = game_console(); FOOT['model.couchPotato.gameConsole'] = (1, 1)
@@ -99,15 +103,25 @@ E['model.couchPotato.gameConsole'] = game_console(); FOOT['model.couchPotato.gam
 
 # ---- recliner (1x1): deep power recliner, footrest out, cup holder arm -------------------------
 def recliner():
-    p = recliner_seat(0, 0.86, PLUSH, arm=False, foot=True)
+    """As the model stands at rest (families/pack_couchPotato.py): 3 cm off the wall, the back upright, the
+    footrest folded down under the seat's front."""
+    Z = 0.03
+    p = [box([0.6, 0.05, 0.6], [0, 0.025, -0.06 + Z], '#6E5038', 'wood', radius=0.012),           # plinth
+         cushion([0.58, 0.3, 0.6], [0, 0.2, -0.06 + Z], PLUSH, radius=0.05),                       # base
+         cushion([0.56, 0.11, 0.54], [0, 0.395, -0.02 + Z], PLUSH, radius=0.05),                   # seat (top 0.45)
+         cushion([0.6, 0.56, 0.15], [0, 0.67, -0.27 + Z], PLUSH, rotate=[-8, 0, 0], radius=0.06),  # back
+         cushion([0.5, 0.3, 0.09], [0, 0.69, -0.18 + Z], PLUSH, rotate=[-8, 0, 0], radius=0.04),
+         cushion([0.46, 0.13, 0.11], [0, 0.88, -0.21 + Z], PLUSH, rotate=[-8, 0, 0], radius=0.05),
+         cushion([0.5, 0.22, 0.08], [0, 0.28, 0.29 + Z], PLUSH, radius=0.035)]                     # footrest, folded
     for s in (-1, 1):                                                                              # big rolled arms
-        p += [cushion([0.16, 0.36, 0.7], [s * 0.37, 0.4, -0.08], PLUSH, radius=0.07)]
-    p += [cyl([0.08, 0.02, 0.08], [0.37, 0.59, 0.1], '#3A3D41', 'satin', segments=12),          # cup holder
-          cyl([0.07, 0.12, 0.07], [0.37, 0.64, 0.1], TEAL, 'gloss', segments=12),
-          box([0.05, 0.02, 0.14], [-0.37, 0.59, 0.08], '#3A3D41', 'satin', radius=0.01),        # remote
-          box([0.02, 0.006, 0.12], [-0.38, 0.6, 0.1], '#5C6168', 'satin', radius=0.003),
-          box([0.6, 0.05, 0.6], [0, 0.025, -0.06], '#6E5038', 'wood', radius=0.012)]           # plinth
-    p += [box([0.4, 0.025, 0.5], [-0.12, 0.475, -0.04], '#D9C7A6', 'fabric', radius=0.012, rotate=[0, 10, 0])]  # throw
+        p += [cushion([0.16, 0.5, 0.7], [s * 0.37, 0.3, -0.08 + Z], PLUSH, radius=0.06),
+              cyl([0.16, 0.7, 0.16], [s * 0.375, 0.56, -0.08 + Z], PLUSH, 'fabric', rotate=[90, 0, 0], segments=16)]
+    p += [cyl([0.09, 0.02, 0.09], [0.37, 0.65, 0.12 + Z], '#3A3D41', 'satin', segments=12),       # cup holder
+          cyl([0.07, 0.12, 0.07], [0.37, 0.7, 0.12 + Z], TEAL, 'gloss', segments=12),
+          box([0.05, 0.02, 0.14], [-0.37, 0.655, 0.1 + Z], '#3A3D41', 'satin', radius=0.01),       # remote
+          box([0.02, 0.006, 0.1], [-0.37, 0.666, 0.11 + Z], '#5C6168', 'satin', radius=0.003),
+          box([0.02, 0.36, 0.4], [-0.445, 0.47, -0.12 + Z], '#D9C7A6', 'fabric', radius=0.006),     # throw over the left arm
+          box([0.17, 0.025, 0.4], [-0.37, 0.655, -0.12 + Z], '#D9C7A6', 'fabric', radius=0.01)]
     return placeholder(p)
 
 
@@ -121,9 +135,9 @@ def snack_fridge():
          box([0.18, 0.12, 0.012], [0.08, 0.24, 0.235], '#1B2A3A', 'gloss', radius=0.01),        # door screen
          box([0.15, 0.09, 0.002], [0.08, 0.24, 0.242], '#F2A541', 'gloss', radius=0.006),       # takeout menu glow
          box([0.04, 0.03, 0.002], [0.04, 0.26, 0.244], '#C9483B', 'gloss', radius=0.003),
-         lathe([0.24, 0.1, 0.24], [0.28, 0.5, -0.16], '#F2EDE2', 'gloss',                     # snack bowl on the lid
+         lathe([0.22, 0.06, 0.22], [0.13, 0.48, -0.12], '#F2EDE2', 'gloss',                     # snack bowl on the lid
                [[0, -0.5], [0.3, -0.5], [0.5, 0.5], [0.45, 0.5], [0, -0.3]], segments=16),
-         sph([0.2, 0.06, 0.2], [0.28, 0.54, -0.16], '#E9B54A', 'matte', segments=10),
+         sph([0.18, 0.05, 0.18], [0.13, 0.5, -0.12], '#E9B54A', 'matte', segments=10),
          box([0.5, 0.02, 0.06], [0, 0.05, 0.22], '#5C6168', 'satin', radius=0.01)]              # kick plate
     return placeholder(mini_fridge(0, -0.02, 0.56, 0.37, 0.46, body=MINT, trim='#7FB5A9') + p)
 
@@ -174,6 +188,11 @@ def lava_lamp():
 
 E['model.couchPotato.lavaLamp'] = lava_lamp(); FOOT['model.couchPotato.lavaLamp'] = (1, 1)
 
+
+# Wall-standing things: their backs on the wall face, as their models' (pack_shapes.to_wall).
+from pack_shapes import to_wall  # noqa: E402
+to_wall('couchPotato', E, ['model.couchPotato.cinemaWall', 'model.couchPotato.fitnessGame',
+                           'model.couchPotato.gameConsole', 'model.couchPotato.lavaLamp'])
 
 if __name__ == '__main__':
     sys.exit(1 if run('couchPotato', sys.argv[1] if len(sys.argv) > 1 else None, E, FOOT) else 0)

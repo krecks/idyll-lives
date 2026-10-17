@@ -153,6 +153,7 @@
       "footprint": [1, 1],
       "price": 160,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "A glass column of endless indoor rain; watching it is oddly soothing and a little fun.",
       "interactions": [
@@ -195,6 +196,7 @@
           "minutes": 30,
           "pose": "lie",
           "autonomous": true,
+          "whole": true,
           "effects": { "energy": 0.11, "comfort": 0.13 },
           "tags": ["rest", "nap"]
         }

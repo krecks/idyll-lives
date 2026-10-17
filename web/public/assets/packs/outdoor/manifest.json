@@ -1,0 +1,645 @@
+{
+  "$comment": "Blender-built outdoor things (tools/art/blender/families/outdoor.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The parasol's canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a soak.",
+  "version": 1,
+  "entries": {
+    "model.bench": {
+      "type": "model",
+      "url": "../../models/outdoor/bench.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "park_slats": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Frame"
+        },
+        {
+          "material": "park_slats",
+          "label": "Slats"
+        }
+      ]
+    },
+    "model.patioSet": {
+      "type": "model",
+      "url": "../../models/outdoor/patioSet.glb",
+      "materials": {
+        "bistro": {
+          "finish": "material.finish.wood"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "jug": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Frame"
+        },
+        {
+          "material": "bistro",
+          "label": "Slats"
+        }
+      ]
+    },
+    "model.picnicTable": {
+      "type": "model",
+      "url": "../../models/outdoor/picnicTable.glb",
+      "materials": {
+        "cloth": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth_check": {
+          "finish": "material.finish.fabric"
+        },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "handle": {
+          "finish": "material.finish.wood"
+        },
+        "jug": {
+          "finish": "material.finish.gloss"
+        },
+        "pine": {
+          "finish": "material.finish.wood"
+        },
+        "pine_dark": {
+          "finish": "material.finish.wood"
+        },
+        "wicker": {
+          "finish": "material.finish.fabric"
+        },
+        "wicker_rim": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "pine_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "pine",
+          "label": "Planks"
+        },
+        {
+          "material": "cloth",
+          "label": "Cloth"
+        }
+      ]
+    },
+    "model.gardenChair": {
+      "type": "model",
+      "url": "../../models/outdoor/gardenChair.glb",
+      "materials": {
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
+        "garden_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "garden_white",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.patioTableRound": {
+      "type": "model",
+      "url": "../../models/outdoor/patioTableRound.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "mosaic": {
+          "finish": "material.finish.gloss"
+        },
+        "tile": {
+          "finish": "material.finish.gloss"
+        },
+        "tile_light": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Frame"
+        },
+        {
+          "material": "mosaic",
+          "label": "Top"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.patioTable4": {
+      "type": "model",
+      "url": "../../models/outdoor/patioTable4.glb",
+      "materials": {
+        "teak": {
+          "finish": "material.finish.wood"
+        },
+        "teak_dark": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "teak_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "teak",
+          "label": "Top"
+        }
+      ]
+    },
+    "model.patioChair": {
+      "type": "model",
+      "url": "../../models/outdoor/patioChair.glb",
+      "materials": {
+        "cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "patio_green": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "patio_green",
+          "label": "Frame"
+        },
+        {
+          "material": "cushion",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.adirondackChair": {
+      "type": "model",
+      "url": "../../models/outdoor/adirondackChair.glb",
+      "materials": {
+        "adirondack": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "adirondack",
+          "label": "Chair"
+        }
+      ]
+    },
+    "model.benchGarden3": {
+      "type": "model",
+      "url": "../../models/outdoor/benchGarden3.glb",
+      "materials": {
+        "bench_slats": {
+          "finish": "material.finish.wood"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "iron",
+          "label": "Frame"
+        },
+        {
+          "material": "bench_slats",
+          "label": "Slats"
+        }
+      ]
+    },
+    "model.outdoorBar": {
+      "type": "model",
+      "url": "../../models/outdoor/outdoorBar.glb",
+      "materials": {
+        "bar_top": {
+          "finish": "material.finish.wood"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "teak": {
+          "finish": "material.finish.wood"
+        },
+        "teak_dark": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "teak",
+          "label": "Body"
+        },
+        {
+          "material": "bar_top",
+          "label": "Counter"
+        },
+        {
+          "material": "steel",
+          "label": "Foot rail"
+        }
+      ]
+    },
+    "model.parasol": {
+      "type": "model",
+      "url": "../../models/outdoor/parasol.glb",
+      "materials": {
+        "base": {
+          "finish": "material.finish.satin"
+        },
+        "canopy": {
+          "finish": "material.finish.fabric"
+        },
+        "pole": {
+          "finish": "material.finish.satin"
+        },
+        "valance": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "idle": "stir"
+      },
+      "paint": [
+        {
+          "material": "canopy",
+          "label": "Canopy"
+        },
+        {
+          "material": "pole",
+          "label": "Pole"
+        },
+        {
+          "material": "valance",
+          "label": "Edge"
+        }
+      ]
+    },
+    "model.sunLounger": {
+      "type": "model",
+      "url": "../../models/outdoor/sunLounger.glb",
+      "materials": {
+        "lounger": {
+          "finish": "material.finish.wood"
+        },
+        "lounger_pad": {
+          "finish": "material.finish.fabric"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "towel": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sunbathe": "recline",
+          "doze": "recline"
+        }
+      },
+      "paint": [
+        {
+          "material": "lounger",
+          "label": "Frame"
+        },
+        {
+          "material": "lounger_pad",
+          "label": "Cushions"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.hammock": {
+      "type": "model",
+      "url": "../../models/outdoor/hammock.glb",
+      "materials": {
+        "hammock_frame": {
+          "finish": "material.finish.wood"
+        },
+        "pillow": {
+          "finish": "material.finish.fabric"
+        },
+        "sling": {
+          "finish": "material.finish.fabric"
+        },
+        "sling_stripe": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "loops": {
+          "swing": "sway",
+          "doze": "sway"
+        },
+        "ride": "sway"
+      },
+      "paint": [
+        {
+          "material": "hammock_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "sling",
+          "label": "Fabric"
+        },
+        {
+          "material": "sling_stripe",
+          "label": "Stripes"
+        }
+      ]
+    },
+    "model.porchSwing": {
+      "type": "model",
+      "url": "../../models/outdoor/porchSwing.glb",
+      "materials": {
+        "chain": {
+          "finish": "material.finish.satin"
+        },
+        "porch_cushion": {
+          "finish": "material.finish.fabric"
+        },
+        "porch_frame": {
+          "finish": "material.finish.wood"
+        },
+        "porch_seat": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "swing": "swing"
+        },
+        "ride": "swing"
+      },
+      "paint": [
+        {
+          "material": "porch_seat",
+          "label": "Seat"
+        },
+        {
+          "material": "porch_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "chain",
+          "label": "Chains"
+        },
+        {
+          "material": "porch_cushion",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.swingSet": {
+      "type": "model",
+      "url": "../../models/outdoor/swingSet.glb",
+      "materials": {
+        "chain": {
+          "finish": "material.finish.satin"
+        },
+        "swing_frame": {
+          "finish": "material.finish.wood"
+        },
+        "swing_seat": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "swing": "swing"
+        },
+        "ride": "swing"
+      },
+      "paint": [
+        {
+          "material": "swing_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "swing_seat",
+          "label": "Seats"
+        }
+      ]
+    },
+    "model.hotTubCedar": {
+      "type": "model",
+      "url": "../../models/outdoor/hotTubCedar.glb",
+      "materials": {
+        "cedar": {
+          "finish": "material.finish.wood"
+        },
+        "cedar_band": {
+          "finish": "material.finish.wood"
+        },
+        "foam": {
+          "finish": "material.finish.gloss"
+        },
+        "tub_cover": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "soak": "cover_off"
+        },
+        "open": "cover_off",
+        "loops": {
+          "soak": "bubbles"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Cedar"
+        },
+        {
+          "material": "tub_cover",
+          "label": "Cover"
+        }
+      ]
+    },
+    "model.grill": {
+      "type": "model",
+      "url": "../../models/outdoor/grill.glb",
+      "materials": {
+        "burger": {
+          "finish": "material.finish.satin"
+        },
+        "coal_hot": {
+          "finish": "material.finish.gloss"
+        },
+        "coals": {
+          "finish": "material.finish.matte"
+        },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
+        "handle_steel": {
+          "finish": "material.finish.chrome"
+        },
+        "kettle": {
+          "finish": "material.finish.gloss"
+        },
+        "kettle_lid": {
+          "finish": "material.finish.gloss"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        },
+        "wheel": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "kettle",
+          "label": "Body"
+        },
+        {
+          "material": "kettle_lid",
+          "label": "Lid"
+        }
+      ]
+    },
+    "model.grillStation": {
+      "type": "model",
+      "url": "../../models/outdoor/grillStation.glb",
+      "materials": {
+        "board": {
+          "finish": "material.finish.wood"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "burger": {
+          "finish": "material.finish.satin"
+        },
+        "cart": {
+          "finish": "material.finish.metal"
+        },
+        "corn": {
+          "finish": "material.finish.satin"
+        },
+        "firebox": {
+          "finish": "material.finish.matte"
+        },
+        "gauge": {
+          "finish": "material.finish.gloss"
+        },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
+        "handle_steel": {
+          "finish": "material.finish.chrome"
+        },
+        "hood": {
+          "finish": "material.finish.metal"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "worktop": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cook": "hood_up",
+          "feast": "hood_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "cart",
+          "label": "Cart"
+        },
+        {
+          "material": "hood",
+          "label": "Hood"
+        }
+      ]
+    },
+    "model.firePit": {
+      "type": "model",
+      "url": "../../models/outdoor/firePit.glb",
+      "materials": {
+        "coals": {
+          "finish": "material.finish.matte"
+        },
+        "ember": {
+          "finish": "material.finish.gloss",
+          "glow": "#FF7A2E"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFB050"
+        },
+        "flame_core": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFE0A0"
+        },
+        "log": {
+          "finish": "material.finish.bark"
+        },
+        "pit": {
+          "finish": "material.finish.matte"
+        },
+        "pit_stones": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "relax": "flames"
+        }
+      },
+      "paint": [
+        {
+          "material": "pit",
+          "label": "Bowl"
+        },
+        {
+          "material": "pit_stones",
+          "label": "Stones"
+        }
+      ]
+    }
+  }
+}

@@ -11,7 +11,8 @@
  * - every clip's length is within 15% of its target (the runtime sequences on them);
  * - seated on a 0.45 m seat (`sit` fitted with the body's `seatDrop`), the feet reach the floor,
  *   and the other seated clips (and the seated ends of sitDown / standUp) keep `sit`'s pelvis;
- * - `lie` lies straight: knees nearly straight, the hands in front of the body;
+ * - `lie` lies straight and down: knees nearly straight and not above the hips, the ankles below the
+ *   pelvis (the legs on the mattress, not floating), the hands in front of the body;
  * - the baby's lying clips keep the baby on the mattress and inside the crib: no joint more than
  *   3 cm (reference skeleton) behind the back, none further out to the side than `BABY_REACH`, the
  *   knees bent.
@@ -38,18 +39,22 @@ const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
-  idle: true, talk: true, walk: true, jog: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true,
+  idle: true, talk: true, walk: true, jog: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
-  eat: false, water: true, harvest: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
+  eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
+  // The drinking fountain and the climbing frame, in sizes (and the frame's in lanes: characters.ts STEP_IN, clips/street.ts).
+  fountainDrink181: true, fountainDrink163: true, fountainDrink147: true, fountainDrink129: true, fountainDrink112: true,
+  climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
-  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, interact: 2.0, pickUp: 0.87,
-  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, plant: 2.8, foldArms: 2.5,
+  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
+  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
+  fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;
@@ -212,6 +217,11 @@ if (lie) {
     const bend = (Math.acos((u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / Math.hypot(...u) / Math.hypot(...v)) * 180) / Math.PI;
     if (bend > 20) errors.push(`lie: the ${side} knee is bent ${bend.toFixed(0)} deg`);
     if (w[bone[`hand_${side}`]][2] < w[bone.pelvis][2] + 0.05) errors.push(`lie: the ${side} hand is not in front of the body`);
+    // Down on the mattress (z is up once lying): the buttocks reach about 15 cm behind the pelvis joint, the
+    // calves 7 cm behind the knee and the heels 7 cm behind the ankle, so for the legs to lie on what the
+    // back lies on the knees can't rise above the hips and the ankles must be well below the pelvis.
+    if (k[2] > a[2]) errors.push(`lie: the ${side} knee is ${((k[2] - a[2]) * 100).toFixed(1)} cm above the hip (the legs float)`);
+    if (f[2] > w[bone.pelvis][2] - 0.05) errors.push(`lie: the ${side} ankle is ${((f[2] - w[bone.pelvis][2]) * 100).toFixed(1)} cm from the pelvis, not under it (the heels float)`);
   }
 }
 // The baby lying in the crib: on its back on the mattress (nothing behind the back of the pelvis and

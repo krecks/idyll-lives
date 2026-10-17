@@ -143,6 +143,7 @@
       "footprint": [1, 2],
       "price": 3400,
       "category": "bathroom",
+      "fillsWall": true,
       "slots": 1,
       "description": "A private cedar cabin: comfort and hygiene in one hot, silent session. Afterwards the resident sleeps deeper and barely misses company for hours.",
       "interactions": [

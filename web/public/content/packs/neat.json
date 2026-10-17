@@ -5,6 +5,7 @@
       "id": "neat.steamMopDock",
       "name": "Steam mop dock",
       "model": "model.neat.steamMopDock",
+      "held": {"part": "mop", "grip": "pole"},
       "footprint": [1, 1],
       "price": 240,
       "category": "kitchen",
@@ -69,6 +70,7 @@
       "footprint": [1, 1],
       "price": 2400,
       "category": "bathroom",
+      "fillsWall": true,
       "slots": 1,
       "description": "A ceiling rain head, steam jets and a teak bench. Cleans as well as a shower while soothing tired muscles, and leaves the resident squeaky clean: they stay fresh much longer.",
       "interactions": [
@@ -154,6 +156,7 @@
       "footprint": [1, 1],
       "price": 110,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "A slim console with a shoe shelf, key tray and coat hooks. A quick tidy of the entryway is a small comfort for orderly residents.",
       "interactions": [

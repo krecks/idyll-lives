@@ -11,6 +11,7 @@
   import PauseMenu from './PauseMenu.svelte';
   import Planner from '../planner/Planner.svelte';
   import Creation from '../Creation.svelte';
+  import CustomiseColours from '../buy/CustomiseColours.svelte';
 
   /** The game screen: the canvas lives in the host (behind every screen); this adds the HUD. */
   let session = $state.raw<GameSession | null>(null);
@@ -74,6 +75,7 @@
     <div class="scaled hud-root"><Hud /></div>
     {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
     {#if game.mode === 'create'}<Creation />{/if}
+    {#if game.customising}<CustomiseColours def={game.customising.def} objectId={game.customising.objectId} />{/if}
     {#if game.pauseMenu}<PauseMenu {session} />{/if}
     {#snippet failed()}{/snippet}
   </svelte:boundary>

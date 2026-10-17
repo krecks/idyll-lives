@@ -167,11 +167,17 @@ mod tests {
             dirt: 0.0,
             baby: false,
             needs_table: false,
+            whole: false,
             recipe: None,
             homework: 0.0,
             care: [0.0; MAX_NEEDS],
             after: 0,
             eats: None,
+            when: None,
+            leaves: None,
+            close_after: false,
+            ripe: false,
+            picks: false,
         }
     }
 

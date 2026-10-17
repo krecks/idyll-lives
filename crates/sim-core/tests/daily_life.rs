@@ -29,8 +29,7 @@ const CONTENT: &str = r#"{
     "dayRhythm":{"wakeHour":7,"bedHour":22,"sleepTags":["sleep"],"asleepDecay":{"hunger":0.5}},
     "economy":{"startingFunds":1000,"rent":{"weekday":6,"hour":12,"base":100,"perTile":1,"billsBase":20,"billsRate":0.1,"debtFeeling":"inDebt"}},
     "objectRules":{"maxQuality":2,"qualityBonus":0.5,"upgradeCost":0.5,"resale":0.5},
-    "build":{"wall":10,"door":50,"remove":5},
-    "styles":[{"id":"modern","label":"Modern"},{"id":"cozy","label":"Cozy"}]}"#;
+    "build":{"wall":10,"door":50,"remove":5}}"#;
 
 /// One 12×10 house plot with an open front (entry at the bottom).
 const TOWN: &str = r#"{"width":12,"depth":12,
@@ -207,7 +206,7 @@ fn rent_and_bills_are_charged_weekly_and_debt_hurts() {
 #[test]
 fn buying_selling_and_moving_objects() {
     let mut w = world();
-    let id = w.buy(0, "shower", Some([4, 1, 0]), None).unwrap();
+    let id = w.buy(0, "shower", Some([4, 1, 0]), Default::default()).unwrap();
     assert_eq!(w.households[0].funds, 400);
     assert_eq!(
         life::weekly_costs(&w, 0),
@@ -215,10 +214,10 @@ fn buying_selling_and_moving_objects() {
         "more stuff, higher bills"
     );
     assert!(
-        w.buy(0, "shower", None, None).is_err(),
+        w.buy(0, "shower", None, Default::default()).is_err(),
         "can't afford a second"
     );
-    assert!(w.buy(0, "rock", None, None).is_err(), "not for sale");
+    assert!(w.buy(0, "rock", None, Default::default()).is_err(), "not for sale");
     w.apply(Command::MoveObject {
         household: 0,
         object: id,
@@ -243,10 +242,10 @@ fn buying_selling_and_moving_objects() {
         "selling lowers them again"
     );
     // Auto-placement finds a free spot.
-    let id = w.buy(0, "weights", None, Some(1)).unwrap();
-    assert_eq!(w.objects[id as usize].style, 1);
+    let id = w.buy(0, "weights", None, [("body".into(), 0xC46B4A)].into()).unwrap();
+    assert_eq!(w.objects[id as usize].colors["body"], 0xC46B4A);
     // Off the plot, or blocking the only way in, is refused.
-    assert!(w.buy(0, "weights", Some([5, 11, 0]), None).is_err());
+    assert!(w.buy(0, "weights", Some([5, 11, 0]), Default::default()).is_err());
 }
 
 #[test]
@@ -335,9 +334,9 @@ fn garden_things_only_go_outdoors() {
     room.extend((4..7).map(|z| edge(EdgeAxis::V, 1, z, EdgeKind::Wall)));
     room.extend((4..7).map(|z| edge(EdgeAxis::V, 4, z, if z == 5 { EdgeKind::Door } else { EdgeKind::Wall })));
     w.build(0, &room).unwrap();
-    let err = w.buy(0, "sapling", Some([2, 5, 0]), None).unwrap_err();
+    let err = w.buy(0, "sapling", Some([2, 5, 0]), Default::default()).unwrap_err();
     assert!(err.to_string().contains("outside"), "{err}");
-    let id = w.buy(0, "sapling", Some([6, 8, 0]), None).unwrap();
+    let id = w.buy(0, "sapling", Some([6, 8, 0]), Default::default()).unwrap();
     // Moving it indoors fails and leaves it where it was.
     let moved = w.apply(Command::MoveObject {
         household: 0,
@@ -354,7 +353,7 @@ fn garden_things_only_go_outdoors() {
     let o = w.objects.iter().find(|o| o.x == 6 && o.z == 8);
     assert!(o.is_some(), "still where it was");
     // Auto-placement picks an outdoor spot.
-    let id = w.buy(0, "sapling", None, None).unwrap();
+    let id = w.buy(0, "sapling", None, Default::default()).unwrap();
     let o = &w.objects[id as usize];
     let inside = (1..4).contains(&o.x) && (4..7).contains(&o.z);
     assert!(!inside, "placed outdoors, at {},{}", o.x, o.z);
@@ -447,21 +446,25 @@ fn windows_go_into_walls_cost_money_and_never_let_sims_through() {
 }
 
 #[test]
-fn skills_quality_and_style_survive_saving() {
+fn skills_quality_and_colour_survive_saving() {
     let mut w = world();
     w.sims[0].skills[1] = 3.5;
     w.objects[2].quality = 2;
-    w.apply(Command::Restyle {
+    w.apply(Command::Recolor {
         household: 0,
         object: 2,
-        style: 1,
+        colors: [("body".into(), 0x4E9C9A), ("stone".into(), 0xF2EFE8)].into(),
     })
     .unwrap();
-    w.apply(Command::SetStyle { household: 0, style: 1 }).unwrap();
+    assert!(w.save_json().contains(r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##), "saved as #rrggbb by part");
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.sims[0].skills[1], 3.5);
     assert_eq!(loaded.objects[2].quality, 2);
-    assert_eq!(loaded.objects[2].style, 1);
-    assert_eq!(loaded.households[0].style, 1);
+    assert_eq!(loaded.objects[2].colors, w.objects[2].colors);
+    assert!(loaded.objects[1].colors.is_empty(), "as made");
     assert_eq!(loaded.save_json(), w.save_json());
+    // A file from before parts had colours of their own: its one colour goes on the body.
+    let old = w.save_json().replace(r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##, r##""color":"#c46b4a""##);
+    let loaded = World::from_save_json(CONTENT, &old).unwrap();
+    assert_eq!(loaded.objects[2].colors, [("body".to_string(), 0xC46B4A)].into());
 }

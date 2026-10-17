@@ -103,8 +103,12 @@ pub struct BlueprintObject {
     /// Centimetres taller (negative: shorter) than its kind.
     #[serde(default, skip_serializing_if = "is_level")]
     pub tall: i16,
-    #[serde(default)]
-    pub style: Option<String>,
+    /// Its parts' colours (`#rrggbb` by part); absent: as it's made.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub colors: std::collections::BTreeMap<String, String>,
+    /// An older blueprint's one colour, on the `body`.
+    #[serde(default, skip_serializing)]
+    pub color: Option<String>,
     #[serde(default)]
     pub quality: u8,
 }
@@ -298,7 +302,8 @@ impl World {
                 offset: if f.flip { o.offset.map(|c| -c) } else { o.offset },
                 size: (o.extent != kind_size(def.footprint)).then_some(o.extent),
                 tall: o.tall,
-                style: self.content.styles.get(o.style as usize).map(|s| s.id.clone()),
+                colors: crate::world::colors_hex(&o.colors),
+                color: None,
                 quality: o.quality,
             });
         }
@@ -437,14 +442,14 @@ impl World {
             let (x, z, rot) = f.object(o.x + ox, o.z, w, d, o.rot, true);
             let Ok(up) = lift(o.storey) else { continue };
             let z = z + up;
-            let style = o.style.as_ref().and_then(|s| self.content.styles.iter().position(|x| &x.id == s)).map(|s| s as u8);
+            let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
             // Turned round, it stands off the other way.
             let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
             let offset = self.check_offset(def, rot, offset).unwrap_or([0, 0]);
             let own = kind_size(self.content.objects[def].footprint);
             let (size, tall) = self.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
             let layout = Layout { offset, extent: Some(size), tall };
-            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), style, layout) else { continue };
+            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), colors, layout) else { continue };
             if self.content.objects[def].turns && o.turn < 90 {
                 self.objects[id as usize].turn = o.turn;
             }
@@ -616,12 +621,15 @@ impl World {
             for o in rest.into_iter().chain(riders) {
                 let name = self.content.objects[o.def].name.to_lowercase();
                 let id = self
-                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, Layout::of(o), o.style, o.quality, o.value)
+                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, Layout::of(o), o.colors.clone(), o.quality, o.value)
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
                 let placed = &mut self.objects[id as usize];
                 placed.turn = o.turn;
                 placed.offset = o.offset;
                 placed.wear = o.wear;
+                placed.open = o.open;
+                placed.off = o.off;
+                placed.growth = o.growth;
             }
             // Food and dishes in the room move with it.
             let room: Vec<(i32, i32)> = tiles.iter().copied().collect();

@@ -1,0 +1,1440 @@
+{
+  "$comment": "Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them as it does the placeholders'. The outdoor ones have a far version (`far`). Clips: the bonsai's sprig and the clipped shrubs' sprigs shrink away while they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).",
+  "version": 1,
+  "entries": {
+    "model.plant": {
+      "type": "model",
+      "url": "../../models/plants/plant.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.monstera": {
+      "type": "model",
+      "url": "../../models/plants/monstera.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.fiddleFig": {
+      "type": "model",
+      "url": "../../models/plants/fiddleFig.glb",
+      "materials": {
+        "bark": {
+          "finish": "material.finish.bark"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.snakePlant": {
+      "type": "model",
+      "url": "../../models/plants/snakePlant.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.cacti": {
+      "type": "model",
+      "url": "../../models/plants/cacti.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_accent": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.succulents": {
+      "type": "model",
+      "url": "../../models/plants/succulents.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_pink": {
+          "finish": "material.finish.satin"
+        },
+        "sand": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.bostonFern": {
+      "type": "model",
+      "url": "../../models/plants/bostonFern.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.palm": {
+      "type": "model",
+      "url": "../../models/plants/palm.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.orchid": {
+      "type": "model",
+      "url": "../../models/plants/orchid.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom_accent": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.garden.bonsai": {
+      "type": "model",
+      "url": "../../models/plants/bonsai.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "moss": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "prune": "trim"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ]
+    },
+    "model.flowerbed": {
+      "type": "model",
+      "url": "../../models/plants/flowerbed.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "wood",
+          "label": "Box"
+        }
+      ],
+      "far": "../../models/plants/flowerbed.far.glb"
+    },
+    "model.garden.tulips": {
+      "type": "model",
+      "url": "../../models/plants/tulips.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/tulips.far.glb"
+    },
+    "model.garden.daffodils": {
+      "type": "model",
+      "url": "../../models/plants/daffodils.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        },
+        {
+          "material": "bloom",
+          "label": "Petals"
+        }
+      ],
+      "far": "../../models/plants/daffodils.far.glb"
+    },
+    "model.garden.daisies": {
+      "type": "model",
+      "url": "../../models/plants/daisies.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        },
+        {
+          "material": "bloom",
+          "label": "Petals"
+        }
+      ],
+      "far": "../../models/plants/daisies.far.glb"
+    },
+    "model.garden.sunflowers": {
+      "type": "model",
+      "url": "../../models/plants/sunflowers.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "centre_dark": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        },
+        {
+          "material": "bloom",
+          "label": "Petals"
+        }
+      ],
+      "far": "../../models/plants/sunflowers.far.glb"
+    },
+    "model.garden.poppies": {
+      "type": "model",
+      "url": "../../models/plants/poppies.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "centre_dark": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        },
+        {
+          "material": "bloom",
+          "label": "Petals"
+        }
+      ],
+      "far": "../../models/plants/poppies.far.glb"
+    },
+    "model.garden.marigolds": {
+      "type": "model",
+      "url": "../../models/plants/marigolds.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom2": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/marigolds.far.glb"
+    },
+    "model.garden.pansies": {
+      "type": "model",
+      "url": "../../models/plants/pansies.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "centre_dark": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/pansies.far.glb"
+    },
+    "model.garden.lilies": {
+      "type": "model",
+      "url": "../../models/plants/lilies.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/lilies.far.glb"
+    },
+    "model.garden.lupins": {
+      "type": "model",
+      "url": "../../models/plants/lupins.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom2": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom3": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/lupins.far.glb"
+    },
+    "model.garden.forgetMeNots": {
+      "type": "model",
+      "url": "../../models/plants/forgetMeNots.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom2": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom3": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/forgetMeNots.far.glb"
+    },
+    "model.garden.cosmos": {
+      "type": "model",
+      "url": "../../models/plants/cosmos.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/cosmos.far.glb"
+    },
+    "model.garden.meadow": {
+      "type": "model",
+      "url": "../../models/plants/meadow.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pickFlower": "pick"
+        }
+      },
+      "far": "../../models/plants/meadow.far.glb"
+    },
+    "model.garden.geraniums": {
+      "type": "model",
+      "url": "../../models/plants/geraniums.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        },
+        {
+          "material": "bloom",
+          "label": "Flowers"
+        }
+      ],
+      "far": "../../models/plants/geraniums.far.glb"
+    },
+    "model.garden.flowerBox": {
+      "type": "model",
+      "url": "../../models/plants/flowerBox.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Box"
+        }
+      ],
+      "far": "../../models/plants/flowerBox.far.glb"
+    },
+    "model.bush": {
+      "type": "model",
+      "url": "../../models/plants/bush.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/bush.far.glb"
+    },
+    "model.garden.boxwood": {
+      "type": "model",
+      "url": "../../models/plants/boxwood.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "trim": "trim"
+        }
+      },
+      "far": "../../models/plants/boxwood.far.glb"
+    },
+    "model.garden.topiaryCone": {
+      "type": "model",
+      "url": "../../models/plants/topiaryCone.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "trim": "trim"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pot"
+        }
+      ],
+      "far": "../../models/plants/topiaryCone.far.glb"
+    },
+    "model.garden.hedge": {
+      "type": "model",
+      "url": "../../models/plants/hedge.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "trim": "trim"
+        }
+      },
+      "far": "../../models/plants/hedge.far.glb"
+    },
+    "model.garden.hydrangea": {
+      "type": "model",
+      "url": "../../models/plants/hydrangea.glb",
+      "materials": {
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "blossom",
+          "label": "Flowers"
+        }
+      ],
+      "far": "../../models/plants/hydrangea.far.glb"
+    },
+    "model.garden.rosebush": {
+      "type": "model",
+      "url": "../../models/plants/rosebush.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "prune": "cut"
+        }
+      },
+      "paint": [
+        {
+          "material": "bloom",
+          "label": "Roses"
+        }
+      ],
+      "far": "../../models/plants/rosebush.far.glb"
+    },
+    "model.garden.azalea": {
+      "type": "model",
+      "url": "../../models/plants/azalea.glb",
+      "materials": {
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "trim": "trim"
+        }
+      },
+      "paint": [
+        {
+          "material": "blossom",
+          "label": "Flowers"
+        }
+      ],
+      "far": "../../models/plants/azalea.far.glb"
+    },
+    "model.garden.lavender": {
+      "type": "model",
+      "url": "../../models/plants/lavender.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "cut": "cut"
+        }
+      },
+      "paint": [
+        {
+          "material": "bloom",
+          "label": "Flowers"
+        }
+      ],
+      "far": "../../models/plants/lavender.far.glb"
+    },
+    "model.garden.fern": {
+      "type": "model",
+      "url": "../../models/plants/fern.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/fern.far.glb"
+    },
+    "model.garden.grass": {
+      "type": "model",
+      "url": "../../models/plants/grass.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/grass.far.glb"
+    },
+    "model.garden.hosta": {
+      "type": "model",
+      "url": "../../models/plants/hosta.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/hosta.far.glb"
+    },
+    "model.garden.vegPatch": {
+      "type": "model",
+      "url": "../../models/plants/vegPatch.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/vegPatch.far.glb"
+    },
+    "model.garden.tomatoes": {
+      "type": "model",
+      "url": "../../models/plants/tomatoes.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom2": {
+          "finish": "material.finish.satin"
+        },
+        "bloom3": {
+          "finish": "material.finish.satin"
+        },
+        "bloom4": {
+          "finish": "material.finish.satin"
+        },
+        "flesh": {
+          "finish": "material.finish.satin"
+        },
+        "flesh_light": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/tomatoes.far.glb"
+    },
+    "model.garden.strawberries": {
+      "type": "model",
+      "url": "../../models/plants/strawberries.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "bloom5": {
+          "finish": "material.finish.satin"
+        },
+        "centre": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/strawberries.far.glb"
+    },
+    "model.garden.herbs": {
+      "type": "model",
+      "url": "../../models/plants/herbs.glb",
+      "materials": {
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "uses": {
+          "pickHerbs": "harvest"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/herbs.far.glb"
+    },
+    "model.garden.pumpkins": {
+      "type": "model",
+      "url": "../../models/plants/pumpkins.glb",
+      "materials": {
+        "bed": {
+          "finish": "material.finish.matte"
+        },
+        "bloom": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "motions": {
+        "growth": "grow"
+      },
+      "paint": [
+        {
+          "material": "bed",
+          "label": "Bed"
+        }
+      ],
+      "far": "../../models/plants/pumpkins.far.glb"
+    },
+    "model.bush.small": {
+      "type": "model",
+      "url": "../../models/plants/bushSmall.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/bushSmall.far.glb"
+    },
+    "model.bush.flowering": {
+      "type": "model",
+      "url": "../../models/plants/bushFlowering.glb",
+      "materials": {
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom2": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom3": {
+          "finish": "material.finish.foliage"
+        },
+        "blossom4": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/bushFlowering.far.glb"
+    },
+    "model.hedge": {
+      "type": "model",
+      "url": "../../models/plants/streetHedge.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/plants/streetHedge.far.glb"
+    }
+  }
+}

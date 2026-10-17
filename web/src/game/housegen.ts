@@ -91,6 +91,8 @@ interface BasementSpec {
 interface RoomSpec {
   weight: number;
   minSide: number;
+  /** Per lot size, a narrowest width instead of `minSide` (a large house's kitchen, room for an island). */
+  minSideOn?: Record<string, number>;
   /** The most a room may measure (tiles: its short side, its long side); bigger floors get more rooms. */
   maxSide?: [number, number];
   /** Kitchens: a counter run along one wall, placed before the furniture. */
@@ -115,6 +117,8 @@ interface Slot {
   chance?: number;
   count?: [number, number];
   opposite?: string;
+  /** On the same wall as another piece if there's room (`"run"`: the kitchen's counter run; a fridge at its end). */
+  beside?: string;
   /** Things on walls: on the wall behind one of these if the room has one (a mirror over the basin). */
   over?: string[];
 }
@@ -124,6 +128,8 @@ interface CounterRun {
   segments: string[];
   with: Slot[];
   length: [number, number];
+  /** Rows of room it leaves in front of it where a wall allows (an island and its stools). */
+  clear?: number;
 }
 
 /**
@@ -161,12 +167,25 @@ export interface ObjectInfo extends Shape {
   footprint: [number, number];
   /** The disc it takes on a top (m), its default and limits applied (`Content.radius`). */
   radius: number;
-  /** Whether it has interactions: someone must be able to get to it. */
+  /** Whether it has interactions or cooking stations: someone must be able to get to it. */
   used: boolean;
   /** Whether it gives light (content `light`): it counts for its room's light at night. */
   lamp: boolean;
   /** Tiles it lights at night (content `light.tiles`; undefined: `roomRules.lampTiles`). */
   lightTiles?: number;
+  /** As tall as the wall: nothing hangs on the wall or from the ceiling over it (content `fillsWall`). */
+  fillsWall?: boolean;
+  /** Belongs over a window (content `overWindow`): only such things hang on one. */
+  overWindow?: boolean;
+  /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
+  keepClear: boolean;
+}
+
+/** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
+function cooksOrWashes(o: ObjectDef): boolean {
+  const stations = o.stations ?? [];
+  const sink = stations.includes('dishes') && (o.interactions ?? []).some((i) => (i.tags ?? []).includes('handwash'));
+  return sink || stations.includes('stove') || stations.includes('grill');
 }
 
 /** An object type's details, or undefined if it doesn't exist. */
@@ -178,7 +197,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o) });
     }
     return known.get(def);
   };
@@ -208,6 +227,8 @@ interface Floor {
   fronts: ([number, number][] | null)[];
   /** Tiles nothing may stand on (by doors, stairs, the landing). */
   keep: Set<string>;
+  /** Of `keep`, the tiles along an open kitchen and living room's missing wall: an island's stools may stand on them. */
+  open?: Set<string>;
   /** Tiles taken by furniture. */
   taken: Set<string>;
   /** Tiles taken on the wall, ceiling and rug layers (`wall:x:z`, ...). */
@@ -235,6 +256,9 @@ export function random(seed: number): () => number {
  * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
  */
 export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
+  // Rooms as narrow as their kind may be on this size of lot.
+  const sized = (s: RoomSpec): RoomSpec => (s.minSideOn?.[lotSize] === undefined ? s : { ...s, minSide: s.minSideOn[lotSize] });
+  cfg = { ...cfg, rooms: Object.fromEntries(Object.entries(cfg.rooms).map(([k, s]) => [k, sized(s)])) };
   // A few tries: some draws don't fit (too many rooms for the floor, no wall for the stairs).
   for (let attempt = 0; attempt < 12; attempt++) {
     // The basement draws numbers of its own: a house without one is laid out as it was before
@@ -583,10 +607,14 @@ function connect(f: Floor, rng: () => number, openPlan: boolean): void {
     const l = rooms.find((r) => r.kind === 'living');
     const wall = k && l ? shared(k, l) : [];
     if (wall.length >= 2) {
-      // The way between them stays clear of furniture.
+      // The way between them stays clear of furniture (but for stools pulled up to an island).
+      f.open = new Set();
       for (const e of wall) {
         f.edges.delete(e);
-        for (const [x, z] of sides(e)) f.keep.add(key(x, z));
+        for (const [x, z] of sides(e)) {
+          f.keep.add(key(x, z));
+          f.open.add(key(x, z));
+        }
       }
     }
   }
@@ -694,11 +722,12 @@ const BASEMENT_TRIES = [40, 400];
 
 /**
  * A basement under the house: stairs down from a ground-floor room (the living room, the
- * entrance hall or the dining room; else the kitchen), along one of its walls, climbing either
- * way, their top and landing in the room (which stays walkable round the stairwell). Below, a
- * hall two tiles wide holding the stairs, at least as long as they and their foot, and the rooms
- * of `kinds` off it (as upstairs) on the side away from the stairs, under the house; the
- * basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
+ * entrance hall or the dining room; else the kitchen), along one of its walls (its only outside
+ * wall, which its windows need, if nothing else will do; never that of a room open to the next),
+ * climbing either way, their top and landing in the room (which stays walkable round the
+ * stairwell). Below, a hall two tiles wide holding the stairs, at least as long as they and
+ * their foot, and the rooms of `kinds` off it (as upstairs) on the side away from the stairs,
+ * under the house; the basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
  * once it all fits does the ground keep the stairwell and landing clear. Null if it doesn't.
  */
 function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[], has: Set<Kind>, lampTiles: number): Floor | null {
@@ -711,16 +740,26 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
   const could = (w: number, d: number) => kinds.every((k) => longest(k, w) >= cfg.rooms[k].minSide) && d >= kinds.reduce((n, k) => n + cfg.rooms[k].minSide, 0) && d <= kinds.reduce((n, k) => n + longest(k, w), 0);
   // Worked out along z, the stairs in column `u` climbing along `v`; stairs along x (`across`)
   // the same with x and z swapped.
-  type Spot = { across: boolean; u: number; first: boolean; room: Room };
+  // `dark`: along the room's only outside wall, which its windows need.
+  type Spot = { across: boolean; u: number; first: boolean; room: Room; dark: boolean };
   const spots: Spot[] = [];
   for (const room of g.rooms.filter((r) => DOWN_ROOMS.includes(r.kind)).sort(() => rng() - 0.5)) {
+    // Its outside walls (towards the street, then clockwise).
+    const out = [room.z === house.z, room.x + room.w === house.x + house.w, room.z + room.d === house.z + house.d, room.x === house.x];
+    const only = out.filter(Boolean).length === 1;
+    // Never there in a kitchen or living room open to the other (its windows light both).
+    const opened = [...(g.open ?? [])].some((t) => inside(room, ...(t.split(':').map(Number) as [number, number])));
     for (const across of [false, true]) {
       const [u0, n] = across ? [room.z, room.d] : [room.x, room.w];
       // Against the room's first wall (the hall past the stairs, the rooms past it), or its last.
-      spots.push({ across, u: u0, first: true, room }, { across, u: u0 + n - 1, first: false, room });
+      const [low, high] = [only && out[across ? 0 : 3], only && out[across ? 2 : 1]];
+      if (!(low && opened)) spots.push({ across, u: u0, first: true, room, dark: low });
+      if (!(high && opened)) spots.push({ across, u: u0 + n - 1, first: false, room, dark: high });
     }
   }
-  spots.sort(() => rng() - 0.5).sort((a, b) => Number(a.room.kind === 'kitchen') - Number(b.room.kind === 'kitchen'));
+  // The kitchen last (it wants its floor for an island), and a room's only outside wall only if nothing else will do.
+  const last = (s: Spot) => 2 * Number(s.dark) + Number(s.room.kind === 'kitchen');
+  spots.sort(() => rng() - 0.5).sort((a, b) => last(a) - last(b));
   let total = 0;
   for (const { across, u, first, room } of spots) {
     const at = (a: number, b: number): [number, number] => (across ? [b, a] : [a, b]);
@@ -910,8 +949,12 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
       continue;
     }
     const spec = cfg.rooms[r.kind];
-    if (spec.run && !counterRun(f, r, info, rng, spec.run)) return false;
     const sideOf = new Map<string, number>();
+    if (spec.run) {
+      const side = counterRun(f, r, info, rng, spec.run);
+      if (side === false) return false;
+      if (side !== undefined) sideOf.set('run', side);
+    }
     const required = (slot: Slot) => slot.chance === undefined || slot.chance >= 1;
     const furniture = (slot: Slot) => {
       const count = slot.count ? between(rng, slot.count) : 1;
@@ -921,7 +964,7 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
         let done = false;
         for (const def of options) {
           const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
-          const prefer = across === undefined ? undefined : (across + 2) % 4;
+          const prefer = across === undefined ? (slot.beside ? sideOf.get(slot.beside) : undefined) : (across + 2) % 4;
           // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
           // one that must come goes wherever it fits if it has to.
           const aside = !info(def)!.used;
@@ -1039,10 +1082,13 @@ function undo(f: Floor, n: number, tiles: string[]): void {
 /**
  * A kitchen's counter run: the pieces of `run.with` (one of each slot that comes; a sink, a
  * stove, maybe a dishwasher) in a random order among plain segments, side by side along one wall,
- * each used from the row in front (kept clear). Shorter if the walls are short; if no wall has
- * room, the pieces go against the walls one by one. False if a piece that must come doesn't fit.
+ * each used from the row in front (kept clear). Along a wall with `run.clear` rows of room in
+ * front of it if there's one (an island and its stools), shorter if the walls are short; if no
+ * wall has room, the pieces go against the walls one by one. The side it went on (0 the side
+ * towards the street, then clockwise; undefined one by one), false if a piece that must come
+ * doesn't fit.
  */
-function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run: CounterRun): boolean {
+function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run: CounterRun): number | undefined | false {
   const pieces: { def: string; w: number; required: boolean }[] = [];
   for (const slot of run.with) {
     if (slot.chance !== undefined && rng() >= slot.chance) continue;
@@ -1052,10 +1098,14 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
   const segments = run.segments.filter((d) => info(d)?.footprint.every((n) => n === 1));
   const segment = segments.length ? pick(rng, segments) : null;
   const least = pieces.reduce((n, p) => n + p.w, 0);
-  for (let len = Math.max(least, between(rng, run.length)); len >= Math.max(least, 1); len--) {
+  const longest = Math.max(least, between(rng, run.length));
+  // The walls with room enough in front first, then any.
+  const roomy = (side: number) => (side % 2 === 0 ? r.d : r.w) >= (run.clear ?? 0);
+  for (const first of [true, false]) for (let len = longest; len >= Math.max(least, 1); len--) {
     if (len > least && !segment) continue;
     const order = [...pieces.map((p) => p.def), ...Array<string>(len - least).fill(segment ?? '')].sort(() => rng() - 0.5);
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
+      if (roomy(side) !== first) continue;
       // Back to the wall on `side` (0 the side towards the street, then clockwise), as in `place`.
       const rot = [0, 3, 2, 1][side];
       const along = side % 2 === 0;
@@ -1085,14 +1135,15 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
         }
         if (ok && reachable(f, r)) {
           for (const fr of f.fronts.slice(n)) for (const [x, z] of fr ?? []) f.keep.add(key(x, z));
-          return true;
+          return side;
         }
         undo(f, n, tiles);
       }
     }
   }
   // No wall long enough: one by one.
-  return pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required);
+  if (!pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required)) return false;
+  return undefined;
 }
 
 /** Room a chair takes along a table's edge (m). */
@@ -1161,17 +1212,18 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
         const [w, d] = turned ? [fd, fw] : [fw, fd];
         for (let z = r.z; z + d <= r.z + r.d; z++) {
           for (let x = r.x; x + w <= r.x + r.w; x++) {
-            // Facing into the room (a table nobody uses still needs its front open).
-            const rot = inside(r, ...frontTile(x, z, w, d, turned)) ? turned : turned + 2;
+            // Facing into the room (a table nobody uses still needs its front open), either way if
+            // both are (an island's cook stands at the front, its stools behind).
+            const rots = [turned, turned + 2].filter((rot) => inside(r, ...frontTile(x, z, w, d, rot)));
             // Room for chairs and a way round them on every side; else as near the middle as can be.
             const gap = Math.min(x - r.x, z - r.z, r.x + r.w - x - w, r.z + r.d - z - d);
-            spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
+            for (const rot of rots) spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
           }
         }
       }
     }
     spots.sort((a, b) => b.score - a.score);
-    for (const { x, z, rot } of spots.slice(0, 24)) {
+    for (const { x, z, rot } of spots.slice(0, 48)) {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
       const mine = tilesOf(x, z, w, d);
       const front = frontTile(x, z, w, d, rot);
@@ -1181,7 +1233,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
       const [fs, bs] = [[2, 1, 0, 3][rot % 4], [0, 3, 2, 1][rot % 4]];
       const one = (w === d ? [[0, 2], [1, 3]] : w > d ? [[0], [2]] : [[1], [3]]).sort(() => rng() - 0.5);
       const choices = set.wall ? [[fs]] : set.oneSide ? (table.used ? [[bs]] : one) : [undefined];
-      const free = (s: { x: number; z: number }) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && !f.keep.has(key(s.x, s.z));
+      // Stools may stand on the kitchen's side of the way into an open living room (it stays open on the other).
+      const free = (s: { x: number; z: number }) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && (!f.keep.has(key(s.x, s.z)) || (!!set.oneSide && !!f.open?.has(key(s.x, s.z))));
       const options = choices.map((sides) => seatTiles(table, x, z, rot, sides).filter(free)).filter((seats) => seats.length >= least);
       if (!options.length) continue;
       const n = f.objects.length;
@@ -1217,8 +1270,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
 
 /**
  * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
- * in its middle, elsewhere anywhere free), facing about the way its host does, listed right
- * after its host (the simulation places it on a top that's already there).
+ * in its middle, elsewhere anywhere free; never a hob's or a sink's), facing about the way its
+ * host does, listed right after its host (the simulation places it on a top that's already there).
  */
 function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () => number, slot: TopSlot): void {
   const count = slot.count ? between(rng, slot.count) : 1;
@@ -1232,7 +1285,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     if (thing?.layer !== 'surface') continue;
     const tops = f.objects
       .map((o) => topOf(shapes, o))
-      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
     const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
     const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
     for (const { t } of order) {
@@ -1252,12 +1305,14 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
 
 /**
  * One thing on the wall, ceiling or rug layer of room `r` (it never blocks anything): on a wall,
- * its back on wall or window edges; from the ceiling, over a free spot; a rug, in the middle of
+ * its back on wall edges (or window ones, for what goes over a window), not over furniture as tall
+ * as the wall; from the ceiling, over a free spot (not over such furniture either); a rug, in the middle of
  * the room. Never on the stairs, and its front (where the simulation checks for walls) inside the room.
  * `near`: from the ceiling, as near this tile as there's room (else near the middle).
  */
 function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: string, [fw, fd]: [number, number], layer: 'wall' | 'ceiling' | 'rug', rng: () => number, over?: string[], near?: [number, number]): boolean {
   const layers = (f.layers ??= new Set());
+  const used = !!info(def)?.used;
   const stairs = new Set<string>();
   for (const o of f.objects) {
     if (o.def !== cfg.stairs) continue;
@@ -1268,6 +1323,15 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
   // Nor over the stairwell upstairs (all a hall has taken), nor over the one down to the basement.
   if (r.kind === 'hall') for (const t of f.taken) stairs.add(t);
   for (const t of f.well ?? []) stairs.add(t);
+  // Nor on the wall or from the ceiling over furniture as tall as the wall (content `fillsWall`).
+  if (layer !== 'rug') {
+    for (const o of f.objects) {
+      const thing = info(o.def);
+      if (!thing?.fillsWall) continue;
+      const [w, d] = o.rot % 2 === 0 ? thing.footprint : [thing.footprint[1], thing.footprint[0]];
+      for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
+    }
+  }
   const fits = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) {
       for (let dx = 0; dx < w; dx++) {
@@ -1276,16 +1340,28 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       }
     }
     const [frx, frz] = frontTile(x, z, w, d, rot);
-    return inside(r, frx, frz);
+    // One with a use (the mirror cabinet's "Brush your teeth") has its front tile free to stand on.
+    return inside(r, frx, frz) && !(used && f.taken.has(key(frx, frz)));
   };
   const take = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.add(`${layer}:${key(x + dx, z + dz)}`);
     f.objects.push({ def, x, z, rot });
-    f.fronts.push(null);
+    f.fronts.push(used ? [frontTile(x, z, w, d, rot)] : null);
+    // ...and a way to it.
+    if (used && !reachable(f, r)) {
+      f.objects.pop();
+      f.fronts.pop();
+      for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.delete(`${layer}:${key(x + dx, z + dz)}`);
+      return false;
+    }
     return true;
   };
   if (layer === 'wall') {
-    const backed = (e: string) => f.edges.get(e) === 'wall' || f.edges.get(e) === 'window';
+    // Only what belongs over a window (content `overWindow`: curtains) hangs on one.
+    const window = !!info(def)?.overWindow;
+    const backed = (e: string) => f.edges.get(e) === 'wall' || (window && f.edges.get(e) === 'window');
+    // ...and that only over one (with no free window in the room, none).
+    const hangs = (backs: string[]) => backs.every(backed) && (!window || backs.some((e) => f.edges.get(e) === 'window'));
     // Over a piece in the room: turned as it is, centred on it, its back on the same wall.
     for (const o of over ? f.objects.filter((o) => over.includes(o.def) && inside(r, o.x, o.z)) : []) {
       const [ow, od] = info(o.def)?.footprint ?? [1, 1];
@@ -1299,7 +1375,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
         : o.rot === 3 ? Array.from({ length: d }, (_, i) => `v:${o.x + pw}:${z + i}`)
         : Array.from({ length: d }, (_, i) => `v:${o.x}:${z + i}`);
       const [wx, wz] = o.rot === 2 ? [x, o.z + pd - d] : o.rot === 3 ? [o.x + pw - w, z] : o.rot === 0 ? [x, o.z] : [o.x, z];
-      if (backs.every(backed) && fits(wx, wz, w, d, o.rot)) return take(wx, wz, w, d, o.rot);
+      if (hangs(backs) && fits(wx, wz, w, d, o.rot) && take(wx, wz, w, d, o.rot)) return true;
     }
     for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
       const rot = [0, 3, 2, 1][side];
@@ -1310,10 +1386,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x, z, Array.from({ length: d }, (_, i) => `v:${r.x}:${z + i}`)]);
       if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z, Array.from({ length: d }, (_, i) => `v:${r.x + r.w}:${z + i}`)]);
       spots.sort(() => rng() - 0.5);
-      // Curtains go over windows; everything else prefers a plain wall.
-      const window = def.startsWith('curtains');
-      spots.sort((a, b) => Number(b[2].some((e) => f.edges.get(e) === 'window') === window) - Number(a[2].some((e) => f.edges.get(e) === 'window') === window));
-      for (const [x, z, backs] of spots) if (backs.every(backed) && fits(x, z, w, d, rot)) return take(x, z, w, d, rot);
+      for (const [x, z, backs] of spots) if (hangs(backs) && fits(x, z, w, d, rot) && take(x, z, w, d, rot)) return true;
     }
     return false;
   }
@@ -1402,7 +1475,8 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectIn
 
 /**
  * Every free tile of the room the doors need is still connected, and so is a way to everything
- * in it: its front tile (which must be free), or for chairs one of the free tiles round them.
+ * in it: its front tile (which must be free), or for chairs one of the free tiles round them;
+ * no free floor is shut off behind furniture.
  */
 function reachable(f: Floor, r: Room): boolean {
   const free = (x: number, z: number) => inside(r, x, z) && !f.taken.has(key(x, z));
@@ -1431,7 +1505,10 @@ function reachable(f: Floor, r: Room): boolean {
       }
     }
   }
-  return needed.every((k) => seen.has(k)) && ways.every((w) => w.some((k) => seen.has(k)));
+  if (!needed.every((k) => seen.has(k)) || !ways.every((w) => w.some((k) => seen.has(k)))) return false;
+  // No free floor shut off behind furniture.
+  for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (free(x, z) && !seen.has(key(x, z))) return false;
+  return true;
 }
 
 function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }): void {

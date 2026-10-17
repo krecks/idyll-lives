@@ -74,10 +74,11 @@ if (mode === 'bench') {
     ['child_sky_up18', [['af_sky', 1]], 1.0, 1.18],
     ['child_nicole_up15', [['af_nicole', 0.5], ['af_sky', 0.5]], 1.0, 1.15],
   ];
+  const styles = voices.map(([, parts]) => blend(parts));
   for (const [li, line] of LINES.entries()) {
     const { ids } = await misaki(line);
-    for (const [name, parts, speed = 1, a = 1] of voices) {
-      let y = await say(ids, blend(parts), speed / a);
+    for (const [vi, [name, , speed = 1, a = 1]] of voices.entries()) {
+      let y = await say(ids, styles[vi], speed / a);
       if (a !== 1) y = resample(y, RATE * a, RATE);
       save(OUTDIR, `${name}_line${li + 1}`, y, RATE);
     }

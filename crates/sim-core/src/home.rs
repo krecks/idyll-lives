@@ -24,7 +24,7 @@ const REACH_MARGIN: i32 = 2;
 const UNDO_DEPTH: usize = 30;
 
 /// The world as it was before a build or buy edit: everything an edit can change (walls,
-/// objects, money and style, and residents stopped or moved by it). Time stands still while
+/// objects and money, and residents stopped or moved by it). Time stands still while
 /// edits are kept (see `World::apply`), so putting it back restores exactly that moment.
 #[derive(Debug, Clone)]
 pub(crate) struct HomeSnapshot {
@@ -126,7 +126,6 @@ impl World {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
         let changed = before.households[h].funds != self.households[h].funds
-            || before.households[h].style != self.households[h].style
             || before.objects != self.objects
             || lot_changed
             || before.plots != self.plots;
@@ -334,14 +333,6 @@ impl World {
         Ok(Layout { offset, extent: Some(size), tall })
     }
 
-    pub(crate) fn check_style(&self, style: u8) -> Result<u8, Error> {
-        if (style as usize) < self.content.styles.len().max(1) {
-            Ok(style)
-        } else {
-            Err(Error::new(format!("unknown style {style}")))
-        }
-    }
-
     fn home_object(&self, household: u32, object: u32) -> Result<(usize, u32), Error> {
         let (h, plot) = self.home_of(household)?;
         if object as usize >= self.objects.len() {
@@ -459,7 +450,7 @@ impl World {
         z: i32,
         rot: u8,
         layout: Layout,
-        style: u8,
+        colors: crate::world::Colors,
         quality: u8,
         value: i64,
     ) -> Result<u32, Error> {
@@ -468,6 +459,12 @@ impl World {
             // The storeys' rules say what's wrong in words already (`check_storey_fit`).
             if !e.starts_with('\'') {
                 return Error::new(e);
+            }
+            // Why it doesn't fit beside something else, as it says it.
+            for why in ["would hang into ", "would hang too low over ", "is too tall for ", "is under ", "can't hang over a window"] {
+                if let Some(i) = e.find(why) {
+                    return Error::new(format!("that {}", &e[i..]));
+                }
             }
             Error::new(if e.contains("diagonal") {
                 "furniture can't stand on a tile with a diagonal wall"
@@ -489,13 +486,14 @@ impl World {
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
         }
-        // Residents walk under pictures and lamps and over rugs.
-        let mounted = self.content.objects[def].layer.mounted();
+        // Residents walk under pictures and lamps and over rugs (not into a plant hanging low).
+        let d = &self.content.objects[def];
+        let mounted = d.layer.mounted() && !d.hangs_low;
         if !mounted && self.sim_in_the_way(&obj) {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, layout, style, quality, value)?;
+        let id = self.place(def, x, z, rot, layout, colors, quality, value)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
         let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
@@ -543,7 +541,7 @@ impl World {
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
     fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
         let d = &self.content.objects[def];
-        if d.layer.mounted() || d.stairs {
+        if (d.layer.mounted() && !d.hangs_low) || d.stairs {
             return Ok(());
         }
         // Where it doesn't fit at all, `place_at_home` says why.
@@ -612,9 +610,9 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        style: Option<u8>,
+        colors: crate::world::Colors,
     ) -> Result<u32, Error> {
-        self.buy_at(household, def_id, at, style, Layout::default())
+        self.buy_at(household, def_id, at, colors, Layout::default())
     }
 
     /// Buys an object for the household's home, laid out as `layout` (unchecked: see
@@ -626,7 +624,7 @@ impl World {
         household: u32,
         def_id: &str,
         at: Option<[i32; 3]>,
-        style: Option<u8>,
+        colors: crate::world::Colors,
         layout: Layout,
     ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
@@ -639,22 +637,25 @@ impl World {
             .price
             .ok_or_else(|| Error::new(format!("{} isn't for sale", d.name)))?;
         self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
-        let style = self.check_style(style.unwrap_or(self.households[h].style))?;
         let on_top = d.layer == Layer::Surface;
         let id = match at {
             Some([x, z, rot]) => {
                 self.keep_doorway_clear(def, x, z, rot as u8, layout)?;
-                self.place_at_home(plot, def, x, z, rot as u8, layout, style, 0, price)?
+                self.place_at_home(plot, def, x, z, rot as u8, layout, colors, 0, price)?
             }
             None => self
                 .find_spot(plot, def)
                 .into_iter()
                 .find_map(|(x, z, rot, found)| {
                     let layout = if on_top { Layout::at(found) } else { layout };
-                    self.place_at_home(plot, def, x, z, rot, layout, style, 0, price).ok()
+                    self.place_at_home(plot, def, x, z, rot, layout, colors.clone(), 0, price).ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
+        // A crop bought new is just planted: it ripens over its days.
+        if self.content.objects[def].grows.is_some() {
+            self.objects[id as usize].growth = 0.0;
+        }
         self.pay(h, price);
         Ok(id)
     }
@@ -662,12 +663,11 @@ impl World {
     /// Puts `def` into the household's home at the first good free spot, free of charge (a
     /// delivery: a crib for a new baby). None if there's no room.
     pub(crate) fn deliver(&mut self, household: u32, def: usize) -> Option<u32> {
-        let (h, plot) = self.home_of(household).ok()?;
-        let style = self.households[h].style;
+        let (_, plot) = self.home_of(household).ok()?;
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), style, 0, value).ok())
+            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), Default::default(), 0, value).ok())
     }
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
@@ -744,10 +744,13 @@ impl World {
         let result = (|| {
             let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
-            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.style, old.quality, old.value)?;
+            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
+            placed.open = old.open;
+            placed.off = old.off;
+            placed.growth = old.growth;
             let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
             let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
             let delta = turned(&self.objects[id as usize]) - turned(&old);
@@ -765,11 +768,14 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.style, r.quality, r.value)
+                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.colors.clone(), r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let o = &mut self.objects[rid as usize];
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
                 o.wear = r.wear;
+                o.open = r.open;
+                o.off = r.off;
+                o.growth = r.growth;
                 placed.push((r.clone(), rid));
             }
             for (was, now) in placed {
@@ -787,9 +793,9 @@ impl World {
         result
     }
 
-    pub fn restyle(&mut self, household: u32, object: u32, style: u8) -> Result<(), Error> {
+    pub fn recolor(&mut self, household: u32, object: u32, colors: crate::world::Colors) -> Result<(), Error> {
         self.home_object(household, object)?;
-        self.objects[object as usize].style = self.check_style(style)?;
+        self.objects[object as usize].colors = colors;
         self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
     }
@@ -921,7 +927,10 @@ impl World {
             if matches!(target, Edge::Window | Edge::Fence | Edge::Gate) && (self.storey_of(a.1) < 0 || self.storey_of(b.1) < 0) {
                 return Err(Error::new("a basement is underground: no windows, fences or gates down there"));
             }
-            if e.kind != EdgeKind::Open && diagonal.is_some() && object_at(a.0, a.1).is_some() {
+            if e.kind != EdgeKind::Open
+                && let Some(dir) = diagonal
+                && (object_at(a.0, a.1).is_some() || self.objects.iter().any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
+            {
                 return Err(Error::new("a wall can't go through furniture"));
             }
             if e.kind != EdgeKind::Open
@@ -941,6 +950,14 @@ impl World {
                 && self.hangs_on(e.axis == EdgeAxis::H, e.x, e.z)
             {
                 return Err(Error::new("something hangs on that wall: move it first"));
+            }
+            // Only curtains and the like hang over a window.
+            if target == Edge::Window
+                && diagonal.is_none()
+                && let Some(o) = self.hung_on(e.axis == EdgeAxis::H, e.x, e.z).find(|o| !self.content.objects[o.def].over_window)
+            {
+                let name = self.content.objects[o.def].name.to_lowercase();
+                return Err(Error::new(format!("the {name} hangs there, and it can't hang over a window: move it first")));
             }
             if let Some(dir) = diagonal
                 && target != Edge::Open

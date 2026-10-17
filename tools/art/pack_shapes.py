@@ -91,6 +91,42 @@ def _lathe_as_box(p):
     return q
 
 
+def _depth_axis(q):
+    """Each of a part's axes' share of its depth, its box turned as models.ts `partBox` turns it."""
+    rx, ry, rz = (math.radians(a) for a in q.get('rotate', [0, 0, 0]))
+    cy, sy, cp, sp, cr, sr = math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2), math.cos(rz / 2), math.sin(rz / 2)
+    x, y = cy * sp * cr + sy * cp * sr, sy * cp * cr - cy * sp * sr
+    z, w = cy * cp * sr - sy * sp * cr, cy * cp * cr + sy * sp * sr
+    return [abs(2 * (z * x - y * w)), abs(2 * (y * z + x * w)), abs(1 - 2 * (y * y + x * x))]
+
+
+def _depths(q):
+    """A part's back and front (least and most depth)."""
+    half = sum(c * s for c, s in zip(_depth_axis(q), q['size'])) / 2
+    return q['at'][2] - half, q['at'][2] + half
+
+
+def to_wall(trait, E, keys):
+    """Wall-standing things: moves each placeholder so that its back is on the wall face, 7 cm into its tiles
+    (-0.43 in a 1-deep footprint), where its model's is (tools/art/blender/README.md, "Against a wall, on the
+    floor"). One deeper than the space left in front (4.5 cm short of the tile's front, as `validate_parts` asks)
+    is squeezed to fit, a percent or two."""
+    fp = footprints(trait)
+    for k in keys:
+        parts = E[k]['placeholder']
+        face, most = -fp[k][1] / 2 + 0.07, fp[k][1] / 2 - 0.045
+        move = face - min(_depths(q)[0] for q in parts)
+        parts = [{**q, 'at': [q['at'][0], q['at'][1], q['at'][2] + move]} for q in parts]
+        f, squeezed = 1.0, parts
+        while max(_depths(q)[1] for q in squeezed) > most + 1e-4:
+            f *= (most - face) / (max(_depths(q)[1] for q in squeezed) - face) - 1e-4
+            squeezed = [{**q, 'at': [q['at'][0], q['at'][1], face + (q['at'][2] - face) * f],
+                         'size': [s * (1 - (1 - f) * c) for s, c in zip(q['size'], _depth_axis(q))]} for q in parts]
+        E[k] = {**E[k], 'placeholder': [{**q, 'at': [round(v, 4) for v in q['at']], 'size': [round(v, 4) for v in q['size']]}
+                                        for q in squeezed]}
+    return E
+
+
 def footprints(trait):
     doc = json.load(open(os.path.join(CONTENT, f'{trait}.json')))
     return {o['model']: tuple(o['footprint']) for o in doc.get('objects', [])}

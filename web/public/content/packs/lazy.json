@@ -91,7 +91,7 @@
           "label": "Take a power nap",
           "anim": "nap",
           "minutes": 25,
-          "pose": "lie",
+          "pose": "sit",
           "effects": { "energy": 0.1, "comfort": 0.1 },
           "tags": ["rest", "nap"],
           "feeling": "lazy.powerNap"
@@ -122,7 +122,7 @@
           "label": "Doze under the quilt",
           "anim": "nap",
           "minutes": 30,
-          "pose": "lie",
+          "pose": "sit",
           "effects": { "energy": 0.11, "comfort": 0.13 },
           "tags": ["rest", "nap", "cozy"]
         }
@@ -136,6 +136,7 @@
       "slots": 1,
       "price": 380,
       "category": "kitchen",
+      "fillsWall": true,
       "description": "Order hot food without lifting a pan: takeout costs money each time but fills residents faster than cooking and spares them the dishes.",
       "interactions": [
         {
@@ -165,6 +166,7 @@
       "id": "lazy.vibePlate",
       "name": "Effortless vibration plate",
       "model": "model.lazy.vibePlate",
+      "stand": {"height": 0.12, "motion": "buzz"},
       "footprint": [1, 1],
       "slots": 1,
       "price": 520,

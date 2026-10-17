@@ -123,6 +123,7 @@
       "footprint": [1, 1],
       "price": 750,
       "category": "hobbies",
+      "fillsWall": true,
       "slots": 1,
       "description": "A glowing upright cabinet full of retro shooters. Chasing the high score builds Dexterity; nimble players (Dexterity 5+) set records that keep them sharp for hours.",
       "interactions": [

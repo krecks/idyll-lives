@@ -21,12 +21,16 @@ export type Command =
   | { type: 'setAutonomy'; enabled: boolean; household?: number }
   | { type: 'setLifespan'; lifespan: Lifespan }
   | { type: 'setPlayerMoves'; enabled: boolean }
+  /** Tests and `?debug` only (`__addFunds`): money for a household (negative takes it away, down to 0). */
+  | { type: 'addFunds'; household: number; amount: number }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number; seen?: Seen }
   /** Eat a serving of food (an item), or clear it away to the sink. */
   | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
+  /** A lamp switched on or off (sim-core `lights.rs`): at once, nobody walks over. */
+  | { type: 'switchLamp'; object: number; on: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
@@ -44,13 +48,13 @@ export type Command =
    * `MAX_SIZE` tiles; it takes them rounded up to whole tiles); `tall`: centimetres taller
    * (negative: shorter) than its kind.
    */
-  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; style?: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
+  | { type: 'buy'; household: number; object: string; at?: [number, number, number]; colors?: Record<string, number>; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number }
   | { type: 'sell'; household: number; object: number; seen?: Seen }
   /** The paid quick fix for something worn or broken. */
   | { type: 'repair'; household: number; object: number; seen?: Seen }
   | { type: 'moveObject'; household: number; object: number; x: number; z: number; rot: number; turn?: number; offset?: [number, number]; size?: [number, number]; tall?: number; seen?: Seen }
-  | { type: 'restyle'; household: number; object: number; style: number; seen?: Seen }
-  | { type: 'setStyle'; household: number; style: number }
+  /** `color`: 0xRRGGBB on the parts its model paints; absent: as made. */
+  | { type: 'recolor'; household: number; object: number; colors: Record<string, number>; seen?: Seen }
   | { type: 'upgrade'; household: number; object: number; seen?: Seen }
   | { type: 'build'; household: number; edits: EdgeEdit[] }
   | { type: 'paint'; household: number; faces: FacePaint[] }
@@ -332,12 +336,16 @@ export interface ObjectPlacement {
   d: number;
   /** Upgrade level (0 = as bought). */
   quality: number;
-  /** Index into the content's styles. */
-  style: number;
+  /** The colours the player chose for its parts; absent: as made. */
+  colors?: PartColors;
   /** What selling returns; null if it can't be sold. */
   sellValue: number | null;
   /** Wear 0..1 (broken at 1). */
   wear?: number;
+  /** Open (a wall bed folded down): set by interactions that open or close it (`leaves`). */
+  open?: boolean;
+  /** A crop's stage (content `grows`): 0 planted, 1 growing, 2 ripe, 3 picked; absent for other things. */
+  growth?: number;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }
@@ -689,7 +697,6 @@ export interface FundsView {
   funds: number;
   rent: number | null;
   bills: number | null;
-  style: number;
   undo?: number;
   redo?: number;
   /** The routine template (the player's household only). */
@@ -829,6 +836,8 @@ export type FromWorker =
   | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
   /** Food and dishes, whenever they change (`ItemPlacement`). */
   | { type: 'items'; items: ItemPlacement[] }
+  /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
+  | { type: 'lamps'; off: number[] }
   | { type: 'ui'; ui: UiUpdate }
   | { type: 'saved'; requestId: number; data: string }
   | { type: 'socialOptions'; requestId: number; options: SocialOption[] }
@@ -873,6 +882,22 @@ export function storeyRow(world: StoreyLayout, k: number): number {
   const b = world.basement;
   const block = k < 0 ? (b ?? 0) : b !== undefined && k >= b ? k + 1 : k;
   return block * groundDepth(world);
+}
+
+/**
+ * The colours a player gave an object's parts: `#rrggbb` by the name of the model's material it
+ * goes on (`body`, `stone`); a part left out is as made.
+ */
+export type PartColors = Record<string, string>;
+
+/** `colors` as one string, the same for the same colours (for template and cache keys); '' for none. */
+export function colorsKey(colors: PartColors | undefined): string {
+  return colors
+    ? Object.keys(colors)
+        .sort()
+        .map((part) => `${part}:${colors[part]}`)
+        .join(',')
+    : '';
 }
 
 /** What a command naming object `id` sends as `seen`: the object as the view shows it. */

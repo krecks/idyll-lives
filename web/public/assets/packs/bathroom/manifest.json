@@ -1,0 +1,979 @@
+{
+  "$comment": "Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
+  "version": 1,
+  "entries": {
+    "model.sink": {
+      "type": "model",
+      "url": "../../models/bathroom/sink.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wash": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "metal",
+          "label": "Basin"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.sinkPedestal": {
+      "type": "model",
+      "url": "../../models/bathroom/sinkPedestal.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wash": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pedestal"
+        },
+        {
+          "material": "porcelain",
+          "label": "Basin & cup"
+        },
+        {
+          "material": "chrome",
+          "label": "Tap"
+        }
+      ]
+    },
+    "model.vanityDouble": {
+      "type": "model",
+      "url": "../../models/bathroom/vanityDouble.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wash": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "porcelain",
+          "label": "Basins"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps & handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.sinkVessel": {
+      "type": "model",
+      "url": "../../models/bathroom/sinkVessel.glb",
+      "materials": {
+        "blackmetal": {
+          "finish": "material.finish.metal"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wood": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wash": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Vanity"
+        },
+        {
+          "material": "stone",
+          "label": "Worktop"
+        },
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "blackmetal",
+          "label": "Tap"
+        },
+        {
+          "material": "wood",
+          "label": "Shelf & legs"
+        },
+        {
+          "material": "towel",
+          "label": "Towels"
+        }
+      ]
+    },
+    "model.sinkConsole": {
+      "type": "model",
+      "url": "../../models/bathroom/sinkConsole.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "fabric": {
+          "finish": "material.finish.fabric"
+        },
+        "metal": {
+          "finish": "material.finish.metal"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "wash": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Basin"
+        },
+        {
+          "material": "brass",
+          "label": "Legs & tap"
+        },
+        {
+          "material": "fabric",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.toilet": {
+      "type": "model",
+      "url": "../../models/bathroom/toilet.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletCompact": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletCompact.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletSmart": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletSmart.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "panel": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "panel",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletClassic": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletClassic.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cistern": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "seat_wood": {
+          "finish": "material.finish.wood"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat_wood",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "cistern",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.toiletWallHung": {
+      "type": "model",
+      "url": "../../models/bathroom/toiletWallHung.glb",
+      "materials": {
+        "boxing": {
+          "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "seat": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "toilet": "lid_up"
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Bowl"
+        },
+        {
+          "material": "seat",
+          "label": "Seat & lid"
+        },
+        {
+          "material": "boxing",
+          "label": "Cistern"
+        }
+      ]
+    },
+    "model.shower": {
+      "type": "model",
+      "url": "../../models/bathroom/shower.glb",
+      "materials": {
+        "fittings": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.chrome"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "grout": {
+          "finish": "material.finish.satin"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray",
+          "label": "Tray"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings",
+          "label": "Head & tap"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.showerStall": {
+      "type": "model",
+      "url": "../../models/bathroom/showerStall.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "curtain": {
+          "finish": "material.finish.fabric"
+        },
+        "fittings": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.chrome"
+        },
+        "grout": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
+        "tile": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray",
+          "label": "Tray"
+        },
+        {
+          "material": "frame",
+          "label": "Rail"
+        },
+        {
+          "material": "fittings",
+          "label": "Head & tap"
+        },
+        {
+          "material": "curtain",
+          "label": "Curtain"
+        },
+        {
+          "material": "tile",
+          "label": "Tiles"
+        }
+      ]
+    },
+    "model.showerWalkIn": {
+      "type": "model",
+      "url": "../../models/bathroom/showerWalkIn.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "fittings_dark": {
+          "finish": "material.finish.metal"
+        },
+        "frame_dark": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "groove": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "slate": {
+          "finish": "material.finish.matte"
+        },
+        "slate_wall": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "slate",
+          "label": "Floor"
+        },
+        {
+          "material": "frame_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings_dark",
+          "label": "Head & tap"
+        },
+        {
+          "material": "slate_wall",
+          "label": "Wall"
+        }
+      ]
+    },
+    "model.showerRain": {
+      "type": "model",
+      "url": "../../models/bathroom/showerRain.glb",
+      "materials": {
+        "fittings_dark": {
+          "finish": "material.finish.metal"
+        },
+        "frame_dark": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "tray_stone": {
+          "finish": "material.finish.matte"
+        },
+        "wall_stone": {
+          "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "shower": "water_on"
+        }
+      },
+      "paint": [
+        {
+          "material": "tray_stone",
+          "label": "Tray"
+        },
+        {
+          "material": "frame_dark",
+          "label": "Frame"
+        },
+        {
+          "material": "fittings_dark",
+          "label": "Head & tap"
+        },
+        {
+          "material": "wall_stone",
+          "label": "Walls"
+        }
+      ]
+    },
+    "model.bathtub": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtub.glb",
+      "materials": {
+        "bath_panel": {
+          "finish": "material.finish.gloss"
+        },
+        "beak": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "duck": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "bath_panel",
+          "label": "Panel"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.bathtubClawfoot": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtubClawfoot.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "feet": {
+          "finish": "material.finish.metal"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "feet",
+          "label": "Feet"
+        },
+        {
+          "material": "brass",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.bathtubFreestanding": {
+      "type": "model",
+      "url": "../../models/bathroom/bathtubFreestanding.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "bath": [
+            {
+              "clip": "tap_on",
+              "hold": 2.4
+            },
+            "fill"
+          ]
+        }
+      },
+      "paint": [
+        {
+          "material": "porcelain",
+          "label": "Tub"
+        },
+        {
+          "material": "chrome",
+          "label": "Taps"
+        },
+        {
+          "material": "towel",
+          "label": "Towel"
+        }
+      ]
+    },
+    "model.mirrorCabinet": {
+      "type": "model",
+      "url": "../../models/bathroom/mirrorCabinet.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "cab_door": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "mirror": {
+          "finish": "material.finish.gloss",
+          "mirror": "front"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "brushTeeth": "door_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "cab_door",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.mirrorRound": {
+      "type": "model",
+      "url": "../../models/bathroom/mirrorRound.glb",
+      "materials": {
+        "frame_brass": {
+          "finish": "material.finish.metal"
+        },
+        "leather": {
+          "finish": "material.finish.satin"
+        },
+        "mirror": {
+          "finish": "material.finish.gloss",
+          "mirror": "front"
+        }
+      },
+      "paint": [
+        {
+          "material": "frame_brass",
+          "label": "Frame"
+        },
+        {
+          "material": "leather",
+          "label": "Strap"
+        }
+      ]
+    },
+    "model.bathCabinetTall": {
+      "type": "model",
+      "url": "../../models/bathroom/bathCabinetTall.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "cab": {
+          "finish": "material.finish.satin"
+        },
+        "cab_door": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "towel_blue": {
+          "finish": "material.finish.satin"
+        },
+        "towel_cream": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "takeTowel": "door_open"
+        },
+        "hold": 1.5
+      },
+      "paint": [
+        {
+          "material": "cab",
+          "label": "Cabinet"
+        },
+        {
+          "material": "cab_door",
+          "label": "Doors"
+        },
+        {
+          "material": "towel_blue",
+          "label": "Towels"
+        }
+      ]
+    }
+  }
+}

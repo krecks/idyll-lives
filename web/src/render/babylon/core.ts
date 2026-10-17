@@ -12,6 +12,7 @@ import '@babylonjs/core/Meshes/thinInstanceMesh';
 // `scene.createPickingRay` (analytic picking in `BabylonRenderer.pick`).
 import '@babylonjs/core/Culling/ray';
 
+export type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 export { Bone } from '@babylonjs/core/Bones/bone';
 export { Skeleton } from '@babylonjs/core/Bones/skeleton';
 export { Buffer, VertexBuffer } from '@babylonjs/core/Buffers/buffer';
@@ -68,5 +69,6 @@ export { CreateScreenshotAsync } from '@babylonjs/core/Misc/screenshotTools';
 export type { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 export { PostProcess } from '@babylonjs/core/PostProcesses/postProcess';
 export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';
+export type { Node } from '@babylonjs/core/node';
 export { Scene } from '@babylonjs/core/scene';
 export type { Nullable } from '@babylonjs/core/types';

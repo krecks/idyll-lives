@@ -14,7 +14,7 @@
       "group": "sectionals",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "An armless seat of the sectional sofa. Put pieces side by side for a sofa of any length.",
       "interactions": [
@@ -62,7 +62,7 @@
       "group": "sectionals",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A sectional seat with an arm on the left as you face it: the end of a run.",
       "interactions": [
@@ -110,7 +110,7 @@
       "group": "sectionals",
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A sectional seat with an arm on the right as you face it: the end of a run.",
       "interactions": [
@@ -158,7 +158,7 @@
       "group": "sectionals",
       "seat": {
         "height": 0.44,
-        "forward": 0.1
+        "forward": 0.17
       },
       "description": "The corner of an L-shaped sectional, with backs on two sides.",
       "interactions": [
@@ -206,7 +206,8 @@
       "group": "sectionals",
       "seat": {
         "height": 0.44,
-        "forward": -0.3
+        "forward": -0.28,
+        "legs": "out"
       },
       "description": "A long seat to put your feet up, with an arm along one side.",
       "interactions": [
@@ -271,14 +272,15 @@
           "tags": [
             "rest",
             "lounge"
-          ]
+          ],
+          "when": "closed"
         },
         {
           "id": "doze",
           "label": "Doze off",
           "anim": "nap",
           "minutes": 30,
-          "pose": "sit",
+          "pose": "lie",
           "effects": {
             "energy": 0.1,
             "comfort": 0.1
@@ -286,7 +288,97 @@
           "tags": [
             "rest",
             "nap"
-          ]
+          ],
+          "leaves": "open"
+        },
+        {
+          "id": "pullOut",
+          "label": "Pull out the bed",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "foldAway",
+          "label": "Fold the bed away",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
+        }
+      ]
+    },
+    {
+      "id": "wallBed",
+      "name": "Fold-down wall bed",
+      "model": "model.wallBed",
+      "footprint": [
+        2,
+        3
+      ],
+      "price": 1150,
+      "category": "living",
+      "group": "seating",
+      "slots": 2,
+      "decor": 0.15,
+      "description": "A double bed that folds up into a cabinet against the wall, between two narrow bookshelves. It folds down for bed and back up in the morning, or whenever you like. It needs the floor in front of it.",
+      "interactions": [
+        {
+          "id": "sleep",
+          "label": "Sleep",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.95,
+            "comfort": 0.35
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "leaves": "open"
+        },
+        {
+          "id": "nap",
+          "label": "Take a nap",
+          "anim": "nap",
+          "minutes": 30,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.12,
+            "comfort": 0.1
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ],
+          "leaves": "open"
+        },
+        {
+          "id": "foldDown",
+          "label": "Fold down",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "foldUp",
+          "label": "Fold up",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
         }
       ]
     },
@@ -305,7 +397,7 @@
       "decor": 0.2,
       "seat": {
         "height": 0.44,
-        "forward": 0.08
+        "forward": 0.13
       },
       "description": "A long sage sofa with three seat cushions: three can sit side by side.",
       "interactions": [
@@ -353,7 +445,7 @@
       "group": "seating",
       "seat": {
         "height": 0.44,
-        "forward": 0.0
+        "forward": 0.12
       },
       "description": "A deep leather armchair with a footrest that pops up. Very hard to get out of.",
       "interactions": [
@@ -556,7 +648,7 @@
       "decor": 0.4,
       "seat": {
         "height": 0.44,
-        "forward": 0.04
+        "forward": 0.07
       },
       "description": "A high-backed armchair in bottle green: the reading chair.",
       "interactions": [
@@ -710,7 +802,7 @@
         ],
         "at": [
           0.0,
-          -0.18
+          -0.15
         ]
       },
       "description": "A slim oak table for a hall or behind a sofa, baskets underneath.",
@@ -754,6 +846,7 @@
       ],
       "price": 320,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
       "description": "Six shelves of books in walnut: a proper library wall.",
@@ -805,6 +898,7 @@
       ],
       "price": 240,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves",
       "decor": 0.4,
       "description": "A narrow bookcase with open shelves on its end, for a corner.",
@@ -880,6 +974,7 @@
       ],
       "price": 480,
       "category": "living",
+      "fillsWall": true,
       "group": "shelves",
       "decor": 0.9,
       "description": "A walnut vitrine with glass shelves for treasured ornaments.",
@@ -901,7 +996,8 @@
         "range": 3.5,
         "intensity": 0.6,
         "height": 0.45,
-        "tiles": 4
+        "tiles": 4,
+        "switch": false
       },
       "description": "A slim white surround with a flickering electric fire: no chimney needed. It lights the room at night.",
       "interactions": [

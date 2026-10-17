@@ -19,6 +19,7 @@ mod index;
 pub mod items;
 pub mod life;
 pub mod lifecycle;
+pub mod lights;
 pub mod lod;
 pub mod lot;
 pub mod mesh;

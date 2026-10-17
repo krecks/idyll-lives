@@ -150,6 +150,7 @@
       ],
       "price": 60,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "A glass jar on a little stand for spare change to good causes; each gift costs a few dollars and leaves a warm heart that makes friendly chats go better.",
       "interactions": [
@@ -278,6 +279,7 @@
       ],
       "price": 140,
       "category": "outdoor",
+      "freeRotation": true,
       "slots": 1,
       "description": "A post-mounted feeder and bird bath; filling it with seed is a small daily kindness, and watching the visitors sharpens Perception.",
       "interactions": [
@@ -364,6 +366,7 @@
           "minutes": 40,
           "pose": "lie",
           "autonomous": true,
+          "whole": true,
           "effects": {
             "energy": 0.14,
             "comfort": 0.2

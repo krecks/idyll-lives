@@ -8,6 +8,7 @@
       "footprint": [1, 1],
       "price": 140,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "Basil, thyme and rosemary within arm's reach. Tending it leaves residents eager to cook and learning Cooking faster for a few hours.",
       "interactions": [
@@ -33,6 +34,7 @@
       "footprint": [1, 1],
       "price": 320,
       "category": "kitchen",
+      "fillsWall": true,
       "slots": 1,
       "description": "Cured meats, aged cheese and good bread on hand: fast, slightly better bites for a few dollars each, perfect for a resident who is always peckish.",
       "interactions": [

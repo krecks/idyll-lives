@@ -1,0 +1,587 @@
+{
+  "$comment": "Blender-built bedroom storage (tools/art/blender/families/bedroom_storage.py): the nightstands, the blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. A dresser or chest slides its middle drawer out 30 cm (`drawer_open`), a wardrobe swings its doors open (`doors_open`, `door_open`) while a resident picks an outfit.",
+  "version": 1,
+  "entries": {
+    "model.nightstand": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/nightstand.glb",
+      "materials": {
+        "book2": {
+          "finish": "material.finish.matte"
+        },
+        "book3": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cream": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "teal": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.nightstandModern": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/nightstandModern.glb",
+      "materials": {
+        "book2": {
+          "finish": "material.finish.matte"
+        },
+        "book3": {
+          "finish": "material.finish.matte"
+        },
+        "box": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "teal": {
+          "finish": "material.finish.matte"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "white",
+          "label": "Body"
+        },
+        {
+          "material": "iron",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.nightstandRound": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/nightstandRound.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clay": {
+          "finish": "material.finish.satin"
+        },
+        "clay2": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "clay",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.nightstandDrawers": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/nightstandDrawers.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.nightstandLamp": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/nightstandLamp.glb",
+      "materials": {
+        "book2": {
+          "finish": "material.finish.matte"
+        },
+        "book3": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "bulb": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "shade": {
+          "finish": "material.finish.fabric",
+          "glow": "#FFD9A0"
+        },
+        "teal": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        },
+        {
+          "material": "shade",
+          "label": "Shade"
+        }
+      ]
+    },
+    "model.cedarChest": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/cedarChest.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cedar": {
+          "finish": "material.finish.wood"
+        },
+        "cedar2": {
+          "finish": "material.finish.wood"
+        },
+        "cedarin": {
+          "finish": "material.finish.wood"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "takeBlanket": "lid_open"
+        },
+        "hold": 2.0
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Body"
+        },
+        {
+          "material": "iron",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.laundryHamper": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/laundryHamper.glb",
+      "materials": {
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "wicker": {
+          "finish": "material.finish.fabric"
+        },
+        "wicker2": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sortWashing": "lid_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "wicker",
+          "label": "Hamper"
+        }
+      ]
+    },
+    "model.benchBedEnd": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/benchBedEnd.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "olive": {
+          "finish": "material.finish.fabric"
+        },
+        "olive2": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Frame"
+        },
+        {
+          "material": "olive",
+          "label": "Cushion"
+        }
+      ]
+    },
+    "model.dresser": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/dresser.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "ebony": {
+          "finish": "material.finish.wood"
+        },
+        "frame": {
+          "finish": "material.finish.wood"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "print1": {
+          "finish": "material.finish.wood"
+        },
+        "pull": {
+          "finish": "material.finish.wood"
+        },
+        "vase": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.wardrobe": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/wardrobe.glb",
+      "materials": {
+        "birch": {
+          "finish": "material.finish.satin"
+        },
+        "box": {
+          "finish": "material.finish.matte"
+        },
+        "box2": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "doors_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "white",
+          "label": "Body"
+        },
+        {
+          "material": "birch",
+          "label": "Doors"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.chestOfDrawers": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/chestOfDrawers.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "linen": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.dresserLow": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/dresserLow.glb",
+      "materials": {
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "ebony": {
+          "finish": "material.finish.wood"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oakleg": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "drawer_open"
+        },
+        "hold": 2.5
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Body"
+        },
+        {
+          "material": "iron",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.wardrobeSingle": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/wardrobeSingle.glb",
+      "materials": {
+        "box": {
+          "finish": "material.finish.matte"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "door_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "white",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    },
+    "model.armoire": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/armoire.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cloth1": {
+          "finish": "material.finish.satin"
+        },
+        "cloth2": {
+          "finish": "material.finish.satin"
+        },
+        "cloth3": {
+          "finish": "material.finish.satin"
+        },
+        "cloth4": {
+          "finish": "material.finish.satin"
+        },
+        "mahogany": {
+          "finish": "material.finish.satin"
+        },
+        "mahogany2": {
+          "finish": "material.finish.satin"
+        },
+        "walnut": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "outfit": "doors_open"
+        },
+        "hold": 3.0
+      },
+      "paint": [
+        {
+          "material": "mahogany",
+          "label": "Body"
+        },
+        {
+          "material": "brass",
+          "label": "Handles"
+        }
+      ]
+    }
+  }
+}

@@ -17,11 +17,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -46,11 +46,11 @@
         "kind": "counter",
         "size": [
           0.81,
-          0.79
+          0.66
         ],
         "at": [
           -0.095,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -75,11 +75,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -104,11 +104,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -130,7 +130,7 @@
       "group": "counters",
       "decor": 0.2,
       "surface": {
-        "height": 0.93,
+        "height": 0.95,
         "kind": "counter",
         "size": [
           0.9,
@@ -170,11 +170,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -259,7 +259,7 @@
         ],
         "at": [
           0.0,
-          -0.04
+          0.02
         ]
       },
       "description": "A tall counter with a slatted front and a brass foot rail. Line a few up and pull up bar stools.",
@@ -285,7 +285,7 @@
         ],
         "at": [
           0.0,
-          -0.04
+          0.02
         ]
       },
       "description": "The end of a bar, finished with a solid wooden side.",
@@ -307,7 +307,11 @@
         "kind": "counter",
         "size": [
           0.96,
-          0.94
+          0.9
+        ],
+        "at": [
+          0,
+          0.02
         ]
       },
       "stations": [
@@ -333,7 +337,11 @@
         "kind": "counter",
         "size": [
           2.96,
-          0.94
+          0.9
+        ],
+        "at": [
+          0,
+          0.02
         ]
       },
       "stations": [
@@ -352,6 +360,7 @@
       ],
       "price": 420,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "counters",
       "stations": [
         "ingredients"
@@ -386,6 +395,7 @@
       ],
       "price": 900,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "appliances",
       "stations": [
         "oven"
@@ -523,11 +533,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -565,6 +575,7 @@
       ],
       "price": 1500,
       "category": "kitchen",
+      "fillsWall": true,
       "group": "appliances",
       "stations": [
         "ingredients"
@@ -703,6 +714,71 @@
       ]
     },
     {
+      "id": "fridgeMiniRetro",
+      "name": "Retro mini fridge",
+      "model": "model.fridgeMiniRetro",
+      "stores": true,
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "kitchen",
+      "group": "appliances",
+      "decor": 0.45,
+      "stations": [
+        "ingredients"
+      ],
+      "description": "A pastel-pink mini fridge with brass feet and a unicorn sticker on the door: a treat for a kid's room or a corner bar.",
+      "interactions": [
+        {
+          "id": "snack",
+          "label": "Grab a snack",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 8
+          },
+          "effects": {
+            "hunger": 0.3
+          },
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "meal",
+          "label": "Make a simple meal",
+          "recipe": "meal",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "cooking"
+          ],
+          "skills": {
+            "cooking": 0.1
+          }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
       "id": "wineFridge",
       "name": "Wine fridge",
       "model": "model.wineFridge",
@@ -718,11 +794,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "description": "An under-counter wine cooler behind a smoked glass door, drawers beside it.",
@@ -759,11 +835,11 @@
         "kind": "counter",
         "size": [
           1.0,
-          0.79
+          0.66
         ],
         "at": [
           0.0,
-          -0.085
+          -0.1
         ]
       },
       "stations": [
@@ -816,12 +892,29 @@
       "category": "kitchen",
       "group": "counters",
       "description": "Three bins side by side: paper, glass and plastic.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sortRecycling",
+          "label": "Sort the recycling",
+          "anim": "clean",
+          "minutes": 4,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores"
+          ],
+          "autonomous": false
+        }
+      ]
     },
     {
       "id": "wallCabinetGlass",
       "name": "Glazed wall cabinet",
       "model": "model.wallCabinetGlass",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1
@@ -838,6 +931,9 @@
       "id": "wallCabinetCorner",
       "name": "Wall cabinet with end shelves",
       "model": "model.wallCabinetCorner",
+      "stations": [
+        "cupboard"
+      ],
       "footprint": [
         1,
         1

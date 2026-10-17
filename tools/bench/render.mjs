@@ -12,7 +12,8 @@
  *     --scene village          web/public/bench/<scene>.json(.gz)
  *     --presets low,medium,high
  *     --backends webgpu,webgl
- *     --scenarios orbit-day,orbit-night,dusk,build,wide
+ *     --scenarios orbit-day,orbit-night,dusk,build,wide   (also mirror-day, mirror-night, mirror-still:
+ *                              the home lot's mirror in view, the camera swinging before it or held)
  *     --throttle 1,3           CPU slow-down factors (CDP Emulation.setCPUThrottlingRate)
  *     --diags none,noshadows   one run each ('+' joins several: noshadows+noaa)
  *     --res 1                  render scale: 1, 0.5–1, or auto
@@ -51,6 +52,10 @@ const SCENARIOS = {
   dusk: 'cam=dusk',
   build: 'cam=build&hour=13',
   wide: 'cam=wide&hour=13',
+  // The home lot's mirror on screen all the time (not in the default list: `--scenarios mirror-day,…`).
+  'mirror-day': 'cam=mirror&hour=13',
+  'mirror-night': 'cam=mirror&hour=21',
+  'mirror-still': 'cam=mirror-still&hour=13',
 };
 /** Screenshot poses: along the paths (seconds), by day and by night. */
 const POSES = {
@@ -228,8 +233,8 @@ function table(results) {
   const rows = [
     `Scene \`${scene}\`, 1920×1080 at DPR 1, render scale ${res}, ${throughput ? 'no vsync (throughput)' : 'vsync'}, ${secs} s after ${warmup} s warm-up, median of ${runs} run(s).`,
     '',
-    '| preset | backend | scenario | diag | CPU× | fps | frame p50 / p95 / p99 ms | CPU ms (update + draw) | GPU ms avg / p95 | draws (shadow) | triangles M (shadow) | passes · M px×samples | residents ms | lighting /s | long tasks | fingerprint |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+    '| preset | backend | scenario | diag | CPU× | fps | frame p50 / p95 / p99 ms | CPU ms (update + draw) | GPU ms avg / p95 | draws (shadow / mirror) | triangles M (shadow / mirror) | passes · M px×samples · targets MB | residents ms | lighting /s | reflections /s | long tasks | fingerprint |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
   ];
   for (const list of cells.values()) {
     const ok = list.filter((r) => r.ok);
@@ -241,7 +246,7 @@ function table(results) {
     const m = (get) => median(ok.map(get));
     const r = ok[0];
     rows.push(
-      `| ${c.preset} | ${c.backend} | ${c.scenario} | ${c.diag} | ${c.throttle} | ${f(m((x) => x.fps))} | ${f(m((x) => x.interval?.p50))} / ${f(m((x) => x.interval?.p95))} / ${f(m((x) => x.interval?.p99))} | ${f(m((x) => x.cpu?.frame.avg), 2)} (${f(m((x) => x.cpu?.update.avg), 2)} + ${f(m((x) => x.cpu?.render.avg), 2)}) | ${r.gpu.frame ? `${f(m((x) => x.gpu.frame?.avg), 2)} / ${f(m((x) => x.gpu.frame?.p95), 2)}` : 'n/a'} | ${f(m((x) => x.drawCalls.total), 0)} (${f(m((x) => x.drawCalls.shadow), 0)}) | ${f(m((x) => x.triangles.total / 1e6), 2)} (${f(m((x) => x.triangles.shadow / 1e6), 2)}) | ${r.passes.length} · ${f(r.pixelSamples / 1e6, 1)} | ${f(m((x) => x.residentsMs), 2)} | ${f(m((x) => x.lightingPerSecond), 1)} | ${f(m((x) => x.longTasks.count), 0)} | ${r.fingerprint} |`,
+      `| ${c.preset} | ${c.backend} | ${c.scenario} | ${c.diag} | ${c.throttle} | ${f(m((x) => x.fps))} | ${f(m((x) => x.interval?.p50))} / ${f(m((x) => x.interval?.p95))} / ${f(m((x) => x.interval?.p99))} | ${f(m((x) => x.cpu?.frame.avg), 2)} (${f(m((x) => x.cpu?.update.avg), 2)} + ${f(m((x) => x.cpu?.render.avg), 2)}) | ${r.gpu.frame ? `${f(m((x) => x.gpu.frame?.avg), 2)} / ${f(m((x) => x.gpu.frame?.p95), 2)}` : 'n/a'} | ${f(m((x) => x.drawCalls.total), 0)} (${f(m((x) => x.drawCalls.shadow), 0)} / ${f(m((x) => x.drawCalls.mirrors), 0)}) | ${f(m((x) => x.triangles.total / 1e6), 2)} (${f(m((x) => x.triangles.shadow / 1e6), 2)} / ${f(m((x) => x.triangles.mirrors / 1e6), 2)}) | ${r.passes.length} · ${f(r.pixelSamples / 1e6, 1)} · ${f(m((x) => x.targetBytes / 1e6), 0)} | ${f(m((x) => x.residentsMs), 2)} | ${f(m((x) => x.lightingPerSecond), 1)} | ${f(m((x) => x.reflectionsPerSecond ?? 0), 1)} | ${f(m((x) => x.longTasks.count), 0)} | ${r.fingerprint} |`,
     );
   }
   return rows.join('\n') + '\n';

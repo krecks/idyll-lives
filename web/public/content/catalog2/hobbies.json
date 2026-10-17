@@ -14,7 +14,7 @@
       "group": "music",
       "seat": {
         "height": 0.52,
-        "forward": -0.3
+        "forward": -0.23
       },
       "description": "A red five-piece kit with cymbals and a stool. Loud, and good for Dexterity.",
       "interactions": [
@@ -66,6 +66,7 @@
       ],
       "price": 1100,
       "category": "hobbies",
+      "fillsWall": true,
       "group": "games",
       "decor": 0.2,
       "description": "A full-size arcade machine with a joystick and four buttons.",
@@ -101,7 +102,7 @@
       "group": "crafts",
       "seat": {
         "height": 0.45,
-        "forward": -0.3
+        "forward": -0.28
       },
       "description": "A wheel, a stool and a lump of clay: throwing pots trains Creativity.",
       "interactions": [
@@ -202,6 +203,10 @@
       "id": "guitarAcoustic",
       "name": "Acoustic guitar",
       "model": "model.guitarAcoustic",
+      "held": {
+        "part": "guitar",
+        "grip": "guitar"
+      },
       "footprint": [
         1,
         1

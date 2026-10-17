@@ -1,0 +1,311 @@
+{
+  "$comment": "Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Replaces the primitive-part placeholders of packs/hotHeaded by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge cover rolls back.",
+  "version": 1,
+  "entries": {
+    "model.hotHeaded.heavyBag": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/heavyBag.glb",
+      "materials": {
+        "bag": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "fire": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "head": {
+          "finish": "material.finish.satin"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "steel_dark": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "pound": "swing"
+        }
+      },
+      "paint": [
+        {
+          "material": "bag",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hotHeaded.smashBin": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/smashBin.glb",
+      "materials": {
+        "crate": {
+          "finish": "material.finish.wood"
+        },
+        "crate_dark": {
+          "finish": "material.finish.wood"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "plate_blue": {
+          "finish": "material.finish.gloss"
+        },
+        "plate_gold": {
+          "finish": "material.finish.gloss"
+        },
+        "plate_green": {
+          "finish": "material.finish.gloss"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "straw": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "motions": {
+        "uses": {
+          "smash": "lid_open"
+        },
+        "hold": 1
+      },
+      "paint": [
+        {
+          "material": "crate",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hotHeaded.thunderDrums": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/thunderDrums.glb",
+      "materials": {
+        "amp": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "cymbal": {
+          "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "fire": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss"
+        },
+        "head": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "rug": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
+          "finish": "material.finish.gloss"
+        },
+        "speaker": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "drum": "cymbals"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hotHeaded.coolDownCushion": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/coolDownCushion.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "calm": {
+          "finish": "material.finish.satin"
+        },
+        "calm_deep": {
+          "finish": "material.finish.fabric"
+        },
+        "calm_light": {
+          "finish": "material.finish.fabric"
+        },
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "candle_flame": {
+          "finish": "material.finish.gloss"
+        },
+        "ember": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "oat": {
+          "finish": "material.finish.fabric"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
+        },
+        "zafu": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "motions": {
+        "uses": {
+          "countToTen": "sink_in",
+          "breathe": "sink_in"
+        }
+      },
+      "paint": [
+        {
+          "material": "zafu",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hotHeaded.grudgeJournal": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/grudgeJournal.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.wood"
+        },
+        "cactus": {
+          "finish": "material.finish.satin"
+        },
+        "calm": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "drawer": {
+          "finish": "material.finish.satin"
+        },
+        "ember": {
+          "finish": "material.finish.satin"
+        },
+        "fire": {
+          "finish": "material.finish.satin"
+        },
+        "journal": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "steel_dark": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "writeItOut": "drawer_open"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.hotHeaded.coldPlunge": {
+      "type": "model",
+      "url": "../../models/pack_hotHeaded/coldPlunge.glb",
+      "materials": {
+        "calm": {
+          "finish": "material.finish.satin"
+        },
+        "cedar": {
+          "finish": "material.finish.wood"
+        },
+        "cover": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "drawer": {
+          "finish": "material.finish.satin"
+        },
+        "hose": {
+          "finish": "material.finish.satin"
+        },
+        "ice": {
+          "finish": "material.finish.gloss"
+        },
+        "readout": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "shell_white": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "plunge": "cover_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "cedar",
+          "label": "Body"
+        }
+      ]
+    }
+  }
+}

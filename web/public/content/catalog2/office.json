@@ -17,11 +17,11 @@
         "kind": "desk",
         "size": [
           1.5,
-          0.72
+          0.69
         ],
         "at": [
           0.0,
-          -0.1
+          -0.085
         ]
       },
       "description": "An oak top on hairpin legs with a drawer. Pull up a desk chair.",
@@ -42,8 +42,8 @@
         "height": 0.74,
         "kind": "desk",
         "size": [
-          1.96,
-          1.96
+          1.86,
+          1.86
         ]
       },
       "description": "A big white corner desk with a drawer unit: room for two to work.",
@@ -65,11 +65,11 @@
         "kind": "desk",
         "size": [
           0.96,
-          0.66
+          0.63
         ],
         "at": [
           0.0,
-          -0.13
+          -0.115
         ]
       },
       "description": "A desk at standing height with a monitor on an arm. Good for the back.",
@@ -124,11 +124,11 @@
         "kind": "desk",
         "size": [
           1.8,
-          0.8
+          0.77
         ],
         "at": [
           0.0,
-          -0.06
+          -0.045
         ]
       },
       "description": "A walnut desk with a green leather top and drawers both sides.",
@@ -145,7 +145,20 @@
       "price": 120,
       "category": "office",
       "description": "Three steel drawers of paperwork, a plant on top.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "file",
+          "label": "File papers",
+          "anim": "fetch",
+          "minutes": 10,
+          "effects": {
+            "environment": 0.05
+          },
+          "tags": [
+            "chores"
+          ]
+        }
+      ]
     },
     {
       "id": "chairExecutive",

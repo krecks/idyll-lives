@@ -37,6 +37,9 @@
   "objects": [
     {
       "id": "natureLover.veggieBed",
+      "grows": {
+        "days": 2
+      },
       "name": "Raised veggie bed",
       "model": "model.natureLover.veggieBed",
       "footprint": [2, 1],
@@ -60,6 +63,8 @@
         },
         {
           "id": "pickSnack",
+          "when": "ripe",
+          "leaves": "picked",
           "label": "Pick something fresh",
           "anim": "eat",
           "minutes": 15,
@@ -115,6 +120,7 @@
       "footprint": [1, 1],
       "price": 140,
       "category": "outdoor",
+      "freeRotation": true,
       "slots": 1,
       "description": "Fill it with seed and watch who visits: fun that sharpens Perception, and keen observers (Perception 3+) leave cheered by the birdsong.",
       "interactions": [
@@ -176,6 +182,8 @@
       "footprint": [1, 1],
       "price": 580,
       "category": "outdoor",
+      "fillsWall": true,
+      "freeRotation": true,
       "slots": 1,
       "description": "Rinse off the garden soil under the open sky: a full wash that leaves residents with a burst of Fresh air.",
       "interactions": [
@@ -200,6 +208,7 @@
       "footprint": [1, 1],
       "price": 150,
       "category": "decor",
+      "freeRotation": true,
       "slots": 1,
       "description": "A little glass forest on a stand: a calming indoor garden to mist and tend when the weather keeps residents inside.",
       "interactions": [

@@ -1,7 +1,7 @@
 /** Non-reactive handles the UI needs. Set once by the game layer before the HUD mounts. */
 
 import type { AssetRegistry } from '../assets/registry';
-import type { EdgeEdit, FacePaint, GoalIn, Lifespan, RoutineIn, SocialEvent } from '../core/protocol';
+import type { EdgeEdit, FacePaint, GoalIn, Lifespan, PartColors, RoutineIn, SocialEvent } from '../core/protocol';
 import type { BuildTab, BuildTool, BuyFilter, GameMode } from './state.svelte';
 import type { Content } from '../content/content';
 import type { HouseholdDraft } from '../game/household';
@@ -57,6 +57,8 @@ export interface GameControls {
   useObject(objectId: number, interaction: number): void;
   /** The selected Sim eats a serving of food (an item) or clears it away to the sink. */
   useItem(itemId: number, action: 'eat' | 'clear'): void;
+  /** Switches a lamp on if it's off, off if it's on (at once: nobody walks over). */
+  switchLamp(objectId: number): void;
   cancelAction(index: number): void;
   setWallMode(mode: WallMode): void;
   closeMenu(): void;
@@ -81,8 +83,10 @@ export interface GameControls {
   undo(): void;
   /** Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
   redo(): void;
-  restyle(objectId: number, style: number): void;
-  setHouseholdStyle(style: number): void;
+  /** Gives something at home its parts' colours, all at once (none: as made). Free; effects stay the same. */
+  recolor(objectId: number, colors: PartColors | undefined): void;
+  /** Gives the new purchase in hand its parts' colours (none: as made). */
+  colorPlacing(colors: PartColors | undefined): void;
   upgrade(objectId: number): void;
   /** Build mode: arms (or disarms) the eyedropper: the next click picks up a look (E). */
   toggleEyedropper(): void;
