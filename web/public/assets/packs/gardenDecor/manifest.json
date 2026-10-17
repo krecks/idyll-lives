@@ -24,7 +24,21 @@
         "wood_dark": {
           "finish": "material.finish.satin"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "hat",
+          "label": "Hat"
+        },
+        {
+          "material": "tunic",
+          "label": "Tunic"
+        },
+        {
+          "material": "wood_dark",
+          "label": "Belt"
+        }
+      ]
     },
     "model.garden.birdbath": {
       "type": "model",
@@ -45,7 +59,17 @@
         "water": {
           "finish": "material.finish.gloss"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Bowl & column"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Plinth"
+        }
+      ]
     },
     "model.garden.fountain": {
       "type": "model",
@@ -60,7 +84,17 @@
         "water": {
           "finish": "material.finish.gloss"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Fountain"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Plinth"
+        }
+      ]
     },
     "model.garden.lantern": {
       "type": "model",
@@ -75,7 +109,17 @@
         "stone_dark": {
           "finish": "material.finish.matte"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Lantern"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Base"
+        }
+      ]
     },
     "model.garden.wheelbarrow": {
       "type": "model",
@@ -108,7 +152,21 @@
         "wood": {
           "finish": "material.finish.wood"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "paint",
+          "label": "Tray"
+        },
+        {
+          "material": "wood",
+          "label": "Handles"
+        },
+        {
+          "material": "metal_dark",
+          "label": "Legs & tyre"
+        }
+      ]
     },
     "model.garden.boulder": {
       "type": "model",
@@ -129,7 +187,21 @@
         "stone_warm": {
           "finish": "material.finish.matte"
         }
-      }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Large boulder"
+        },
+        {
+          "material": "stone_dark",
+          "label": "Middle boulder"
+        },
+        {
+          "material": "stone_warm",
+          "label": "Small boulder"
+        }
+      ]
     }
   }
 }

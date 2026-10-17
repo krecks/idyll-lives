@@ -1,6 +1,6 @@
 # Outdoor
 
-The garden decor (gnome, bird bath, fountain, lantern, wheelbarrow, boulders) is done (`families/garden_decor.py`); the eleven OU1 patio models and the five OU2 loungers and swings are done in `families/outdoor.py` (notes: `outdoor.md`).
+The garden decor (gnome, bird bath, fountain, lantern, wheelbarrow, boulders) is done (`families/garden_decor.py`), signed off 2026-10-17 (back in outdoor / decor, the lantern in outdoor / lights; Validate › Garden Decor). Colour parts: the gnome's Hat, Tunic and Belt; the bird bath's Bowl & column and Plinth; the fountain's Fountain (basins, column and finial) and Plinth; the lantern's Lantern and Base; the wheelbarrow's Tray, Handles and Legs & tyre; the boulders' Large, Middle and Small boulder. The eleven OU1 patio models and the five OU2 loungers and swings are done in `families/outdoor.py` (notes: `outdoor.md`).
 Outdoor things are seen from far: watch the budget, and street-scale props wait for LOD (E7).
 
 ## OU1. Patio seating and tables (11) — **Done**, signed off 2026-10-17 (back in outdoor / seating)

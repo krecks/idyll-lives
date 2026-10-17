@@ -163,12 +163,18 @@ TOLERANCE = 0.1
 
 FAMILY = G.Family(
     'garden', M,
-    [G.Model('gnome', gnome, size=(0.26, 0.58, 0.18), tolerance=TOLERANCE),
-     G.Model('birdbath', birdbath, size=(0.68, 0.935, 0.68), tolerance=TOLERANCE),
-     G.Model('fountain', fountain, size=(0.92, 1.17, 0.92), tolerance=TOLERANCE),
-     G.Model('lantern', lantern, size=(0.54, 1.035, 0.468), tolerance=TOLERANCE),
-     G.Model('wheelbarrow', wheelbarrow, size=(0.587, 0.754, 1.036), tolerance=TOLERANCE),
-     G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE)],
+    [G.Model('gnome', gnome, size=(0.26, 0.58, 0.18), tolerance=TOLERANCE,
+             paint=[('hat', 'Hat'), ('tunic', 'Tunic'), ('wood_dark', 'Belt')]),
+     G.Model('birdbath', birdbath, size=(0.68, 0.935, 0.68), tolerance=TOLERANCE,
+             paint=[('stone', 'Bowl & column'), ('stone_dark', 'Plinth')]),
+     G.Model('fountain', fountain, size=(0.92, 1.17, 0.92), tolerance=TOLERANCE,
+             paint=[('stone', 'Fountain'), ('stone_dark', 'Plinth')]),
+     G.Model('lantern', lantern, size=(0.54, 1.035, 0.468), tolerance=TOLERANCE,
+             paint=[('stone', 'Lantern'), ('stone_dark', 'Base')]),
+     G.Model('wheelbarrow', wheelbarrow, size=(0.587, 0.754, 1.036), tolerance=TOLERANCE,
+             paint=[('paint', 'Tray'), ('wood', 'Handles'), ('metal_dark', 'Legs & tyre')]),
+     G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE,
+             paint=[('stone', 'Large boulder'), ('stone_dark', 'Middle boulder'), ('stone_warm', 'Small boulder')])],
     pack='gardenDecor',
     comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a '
             'two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part '
