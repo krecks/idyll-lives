@@ -10,7 +10,7 @@
  * each at its pace in the game.
  */
 
-import { Engine, FreeCamera, Matrix, TransformNode, Vector3, type Mesh, type Scene } from '../babylon/core';
+import { Engine, FreeCamera, Matrix, TransformNode, Vector3, VertexBuffer, type Mesh, type Scene } from '../babylon/core';
 import type { AssetRegistry } from '../../assets/registry';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import type { PopTarget } from '../babylon/buildFx';
@@ -249,12 +249,19 @@ export class ItemStageController implements ItemStage {
     if (lo && hi && parts) {
       const open = this.playing(true);
       const pose = new Float32Array(16);
+      const posed = new Matrix();
       const m = new Matrix();
+      const at = new Vector3();
       this.meshes.forEach((mesh, i) => {
-        if (parts[i] < 0 || !mesh.getTotalVertices() || !partPose(open, parts[i], pose)) return;
-        Matrix.FromArrayToRef(pose, 0, m);
-        for (const corner of mesh.getBoundingInfo().boundingBox.vectorsWorld) {
-          const at = Vector3.TransformCoordinates(corner, m);
+        const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+        if (parts[i] < 0 || !positions?.length || !partPose(open, parts[i], pose)) return;
+        // Its vertices posed, not its box: a part grown from nothing (water, flames) lies flat at rest and its
+        // pose grows it across the flat many times over, so a box's corners off the flat (a slanted shower's
+        // rain, its flat turned) would land metres away, and the camera with them.
+        Matrix.FromArrayToRef(pose, 0, posed);
+        mesh.computeWorldMatrix(true).multiplyToRef(posed, m);
+        for (let k = 0; k < positions.length; k += 3) {
+          Vector3.TransformCoordinatesFromFloatsToRef(positions[k], positions[k + 1], positions[k + 2], m, at);
           lo.minimizeInPlace(at);
           hi.maximizeInPlace(at);
         }
