@@ -9,13 +9,19 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 The cinema wall and the game console stood 2–3 cm into the wall; they are centred on their `Model` `centre` now
 (`G.settle()`), their backs on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_couchPotato.py`, `pack_shapes.to_wall`) stand with their backs
 on the wall face too, so the fallback, the model and the wall agree within a centimetre.
-As on the placeholders, the screens the residents watch (the cinema's, the console's) stand at the front edge facing
-the seats, their oak backs to the room: their curtains and tray show from behind and from above.
+The screens the residents watch (the cinema's, the console's) stand on the wall at the back of the footprint, the
+seats in front of them, the sitters facing the object's back (content `"seat": {"height": 0.45, "forward": 0.05,
+"facing": "back"}` for the cinema, `"forward": 0.12` for the console, as the piano and the writer's bureau). Each is
+built as the placeholder first stood (the seats at the back, the screen at the front edge facing them, its oak back to
+the room) and turned round (`_turn_round`), so its oak back is on the wall and the console's tray slides out the other
+way (+Z game, towards the players); the placeholders (`tools/art/pack_couchPotato.py`, `furniture.turned`, then
+`to_wall`) are turned the same. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
+the console's sit 8 cm further back than before, against the loveseat's back, so the knees stay under the shelf.
 
 | Model | Moving parts and clip | Played by |
 |---|---|---|
 | `cinemaWall` | the left and right curtains over the picture, each with its origin at its outer end: `curtains` gathers both to their sides (scaled to 22 % across, 1.2 s) | `marathon`, `channelSurf` |
-| `gameConsole` | the disc tray with a disc on it: `tray` slides it 9 cm out of the console towards the players (0.6 s), `hold` 1.5 s, so it goes back in | `play`, `speedrun` |
+| `gameConsole` | the disc tray with a disc on it: `tray` slides it 9 cm out of the console towards the players, away from the wall (0.6 s), `hold` 1.5 s, so it goes back in | `play`, `speedrun` |
 | `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back; the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s); the sitter rides the back (`ride: recline`) | `recline`, `doze` |
 | `snackFridge` | the door with its takeout screen and handle, hinged on its right edge: `fridge_open` swings it 100° (0.9 s); cans, a takeout box and a pizza inside | `snack`, `takeout` |
 | `fitnessGame` | the balance board on its rocker, on the mat: `board` tilts it 10° to one side (0.8 s) | `workout` |

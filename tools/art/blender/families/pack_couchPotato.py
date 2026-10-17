@@ -7,8 +7,10 @@
 # `Model`). The cinema's two side curtains are drawn apart (`curtains`), the console's disc tray slides out
 # (`tray`), the recliner's back tips and its footrest rises (`recline`), the fridge door swings (`fridge_open`),
 # the balance board tilts (`board`) and the lava lamp's wax rises (`blobs`) while more wax drifts round all the
-# time (`drift`, ambient). Screens the residents watch stand at the front edge, facing the seats (-Z), as on the
-# placeholders.
+# time (`drift`, ambient). The screens the residents watch (the cinema's, the console's) stand on the wall at the
+# back, the seats in front of them, the sitters facing the object's back (content `seat.facing: "back"`, as the
+# piano): each is built as its placeholder first stood (the seats at the back, the screen at the front edge facing
+# them) and turned round (`_turn_round`), as is its placeholder.
 #
 # Run:  python3 -B tools/art/blender/build.py pack_couchPotato [--only recliner] [--preview]
 import math
@@ -143,9 +145,17 @@ def _cushion(F, name, w, h, d, at, mat, rot=(0, 0, 0), r=0.05):
     return F.box(name, w, h, d, at, mat, rot=rot, bevel=min(r, w / 2.2, h / 2.2, d / 2.2), bevel_segments=3)
 
 
+def _turn_round(objs):
+    """Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
+    which moves round with it), as pack_bookworm turns the writer's bureau. A part's slides then go the other way."""
+    for o in objs:
+        G.turn(o, 180, 'Z')
+        o.location = (-o.location.x, -o.location.y, o.location.z)
+
+
 def _screen(F, x0, x1, y0, y1, z, stripe):
-    """A screen held between two slim posts at the front edge, its picture facing the seats (-Z), the oak back
-    with slats to the room."""
+    """A screen held between two slim posts at depth `z`, its picture facing the seats behind it (-Z), the oak back
+    with slats on its other side (to the wall, once the model is turned round)."""
     w, h = x1 - x0, y1 - y0
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     F.box(_name('screen_back'), w, h, 0.05, (cx, cy, z), M.screen_back, bevel=0.012)
@@ -161,12 +171,14 @@ def _screen(F, x0, x1, y0, y1, z, stripe):
         F.box(_name('post_foot'), 0.08, 0.02, 0.12, (x, 0.01, z - 0.04), M.graphite, bevel=0.006)
 
 
-# --- the grand cinema wall (2x1): twin recliners, a console between, the screen at the front edge ----------------
+# --- the grand cinema wall (2x1): the screen on the wall, twin recliners in front of it, a console between --------
+# (built with the seats at the back and the screen at the front edge facing them, then turned round)
 SCREEN_Z = 0.42
 
 
 def _cinema_seat(F, x, w, outer):
-    """One recliner of the pair centred on (x, 0), facing the screen in front: seat top 0.45, an arm outside."""
+    """One recliner of the pair centred on (x, 0), facing the screen (before the turn, in front): seat top 0.45, an
+    arm outside."""
     _cushion(F, _name('seat_base'), w, 0.3, 0.62, (x, 0.2, -0.06), M.leather, r=0.06)
     _cushion(F, _name('seat'), w - 0.16, 0.12, 0.56, (x, 0.39, -0.02), M.leather, r=0.05)
     _cushion(F, _name('seat_back'), w, 0.66, 0.18, (x, 0.64, -0.31), M.leather, rot=(-14, 0, 0), r=0.07)
@@ -194,10 +206,10 @@ def cinemaWall():
             F.sphere(_name('popcorn'), 0.024, (0.035 * G.cosd(a), 0.645 + 0.01 * (k % 2), -0.16 + 0.035 * G.sind(a)),
                      M.popcorn, segments=7, rings=5)
         F.box('remote', 0.04, 0.02, 0.15, (-0.3, 0.465, 0.1), M.dark, rot=(0, 20, 0), bevel=0.008)
-        # the screen at the front edge, facing the seats; a pelmet over it for the curtains
+        # the screen (at the front edge until turned round), facing the seats; a pelmet over it for the curtains
         _screen(F, -0.92, 0.92, 0.88, 1.42, SCREEN_Z, M.picture)
         F.box('pelmet', 1.6, 0.1, 0.1, (0, 1.47, SCREEN_Z - 0.06), M.pelmet, bevel=0.012)
-        # the surround speakers at the front corners
+        # the surround speakers at the screen's corners
         for x in (-0.86, 0.86):
             F.box(_name('speaker'), 0.16, 0.84, 0.16, (x, 0.42, 0.33), M.speaker_grey, bevel=0.02)
             for y, r in ((0.6, 0.05), (0.76, 0.03)):
@@ -210,13 +222,15 @@ def cinemaWall():
         with G.new_parts() as cur:
             _pleats(F, name, s * 0.01, s * 0.78, 0.9, 1.42, zc - 0.012, 8, 0.016, M.curtain)
         parts.append(G.hinged(G.join(cur, name), F.at(s * 0.78, 1.42, zc - 0.012)))
-    objs = G.settle()      # on its Model centre: the back on the wall face
+    _turn_round(G.meshes())
+    objs = G.settle()      # on its Model centre: the screen's back on the wall face
     for cur in parts:
         G.squash(cur, 'curtains', (0.22, 1, 1), seconds=1.2)
     return objs
 
 
-# --- the Pixel Arcade console (1x1): a gaming loveseat for two, the screen and console in front ------------------
+# --- the Pixel Arcade console (1x1): the screen and console on the wall, a gaming loveseat for two in front -------
+# (built with the loveseat at the back and the screen at the front edge facing it, then turned round)
 def gameConsole():
     F = G.GameFrame()
     with G.new_parts() as still:
@@ -234,7 +248,8 @@ def gameConsole():
                 F.sphere(_name('grip'), 0.025, (x + dx, 0.46, 0.085), M.console, segments=10, rings=6)
             F.sphere(_name('button'), 0.008, (x + 0.03, 0.482, 0.05), M.soda, segments=6, rings=4)
             F.cyl(_name('stick'), 0.008, 0.012, (x - 0.03, 0.486, 0.05), M.dark, verts=8)
-        # the screen at the front edge and the shelf between its posts, with the console and two games
+        # the screen (at the front edge until turned round) and the shelf between its posts, with the console and two
+        # games
         _screen(F, -0.4, 0.4, 0.85, 1.32, SCREEN_Z, M.mustard)
         F.box('shelf', 0.74, 0.03, 0.12, (0, 0.62, 0.39), M.screen_back, bevel=0.006)
         F.box('console', 0.3, 0.06, 0.1, (0, 0.665, 0.39), M.console, bevel=0.012)
@@ -248,8 +263,9 @@ def gameConsole():
         F.box('tray', 0.13, 0.008, 0.09, (0, 0.67, 0.385), M.dark, bevel=0.002)
         F.cyl('tray_disc', 0.04, 0.003, (0, 0.6755, 0.385), M.disc, verts=24)
     tray = G.join(tray, 'tray')
-    objs = G.settle()      # on its Model centre: the back on the wall face
-    G.slide(tray, 'tray', (0, 0.09, 0), seconds=0.6)     # 9 cm towards the players (-Z game)
+    _turn_round(G.meshes())
+    objs = G.settle()      # on its Model centre: the screen's back on the wall face
+    G.slide(tray, 'tray', (0, -0.09, 0), seconds=0.6)    # 9 cm towards the players (+Z game, once turned round)
     return objs
 
 

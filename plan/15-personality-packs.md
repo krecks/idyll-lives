@@ -46,8 +46,8 @@ are done (2026-10-14); what is left is in `future.md`.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `couchPotato.cinemaWall` Grand cinema wall | 2x1 · floor | marathon:watch channelSurf:watch | living / — | Body, Upholstery | Use | `curtains`: the side curtains slide apart for marathon and channelSurf. |
-| `couchPotato.gameConsole` Pixel Arcade console | 1x1 · floor | play:play speedrun:play | hobbies / — | Body, Upholstery | Use | `tray`: the disc tray slides out and back for play and speedrun. |
+| `couchPotato.cinemaWall` Grand cinema wall | 2x1 · floor | marathon:watch channelSurf:watch | living / — | Body, Upholstery | Use | `curtains`: the side curtains slide apart for marathon and channelSurf. **Done:** the screen on the wall at the back, the twin recliners in front facing it (content `seat.facing: "back"`), two sitters at once. |
+| `couchPotato.gameConsole` Pixel Arcade console | 1x1 · floor | play:play speedrun:play | hobbies / — | Body, Upholstery | Use | `tray`: the disc tray slides out and back for play and speedrun. **Done:** the screen and shelf on the wall at the back, the loveseat in front facing it (content `seat.facing: "back"`); the tray slides towards the players. |
 | `couchPotato.recliner` Cloud Nine power recliner | 1x1 · floor | recline:relax doze:nap | living / — | Body, Upholstery | Use | `recline`: the back tips and the footrest rises for recline and doze. |
 | `couchPotato.snackFridge` Sofa-side snack fridge | 1x1 · floor | snack:fetch takeout:fetch | kitchen / — | Body, Upholstery | Use | `fridge_open`: the door swings for snack and takeout. |
 | `couchPotato.fitnessGame` Living-room workout game | 1x1 · floor | workout:exercise | fitness / — | Body, Upholstery | Use | `board`: the balance board tilts 10° for workout. |

@@ -1,11 +1,13 @@
 # Couch Potato pack models (web/public/assets/packs/couchPotato/manifest.json). Conventions: see
 # pack_foodie.py. Seated items put their seat on the footprint centre line (characters.ts DEFAULT_SEAT:
-# seat top 0.45 m, facing +Z); screens the Sim watches stand at the front edge facing -Z (toward it).
+# seat top 0.45 m, facing +Z). The screens the Sim watches (cinemaWall, gameConsole) are drawn at the front edge
+# facing -Z (the seats), then turned round (`turned`): the screen on the wall, the seats in front, the sitter facing
+# the object's back (content `seat.facing`; Blender's pack_couchPotato.py does the same).
 # Run: python3 -I pack_couchPotato.py [out.json] && python3 -I apply_pack.py couchPotato out.json
 import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder,  # noqa: E402
+from furniture import (box, cyl, cone, sph, rod, part, lathe, torus, cushion, placeholder, turned,  # noqa: E402
                        OAK, OAKD, HONEY, BRASS, TEAL, MUSTARD, SAGE, RUST, CREAM)
 from pack_foodie import run  # noqa: E402
 from furniture_prims import mini_fridge, flat_tv  # noqa: E402
@@ -50,7 +52,8 @@ def recliner_seat(x, w=0.74, color=CORD, arm=True, foot=False):
     return p
 
 
-# ---- cinemaWall (2x1, 2 seats): twin recliners with a cup console, big screen at the front edge -
+# ---- cinemaWall (2x1, 2 seats): twin recliners with a cup console, big screen; drawn with the screen at the front
+# edge, then turned round (the screen on the wall) -
 def cinema_wall():
     p = recliner_seat(-0.5, 0.78, '#7A2E2E') + recliner_seat(0.5, 0.78, '#7A2E2E')
     p += [box([0.2, 0.5, 0.6], [0, 0.25, -0.06], FRAME, 'satin', radius=0.03),                   # centre console
@@ -66,13 +69,14 @@ def cinema_wall():
               cyl([0.1, 0.01, 0.1], [x, 0.6, 0.235], '#3A3D41', 'satin', rotate=[90, 0, 0], segments=12),
               cyl([0.06, 0.01, 0.06], [x, 0.76, 0.235], '#3A3D41', 'satin', rotate=[90, 0, 0], segments=12)]
     p += [box([0.4, 0.02, 0.12], [-0.25, 0.465, 0.12], '#2B2C2E', 'satin', radius=0.01, rotate=[0, 20, 0])]  # remote
-    return placeholder(p)
+    return placeholder(turned(p))
 
 
 E['model.couchPotato.cinemaWall'] = cinema_wall(); FOOT['model.couchPotato.cinemaWall'] = (2, 1)
 
 
-# ---- gameConsole (1x1, 2 players at x = +-0.25): gaming loveseat + screen and console in front --
+# ---- gameConsole (1x1, 2 players at x = +-0.25): gaming loveseat, screen and console; drawn with the screen at
+# the front edge, then turned round (the screen on the wall) --
 def game_console():
     C = '#3F6E9E'
     p = [cushion([0.88, 0.28, 0.56], [0, 0.15, -0.12], C, radius=0.08),
@@ -91,7 +95,7 @@ def game_console():
           box([0.1, 0.008, 0.002], [0.05, 0.67, 0.339], '#3BA3E0', 'gloss', radius=0.002),     # power light
           box([0.14, 0.18, 0.02], [-0.2, 0.73, 0.43], '#B33A32', 'satin', radius=0.004),       # game box
           box([0.14, 0.18, 0.02], [-0.17, 0.73, 0.41], '#3E8EDE', 'satin', radius=0.004)]
-    return placeholder(p)
+    return placeholder(turned(p))
 
 
 E['model.couchPotato.gameConsole'] = game_console(); FOOT['model.couchPotato.gameConsole'] = (1, 1)
