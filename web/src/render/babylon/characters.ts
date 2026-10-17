@@ -2629,9 +2629,12 @@ export class Characters {
       rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
+      rig.useObj = null;
     } else if (social) {
       const me = speaking(pair, role, time);
       hands = HANDS.relaxed;
+      // Done with the thing they used: its prop (a guitar, a mop) isn't in their hands while they talk.
+      rig.useObj = null;
       switch (social) {
         case Anim.Talk:
           key = me
