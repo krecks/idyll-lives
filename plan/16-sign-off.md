@@ -851,6 +851,36 @@ in all four facings): `off_stand` plays and shuts each time. In the hands the in
 expected until held parts take the object's colours. In the colour studio, labels Body/Top/Stand and Body &
 neck/Top/Stand each land where named, and "In use" shows the empty stand.
 
+## After the sign-off: what it saw, fixed (2026-10-17)
+
+The things the sign-off saw but didn't change were fixed after it, by four agents, each checked in play in four
+facings, by day and on Low WebGL at night (logs and pictures in the session's scratchpad), then together on the
+merged branch:
+- **Lamp light** (`house.ts`, content `light.at`): the arc lamp's light was 28–32 cm from its shade, the table lamp's
+  12 cm and the nightstand lamp's 26 cm; each now sits at the shade in every facing, against a wall and free. The
+  other 26 lights were looked at and left (the wall lights' pool on the wall reads better as it is).
+- **Cut walls** (`BabylonRenderer.ts`): a wall thing was hidden only when its own wall stood between it and the
+  camera, so with the wall dropped from the other side it floated over the stub. Each wall thing now knows, from when
+  it is placed, which views drop its wall, and hides with it. Checked on inner and outer walls from all four sides,
+  walls up and down; floor things against a wall stay.
+- **Screens** (`pack_couchPotato.py`, content seats `facing: "back"`): the cinema wall and the game console are built
+  turned round, the screen on the wall face and the seats in front; two sitters face the picture, the curtains part,
+  the tray slides out. Placeholders turned to match; 3 draws each.
+- **Naps on the window seat and hearth settee** (`BEDS` `across`): a lone napper lies along the seat, the head at the
+  pillow (seat) or the lantern end (settee); with a second user each keeps their own half, as before.
+- **Teddy**: the hugger crouches in, arms round its neck, cheek on its head, while it squishes (`hugArms` shared with
+  the social hug, unchanged there).
+- **Herb planter**: "Pick fresh herbs" is a standing reach into the plants (`pick`), the basil shrinking under the
+  hands; other crops still kneel.
+- **Desks**: of the 13 seated writing desks, four with their chair built in 0.3 m from the top had the hands through
+  their front; they use nearer hands (`sitHandsNear`) and seats of their own. The other nine look as before.
+- **Drinking fountain**: the drinker steps up and bends over the bowl, hands on the rim, mouth at the arc
+  (`fountainDrink<cm>` in `clips/street.ts`, one per height).
+- **Phone box**: the door opens outwards, the caller steps inside onto the plinth, it shuts behind them, and it opens
+  again to let them out (motions `out`: a use's clip opens again for N s at its end).
+- **Climbing frame**: climbed up its rope net, hands and feet on the ropes, the hands on the deck's edge at the top
+  (`climb<cm>`, an 8 s loop); a second climber takes the other half of the net.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

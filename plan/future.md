@@ -24,10 +24,28 @@ open**. Each line says where it lives.
   - the agents' own calls: the wardrobe got a third colour (Body, Doors, Handles); the horse statue's text
     became "Bronze horse" (its model since 43650af) and the pedestal vase's "blue"; the leather armchair
     reads sitting down; the stairs went back to living with no group (the plan said "living / stairs").
-- **Seen in the sign-off, not changed** (each in its group's section of `16-sign-off.md`): a lamp's light is at its tile's middle, not its shade; things on a cut wall
-  float; nappers on the 2-wide window seat and hearth settee lie front to back (`BEDS` `across`); the
-  shared poses at the drinking fountain, phone box, climbing frame, teddy, herb planter and desks; the
-  cinema wall's and game console's screens face away from the room.
+- **Seen in the sign-off, fixed after it** (2026-10-17, `16-sign-off.md` "After the sign-off"); calls to review:
+  - a lamp's content `light` takes `at` [x, z] (object frame): the arc, table and nightstand lamps shine from their
+    shade; the wall lights keep theirs out from the wall (at the bulb they lost the warm pool on the wall), the
+    fireplaces in front of the fire;
+  - a wall thing hides whenever the cutaway drops its wall, from either side; hidden, a lamp still lights and a
+    dartboard or mirror can still be used;
+  - the cinema wall and game console are turned round: the screen on the wall, the seats facing it (`seat.facing:
+    "back"`); the console's sitters sit 8 cm further back, so their knees clear the shelf;
+  - a lone napper lies along the window seat and hearth settee; shared, each still lies on their own half front to
+    back (a lie use taking both places needs a sim rule: content flag, `can_use_in`/`reserve_in`, a wasm rebuild);
+  - the teddy is hugged crouching (grown-ups too: standing doesn't reach past its feet); herbs are picked standing
+    (`pick`, `STAND_BACK` -0.5: a negative stand-back steps in, the planter's watering too); the four desks with a
+    chair built in close (organizer, journal, love-letter bureau, grudge journal) write with `sitHandsNear`;
+  - the drinking fountain is drunk from bent over the spout (`fountainDrink<cm>`, five heights); the phone box's
+    door opens outwards, the caller steps in and it shuts behind them, then opens to let them out (motions `out`);
+    the climbing frame is climbed up its net (`climb<cm>`), a second climber on the other half (`STEP_IN`,
+    renderer offsets only: the sim keeps them on the tile in front).
+- **Seen in that round, not changed:** two residents in a social hug step through each other; on every bed the legs
+  float about 5 cm and rise to the feet (the shared `lie`); at a desk with a separate chair (task, executive, the
+  kids' table) the hands stop 0.2–0.3 m short of the top; climbers don't use the fireman's pole or the deck;
+  `check_clips.ts` fails `jogAlong` (loop seam, sliding feet; already on fbf8883); the lamp build (`_bulb`) checks
+  only the light's height, not `at`.
 
 ## Decided in the fix-up round (review these)
 
