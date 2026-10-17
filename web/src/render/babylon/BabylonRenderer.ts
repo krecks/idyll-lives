@@ -305,6 +305,8 @@ export class BabylonRenderer implements Renderer {
    */
   private readonly templates = new Map<string, Promise<ModelTemplate>>();
   private readonly templatesInUse = new Set<string>();
+  /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
+  private readonly paintedTemplates = new Set<string>();
   /** Landscape shadow casters (the landscape survives lot switches; rebuilt only for a different town). */
   private natureCasters: Mesh[] = [];
   /** Landscapes by town (seed and size), and which one each layer shows. */
@@ -3420,7 +3422,9 @@ export class BabylonRenderer implements Renderer {
     const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
     const resize = this.objectResize(o);
     const colors = this.objectColors(o);
-    return [`object:${key}${resizeKey(resize)}${colorsKey(colors)}`, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { radius, resize })];
+    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
+    if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { radius, resize })];
   }
 
   /** Bumped by each world build: an older pass of `warmTemplates` stops. */
@@ -3467,12 +3471,20 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  /** Disables cached templates the current world doesn't use. */
+  /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
   private retireTemplates(keep: Set<string>): void {
     for (const [key, t] of this.templates) {
       if (keep.has(key)) continue;
       void t.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)]) mesh.setEnabled(false);
+        if (this.templatesInUse.has(key)) return;
+        const meshes = [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)];
+        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
+          for (const mesh of meshes) mesh.setEnabled(false);
+          return;
+        }
+        this.templates.delete(key);
+        this.paintedTemplates.delete(key);
+        for (const mesh of meshes) mesh.dispose(false, false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
