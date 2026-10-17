@@ -4315,9 +4315,9 @@
         1
       ],
       "price": 280,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "grills",
+      "group": "cooking",
       "outdoors": true,
       "description": "A kettle grill for the garden: dinner with smoke and a bit of fun. Trains Cooking.",
       "interactions": [
@@ -4366,9 +4366,9 @@
         1
       ],
       "price": 1300,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "grills",
+      "group": "cooking",
       "outdoors": true,
       "description": "An outdoor kitchen with a hooded grill. From Cooking 3 a barbecue feast leaves residents with that home-cooked glow.",
       "interactions": [
@@ -4423,9 +4423,9 @@
         1
       ],
       "price": 380,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "grills",
+      "group": "cooking",
       "outdoors": true,
       "light": {
         "range": 4.0,
@@ -4469,8 +4469,8 @@
         2
       ],
       "price": 220,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "description": "A slatted folding table and chairs for a sunny corner.",
       "surface": {
         "height": 0.72,
@@ -4527,8 +4527,8 @@
         2
       ],
       "price": 260,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "slots": 2,
       "description": "A big wooden table with benches: picnics for two.",
       "surface": {
@@ -4583,9 +4583,9 @@
         1
       ],
       "price": 150,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "patio",
+      "group": "seating",
       "description": "A deep slatted chair with wide arms.",
       "interactions": [
         {
@@ -4614,8 +4614,8 @@
         2
       ],
       "price": 220,
-      "category": "validate",
-      "group": "loungers",
+      "category": "outdoor",
+      "group": "seating",
       "outdoors": true,
       "description": "Stretch out in the sun, or doze off.",
       "interactions": [
@@ -4662,8 +4662,8 @@
         2
       ],
       "price": 240,
-      "category": "validate",
-      "group": "loungers",
+      "category": "outdoor",
+      "group": "seating",
       "description": "A striped hammock on a wooden stand: swing, daydream, doze.",
       "interactions": [
         {
@@ -4708,8 +4708,8 @@
         2
       ],
       "price": 2400,
-      "category": "validate",
-      "group": "loungers",
+      "category": "outdoor",
+      "group": "seating",
       "slots": 2,
       "outdoors": true,
       "description": "A round wooden tub of hot water for two. A soak leaves residents pampered.",
@@ -4755,8 +4755,8 @@
         1
       ],
       "price": 380,
-      "category": "validate",
-      "group": "loungers",
+      "category": "outdoor",
+      "group": "play",
       "slots": 2,
       "outdoors": true,
       "description": "Two swings on a wooden frame. Children love it; grown-ups sometimes have a go.",
@@ -4786,9 +4786,9 @@
         2
       ],
       "price": 150,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "yard",
+      "group": "play",
       "outdoors": true,
       "description": "A wooden box of sand with a bucket and spade.",
       "interactions": [
@@ -4820,9 +4820,9 @@
         1
       ],
       "price": 140,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "yard",
+      "group": "play",
       "outdoors": true,
       "description": "A rack with a bike in it. Tuning it up trains Handiness.",
       "interactions": [
@@ -4853,9 +4853,9 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "lights",
       "outdoors": true,
       "decor": 0.5,
       "light": {
@@ -4876,9 +4876,9 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "lights",
       "outdoors": true,
       "decor": 0.6,
       "light": {

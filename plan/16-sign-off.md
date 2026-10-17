@@ -438,6 +438,26 @@ walls (speech), the resident in front of the glass, which reflects the room; the
 fixing. Seen in passing: a wall mirror on a wall cut down for the camera stays drawn at full height above it
 (renderer). All back in bedroom / dressing.
 
+## The patio
+
+The eleven OU1 things (Validate › Patio) were signed off on 2026-10-17, checked as the sinks were, standing free in the garden: sat on (the park bench, the garden bench, the garden chair, the patio chair), relaxed in (the Adirondack chair), coffee and sitting in the sun at the bistro set, a picnic and a coffee at the picnic table, all in four facings. The patio chair's coffee (`needsTable`) was checked at the round patio table and at the teak table pushed up to it. The round and teak tables, the outdoor bar and the parasol are still, looked at in four facings; the parasol's `stir` is ambient (not on Low). Every colour part lands on the part its label names (the round table's Frame is its rim and pedestal, Top and Tiles the mosaic; the parasol's Edge is the valance). Nothing needed fixing. All back in outdoor / seating.
+
+## The loungers
+
+The five OU2 things (Validate › Loungers) were signed off on 2026-10-17, checked as the sinks were, each in four facings: the sun lounger's back lowers (`recline`) for sunbathe and doze and comes up after; the hammock's `sway` and the porch swing's and swing set's `swing` loop while used, ridden by the resident, and stop after; the hot tub's cover lifts (`cover_off`) and the water bubbles for a soak, and the resident puts the cover back on after (`closeAfter`: "Put the cover on" follows, the cover shuts). Lying was checked with shots 1, 4 and 8 s into the use (also on Low WebGL2 at night): they sit on first, then lie along the lounger and in the hammock's sling. Seen in passing: a swing or a sunbathe ends within seconds when the need it fills is full (fun 0.8 to 1 in about 8 s), and the next one is refused until it drops: that is the needs, not the model. All back in outdoor / seating, the swing set in outdoor / play.
+
+## The grills
+
+The three OU3 things (Validate › Grills) were signed off on 2026-10-17, checked as the sinks were, each in four facings: the charcoal grill's lid swings up (`lid_open`) for the whole of "Grill dinner" over the coals and food; the gas station's hood (`hood_up`) for cook and for the feast; the fire pit's flames grow for "Warm up by the fire", the resident on its front capstones, and the embers and flames glow at night (the content's light). Each shuts when the use ends. Nothing needed fixing. All back in outdoor / cooking.
+
+## The yard
+
+The nine OU4 things (Validate › Yard) were signed off on 2026-10-17, checked as the sinks were, each in four facings: the sand castle rises (`castle`) for a sandcastle; the bike tips onto its stand and its back wheel turns (`wheel_up`, `wheel_turn`) for a tune-up; the shed's door (`door_open`) for pottering, the dark inside showing; the greenhouse's door and roof vent for tend and harvest; the compost lid for 2 s; the raised bed's plants rustle every 2.4 s while tended, and a ripe bed (a state with the bed bought ripe: a new bed is planted, and harvest isn't offered) is harvested, the crop picked away and the bed left at picked; the washing comes down onto the line for "Hang out the washing" and stays out after (held open), and "Take the washing in" takes it in. The rain barrel and log store are still. Colour parts land where named (the log store's Shelter is the whole iron rack and roof, one material). Nothing needed fixing. The sandpit and bike rack back in outdoor / play, the rest in outdoor / yard.
+
+## The garden things
+
+The nine OU5 things (Validate › Garden Things) were signed off on 2026-10-17, checked as the sinks were, each in four facings: the koi comes up (`fish`) for "Feed the fish" and surfaces every 7 s while watching the fish, with the ambient ripples; the blue tit appears on the feeder (`bird`) for "Watch the birds"; the planter box is watered. The lamp post's panes and the string lights' bulbs glow at night, on WebGPU and on Low WebGL2; the birdhouse, dog house, sundial and stepping stones are still. Nothing needed fixing. Seen in passing: one stepping stone has a small dark nick on its edge (a dent in the boulder shape, a few pixels from the game camera). The pond, planter box, birdhouse, feeders, dog house, sundial and stepping stones back in outdoor / decor, the lamp post and string lights in outdoor / lights.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

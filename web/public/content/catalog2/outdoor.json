@@ -10,9 +10,9 @@
         1
       ],
       "price": 140,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "patio",
+      "group": "seating",
       "outdoors": true,
       "surface": {
         "height": 0.72,
@@ -34,8 +34,8 @@
         1
       ],
       "price": 320,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "outdoors": true,
       "surface": {
         "height": 0.74,
@@ -61,9 +61,9 @@
         1
       ],
       "price": 70,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "patio",
+      "group": "seating",
       "outdoors": true,
       "approach": "around",
       "seatAt": [
@@ -117,9 +117,9 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "patio",
+      "group": "seating",
       "outdoors": true,
       "seat": {
         "height": 0.42,
@@ -154,8 +154,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "slots": 3,
       "outdoors": true,
       "seat": {
@@ -190,8 +190,8 @@
         1
       ],
       "price": 420,
-      "category": "validate",
-      "group": "loungers",
+      "category": "outdoor",
+      "group": "seating",
       "slots": 2,
       "outdoors": true,
       "decor": 0.3,
@@ -227,9 +227,9 @@
         1
       ],
       "price": 120,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "patio",
+      "group": "seating",
       "outdoors": true,
       "decor": 0.4,
       "description": "A big canvas parasol on a weighted base.",
@@ -244,8 +244,8 @@
         1
       ],
       "price": 650,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "outdoors": true,
       "decor": 0.3,
       "surface": {
@@ -272,9 +272,9 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "decor": 0.6,
       "description": "A wooden planter full of flowers.",
@@ -311,7 +311,7 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -372,7 +372,7 @@
         2
       ],
       "price": 900,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -406,7 +406,7 @@
         3
       ],
       "price": 2400,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -464,7 +464,7 @@
         1
       ],
       "price": 80,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -499,7 +499,7 @@
         1
       ],
       "price": 70,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -516,7 +516,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -567,7 +567,7 @@
         1
       ],
       "price": 90,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
@@ -584,9 +584,9 @@
         1
       ],
       "price": 50,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "decor": 0.4,
       "description": "A little house with a red roof on a post.",
@@ -601,9 +601,9 @@
         1
       ],
       "price": 60,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "decor": 0.3,
       "description": "Two seed feeders on a shepherd’s hook. A robin is already there.",
@@ -636,9 +636,9 @@
         1
       ],
       "price": 180,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "decor": 0.3,
       "description": "A red kennel with a name over the door and a water bowl.",
@@ -653,9 +653,9 @@
         1
       ],
       "price": 150,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "decor": 0.5,
       "description": "A copper dial on a stone pedestal.",
@@ -670,9 +670,9 @@
         3
       ],
       "price": 60,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "layer": "rug",
       "outdoors": true,
       "decor": 0.4,

@@ -2243,9 +2243,9 @@
       "name": "Garden pond",
       "model": "model.garden.pond",
       "price": 650,
-      "category": "validate",
+      "category": "outdoor",
       "freeRotation": true,
-      "group": "garden things",
+      "group": "decor",
       "outdoors": true,
       "footprint": [
         2,

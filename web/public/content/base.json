@@ -2732,8 +2732,8 @@
         }
       ],
       "price": 200,
-      "category": "validate",
-      "group": "patio",
+      "category": "outdoor",
+      "group": "seating",
       "slots": 2
     },
     {
@@ -3713,16 +3713,6 @@
           "label": "Books And Pots"
         },
         {
-          "id": "patio",
-          "label": "Patio",
-          "outside": true
-        },
-        {
-          "id": "loungers",
-          "label": "Loungers",
-          "outside": true
-        },
-        {
           "id": "houseplants",
           "label": "Houseplants"
         },
@@ -3840,11 +3830,6 @@
           "outside": true
         },
         {
-          "id": "garden things",
-          "label": "Garden Things",
-          "outside": true
-        },
-        {
           "id": "shelves",
           "label": "Shelves"
         },
@@ -3853,18 +3838,8 @@
           "label": "Media"
         },
         {
-          "id": "yard",
-          "label": "Yard",
-          "outside": true
-        },
-        {
           "id": "stairs",
           "label": "Stairs"
-        },
-        {
-          "id": "grills",
-          "label": "Grills",
-          "outside": true
         }
       ]
     },
