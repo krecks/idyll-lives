@@ -140,7 +140,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in`. |
 
-## P10. Lazy (6) — **Done** (in Validate › Lazy)
+## P10. Lazy (6) — **Done**, signed off 2026-10-17 (back in bedroom, living, kitchen, fitness and office, no group)
 
 - **Family:** `tools/art/blender/families/pack_lazy.py`
 - **Validate group:** `lazy` (Validate › Lazy)
@@ -149,8 +149,8 @@ are done (2026-10-14); what is left is in `future.md`.
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `lazy.snoozecloudBed` Snoozecloud adjustable bed | 2x2 · floor | sleep:sleep sleepIn:nap | bedroom / — | Body, Upholstery | Use | `head_up`: the head section rises 30° for sleepIn (check `BEDS`). |
-| `lazy.napPod` Daydream nap pod | 1x1 · floor | curlUp:relax powerNap:nap | living / — | Body, Upholstery | Use | `hood`: the hood swings half over for powerNap and curlUp. |
-| `lazy.quiltTable` Heated quilt table | 2x1 · floor | tuckIn:relax doze:nap | living / — | Body, Upholstery | Use | `quilt`: the quilt edge lifts for tuckIn and doze. |
+| `lazy.napPod` Daydream nap pod | 1x1 · floor | curlUp:relax powerNap:nap | living / — | Body, Upholstery | Use | `hood`: the hood swings half over for powerNap and curlUp. Both are sat in the pod (powerNap a sitting nap). |
+| `lazy.quiltTable` Heated quilt table | 2x1 · floor | tuckIn:relax doze:nap | living / — | Body, Upholstery | Use | `quilt`: the quilt edge lifts for tuckIn and doze. Both sit on a pouf at the table, legs under the quilt (doze a sitting nap). |
 | `lazy.deliveryLocker` Doorstep delivery locker | 1x1 · floor | takeout:fetch noodles:fetch | kitchen / — | Body, Upholstery | Use | `door_open`: a locker door opens for takeout and noodles; `hold` 2 s. |
 | `lazy.vibePlate` Effortless vibration plate | 1x1 · floor | shake:exercise | fitness / — | Body, Upholstery | Loop (E1) | `shake` (E1). Until then static. |
 | `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Upholstery | Use | `screen_up`: the tablet tilts up for program and story. |
