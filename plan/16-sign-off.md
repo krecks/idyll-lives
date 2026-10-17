@@ -730,6 +730,22 @@ The scarecrow sways (`sway`, ambient: off on Low as designed); the coop's hatch 
 (`close`, held from dusk) and is open by day. Also seen together on the `town-things` lot, near and far.
 Nothing needed fixing. All back in community / farm.
 
+## The showers
+
+The four B2 showers (Validate › Showers) were signed off on 2026-10-17. The bathroom agent checked them as the
+sinks were: each bought in all four facings (23,14 north, 21,18 west, 22,23 south, 28,17 east), showered in ("Take
+a shower"), by day and at night, on WebGPU and WebGL2, on Medium and Low, every part coloured. `water_on` (0.5 s) grows
+the rain from the head as the use starts, holds it for the whole use and shuts it as it ends; the stall's rain falls
+slanted from its wall head onto the resident. They were held back only because the colour studio drew nothing for
+the shower stall, at rest or in use. One fix, in the studio (5104118): the stage framed a moving part by its rest
+box's corners, posed. The stall's water is grown from nothing (flat at rest) and turned for the slant, so its box had
+corners off the flat, which the pose threw tens of metres away; the camera ended up 80 m back, beyond its far plane.
+The stage now frames a moving part by its posed vertices, so any turned part that grows from nothing frames right.
+Rechecked in the studio: all four showers draw at rest and In use, with every part coloured (the stall: Tray, Rail,
+Head & tap, Curtain, Tiles), the stall's rain slanted onto the tray; the fridge, dishwasher, rain lamp and lava lamp
+still frame and open as before; the stall in play unchanged. The plan's colour-part cells now list what the studio
+lists (Tiles, Walls, Wall, the stall's Rail and Curtain were missing). All back in bathroom / bathing.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed

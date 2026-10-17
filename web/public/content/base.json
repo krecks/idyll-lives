@@ -2519,9 +2519,9 @@
         }
       ],
       "price": 650,
-      "category": "validate",
+      "category": "bathroom",
       "fillsWall": true,
-      "group": "showers"
+      "group": "bathing"
     },
     {
       "id": "sofa",
@@ -3686,10 +3686,6 @@
         {
           "id": "sofas",
           "label": "Sofas"
-        },
-        {
-          "id": "showers",
-          "label": "Showers"
         },
         {
           "id": "baths",

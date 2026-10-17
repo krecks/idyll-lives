@@ -2363,9 +2363,9 @@
         1
       ],
       "price": 320,
-      "category": "validate",
+      "category": "bathroom",
       "fillsWall": true,
-      "group": "showers",
+      "group": "bathing",
       "description": "A tiled corner with a curtain: cheap, cheerful and a bit slow.",
       "interactions": [
         {
@@ -2392,9 +2392,9 @@
         1
       ],
       "price": 1300,
-      "category": "validate",
+      "category": "bathroom",
       "fillsWall": true,
-      "group": "showers",
+      "group": "bathing",
       "decor": 0.3,
       "description": "A stone floor, a glass screen and a big rain head. A quick, invigorating shower that leaves residents refreshed.",
       "interactions": [

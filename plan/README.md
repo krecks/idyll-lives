@@ -16,7 +16,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the twelve K8 chairs and stools: `barStool`, `stoolCounter`, `stoolBarHigh`, `diningChair`, `chairWood`, `chairUpholstered`, `chairModern`, `chairWindsor`, `chairBentwood`, `chairFolding`, `chairArm`, `benchDining` (signed off 2026-10-16: back in kitchen / dining);
 - the four K9 dining storage things: `sideboard`, `buffet`, `chinaCabinet`, `barCart` (signed off 2026-10-16: back in kitchen / cabinets);
 - the five B1 toilets: `toilet`, `toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung` (signed off 2026-10-17);
-- the four B2 showers: `shower`, `showerStall`, `showerWalkIn`, `showerRain` (in Validate › Showers);
+- the four B2 showers: `shower`, `showerStall`, `showerWalkIn`, `showerRain` (signed off 2026-10-17);
 - the three B3 baths: `bathtub`, `bathtubClawfoot`, `bathtubFreestanding` (in Validate › Baths);
 - the six B4 laundry models: `laundryWasher`, `laundryDryer`, `towelRail`, `towelLadder`, `laundryBasket`, `bathMat` (signed off 2026-10-17);
 - the three B5 storage and mirrors: `mirrorCabinet`, `mirrorRound`, `bathCabinetTall` (signed off 2026-10-17);
@@ -48,7 +48,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (signed off 2026-10-16); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (signed off 2026-10-16); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (signed off 2026-10-16); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (signed off 2026-10-16).
 - the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, signed off 2026-10-17 and back home, but for the lazy pack, still in Validate › Lazy);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, K1–K9, LT1–LT4, D1–D3, H1–H3, TT1, TT2, TT4, TT5, O1–O3, B1, B4, B5, KD1–KD3, BR1–BR4, OU1–OU5, L2–L6, G1–G5, P1–P9, P11–P16, CM1–CM5 are back home (2026-10-16); Validate holds the other 43 items in 7 groups.
+**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, K1–K9, LT1–LT4, D1–D3, H1–H3, TT1, TT2, TT4, TT5, O1–O3, B1, B4, B5, KD1–KD3, BR1–BR4, OU1–OU5, L2–L6, G1–G5, P1–P9, P11–P16, CM1–CM5, B2 are back home (2026-10-16); Validate holds the other 39 items in 6 groups.
 
 **No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
 placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9
