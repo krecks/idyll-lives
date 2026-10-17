@@ -266,7 +266,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
-| climb172, 147, 112 | yes | 8 | up a climbing frame's rope net two ropes and down again, hands and feet in turn, a hand past the top on the deck's edge (a size per height, in cm) |
+| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 

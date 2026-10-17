@@ -12,7 +12,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Seats | Static | Static. |
-| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Seats | Static | Static. Climbed up its rope net and down again (`climb172`/`147`/`112` by height), two side by side. |
+| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Seats | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide). |
 | `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). Until then U: tips to one side and holds. |
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Frame, Seats | Loop (E1) | `rock` on its spring (E1). Until then U: leans forward 10°. |
 | `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Frame, Seats | Loop (E1) | `spin` while ridden (E1). Until then static. |

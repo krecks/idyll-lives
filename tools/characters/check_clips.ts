@@ -43,9 +43,9 @@ const RUNTIME: Record<string, boolean> = {
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
   eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
-  // The drinking fountain and the climbing frame, in sizes (characters.ts STEP_IN, clips/street.ts).
+  // The drinking fountain and the climbing frame, in sizes (and the frame's in lanes: characters.ts STEP_IN, clips/street.ts).
   fountainDrink181: true, fountainDrink163: true, fountainDrink147: true, fountainDrink129: true, fountainDrink112: true,
-  climb172: true, climb147: true, climb112: true,
+  climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
@@ -54,7 +54,7 @@ const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
-  fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172: 8, climb147: 8, climb112: 8,
+  fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;

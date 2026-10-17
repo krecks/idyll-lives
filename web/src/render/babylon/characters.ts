@@ -73,7 +73,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
-import { CLIMB, FOUNTAIN } from './characters/clips/street';
+import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
@@ -229,7 +229,8 @@ const CROUCH_SHOULDER = 0.55;
  * lower x or z: the climbing frame's net side or its pole's, by its facing). `wait`: seconds into the use
  * before stepping in (the phone box's door opening first; its clip `delay`s so that they stand `back` m
  * back from the tile's middle first, clear of the door), and `out` seconds after the use before stepping
- * out (the door opening again, `out` in its motions).
+ * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
+ * lane's round goes its own way: the climbing frame's, round to its pole and back).
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -237,14 +238,17 @@ interface StepIn {
   wait?: number;
   back?: number;
   out?: number;
+  perLane?: boolean;
 }
 const STEP_IN: Record<string, StepIn> = {
   drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
-  // Side by side on the net (0.9 m wide, from -0.75 m).
-  climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.53, -0.1] },
+  // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
+  climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
 };
+/** One clip played alone (`StepIn.perLane`), by name. */
+const LANE_SEQ = new Map<string, readonly string[]>();
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
@@ -2689,7 +2693,7 @@ export class Characters {
       const into = known && obj ? STEP_IN[obj.def] : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = into
-        ? this.stepFit(rig, into)[1]
+        ? this.stepSeq(rig, into)
         : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
@@ -2849,6 +2853,23 @@ export class Characters {
     return into.by.find(([min]) => h >= min) ?? into.by[into.by.length - 1];
   }
 
+  /** The first of `into`'s lanes no one else using the same thing has taken (its middle without lanes). */
+  private freeLane(rig: SimRig, into: StepIn): number {
+    const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId).map((r) => r!.inLane);
+    return into.lanes?.find((x) => !taken.includes(x)) ?? into.lanes?.[0] ?? 0;
+  }
+
+  /** The clips played using `into` (`STEP_IN`): its sequence for the resident's height, or (`perLane`) the one for their lane. */
+  private stepSeq(rig: SimRig, into: StepIn): readonly string[] {
+    const seq = this.stepFit(rig, into)[1];
+    if (!into.perLane || !into.lanes) return seq;
+    const lane = Math.max(0, into.lanes.indexOf(rig.inside === into ? rig.inLane : this.freeLane(rig, into)));
+    const clip = seq[lane % seq.length];
+    let one = LANE_SEQ.get(clip);
+    if (!one) LANE_SEQ.set(clip, (one = [clip]));
+    return one;
+  }
+
   /**
    * Using a thing from inside or up against it (`STEP_IN`) from the tile in front: back a little while its
    * door opens (`back`, the first `wait` s), then walking in to where they use it, up onto its floor on the
@@ -2860,8 +2881,7 @@ export class Characters {
       rig.inside = into;
       rig.inT = 0;
       rig.outT = -1;
-      const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId).map((r) => r!.inLane);
-      rig.inLane = into.lanes?.find((x) => !taken.includes(x)) ?? into.lanes?.[0] ?? 0;
+      rig.inLane = this.freeLane(rig, into);
     } else rig.inT += step;
     const at = this.stepFit(rig, into)[2];
     const f = (obj.rot * Math.PI) / 2;
