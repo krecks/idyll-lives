@@ -405,7 +405,9 @@ def firesideLounge():
         F.cyl('embers', 0.13, 0.02, (sx, 0.16, sz), M.ember, verts=18)
         G.revolve('hood', [(0.25, 0.0), (0.235, 0.02), (0.07, 0.26), (0.06, 0.28), (0.06, 0.29), (0.24, 0.03)],
                   at=F.at(sx, 1.0, sz), material=M.iron, segments=28)
-        F.cyl('flue', 0.06, 0.68, (sx, 1.62, sz), M.iron, verts=20)
+        # the flue up to the ceiling (2.8 m) and its collar there: the hood hangs from it
+        F.cyl('flue', 0.06, 1.5, (sx, 2.03, sz), M.iron, verts=20)
+        F.cyl('flue_collar', 0.09, 0.03, (sx, 2.785, sz), M.iron, verts=20, bevel=0.005)
         # the chairs, a side table with books and tea between them, a low bookcase behind
         _wing_chair(F, -0.5)
         _wing_chair(F, 0.5)
@@ -495,7 +497,7 @@ FAMILY = G.Family(
      G.Model('teaTrolley', teaTrolley, size=(0.746, 0.939, 0.492), key='model.bookworm.teaTrolley',
              centre=(0, -0.184), motions={'uses': {'brew': 'pour'}, 'hold': 1.5},
              paint=[('honey', 'Wood'), ('linen', 'Fabric'), ('brass', 'Frame')]),
-     G.Model('firesideLounge', firesideLounge, size=(1.7, 1.96, 1.85), key='model.bookworm.firesideLounge',
+     G.Model('firesideLounge', firesideLounge, size=(1.7, 2.8, 1.85), key='model.bookworm.firesideLounge',
              centre=(0, -0.005), motions={'uses': {'readByFire': 'flames', 'readAloud': 'flames'}},
              paint=[('walnut', 'Wood'), ('velvet', 'Fabric'), ('rug', 'Rug')]),
      G.Model('bedsideStack', bedsideStack, size=(0.846, 0.931, 0.74), key='model.bookworm.bedsideStack',
