@@ -370,9 +370,11 @@ def phoneBooth():
         F.box('door_handle', 0.025, 0.14, 0.03, (DOOR_W / 2 - 0.07, 1.15, FACE + 0.04), M.chrome, bevel=0.008)
     door = G.hinged(G.join(door, 'door'), F.at(-DOOR_W / 2, 1.0, FACE))
     G.settle()
-    # In, about its hinge, to lie along the left side: out to the front, it swept through the caller, who
-    # stands on the tile in front.
-    G.swing(door, 'door_open', -90, seconds=0.8)
+    # Out, about its hinge, to stand square to the front, as a real kiosk's: the caller stands back from the
+    # tile in front while it opens, steps inside and it shuts behind them (and it opens again to let them
+    # out: the motions' `out`; `STEP_IN` in characters.ts times their steps to it). Opening in, it swept
+    # through them inside.
+    G.swing(door, 'door_open', 90, seconds=0.8)
     return G.meshes()
 
 
@@ -520,7 +522,8 @@ FAMILY = G.Family(
      G.Model('noticeBoard', noticeBoard, size=(1.02, 2.065, 0.347), key='model.noticeBoard', centre=(0, -0.05), far=FAR,
              paint=[('body', 'Frame')]),
      G.Model('phoneBooth', phoneBooth, size=(0.952, 2.7, 0.952), key='model.phoneBooth', far=FAR,
-             motions={'uses': {'call': 'door_open'}, 'hold': 1.5}, paint=[('body', 'Kiosk')]),
+             motions={'uses': {'call': {'clip': 'door_open', 'delay': 0.3, 'hold': 2.4, 'out': 1.6}}},
+             paint=[('body', 'Kiosk')]),
      G.Model('fountainTown', fountainTown, size=(2.96, 2.473, 2.94), key='model.fountainTown', far=FAR,
              motions={'idle': 'water_run'}, paint=[('body', 'Stone')]),
      G.Model('townStatue', townStatue, size=(1.8, 3.39, 1.8), key='model.townStatue', far=_far(townStatue),

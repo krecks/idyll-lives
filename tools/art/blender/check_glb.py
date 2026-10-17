@@ -165,7 +165,7 @@ def named_finish(name):
 
 
 def uses(motions):
-    """[(use, {clip, hold, delay, every, slot})] for each clip an entry's `motions.uses` plays (a clip,
+    """[(use, {clip, hold, delay, every, slot, out})] for each clip an entry's `motions.uses` plays (a clip,
     {clip, ...} or a list of them)."""
     return [(use, u if isinstance(u, dict) else {'clip': u})
             for use, value in (motions.get('uses') or {}).items() for u in (value if isinstance(value, list) else [value])]
@@ -198,17 +198,18 @@ def loops(motions):
 
 def motions_errors(motions):
     """What's wrong with the fields of an entry's `motions` (objectMotion.ts): a use's `delay` and `hold` are
-    seconds (0 or more), `every` more than 0, `slot` a slot number; `clock` names its hands' clips."""
+    seconds (0 or more), `every` and `out` more than 0, `slot` a slot number; `clock` names its hands' clips."""
     errors = []
     for use, u in uses(motions):
         for key in ('hold', 'delay'):
             if key in u and not (isinstance(u[key], (int, float)) and u[key] >= 0):
                 errors.append(f'`motions.uses` {use!r}: {key} {u[key]!r} is no number of seconds')
-        if 'every' in u and not (isinstance(u['every'], (int, float)) and u['every'] > 0):
-            errors.append(f'`motions.uses` {use!r}: every {u["every"]!r} is no number of seconds above 0')
+        for key in ('every', 'out'):
+            if key in u and not (isinstance(u[key], (int, float)) and u[key] > 0):
+                errors.append(f'`motions.uses` {use!r}: {key} {u[key]!r} is no number of seconds above 0')
         if 'slot' in u and not (isinstance(u['slot'], int) and not isinstance(u['slot'], bool) and u['slot'] >= 0):
             errors.append(f'`motions.uses` {use!r}: slot {u["slot"]!r} is no slot (0, 1, ...)')
-        unknown = set(u) - {'clip', 'hold', 'delay', 'every', 'slot'}
+        unknown = set(u) - {'clip', 'hold', 'delay', 'every', 'slot', 'out'}
         if unknown:
             errors.append(f'`motions.uses` {use!r}: unknown {", ".join(sorted(unknown))}')
     clock = motions.get('clock')

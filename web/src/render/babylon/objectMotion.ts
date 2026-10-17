@@ -3,7 +3,8 @@
  * played while residents use them, as the model entry's `motions` say. A use that starts opens
  * its clips (each `delay` seconds in, if it says; only the one for the resident's slot, if it
  * says); each plays back after its `hold` seconds or when the use ends, or, with `every`, plays from
- * rest to rest again every so many seconds while the use lasts. A loop (`loops`: a
+ * rest to rest again every so many seconds while the use lasts; with `out`, it opens again for that
+ * long when the use ends (a phone box's door letting the caller out). A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
@@ -72,6 +73,9 @@ interface ClipState {
   start: number;
   /** Seconds between its rounds (`repeat`). */
   every?: number;
+  /** Seconds it opens again for when the use ends (`out`), and whether it is doing so. */
+  out?: number;
+  leaving?: boolean;
   /**
    * Opens and closes (a use's, or held open), goes round while used (`loops`), plays from rest to rest
    * every so often while used (`repeat`), goes round always (`idle`), or is held where a crop's stage
@@ -90,6 +94,8 @@ interface Wanted {
   delay?: number;
   /** Seconds between its rounds, if it repeats. */
   every?: number;
+  /** Seconds it opens again for when the use ends. */
+  out?: number;
   kind: 'use' | 'loop';
 }
 
@@ -255,8 +261,8 @@ export class ObjectMotion {
         const start = this.clock + (want.delay ?? 0);
         const until = want.hold === undefined ? Infinity : start + want.hold;
         const kind = want.every ? 'repeat' : want.kind;
-        if (state) Object.assign(state, { use: want.use, until, start, every: want.every, kind });
-        else clips.set(name, { clip, time: 0, use: want.use, until, start, every: want.every, kind });
+        if (state) Object.assign(state, { use: want.use, until, start, every: want.every, out: want.out, leaving: false, kind });
+        else clips.set(name, { clip, time: 0, use: want.use, until, start, every: want.every, out: want.out, kind });
       }
       for (const [name, state] of clips) {
         const d = state.clip.duration;
@@ -282,8 +288,12 @@ export class ObjectMotion {
           continue;
         }
         const using = state.use !== '' && wanted?.get(name)?.use === state.use;
-        // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open.)
-        if (!using && !wanted?.has(name)) state.use = '';
+        // (A use that ended leaves `use` empty: nothing wanted then is no use keeping it open; one
+        // that lets them out opens again for its `out` seconds.)
+        if (!using && !wanted?.has(name)) {
+          if (state.use !== '' && state.out) Object.assign(state, { start: this.clock, until: this.clock + state.out, leaving: true });
+          state.use = '';
+        }
         if (state.kind === 'repeat') {
           // From rest to rest each round, the first its `delay` into the use, then every `every`
           // seconds; once not used, it finishes its round.
@@ -314,7 +324,7 @@ export class ObjectMotion {
           state.time = time;
           continue;
         }
-        const open = held.includes(name) || (using && this.clock >= state.start && this.clock < state.until);
+        const open = held.includes(name) || ((using || state.leaving) && this.clock >= state.start && this.clock < state.until);
         const step = name === snap ? d : dt;
         const time = Math.min(Math.max(state.time + (open ? step : -step), 0), d);
         if (time !== state.time) changed = true;
@@ -406,10 +416,10 @@ export class ObjectMotion {
       const use = `${curr[o + k.id]}:${act}:${interaction}`;
       const wanted = this.wanted.get(id) ?? new Map<string, Wanted>();
       let slot: number | undefined;
-      for (const { clip, hold, delay, every, slot: only } of clips ?? []) {
+      for (const { clip, hold, delay, every, out, slot: only } of clips ?? []) {
         // A clip for one slot (a bunk's duvet): only for the resident there.
         if (only !== undefined && only !== (slot ??= object.slotOf?.(curr[o + k.x], curr[o + k.z]) ?? 0)) continue;
-        wanted.set(clip, { use, hold, delay, every, kind: 'use' });
+        wanted.set(clip, { use, hold, delay, every, out, kind: 'use' });
       }
       if (loop) wanted.set(loop, { use, kind: 'loop' });
       this.wanted.set(id, wanted);

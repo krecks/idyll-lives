@@ -831,8 +831,8 @@ interface ModelExtras {
   motions?: MotionsEntry;
 }
 
-/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold` (and `delay`, `every`, `slot`); or several of these. */
-type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number };
+/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold` (and `delay`, `every`, `slot`, `out`); or several of these. */
+type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number; out?: number };
 
 /** A model entry's `motions` as the manifest writes it: when its clips play (see `Motions`). */
 interface MotionsEntry {
@@ -888,6 +888,8 @@ export interface UseClip {
   every?: number;
   /** Only for the resident in this slot (content `slots`, from 0 along the object's x, as sim-core's `slot_position`; a bunk's 1 is the upper one). */
   slot?: number;
+  /** Opens again for so many seconds when the use ends (a phone box's door letting the caller out). */
+  out?: number;
 }
 
 /**

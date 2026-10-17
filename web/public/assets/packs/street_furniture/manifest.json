@@ -218,9 +218,13 @@
       },
       "motions": {
         "uses": {
-          "call": "door_open"
-        },
-        "hold": 1.5
+          "call": {
+            "clip": "door_open",
+            "delay": 0.3,
+            "hold": 2.4,
+            "out": 1.6
+          }
+        }
       },
       "paint": [
         {

@@ -215,6 +215,9 @@ How the parts work:
     the use lasts, the first 1.4 s in (the hoops' nets after each shot). It must end where it starts.
   - `{'clip': 'turn_down_upper', 'slot': 1}`: only for the resident in that slot (`bedBunk`: one duvet
     per bunk).
+  - `{'clip': 'door_open', 'delay': 0.3, 'hold': 2.4, 'out': 1.6}`: the clip opens again for 1.6 s when
+    the use ends (the phone box's door, opened for the caller to step in and shut behind them, letting
+    them out again: `STEP_IN` in characters.ts times their steps to it).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock`, `G.spin` or `G.turns` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
@@ -246,7 +249,7 @@ How the parts work:
   3.5 s) and aren't checked; an ambient clip runs on game time and is off on Low. The clock is the
   residents' animation time. Clock hands are the exception: the game's time sets them, on every preset.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
-  a clip that nothing plays, fails a `delay`, `hold`, `every` or `slot` that isn't one, and fails a loop
+  a clip that nothing plays, fails a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown where the model is

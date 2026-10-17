@@ -35,7 +35,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Body | Static | Static. |
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Body | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Body | Static | Static. |
-| `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Body | Use | `door_open`: the folding door opens and shuts behind them (`hold` 1.5 s) for call. |
+| `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Body | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
 | `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Body | Ambient (E2) | the water runs (E2). Until then static jets, as the garden fountain. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Body | Static | Static. |
 
