@@ -6,7 +6,7 @@
  */
 
 import type { AssetRegistry } from '../../assets/registry';
-import type { Content, NeedDef, ObjectDef, TraitDef } from '../../content/content';
+import type { Content, InteractionDef, NeedDef, ObjectDef, TraitDef } from '../../content/content';
 import type { PartColors } from '../../core/protocol';
 
 export interface NeedBoost {
@@ -147,6 +147,12 @@ export function withColor(colors: PartColors | undefined, part: string, color: s
 
 const cache = new WeakMap<ObjectDef, ItemSummary>();
 
+/** How long one use takes: a recipe's steps (it has no `minutes` of its own), or fetching food and eating it. */
+function minutesOf(content: Content, it: InteractionDef): number {
+  if (it.recipe) return content.recipes.find((r) => r.id === it.recipe)?.steps.reduce((t, s) => t + s.minutes, 0) ?? 0;
+  return (it.minutes ?? 0) + (it.eat?.minutes ?? 0);
+}
+
 export function summarize(content: Content, def: ObjectDef): ItemSummary {
   const hit = cache.get(def);
   if (hit) return hit;
@@ -158,7 +164,7 @@ export function summarize(content: Content, def: ObjectDef): ItemSummary {
   const feelings: FeelingInfo[] = [];
   const costs: number[] = [];
   for (const it of def.interactions) {
-    const hours = Math.max(it.minutes, 1) / 60;
+    const hours = Math.max(minutesOf(content, it), 1) / 60;
     for (const [id, v] of Object.entries(it.effects ?? {})) {
       const need = content.needs.find((n) => n.id === id);
       if (!need || v === 0) continue;
@@ -191,7 +197,7 @@ export function summarize(content: Content, def: ObjectDef): ItemSummary {
     trains: [...trains].sort((a, b) => b[1] - a[1]).map(([skill, perHour]) => ({ skill, perHour })),
     betterWith: [...betterWith],
     feelings,
-    actions: def.interactions.map((it) => ({ label: it.label, minutes: it.minutes, cost: it.cost ?? 0, skill: it.skill ?? null })),
+    actions: def.interactions.map((it) => ({ label: it.label, minutes: minutesOf(content, it), cost: it.cost ?? 0, skill: it.skill ?? null })),
     useCost: costs.length ? { min: Math.min(...costs), max: Math.max(...costs) } : null,
     slots: def.slots ?? 1,
     haystack: '',
