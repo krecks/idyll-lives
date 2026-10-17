@@ -6,8 +6,8 @@
 # Each is built where its placeholder stands (`F`, game axes). The treadmill's belt slats run back under the
 # runner while it is used (`belt_run`, a loop: one slat on, home unseen under the hood and the rear cap). The
 # bike's cranks and pedals turn while it is cycled (`pedals_turn`, a loop). The yoga mat lies rolled up and
-# unrolls flat for yoga (`unroll`), rolling up again at the end. The lift animation draws no weight in the
-# hands, so the bench's bar and the rack's dumbbells stay where they are: those two are still.
+# unrolls flat for yoga (`unroll`), rolling up again at the end. The lift draws the weight in the
+# hands (content `held`), so the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
 #
 # Run:  python3 -B tools/art/blender/build.py fitness [--only treadmill] [--preview]
 import math

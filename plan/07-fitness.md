@@ -1,8 +1,8 @@
 # Fitness
 
 The five F1 models are done in `families/fitness.py` (notes: `fitness.md`): the treadmill's belt (`belt_run`, the
-new `G.scroll`), the bike's pedals (`pedals_turn`) and the yoga mat (`unroll`). The lift animation draws no weight
-in the hands, so the bench and the rack are still. Runners now jog on the treadmill's belt (`characters.ts`), and yoga
+new `G.scroll`), the bike's pedals (`pedals_turn`) and the yoga mat (`unroll`). The lift draws the weight in the
+hands (content `held`): the bench's bar (`bar_off`) and one pair of the rack's dumbbells (`pair_off`) leave them. Runners now jog on the treadmill's belt (`characters.ts`), and yoga
 is done sitting cross-legged on the mat (content `pose: sit`, `seat`). What's left to consider: `future.md`.
 
 Where a resident holds the weight in the hand, the object's own weight hides while it is used (T0 `squash` to 0),
