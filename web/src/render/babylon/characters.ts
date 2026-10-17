@@ -73,7 +73,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
-import { FOUNTAIN } from './characters/clips/street';
+import { CLIMB, FOUNTAIN } from './characters/clips/street';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
@@ -241,6 +241,8 @@ const STEP_IN: Record<string, StepIn> = {
   drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
+  // Side by side on the net (0.9 m wide, from -0.75 m).
+  climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.53, -0.1] },
 };
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;

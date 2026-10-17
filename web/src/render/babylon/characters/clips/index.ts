@@ -3,8 +3,8 @@
  * Every name the runtime plays (characters.ts `ACTIONS`, `choose`, reactions) must be here; see
  * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
  * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. A baby in
- * the crib has its own lying clips (`baby.ts`); the drinking fountain its, in sizes
- * (`street.ts`). Arm and leg placement uses the IK helpers in
+ * the crib has its own lying clips (`baby.ts`); the drinking fountain and the climbing frame theirs, in
+ * three sizes (`street.ts`). Arm and leg placement uses the IK helpers in
  * `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
