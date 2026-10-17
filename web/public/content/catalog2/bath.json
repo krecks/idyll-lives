@@ -80,10 +80,6 @@
       "category": "validate",
       "group": "baths",
       "decor": 0.6,
-      "seat": {
-        "height": 0.28,
-        "forward": 0.0
-      },
       "description": "A deep oval tub with a floor-standing tap. A long soak leaves residents pampered.",
       "interactions": [
         {

@@ -138,9 +138,10 @@ const DEFAULT_FADE = 0.25;
 /**
  * Seat surface height (m) and forward offset of the hips from the object's centre, per object def;
  * `back`: the sitter faces the object's back (a dressing table's mirror against the wall), `fwd` still
- * towards its front; `recline`: leant back against a slanted back (rad, `Seat.recline`).
+ * towards its front; `recline`: leant back against a slanted back (rad, `Seat.recline`); `along`, `legsOut`:
+ * as `Seat`'s.
  */
-const SEATS: Record<string, { h: number; fwd: number; back?: boolean; recline?: number }> = {
+const SEATS: Record<string, Seat> = {
   sofa: { h: 0.44, fwd: -0.087 },
   armchair: { h: 0.42, fwd: -0.013 },
   bench: { h: 0.45, fwd: -0.03 },
@@ -172,8 +173,10 @@ const SEATS: Record<string, { h: number; fwd: number; back?: boolean; recline?: 
   dressingTable: { h: 0.45, fwd: 0.22, back: true },
   toiletCompact: { h: 0.43, fwd: -0.13 },
   toiletSmart: { h: 0.44, fwd: -0.06 },
-  bathtub: { h: 0.25, fwd: 0 },
-  bathtubClawfoot: { h: 0.28, fwd: 0 },
+  // In the bath, along the tub: the back at the end without the taps, the legs out along it towards them.
+  bathtub: { h: 0.25, fwd: -0.42, along: -1, legsOut: true },
+  bathtubClawfoot: { h: 0.28, fwd: -0.38, along: -1, legsOut: true },
+  bathtubFreestanding: { h: 0.27, fwd: -0.4, along: 1, legsOut: true },
   hotTubCedar: { h: 0.35, fwd: 0 },
   rockingHorse: { h: 0.56, fwd: 0 },
   kidsDesk: { h: 0.36, fwd: -0.2 },
@@ -222,6 +225,11 @@ interface Seat {
   back?: boolean;
   /** Legs stretched out along the seat (a chaise). */
   legsOut?: boolean;
+  /**
+   * Facing along the object, a quarter turn from its front: towards its right (1) or its left (-1), `fwd`
+   * then being along that way (a bath, sat in lengthways).
+   */
+  along?: 1 | -1;
   /** How far back (rad, from sitting up) the back leans just sitting, relaxing, napping or watching: against a slanted back (an Adirondack chair). Default: upright sitting, a little relaxing (`activityPose`). */
   recline?: number;
   /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
@@ -2138,9 +2146,13 @@ export class Characters {
       let faceYaw = tyaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       if (pose === Pose.Lie && BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across) faceYaw = wrapAngle(tyaw + Math.PI / 2);
-      // A seat facing the object's back (`SEATS` `back`, content `seat.facing`): turned round, facing into it (a
-      // dressing table's mirror, an upright piano).
-      else if (pose === Pose.Sit && (useObj ?? this.objectAt(rig.x, rig.z))?.seat.back) faceYaw = wrapAngle(tyaw + Math.PI);
+      else if (pose === Pose.Sit) {
+        const seat = (useObj ?? this.objectAt(rig.x, rig.z))?.seat;
+        // A seat facing the object's back (`SEATS` `back`, content `seat.facing`): turned round, facing into it (a
+        // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
+        if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
+        else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
+      }
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);

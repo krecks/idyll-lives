@@ -118,8 +118,9 @@ Validate › Showers until checked in play.
 `model.bathtub`, `model.bathtubClawfoot` and `model.bathtubFreestanding`, built 2026-10-14. They sit in
 Validate › Baths until checked in play.
 
-- **2 × 1 tiles, centred.** The resident sits at the middle (`SEATS` 0.25 m and 0.28 m, the content's `seat`
-  0.28 m); the tub floors are 0.15–0.17 m, so they sit in the water.
+- **2 × 1 tiles, centred.** The resident sits along the tub, back at the end without the taps and legs out
+  towards them (`SEATS` `along`, `legsOut`: 0.25, 0.28 and 0.27 m high, the hips 0.38–0.42 m from the middle);
+  the tub floors are 0.15–0.17 m, so they sit in the water.
 - **The tub** is one closed shell (`_loft`): superellipse rings up the outside, over the rim and down the inside
   to the floor, so the inside faces up into the tub; flat-shaded above 40°. The built-in bath is squarer
   (higher exponent) behind a gloss front and end panels over a dark plinth set back under them.

@@ -685,8 +685,8 @@ def showerRain():
 
 
 # --- the baths: a tub, its taps and the bath water ----------------------------------------------------------
-# 2 x 1 tiles, centred; the resident sits in the middle (SEATS / the content's `seat`: 0.25-0.28 m, so the
-# tub's floor is 10-13 cm below). Each tub is one closed shell lofted through rounded rings (`_loft`): up the
+# 2 x 1 tiles, centred; the resident sits along the tub, back at the end without the taps and legs out towards
+# them (characters.ts SEATS: 0.25-0.28 m, so the tub's floor is 10-13 cm below). Each tub is one closed shell lofted through rounded rings (`_loft`): up the
 # outside, over the rim and down the inside to the floor, so its inside faces up into the tub.
 # Two moving parts: the tap's stream (`tap_on`, 0.4 s, held 2.4 s so the tap runs while the tub fills) and the
 # bath water (`fill`): a body of water in the tub's shape up to two thirds of its depth, its origin just under

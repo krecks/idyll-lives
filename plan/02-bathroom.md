@@ -31,7 +31,7 @@ files (E6), as the double vanity did.
 | `showerWalkIn` Walk-in rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Floor, Frame, Head and tap, Wall | Use | `water_on` from a wide rain head. |
 | `showerRain` Rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head and tap, Walls | Use | `water_on` from the ceiling rose. |
 
-## B3. Baths (3) — **Done** (in Validate › Baths)
+## B3. Baths (3) — **Done**, signed off 2026-10-17 (back in bathroom / bathing)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
 - **Validate group:** `baths` (Validate › Baths)
@@ -39,9 +39,9 @@ files (E6), as the double vanity did.
 
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bathtub` Bathtub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `tap_on` + `fill`: the tap stream grows (0.4 s) and runs while the tub fills; the water rises from the bottom to two thirds (2 s) and stays for the whole bath; it drains as the bath ends. |
-| `bathtubClawfoot` Clawfoot tub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
-| `bathtubFreestanding` Freestanding bath | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`. |
+| `bathtub` Bathtub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `tap_on` + `fill`: the tap stream grows (0.4 s) and runs while the tub fills; the water rises from the bottom to two thirds (2 s) and stays for the whole bath; it drains as the bath ends. The bather sits along the tub, back at the end without the taps and legs out towards them (`SEATS` `along`, `legsOut`). |
+| `bathtubClawfoot` Clawfoot tub | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`; sat in along the tub, as the bathtub. |
+| `bathtubFreestanding` Freestanding bath | 2x1 · floor | bath:bath | bathroom / bathing | Tub, Feet or panel, Taps | Use | `fill`; sat in along the tub, as the bathtub. |
 
 ## B4. Laundry (6) — **Done**, signed off 2026-10-16 (back in bathroom / laundry)
 
