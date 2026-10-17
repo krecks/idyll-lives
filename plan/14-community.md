@@ -3,7 +3,7 @@
 Town things (`tools/art/community.py`). They are placed on town lots and seen from far and by the hundred: LOD (E7)
 before the street furniture. Check them on a town lot (`?state=` from a test dump) as well as in Validate.
 
-## CM1. Playground (8) — **Done** (in Validate › Playground)
+## CM1. Playground (8) — **Done**, signed off 2026-10-16 (back in community / play)
 
 - **Family:** `tools/art/blender/families/playground.py`
 - **Validate group:** `playground` (Validate › Playground)
@@ -20,7 +20,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Frame, Seats | Static | Static. |
 | `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Frame, Seats | Use | `move`: a pawn slides one square for chess. |
 
-## CM2. Street furniture (10) — **Done** (in Validate › Street)
+## CM2. Street furniture (10) — **Done**, signed off 2026-10-16 (back in community / street)
 
 - **Family:** `tools/art/blender/families/street_furniture.py`
 - **Validate group:** `street` (Validate › Street)
@@ -39,7 +39,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Body | Ambient (E2) | the water runs (E2). Until then static jets, as the garden fountain. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Body | Static | Static. |
 
-## CM3. Food stalls and vending (5) — **Done** (in Validate › Stalls)
+## CM3. Food stalls and vending (5) — **Done**, signed off 2026-10-16 (back in community / food)
 
 - **Family:** `tools/art/blender/families/stalls.py`
 - **Validate group:** `stalls` (Validate › Stalls)
@@ -53,7 +53,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body, Awning | Use | `drop`: a can drops to the tray for drink. |
 | `marketStall` Market stall | 2x1 · floor | browse:look fruit:eat | community / food | Body, Awning | Static | Static. |
 
-## CM4. Shops and café (5) — **Done** (in Validate › Shops)
+## CM4. Shops and café (5) — **Done**, signed off 2026-10-16 (back in community / shops)
 
 - **Family:** `tools/art/blender/families/shops.py`
 - **Validate group:** `shops` (Validate › Shops)
@@ -67,7 +67,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Counter, Trim | Static | Static. |
 | `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Counter, Trim | Static | Static. |
 
-## CM5. Farm (8) — **Done** (in Validate › Farm)
+## CM5. Farm (8) — **Done**, signed off 2026-10-16 (back in community / farm)
 
 - **Family:** `tools/art/blender/families/farm.py`
 - **Validate group:** `farm` (Validate › Farm)
