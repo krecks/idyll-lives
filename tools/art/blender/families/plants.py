@@ -912,8 +912,8 @@ def topiary_cone():
     G.cone('cone', 0.33, 0.012, 1.3, at=(0, 0, top + 0.82), material=P.leaf, verts=low(14, 8))
     G.cone('cone2', 0.25, 0.01, 0.9, at=(-0.02, 0.02, top + 0.97), material=P.leaf_light, verts=low(9, 6), rot=(0, 0, 20))
     still = G.join_all('topiaryCone')
-    tip = (0.0, 0.0, top + 1.18)
-    return _with_part('sprigs', still, lambda: sprigs('sprig', P, tip, 0.06, n=4, length=0.08), tip, 'trim')
+    tip = (0.0, 0.0, top + 1.22)                                       # sprigs reach out of the cone's sides there
+    return _with_part('sprigs', still, lambda: sprigs('sprig', P, tip, 0.1, n=5, length=0.12), tip, 'trim')
 
 
 def hedge_block(P, length, h, depth, name='hedge'):

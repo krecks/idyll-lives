@@ -117,7 +117,8 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
   part of an ellipsoid round the crown.
 - **Clips:** a trim (`trim`, for `trim`) shrinks a cluster of shaggy sprigs (`sprigs`) on the boxwood, the topiary's
   tip, the hedge and the azalea; a prune (`cut`, for `prune`) one rose at the front; a cut (`cut`, for `cut`) the
-  three lavender stems nearest the front. Each part is one draw call on its own finish.
+  three lavender stems nearest the front. Each part is one draw call on its own finish. (The topiary's sprigs stood
+  inside its cone, so its trim showed nothing; since 2026-10-17 they reach out of the cone's sides near the tip.)
 - **Colour parts:** only the topiary has a pot ("Pot"); the hydrangea, azalea and lavender colour their flowers, the
   roses their roses; the rest none. Each one's flower heads are all one material, the colour part, so "Flowers"
   colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
@@ -127,7 +128,7 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
 |---|---|---|---|---|
 | `model.bush` | 1.04 × 0.91 × 1.10 m | 700 | 252 | 1 |
 | `model.garden.boxwood` | 0.70 × 0.75 × 0.72 m | 604 | 196 | 2 |
-| `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 728 | 338 | 3 |
+| `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 764 | 350 | 3 |
 | `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 660 | 204 | 2 |
 | `model.garden.hydrangea` | 1.20 × 0.96 × 1.18 m | 1,404 | 516 | 1 |
 | `model.garden.rosebush` | 0.93 × 0.86 × 0.95 m | 1,394 | 636 | 3 |
