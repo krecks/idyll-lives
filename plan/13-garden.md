@@ -25,7 +25,7 @@ The twelve G5 trees are done (`families/trees.py`, notes in `families/trees.md`)
 woods drew the `*.far` placeholder keys whatever the model; they now draw a file's own far version when it has
 one (`nature.ts` `forests`), so the woods and the town match.
 
-## G1. Houseplants (10) — **Done** (in Validate › Houseplants)
+## G1. Houseplants (10) — **Done**, signed off 2026-10-17 (back in garden / houseplants)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `houseplants` (Validate › Houseplants)
@@ -44,7 +44,7 @@ one (`nature.ts` `forests`), so the woods and the town match.
 | `garden.orchid` Orchid | 1x1 · floor | water:water talk:talk admire:look | garden / houseplants | Pot | Static | Static; the foliage sways in the shader. |
 | `garden.bonsai` Bonsai | 1x1 · floor | prune:tinker water:water | garden / houseplants | Pot | Use | `trim`: a stray twig shrinks away for prune. |
 
-## G2. Flowers (15) — **Done** (in Validate › Flowers)
+## G2. Flowers (15) — **Done**, signed off 2026-10-17 (back in garden / flowers)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `flowers` (Validate › Flowers)
@@ -68,7 +68,7 @@ one (`nature.ts` `forests`), so the woods and the town match.
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot or box | Static | Static. |
 | `garden.flowerBox` Flower box | 1x1 · floor | water:water smell:smell | garden / flowers | Pot or box | Static | Static. |
 
-## G3. Shrubs (11) — **Done** (in Validate › Shrubs)
+## G3. Shrubs (11) — **Done**, signed off 2026-10-17 (back in garden / shrubs)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `shrubs` (Validate › Shrubs)
@@ -88,7 +88,7 @@ one (`nature.ts` `forests`), so the woods and the town match.
 | `garden.grass` Ornamental grass | 1x1 · floor | — | garden / shrubs | Pot | Static | Static. |
 | `garden.hosta` Hosta | 1x1 · floor | water:water | garden / shrubs | Pot | Static | Static. |
 
-## G4. Edibles (5) — **Done** (in Validate › Edibles)
+## G4. Edibles (5) — **Done**, signed off 2026-10-17 (back in garden / edibles)
 
 - **Family:** `tools/art/blender/families/plants.py`
 - **Validate group:** `edibles` (Validate › Edibles)
@@ -102,7 +102,7 @@ one (`nature.ts` `forests`), so the woods and the town match.
 | `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs shrink away for pickHerbs. |
 | `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
 
-## G5. Trees (12) — **Done** (in Validate › Trees)
+## G5. Trees (12) — **Done**, signed off 2026-10-17 (back in garden / trees)
 
 - **Family:** `tools/art/blender/families/trees.py`
 - **Validate group:** `trees` (Validate › Trees)
