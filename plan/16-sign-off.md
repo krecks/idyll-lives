@@ -754,6 +754,73 @@ task done in the category file (strike through its heading, with the commit).
 - **Garden** (`13-garden.md`, G1–G5): signed off 2026-10-17.
 - **Community** (`14-community.md`, CM1–CM5): signed off 2026-10-17.
 
+## Lessons for the tooling (2026-10-17)
+
+The sign-off of 2026-10-16/17 ran 14 category agents at once, one worktree each. Their logs (steps, timings,
+failures, ideas) are summed up here; the same faults cost nearly every agent time, so fix them before the next
+large check.
+
+**Setup (every agent hit these)**
+- Worktree vite: the git-ignored wasm packages must be *copied* into the worktree (a symlink is refused with
+  403 and the sim, font and environment light silently fail: "lights only" pictures). Vite needs a wrapper
+  config that adds the main checkout's `node_modules` to `server.fs.allow` **and** its own `cacheDir`: the shared
+  `node_modules/.vite` is re-optimised by every agent's server (ENOTEMPTY at start, reloads mid-run, lost
+  environment maps). Better still, the repo's `vite.config.ts` could do both when `node_modules` is a symlink.
+- Setup must fail loudly: fetch the wasm through the new server (expect 200) and load the check house once
+  (`__sims()` answers, no "using lights only") before any run; the runner should record HTTP ≥ 400 and console
+  errors per job.
+- The agent sandbox refuses `bash script.sh`, `cd … &&` chains, `$VAR` in command or option position and loops
+  calling bash: ship setup as plain commands, with absolute paths, and a node launcher that sets
+  PORT/PLAYWRIGHT/CHROME itself.
+- Debug states are shared through the link: give each worktree a copy, or a run can change the check house.
+- One CPU core per agent (1 page, no browser and Blender at once), never more agents than cores.
+
+**The runner (one shared version with what the agents each re-added)**
+- Reuse one page for many jobs (sell, buy the next facing): a fresh page cost 10–75 s under load; reuse made
+  jobs 5–15 s (outdoor: 85 s → 10 s; static shooters ~4× faster).
+- Wait for every loading text ("Moving in", "Getting ready", "Drawing portraits", "Building the world",
+  "Warming up") before buying and again before each shot; time out `goto` at 90 s; count the cap from page ready
+  and from when the use is sent.
+- Walk fast and slow down only within a few tiles of the object (never above 10×: 30× skips short uses); the
+  old "heading" test never fired because `s.object` is empty while walking.
+- Sample clips in the page every animation frame, not from node every 100 ms (short clips were missed and
+  "max" read low under load).
+- Ignore always-running clips (`idle`, `growth`, `night`, clock hands) for at-it / picture / shut; know held-open
+  things (`motions.open`: beds, washing line, hot tub) and `then=<use>` to close them.
+- Frame the object, not the resident: clear the follow (`__controls.follow(null)`), aim at the footprint's
+  middle with a radius from its size (trees ~17 m, small things closer than the 5 m house limit), re-aim just
+  before the shot (the intro tween and the game's auto-watch override it); a back view; walls kept up for wall
+  things or an uncut wall chosen.
+- Shoot sit and lie uses again ~4 s in (the full-clip moment catches the sit-down); print the resident's needs (a
+  use ends when its need is full: toilets, swings, sunbathing), with `drain=<need>:<level>` and `cancel=<s>`.
+- Record what each shot shows (object found, its facing, colours set) and flag mismatches: a late buy once put
+  the wrong facing's object in a plausible picture.
+- Options: `sim=` (any resident), `host=` (a table bought first for surface things), `pre=`, `sellAny=`, camera
+  `radius=`/`alpha=`/`beta=`, `SKIP=1` resume; `sell=ceilingLight`/`chandelier` by day (they hang in front of the
+  23,14 shots).
+- Generate the jobs from content + manifest (main use = first with a clip, extra runs only for uses whose
+  pose/anim/clip differ, outdoor things to the yard, radius from the footprint): 776 jobs for 94 items, no hand
+  editing. A report from the JSONs per group (clips, max/duration, shut, errors) instead of greps.
+
+**Colours and the studio**
+- Pick test colours far from each part's default (read it from the GLB), or run a second rotated colour run as
+  standard: a part whose default is already the first test colour proves nothing.
+- One studio script that clicks a distinct swatch per part, shoots, turns the turntable and takes "In use":
+  labels, colour landing and the open clip in one picture. Wait for the stage to draw (poll the canvas) instead
+  of a fixed delay; loop-only models have no "In use".
+- Contact sheets from a node script (some sandboxes refuse bash), 7 play shots plus the studio in one row per item,
+  with a label tile per shot.
+
+**States, spots and gates**
+- A spot table per check house: wall spots with and without windows, plain 2-wide walls, the yard, the r2
+  spots that work (several agents probed for them).
+- Debug states for what play can't stage quickly: a ripe crop or a `__debugSet` for growth and needs, a two-storey
+  house with a basement (stairs), a two-resident house (double beds, bunks), `family-night` (children at night).
+- The clips bench at t=0 / t=99 finds clips that show nothing (the topiary) faster than play runs: run it first.
+- `check_glb.py` could flag coplanar faces of different materials in one part (three z-fight fixes: duvet end,
+  chest lid, bread bin) and parts scaled to a sliver at rest that are still visible (the kids' hairline).
+- `gamekit` smooth-shades cylinders without a bevel, so flat caps can shade like domes (the bread bin).
+
 ## The end
 
 - **Last group:** when the last group leaves Validate, remove the `validate` category and `icon.category.validate`
