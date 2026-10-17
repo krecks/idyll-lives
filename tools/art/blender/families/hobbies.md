@@ -67,11 +67,11 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.piano` | 1.54 × 1.48 × 0.83 m | 5,072 | 3 | Body, Trim |
-| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,124 | 3 | Instrument, Stand |
+| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,124 | 3 | Body & neck, Top, Stand |
 | `model.guitarElectric` | 0.46 × 1.37 × 0.58 m | 3,256 | 3 | Guitar, Amp |
 | `model.keyboardDigital` | 0.90 × 1.09 × 0.75 m | 2,420 | 2 | Body, Trim |
 | `model.drumKit` | 0.98 × 1.09 × 0.89 m | 5,876 | 3 | Shells, Hardware |
-| `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 3 | Guitar, Stand |
+| `model.guitarAcoustic` | 0.36 × 1.48 × 0.40 m | 2,856 | 3 | Body, Top, Stand |
 | `model.chessTable` | 0.46 × 0.92 × 0.85 m | 3,760 | 3 | Table, Chair |
 | `model.poolTable` | 2.50 × 0.84 × 1.40 m | 5,268 | 3 | Frame, Cloth |
 | `model.foosball` | 1.42 × 0.95 × 0.94 m | 7,928 | 3 | Table, Trim |

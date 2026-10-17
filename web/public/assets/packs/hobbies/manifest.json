@@ -93,7 +93,11 @@
       "paint": [
         {
           "material": "uke",
-          "label": "Instrument"
+          "label": "Body & neck"
+        },
+        {
+          "material": "uke_top",
+          "label": "Top"
         },
         {
           "material": "stand",
@@ -296,7 +300,11 @@
       "paint": [
         {
           "material": "acoustic",
-          "label": "Guitar"
+          "label": "Body"
+        },
+        {
+          "material": "spruce",
+          "label": "Top"
         },
         {
           "material": "stand",

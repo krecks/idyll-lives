@@ -14,11 +14,11 @@ them in the hands (T0 `squash` to 0).
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play. |
-| `ukulele` Ukulele | 1x1 · floor | strum:music practise:music | hobbies / music | Instrument, Stand | Use | `off_stand`: the ukulele leaves its stand while strummed (if held in the hands). |
+| `ukulele` Ukulele | 1x1 · floor | strum:music practise:music | hobbies / music | Body & neck, Top, Stand | Use | `off_stand`: the ukulele leaves its stand while strummed (if held in the hands). |
 | `guitarElectric` Electric guitar | 1x1 · floor | jam:music practise:music | hobbies / music | Guitar, Amp | Use | `off_stand`, as the ukulele; the amp is static. |
 | `keyboardDigital` Digital piano | 1x1 · floor | play:music | hobbies / music | Body, Trim | Static | Static. |
 | `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Loop (E1) | `cymbals`: the cymbals wobble while drummed (E1). Until then U: the hi-hat closes. |
-| `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Guitar, Stand | Use | `off_stand`. |
+| `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Body, Top, Stand | Use | `off_stand`. |
 
 ## H2. Games (6) — **Done**, signed off 2026-10-16 (back in hobbies / games)
 
