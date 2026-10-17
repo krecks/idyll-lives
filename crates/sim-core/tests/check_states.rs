@@ -15,7 +15,7 @@
 //!   0.25, hygiene 0.3, the rest 0.5): they go to the toilet, then eat, wash and sleep on their own.
 //! - `office-night`: `bathroom-check` at 21:30, after dark (lamps, screens, night lighting).
 //! - `town-things`: a public lot ("Town things", plot 1) with every community thing
-//!   (`community.json`: street, playground, stalls, farm and shops, in rows by group facing the
+//!   (`community.json`: street, play, food, farm and shops, in rows by group facing the
 //!   street, the shops against a wall at the back), beside a home plot with a small house. The
 //!   resident stands at the lot's front, free will off, needs at 0.8. Look with `__showPlot(1)`.
 
@@ -164,7 +164,7 @@ fn town_things_lot() {
     let (hw, w, d) = (12, 54, 32);
     // Rows by group, front to back; each row starts a tile in, things two tiles apart. The
     // shops' row stands at the back against a wall, as in a shop.
-    let rows = [("street", 3), ("playground", 8), ("stalls", 13), ("farm", 18), ("shops", d - 3)];
+    let rows = [("street", 3), ("play", 8), ("food", 13), ("farm", 18), ("shops", d - 3)];
     let mut objects = Vec::new();
     for (group, z0) in rows {
         let mut x = hw + 2;
