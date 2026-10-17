@@ -6,7 +6,7 @@ The wall bed is done (`families/living.py`, the model for anything held open). L
 is done too: the recliner's seat and back tip back with the resident riding them, the rocking chair rocks (E1)
 with its rider. L3 is done: still tables, but the coffee table's drawer opens for a magazine.
 
-## L1. Sofas and sectionals (11) — **Done** (in Validate › Sofas)
+## L1. Sofas and sectionals (11) — **Done**, signed off 2026-10-17 (back in living / seating and living / sectionals)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `sofas` (Validate › Sofas)
@@ -19,7 +19,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
-| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Held open | **Done** (in Validate › Sofas): `bed_out`, the mattress pulls out forward from under the seat while dozed on or pulled out; `BEDS` height 0.44 and `fwd` 0.6 (head on the seat). |
+| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Cushions, Legs | Held open | **Done** (in Validate › Sofas): `bed_out`, the mattress pulls out forward from under the seat while dozed on or pulled out; `BEDS` height 0.44 and `fwd` 0.6 (head on the seat); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
 | `sectionalMiddle` Sectional: middle seat | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmLeft` Sectional: left arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmRight` Sectional: right arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
