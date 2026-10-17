@@ -83,7 +83,7 @@ their placeholder's pot narrowed to the model's 40 cm on 2026-10-15).
 | `model.garden.sunflowers` | 0.84 × 2.11 × 0.91 m | 1,344 | 2 |
 | `model.garden.poppies` | 0.84 × 0.66 × 0.84 m | 2,152 | 2 |
 | `model.garden.marigolds` | 0.88 × 0.34 × 0.84 m | 2,660 | 2 |
-| `model.garden.pansies` | 0.84 × 0.26 × 0.84 m | 1,820 | 2 |
+| `model.garden.pansies` | 0.84 × 0.26 × 0.84 m | 2,000 | 2 |
 | `model.garden.lilies` | 0.84 × 0.94 × 0.87 m | 1,444 | 2 |
 | `model.garden.lupins` | 0.84 × 0.99 × 0.84 m | 1,120 | 2 |
 | `model.garden.forgetMeNots` | 0.87 × 0.28 × 0.84 m | 2,460 | 2 |

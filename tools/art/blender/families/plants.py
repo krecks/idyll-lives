@@ -642,6 +642,7 @@ def pansies():
         h = rng.uniform(0.17, 0.23)
         petal, eye = faces[i % len(faces)]
         yaw, tilt = a + rng.uniform(-30, 30), rng.uniform(35, 60)
+        stem(f'stem{i}', (x, y, top + 0.02), (x, y, h), P.stem, r=0.004)   # on stems: without, the faces stood in the air
         star(f'pansy{i}', (x, y, h), 0.045, 5, petal, yaw, tilt, inner=0.75, cup=0.05)
         dome(f'eye{i}', (x, y, h), 0.017, 0.006, eye, yaw, tilt)
     return G.settle([G.join_all('pansies')])

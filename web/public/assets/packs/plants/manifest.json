@@ -603,6 +603,9 @@
         },
         "leaf_light": {
           "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
         }
       },
       "paint": [
