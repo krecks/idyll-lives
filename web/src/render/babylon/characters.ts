@@ -73,6 +73,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
+import { FOUNTAIN } from './characters/clips/street';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
@@ -215,6 +216,33 @@ const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact
 const HUGGED: Record<string, { reach: number; at: number }> = { teddyBear: { reach: 0.58, at: 0.6 } };
 /** Crouched (the `crouch` clip): the shoulders' height for a body's standing height. */
 const CROUCH_SHOULDER = 0.55;
+
+/**
+ * Things used from inside or right up against them, while sim-core stands their users on the tile in front
+ * (`stepIn`): they step up to the object (walking) and use it there, and step back out to the tile when
+ * done (`stepOut`). `by`: by the user's height (m, the tallest first), the clip played there instead of
+ * the action's, and where: the feet `to` m from the object's middle (along its facing), `up` m above the
+ * ground (the clips in `street.ts` are fitted to the drinking fountain and the climbing frame for each
+ * size), and at one of `lanes`, m to the object's right of its middle: the first no one else using it has
+ * taken (sim-core stands everyone using it on the same tile in front, of a 2-wide thing the one with the
+ * lower x or z: the climbing frame's net side or its pole's, by its facing). `wait`: seconds into the use
+ * before stepping in (the phone box's door opening first; its clip `delay`s so that they stand `back` m
+ * back from the tile's middle first, clear of the door), and `out` seconds after the use before stepping
+ * out (the door opening again, `out` in its motions).
+ */
+interface StepIn {
+  by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
+  lanes?: readonly number[];
+  wait?: number;
+  back?: number;
+  out?: number;
+}
+const STEP_IN: Record<string, StepIn> = {
+  drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+};
+/** Stepping in (m/s, game time) and out again (s). */
+const STEP_IN_SPEED = 1.05;
+const STEP_OUT_S = 1.1;
 
 /**
  * Where a Sim sits on an object (`PlacedObject.seat`): the table above, else the content's `seat`
@@ -752,6 +780,23 @@ interface SimRig {
   fromBed: boolean;
   lieX: number;
   lieZ: number;
+  /**
+   * Using a thing from inside or up against it (`STEP_IN`): which and how (null: not), the seconds since
+   * the use began, and where they were last drawn (world); stepping back out to the tile in front after:
+   * the seconds since the use ended (-1: not stepping out).
+   */
+  inside: StepIn | null;
+  inT: number;
+  inX: number;
+  inY: number;
+  inZ: number;
+  /** Its lane (`lanes`), and the step in's sideways part to it (world). */
+  inLane: number;
+  inDX: number;
+  inDZ: number;
+  outT: number;
+  /** Seconds after the use before stepping out (the entry's `out`). */
+  outWait: number;
   cover: number;
   /** Current (smoothed) facial expression. */
   face: Face;
@@ -1345,6 +1390,16 @@ export class Characters {
         fromBed: false,
         lieX: 0,
         lieZ: 0,
+        inside: null,
+        inT: 0,
+        inX: 0,
+        inY: 0,
+        inZ: 0,
+        inLane: 0,
+        inDX: 0,
+        inDZ: 0,
+        outT: -1,
+        outWait: 0,
         cover: 0,
         face: { ...NEUTRAL },
         blinkAt: -1,
@@ -2308,6 +2363,7 @@ export class Characters {
       pl.x = rig.x + Math.sin(rig.yaw) * rootFwd;
       pl.y = rootY + rig.floorY;
       pl.z = rig.z + Math.cos(rig.yaw) * rootFwd;
+      this.stepPlace(rig, pl, step);
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
@@ -2335,9 +2391,11 @@ export class Characters {
       shadows[m] = r;
       shadows[m + 5] = 1;
       shadows[m + 10] = r;
-      shadows[m + 12] = rig.x;
-      shadows[m + 13] = 0.02 + rig.floorY;
-      shadows[m + 14] = rig.z;
+      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`.)
+      const stepped = !!rig.inside || rig.outT >= 0;
+      shadows[m + 12] = stepped ? pl.x : rig.x;
+      shadows[m + 13] = 0.02 + (stepped ? pl.y : rig.floorY);
+      shadows[m + 14] = stepped ? pl.z : rig.z;
       shadows[m + 15] = 1;
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
@@ -2412,6 +2470,8 @@ export class Characters {
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
+    // Using a thing from inside or up against it this frame (`stepIn`).
+    let inside = false;
 
     if (this.force) {
       key = this.force;
@@ -2561,8 +2621,12 @@ export class Characters {
       const obj = known ? useObj : this.objectInFront(rig);
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
+      // Used from inside or up against it (`STEP_IN`): the clip for their height.
+      const into = known && obj ? STEP_IN[obj.def] : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
-      const seq = known
+      const seq = into
+        ? this.stepFit(rig, into)[1]
+        : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
           : obj?.stand?.motion || obj?.held?.grip === 'pair' || obj?.held?.grip === 'guitar'
@@ -2614,6 +2678,10 @@ export class Characters {
             rootY += Math.sin(rig.actTime * 90) * 0.004;
           }
         }
+        if (into && obj) {
+          [rootFwd, rootY, key, rate] = this.stepIn(rig, obj, into, key, step, dt);
+          inside = true;
+        }
       } else {
         rig.useKey = '';
         rig.useSeq = null;
@@ -2624,6 +2692,7 @@ export class Characters {
         if (!tag || tag === 'idle') hands = HANDS.rest;
       }
     }
+    if (!inside && rig.inside) this.stepOut(rig, fresh);
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
@@ -2707,6 +2776,73 @@ export class Characters {
       rig.approach = reach;
       rig.hands = hands;
     }
+  }
+
+  /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
+  private stepFit(rig: SimRig, into: StepIn): StepIn['by'][number] {
+    const h = rig.body.height * rig.scale;
+    return into.by.find(([min]) => h >= min) ?? into.by[into.by.length - 1];
+  }
+
+  /**
+   * Using a thing from inside or up against it (`STEP_IN`) from the tile in front: back a little while its
+   * door opens (`back`, the first `wait` s), then walking in to where they use it, up onto its floor on the
+   * way. The root's forward offset and height, the clip (standing about while waiting, walking, or `key`)
+   * and its rate.
+   */
+  private stepIn(rig: SimRig, obj: PlacedObject, into: StepIn, key: string, step: number, dt: number): [number, number, string, number] {
+    if (rig.inside !== into) {
+      rig.inside = into;
+      rig.inT = 0;
+      rig.outT = -1;
+      const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId).map((r) => r!.inLane);
+      rig.inLane = into.lanes?.find((x) => !taken.includes(x)) ?? into.lanes?.[0] ?? 0;
+    } else rig.inT += step;
+    const at = this.stepFit(rig, into)[2];
+    const f = (obj.rot * Math.PI) / 2;
+    // The tile's distance from the object's middle, along its facing; the way in from stood back.
+    const ahead = (rig.x - obj.cx) * Math.sin(f) + (rig.z - obj.cz) * Math.cos(f);
+    const back = into.back ?? 0;
+    const dist = ahead - at.to + back;
+    // And sideways to its lane (along the object's right).
+    const across = into.lanes ? rig.inLane - ((rig.x - obj.cx) * Math.cos(f) - (rig.z - obj.cz) * Math.sin(f)) : 0;
+    const way = Math.hypot(dist, across);
+    const span = Math.max(0.3, way / STEP_IN_SPEED);
+    const k = smooth(clamp((rig.inT - (into.wait ?? 0)) / span, 0, 1));
+    const fwd = -back * smooth(clamp(rig.inT / 0.4, 0, 1)) + dist * k;
+    const y = (at.up ?? 0) * smooth(clamp((k - 0.35) / 0.3, 0, 1));
+    rig.inDX = Math.cos(f) * across * k;
+    rig.inDZ = -Math.sin(f) * across * k;
+    // (Waiting to step in, standing about.)
+    if (k <= 0) return [fwd, y, into.wait ? 'idle' : key, 1];
+    if (k >= 1) return [fwd, y, key, 1];
+    // Walking, the cycle matched to the step's pace (the walk runs on real time).
+    const legs = rig.body.pelvisScale * rig.scale;
+    const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
+    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+  }
+
+  /** The use of a thing used from inside (`STEP_IN`) is over: back out to the tile in front after its `out` seconds (`stepPlace`); none when drawn afresh. */
+  private stepOut(rig: SimRig, fresh: boolean): void {
+    rig.outT = fresh ? -1 : 0;
+    rig.outWait = rig.inside?.out ?? 0;
+    rig.inside = null;
+  }
+
+  /** Where a resident using a thing from inside is drawn (kept for stepping out), and stepping out: from there to where they are now (`STEP_OUT_S`). */
+  private stepPlace(rig: SimRig, pl: Placement, step: number): void {
+    if (rig.inside) {
+      pl.x += rig.inDX;
+      pl.z += rig.inDZ;
+      [rig.inX, rig.inY, rig.inZ] = [pl.x, pl.y, pl.z];
+      return;
+    }
+    if (rig.outT < 0) return;
+    const k = smooth(clamp((rig.outT - rig.outWait) / STEP_OUT_S, 0, 1));
+    pl.x = lerp(rig.inX, pl.x, k);
+    pl.y = lerp(rig.inY, pl.y, k);
+    pl.z = lerp(rig.inZ, pl.z, k);
+    rig.outT = k < 1 ? rig.outT + step : -1;
   }
 
   private clip(key: string): Clip {

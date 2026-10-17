@@ -30,7 +30,7 @@ before the street furniture. Check them on a town lot (`?state=` from a test dum
 |---|---|---|---|---|---|---|
 | `streetLamp` Street lamp | 1x1 · floor | — | community / street | Body | Static | Static. N glow (E8). LOD (E7). |
 | `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:sit | community / street | Body | Static | Static. |
-| `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Body | Use | `water_on`: the water arc grows for drink. |
+| `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Body | Use | `water_on`: the water arc grows for drink; the drinker steps up and bends over the spout (`fountainDrink<cm>` by height). |
 | `litterBin` Litter bin | 1x1 · floor | — | community / street | Body | Static | Static. |
 | `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Body | Static | Static. |
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Body | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |

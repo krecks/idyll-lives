@@ -3,7 +3,8 @@
  * Every name the runtime plays (characters.ts `ACTIONS`, `choose`, reactions) must be here; see
  * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
  * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. A baby in
- * the crib has its own lying clips (`baby.ts`). Arm and leg placement uses the IK helpers in
+ * the crib has its own lying clips (`baby.ts`); the drinking fountain its, in sizes
+ * (`street.ts`). Arm and leg placement uses the IK helpers in
  * `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
@@ -19,11 +20,12 @@ import { idleClips } from './idle';
 import { lieClips } from './lie';
 import { locomotionClips } from './locomotion';
 import { seatedClips } from './seated';
+import { streetClips } from './street';
 import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips()];
 }
 
 const live = new Set<CharacterSet>();
