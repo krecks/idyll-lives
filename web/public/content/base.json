@@ -2548,8 +2548,8 @@
         }
       ],
       "price": 500,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2
     },
     {
@@ -2891,8 +2891,7 @@
         2
       ],
       "price": 650,
-      "category": "validate",
-      "group": "fitness",
+      "category": "fitness",
       "description": "Builds Endurance.",
       "interactions": [
         {
@@ -2929,8 +2928,7 @@
         2
       ],
       "price": 480,
-      "category": "validate",
-      "group": "fitness",
+      "category": "fitness",
       "description": "Builds Strength.",
       "interactions": [
         {
@@ -3683,18 +3681,6 @@
       "label": "Validate",
       "icon": "icon.category.validate",
       "groups": [
-        {
-          "id": "sofas",
-          "label": "Sofas"
-        },
-        {
-          "id": "baths",
-          "label": "Baths"
-        },
-        {
-          "id": "fitness",
-          "label": "Fitness"
-        },
         {
           "id": "books and pots",
           "label": "Books And Pots"

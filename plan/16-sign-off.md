@@ -746,6 +746,57 @@ Head & tap, Curtain, Tiles), the stall's rain slanted onto the tray; the fridge,
 still frame and open as before; the stall in play unchanged. The plan's colour-part cells now list what the studio
 lists (Tiles, Walls, Wall, the stall's Rail and Curtain were missing). All back in bathroom / bathing.
 
+## The home gym
+
+The five F1 things (Validate › Fitness) were signed off on 2026-10-17. They were checked on 2026-10-16/17 as the
+sinks were (the fitness agent's notes, `$S/fitness/signoff.md`): each bought on free floor in all four facings and
+against the north wall, and used there: the treadmill's `belt_run` loops under the jogging runner, the bike's
+`pedals_turn` with the rider's feet on the pedals, the yoga mat unrolls for yoga and rolls up again, the weight
+bench's `bar_off` and the dumbbell rack's `pair_off`, by day and at night, WebGPU and `renderer=webgl` Low, every
+paint slot a colour of its own, and the colour studio (labels, colour landing, "In use"). They were held for one
+fault: with "Weights" coloured, the pair in the resident's hands kept the model's dark grey. Two fixes:
+- **Held parts in the object's colours** (`characters.ts`, commit 10b8dc1). A held part's prop key now carries the
+  object's player colours (`<model>#<part>@<colours>`) and the part is built painted, as the object is. Rechecked:
+  the rack coloured (Rack terracotta, Weights blue), lifted in all four facings at 23,16 (both dumbbells blue in the
+  hands, the rack's six others blue), at night on WebGPU and on Low WebGL2 at night; the ukulele, acoustic and
+  electric guitar played with their instrument coloured green (each held green, the stand or amp teal); the rack
+  and the ukulele uncoloured still hold dark grey dumbbells and a wooden ukulele.
+- **The bench's bar no longer vanishes for the lie-down** (`fitness.py` `BAR_DELAY`, manifest only: the `.glb` is
+  byte-identical; same commit). The game draws the bar in the hands once the lifter has sat down (the `sitDown`
+  clip less its last 0.35 s, 0.98 s), so `bar_off` waits 0.8 s and ends as the bar shows in the hands. Rechecked in
+  two facings with pictures 0.25–2 s into the lift: the bar is on the hooks while she sits down, shrinks away at
+  0.8–1.0 s, and is in her hands from about 1.0 s on, never missing.
+All back in fitness (no group).
+
+## The baths
+
+The three B3 baths (Validate › Baths) were signed off on 2026-10-17. The bathroom agent had checked them in full
+(four facings, `tap_on` and `fill` playing, holding and draining, colours, night, Low), but held them because the
+bather sat across the tub facing its long side, legs out through its side. One fix (`characters.ts`, commit
+1a0ad51): `SEATS` gives the baths `along` (the seat faced a quarter turn from the object's front, `fwd` then along
+it) and `legsOut`; the back at the end without the taps (the bathtub's and clawfoot's right end, the freestanding
+bath's left), the hips 0.38–0.42 m from the middle, the legs out towards the taps; the arms rest on the long rims.
+The freestanding bath's seat moved from its content into `SEATS` (`SEATS` overrode it anyway). Rechecked: each bath
+used in all four facings (23,16 at 0, 2 and 3 facings; 21,18 at 1), seen from the front and from above: the legs in
+the tub and under the water, the back at the end, nothing through the panel or the rim; by day, at night on WebGPU
+and on Low WebGL2 at night; coloured by day and at night (Tub blue, Panel/Feet terracotta, Taps green, Towel
+purple: each lands where it did); `tap_on` and `fill` play (fill 2.42 s, held for the bath) and drain as the bath
+ends (logged every 150 ms: `fill` falls from 2.4 to nothing in about 2 s, then shut). The colour studio was not
+re-run (nothing in it changed). All back in bathroom / bathing.
+
+## The sofas
+
+The twelve things of Validate › Sofas (the ten L1 sofas and sectionals, the sofa bed, the wall bed) were signed off on
+2026-10-17. The living agent had checked them in full (`$S/living/signoff.md`, `$S/held.md`) and held them for one
+fault: pulling the sofa bed out and folding it away, the resident stood inside the pulled-out mattress (her spot is
+the middle of the tile in front; the mattress reaches 1.52 m from the sofa's middle). One fix (`characters.ts`,
+commit 6c98e40): `STAND_BACK` 1 m for the sofa bed, as the dishwashers' 0.15 m, so she stands half a metre past the
+mattress's foot and reaches to it. Rechecked in all four facings (23,16 at 0, 2, 3; 21,18 at 1), 0.25 s and 1.3 s
+into "Pull out the bed" and into "Fold the bed away", from the side and from above: clear of the mattress
+throughout, her hands at its foot when it is out. Doze still lies her on the bed; the wall bed's fold down and up
+and a sofa's relax are as before (their code paths take no `STAND_BACK`). All back in living / seating (the sofas,
+the sofa bed, the wall bed) and living / sectionals.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -769,6 +820,9 @@ task done in the category file (strike through its heading, with the commit).
 - **Bedroom** (`03-bedroom.md`, BR1–BR4): signed off 2026-10-17.
 - **Garden** (`13-garden.md`, G1–G5): signed off 2026-10-17.
 - **Community** (`14-community.md`, CM1–CM5): signed off 2026-10-17.
+- **Fitness** (`07-fitness.md`, F1): signed off 2026-10-17.
+- **Bathroom** (`02-bathroom.md`, B1–B5): signed off 2026-10-17.
+- **Living** (`05-living.md`, L1–L6): signed off 2026-10-17.
 
 ## Lessons for the tooling (2026-10-17)
 

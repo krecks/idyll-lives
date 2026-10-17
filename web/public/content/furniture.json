@@ -1112,8 +1112,8 @@
         1
       ],
       "price": 350,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2,
       "description": "A compact two-seater sofa.",
       "interactions": [
@@ -1157,8 +1157,8 @@
         1
       ],
       "price": 900,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2,
       "description": "A long, deep sofa with soft cushions: very comfortable, and good for a doze.",
       "interactions": [
@@ -1202,8 +1202,8 @@
         1
       ],
       "price": 1500,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2,
       "decor": 0.6,
       "description": "A low, sculpted sofa that makes a room. The most comfortable seat in the house, and a pleasure to look at.",
@@ -2299,8 +2299,8 @@
         1
       ],
       "price": 750,
-      "category": "validate",
-      "group": "baths",
+      "category": "bathroom",
+      "group": "bathing",
       "description": "A long soak gets residents clean and comfortable.",
       "interactions": [
         {
@@ -2330,8 +2330,8 @@
         1
       ],
       "price": 1800,
-      "category": "validate",
-      "group": "baths",
+      "category": "bathroom",
+      "group": "bathing",
       "decor": 0.6,
       "description": "A deep freestanding tub on brass feet. A soak leaves residents pampered: they stay fresh for longer.",
       "interactions": [
@@ -3498,8 +3498,7 @@
         1
       ],
       "price": 420,
-      "category": "validate",
-      "group": "fitness",
+      "category": "fitness",
       "description": "A basic upright bike: cycling builds Endurance.",
       "interactions": [
         {
@@ -3534,8 +3533,7 @@
         1
       ],
       "price": 45,
-      "category": "validate",
-      "group": "fitness",
+      "category": "fitness",
       "seat": {
         "height": 0.03,
         "forward": 0.0
@@ -3579,8 +3577,7 @@
         1
       ],
       "price": 160,
-      "category": "validate",
-      "group": "fitness",
+      "category": "fitness",
       "description": "Eight dumbbells on a rack: lifting builds Strength.",
       "interactions": [
         {

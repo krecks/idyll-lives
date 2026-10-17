@@ -10,8 +10,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "sectionals",
       "seat": {
         "height": 0.44,
         "forward": 0.13
@@ -58,8 +58,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "sectionals",
       "seat": {
         "height": 0.44,
         "forward": 0.13
@@ -106,8 +106,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "sectionals",
       "seat": {
         "height": 0.44,
         "forward": 0.13
@@ -154,8 +154,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "sectionals",
       "seat": {
         "height": 0.44,
         "forward": 0.17
@@ -202,8 +202,8 @@
         2
       ],
       "price": 420,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "sectionals",
       "seat": {
         "height": 0.44,
         "forward": -0.28,
@@ -251,8 +251,8 @@
         1
       ],
       "price": 620,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2,
       "seat": {
         "height": 0.44,
@@ -322,8 +322,8 @@
         3
       ],
       "price": 1150,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 2,
       "decor": 0.15,
       "description": "A double bed that folds up into a cabinet against the wall, between two narrow bookshelves. It folds down for bed and back up in the morning, or whenever you like. It needs the floor in front of it.",
@@ -391,8 +391,8 @@
         1
       ],
       "price": 980,
-      "category": "validate",
-      "group": "sofas",
+      "category": "living",
+      "group": "seating",
       "slots": 3,
       "decor": 0.2,
       "seat": {

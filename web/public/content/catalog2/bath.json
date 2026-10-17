@@ -77,8 +77,8 @@
         1
       ],
       "price": 1600,
-      "category": "validate",
-      "group": "baths",
+      "category": "bathroom",
+      "group": "bathing",
       "decor": 0.6,
       "description": "A deep oval tub with a floor-standing tap. A long soak leaves residents pampered.",
       "interactions": [
