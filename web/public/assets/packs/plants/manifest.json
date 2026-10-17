@@ -810,12 +810,6 @@
         "bloom": {
           "finish": "material.finish.satin"
         },
-        "bloom2": {
-          "finish": "material.finish.satin"
-        },
-        "bloom3": {
-          "finish": "material.finish.satin"
-        },
         "body": {
           "finish": "material.finish.satin"
         },
@@ -988,15 +982,6 @@
         "blossom": {
           "finish": "material.finish.foliage"
         },
-        "blossom2": {
-          "finish": "material.finish.foliage"
-        },
-        "blossom3": {
-          "finish": "material.finish.foliage"
-        },
-        "blossom4": {
-          "finish": "material.finish.foliage"
-        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -1058,15 +1043,6 @@
         "blossom": {
           "finish": "material.finish.foliage"
         },
-        "blossom2": {
-          "finish": "material.finish.foliage"
-        },
-        "blossom3": {
-          "finish": "material.finish.foliage"
-        },
-        "blossom4": {
-          "finish": "material.finish.foliage"
-        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -1098,12 +1074,6 @@
       "url": "../../models/plants/lavender.glb",
       "materials": {
         "bloom": {
-          "finish": "material.finish.satin"
-        },
-        "bloom2": {
-          "finish": "material.finish.satin"
-        },
-        "bloom3": {
           "finish": "material.finish.satin"
         },
         "leaf": {

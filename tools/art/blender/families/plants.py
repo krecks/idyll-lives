@@ -746,8 +746,8 @@ def meadow():
 
 
 def geraniums():
-    """Potted geraniums: a terracotta pot of round leaves and clusters of red flowers."""
-    P = palette(body='#C0683F', bloom='#D6283A', bloom2='#E23A48', bloom3='#C41E32')
+    """Potted geraniums: a terracotta pot of round leaves and clusters of red flowers (all `bloom`: "Flowers")."""
+    P = palette(body='#C0683F', bloom='#D6283A')
     rng = random.Random(63)
     top = pot(P, 0.2, 0.34, r_bottom=0.15, rim=0.012)
     for i, (x, y, _) in enumerate(spiral(5, 0.11, rng)):
@@ -755,7 +755,7 @@ def geraniums():
     for i, (x, y, a) in enumerate(spiral(6, 0.15, rng)):
         h = top + rng.uniform(0.2, 0.27)
         stem(f'stem{i}', (x * 0.5, y * 0.5, top), (x, y, h), P.stem, r=0.005)
-        lump(f'flowers{i}', 0.05, (x, y, h - 0.02), [P.bloom, P.bloom2, P.bloom3][i % 3], scale=(1, 1, 0.85), seed=i * 0.6)
+        lump(f'flowers{i}', 0.05, (x, y, h - 0.02), P.bloom, scale=(1, 1, 0.85), seed=i * 0.6)
     return G.settle([G.join_all('geraniums')])
 
 
@@ -933,11 +933,11 @@ def garden_hedge():
 
 
 def hydrangea():
-    """Hydrangea: a leafy shrub covered in big blue and lilac mopheads."""
-    P = palette(blossom='#9CB8F4', blossom2='#B8A6F0', blossom3='#8CA8EC', blossom4='#D4BCF4')
+    """Hydrangea: a leafy shrub covered in big blue mopheads (all one material: "Flowers" colours every one)."""
+    P = palette(blossom='#9CB8F4')
     rng = random.Random(72)
     shrub(P, rng, 5, 1.0, 0.82, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
-    dots(rng, 11, (0, 0, 0.52), (0.48, 0.48, 0.42), 0.28, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'mophead')
+    dots(rng, 11, (0, 0, 0.52), (0.48, 0.48, 0.42), 0.28, [P.blossom], 'mophead')
     return G.settle([G.join_all('hydrangea')])
 
 
@@ -954,11 +954,11 @@ def rosebush():
 
 
 def azalea():
-    """Azalea: a wide shrub smothered in pink flowers; shaggy sprigs on top, which a trim takes off."""
-    P = palette(blossom='#F0549C', blossom2='#F878B4', blossom3='#E04090', blossom4='#FC9CC8')
+    """Azalea: a wide shrub smothered in pink flowers (one material, the colour part); shaggy sprigs on top, which a trim takes off."""
+    P = palette(blossom='#F0549C')
     rng = random.Random(74)
     shrub(P, rng, 6, 1.12, 0.92, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
-    dots(rng, 20, (0, 0, 0.5), (0.54, 0.54, 0.42), 0.2, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'flowers', flat=0.6)
+    dots(rng, 20, (0, 0, 0.5), (0.54, 0.54, 0.42), 0.2, [P.blossom], 'flowers', flat=0.6)
     still = G.join_all('azalea')
     at = (-0.05, 0.05, 0.94)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.14), at, 'trim')
@@ -966,8 +966,7 @@ def azalea():
 
 def lavender():
     """Lavender: a grey-green mound and a spray of stems with purple spikes; a few at the front, which are cut."""
-    P = palette(leaf='#748C70', leaf_light='#82987C', stem='#7E947A', stalk='#7E947A', bloom='#7E64B8', bloom2='#8F74C8',
-                bloom3='#6E58A8')
+    P = palette(leaf='#748C70', leaf_light='#82987C', stem='#7E947A', stalk='#7E947A', bloom='#7E64B8')  # spikes all `bloom`: the colour part
     rng = random.Random(75)
     lump('mound', 0.28, (0, 0, 0), P.leaf, scale=(1, 1, 0.6), seed=1.0)
     lump('mound2', 0.2, (0.1, 0.06, 0.08), P.leaf_light, scale=(1, 1, 0.75), seed=2.0)
@@ -981,11 +980,11 @@ def lavender():
             length = rng.uniform(0.38, 0.55)
             tip = base + d * length
             if LOW[0]:
-                G.cone(f'stem{i}', 0.012, 0.002, length + 0.14, material=[P.bloom, P.bloom2, P.bloom3][i % 3], verts=3)
+                G.cone(f'stem{i}', 0.012, 0.002, length + 0.14, material=P.bloom, verts=3)
                 bpy.context.object.data.transform(Matrix.Translation(base + d * (length + 0.14) / 2) @ d.to_track_quat('Z', 'Y').to_matrix().to_4x4())
                 continue
             tube(f'{"cut_" if cut else ""}stem{i}', [base, tip], 0.005, 0.004, stem_mat, verts=3)
-            G.cone(f'{"cut_" if cut else ""}spike{i}', 0.018, 0.004, 0.15, material=[P.bloom, P.bloom2, P.bloom3][i % 3], verts=5)
+            G.cone(f'{"cut_" if cut else ""}spike{i}', 0.018, 0.004, 0.15, material=P.bloom, verts=5)
             spike = bpy.context.object
             spike.data.transform(Matrix.Translation(tip + d * 0.07) @ d.to_track_quat('Z', 'Y').to_matrix().to_4x4())
 

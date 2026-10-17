@@ -119,7 +119,9 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
   tip, the hedge and the azalea; a prune (`cut`, for `prune`) one rose at the front; a cut (`cut`, for `cut`) the
   three lavender stems nearest the front. Each part is one draw call on its own finish.
 - **Colour parts:** only the topiary has a pot ("Pot"); the hydrangea, azalea and lavender colour their flowers, the
-  roses their roses; the rest none.
+  roses their roses; the rest none. Each one's flower heads are all one material, the colour part, so "Flowers"
+  colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
+  first; the geraniums' clusters too).
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
