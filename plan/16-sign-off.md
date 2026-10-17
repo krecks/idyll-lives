@@ -232,7 +232,8 @@ the workbench's vice shuts for tinker; the telescope's tube tilts up for stargaz
 table's presser foot lowers and its handwheel turns for sew and mend; the chemistry bench's flask fills for
 experiment; the pot rises and the wheel head spins for throw; the scrapbook opens for scrapbook. Every clip
 shuts when the resident moves on. Nothing needed fixing. Seen in passing: the sewing table's "Table" colours its
-top and chair but not its legs and apron (their own, darker wood). All back in hobbies / crafts.
+top and chair but not its legs and apron (their own, darker wood); on 2026-10-17 they got a colour of their own,
+"Legs" (with the drawer), dark wood as made. All back in hobbies / crafts.
 
 ## The kitchenware
 

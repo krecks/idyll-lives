@@ -837,6 +837,10 @@
           "label": "Table"
         },
         {
+          "material": "sew_legs",
+          "label": "Legs"
+        },
+        {
           "material": "machine",
           "label": "Machine"
         }

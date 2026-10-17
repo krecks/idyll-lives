@@ -1485,7 +1485,7 @@ FAMILY = G.Family(
              motions={'uses': {'stargaze': 'aim'}}, paint=[('tube', 'Tube'), ('tripod', 'Tripod')]),
      G.Model('sewingTable', sewingTable, size=(0.9, 1.08, 0.89), key='model.sewingTable', centre=(0, 0.025),
              motions={'uses': {'sew': 'presser', 'mend': 'presser'}, 'loops': {'sew': 'handwheel', 'mend': 'handwheel'}},
-             paint=[('sew_table', 'Table'), ('machine', 'Machine')]),
+             paint=[('sew_table', 'Table'), ('sew_legs', 'Legs'), ('machine', 'Machine')]),
      G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.18),
              motions={'uses': {'experiment': 'bubble'}}, paint=[('chem_bench', 'Bench'), ('glass', 'Glassware')]),
      G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.92), key='model.potteryWheel', centre=(0, 0.03),
