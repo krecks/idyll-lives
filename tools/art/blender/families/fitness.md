@@ -59,7 +59,9 @@ is never two of it.
 
 - **Weight bench**: 2 cm forward of where its placeholder stood (both now stop at the wall's face), a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
   lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet. The bar with its plates
-  is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`).
+  is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`),
+  `BAR_DELAY` (0.8 s) into the lift: the game draws the bar in the hands only once the lifter has sat down and
+  lies back (0.98 s in), so it leaves the hooks then rather than vanishing for the lie-down.
 - **Dumbbell rack**: two tilted shelves of two hex dumbbell pairs each on A-frames (the lower shelf's heavier),
   a rubber mat in front. The upper shelf's left pair (`LIFTED`) is two parts, `dumbbell_l` and `dumbbell_r`,
   each with its origin at its middle; `pair_off` hides both (`"held": {"part": ["dumbbell_l", "dumbbell_r"],

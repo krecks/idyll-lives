@@ -65,7 +65,7 @@ import { BakedVertexAnimationManager } from '@babylonjs/core/BakedVertexAnimatio
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content, ItemDef, ObjectDef } from '../../content/content';
 import type { FrameState } from '../../core/bridge';
-import { objectCentre, storeyShown, type ObjectPlacement, type SimInfo, type WorldStructure } from '../../core/protocol';
+import { colorsKey, objectCentre, storeyShown, type ObjectPlacement, type PartColors, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
 import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
@@ -77,7 +77,7 @@ import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, rese
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
-import { buildModel, type ModelTemplate } from './models';
+import { buildModel, paintColors, painted, type ModelTemplate } from './models';
 
 /** Rows in the pose texture (= Sim capacity). */
 export const MAX_CHARACTERS = 64;
@@ -207,6 +207,12 @@ function seatOf(def: ObjectDef | undefined, id: string): Seat {
   const pedals = own.pedals ? { h: own.pedals.height, fwd: own.pedals.forward ?? 0, crank: own.pedals.crank } : undefined;
   const recline = own.recline !== undefined ? (own.recline * Math.PI) / 180 : undefined;
   return { h: own.height, fwd: own.forward ?? 0, back: own.facing === 'back', legsOut: own.legs === 'out', pedals, recline };
+}
+/** A held part's name and its colours from the end of its prop key (`<part>@<colorsKey>`, see `PlacedObject.held`). */
+function partColors(ref: string): [string, PartColors?] {
+  const at = ref.indexOf('@');
+  if (at < 0) return [ref];
+  return [ref.slice(0, at), Object.fromEntries(ref.slice(at + 1).split(',').map((p) => [p.slice(0, p.indexOf(':')), p.slice(p.indexOf(':') + 1)]))];
 }
 /** A seat (see `seatOf`): its height and the hips' forward offset (m, the object's frame), and how they sit. */
 interface Seat {
@@ -775,7 +781,10 @@ interface PlacedObject {
   seat: Seat;
   /** What Sims stand up on to use it (content `stand`; resized, it moves too), or null. */
   stand: { h: number; motion?: 'bounce' | 'buzz' } | null;
-  /** What Sims hold while they use it (content `held`): its parts' prop keys (`<model key>#<part>`) and how, or null. */
+  /**
+   * What Sims hold while they use it (content `held`): its parts' prop keys (`<model key>#<part>`, then
+   * `@<colours>` for an object the player coloured: drawn in its colours, as the object is) and how, or null.
+   */
   held: { keys: string[]; grip: Grip } | null;
   /** Metres taller than its kind (the player's resizing): mattresses rise with it too. */
   lift: number;
@@ -1353,7 +1362,8 @@ export class Characters {
       const lift = (o.tall ?? 0) / 100;
       const seat = seatOf(def, o.def);
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
-      const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}`), grip: def.held.grip } : null;
+      const paint = def?.held ? colorsKey(paintColors(this.assets.get(def.model, 'model'), o.colors)) : '';
+      const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}${paint ? `@${paint}` : ''}`), grip: def.held.grip } : null;
       return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
@@ -1496,7 +1506,8 @@ export class Characters {
 
   /**
    * A prop's template and matrices; starts loading it the first time (null until loaded, and for a part
-   * its model doesn't have). `<model key>#<part>`: a moving part of an object's model, in its own frame.
+   * its model doesn't have). `<model key>#<part>`: a moving part of an object's model, in its own frame
+   * (`…@<colours>`: in those colours, `colorsKey`'s).
    */
   private prop(key: string): Prop | null {
     const known = this.props.get(key);
@@ -1506,7 +1517,7 @@ export class Characters {
     const built =
       at < 0
         ? buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { radius: 0.1 }).then((t) => ({ meshes: t.meshes, top: [0, 0, 0] as const }))
-        : this.partProp(key.slice(0, at), key.slice(at + 1));
+        : this.partProp(key.slice(0, at), ...partColors(key.slice(at + 1)));
     void built.then((p) => {
       if (!p) return;
       const matrices = new Float32Array(MAX_CHARACTERS * 16);
@@ -1522,11 +1533,12 @@ export class Characters {
 
   /**
    * Moving part `part` of model `model` on its own (a held instrument), in the part's own frame (its node's
-   * origin and axes at rest), and its top (the highest point: a mop's handle); null if the model has no
-   * such part (a placeholder: nothing is drawn, and nothing is hidden on the object either).
+   * origin and axes at rest), painted in `colors` as the object is; and its top (the highest point: a mop's
+   * handle); null if the model has no such part (a placeholder: nothing is drawn, and nothing is hidden on
+   * the object either).
    */
-  private async partProp(model: string, part: string): Promise<{ meshes: Mesh[]; top: readonly [number, number, number] } | null> {
-    const t: ModelTemplate = await buildModel(this.scene, `prop:${model}#${part}`, this.assets.get(model, 'model'), [1, 1]);
+  private async partProp(model: string, part: string, colors?: PartColors): Promise<{ meshes: Mesh[]; top: readonly [number, number, number] } | null> {
+    const t: ModelTemplate = await buildModel(this.scene, `prop:${model}#${part}`, painted(this.assets.get(model, 'model'), colors), [1, 1]);
     const motion = t.motion;
     const j = motion?.names?.indexOf(part) ?? -1;
     const keep = t.meshes.filter((_, k) => j >= 0 && motion!.parts[k] === j);

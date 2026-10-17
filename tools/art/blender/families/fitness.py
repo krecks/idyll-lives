@@ -104,6 +104,9 @@ def treadmill():
 
 # --- the weight bench: a padded bench, a rack with the bar at the head end, dumbbells by the feet ----------
 BAR = (0, 1.02, -0.72)   # the bar's middle on the J-hooks
+# `bar_off` waits while the lifter sits down on the bench (characters.ts: the `sitDown` clip but its last
+# 0.35 s, 0.98 s), so the bar leaves the hooks as the game starts drawing it in the hands, lying back.
+BAR_DELAY = 0.8
 
 
 def weightBench():
@@ -132,7 +135,7 @@ def weightBench():
             _dumbbell(F, f'dumbbell{x}', x, 0.05, 0.85, 0.1)
     G.join(parts, 'body', origin=(0, 0, 0))
     # The bar on the J-hooks, its origin at its middle: hidden while lifted (`bar_off`), the game drawing it
-    # in the lifter's hands (content `held`).
+    # in the lifter's hands (content `held`) once they lie down (`BAR_DELAY`).
     with G.new_parts() as parts:
         G.rod('bar', F.at(-0.45, BAR[1], BAR[2]), F.at(0.45, BAR[1], BAR[2]), 0.014, material=M.chrome, verts=12)
         for s in (-1, 1):
@@ -271,7 +274,7 @@ FAMILY = G.Family(
     [G.Model('treadmill', treadmill, size=(0.794, 1.439, 1.85), key='model.treadmill', centre=(0.032, -0.005),
              motions={'loops': {'run': 'belt_run'}}, paint=FRAME_PADS),
      G.Model('weightBench', weightBench, size=(0.9, 1.2, 1.849), key='model.weightBench', centre=(0, -0.006),
-             motions={'uses': {'lift': 'bar_off'}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
+             motions={'uses': {'lift': {'clip': 'bar_off', 'delay': BAR_DELAY}}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
      G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), centre=(0, 0.02), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
      G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, -0.295),

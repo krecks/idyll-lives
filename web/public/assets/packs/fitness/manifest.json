@@ -81,7 +81,10 @@
       },
       "motions": {
         "uses": {
-          "lift": "bar_off"
+          "lift": {
+            "clip": "bar_off",
+            "delay": 0.8
+          }
         }
       },
       "paint": [
