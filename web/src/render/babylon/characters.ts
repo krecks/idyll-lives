@@ -200,6 +200,15 @@ const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
  * mattress, pulled out or folded away, reaches half a metre past it.
  */
 const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15, sofaBed: 1 };
+/**
+ * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
+ * the middle of the tile in front and wraps the arms round it
+ * (the social hug's, `hugArms`), raised as far as their shoulders come down below where the arms go round
+ * (`at`, m: the bear's neck).
+ */
+const HUGGED: Record<string, { reach: number; at: number }> = { teddyBear: { reach: 0.58, at: 0.6 } };
+/** Crouched (the `crouch` clip): the shoulders' height for a body's standing height. */
+const CROUCH_SHOULDER = 0.55;
 
 /**
  * Where a Sim sits on an object (`PlacedObject.seat`): the table above, else the content's `seat`
@@ -378,6 +387,8 @@ const GUITAR_ARMS = {
 /** A use sequence of the idle alone (curling dumbbells and playing a guitar on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Crouched down (to hug the teddy, `HUGGED`). */
+const CROUCH_ONLY: readonly string[] = ['crouch'];
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -2539,7 +2550,9 @@ export class Characters {
       rig.useObj = obj ?? null;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = known
-        ? obj?.stand?.motion || obj?.held?.grip === 'pair' || obj?.held?.grip === 'guitar'
+        ? obj && HUGGED[obj.def]
+          ? CROUCH_ONLY
+          : obj?.stand?.motion || obj?.held?.grip === 'pair' || obj?.held?.grip === 'guitar'
           ? IDLE_ONLY
           : obj?.held?.grip === 'pole'
             ? PUSH_ONLY
@@ -2569,6 +2582,9 @@ export class Characters {
         } else if (obj && STAND_BACK[obj.def]) {
           // Back from the door it opens, eased like the hug's approach.
           reach = -STAND_BACK[obj.def];
+        } else if (obj && HUGGED[obj.def]) {
+          // Up to the teddy, to hug it.
+          reach = HUGGED[obj.def].reach;
         }
         const on = obj?.stand;
         if (on && obj && tag !== 'cuddle') {
@@ -2838,18 +2854,8 @@ export class Characters {
       case Anim.Hug: {
         addRotation(add, B.spine_02, 1, 0, 0, 0.1);
         addRotation(add, B.Head, 0, 1, 0, role === 1 ? 0.5 : -0.5);
-        // Arms around the other: raised forward (one Sim over the shoulders, the other a little
-        // lower, around the back), elbows wrapping in; a slow squeeze.
-        // (Model space: +z forward, the left arm on -x; x rotations raise / bend both sides alike.)
-        // (Spread first, then raise: the other order would only roll the raised arm.)
-        const squeeze = Math.sin(time * 1.5 + role) * 0.05;
-        const raise = role === 1 ? 1.3 : 1.05;
-        addRotation(add, B.upperarm_l, 0, 0, 1, -0.35);
-        addRotation(add, B.upperarm_r, 0, 0, 1, 0.35);
-        addRotation(add, B.upperarm_l, 1, 0, 0, -raise);
-        addRotation(add, B.upperarm_r, 1, 0, 0, -raise);
-        addRotation(add, B.lowerarm_l, 0, 1, 0, 0.95 + squeeze);
-        addRotation(add, B.lowerarm_r, 0, 1, 0, -0.95 - squeeze);
+        // Arms around the other: one Sim over the shoulders, the other a little lower, around the back.
+        this.hugArms(role === 1 ? 1.3 : 1.05, time + role / 1.5);
         break;
       }
       case Anim.Argue:
@@ -2902,6 +2908,23 @@ export class Characters {
     }
     dir?.pose?.(add, B, time);
     this.animateFace(rig, i, social, role, partner, pose, moving, time, dt);
+  }
+
+  /**
+   * Arms round someone or something hugged: raised forward `raise` (rad), elbows wrapping in; a slow squeeze.
+   * (Model space: +z forward, the left arm on -x; x rotations raise / bend both sides alike. Spread first,
+   * then raise: the other order would only roll the raised arm.)
+   */
+  private hugArms(raise: number, time: number): void {
+    const B = this.set!.bone;
+    const add = this.add;
+    const squeeze = Math.sin(time * 1.5) * 0.05;
+    addRotation(add, B.upperarm_l, 0, 0, 1, -0.35);
+    addRotation(add, B.upperarm_r, 0, 0, 1, 0.35);
+    addRotation(add, B.upperarm_l, 1, 0, 0, -raise);
+    addRotation(add, B.upperarm_r, 1, 0, 0, -raise);
+    addRotation(add, B.lowerarm_l, 0, 1, 0, 0.95 + squeeze);
+    addRotation(add, B.lowerarm_r, 0, 1, 0, -0.95 - squeeze);
   }
 
   /**
@@ -3050,6 +3073,15 @@ export class Characters {
           addRotation(add, B.Head, 0, 1, 0, 0.15);
         }
         break;
+      case 'relax': {
+        const hugged = HUGGED[def];
+        if (!hugged) break;
+        // Hugging the teddy, crouched: the arms round its neck, the cheek on its head.
+        const shoulder = rig.body.height * rig.scale * CROUCH_SHOULDER;
+        addRotation(add, B.Head, 0, 1, 0, 0.5);
+        this.hugArms(0.35 + 0.45 * clamp((hugged.at + 0.35 - shoulder) / 0.3, 0, 1), time);
+        break;
+      }
       case 'smell':
         // Nose down to the flowers.
         addRotation(add, B.spine_03, 1, 0, 0, 0.12);
