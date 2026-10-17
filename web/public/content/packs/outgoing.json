@@ -7,8 +7,7 @@
       "model": "model.outgoing.partyBar",
       "footprint": [2, 1],
       "price": 1150,
-      "category": "validate",
-      "group": "outgoing",
+      "category": "kitchen",
       "slots": 2,
       "description": "A two-stool bar where everyone ends up: mixing drinks is fun, gets better with Charisma, and charming hosts (Charisma 4+) become the life of the party.",
       "interactions": [
@@ -44,8 +43,7 @@
       "model": "model.outgoing.conversationSectional",
       "footprint": [2, 2],
       "price": 1350,
-      "category": "validate",
-      "group": "outgoing",
+      "category": "living",
       "slots": 2,
       "description": "A deep L-shaped sofa built for long evenings with friends: comfier than a plain sofa and a little fun to hang out on.",
       "interactions": [
@@ -67,8 +65,7 @@
       "model": "model.outgoing.karaokeStage",
       "footprint": [2, 1],
       "price": 680,
-      "category": "validate",
-      "group": "outgoing",
+      "category": "hobbies",
       "slots": 2,
       "description": "Two mics and a lyrics screen: practising songs builds Charisma, and a confident singer (Charisma 5+) brings the house down.",
       "interactions": [
@@ -105,8 +102,7 @@
       "model": "model.outgoing.videoCallNook",
       "footprint": [1, 1],
       "price": 360,
-      "category": "validate",
-      "group": "outgoing",
+      "category": "office",
       "slots": 1,
       "description": "A little desk with a ring light for calling friends: tops up Social when nobody is home (slower than a real chat).",
       "interactions": [
@@ -129,8 +125,7 @@
       "model": "model.outgoing.danceFloor",
       "footprint": [2, 2],
       "price": 3400,
-      "category": "validate",
-      "group": "outgoing",
+      "category": "hobbies",
       "slots": 2,
       "description": "Glowing tiles and a mirror ball: dancing is great fun with company, builds a little Endurance and Dexterity, and leaves a party glow that keeps loneliness away.",
       "interactions": [
@@ -154,10 +149,9 @@
       "model": "model.outgoing.photoWall",
       "footprint": [1, 1],
       "price": 120,
-      "category": "validate",
+      "category": "decor",
       "fillsWall": true,
       "freeRotation": true,
-      "group": "outgoing",
       "slots": 1,
       "description": "A board of snapshots and string lights: a quick look at good times takes the edge off loneliness.",
       "interactions": [

@@ -7,8 +7,7 @@
       "model": "model.bookworm.readingNook",
       "footprint": [2, 1],
       "price": 850,
-      "category": "validate",
-      "group": "bookworm",
+      "category": "living",
       "slots": 1,
       "description": "A cushioned window seat between two little bookcases: reading here is fun and comfortable at the same time.",
       "interactions": [
@@ -30,9 +29,8 @@
       "model": "model.bookworm.libraryWall",
       "footprint": [2, 1],
       "price": 1250,
-      "category": "validate",
+      "category": "office",
       "fillsWall": true,
-      "group": "bookworm",
       "slots": 1,
       "description": "Floor-to-ceiling shelves of rare editions with a rolling ladder. Trains Intelligence; scholars (Intelligence 4+) come away with a eureka moment.",
       "interactions": [
@@ -66,8 +64,7 @@
       "seat": { "height": 0.45, "forward": 0.12, "facing": "back" },
       "footprint": [1, 1],
       "price": 700,
-      "category": "validate",
-      "group": "bookworm",
+      "category": "office",
       "slots": 1,
       "description": "A roll-top bureau with a mechanical typewriter. Trains Writing; skilled writers (Writing 5+) hit a creative flow.",
       "interactions": [
@@ -103,8 +100,7 @@
       "model": "model.bookworm.teaTrolley",
       "footprint": [1, 1],
       "price": 240,
-      "category": "validate",
-      "group": "bookworm",
+      "category": "kitchen",
       "slots": 1,
       "description": "Loose-leaf tea and biscuits on wheels ($4 a pot): a quick comfort-and-nibble break that makes the next book even more inviting.",
       "interactions": [
@@ -126,8 +122,7 @@
       "model": "model.bookworm.firesideLounge",
       "footprint": [2, 2],
       "price": 2800,
-      "category": "validate",
-      "group": "bookworm",
+      "category": "living",
       "slots": 2,
       "description": "A stone hearth flanked by two wing chairs. Reading by the fire restores comfort and fun together and leaves a warm glow that improves sleep for hours.",
       "interactions": [
@@ -161,8 +156,7 @@
       "model": "model.bookworm.bedsideStack",
       "footprint": [1, 1],
       "price": 90,
-      "category": "validate",
-      "group": "bookworm",
+      "category": "bedroom",
       "slots": 1,
       "description": "A nightstand piled with half-finished books and a warm lamp: one more chapter before bed.",
       "interactions": [

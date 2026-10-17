@@ -7,8 +7,7 @@
       "model": "model.romantic.candlelitTable",
       "footprint": [2, 1],
       "price": 780,
-      "category": "validate",
-      "group": "romantic",
+      "category": "kitchen",
       "slots": 2,
       "description": "A linen-draped table for two with tall candles and a single rose. Dinner here is a little more fun and comfortable than at the fridge; good cooks (Cooking 4+) leave with a Candlelit glow that makes flirting land.",
       "interactions": [
@@ -44,8 +43,7 @@
       "model": "model.romantic.heartTub",
       "footprint": [2, 2],
       "price": 2800,
-      "category": "validate",
-      "group": "romantic",
+      "category": "bathroom",
       "slots": 2,
       "description": "A blush-pink tub for two, scattered with rose petals. A soak soothes Comfort, Hygiene and Fun at once and leaves residents Petal-soft: they sleep better and are easier to woo for hours.",
       "interactions": [
@@ -68,8 +66,7 @@
       "model": "model.romantic.letterBureau",
       "footprint": [1, 1],
       "price": 420,
-      "category": "validate",
-      "group": "romantic",
+      "category": "office",
       "slots": 1,
       "description": "A little writing desk with pigeonholes, a quill and red sealing wax. Builds Writing (and a little Charisma); practised writers (Writing 3+) compose poems that leave them Lovestruck.",
       "interactions": [
@@ -106,8 +103,7 @@
       "model": "model.romantic.vanity",
       "footprint": [1, 1],
       "price": 520,
-      "category": "validate",
-      "group": "romantic",
+      "category": "bedroom",
       "slots": 1,
       "description": "An oval mirror, a velvet pouf and a row of perfumes. Primping freshens up a little, teaches a bit of Charisma and leaves the resident Date-ready; charming residents get more out of it.",
       "interactions": [
@@ -132,8 +128,7 @@
       "model": "model.romantic.gramophone",
       "footprint": [1, 1],
       "price": 360,
-      "category": "validate",
-      "group": "romantic",
+      "category": "living",
       "slots": 1,
       "description": "A brass-horn record player stocked with old love songs. Listening is good Fun and gives residents butterflies; waltzing trains Dexterity.",
       "interactions": [
@@ -168,8 +163,7 @@
       "outdoors": true,
       "footprint": [2, 1],
       "price": 750,
-      "category": "validate",
-      "group": "romantic",
+      "category": "outdoor",
       "slots": 2,
       "description": "A porch swing for two under an arch of climbing roses. Swinging restores Comfort and Fun outdoors; tending the roses is a gentle chore.",
       "interactions": [

@@ -3728,66 +3728,6 @@
           "outside": true
         },
         {
-          "id": "bookworm",
-          "label": "Bookworm"
-        },
-        {
-          "id": "outgoing",
-          "label": "Outgoing"
-        },
-        {
-          "id": "romantic",
-          "label": "Romantic"
-        },
-        {
-          "id": "slob",
-          "label": "Slob"
-        },
-        {
-          "id": "example",
-          "label": "Example"
-        },
-        {
-          "id": "foodie",
-          "label": "Foodie"
-        },
-        {
-          "id": "gloomy",
-          "label": "Gloomy"
-        },
-        {
-          "id": "loner",
-          "label": "Loner"
-        },
-        {
-          "id": "natureLover",
-          "label": "Nature Lover"
-        },
-        {
-          "id": "neat",
-          "label": "Neat"
-        },
-        {
-          "id": "cheerful",
-          "label": "Cheerful"
-        },
-        {
-          "id": "couchPotato",
-          "label": "Couch Potato"
-        },
-        {
-          "id": "energetic",
-          "label": "Energetic"
-        },
-        {
-          "id": "hotHeaded",
-          "label": "Hot Headed"
-        },
-        {
-          "id": "kind",
-          "label": "Kind"
-        },
-        {
           "id": "lazy",
           "label": "Lazy"
         },

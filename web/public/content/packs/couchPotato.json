@@ -41,8 +41,7 @@
       "model": "model.couchPotato.cinemaWall",
       "footprint": [2, 1],
       "price": 2900,
-      "category": "validate",
-      "group": "couchPotato",
+      "category": "living",
       "slots": 2,
       "description": "A huge screen with surround sound for two. A movie marathon tops up fun and comfort and leaves residents relaxed for the evening, so they lounge and sleep better.",
       "interactions": [
@@ -76,8 +75,7 @@
       "model": "model.couchPotato.gameConsole",
       "footprint": [1, 1],
       "price": 520,
-      "category": "validate",
-      "group": "couchPotato",
+      "category": "hobbies",
       "slots": 2,
       "description": "A games console on its own screen with two controllers. Better players (Dexterity) have more fun, and from Dexterity 4 they set high scores that make them learn faster.",
       "interactions": [
@@ -114,8 +112,7 @@
       "model": "model.couchPotato.recliner",
       "footprint": [1, 1],
       "price": 780,
-      "category": "validate",
-      "group": "couchPotato",
+      "category": "living",
       "slots": 1,
       "description": "A deep power recliner with a footrest. Reclining keeps residents comfy for hours, and it's good for a quick doze.",
       "interactions": [
@@ -150,8 +147,7 @@
       "stores": true,
       "footprint": [1, 1],
       "price": 260,
-      "category": "validate",
-      "group": "couchPotato",
+      "category": "kitchen",
       "slots": 1,
       "description": "A small fridge that sits next to the sofa, with a door screen for ordering food. Snacks within reach, and takeout so nobody has to cook (it costs money).",
       "interactions": [
@@ -184,8 +180,7 @@
       "model": "model.couchPotato.fitnessGame",
       "footprint": [1, 1],
       "price": 450,
-      "category": "validate",
-      "group": "couchPotato",
+      "category": "fitness",
       "slots": 1,
       "description": "A motion-sensing workout game with a mat and a screen. It builds Endurance with more fun and less sweat than a treadmill, and afterwards residents move faster.",
       "interactions": [
@@ -208,9 +203,8 @@
       "model": "model.couchPotato.lavaLamp",
       "footprint": [1, 1],
       "price": 90,
-      "category": "validate",
+      "category": "decor",
       "freeRotation": true,
-      "group": "couchPotato",
       "slots": 1,
       "description": "Slow, glowing blobs of wax on a little side table. Watching them is a cheap bit of fun and comfort.",
       "interactions": [

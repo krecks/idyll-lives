@@ -566,6 +566,122 @@ Nothing needed fixing. Seen in passing: two tiles from the house the pine's and 
 on a one-tile footprint) reach through the house's wall; the game lets a tree stand that close, and the placeholders
 were as wide. All back in garden / trees.
 
+## The bookworm pack
+
+The reading nook's cushion settles for "Curl up", the library wall's ladder rolls for research and browsing, the
+writer's bureau's flap drops (writer facing the wall, `seat.facing: back`), the tea trolley's teapot pours, the
+fireside lounge's fire grows for both readings, the bedside stack's top book opens. One fix: **the fireside
+lounge's hood hung on a flue that ended about 2 m up, in mid-air**; the flue now rises to the 2.8 m ceiling with a
+collar there (`pack_bookworm.py`; 3 draws, 0 failed; validator 0/0; the placeholder stays 1.96 m tall, only the
+fallback). Back in living, office, kitchen and bedroom (no group).
+
+## The cheerful pack
+
+The jukebox's record swings up and its label spins while dancing, the karaoke machine's microphone rises, the
+mocktail cart's shaker tips, the sunrise lamp's sun rises for "Stretch", the party booth's curtain swings aside and
+holds 1.5 s; the rainbow hammock sways (lain across, `BEDS` `across`) for swing and doze. Nothing needed fixing.
+Back in living, hobbies, kitchen, outdoor and bedroom.
+
+## The couch potato pack
+
+The cinema wall's curtains part for both watches, the console's tray slides out, the recliner tips back with its
+sitter riding it (recline and doze), the snack fridge's door opens for snack and takeout, the workout game's board
+tilts, the lava lamp's wax rises for "Zone out" over its ambient `drift`. Seen in passing: the cinema wall and the
+console put their screen at the footprint's front facing the seats, so from the room one sees the screen's back
+(the placeholders' layout). Back in living, hobbies, kitchen, fitness and decor.
+
+## The energetic pack
+
+The bouldering wall is still (looked at in all facings, climbed); the spin bike's pedals turn while riding; the
+trampoline's mat dips with the bouncer; the streetball hoop's net sways after each shot (1.4 s in, every 3.2 s); the
+power blender's lid lifts and settles; the contrast shower's rain grows; the recovery pod's canopy lowers and lifts.
+Nothing needed fixing. Back in fitness, outdoor, kitchen and bathroom.
+
+## The example pack
+
+The chef's stove opens its oven door and lights its burners for cook and practise (each run as a recipe from the
+house's fridge), the whirlpool tub fills and bubbles for "Soak". Nothing needed fixing. Back in kitchen and wellness
+(the pack's own category).
+
+## The foodie pack
+
+The herb garden grows a sprig, the deli pantry's doors open for nibble and cheese board (hold 2.5 s), the espresso
+bar's stream grows and wand swings out, the cookbook lectern turns a page, the pizza oven's door lifts aside and
+fire grows for "Bake a pizza" and the fire alone for "Warm up", the chef's island opens its drawer for the tasting
+menu and is sat at for a bar bite. Nothing needed fixing. Back in decor, kitchen and outdoor.
+
+## The gloomy pack
+
+The record cabinet's lid lifts and its platter turns for listen and new album, the cello comes off its stand, the
+journal desk's candle grows, the rain lamp's strands grow for "Watch the rain" over its ambient ripple, the window
+seat's cushion sinks for brood and doze, the soaking tub fills. One fix: **the record cabinet's back was the Trim
+(ink) colour outside**, navy from behind when it stands free; it is walnut outside now, ink inside the bays
+(`pack_gloomy.py`; 4 draws as before, 0 failed; validator 0/0). Seen in passing: dozing on the window seat (2x1,
+`lie`) lies front to back, head at the window, legs off the front edge: the renderer's `BEDS` table has no entry for
+it (the hammocks lie `across`). Back in living, hobbies, office, decor and bathroom.
+
+## The hot-headed pack
+
+The heavy bag swings while pounded, the smash bin's lid flips up (hold 1 s), the drum kit's cymbals shake while
+drumming, the cool-down cushion sinks for both meditations, the grudge desk opens its drawer, the cold plunge's
+cover slides off. Nothing needed fixing. Back in fitness, hobbies, decor, office and bathroom.
+
+## The kind pack
+
+The baking counter's oven opens for pie and treats (recipes from the house's fridge), the giving jar takes a coin,
+the knitting rocker rocks with its sitter for knit and rock, the tea table's pot pours, the songbird feeder's lid
+opens for refill and birds come for "Watch the birds", the hearth settee's cushions sink. Seen in passing: the quilt
+nap on the settee (2x1, `lie`) lies front to back with the legs off the front, as on the window seat. Back in
+kitchen, decor, hobbies, living and outdoor.
+
+## The loner pack
+
+The quiet pod's hood swings half closed for retreat and read, the shortwave radio's dial turns for "Tune" and its
+antenna rises then the dial for "Airwaves", the puzzle grows for both uses, the bonsai's twig shrinks for "Shape" and
+the mist plays for "Tend", the sauna's door opens and shuts behind the sitter (hold 1.5 s), the delivery hatch
+opens for order and treat. Nothing needed fixing. Back in living, office, hobbies, bathroom and kitchen.
+
+## The nature lover pack
+
+The veggie bed's plants sway every 2.4 s while tended (over the growth pose), the potting bench grows a seedling
+for "Pot seedlings" and a bouquet for "Tie a bouquet", the bird feeder's bird comes, the garden hammock sways
+(lain across), the cedar shower's stream grows, the moss terrarium's lid lifts, the glasshouse's door and vent open
+for unwind and orchids. Nothing needed fixing. Not seen in a picture: "Pick something fresh" (`when: ripe`); the
+crop takes two game days to ripen and the resident fell asleep each time it did; its `harvest` clip was seen
+playing (sampled to 0.62 of 0.79 s at speed) and shutting when the ripe crop was picked in the first run. Back in
+garden / edibles (veggie bed), hobbies, outdoor and decor.
+
+## The neat pack
+
+The steam mop leaves its dock into the resident's hands, the laundry centre's washer door swings for laundry and
+fold, the rain shower's rain grows, the organizer desk's bin drawer slides out for sort and ledger, the robot vacuum
+rolls out and back (hold 2 s), the entry console's key tray slides out. Seen in passing: at the organizer desk the
+writer's hands come through the modesty panel to the room side (the shared `write` pose reaches low and far; the
+candlelit journal desk shows the hands under its apron too); the entry console's leaning mirror and hook board (and
+the slob spritz station's round mirror) stand on the wall face, so they hang in the air when the piece stands free.
+Back in kitchen, bathroom, office, living and decor.
+
+## The outgoing pack
+
+The party bar's tap pulls for mix and soda (hold 2 s), the sectional's cushions sink, the karaoke stage's mic stand
+rises for practise and perform, the video-call ring light swings up, the dance floor's tiles pulse while dancing,
+a photo grows on the photo wall. Seen in passing: the party bar's "Back bar" colours the low back cabinet, not the
+bottle shelves above it. Back in kitchen, living, hobbies, office and decor.
+
+## The romantic pack
+
+The candlelit table's flames grow for dinner and dessert, the heart tub fills with petals, the letter bureau's flap
+drops, the vanity's drawer opens (hold 2 s), the gramophone's arm swings onto the record and the platter spins for
+listen and waltz, the rose-arbour swing swings with its sitter and a bloom shrinks for "Tend the roses". Nothing
+needed fixing. Back in kitchen, bathroom, bedroom, living, office and outdoor.
+
+## The slob pack
+
+The microwave cart's door opens and shuts for nuke and invent, the beanbag squashes for flop and snooze, the snack
+nightstand's drawer opens (eaten sitting on its padded top), the spritz bottle tips, the arcade's joystick moves
+while playing, the gaming recliner tips back for the marathon and its cup holder swings out for a soda. Nothing
+needed fixing. Back in kitchen, living, bedroom, bathroom and hobbies.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
