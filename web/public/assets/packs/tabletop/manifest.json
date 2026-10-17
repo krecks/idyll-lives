@@ -589,7 +589,23 @@
         },
         {
           "material": "book_a",
-          "label": "Books"
+          "label": "Book 1"
+        },
+        {
+          "material": "book_c",
+          "label": "Book 2"
+        },
+        {
+          "material": "book_b",
+          "label": "Book 3"
+        },
+        {
+          "material": "book_e",
+          "label": "Book 4"
+        },
+        {
+          "material": "book_d",
+          "label": "Book 5"
         }
       ]
     },

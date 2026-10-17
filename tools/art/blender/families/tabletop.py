@@ -890,7 +890,10 @@ FAMILY = G.Family(
         # TT3 books and small plants
         T('bookStack', bookStack, (0.25, 0.133, 0.196),
           [('book_a', 'Book 1'), ('book_b', 'Book 2'), ('book_c', 'Book 3'), ('book_d', 'Book 4')]),
-        T('booksUpright', booksUpright, (0.32, 0.206, 0.126), [('brass', 'Bookends'), ('book_a', 'Books')]),
+        # each cover colour, left to right as they first show (eight books: Book 1-3 colour two each)
+        T('booksUpright', booksUpright, (0.32, 0.206, 0.126),
+          [('brass', 'Bookends'), ('book_a', 'Book 1'), ('book_c', 'Book 2'), ('book_b', 'Book 3'),
+           ('book_e', 'Book 4'), ('book_d', 'Book 5')]),
         T('vaseFlowers', vaseFlowers, (0.179, 0.41, 0.172), [('vase', BODY)]),
         T('vaseSmall', vaseSmall, (0.08, 0.277, 0.08), [('bud_vase', BODY)]),
         T('potSucculent', potSucculent, (0.164, 0.136, 0.164), [('pot_pale', BODY)]),

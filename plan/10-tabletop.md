@@ -43,7 +43,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | `wineGlasses` Wine and glasses | 1x1 · surface | — | tabletop / tableware | Body | Static | Static. |
 | `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body | Static | Static. |
 
-## TT3. Books and small plants (7) — **Done** (in Validate › Books And Pots)
+## TT3. Books and small plants (7) — **Done**, signed off 2026-10-17 (back in tabletop / books and tabletop / plants)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 - **Validate group:** `books and pots` (Validate › Books And Pots)
@@ -52,7 +52,7 @@ kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their o
 | Item | Size · layer | Uses (id:anim) | Back to | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `bookStack` Stack of books | 1x1 · surface | — | tabletop / books | Body | Static | Static. |
-| `booksUpright` Books and bookends | 1x1 · surface | — | tabletop / books | Body | Static | Static. |
+| `booksUpright` Books and bookends | 1x1 · surface | — | tabletop / books | Bookends, Book 1–5 (each cover colour) | Static | Static. |
 | `vaseFlowers` Vase of flowers | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 | `vaseSmall` Bud vase | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 | `potSucculent` Succulent | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
