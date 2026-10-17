@@ -1,6 +1,6 @@
 # Yard (`families/yard.py`)
 
-The OU4 play and yard things (plan/12-outdoor.md), built over their primitive-part placeholders (`catalog.py`:
+The OU4 play and yard things (docs/objects/outdoor.md), built over their primitive-part placeholders (`catalog.py`:
 the sandpit and the bike rack; `catalog2.py`: the rest), which stay the fallback. One pack, `packs/yard/manifest.json`,
 models in `models/yard/`. Built 2026-10-16; they sit in Validate › Yard until signed off (the sandpit and the bike
 rack back to Outdoor › Play, the rest to Outdoor › Yard).

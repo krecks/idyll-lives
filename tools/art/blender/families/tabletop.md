@@ -1,6 +1,6 @@
 # Tabletop — notes
 
-`tabletop.py` builds the 39 tabletop things (plan/10-tabletop.md, TT1–TT5) into `web/public/assets/models/tabletop/`
+`tabletop.py` builds the 39 tabletop things (docs/objects/tabletop.md, TT1–TT5) into `web/public/assets/models/tabletop/`
 and their entries in `packs/tabletop/manifest.json`, over the primitive-part placeholders of `catalog2.py`, which stay
 the fallback. Built 2026-10-14; they sit in Validate (Kitchenware, Tableware, Books And Pots, Small Ornaments, Desk And
 Bath Bits) until checked in play, then go back to `tabletop` and their old group (`kitchenware`, `tableware`, `books`,

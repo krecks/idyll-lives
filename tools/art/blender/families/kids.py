@@ -1,4 +1,4 @@
-# The kids' things (plan/04-kids.md), over their primitive-part placeholders (`catalog.py`, `catalog2.py`,
+# The kids' things (docs/objects/kids.md), over their primitive-part placeholders (`catalog.py`, `catalog2.py`,
 # `furniture.py`), which stay the fallback. Notes: kids.md.
 #
 # KD1 baby and kids' beds: the crib with its changing table (`model.crib`), the kids' bed (`model.kidsBed`),

@@ -3,7 +3,7 @@
 *Status: the standard proposed for 0.3.0, written from the review of the first Blender models
 (the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 every object's
 model is built in Blender and exported as glTF: all 541 were built and signed off in play by 2026-10-17
-(`plan/16-sign-off.md`). Files now resize, are picked by what's drawn, load
+([docs/objects/](../objects/README.md)). Files now resize, are picked by what's drawn, load
 once per scene and can have [moving parts](#moving-parts) (branch `v0.3/object-motion`); the rest of
 [Before Blender is the standard](#before-blender-is-the-standard) is still to do. The toolkit and
 the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*

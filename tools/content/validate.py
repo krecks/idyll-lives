@@ -7,19 +7,19 @@ was meant). Several sessions edit these files: run it on a clean file, or commit
 right after (`git add -p`).
 
     python3 -B tools/content/validate.py list
-        Validate's groups, their items, and where each goes back to (the plan's "Back to").
+        Validate's groups, their items, and where each goes back to (the "Home" column).
     python3 -B tools/content/validate.py in <id>... --group <group> [--label "Label"]
         Into Validate › <group> (made if missing; "outside" when the items' home group is).
-        Prints each item's home, for the task table's "Back to" column.
+        Prints each item's home, for the category table's "Home" column.
     python3 -B tools/content/validate.py out <id>... [--to <category>/<group>]
     python3 -B tools/content/validate.py out --group <group> [--to <category>/<group>]
-        Sign-off: back home. Without --to, each item goes back to its "Back to" in the plan's task
-        tables (plan/*.md: `living / seating`; `living / —` is the category with no group).
-        Validate groups left empty are dropped; the last one leaving is reported (16-sign-off.md
-        says what to do then).
+        Sign-off: back home. Without --to, each item goes back to its "Home" in the category
+        tables (docs/objects/*.md: `living / seating`; `living / —` is the category with no group).
+        Validate groups left empty are dropped; the last one leaving is reported (then remove the
+        category and its icon, docs/objects/README.md).
 
     Options: --dry-run (print the diff, write nothing), --content <dir> (default
-    web/public/content: base.json and its includes), --plan <dir> (default plan/).
+    web/public/content: base.json and its includes), --plan <dir> (default docs/objects/).
 
 Free turning: whether a 1x1 item may turn freely comes from its category (`objectRules.freeRotation`
 in base.json) unless the item says `"freeRotation": true|false`. Going into Validate, an item that
@@ -199,12 +199,12 @@ def load(content):
 
 
 def back_to_table(plan):
-    """Item id -> (category, group or None) from the task tables' "Back to" column."""
+    """Item id -> (category, group or None) from the category tables' "Home" (or "Back to") column."""
     homes = {}
     for md in sorted(plan.glob('*.md')):
         column = None
         for line in md.read_text().splitlines():
-            # A list instead (16-sign-off.md's sinks): "- `a`, `b`: bathroom / sinks;".
+            # A list instead: "- `a`, `b`: bathroom / sinks;".
             listed = re.match(r'- ((?:`[^`]+`(?:, )?)+): ([\w ]+) / ([^;.]+)[;.]?$', line)
             if listed:
                 group = listed.group(3).strip()
@@ -214,8 +214,9 @@ def back_to_table(plan):
                 column = None
                 continue
             cells = [c.strip() for c in line.strip().strip('|').split('|')]
-            if 'Back to' in cells:
-                column = cells.index('Back to')
+            heading = next((h for h in ('Home', 'Back to') if h in cells), None)
+            if heading:
+                column = cells.index(heading)
                 continue
             if column is None or column >= len(cells):
                 continue
@@ -240,7 +241,7 @@ def main():
     ap.add_argument('--to')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--content', type=Path, default=ROOT / 'web/public/content')
-    ap.add_argument('--plan', type=Path, default=ROOT / 'plan')
+    ap.add_argument('--plan', type=Path, default=ROOT / 'docs/objects')
     args = ap.parse_args()
 
     files = load(args.content)
@@ -285,7 +286,7 @@ def main():
             print(f'{gid} ({len(items)})')
             for ident in items:
                 home = homes.get(ident)
-                print(f'  {ident}  ->  {f"{home[0]} / {home[1] or chr(8212)}" if home else "(no Back to in plan/)"}')
+                print(f'  {ident}  ->  {f"{home[0]} / {home[1] or chr(8212)}" if home else "(no Home in docs/objects/)"}')
         for gid, items in in_validate.items():
             print(f'{gid} (not a Validate group!): {", ".join(items)}')
         return
@@ -344,7 +345,7 @@ def main():
             elif ident in homes:
                 home = homes[ident]
             else:
-                sys.exit(f'validate: no "Back to" for {ident} in {args.plan}: give --to <category>/<group>')
+                sys.exit(f'validate: no "Home" for {ident} in {args.plan}: give --to <category>/<group>')
             if home[0] not in cats:
                 sys.exit(f'validate: {ident}: no category "{home[0]}"')
             if home[1] is not None and home[1] not in groups_of(home[0]):
@@ -364,7 +365,7 @@ def main():
             vfile.remove_item(vgroups, g)
             print(f'dropped the empty Validate group: {g.get("id").value}')
         if len(dropped) == len(vgroups.items):
-            print('Validate is empty now: remove the category and its icon (plan/16-sign-off.md, "The end").')
+            print('Validate is empty now: remove the category and its icon (docs/objects/README.md, "Validate").')
 
     # Build, parse and check every changed file before writing any.
     out = []

@@ -1,4 +1,4 @@
-# The farm (plan/14-community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale,
+# The farm (docs/objects/community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale,
 # the stack of hay bales, the scarecrow, the water trough and the chicken coop (`model.farm.<id>`), over the
 # primitive-part placeholders of `tools/art/community.py` ("Farm"), which stay the fallback. They stand on
 # the farm lots of farm worlds (web/src/game/town.ts `farmstead`) and are seen from afar in the town
@@ -743,7 +743,7 @@ FAMILY = G.Family(
              paint=[('trough', 'Paint')]),
      G.Model('coop', coop, size=(1.74, 1.88, 1.97), tolerance=TOLERANCE, far=0.25, motions={'night': 'close'},
              paint=[('coop', 'Paint'), ('coop_roof', 'Roof'), ('coop_trim', 'Trim')])],
-    comment='Blender-built farm (tools/art/blender/families/farm.py, plan/14-community.md CM5): the red barn, the '
+    comment='Blender-built farm (tools/art/blender/families/farm.py, docs/objects/community.md CM5): the red barn, the '
             'grain silo, the little tractor, the round hay bale, the stack of hay bales, the scarecrow (an ambient '
             'sway), the water trough and the chicken coop (its pop-hole hatch shut at night, `close`). Each has a far '
             'version (`far`, E7) for the town overview. Replaces the primitive-part placeholders of '

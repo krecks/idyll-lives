@@ -1,6 +1,6 @@
 # Garden things (`families/garden_things.py`)
 
-OU5 of `plan/12-outdoor.md`: the pond, the small garden things and the garden lights, built over their primitive-part
+OU5 of `docs/objects/outdoor.md`: the pond, the small garden things and the garden lights, built over their primitive-part
 placeholders (`nature.py` for the pond, `catalog2.py` for the planter box, birdhouse, feeders, dog house, sundial and
 stepping stones, `catalog.py` for the lamp post and the string lights), which stay the fallback. One pack,
 `packs/garden_things/manifest.json`. Built 2026-10-16; in Validate › Garden Things until signed off (back to Outdoor ›

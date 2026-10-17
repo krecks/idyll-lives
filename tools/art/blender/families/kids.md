@@ -1,6 +1,6 @@
 # Kids — notes
 
-`kids.py` builds the twenty kids' things of plan/04-kids.md into `web/public/assets/models/kids/` and their entries
+`kids.py` builds the twenty kids' things of docs/objects/kids.md into `web/public/assets/models/kids/` and their entries
 in `packs/kids/manifest.json`, over the primitive-part placeholders of the base manifest (the crib), `catalog.py`
 and `catalog2.py`, which stay the fallback. Built 2026-10-14; they sit in Validate › Baby And Beds, Toys and Kids
 Study until checked in play.

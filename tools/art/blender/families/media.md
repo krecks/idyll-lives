@@ -1,6 +1,6 @@
 # Media — notes
 
-`media.py` builds the eight L4 living-room media models (plan/05-living.md) into `web/public/assets/models/media/` and
+`media.py` builds the eight L4 living-room media models (docs/objects/living.md) into `web/public/assets/models/media/` and
 their entries in `packs/media/manifest.json`, an override pack over the base manifest (`tv`, furniture.py `tv_set`),
 `catalog/manifest.json` (`tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`) and `catalog2/manifest.json`
 (`tvStandLow`, `fireplaceElectric`). Their primitive-part placeholders stay as the fallback. Built 2026-10-16; they sit

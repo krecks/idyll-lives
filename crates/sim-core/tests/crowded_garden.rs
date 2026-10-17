@@ -1,4 +1,4 @@
-//! A crowded garden (plan/future.md, Outdoor): eleven outdoor things bought side by side in a row,
+//! A crowded garden (docs/objects/open.md, Still open): eleven outdoor things bought side by side in a row,
 //! facing the house or away from it. Each is still reached and used when a resident is told to,
 //! from the free row in front of it, and two residents share what seats two.
 

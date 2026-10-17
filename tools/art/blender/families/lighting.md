@@ -1,6 +1,6 @@
 # Lighting — notes
 
-`lighting.py` builds the 21 lamps of plan/11-lighting.md into `web/public/assets/models/lighting/` and their
+`lighting.py` builds the 21 lamps of docs/objects/lighting.md into `web/public/assets/models/lighting/` and their
 entries in `packs/lighting/manifest.json`, over the primitive-part placeholders of `catalog.py`, `catalog2.py`
 and the base manifest (`model.lamp`), which stay as the fallback. Built 2026-10-14; they sit in Validate ›
 Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.

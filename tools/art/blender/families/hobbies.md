@@ -1,6 +1,6 @@
 # Hobbies — notes
 
-`hobbies.py` builds the nineteen hobby models (plan/08-hobbies.md, H1–H3) into `web/public/assets/models/hobbies/`
+`hobbies.py` builds the nineteen hobby models (docs/objects/hobbies.md, H1–H3) into `web/public/assets/models/hobbies/`
 and their entries in `packs/hobbies/manifest.json`. They replace the primitive-part placeholders of
 `furniture.py` (the base manifest), `catalog.py` and `catalog2.py`, which stay as the fallback. Built 2026-10-14;
 they sit in Validate › Music, Games and Crafts until checked in play.

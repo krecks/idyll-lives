@@ -1,4 +1,4 @@
-# The play and yard things (plan/12-outdoor.md OU4), over their primitive-part placeholders (`catalog.py`,
+# The play and yard things (docs/objects/outdoor.md OU4), over their primitive-part placeholders (`catalog.py`,
 # `catalog2.py`), which stay the fallback. Notes: yard.md.
 #
 # The sandpit (`model.sandbox`), whose sand castle grows while one is built (`castle`); the bike rack

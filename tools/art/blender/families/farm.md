@@ -1,6 +1,6 @@
 # Farm — notes
 
-`farm.py` builds the eight CM5 farm models (plan/14-community.md) into `web/public/assets/models/farm/` and their
+`farm.py` builds the eight CM5 farm models (docs/objects/community.md) into `web/public/assets/models/farm/` and their
 entries in `packs/farm/manifest.json`: the red barn (`model.farm.barn`), the grain silo (`model.farm.silo`), the
 little tractor (`model.farm.tractor`), the round hay bale (`model.farm.hayBale`), the stack of hay bales
 (`model.farm.hayStack`), the scarecrow (`model.farm.scarecrow`), the water trough (`model.farm.trough`) and the
