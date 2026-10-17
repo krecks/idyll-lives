@@ -2463,7 +2463,7 @@
         }
       ],
       "price": 750,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2
     },
@@ -3145,7 +3145,7 @@
         1
       ],
       "price": 180,
-      "category": "validate",
+      "category": "bedroom",
       "group": "dressing",
       "description": "Builds Charisma.",
       "interactions": [
@@ -3707,22 +3707,6 @@
         {
           "id": "fitness",
           "label": "Fitness"
-        },
-        {
-          "id": "dressing",
-          "label": "Dressing"
-        },
-        {
-          "id": "nightstands",
-          "label": "Nightstands"
-        },
-        {
-          "id": "wardrobes",
-          "label": "Wardrobes"
-        },
-        {
-          "id": "beds",
-          "label": "Beds"
         },
         {
           "id": "books and pots",

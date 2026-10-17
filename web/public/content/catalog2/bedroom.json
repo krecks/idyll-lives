@@ -10,7 +10,7 @@
         2
       ],
       "price": 900,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "decor": 0.2,
@@ -57,7 +57,7 @@
         2
       ],
       "price": 1400,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "decor": 0.4,
@@ -104,7 +104,7 @@
         2
       ],
       "price": 2200,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "decor": 0.8,
@@ -152,7 +152,7 @@
         2
       ],
       "price": 480,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "decor": 0.2,
       "description": "A single bed with a back and arms: a sofa by day, a bed by night.",
@@ -198,7 +198,7 @@
         1
       ],
       "price": 95,
-      "category": "validate",
+      "category": "bedroom",
       "group": "nightstands",
       "decor": 0.15,
       "surface": {
@@ -225,7 +225,7 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "bedroom",
       "group": "nightstands",
       "decor": 0.2,
       "surface": {
@@ -252,7 +252,7 @@
         1
       ],
       "price": 130,
-      "category": "validate",
+      "category": "bedroom",
       "group": "nightstands",
       "decor": 0.2,
       "surface": {
@@ -293,8 +293,8 @@
         1
       ],
       "price": 280,
-      "category": "validate",
-      "group": "wardrobes",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.2,
       "surface": {
         "height": 1.16,
@@ -334,8 +334,8 @@
         1
       ],
       "price": 360,
-      "category": "validate",
-      "group": "wardrobes",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.3,
       "surface": {
         "height": 0.8,
@@ -375,9 +375,9 @@
         1
       ],
       "price": 240,
-      "category": "validate",
+      "category": "bedroom",
       "fillsWall": true,
-      "group": "wardrobes",
+      "group": "storage",
       "description": "A narrow white wardrobe for a small room.",
       "interactions": [
         {
@@ -404,9 +404,9 @@
         1
       ],
       "price": 900,
-      "category": "validate",
+      "category": "bedroom",
       "fillsWall": true,
-      "group": "wardrobes",
+      "group": "storage",
       "decor": 0.6,
       "description": "A grand two-door wardrobe in dark wood with a cornice and turned feet.",
       "interactions": [
@@ -434,8 +434,8 @@
         1
       ],
       "price": 220,
-      "category": "validate",
-      "group": "nightstands",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.3,
       "surface": {
         "height": 0.505,
@@ -469,8 +469,8 @@
         1
       ],
       "price": 240,
-      "category": "validate",
-      "group": "nightstands",
+      "category": "bedroom",
+      "group": "storage",
       "slots": 2,
       "decor": 0.3,
       "seat": {
@@ -503,7 +503,7 @@
         1
       ],
       "price": 160,
-      "category": "validate",
+      "category": "bedroom",
       "group": "dressing",
       "decor": 0.3,
       "description": "A full-length mirror on a brass stand.",
@@ -534,8 +534,8 @@
         1
       ],
       "price": 45,
-      "category": "validate",
-      "group": "nightstands",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.1,
       "description": "A wicker hamper with a lid.",
       "interactions": [

@@ -387,6 +387,57 @@ in the studio and the clips bench and in play). The kids' chair's seat was label
 (b43a0e6). Seen in passing: the drawing grows from the board's right as you face it (the family's "left" is the
 object's own). All back in kids / —.
 
+## The beds
+
+The nine BR1 beds (Validate › Beds) were signed off on 2026-10-16, checked as the sinks were: each standing free and
+napped in, in all four facings (`nap`: the 480-minute sleep plays the same clips), by day and at night, on WebGPU and
+WebGL2, on Medium and Low, with every part coloured (through `buy` and in the colour studio). The duvet's top third
+turns down (`turn_down`) as the sleeper gets in and back up as they get up, under the game's blanket; with two
+sleepers (Ada and Ben in `family-check`) both quilts cover the turned-down duvet and nothing pokes through, on the
+double, king, oak double, upholstered queen and four-poster. The bunk turns down the lower duvet for the one in
+slot 0 and the upper (`turn_down_upper`) for the one in slot 1, each shutting when its sleeper gets up. The futon's
+back folds flat (`unfold`) for a nap or a night, and the last one up folds it away (as the wall bed); Unfold leaves it
+open and Fold away closes it. The daybed is still. Two fixes:
+- **The four-poster's duvet foot** flickered: its end was in the plane of the mattress's end. It now stands 1.5 cm
+  past it (529605e).
+- **The daybed's back cushions** took in a sleeper's shoulder and hip. They are thinner, closer to the back and lean
+  less (51bb85d).
+
+Seen in passing: two residents getting up from the same bed stand on the same spot for a moment (sim); the oak double's
+"Headboard" colours its teak slats, the posts and rails going with the frame; the daybed's back runs along a long
+side, so standing head-end to the wall it doesn't read as a sofa (as built: head end on the wall). All back in
+bedroom / beds.
+
+## The nightstands
+
+The eight BR2 things (Validate › Nightstands) were signed off on 2026-10-16, checked as the sinks were, in all four
+facings standing free and against the wall: the three-drawer nightstand's top drawer slides out for "Pick an
+outfit"; the blanket chest's lid lifts (`lid_open`) for "Take out a blanket" and the hamper's for "Sort the washing",
+each shutting after its use; the bed-end bench is sat on. The nightstand with a lamp lights at night
+(its shade glows, the top lit warm; coloured by day, the shade shows its glow's colour at night). The rest are still.
+One fix: **the blanket chest's lid underside** flickered with the edge band below it (same plane), seen with the lid
+up; the lid's underside is now 2 mm lower (a23e9c7). `nightstand`, `nightstandLamp`, `cedarChest`, `benchBedEnd`,
+`laundryHamper` back in bedroom / storage; `nightstandModern`, `nightstandRound`, `nightstandDrawers` in bedroom /
+nightstands.
+
+## The wardrobes
+
+The six BR3 things (Validate › Wardrobes) were signed off on 2026-10-16, checked as the sinks were, each standing
+free in all four facings: the dresser's, tall chest's and low dresser's drawer slides out 30 cm for "Pick an outfit"
+and the wardrobe's, armoire's (both doors, `doors_open`) and single wardrobe's (`door_open`) doors swing out onto the
+rail of clothes, each shutting after its `hold`. One fix: **the wardrobe's "Body" coloured only its birch doors**, the
+white carcass staying white. Body now colours the carcass and the doors are their own part, Doors (Body, Doors,
+Handles; as the butcher block got its own Top in K4; the plan table updated) (0fa072f). All back in bedroom / storage.
+
+## The dressing things
+
+The four BR4 things (Validate › Dressing) were signed off on 2026-10-16, checked as the sinks were: the cheval mirror
+(speech) and the standing mirror (Check the mirror) standing free in all four facings, the wall mirror on all four
+walls (speech), the resident in front of the glass, which reflects the room; the dressing table's drawer slides out
+(`drawer_open`) for "Get ready", the resident on the pouf facing the mirror, and shuts after its `hold`. Nothing needed
+fixing. Seen in passing: a wall mirror on a wall cut down for the camera stays drawn at full height above it
+(renderer). All back in bedroom / dressing.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -407,6 +458,7 @@ task done in the category file (strike through its heading, with the commit).
 - **Hobbies** (`08-hobbies.md`, H1–H3): signed off 2026-10-16.
 - **Office** (`06-office.md`, O1–O3): signed off 2026-10-17.
 - **Kids** (`04-kids.md`, KD1–KD3): signed off 2026-10-17.
+- **Bedroom** (`03-bedroom.md`, BR1–BR4): signed off 2026-10-17.
 
 ## The end
 

@@ -1845,7 +1845,7 @@
         2
       ],
       "price": 320,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "description": "A bed for one.",
       "interactions": [
@@ -1890,7 +1890,7 @@
         2
       ],
       "price": 650,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "bunk": true,
@@ -1937,7 +1937,7 @@
         2
       ],
       "price": 420,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "description": "A low platform with a firm futon: the cheapest double, if not the comfiest.",
@@ -2005,7 +2005,7 @@
         2
       ],
       "price": 1800,
-      "category": "validate",
+      "category": "bedroom",
       "group": "beds",
       "slots": 2,
       "decor": 0.5,
@@ -2053,8 +2053,8 @@
         1
       ],
       "price": 75,
-      "category": "validate",
-      "group": "nightstands",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.15,
       "description": "A bedside table with a drawer.",
       "surface": {
@@ -2080,8 +2080,8 @@
         1
       ],
       "price": 140,
-      "category": "validate",
-      "group": "nightstands",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.3,
       "light": {
         "range": 3.2,
@@ -2101,8 +2101,8 @@
         1
       ],
       "price": 300,
-      "category": "validate",
-      "group": "wardrobes",
+      "category": "bedroom",
+      "group": "storage",
       "decor": 0.2,
       "description": "Six drawers of clothes. Picking a good outfit makes residents more charming for a few hours.",
       "surface": {
@@ -2142,9 +2142,9 @@
         1
       ],
       "price": 420,
-      "category": "validate",
+      "category": "bedroom",
       "fillsWall": true,
-      "group": "wardrobes",
+      "group": "storage",
       "description": "A double wardrobe. Picking a good outfit makes residents more charming for a few hours.",
       "interactions": [
         {
@@ -2171,7 +2171,7 @@
         1
       ],
       "price": 340,
-      "category": "validate",
+      "category": "bedroom",
       "group": "dressing",
       "description": "A table with a mirror and a pouf: freshen up, practise a smile, look your best.",
       "interactions": [
@@ -2204,7 +2204,7 @@
         1
       ],
       "price": 110,
-      "category": "validate",
+      "category": "bedroom",
       "group": "dressing",
       "layer": "wall",
       "decor": 0.3,
