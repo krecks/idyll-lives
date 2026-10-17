@@ -11,7 +11,8 @@
  * - every clip's length is within 15% of its target (the runtime sequences on them);
  * - seated on a 0.45 m seat (`sit` fitted with the body's `seatDrop`), the feet reach the floor,
  *   and the other seated clips (and the seated ends of sitDown / standUp) keep `sit`'s pelvis;
- * - `lie` lies straight: knees nearly straight, the hands in front of the body;
+ * - `lie` lies straight and down: knees nearly straight and not above the hips, the ankles below the
+ *   pelvis (the legs on the mattress, not floating), the hands in front of the body;
  * - the baby's lying clips keep the baby on the mattress and inside the crib: no joint more than
  *   3 cm (reference skeleton) behind the back, none further out to the side than `BABY_REACH`, the
  *   knees bent.
@@ -216,6 +217,11 @@ if (lie) {
     const bend = (Math.acos((u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / Math.hypot(...u) / Math.hypot(...v)) * 180) / Math.PI;
     if (bend > 20) errors.push(`lie: the ${side} knee is bent ${bend.toFixed(0)} deg`);
     if (w[bone[`hand_${side}`]][2] < w[bone.pelvis][2] + 0.05) errors.push(`lie: the ${side} hand is not in front of the body`);
+    // Down on the mattress (z is up once lying): the buttocks reach about 15 cm behind the pelvis joint, the
+    // calves 7 cm behind the knee and the heels 7 cm behind the ankle, so for the legs to lie on what the
+    // back lies on the knees can't rise above the hips and the ankles must be well below the pelvis.
+    if (k[2] > a[2]) errors.push(`lie: the ${side} knee is ${((k[2] - a[2]) * 100).toFixed(1)} cm above the hip (the legs float)`);
+    if (f[2] > w[bone.pelvis][2] - 0.05) errors.push(`lie: the ${side} ankle is ${((f[2] - w[bone.pelvis][2]) * 100).toFixed(1)} cm from the pelvis, not under it (the heels float)`);
   }
 }
 // The baby lying in the crib: on its back on the mattress (nothing behind the back of the pelvis and

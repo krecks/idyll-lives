@@ -346,7 +346,10 @@ const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBun
  * and moved this much towards its middle, so they overlap by four times it over the middle.
  */
 const BLANKET_MEET = 0.06;
-/** Lying: height of the back above the feet line, and how far the feet reach past the slot centre (body scale 1). */
+/**
+ * Lying: height of the back above the feet line (body scale 1, for a grown-up's body: a smaller body's,
+ * a child's, is thinner by its `size`), and how far the feet reach past the slot centre.
+ */
 const LIE_BACK = 0.1;
 const LIE_CENTRE = 0.86;
 /**
@@ -368,7 +371,7 @@ function lieCentre(rig: SimRig): number {
   return (rig.body.stage === 'baby' ? rig.body.height * 0.5 : LIE_CENTRE - (rig.body.height / rig.size) * (1 - rig.size)) * rig.scale;
 }
 function lieBack(rig: SimRig): number {
-  return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK) * rig.scale;
+  return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK * rig.size) * rig.scale;
 }
 /** A baby in the crib plays its own lying clips (clips/baby.ts: legs drawn up, hands by the head), asleep or awake, at their own speed; crossfaded over `BABY_LIE_FADE` s when the baby falls asleep or wakes. */
 const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
@@ -3792,7 +3795,8 @@ export class Characters {
       this.add,
       {
         x: 0,
-        y: LIE_BACK,
+        // (As `lieBack`: a smaller body than its family's base body lies lower.)
+        y: LIE_BACK * (body.height / (set.bodies.get(body.family)?.height ?? body.height)),
         z: LIE_CENTRE,
         qx: sp,
         qy: 0,
