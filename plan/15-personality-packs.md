@@ -105,7 +105,7 @@ are done (2026-10-14); what is left is in `future.md`.
 |---|---|---|---|---|---|---|
 | `gloomy.recordCabinet` Midnight record cabinet | 1x1 · floor | listen:listen newAlbum:listen | living / — | Body, Trim | Use | `lid_open`: the lid lifts for listen and newAlbum. L the platter turns (E1). |
 | `gloomy.cello` Nocturne cello | 1x1 · floor | practise:music lament:music | hobbies / — | Body, Trim | Use | `off_stand` if the music animation holds it. |
-| `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry. |
+| `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `gloomy.rainLamp` Rainfall lamp | 1x1 · floor | watchRain:look | decor / — | Body, Trim | Use | `rain`: the rain strands grow for watchRain. A rain (E2). |
 | `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Trim | Use | `sink_in`. A lone dozer lies along the cushion, head on the left pillow (`BEDS` 0.45, `across`); sharing the seat, on their own half as before. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
@@ -122,7 +122,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `hotHeaded.smashBin` Plate-smash bin | 1x1 · floor | smash:exercise | hobbies / — | Body | Use | `lid_open`: the lid flips up for smash; `hold` 1 s. |
 | `hotHeaded.thunderDrums` Thunder drum kit | 2x1 · floor | drum:music | hobbies / — | Body | Loop (E1) | `cymbals` (E1). Until then static. |
 | `hotHeaded.coolDownCushion` Cool-down meditation cushion | 1x1 · floor | countToTen:meditate breathe:meditate | decor / — | Body | Use | `sink_in`. |
-| `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. |
+| `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the cover slides off for plunge. |
 
 ## P9. Kind (6) — **Done**, signed off 2026-10-17 (back in kitchen, decor, hobbies, living and outdoor, no group)
@@ -197,7 +197,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body | Use | `mop_out`: the mop leaves its dock for mop (hidden while in the hands, if held). |
 | `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body | Use | `door_open`: the washer door swings for laundry and fold. |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body | Use | `water_on`: the rain grows for steamShower. |
-| `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body | Use | `drawer_open` for sort and ledger. |
+| `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body | Use | `drawer_open` for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program. |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body | Use | `tray`: the key tray drawer slides out for tidy. |
 
@@ -228,7 +228,7 @@ are done (2026-10-14); what is left is in `future.md`.
 | `romantic.heartTub` Heart-shaped petal tub | 2x2 · floor | petalBath:bath | bathroom / — | Body, Fabric | Use | `fill`: the water rises with petals for petalBath. |
 | `romantic.vanity` Rose-gold vanity | 1x1 · floor | primp:wash | bedroom / — | Body, Fabric | Use | `drawer_open` for primp; mirror part (E6). |
 | `romantic.gramophone` Moonlight gramophone | 1x1 · floor | listen:listen waltz:dance | living / — | Body, Fabric | Use | `needle`: the tone arm swings onto the record for listen and waltz. L the platter spins (E1). |
-| `romantic.letterBureau` Love-letter bureau | 1x1 · floor | writeLetter:write writePoem:write | office / — | Body, Fabric | Use | `fall_front`: the writing flap drops for writeLetter and writePoem. |
+| `romantic.letterBureau` Love-letter bureau | 1x1 · floor | writeLetter:write writePoem:write | office / — | Body, Fabric | Use | `fall_front`: the writing flap drops for writeLetter and writePoem. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `romantic.roseArbourSwing` Rose-arbour swing | 2x1 · floor | swing:relax tendRoses:prune | outdoor / — | Body, Fabric | Loop (E1) | `swing` (E1); U `cut`: a bloom shrinks away for tendRoses. |
 
 ## P16. Slob (6) — **Done**, signed off 2026-10-17 (back in kitchen, living, bedroom, bathroom and hobbies, no group)

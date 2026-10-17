@@ -155,6 +155,11 @@ const SEATS: Record<string, Seat> = {
   'romantic.heartTub': { h: 0.35, fwd: -0.36 },
   'hotHeaded.coldPlunge': { h: 0.35, fwd: 0 },
   'hotHeaded.coolDownCushion': { h: 0.4, fwd: 0 },
+  // Their own chairs at the writing desks (`NEAR_DESKS`): the hands on the top or the flap, in front of the hutch.
+  'gloomy.journalDesk': { h: 0.46, fwd: 0 },
+  'neat.organizerDesk': { h: 0.45, fwd: -0.08 },
+  'romantic.letterBureau': { h: 0.45, fwd: -0.06 },
+  'hotHeaded.grudgeJournal': { h: 0.46, fwd: -0.03 },
   // The 0.20 catalogue (content/furniture.json).
   barStool: { h: 0.72, fwd: 0 },
   bistroSet: { h: 0.46, fwd: -0.19 },
@@ -390,6 +395,12 @@ const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
 /** Crouched down (to hug the teddy, `HUGGED`). */
 const CROUCH_ONLY: readonly string[] = ['crouch'];
+/**
+ * Writing desks with their chair built in close, the top only about 0.3 m ahead of the hips (`SEATS`
+ * sits the writer on that chair): written at with the hands nearer (`sitHandsNear`), on the top, not
+ * through its front.
+ */
+const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -457,7 +468,7 @@ const ACTIONS: Record<string, ActionAnim> = {
   sit: { hands: HANDS.open },
   relax: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
-  write: { stand: ['interact', 'spell'], sit: 'sitHands', hands: HANDS.hold },
+  write: { stand: ['interact', 'spell'], sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'), hands: HANDS.hold },
   read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   play: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
