@@ -316,7 +316,8 @@ const BEDS: Record<string, Bed> = {
   bedDaybed: { h: 0.51 },
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
   sofaBed: { h: 0.42, fwd: 0.6 },
-  // The 2-wide window seat and settee: dozed on along the cushion, head to its left, whichever slot.
+  // The 2-wide window seat and settee: dozed on along the cushion, head to its left, whichever slot (the nap
+  // takes both, content `whole`).
   'gloomy.windowSeat': { h: 0.45, across: true },
   'kind.hearthSettee': { h: 0.44, across: true },
 };
@@ -772,8 +773,8 @@ interface SimRig {
   /** How far forward of the slot it lies (`BEDS` `fwd`). */
   bedFwd: number;
   /**
-   * Lying along a bed lain on across (`BEDS` `across`), in its middle: not while someone else uses
-   * it too (a 2-wide seat has no room for that), when they lie on their own slot as on a bed.
+   * Lying along a bed lain on across (`BEDS` `across`), in its middle, from whichever slot (on a
+   * 2-wide seat the nap takes both: content `whole`).
    */
   lieAcross: boolean;
   /**
@@ -2237,11 +2238,8 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
-      // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right (unless shared, `lieAcross`).
-      rig.lieAcross =
-        pose === Pose.Lie &&
-        !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across &&
-        !(usingId >= 0 && this.sims.some((r) => r && r !== rig && r.visible && r.useId === usingId));
+      // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
+      rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
       else if (pose === Pose.Sit) {
         const seat = (useObj ?? this.objectAt(rig.x, rig.z))?.seat;

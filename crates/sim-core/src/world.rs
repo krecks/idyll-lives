@@ -205,6 +205,18 @@ impl ObjectInstance {
         self.users[range].iter().any(|u| u.is_none_or(|u| u == sim))
     }
 
+    /// Whether `sim` can start interaction `i` of `def` here: one of its slots
+    /// (`ObjectDef::slots_for`) free or theirs already; all of them for one that takes the whole
+    /// object (`Interaction::whole`).
+    pub fn can_use_for(&self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
+        let range = def.slots_for(i);
+        if def.interactions[i].whole {
+            self.users[range].iter().all(|u| u.is_none_or(|u| u == sim))
+        } else {
+            self.can_use_in(sim, range)
+        }
+    }
+
     pub fn has_free_slot(&self, slots: u8) -> bool {
         self.users[..slots as usize].iter().any(Option::is_none)
     }
@@ -231,6 +243,20 @@ impl ObjectInstance {
             }
             None => false,
         }
+    }
+
+    /// Takes a place for `sim` for interaction `i` of `def` (see `can_use_for`): one of its
+    /// slots, or every one for a use that takes the whole object (`slot_of` is then the first).
+    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
+        let range = def.slots_for(i);
+        if !def.interactions[i].whole {
+            return self.reserve_in(sim, range);
+        }
+        if !self.can_use_for(sim, def, i) {
+            return false;
+        }
+        self.users[range].fill(Some(sim));
+        true
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
@@ -2638,6 +2664,11 @@ impl World {
                         _ => format!("someone is using the {name}"),
                     }));
                 }
+                // (Lying along the whole window seat: not with someone else on it.)
+                if inter.whole && !obj.can_use_for(sim, &self.content.objects[obj.def], interaction) {
+                    let name = self.content.objects[obj.def].name.to_lowercase();
+                    return Err(Error::new(format!("someone is using the {name}")));
+                }
                 if inter.needs_table && crate::surface::faced_table(&self.content, &self.objects, &self.nav(), object).is_none() {
                     return Err(Error::new(format!(
                         "{} needs a table: pull the {} up to one",
@@ -3372,7 +3403,8 @@ fn pick_autonomous(
             // a baby in it, the more the baby needs it.
             let mut care = 0.0;
             // Dining at a table only with a table to dine at.
-            if inter.baby || (inter.needs_table && !at_table) || !obj.allows(inter, sim.id) {
+            // (Nor one that takes the whole thing while someone else is on it.)
+            if inter.baby || (inter.needs_table && !at_table) || !obj.allows(inter, sim.id) || !obj.can_use_for(sim.id, &content.objects[obj.def], i) {
                 continue;
             }
             // Costing a need about to run out, or planned with one it doesn't fill: it would stop
@@ -3807,7 +3839,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 sim.news.get_or_insert(News::NotClosed(object));
                 return;
             }
-            if !obj.can_use_in(sim.id, content.objects[obj.def].slots_for(interaction)) || obj.broken() {
+            if !obj.can_use_for(sim.id, &content.objects[obj.def], interaction) || obj.broken() {
                 return;
             }
             // Never other people's things; what the player asks a guest to do, only what guests
@@ -3925,7 +3957,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
-        if !obj.reserve_in(sim.id, content.objects[obj.def].slots_for(interaction)) {
+        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction) {
             return;
         }
         // Off to bed (they can get there): the toilet first, out of habit, and then they
@@ -4458,7 +4490,9 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
     let possible = |r: usize| ctx.content.recipes[r].possible(stations);
     let mut found = 0;
     for o in ctx.index.on(home).iter().map(|&o| &objects[o as usize]).filter(|o| !o.broken() && usable(o)) {
-        for i in ctx.content.objects[o.def].interactions.iter().filter(|i| i.autonomous && !i.cares() && i.recipe.is_none_or(possible)) {
+        let def = &ctx.content.objects[o.def];
+        let startable = |&(n, _): &(usize, &crate::content::Interaction)| !free || o.can_use_for(sim.id, def, n);
+        for (_, i) in def.interactions.iter().enumerate().filter(startable).filter(|(_, i)| i.autonomous && !i.cares() && i.recipe.is_none_or(possible)) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
         if found == mask {
@@ -4631,7 +4665,8 @@ fn nearest(
         .filter(|o| Some(o.id) != except && ctx.object_plot[o.id as usize] == plot)
         .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
         .filter_map(|o| {
-            let i = content.objects[o.def].interactions.iter().position(|i| fits(i) && o.allows(i, sim.id))?;
+            let def = &content.objects[o.def];
+            let i = (0..def.interactions.len()).find(|&i| fits(&def.interactions[i]) && o.allows(&def.interactions[i], sim.id) && o.can_use_for(sim.id, def, i))?;
             let (fx, fz) = approach(o);
             Some((ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos), o.id, i))
         })
@@ -4711,7 +4746,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
         let def = &content.objects[o.def];
         let i = def.interactions.iter().position(|it| it.baby)?;
         let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
-        (!o.broken() && !taken && o.can_use_in(sim.id, def.slots_for(i))).then_some((o.id, i))
+        (!o.broken() && !taken && o.can_use_for(sim.id, def, i)).then_some((o.id, i))
     })?;
     let (fx, fz) = ctx.index.links.approach_of(object).unwrap_or_else(|| objects[object as usize].front_tile(content));
     sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];

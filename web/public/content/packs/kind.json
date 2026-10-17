@@ -366,6 +366,7 @@
           "minutes": 40,
           "pose": "lie",
           "autonomous": true,
+          "whole": true,
           "effects": {
             "energy": 0.14,
             "comfort": 0.2

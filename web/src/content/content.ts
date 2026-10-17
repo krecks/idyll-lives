@@ -46,6 +46,8 @@ export interface InteractionDef {
   anim?: string;
   /** Only offered while the seat faces a table it tucks under (`seatAt`): dining at a table. */
   needsTable?: boolean;
+  /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
+  whole?: boolean;
   /**
    * Starts this recipe (`recipes` id): the resident goes round its stations (fridge, counter,
    * stove) instead of using this object alone, and a dish is served. `effects` are then what

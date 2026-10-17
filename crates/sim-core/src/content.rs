@@ -102,6 +102,9 @@ pub struct Interaction {
     /// Only offered while the seat faces a table it tucks under (content `needsTable`; see
     /// `ObjectDef::seat_at` and `surface.rs`): dining at a table.
     pub needs_table: bool,
+    /// Takes every slot of the object (content `whole`): only started with nobody else on it,
+    /// and while it lasts nobody else gets on (a nap along a 2-seat window seat).
+    pub whole: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
     /// Starts this recipe (index into `Content::recipes`): the resident goes round the
@@ -2081,6 +2084,8 @@ struct InteractionRaw {
     #[serde(default)]
     needs_table: bool,
     #[serde(default)]
+    whole: bool,
+    #[serde(default)]
     homework: f32,
     #[serde(default)]
     care: HashMap<String, f32>,
@@ -2586,6 +2591,7 @@ impl Content {
                     dirt: it.dirt.unwrap_or(-1.0),
                     baby: it.baby,
                     needs_table: it.needs_table,
+                    whole: it.whole,
                     homework: it.homework.max(0.0),
                     care,
                     recipe,
