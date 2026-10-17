@@ -99,7 +99,7 @@ one (`nature.ts` `forests`), so the woods and the town match.
 | `garden.vegPatch` Vegetable patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
 | `garden.tomatoes` Tomato plants | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
 | `garden.strawberries` Strawberry bed | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
-| `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs shrink away for pickHerbs. |
+| `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs shrink away for pickHerbs. The resident steps in to it and picks standing, hands at the plants (the `pick` clip; `STAND_BACK` -0.5). |
 | `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Use | `harvest`: the ripe crop shrinks away during harvest and is back after. G growth stages from seedling to ripe (E4). |
 
 ## G5. Trees (12) — **Done**, signed off 2026-10-17 (back in garden / trees)

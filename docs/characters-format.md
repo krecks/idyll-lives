@@ -259,6 +259,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | rail | yes | 2.5 | the telescope |
 | push | yes | 2.67 | mopping, vacuuming |
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
+| pick | yes | 3.0 | picking herbs from a waist-high planter |
 | dance | yes | 1.0 | dancing, fitness games |
 | punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
 | wave | no | 2.2 | the household creator's greetings |

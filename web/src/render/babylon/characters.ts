@@ -197,9 +197,10 @@ const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
 /**
  * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
  * clip opens something across that tile: a dishwasher's door drops 0.44 m into it; a sofa bed's
- * mattress, pulled out or folded away, reaches half a metre past it.
+ * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
+ * smaller than its tile (the herb planter, 0.46 m deep, is picked from as from a counter).
  */
-const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15, sofaBed: 1 };
+const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15, sofaBed: 1, 'garden.herbs': -0.5 };
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
  * the middle of the tile in front and wraps the arms round it
@@ -493,7 +494,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   tend: { stand: ['kneel'], hands: HANDS.relaxed },
   // The baby picked up out of the crib and held (`CUDDLE`).
   cuddle: { stand: ['idle'], hands: HANDS.relaxed },
-  harvest: { stand: ['harvest', 'plant'], hands: HANDS.hold },
+  // (From the waist-high herb planter, standing.)
+  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : ['harvest', 'plant']), hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
     stand: (def) => (def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : ['harvest', 'plant']),
@@ -2580,7 +2582,7 @@ export class Characters {
           reach = rig.cuddleStep;
           reachRate = 6;
         } else if (obj && STAND_BACK[obj.def]) {
-          // Back from the door it opens, eased like the hug's approach.
+          // Back from the door it opens (or in to a small thing), eased like the hug's approach.
           reach = -STAND_BACK[obj.def];
         } else if (obj && HUGGED[obj.def]) {
           // Up to the teddy, to hug it.
