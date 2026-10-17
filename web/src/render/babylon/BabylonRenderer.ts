@@ -93,7 +93,7 @@ import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
-import { Geo } from './geometry';
+import { Geo, LOOK as CUT } from './geometry';
 import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
@@ -181,8 +181,8 @@ interface PlacedObject {
   height: number;
   /** Bottom of the model above `y0` (things on a wall or the ceiling hang higher). */
   bottom: number;
-  /** Things on a wall: the way they face (`rot`), to hide them with the wall they hang on. */
-  wallRot?: number;
+  /** Things on a wall: the cutaway look bits that drop their wall (`wallCutBits`), to hide them with it. */
+  wallCut?: number;
   /** Its instance in the template's matrix buffer (for the placement pop). */
   pop: PopTarget;
   /** Its contact shadow's instance. */
@@ -3150,15 +3150,14 @@ export class BabylonRenderer implements Renderer {
 
   /**
    * Things on a wall go with their wall: all of them with walls down, and in cutaway those on the
-   * walls that drop (facing the way the camera looks, so their wall stands between it and them).
-   * Not while something for a wall is held: then they show, as what may be in its way.
+   * walls that drop, from either side (`wallCutBits`). Not while something for a wall is held:
+   * then they show, as what may be in its way.
    */
   private cutWallItems(bits: number): void {
     const down = this.wallMode === 'down';
     for (const p of this.placed) {
-      if (p.wallRot === undefined || p.id === this.held?.id) continue;
-      const r = p.wallRot;
-      const hide = !this.ghostOnWall && (down || (bits & 1 && r === 1) || (bits & 2 && r === 3) || (bits & 4 && r === 0) || (bits & 8 && r === 2));
+      if (p.wallCut === undefined || p.id === this.held?.id) continue;
+      const hide = !this.ghostOnWall && (down || (bits & p.wallCut) !== 0);
       const saved = this.wallItemsHidden.get(p.id);
       if (hide && !saved) {
         const m = p.pop.matrices.slice(p.pop.index * 16, p.pop.index * 16 + 16);
@@ -3171,6 +3170,30 @@ export class BabylonRenderer implements Renderer {
         this.writeInstance(p.pop, saved);
       }
     }
+  }
+
+  /**
+   * The cutaway look bits (geometry.ts `LOOK`) that drop the wall a thing on a wall hangs on, as
+   * house.ts `edgeMask` gives them: looking towards a room on either side of it (along any of the
+   * tiles it hangs across), and the way it faces (its wall then stands between the camera and it,
+   * even with no room behind).
+   */
+  private wallCutBits(world: WorldStructure, o: ObjectPlacement): number {
+    const W = world.width;
+    const k = this.storeyOf(o.z);
+    // A room on the thing's own storey (lot rows run on into the next storey's).
+    const room = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < world.depth && this.storeyOf(z) === k && world.rooms[z * W + x] > 0;
+    const r = o.rot % 4;
+    let bits: number = [CUT.PosZ, CUT.PosX, CUT.NegZ, CUT.NegX][r];
+    if (r % 2 === 0) {
+      // Its back on the wall along grid line `z`, between rows z - 1 and z.
+      const z = r === 0 ? o.z : o.z + o.d;
+      for (let x = o.x; x < o.x + o.w; x++) bits |= (room(x, z) ? CUT.PosZ : 0) | (room(x, z - 1) ? CUT.NegZ : 0);
+    } else {
+      const x = r === 1 ? o.x : o.x + o.w;
+      for (let z = o.z; z < o.z + o.d; z++) bits |= (room(x, z) ? CUT.PosX : 0) | (room(x - 1, z) ? CUT.NegX : 0);
+    }
+    return bits;
   }
 
   /** How the player resized an object (undefined: as its kind comes). */
@@ -3275,7 +3298,7 @@ export class BabylonRenderer implements Renderer {
           maxZ: pz + pd,
           height: template.height,
           bottom,
-          wallRot: layer === 'wall' ? o.rot % 4 : undefined,
+          wallCut: layer === 'wall' ? this.wallCutBits(world, o) : undefined,
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
           pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
