@@ -26,7 +26,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `sectionalCorner` Sectional: corner | 1x1 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `chaise` Sectional: chaise | 1x2 · floor | relax:relax doze:nap | living / sectionals | Frame, Upholstery, Cushions, Legs | Use | `sink_in`. |
 
-## L2. Armchairs and small seats (11) — **Done** (in Validate › Armchairs)
+## L2. Armchairs and small seats (11) — **Done**, signed off 2026-10-16 (back in living / seating)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `armchairs` (Validate › Armchairs)
@@ -46,7 +46,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `floorCushion` Floor cushion | 1x1 · floor | sit:sit | living / seating | Cushion | Use | `sink_in`. |
 | `beanBag` Bean bag | 1x1 · floor | flop:relax | living / seating | Bag | Use | `squash`: the bag flattens 15% for flop. |
 
-## L3. Coffee and side tables (9) — **Done** (in Validate › Coffee Tables)
+## L3. Coffee and side tables (9) — **Done**, signed off 2026-10-16 (back in living / tables)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `coffee tables` (Validate › Coffee Tables)
@@ -64,7 +64,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `sideTableRound` Round side table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Base | Static | Static. |
 
-## L4. Media (8) — **Done** (in Validate › Media)
+## L4. Media (8) — **Done**, signed off 2026-10-16 (back in living / media)
 
 - **Family:** `tools/art/blender/families/media.py`
 - **Validate group:** `media` (Validate › Media)
@@ -81,7 +81,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of the bench for watch, and sinks back at the end. **Done:** the TV sits in a lift hood at the bench's back (0.8 m high at rest, its lid closing the hood); it glows at night while up. |
 | `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: the flame panel grows for relax (gloss, not emissive; the light is the content's). **Done:** five tongues grow from the log bed; the embers glow at night, the flames while lit. A floor cushion in front, and `characters.ts` `SEATS` sits the resident on it facing the fire (they sat in mid-air before). |
 
-## L5. Shelves (9) — **Done** (in Validate › Shelves)
+## L5. Shelves (9) — **Done**, signed off 2026-10-16 (back in living / shelves)
 
 - **Family:** `tools/art/blender/families/living.py` (notes: `families/living.md`)
 - **Validate group:** `shelves` (Validate › Shelves)
@@ -99,7 +99,7 @@ with its rider. L3 is done: still tables, but the coffee table's drawer opens fo
 | `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Done: colour parts Frame and Shelves (no back); its top on the wall face. |
 | `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; glass door. (+use) the door swings. Done: the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. |
 
-## L6. Stairs (1) — **Done** (in Validate › Stairs)
+## L6. Stairs (1) — **Done**, signed off 2026-10-16 (back in living / stairs)
 
 - **Family:** `tools/art/blender/families/living.py`
 - **Validate group:** `stairs` (Validate › Stairs)
