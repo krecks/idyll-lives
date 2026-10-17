@@ -40,7 +40,9 @@ interface StageClip {
 }
 
 export class ItemStageController implements ItemStage {
+  /** Turns (`yaw`) about the middle of the model's bounds; `item` holds the model in it, moved so that middle is on its axis. */
   private readonly root: TransformNode;
+  private readonly item: TransformNode;
   private readonly camera: FreeCamera;
   private readonly shadow: Mesh;
   private readonly resize: ResizeObserver;
@@ -57,7 +59,7 @@ export class ItemStageController implements ItemStage {
   private next: { colors: PartColors | undefined } | undefined;
   private building = false;
   private detached = false;
-  /** Where the camera looks and how far back it stands to see all of it (set by the first build). */
+  /** Where the camera looks (on the axis it turns about) and how far back it stands to see all of it (set by the first build). */
   private readonly centre = new Vector3(0, 0.5, 0);
   private reach = 2;
   private yaw = START_YAW;
@@ -82,6 +84,9 @@ export class ItemStageController implements ItemStage {
     private readonly footprint: [number, number],
   ) {
     this.root = new TransformNode('stageItem', scene);
+    // A wall thing hangs at the back of its tile, its origin the tile's middle: turned about that, it would swing out of view.
+    this.item = new TransformNode('stageItemModel', scene);
+    this.item.parent = this.root;
     this.opens = new Promise((resolve) => (this.opened = resolve));
     const cam = (this.camera = new FreeCamera('stageItemCamera', new Vector3(0, 2, 5), scene, false));
     cam.fov = FOV;
@@ -92,7 +97,7 @@ export class ItemStageController implements ItemStage {
     this.shadow = contactShadow(scene);
     const [fw, fd] = footprint;
     this.shadow.scaling.set(fw * 1.25 + 0.2, 1, fd * 1.25 + 0.2);
-    this.shadow.parent = this.root;
+    this.shadow.parent = this.item;
 
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline:none';
     canvas.setAttribute('aria-label', 'The item: drag or arrow keys to turn, scroll or +/- to come closer');
@@ -163,7 +168,7 @@ export class ItemStageController implements ItemStage {
         const meshes = template.meshes;
         const identity = Matrix.Identity().asArray() as unknown as Float32Array;
         for (const mesh of meshes) {
-          mesh.parent = this.root;
+          mesh.parent = this.item;
           mesh.isPickable = false;
           mesh.thinInstanceSetBuffer('matrix', identity, 16, true);
           mesh.alwaysSelectAsActiveMesh = true;
@@ -238,10 +243,14 @@ export class ItemStageController implements ItemStage {
     return moved;
   }
 
-  /** Where to look and how far back to stand: the model's bounds, seen from any side, closed and open (a fridge's doors out in front). */
+  /**
+   * Where to look and how far back to stand: the model's bounds, closed and open (a fridge's doors out in
+   * front), their middle moved onto the axis it turns about, so it is seen whole from any side.
+   */
   private frameModel(): void {
     const save = this.root.rotation.y;
     this.root.rotation.y = 0;
+    this.item.position.setAll(0);
     const corners = boxCorners(this.meshes);
     const lo = corners[0]?.clone();
     const hi = corners[corners.length - 1]?.clone();
@@ -269,7 +278,8 @@ export class ItemStageController implements ItemStage {
     }
     this.root.rotation.y = save;
     if (!lo || !hi) return;
-    this.centre.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2);
+    this.item.position.set(-(lo.x + hi.x) / 2, 0, -(lo.z + hi.z) / 2);
+    this.centre.set(0, (lo.y + hi.y) / 2, 0);
     const radius = Math.max(0.35, Vector3.Distance(lo, hi) / 2);
     this.reach = (radius / Math.sin(FOV / 2)) * 1.02;
   }

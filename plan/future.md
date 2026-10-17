@@ -18,16 +18,16 @@ open**. Each line says where it lives.
     (`characters.ts`); the studio frames a moving part by its posed vertices (the shower stall);
     the books and bookends list Book 1–5; the lazy pack's doze and power nap are sitting naps; the garden
     decor has colour parts; the acoustic guitar and ukulele have a "Top" (their body slots renamed Body,
-    Body & neck);
+    Body & neck); afterwards, the sewing table's legs, apron and drawer got a colour of their own (Legs,
+    dark wood as made), and the studio turns a model about the middle of its bounds, so wall things stay in
+    frame (`itemStage.ts`);
   - the agents' own calls: the wardrobe got a third colour (Body, Doors, Handles); the horse statue's text
     became "Bronze horse" (its model since 43650af) and the pedestal vase's "blue"; the leather armchair
     reads sitting down; the stairs went back to living with no group (the plan said "living / stairs").
-- **Seen in the sign-off, not changed** (each in its group's section of `16-sign-off.md`): the sewing
-  table's legs stay dark wood; a lamp's light is at its tile's middle, not its shade; things on a cut wall
+- **Seen in the sign-off, not changed** (each in its group's section of `16-sign-off.md`): a lamp's light is at its tile's middle, not its shade; things on a cut wall
   float; nappers on the 2-wide window seat and hearth settee lie front to back (`BEDS` `across`); the
   shared poses at the drinking fountain, phone box, climbing frame, teddy, herb planter and desks; the
-  cinema wall's and game console's screens face away from the room; the studio turns a model about its
-  origin, not its middle (wall things swing off-centre).
+  cinema wall's and game console's screens face away from the room.
 
 ## Decided in the fix-up round (review these)
 
