@@ -43,8 +43,7 @@
       "footprint": [2, 2],
       "slots": 2,
       "price": 2600,
-      "category": "validate",
-      "group": "lazy",
+      "category": "bedroom",
       "description": "A cloud-soft adjustable double bed: a night on it leaves residents rested for longer (energy drains 20% slower for 8 hours) and its lie-ins are extra cosy.",
       "interactions": [
         {
@@ -75,8 +74,7 @@
       "footprint": [1, 1],
       "slots": 1,
       "price": 680,
-      "category": "validate",
-      "group": "lazy",
+      "category": "living",
       "description": "A padded cocoon chair for curling up anywhere; a quick nap inside leaves the resident briefly energized, quicker on their feet and keener to exercise.",
       "interactions": [
         {
@@ -107,8 +105,7 @@
       "footprint": [2, 1],
       "slots": 2,
       "price": 640,
-      "category": "validate",
-      "group": "lazy",
+      "category": "living",
       "description": "A low table with a warm quilt and floor cushions for two: the cosiest place to snack, chat or doze off for the afternoon.",
       "interactions": [
         {
@@ -138,9 +135,8 @@
       "footprint": [1, 1],
       "slots": 1,
       "price": 380,
-      "category": "validate",
+      "category": "kitchen",
       "fillsWall": true,
-      "group": "lazy",
       "description": "Order hot food without lifting a pan: takeout costs money each time but fills residents faster than cooking and spares them the dishes.",
       "interactions": [
         {
@@ -174,8 +170,7 @@
       "footprint": [1, 1],
       "slots": 1,
       "price": 520,
-      "category": "validate",
-      "group": "lazy",
+      "category": "fitness",
       "description": "Stand still and let the plate do the work: trains Endurance and Strength a bit slower than a treadmill but barely tires or dirties the resident.",
       "interactions": [
         {
@@ -196,8 +191,7 @@
       "footprint": [1, 1],
       "slots": 1,
       "price": 750,
-      "category": "validate",
-      "group": "lazy",
+      "category": "office",
       "description": "Trains Technology by programming the house to run itself; residents with Technology 4+ set it up so well the whole home feels effortless for hours.",
       "interactions": [
         {

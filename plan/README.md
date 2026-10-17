@@ -4,7 +4,7 @@ Every object in the game gets a model built in Blender (`tools/art/blender`), ex
 of its primitive placeholder parts. Each new model goes to the **Validate** buy category first, and gets the
 **animations** it can show.
 
-**Where it stands (2026-10-16):** 541 objects. **All 541 are built** (each in Validate until it's signed off):
+**Where it stands (2026-10-17):** 541 objects. **All 541 are built and signed off**, back in their own categories; Validate is gone:
 - the seven sinks: `sink`, `sinkPedestal`, `vanityDouble`, `sinkVessel`, `sinkConsole`, `farmhouseSink`, `counterSinkDouble` (signed off 2026-10-16: back in bathroom / sinks and kitchen / counters);
 - the seven fridges: `fridge`, and the K1 six `fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge` (signed off 2026-10-16: back in kitchen / appliances);
 - the six K2 cookers: `stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`, `microwave` (signed off 2026-10-16: back in kitchen / appliances);
@@ -35,7 +35,7 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
   D2 `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`, `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace` (signed off 2026-10-16),
   D3 `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern` (signed off 2026-10-16);
 - the nineteen hobby models: H1 `piano`, `ukulele`, `guitarElectric`, `keyboardDigital`, `drumKit`, `guitarAcoustic` (signed off 2026-10-16); H2 `chessTable`, `poolTable`, `foosball`, `dartboard`, `arcadeCabinet`, `puzzleTable` (signed off 2026-10-16); H3 `easel`, `workbench`, `telescope`, `sewingTable`, `chemistrySet`, `potteryWheel`, `craftTable` (signed off 2026-10-16);
-- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder` (in Validate › Garden Decor);
+- six garden decor models: `garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder` (signed off 2026-10-17);
 - the eleven OU1 patio models: `bench`, `patioSet`, `picnicTable`, `gardenChair`, `patioTableRound`, `patioTable4`, `patioChair`, `adirondackChair`, `benchGarden3`, `outdoorBar`, `parasol` (signed off 2026-10-17);
 - the five OU2 loungers and swings: `sunLounger`, `hammock`, `porchSwing`, `swingSet`, `hotTubCedar` (signed off 2026-10-17);
 - the three OU3 grills and fire: `grill`, `grillStation`, `firePit` (signed off 2026-10-17); the nine OU4 play and yard things: `sandbox`, `bikeRack`, `raisedBed`, `shedSmall`, `greenhouse`, `compostBin`, `rainBarrel`, `clothesline`, `firewoodStack` (signed off 2026-10-17); the nine OU5 pond, small garden things and lights: `garden.pond`, `lampPost`, `stringLights`, `planterBox`, `birdhouse`, `birdFeederPole`, `dogHouse`, `sundial`, `steppingStones` (signed off 2026-10-17);
@@ -45,10 +45,10 @@ of its primitive placeholder parts. Each new model goes to the **Validate** buy 
 - the eleven G3 shrubs: `bush`, `garden.boxwood`, `topiary`, `hedge`, `hydrangea`, `roses`, `azalea`, `lavender`, `fern`, `grass`, `hosta` (signed off 2026-10-17);
 - the five G4 edibles: `garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins` (signed off 2026-10-17);
 - the twelve G5 trees: `tree`, `pine`, `garden.maple`, `birch`, `cherry`, `apple`, `japaneseMaple`, `magnolia`, `willow`, `spruce`, `cypress`, `lemonTree` (signed off 2026-10-17).
-- the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (signed off 2026-10-16); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (signed off 2026-10-16); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (Validate › Books And Pots); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (signed off 2026-10-16); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (signed off 2026-10-16).
-- the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, signed off 2026-10-17 and back home, but for the lazy pack, still in Validate › Lazy);
+- the 39 tabletop things: TT1 `kettle`, `toaster`, `blender`, `standMixer`, `espressoMachineSmall`, `knifeBlock`, `utensilCrock`, `cuttingBoard`, `breadBin`, `spiceJars`, `cookieJar` (signed off 2026-10-16); TT2 `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasses`, `candlesticks` (signed off 2026-10-16); TT3 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall` (signed off 2026-10-17); TT4 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall` (signed off 2026-10-16); TT5 `soapSet`, `towelStack`, `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks` (signed off 2026-10-16).
+- the 94 personality pack models, P1–P16: bookworm, cheerful, couch potato, energetic, the example pack (`chefStove`, `whirlpoolTub`), foodie, gloomy, hot-headed, kind, lazy, loner, nature lover, neat, outgoing, romantic and slob (`families/pack_<trait>.py`, signed off 2026-10-17: back home);
 
-**None are left to build.** Next is sign-off (`16-sign-off.md`): the sinks, K1–K9, LT1–LT4, D1–D3, H1–H3, TT1, TT2, TT4, TT5, O1–O3, B1, B4, B5, KD1–KD3, BR1–BR4, OU1–OU5, L2–L6, G1–G5, P1–P9, P11–P16, CM1–CM5, B2, F1, B3, L1 are back home (2026-10-16); Validate holds the other 19 items in 3 groups.
+**None are left to build or sign off.** The sign-off (`16-sign-off.md`) ran 2026-10-16/17: every task in every category was checked in play and is back home, and the empty Validate category and its icon are removed.
 
 **No primitive models are left either** (2026-10-16): the 36 non-object models that were still drawn from
 placeholder parts are Blender models too: the 20 things residents carry and cook with (`families/held.py`), the 9

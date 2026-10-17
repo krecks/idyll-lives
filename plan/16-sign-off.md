@@ -797,6 +797,59 @@ throughout, her hands at its foot when it is out. Doze still lies her on the bed
 and a sofa's relax are as before (their code paths take no `STAND_BACK`). All back in living / seating (the sofas,
 the sofa bed, the wall bed) and living / sectionals.
 
+## The books and pots
+
+The seven TT3 things (Validate › Books And Pots) were signed off on 2026-10-17: the stack of books, the vase of
+flowers, the bud vase, the succulent, the cactus and the small potted plant were checked on 2026-10-16 as the
+kitchenware were. They needed nothing. The books and bookends were held back for one label: "Books" coloured only the
+two books that share cover `book_a`. They have eight books in five cover colours, and now list each colour as the
+stack of books does: Bookends, then Book 1 to 5, left to right in the order each colour first shows. Book 1 to 3
+colour two books each (`tabletop.py`; the change is only in the manifest, so the GLB is unchanged). This was
+rechecked on the square table at 23,16 in all four facings by day, with every slot a colour of its own (r0 and r2:
+all eight books and the bookends take their slot's colour), at night on WebGPU and on Low WebGL2, and in the colour
+studio (labels Bookends, Book 1 to 5, each landing on its covers). The bookStack, booksUpright and their row go back
+to tabletop / books, the plants to tabletop / plants.
+
+## The lazy pack
+
+The six P10 things (Validate › Lazy) were signed off on 2026-10-17. Four needed nothing (`$S/packs/signoff.md`).
+One fix: **the quilt table's "Doze under the quilt" laid the resident on the table top, and the nap pod's "Take a
+power nap" tipped her over in the egg chair with her legs out.** Both are now sitting naps (`"pose": "sit"`, anim
+`nap`, set up like the sofas' and recliners' dozes) in `packs/lazy.json`. Both were rechecked in all four facings,
+with pictures 1, 4 and 8 s into the use, then with colours by day, at night on WebGPU and on Low WebGL2. Each time she
+sits and naps, and the quilt and hood clips play and shut. Close views from the side, back and front show the
+following. At the quilt table she sits on the left pouf (slot 0) with its backrest behind her, arms on the top and
+legs under the quilt, the same as "Tuck in under the quilt". In the pod she sits in the egg chair under the lowered
+hood, feet on the floor. Seen in passing: at the quilt table her shoes poke out at the foot of the quilt's front, as
+they did for tuckIn, which was accepted before. All go back to bedroom, living, kitchen, fitness and office (no group).
+
+## The garden decor
+
+The six garden decor models (Validate › Garden Decor) were signed off on 2026-10-17. They were checked in play
+before (`$S/outdoor/signoff.md`) and were held back because none had colour parts. Each now has 1 to 3, every label
+naming exactly what it colours (`garden_decor.py`; manifest only, GLBs unchanged):
+- gnome: Hat, Tunic (with its sleeves), Belt. Its boots sit wholly inside the tunic bell, so the label names only the belt.
+- bird bath: Bowl & column, Plinth.
+- fountain: Fountain (basins, column, finial), Plinth.
+- lantern: Lantern, Base. The lit fire box stays as made.
+- wheelbarrow: Tray, Handles, Legs & tyre.
+- boulders: Large boulder, Middle boulder, Small boulder (one stone each; the moss stays as made).
+Rechecked in the north yard (19,9 / 20,10) in all four facings with their uses (pat, watch the birds, listen to
+the water, water the planter; the lantern and boulders are still). Colours were checked by day in two facings, with
+test colours far from the defaults, then at night on WebGPU, on Low WebGL2 at night (the lantern's fire box lit as
+before) and in the colour studio. Every colour lands on the part its label names. The gnome, bird bath, fountain,
+wheelbarrow and boulders go back to outdoor / decor, the lantern to outdoor / lights.
+
+## The acoustic guitar and ukulele (hobbies, already signed off)
+
+Their colour went on the back and sides, not the soundboard. Each now has a third slot, "Top", for the
+soundboard. The body's slot is relabelled to say what it colours: the guitar's "Body" (back and sides), the
+ukulele's "Body & neck" (`hobbies.py`; manifest only). Rechecked on the stand from the front and the back (Top,
+body and stand each their own colour), by day, at night on WebGPU and on Low WebGL2, and played (strum and practise,
+in all four facings): `off_stand` plays and shuts each time. In the hands the instrument shows its made colours, as
+expected until held parts take the object's colours. In the colour studio, labels Body/Top/Stand and Body &
+neck/Top/Stand each land where named, and "In use" shows the empty stand.
+
 ## Done before their tasks had tables
 
 Moved into Validate on 2026-10-15 (finished but never put in): the fridge into Validate › Fridges, the wall bed
@@ -823,6 +876,9 @@ task done in the category file (strike through its heading, with the commit).
 - **Fitness** (`07-fitness.md`, F1): signed off 2026-10-17.
 - **Bathroom** (`02-bathroom.md`, B1–B5): signed off 2026-10-17.
 - **Living** (`05-living.md`, L1–L6): signed off 2026-10-17.
+- **Tabletop** (`10-tabletop.md`, TT1–TT5): signed off 2026-10-17.
+- **Outdoor** (`12-outdoor.md`, OU1–OU5 and the garden decor): signed off 2026-10-17.
+- **Personality packs** (`15-personality-packs.md`, P1–P16): signed off 2026-10-17.
 
 ## Lessons for the tooling (2026-10-17)
 
@@ -892,6 +948,10 @@ large check.
 - `gamekit` smooth-shades cylinders without a bevel, so flat caps can shade like domes (the bread bin).
 
 ## The end
+
+Done 2026-10-17: the last groups left Validate; the `validate` category and `icon.category.validate` are
+removed and `docs/design/objects.md` says every object's model is built in Blender. (`tools/content/validate.py`
+needs the category back, with an empty `groups`, before it can put new items into Validate.)
 
 - **Last group:** when the last group leaves Validate, remove the `validate` category and `icon.category.validate`
   (`web/public/assets/manifest.json`).

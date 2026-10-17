@@ -7,19 +7,27 @@ same evening (merges into `v0.3/object-motion`, from `bb0a267` lamps to `f0528c5
 was fixed is in those commits; what's below is what that round **decided** (for review) and what is **still
 open**. Each line says where it lives.
 
-## Next: sign-off
+## Sign-off: done (2026-10-16/17)
 
-- **Validate holds 19 items in 3 groups** (the sinks, K1–K9, LT1–LT4, D1–D3, H1–H3, TT1, TT2, TT4, TT5, O1–O3, B1, B4, B5, KD1–KD3, BR1–BR4, OU1–OU5, L2–L6, G1–G5, P1–P9, P11–P16, CM1–CM5, B2, F1, B3, L1 are signed off, 2026-10-16), against the plan's "about three at a time". Sign tasks off
-  (`16-sign-off.md`) after review. `python3 -B tools/content/validate.py list | out --group <g> [--dry-run]`
-  moves items back to their "Back to" by id, keeps the files' formatting and drops emptied groups. Items whose
-  home turns them freely carry `"freeRotation": true` (Validate itself no longer turns anything).
-- **Everything done is in Validate now** (2026-10-15): the base `fridge` (Validate › Fridges), the `wallBed`
-  (Validate › Sofas) and the six garden decor models (new Validate › Garden Decor) had never been put in; their
-  homes are listed in `16-sign-off.md`. The 39 items of L4–L6 and OU3–OU5 went in once those tasks were done.
-  Validate changes an item's buy group, and the sim treats things of one group with a use in common as
-  the same kind (`planner::same_kind`): with the fridges in Validate › Fridges, other households upgraded their
-  fridges; they're all back in kitchen / appliances now.
-- **The example pack's own "Wellness" category** is empty while its two objects are in Validate.
+- **Every task is signed off** and back home; Validate and its icon are gone (`16-sign-off.md`, with what each
+  group's check found and "Lessons for the tooling"). `tools/content/validate.py` needs the category back
+  (empty `groups`) before it can take new items in.
+- **Decided in the sign-off** (each its own commit, reversible):
+  - the user's picks for the held groups: held parts are drawn in the object's colours, and the weight
+    bench's bar leaves its hooks 0.8 s in; bathers sit along the tub; the sofa bed's user stands 1 m back
+    (`characters.ts`); the studio frames a moving part by its posed vertices (the shower stall);
+    the books and bookends list Book 1–5; the lazy pack's doze and power nap are sitting naps; the garden
+    decor has colour parts; the acoustic guitar and ukulele have a "Top" (their body slots renamed Body,
+    Body & neck);
+  - the agents' own calls: the wardrobe got a third colour (Body, Doors, Handles); the horse statue's text
+    became "Bronze horse" (its model since 43650af) and the pedestal vase's "blue"; the leather armchair
+    reads sitting down; the stairs went back to living with no group (the plan said "living / stairs").
+- **Seen in the sign-off, not changed** (each in its group's section of `16-sign-off.md`): the sewing
+  table's legs stay dark wood; a lamp's light is at its tile's middle, not its shade; things on a cut wall
+  float; nappers on the 2-wide window seat and hearth settee lie front to back (`BEDS` `across`); the
+  shared poses at the drinking fountain, phone box, climbing frame, teddy, herb planter and desks; the
+  cinema wall's and game console's screens face away from the room; the studio turns a model about its
+  origin, not its middle (wall things swing off-centre).
 
 ## Decided in the fix-up round (review these)
 

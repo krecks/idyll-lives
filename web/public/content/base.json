@@ -3677,26 +3677,6 @@
   ],
   "buyCategories": [
     {
-      "id": "validate",
-      "label": "Validate",
-      "icon": "icon.category.validate",
-      "groups": [
-        {
-          "id": "books and pots",
-          "label": "Books And Pots"
-        },
-        {
-          "id": "lazy",
-          "label": "Lazy"
-        },
-        {
-          "id": "garden decor",
-          "label": "Garden Decor",
-          "outside": true
-        }
-      ]
-    },
-    {
       "id": "kitchen",
       "label": "Kitchen",
       "icon": "icon.category.kitchen",

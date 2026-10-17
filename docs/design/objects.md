@@ -1,8 +1,9 @@
 # How to build a new object
 
 *Status: the standard proposed for 0.3.0, written from the review of the first Blender models
-(the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 a new object's
-model is built in Blender and exported as glTF. Files now resize, are picked by what's drawn, load
+(the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 every object's
+model is built in Blender and exported as glTF: all 541 were built and signed off in play by 2026-10-17
+(`plan/16-sign-off.md`). Files now resize, are picked by what's drawn, load
 once per scene and can have [moving parts](#moving-parts) (branch `v0.3/object-motion`); the rest of
 [Before Blender is the standard](#before-blender-is-the-standard) is still to do. The toolkit and
 the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
@@ -432,18 +433,14 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 - [ ] Pack entry with `url` and `materials` (written by the build; the placeholder is the entry's below); base manifest lists the pack.
 - [ ] CREDITS.md updated; only the changed `.glb` files committed; previews not committed.
 
-## The placeholders: migrate or keep
+## The placeholders: kept as the fallback
 
-**Keep every placeholder**, as the fallback and as the model of anything not worth a file. They
-cost nothing to download (they are in the bundled manifests), take 1–3 draw calls, resize
-smartly, carry mirrors and have a reduced build for distance. A Blender file adds detail,
-shading and shape, not lower cost: the six garden models have 2.7 times their placeholders'
-triangles (22,694 against 8,462).
-
-**Migrate by value**: things seen close and often, whose shape the primitives can't give (seating,
-beds, kitchens, the bathroom, garden decor, the residents' hobby things). Not worth it: small
-tabletop things, street props placed by the thousand, and plants and trees
-(they have their own pipeline). Each migrated model keeps its key, so saves and content don't change.
+**Every object is migrated** (2026-10-17): each has a Blender file, signed off in play, and so do the
+things residents carry, the town's street props and the ground's tufts, rocks and marker. **Keep every
+placeholder**, as the fallback drawn when a file fails to load. They cost nothing to download (they are
+in the bundled manifests), take 1–3 draw calls, resize smartly, carry mirrors and have a reduced build for
+distance. Each model kept its key, so saves and content didn't change. A new object gets a Blender file
+from the start, and a placeholder of a few boxes of it at rest (`tools/art/blender/README.md`).
 
 ## Before Blender is the standard
 
