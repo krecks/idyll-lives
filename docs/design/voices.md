@@ -50,7 +50,9 @@ are at the end.*
   16.7 ms. On the CPU (two threads) it would be 0.9–1.3 s and 2.5× real time, still faster than
   Pocket TTS, but voices run on the GPU only. The device test with LFM2.5: 0.44 s from asking for
   a line to hearing it (Pocket TTS on the CPU: 2.1 s); speech made in 0.14 of its length. The
-  first line after loading takes about 1 s more (the GPU sets up its kernels).
+  first line after loading takes about 1 s more (the GPU sets up its kernels). The same test on
+  an M1 Pro (2026-10-18): 0.86 s and 0.24 of its length — the model alone writes 96–98 tokens a
+  second (`tools/llm/bench.mjs`; 76–81 with the game and the voices drawing on the same GPU).
 - **Download:** 216.7 MB once (the model 185.2, the runtime's WebGPU build 26.8, voices and text
   files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by

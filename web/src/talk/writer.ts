@@ -18,6 +18,8 @@ import { buildMessages, type TalkText } from './prompt';
 export const WRITE_MS = 3500;
 /** Tokens a line may take: five short sentences. */
 export const LINE_TOKENS = 160;
+/** Where a line ends: its closing quote, which isn't said. */
+export const LINE_STOPS = ['"', '“', '”'];
 /** How often a line is asked to have 1, 2, 3, 4 or 5 sentences. */
 const LENGTHS = [0.2, 0.25, 0.25, 0.15, 0.15];
 
@@ -81,7 +83,7 @@ export class LlmWriter {
     const start = performance.now();
     const result = await generateText(
       built.messages,
-      { seed: (req.seed * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, '"', '“', '”'], avoidStart: examples, sentences },
+      { seed: (req.seed * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, ...LINE_STOPS], avoidStart: examples, sentences },
       { reply: built.reply, lead: built.lead, deadline: Date.now() + WRITE_MS, signal },
     ).catch(() => null);
     const line = result && !result.nonFinite ? cleanLine(result.text, { me: moment.me, names: moment.names, blocklist: this.text.blocklist, cut: cutShort(result) }) : null;

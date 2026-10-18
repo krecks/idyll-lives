@@ -7,9 +7,12 @@
  * And the square stays put while the camera turns, so the map is drawn again only when something
  * in it changed (`moved`): the sun's step, a Sim's pose, a thing placed or hidden, the walls. While
  * the game is paused (Buy and Build mode too) it isn't drawn at all.
+ *
+ * A Sim's every breath would draw it anew, so the poses (and the street's moving doors) are
+ * throttled: `?shadowrate=<Hz>` caps how often they redraw it (0: every change, the default).
  */
 
-import { Frustum, Plane, RenderTargetTexture, type AbstractMesh, type ShadowGenerator } from './core';
+import { Frustum, Plane, RenderTargetTexture, type AbstractMesh, type Scene, type ShadowGenerator } from './core';
 
 /** Metres a caster's bounds may lie past the square's sides and still be drawn (bounds that lag behind a thing springing into place). */
 const MARGIN = 1;
@@ -20,11 +23,27 @@ export class SunShadows {
   private readonly map: RenderTargetTexture;
   /** The menus' town: its map is fitted round all its casters, and drawn every frame. */
   private overview = false;
+  /** Milliseconds between pose-driven redraws (0: every change), and when the last one was made. */
+  private interval: number;
+  private lastDraw = -Infinity;
+  private pending = false;
 
-  constructor(private readonly generator: ShadowGenerator) {
+  constructor(
+    private readonly generator: ShadowGenerator,
+    scene: Scene,
+  ) {
     this.map = generator.getShadowMap()!;
     this.map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
     this.map.getCustomRenderList = (_pass, casters, count) => (this.overview || !casters ? null : this.cull(casters, count));
+    const rate = Number(new URLSearchParams(location.search).get('shadowrate'));
+    this.interval = Number.isFinite(rate) && rate > 0 ? 1000 / Math.min(240, rate) : 0;
+    // A pose redraw held back waits for the interval to pass, then draws on the next frame.
+    scene.onBeforeRenderObservable.add(() => {
+      if (!this.pending || performance.now() - this.lastDraw < this.interval) return;
+      this.pending = false;
+      this.lastDraw = performance.now();
+      this.map.resetRefreshCounter();
+    });
   }
 
   /** The menus' town (every caster, every frame) or the game. */
@@ -34,9 +53,19 @@ export class SunShadows {
     this.moved();
   }
 
-  /** Something in the map changed: it is drawn again in the next frame. */
-  moved(): void {
-    this.map.resetRefreshCounter();
+  /**
+   * Something in the map changed: it is drawn again in the next frame. `urgent` changes (the sun,
+   * the walls, a thing placed) draw at once; a Sim's pose may wait for the shadow rate.
+   */
+  moved(urgent = true): void {
+    const now = performance.now();
+    if (this.overview || this.interval <= 0 || urgent || now - this.lastDraw >= this.interval) {
+      this.pending = false;
+      this.lastDraw = now;
+      this.map.resetRefreshCounter();
+    } else {
+      this.pending = true;
+    }
   }
 
   private cull(casters: readonly AbstractMesh[], count: number): AbstractMesh[] {

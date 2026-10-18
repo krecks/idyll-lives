@@ -27,7 +27,7 @@ import { synthesize } from '../voice/service.svelte';
 import type { VoiceParams } from '../voice/voices';
 import { cleanLine } from './clean';
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from './prompt';
-import { cutShort, LINE_TOKENS, WRITE_MS } from './writer';
+import { cutShort, LINE_STOPS, LINE_TOKENS, WRITE_MS } from './writer';
 
 export interface TestResult {
   /** It loaded and ran (`error` otherwise). */
@@ -245,7 +245,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
           for (const [i, ask] of asks.entries()) {
             const start = performance.now();
             // As in a game: the writer's limits, and its time (cut short, the finished sentences are said).
-            const g = await generateText(ask.messages, { temperature: 0, maxTokens: LINE_TOKENS, stopAt: ['"', '“', '”'], sentences: i + 1 }, { reply: ask.reply, lead: ask.lead, deadline: Date.now() + WRITE_MS });
+            const g = await generateText(ask.messages, { temperature: 0, maxTokens: LINE_TOKENS, stopAt: LINE_STOPS, sentences: i + 1 }, { reply: ask.reply, lead: ask.lead, deadline: Date.now() + WRITE_MS });
             check();
             advance();
             if (!g) continue;

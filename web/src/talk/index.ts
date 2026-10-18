@@ -10,7 +10,7 @@ import { settings } from '../settings/settings.svelte';
 import { cleanLine } from './clean';
 import { loadDeviceReports, runDeviceTest, testPrompts } from './devices.svelte';
 import { loadTalk } from './text';
-import { cutShort, LINE_TOKENS } from './writer';
+import { cutShort, LINE_STOPS, LINE_TOKENS } from './writer';
 
 export { LlmWriter, WRITE_MS } from './writer';
 export { deviceTest, report, runDeviceTest, stopDeviceTest, type DeviceReport, type TestResult } from './devices.svelte';
@@ -36,6 +36,6 @@ export async function sampleLine(): Promise<string | null> {
   const ask = asks[at];
   if (!ask) return null;
   // `testPrompts` asks the moment at `at` for `at + 1` sentences.
-  const g = await generateText(ask.messages, { seed: Date.now() >>> 0, maxTokens: LINE_TOKENS, stopAt: ['"', '“', '”'], sentences: at + 1 }, { reply: ask.reply, lead: ask.lead });
+  const g = await generateText(ask.messages, { seed: Date.now() >>> 0, maxTokens: LINE_TOKENS, stopAt: LINE_STOPS, sentences: at + 1 }, { reply: ask.reply, lead: ask.lead });
   return g ? cleanLine(g.text, { me: 'Mia', names: ['Tom'], blocklist: text.blocklist, cut: cutShort(g) }) : null;
 }
