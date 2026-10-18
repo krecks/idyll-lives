@@ -1092,10 +1092,20 @@ pub struct World {
     pub(crate) offers_version: u32,
     /// Dirt per tile (0..1), from using things and accidents; cleaned by residents.
     pub dirt: Vec<f32>,
-    /// Every room and garden with its scores (see `rooms.rs`), and the structure version they
+    /// Every room and garden with its scores (see `rooms.rs`), and the layout version they
     /// were computed for.
     pub(crate) rooms: Vec<crate::rooms::RoomInfo>,
     pub(crate) rooms_version: u32,
+    /// Bumped when the lot's rooms or their scores change structurally (walls, coverings,
+    /// objects added or removed). Unlike `structure_version`, a cupboard opening or a crop
+    /// growing doesn't bump it, so a busy town needn't rebuild every room for a change of looks.
+    pub(crate) room_layout_version: u32,
+    /// A room's scores changed without the layout changing (a thing broke, was repaired or
+    /// upgraded); the next tick recomputes the rooms once.
+    pub(crate) rooms_dirty: bool,
+    /// Only cleanliness may have changed (dirt, or a look that doesn't move anything); the next
+    /// tick rescores the rooms without walking the lot again.
+    pub(crate) rooms_rescore: bool,
     /// Overall score of the room or garden each tile is in (`roomRules.away` off the plots).
     pub(crate) room_score: Vec<f32>,
     /// Which tiles make up each room, to rescore cleanliness after messes (see `rooms.rs`).
@@ -1320,6 +1330,9 @@ impl World {
             dirt: vec![0.0; tiles],
             rooms: Vec::new(),
             rooms_version: 0,
+            room_layout_version: 1,
+            rooms_dirty: false,
+            rooms_rescore: false,
             room_score: Vec::new(),
             room_tiles: Default::default(),
             storeys: 1,
@@ -1599,6 +1612,7 @@ impl World {
             self.refresh_stairs();
         }
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_layout_changed();
         Ok(self.objects.len() as u32 - 1)
     }
 
@@ -1846,6 +1860,7 @@ impl World {
         }
         self.relationships.clear(i);
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_clean_rescore();
     }
 
     /// A resident's own modifiers: traits and perks, and what their life stage does (then the
@@ -1930,6 +1945,7 @@ impl World {
             self.households[h].name = name.to_string();
         }
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_clean_rescore();
         self.events
             .push_detail(self.tick, social::EventKind::MovedIn, first, None, None);
         Ok(())
@@ -2066,10 +2082,12 @@ impl World {
             if std::mem::take(&mut self.sims[i].reshaped) {
                 // An object opened or closed: how it looks changes.
                 self.structure_version = self.structure_version.wrapping_add(1);
+                self.rooms_need_clean_rescore();
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
                 self.structure_version = self.structure_version.wrapping_add(1);
+                self.rooms_need_rescore();
                 let (kind, n) = match news {
                     News::Broke(o) => (social::EventKind::Broke, self.objects[o as usize].def as i64),
                     News::Repaired(o) => (social::EventKind::Repaired, self.objects[o as usize].def as i64),
@@ -2256,6 +2274,24 @@ impl World {
         }
     }
 
+    /// Notes that the lot's rooms or their scores changed structurally (walls, coverings,
+    /// objects added or removed): the next tick recomputes the rooms.
+    pub(crate) fn rooms_layout_changed(&mut self) {
+        self.room_layout_version = self.room_layout_version.wrapping_add(1);
+    }
+
+    /// Notes that a room's scores changed without its layout (something broke, was repaired
+    /// or upgraded): the next tick recomputes the rooms once.
+    pub(crate) fn rooms_need_rescore(&mut self) {
+        self.rooms_dirty = true;
+    }
+
+    /// Notes that only cleanliness may have changed (a crop grew, a thing opened): the next
+    /// tick rescores the rooms' cleanliness without walking the whole lot.
+    pub(crate) fn rooms_need_clean_rescore(&mut self) {
+        self.rooms_rescore = true;
+    }
+
     /// Recomputes rooms and their scores (see `rooms.rs`). Call it after changing `dirt`
     /// directly; messes residents make are rescored on their own.
     pub fn refresh_rooms(&mut self) {
@@ -2265,7 +2301,9 @@ impl World {
         self.map_plots();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
-        self.rooms_version = self.structure_version;
+        self.rooms_version = self.room_layout_version;
+        self.rooms_dirty = false;
+        self.rooms_rescore = false;
         // The room (index into `rooms`) whose score each tile takes: its plot's garden, then
         // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
         let rooms = &self.rooms;
@@ -2305,8 +2343,11 @@ impl World {
         // Time moves on: edits can no longer be taken back.
         self.undo.clear();
         self.redo.clear();
-        if self.rooms_version != self.structure_version {
+        if self.rooms_version != self.room_layout_version || self.rooms_dirty {
             self.refresh_rooms();
+        } else if self.rooms_rescore {
+            self.rooms_rescore = false;
+            self.rescore_rooms();
         } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
             self.rescore_rooms();
         }
@@ -2447,6 +2488,7 @@ impl World {
         }
         if changed {
             self.structure_version = self.structure_version.wrapping_add(1);
+            self.rooms_need_clean_rescore();
         }
     }
 
@@ -2483,8 +2525,11 @@ impl World {
                 | Command::DeclinePurchase { .. }
         );
         self.apply_command(cmd)?;
-        if self.rooms_version != self.structure_version {
+        if self.rooms_version != self.room_layout_version || self.rooms_dirty {
             self.refresh_rooms();
+        } else if self.rooms_rescore {
+            self.rooms_rescore = false;
+            self.rescore_rooms();
         }
         // Someone an order or an edit stopped (the sink they carried dishes to was moved) puts
         // down what they carry now, not when time moves on (Build mode stands still).

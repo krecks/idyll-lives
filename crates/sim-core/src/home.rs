@@ -222,6 +222,7 @@ impl World {
         self.items.version = version;
         self.refresh_stairs();
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_layout_changed();
     }
 
     /// The roof over the household's home: a style and a colour (free; only for looks).
@@ -815,6 +816,7 @@ impl World {
         self.pay(h, cost);
         self.objects[object as usize].wear = 0.0;
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_rescore();
         Ok(())
     }
 
@@ -842,6 +844,7 @@ impl World {
         obj.value += cost;
         let quality = obj.quality;
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_rescore();
         // Told about the household's first resident (nobody may live there yet).
         if let Some(member) = self.sims.iter().position(|s| s.here() && s.household as usize == h) {
             self.events.push_detail(
@@ -1077,6 +1080,7 @@ impl World {
         }
         self.pay(h, cost);
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_layout_changed();
         Ok(())
     }
 
@@ -1130,6 +1134,7 @@ impl World {
         }
         self.pay(h, cost);
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_rescore();
         Ok(())
     }
 
@@ -1170,6 +1175,7 @@ impl World {
         }
         self.pay(h, cost);
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_need_rescore();
         Ok(())
     }
 
@@ -1270,6 +1276,7 @@ impl World {
             self.refresh_stairs();
         }
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_layout_changed();
         obj
     }
 }
