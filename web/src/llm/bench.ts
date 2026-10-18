@@ -20,15 +20,11 @@
 
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from '../talk/prompt';
 import { loadTalk } from '../talk/text';
+import { LINE_STOPS, LINE_TOKENS } from '../talk/writer';
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
-
-/** The game's longest line (talk/writer.ts `LINE_TOKENS`). */
-const LINE_TOKENS = 160;
-/** The game's line endings: the closing quote is not said. */
-const LINE_STOPS = ['"', '“', '”'];
 
 export interface PerfSample {
   name: string;

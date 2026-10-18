@@ -17,13 +17,16 @@
  *     --runs 3           decode runs (median, min, max)
  *     --no-lines         skip the game's five test lines
  *     --cold / --warm    only the first load / only the cached reload (default: both)
- *     --headless / --headed
+ *     --headed / --headless  with a window (the default: a timing run, like `devices.mjs`) or
+ *                        without (still the real GPU)
+ *     --left 2600        how far right the window goes, out of the way
  *     --out <dir>        default <repo>/bench-results/llm-<time>/
  */
 
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
@@ -37,7 +40,8 @@ const has = (name) => args.includes(`--${name}`);
 const PORT = Number(flag('port', 5399));
 const TOKENS = Number(flag('tokens', 96));
 const RUNS = Number(flag('runs', 3));
-const HEADLESS = has('headed') ? false : has('headless') ? true : true;
+const HEADLESS = has('headless') && !has('headed');
+const LEFT = Number(flag('left', 2600));
 const COLD = !has('warm');
 const WARM = !has('cold');
 const LINES = !has('no-lines');
@@ -67,8 +71,10 @@ async function startVite() {
 
 const fmt = (n, digits = 0) => (Number.isFinite(n) ? n.toFixed(digits) : '—');
 
-/** The machine the benchmark runs on: model, OS, power and thermal state (Low Power Mode throttles). */
+/** The machine the benchmark runs on: model, OS, and on macOS power and thermal state (Low Power Mode throttles). */
 function machine() {
+  const base = { os: `${os.type()} ${os.release()}`, chip: os.cpus()[0]?.model ?? '?', cores: os.cpus().length, memoryGb: os.totalmem() / 1073741824 };
+  if (process.platform !== 'darwin') return { ...base, power: '?', lowPowerMode: '?', thermal: '' };
   const run = (cmd, args) => {
     try {
       return execFileSync(cmd, args, { encoding: 'utf8' }).trim();
@@ -78,10 +84,8 @@ function machine() {
   };
   const pmset = run('pmset', ['-g']);
   return {
+    ...base,
     os: `macOS ${run('sw_vers', ['-productVersion'])}`,
-    chip: run('sysctl', ['-n', 'machdep.cpu.brand_string']),
-    cores: Number(run('sysctl', ['-n', 'hw.ncpu'])) || undefined,
-    memoryGb: Number(run('sysctl', ['-n', 'hw.memsize'])) / 1073741824 || undefined,
     power: run('pmset', ['-g', 'batt']).split('\n').slice(1).join(' ').trim(),
     lowPowerMode: /lowpowermode\s+(\d)/.exec(pmset)?.[1] ?? '?',
     thermal: run('pmset', ['-g', 'therm']).split('\n').filter((l) => /warning|CPU_Scheduler_Limit|CPU_Available_CPUs/.test(l)).join('; '),
@@ -124,6 +128,15 @@ const browser = await chromium.launch({
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  if (!HEADLESS) {
+    try {
+      const cdp = await page.context().newCDPSession(page);
+      const { windowId } = await cdp.send('Browser.getWindowForTarget');
+      await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left: LEFT, top: 0 } });
+    } catch {
+      // (Some window managers refuse; it still runs.)
+    }
+  }
   page.on('console', (m) => m.type() === 'error' && console.error(`page: ${m.text()}`));
   page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
   const options = { decodeTokens: TOKENS, decodeRuns: RUNS, lines: LINES };
