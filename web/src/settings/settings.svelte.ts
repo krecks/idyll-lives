@@ -129,18 +129,97 @@ export function migrateGraphics(old: OldGraphics): GraphicsPreset {
   return low ? 'low' : 'medium';
 }
 
+/** The version of the stored settings (`settingsVersion`); bump it when a migration is added. */
+const SETTINGS_VERSION = 2;
+
+/**
+ * Ordered migrations: `MIGRATIONS[n]` takes settings at version `n` to `n + 1`. Settings saved
+ * before there was a version are version 0. Each must be safe to run on settings that already
+ * have the new shape (an old save may have skipped versions, and the stored object may be odd).
+ */
+const MIGRATIONS: readonly ((s: Record<string, unknown>) => void)[] = [
+  // 0 → 1: the three graphics presets replaced 0.1's quality preset and its parts.
+  (s) => {
+    if (s.graphics === undefined) s.graphics = migrateGraphics(s as OldGraphics);
+  },
+  // 1 → 2: Babble's language codes (0.14–0.19) became the one language there is.
+  (s) => {
+    if (s.voiceLanguage !== 'en') s.voiceLanguage = DEFAULT_SETTINGS.voiceLanguage;
+  },
+];
+
+const BOOLEAN_KEYS = [
+  'autonomy',
+  'clock24h',
+  'showFps',
+  'reducedMotion',
+  'sound',
+  'hideHudWhileWatching',
+  'autoSlow',
+  'skipQuietHours',
+  'pauseOnBlur',
+  'voices',
+  'subtitles',
+  'worldSound',
+  'muteInBackground',
+] as const satisfies readonly (keyof Settings)[];
+
+/** A number in `lo..hi`, or `fallback` if it isn't one. */
+function clampNumber(value: unknown, lo: number, hi: number, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(hi, Math.max(lo, value)) : fallback;
+}
+
+/** One of `options`, or `fallback` if it isn't one. */
+function oneOf<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
+  return options.includes(value as T) ? (value as T) : fallback;
+}
+
+/**
+ * Makes what the merge produced safe to use: numbers within the ranges the interface offers,
+ * switches really on or off, and choices one of the ones there are. (A stored file may be from
+ * another version, hand-edited, or truncated.)
+ */
+function sanitize(s: Settings): Settings {
+  for (const k of BOOLEAN_KEYS) {
+    if (typeof s[k] !== 'boolean') (s as unknown as Record<string, unknown>)[k] = DEFAULT_SETTINGS[k];
+  }
+  // 0 is "no cap", so it isn't below the smallest cap the interface offers.
+  s.fpsCap = typeof s.fpsCap === 'number' && Number.isFinite(s.fpsCap) && s.fpsCap !== 0
+    ? Math.round(Math.min(500, Math.max(10, s.fpsCap)))
+    : s.fpsCap === 0 ? 0 : DEFAULT_SETTINGS.fpsCap;
+  s.autosaveMinutes = clampNumber(s.autosaveMinutes, 0, 60, DEFAULT_SETTINGS.autosaveMinutes);
+  s.cameraSensitivity = clampNumber(s.cameraSensitivity, 0.5, 2, DEFAULT_SETTINGS.cameraSensitivity);
+  s.uiScale = clampNumber(s.uiScale, 0.5, 2, DEFAULT_SETTINGS.uiScale);
+  s.directorDelay = clampNumber(s.directorDelay, 0, 600, DEFAULT_SETTINGS.directorDelay);
+  s.voiceVolume = clampNumber(s.voiceVolume, 0, 1, DEFAULT_SETTINGS.voiceVolume);
+  s.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
+  s.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
+  s.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
+  if (s.resolution !== 'auto' && (typeof s.resolution !== 'number' || !(s.resolution >= MIN_SCALE && s.resolution <= 1))) s.resolution = DEFAULT_SETTINGS.resolution;
+  s.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
+  s.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
+  s.directControl = oneOf(s.directControl, ['inspect', 'always'] as const, DEFAULT_SETTINGS.directControl);
+  s.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
+  s.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
+  s.catalogSize = oneOf(s.catalogSize, ['compact', 'expanded'] as const, DEFAULT_SETTINGS.catalogSize);
+  if (!Array.isArray(s.tipsSeen) || s.tipsSeen.some((id) => typeof id !== 'string')) s.tipsSeen = [];
+  return s;
+}
+
 function load(): Settings {
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings> & OldGraphics;
-    const merged = { ...DEFAULT_SETTINGS, ...stored };
-    if (stored.graphics === undefined) merged.graphics = migrateGraphics(stored);
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, unknown>;
+    const saved = typeof stored.settingsVersion === 'number' && Number.isInteger(stored.settingsVersion) ? stored.settingsVersion : 0;
+    // A file from a newer version keeps the settings this one knows; there's no way back to
+    // the ones it doesn't.
+    for (let from = Math.max(0, Math.min(saved, SETTINGS_VERSION)); from < SETTINGS_VERSION; from++) {
+      MIGRATIONS[from]?.(stored);
+    }
+    delete stored.settingsVersion;
+    const merged = { ...DEFAULT_SETTINGS, ...stored } as Settings;
     // Settings that are gone (bloom, tilt-shift, the quality preset and its parts, the visual style) aren't kept.
-    for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete (merged as Record<string, unknown>)[k];
-    if (!isGraphicsPreset(merged.graphics)) merged.graphics = DEFAULT_SETTINGS.graphics;
-    if (merged.resolution !== 'auto' && !(merged.resolution >= MIN_SCALE && merged.resolution <= 1)) merged.resolution = DEFAULT_SETTINGS.resolution;
-    // Babble (0.14–0.19) is gone: anything but a language we have becomes the default.
-    if (!['en'].includes(merged.voiceLanguage)) merged.voiceLanguage = DEFAULT_SETTINGS.voiceLanguage;
-    return merged;
+    for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete (merged as unknown as Record<string, unknown>)[k];
+    return sanitize(merged);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -158,7 +237,7 @@ export function unsavedSettings(): void {
 
 $effect.root(() => {
   $effect(() => {
-    const json = JSON.stringify(settings);
+    const json = JSON.stringify({ ...settings, settingsVersion: SETTINGS_VERSION });
     if (!persist) return;
     try {
       localStorage.setItem(STORAGE_KEY, json);
