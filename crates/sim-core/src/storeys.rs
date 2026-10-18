@@ -82,6 +82,7 @@ impl World {
         self.refresh_stairs();
         self.lot_version = self.lot_version.wrapping_add(1);
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.rooms_layout_changed();
     }
 
     /// Rebuilds the stairs list from the stair objects (after objects come or go).
