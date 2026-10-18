@@ -66,6 +66,7 @@
     {
       "id": "foodie.espressoBar",
       "name": "Espresso bar",
+      "provides": ["coffee"],
       "model": "model.foodie.espressoBar",
       "footprint": [1, 1],
       "price": 450,

@@ -46,6 +46,8 @@ export interface InteractionDef {
   anim?: string;
   /** Only offered while the seat faces a table it tucks under (`seatAt`): dining at a table. */
   needsTable?: boolean;
+  /** Things a working object on the same plot must provide (`ObjectDef.provides`): coffee needs a coffee machine. */
+  requires?: string[];
   /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
   whole?: boolean;
   /**
@@ -176,6 +178,8 @@ export interface ObjectDef {
   description?: string;
   /** Sims that can use it at once. */
   slots?: number;
+  /** Things it provides while it works (interactions `requires`): a coffee machine provides coffee. */
+  provides?: string[];
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */

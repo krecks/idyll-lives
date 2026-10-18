@@ -130,7 +130,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 |---|---|---|---|---|---|---|
 | `foodie.herbGarden` Windowsill herb garden | 1x1 · floor | tendHerbs:tend | decor / — | Body, Pots | Use | `sprig`: a fresh sprig grows in a pot for tendHerbs. |
 | `foodie.deliPantry` Deli pantry | 1x1 · floor | nibble:fetch cheeseBoard:cook | kitchen / — | Body, Worktop, Shelves | Use | `doors_open`: the doors swing for nibble and cheeseBoard (`hold` 2.5 s). |
-| `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink | kitchen / — | Body, Worktop, Machine | Use | `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). |
+| `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink | kitchen / — | Body, Worktop, Machine | Use | Provides `coffee`; `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). |
 | `foodie.cookbookLectern` Cookbook lectern | 1x1 · floor | studyRecipes:read foodMagazines:read | kitchen / — | Body, Stool & ledge, Cookbook | Use | `page`: a page turns over for studyRecipes and foodMagazines. |
 | `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza, with the `flames`; the `flames` alone grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop, Stools | Use | `drawer_open` for tastingMenu (`hold` 2.5 s). Sat at on its stools for barBite. |

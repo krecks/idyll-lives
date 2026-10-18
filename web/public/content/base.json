@@ -3294,6 +3294,7 @@
       "interactions": [
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,

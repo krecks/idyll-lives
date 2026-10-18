@@ -158,6 +158,7 @@ mod tests {
             inside: false,
             autonomous: true,
             tags: 0,
+            requires: 0,
             skill_gain: [0.0; crate::content::MAX_SKILLS],
             cost: 0,
             skill: None,

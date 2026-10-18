@@ -81,6 +81,9 @@ pub struct Interaction {
     /// Whether Sims may choose this on their own.
     pub autonomous: bool,
     pub tags: TagMask,
+    /// Things that must be provided by a working object on the same plot (content `requires`;
+    /// see `ObjectDef::provides`): a table's coffee needs a coffee machine.
+    pub requires: TagMask,
     /// Skill levels gained per hour of use (before the per-level slowdown).
     pub skill_gain: [f32; MAX_SKILLS],
     /// Dollars charged from the Sim's household when the Sim starts using the object.
@@ -206,6 +209,9 @@ pub struct ObjectDef {
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
     pub tags: TagMask,
+    /// Things it provides while it stands here working (content `provides`): a coffee machine
+    /// provides coffee, so a table can offer *Have a coffee* (see `Interaction::requires`).
+    pub provides: TagMask,
     /// Where it goes: on the floor like furniture, or on a wall, the ceiling or flat on the floor
     /// as a rug, where it takes no floor space (content `layer`).
     pub layer: Layer,
@@ -1977,6 +1983,9 @@ struct ObjectRaw {
     footprint: [u8; 2],
     #[serde(default)]
     interactions: Vec<InteractionRaw>,
+    /// Things it provides while working (see `Interaction::requires`).
+    #[serde(default)]
+    provides: Vec<String>,
     #[serde(default)]
     price: Option<i64>,
     #[serde(default = "one_slot")]
@@ -2100,6 +2109,9 @@ struct InteractionRaw {
     autonomous: bool,
     #[serde(default)]
     tags: Vec<String>,
+    /// Things a working object on the same plot must provide (see `ObjectDef::provides`).
+    #[serde(default)]
+    requires: Vec<String>,
     /// Skill levels gained per hour.
     #[serde(default)]
     skills: HashMap<String, f32>,
@@ -2379,6 +2391,18 @@ impl Content {
         for t in &clean_tags {
             intern(&mut tags, t)?;
         }
+        // Capabilities (what an object provides, what an interaction requires) share the tag
+        // namespace, so content can refer to them by name without another list.
+        for obj in &raw.objects {
+            for t in &obj.provides {
+                intern(&mut tags, t)?;
+            }
+            for it in &obj.interactions {
+                for t in &it.requires {
+                    intern(&mut tags, t)?;
+                }
+            }
+        }
         let tag_index: HashMap<&str, usize> = tags
             .iter()
             .enumerate()
@@ -2539,6 +2563,10 @@ impl Content {
                 for t in &it.tags {
                     mask |= 1 << tag_index[t.as_str()];
                 }
+                let mut requires = 0;
+                for t in &it.requires {
+                    requires |= 1 << tag_index[t.as_str()];
+                }
                 if it.cost < 0 {
                     return Err(Error::new(format!("{ctx}: negative cost")));
                 }
@@ -2580,6 +2608,7 @@ impl Content {
                     inside: it.inside,
                     autonomous: it.autonomous,
                     tags: mask,
+                    requires,
                     skill_gain: skill_array(&it.skills, &ctx)?,
                     // A recipe costs its ingredients (for its fewest servings; it charges for as
                     // many as it makes).
@@ -2637,6 +2666,10 @@ impl Content {
                 return Err(Error::new(format!("object '{}': negative price", obj.id)));
             }
             let offered = interactions.iter().fold(0, |m: TagMask, it| m | it.tags);
+            let mut provides = 0;
+            for t in &obj.provides {
+                provides |= 1 << tag_index[t.as_str()];
+            }
             let used = !interactions.is_empty();
             let layer = match obj.layer.as_deref() {
                 None | Some("floor") => Layer::Floor,
@@ -2773,6 +2806,7 @@ impl Content {
                         .max(0.0)
                 },
                 tags: offered,
+                provides,
                 layer,
                 bunk: obj.bunk,
                 surface,

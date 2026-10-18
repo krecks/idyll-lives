@@ -84,7 +84,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
+| `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
 | `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
@@ -95,6 +95,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 - The breakfast counter keeps 4 draw calls: the toaster's lever and toast are one part, and the smoothie swirls
   (`blades`, a loop) under the lifted lid.
 - The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as they should.
+- Coffee at the dining tables and chairs needs a working coffee machine on the same lot (`requires` / `provides`).
 
 ## K4. Base counters (8)
 
@@ -190,8 +191,8 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 **In play** (signed off 2026-10-16):
 - Each checked standing free in all four facings. The four with their own seats are used as they are: coffee at the
-  dining table; breakfast and coffee at the bistro set and the glass table; breakfast, coffee and dinner at the
-  farmhouse dining table.
+  dining table (with a coffee machine on the lot); breakfast and coffee at the bistro set and the glass table;
+  breakfast, coffee and dinner at the farmhouse dining table.
 - The dining, glass and farmhouse sets' chairs are part of the model (residents sit on them) and take the table's
   "Legs" colour.
 - At the nine plain tables a snack is eaten from a dining chair (a bar stool at the high café table) set facing it:
@@ -226,7 +227,8 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
   from each.
 - The three stools swivel for sit and drink with the sitter riding them (`ride: swivel`) and turn back after their
   `hold` (0.6 s).
-- Coffee, and a drink on the stools, need a table (`needsTable`): refused for a seat standing alone.
+- Coffee and a drink on the stools need a table (`needsTable`): refused for a seat standing alone. Coffee also
+  needs a working coffee machine on the lot (`requires` / `provides`), as at any table.
 - Pulled in: once seated at a table it faces (`seatAt`, sim-core `faced_table`), the sitter shuffles in with the seat
   until the top's near edge is a fixed reach ahead of the hips (scaled to the body's height), and pushes it back
   while rising. The renderer moves the seat's instance, its contact shadow and a stool's swivel part, up to 0.45 m,

@@ -149,7 +149,11 @@ fn a_job_the_player_gives_a_retiree_sticks() {
 /// in the first house of a town, doesn't lose money over four weeks.
 #[test]
 fn the_basic_pension_pays_for_a_home_of_one() {
-    let content = common::content();
+    // Four weeks age a resident by 14 years here (`life.daysPerYear` 2): no deaths, so this
+    // checks the pension and the rent, not whether an old resident happens to survive.
+    let mut content: serde_json::Value = serde_json::from_str(&common::content()).unwrap();
+    content["life"]["death"] = serde_json::Value::Null;
+    let content = content.to_string();
     let mut town: serde_json::Value = serde_json::from_str(&common::town(&content, 7, 1)).unwrap();
     // Just the player's household in town (faster), alone and 70.
     town["sims"].as_array_mut().unwrap().retain(|s| s["household"] == 0);

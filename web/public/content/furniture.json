@@ -446,6 +446,7 @@
     {
       "id": "coffeeMachine",
       "name": "Coffee machine",
+      "provides": ["coffee"],
       "model": "model.coffeeMachine",
       "footprint": [
         1,
@@ -853,6 +854,7 @@
           "anim": "drink",
           "minutes": 15,
           "pose": "sit",
+          "needsTable": true,
           "effects": {
             "comfort": 0.15,
             "energy": 0.05
@@ -906,6 +908,7 @@
         },
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
@@ -965,6 +968,7 @@
         },
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
@@ -1024,6 +1028,7 @@
         },
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
@@ -1087,6 +1092,7 @@
         },
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
@@ -4493,6 +4499,7 @@
       "interactions": [
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
@@ -4564,6 +4571,7 @@
         },
         {
           "id": "coffee",
+          "requires": ["coffee"],
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,
