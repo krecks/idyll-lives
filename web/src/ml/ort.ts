@@ -34,6 +34,8 @@ export function configureOrt(ort: OrtModule, wasmBinary: ArrayBuffer): void {
   ort.env.wasm.wasmPaths = { wasm: ORT_WASM.url };
   ort.env.wasm.wasmBinary = wasmBinary;
   ort.env.logLevel = 'error';
+  // Ask for the discrete GPU on laptops that have one (the game does the same).
+  ort.env.webgpu.powerPreference = 'high-performance';
 }
 
 /**
@@ -41,10 +43,11 @@ export function configureOrt(ort: OrtModule, wasmBinary: ArrayBuffer): void {
  * logs warnings by default whatever `env.logLevel` says; it warns once that shape calculations
  * stay on the CPU, which ONNX Runtime does on purpose.)
  */
-export function sessionOptions() {
+export function sessionOptions(preferredOutputLocation?: 'cpu' | 'gpu-buffer') {
   return {
     executionProviders: ['webgpu'],
     graphOptimizationLevel: 'all' as const,
     logSeverityLevel: 3 as const,
+    ...(preferredOutputLocation ? { preferredOutputLocation } : {}),
   };
 }

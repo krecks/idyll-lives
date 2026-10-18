@@ -339,12 +339,14 @@ export async function generate(
   const wanted = params.sentences ?? 0;
   for (;;) {
     const logits = ran.logits!;
-    nonFinite ||= !allFinite(logits);
     if (!ids.length) for (const id of barred) logits[id] = -Infinity;
     // Not done yet: only plain speech, so it can't end (or drift off) here.
     const plain = wanted > 0 && sentencesIn(text) < wanted ? plainTokens(engine, logits.length) : null;
     if (plain) for (const id of plain.barred) logits[id] = -Infinity;
     let id = sample(logits, params, ids, rand);
+    // Only the chosen token has to be a number: `sample` skips the ones that aren't, and a broken
+    // model shows here (the text is garbage, and the caller throws it away).
+    nonFinite ||= !Number.isFinite(logits[id]);
     // A sentence's end with a closing quote: the sentence ends, the quote doesn't come.
     if (plain) id = plain.ends.get(id) ?? id;
     if (engine.stopIds.has(id)) {
@@ -411,11 +413,6 @@ function firstOf(text: string, stops: readonly string[] | undefined): number {
   return first;
 }
 
-function allFinite(xs: Float32Array): boolean {
-  for (let i = 0; i < xs.length; i++) if (!Number.isFinite(xs[i])) return false;
-  return true;
-}
-
 /** A small seeded random number generator (0..1). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -441,19 +438,41 @@ export function sample(logits: Float32Array, p: GenParams, written: readonly num
     }
   }
   if (p.temperature <= 0) return argmax(scores);
-  // The top k, best first (k is small: insertion into a short sorted list).
+  // The top k in a min-heap (its root is the weakest kept token), then best first.
   const k = Math.max(1, Math.min(p.topK, scores.length));
   const top: number[] = [];
   for (let i = 0; i < scores.length; i++) {
     const s = scores[i];
     if (!Number.isFinite(s)) continue;
-    if (top.length === k && s <= scores[top[k - 1]]) continue;
-    let at = top.length === k ? k - 1 : top.length;
-    while (at > 0 && scores[top[at - 1]] < s) at--;
-    top.splice(at, 0, i);
-    if (top.length > k) top.pop();
+    if (top.length === k) {
+      if (s <= scores[top[0]]) continue;
+      top[0] = i;
+      // Sift the new token down to where it belongs.
+      let at = 0;
+      for (;;) {
+        const left = at * 2 + 1;
+        const right = left + 1;
+        let small = at;
+        if (left < k && scores[top[left]] < scores[top[small]]) small = left;
+        if (right < k && scores[top[right]] < scores[top[small]]) small = right;
+        if (small === at) break;
+        [top[at], top[small]] = [top[small], top[at]];
+        at = small;
+      }
+    } else {
+      top.push(i);
+      // Sift it up.
+      let at = top.length - 1;
+      while (at > 0) {
+        const parent = (at - 1) >> 1;
+        if (scores[top[parent]] <= scores[top[at]]) break;
+        [top[at], top[parent]] = [top[parent], top[at]];
+        at = parent;
+      }
+    }
   }
   if (!top.length) return argmax(scores);
+  top.sort((a, b) => scores[b] - scores[a]);
   const max = scores[top[0]];
   const weights = top.map((i) => Math.exp((scores[i] - max) / p.temperature));
   const total = weights.reduce((a, b) => a + b, 0);
