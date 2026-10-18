@@ -867,7 +867,7 @@ export class BabylonRenderer implements Renderer {
     // Doors that open while residents use what they're on, and ambient clips near the camera (the
     // sun's shadows aren't redrawn for those).
     const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
-    if (motion.moved) this.sunShadows.moved();
+    if (motion.moved) this.sunShadows.moved(false);
     if (motion.moved) this.resetSnapshot();
     // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
     else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
@@ -877,7 +877,7 @@ export class BabylonRenderer implements Renderer {
     this.pullChairs();
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
-    if (this.characters.posed) this.sunShadows.moved();
+    if (this.characters.posed) this.sunShadows.moved(false);
     // Held reflections are drawn again when a resident in them moved; they draw only the residents they show.
     this.mirrors.update(this.camera, { heads: this.characters.heads, visible: this.characters.visible, count, moved: this.characters.posed, rowsOf: this.residentRows });
     this.handles.update(this.camera.globalPosition);
@@ -2508,7 +2508,7 @@ export class BabylonRenderer implements Renderer {
     shadows.normalBias = 0.02;
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
-    this.sunShadows = new SunShadows(shadows);
+    this.sunShadows = new SunShadows(shadows, this.scene);
     if (this.diag.has('noshadows')) this.sun.shadowEnabled = false;
     // The game's map is drawn again only when something in it moved (see sunShadows.ts); with WebGPU
     // snapshot rendering (the menus' town) Babylon draws every render target each frame anyway.
