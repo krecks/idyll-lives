@@ -24,7 +24,7 @@
   import { voiceFor } from '../../voice/voices';
   import { downloadMb, llmStatus, MODEL } from '../../llm';
   import { hasWebGpu } from '../../ml/ort';
-  import { deviceTest, isFirefox, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
+  import { browserHint, deviceTest, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
 
   // This game's lifespan (sent to the simulation when picked).
   let lifespan = $state<Lifespan>(game.lifespan);
@@ -146,8 +146,7 @@
     const x = r.result;
     if (!r.usable) {
       const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${x.ok ? '' : ' (wrong text)'}.` : "It couldn't load.";
-      const hint = x.ran && isFirefox() ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
-      return `Doesn't run well enough here, so residents say hand-written lines. ${why}${hint}`;
+      return `Doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(x)}`;
     }
     return `Runs on the GPU, voices too: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
   });

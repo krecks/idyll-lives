@@ -141,7 +141,7 @@ export interface LineTiming {
  * 24 kHz mono for one line and its mouth shapes (flat). `finishMs`: bringing it to 24 kHz,
  * trimming, pitch and size, and mouth shapes. `timing`: the model's parts, for measuring.
  */
-export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams, steps = STEPS): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number; timing: LineTiming }> {
+export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number; timing: LineTiming }> {
   // The model speaks at the voice's speed itself; our WASM gives the pitch and size.
   const line = engine.phonemizer.line(text, 1, voice.pitch, voice.depth);
   try {
@@ -178,12 +178,12 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
     const frames = Math.max(1, Math.ceil(Math.floor(seconds * rate) / chunk));
     let latent = new ort.Tensor('float32', noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames), [1, dim, frames]);
     const latentMask = new ort.Tensor('float32', new Float32Array(frames).fill(1), [1, 1, frames]);
-    const total = new ort.Tensor('float32', Float32Array.of(steps), [1]);
+    const total = new ort.Tensor('float32', Float32Array.of(STEPS), [1]);
     let vectorMs = 0;
     try {
       // Keep each step's latent where the runtime put it (on the GPU in the browser): the next
       // pass and the vocoder take it as it is, with no download and upload between the graphs.
-      for (let step = 0; step < steps; step++) {
+      for (let step = 0; step < STEPS; step++) {
         const stepStart = performance.now();
         const out = await sessions.vector.run({
           noisy_latent: latent,

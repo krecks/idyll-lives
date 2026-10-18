@@ -121,12 +121,14 @@ export function usableHere(): boolean {
 
 /**
  * Firefox 158's WebGPU is much slower for these models on macOS (2026-10-18: 9.7 tokens a second,
- * 3.5–4.5 s a line, against 160–200 and 0.25–0.4 s in Chromium, 114 and 0.7 s in Safari), so a
- * failed test there is the browser, not the computer. Say so; the test still runs (a later
- * Firefox may be faster).
+ * 3.5–4.5 s a line, against 160–170 and 0.38–0.42 s in Chromium, 114 and 0.71 s in Safari), so a
+ * test there that wrote the right text and was still too slow is the browser, not the computer.
+ * Says so (appended to the reason, or ''); the test still runs (a later Firefox may be faster).
+ * Not measured elsewhere: on other systems the computer may be the slow part.
  */
-export function isFirefox(): boolean {
-  return /\bFirefox\//.test(navigator.userAgent);
+export function browserHint(x: TestResult): string {
+  const firefoxOnMac = /\bFirefox\//.test(navigator.userAgent) && /\bMacintosh\b/.test(navigator.userAgent);
+  return x.ran && x.ok && firefoxOnMac ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
 }
 
 function readReports(): Record<string, DeviceReport> {
@@ -354,11 +356,11 @@ export function applyReport(r: DeviceReport): void {
   }
   if (!r.usable && settings.voiceWriter === 'llm') {
     settings.voiceWriter = 'lines';
-    const hint = r.result.ran && isFirefox() ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
+    const hint = browserHint(r.result);
     toast(
       r.result.ran
         ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.${hint}`
-        : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.${hint}`,
+        : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.`,
       hint ? 9000 : 7000,
     );
   }

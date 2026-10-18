@@ -336,6 +336,7 @@ export async function generate(
   let text = '';
   let stop: GenResult['stop'] = 'length';
   let nonFinite = false;
+  const seen = { nonFinite: false };
   const wanted = params.sentences ?? 0;
   for (;;) {
     const logits = ran.logits!;
@@ -343,10 +344,10 @@ export async function generate(
     // Not done yet: only plain speech, so it can't end (or drift off) here.
     const plain = wanted > 0 && sentencesIn(text) < wanted ? plainTokens(engine, logits.length) : null;
     if (plain) for (const id of plain.barred) logits[id] = -Infinity;
-    let id = sample(logits, params, ids, rand);
-    // Only the chosen token has to be a number: `sample` skips the ones that aren't, and a broken
-    // model shows here (the text is garbage, and the caller throws it away).
-    nonFinite ||= !Number.isFinite(logits[id]);
+    let id = sample(logits, params, ids, rand, seen);
+    // A broken model shows here (the text is garbage, and the caller throws it away): the chosen
+    // token isn't a number, or `sample` skipped a NaN or +Infinity on its way.
+    nonFinite ||= seen.nonFinite || !Number.isFinite(logits[id]);
     // A sentence's end with a closing quote: the sentence ends, the quote doesn't come.
     if (plain) id = plain.ends.get(id) ?? id;
     if (engine.stopIds.has(id)) {
@@ -427,9 +428,10 @@ export function mulberry32(seed: number): () => number {
 
 /**
  * The next token: repetition penalty on tokens already written, then the likeliest (temperature
- * 0) or a draw among the top-k, top-p tokens at the temperature.
+ * 0) or a draw among the top-k, top-p tokens at the temperature. `seen.nonFinite`: set when the
+ * draw skipped a NaN or +Infinity (-Infinity is a barred token).
  */
-export function sample(logits: Float32Array, p: GenParams, written: readonly number[], rand: () => number): number {
+export function sample(logits: Float32Array, p: GenParams, written: readonly number[], rand: () => number, seen?: { nonFinite: boolean }): number {
   const scores = logits;
   if (p.repetitionPenalty !== 1) {
     for (const id of new Set(written)) {
@@ -443,7 +445,10 @@ export function sample(logits: Float32Array, p: GenParams, written: readonly num
   const top: number[] = [];
   for (let i = 0; i < scores.length; i++) {
     const s = scores[i];
-    if (!Number.isFinite(s)) continue;
+    if (!Number.isFinite(s)) {
+      if (s !== -Infinity && seen) seen.nonFinite = true;
+      continue;
+    }
     if (top.length === k) {
       if (s <= scores[top[0]]) continue;
       top[0] = i;
@@ -472,7 +477,8 @@ export function sample(logits: Float32Array, p: GenParams, written: readonly num
     }
   }
   if (!top.length) return argmax(scores);
-  top.sort((a, b) => scores[b] - scores[a]);
+  // Ties in token order, so a seed draws the same token as the sorted list did.
+  top.sort((a, b) => scores[b] - scores[a] || a - b);
   const max = scores[top[0]];
   const weights = top.map((i) => Math.exp((scores[i] - max) / p.temperature));
   const total = weights.reduce((a, b) => a + b, 0);

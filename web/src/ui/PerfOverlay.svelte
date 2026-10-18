@@ -65,6 +65,7 @@
         <div><span>Lines made</span><b>{v.lines}{v.queued ? ` · ${v.queued} queued` : ''}</b></div>
         {#if v.lines}
           <div><span>Line time</span><b>{v.lastMs.toFixed(0)} ms · avg {v.avgMs.toFixed(0)}</b></div>
+          <div><span>Last line</span><b>length {v.lastTiming.duration.toFixed(0)} · text {v.lastTiming.text.toFixed(0)} · vector {v.lastTiming.vector.toFixed(0)} · vocoder {v.lastTiming.vocoder.toFixed(0)} · shaping {v.lastTiming.finish.toFixed(0)} ms</b></div>
           <div><span>Speed</span><b>{(1 / v.rtf).toFixed(1)}× real time</b></div>
         {/if}
         <div><span>Busy (5 s)</span><b>{pct(v.busy)}</b></div>
