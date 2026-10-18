@@ -38,6 +38,8 @@ none.
 - Checked standing free in the garden in four facings: sat on (park bench, garden bench, garden chair, patio chair),
   relaxed in (Adirondack chair), coffee and sitting in the sun at the bistro set, a picnic and a coffee at the
   picnic table. The tables, the bar and the parasol were looked at in four facings.
+- Coffee at the bistro set, picnic table and patio chair needs a working coffee machine on the same lot
+  (`requires` / `provides`), as at any table.
 - The patio chair is a seat at a table (`seatAt: ["table"]`; its coffee is `needsTable`), checked at the round table
   and at the teak table. Once seated, the sitter shuffles in with the chair until the top's near edge is a fixed
   reach ahead of the hips, and pushes it back while rising. How far it can come is read from the table's drawn

@@ -112,7 +112,9 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 - Checked indoors: the till drawer (held 1.5 s) and the bakery case's back door (held 2 s) for their uses, the
   grocery shelves browsed and a sandwich taken.
 - The café chair is a seat at a table (`seatAt: ["table"]`): coffee and cake at the café table in two placements,
-  refused at a chair standing alone (`needsTable`). Once seated, the sitter shuffles in with the chair until the
+  refused at a chair standing alone (`needsTable`). Its coffee also needs a working coffee machine on the lot
+  (`requires` / `provides`): the Corner Café has one, but a café chair bought for a home does not serve coffee
+  without one. Once seated, the sitter shuffles in with the chair until the
   top's near edge is a fixed reach ahead of the hips (up to 0.45 m, read from the table's triangles in
   `tableTuck.ts`), and pushes it back while rising; the sim's positions are unchanged.
 - The shop counter's "Counter" colours its front panels, "Trim" the walnut top and frame.

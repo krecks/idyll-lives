@@ -1101,8 +1101,18 @@ export async function startSession(
     const state = placement.open ? 'open' : 'closed';
     // A crop is harvested only ripe (growth stage 2).
     const offered = (when: string | undefined) => !when || (when === 'ripe' ? placement.growth === undefined || placement.growth === 2 : when === state);
+    // A coffee needs a working coffee machine on the same lot (content `requires` / `provides`).
+    const plot = world?.plots.find((p) => placement.x >= p.x && placement.z >= p.z && placement.x < p.x + p.w && placement.z < p.z + p.d);
+    const provided = new Set<string>();
+    if (plot) {
+      for (const o of world?.objects ?? []) {
+        if (o.x < plot.x || o.z < plot.z || o.x >= plot.x + plot.w || o.z >= plot.z + plot.d || (o.wear ?? 0) >= 1) continue;
+        for (const thing of content.object(o.def)?.provides ?? []) provided.add(thing);
+      }
+    }
+    const supplied = (requires: string[] | undefined) => !requires?.length || requires.every((r) => provided.has(r));
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      (it.needsTable && !atTable) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
+      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
     );
     // A lamp: its switch (not a fire's).
     if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });

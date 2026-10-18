@@ -288,3 +288,33 @@ fn a_guests_order_goes_when_the_visit_does() {
     }
     assert!(w.sims[0].queue().next().is_none(), "the order was dropped");
 }
+
+/// Coffee is made with a coffee machine, not just a table: a table offers it only while a
+/// working machine stands on the same lot (content `requires` / `provides`).
+#[test]
+fn coffee_needs_a_working_coffee_machine_on_the_lot() {
+    let mut w = world();
+    let table = buy(&mut w, "diningTable", 5, 5);
+    let coffee = interaction(&w, table, "coffee");
+    let err = w
+        .apply(Command::Use { sim: 0, object: table, interaction: coffee })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("provides coffee"), "{err}");
+
+    let machine = buy(&mut w, "coffeeMachine", 8, 5);
+    w.objects[machine as usize].wear = 1.0;
+    let err = w
+        .apply(Command::Use { sim: 0, object: table, interaction: coffee })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("provides coffee"), "a broken machine doesn't make coffee: {err}");
+
+    w.objects[machine as usize].wear = 0.0;
+    w.apply(Command::Use { sim: 0, object: table, interaction: coffee })
+        .expect("a working machine on the lot makes the table's coffee");
+    assert!(w.sims[0].queue().any(|t| matches!(
+        t.kind,
+        TaskKind::Use { object, .. } if object == table
+    )));
+}
