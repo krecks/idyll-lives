@@ -1,5 +1,6 @@
 /** Messages between the main thread and the voice worker (`tts.worker.ts`). */
 
+import type { LineTiming } from './supertonic';
 import type { VoiceParams } from './voices';
 
 export type ToVoiceWorker =
@@ -12,7 +13,7 @@ export type FromVoiceWorker =
   | { type: 'progress'; loaded: number; total: number }
   | { type: 'ready'; ms: number }
   /** 24 kHz mono and its mouth shapes (flat, `parseVisemes`); `ms`: how long the engine took. */
-  | { type: 'audio'; id: number; samples: Float32Array; visemes: Float32Array; ms: number }
+  | { type: 'audio'; id: number; samples: Float32Array; visemes: Float32Array; ms: number; timing: LineTiming }
   /**
    * A line that failed (`id`), or the engine couldn't load or the worker failed. `restart`: the
    * engine broke while making a line (a WebAssembly trap); a new worker can take over.

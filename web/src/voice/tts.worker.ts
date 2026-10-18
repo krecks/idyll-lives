@@ -85,8 +85,8 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     await loading;
     if (!engine) throw new Error('voice model not loaded');
     const start = performance.now();
-    const { samples, visemes } = await synthesizeLine(engine, text, voice);
-    scope.postMessage({ type: 'audio', id, samples, visemes, ms: performance.now() - start }, [samples.buffer, visemes.buffer]);
+    const { samples, visemes, timing } = await synthesizeLine(engine, text, voice);
+    scope.postMessage({ type: 'audio', id, samples, visemes, ms: performance.now() - start, timing }, [samples.buffer, visemes.buffer]);
   } catch (err) {
     scope.postMessage({ type: 'error', id, message: String(err) });
     // A trap (ours, or ONNX Runtime's) leaves that WebAssembly broken: its stack and memory are
@@ -145,8 +145,14 @@ async function load(base: string): Promise<void> {
   const ort = await importOrt();
   configureOrt(ort, ortWasm);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
+  // The runtime creates one WebGPU session at a time. The vector estimator's latent stays on the
+  // GPU between its passes and goes straight into the vocoder; the other graphs hand back the few
+  // numbers we need on the CPU.
   for (const [i, k] of names.entries()) {
-    sessions[k] = (await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions())) as unknown as Session;
+    sessions[k] = (await ort.InferenceSession.create(
+      new Uint8Array(models[i]),
+      sessionOptions(k === 'vector' ? 'gpu-buffer' : undefined),
+    )) as unknown as Session;
   }
   engine = {
     ort: ort as unknown as Engine['ort'],

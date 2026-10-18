@@ -19,6 +19,12 @@ import type { VoiceParams } from './voices';
 export interface OrtTensor {
   readonly data: unknown;
   readonly dims: readonly number[];
+  /** Where the data is (ONNX Runtime Web): `'cpu'` or `'gpu-buffer'`. */
+  readonly location?: 'cpu' | 'cpu-pinned' | 'gpu-buffer' | 'texture' | 'ml-tensor' | 'none';
+  /** The data, downloaded first if it is on the GPU. */
+  getData?(releaseData?: boolean): Promise<unknown>;
+  /** Frees the data (a GPU buffer, for one). */
+  dispose?(): void;
 }
 /** The pieces of ONNX Runtime used here (the worker's `onnxruntime-web/webgpu`, or Node's `onnxruntime-web`). */
 export interface Ort {
@@ -68,8 +74,11 @@ export interface Engine {
 
 /** The voice styles Supertonic 3 comes with, as its files name them. */
 export const STYLE_IDS = ['F1', 'F2', 'F3', 'F4', 'F5', 'M1', 'M2', 'M3', 'M4', 'M5'] as const;
-/** Denoising passes per line (the reference's default: 4 is about twice as fast, a little rougher). */
-export const STEPS = 8;
+/**
+ * Denoising passes per line: 6 is within a hair of the reference's 8 (spectral correlation
+ * 0.97+), a quarter faster; 4 is about twice as fast but rougher.
+ */
+export const STEPS = 6;
 /** The reference's speaking rate; a voice's `speed` is a factor on it. */
 const BASE_SPEED = 1.05;
 
@@ -119,16 +128,25 @@ function noise(seed: number, n: number): Float32Array {
   return out;
 }
 
+/** How long each part of a line took, ms (for the overlay and the browser benchmark). */
+export interface LineTiming {
+  duration: number;
+  text: number;
+  vector: number;
+  vocoder: number;
+  finish: number;
+}
+
 /**
  * 24 kHz mono for one line and its mouth shapes (flat). `finishMs`: bringing it to 24 kHz,
- * trimming, pitch and size, and mouth shapes.
+ * trimming, pitch and size, and mouth shapes. `timing`: the model's parts, for measuring.
  */
-export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number }> {
+export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number; timing: LineTiming }> {
   // The model speaks at the voice's speed itself; our WASM gives the pitch and size.
   const line = engine.phonemizer.line(text, 1, voice.pitch, voice.depth);
   try {
     const plain = line.text;
-    if (!plain) return { samples: new Float32Array(0), visemes: Float32Array.of(0, 0), finishMs: 0 };
+    if (!plain) return { samples: new Float32Array(0), visemes: Float32Array.of(0, 0), finishMs: 0, timing: { duration: 0, text: 0, vector: 0, vocoder: 0, finish: 0 } };
     const style = engine.styles.get(voice.style);
     if (!style) throw new Error(`unknown voice style ${voice.style}`);
     const { ort, sessions, config } = engine;
@@ -144,33 +162,62 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
     const textMask = new ort.Tensor('float32', new Float32Array(n).fill(1), [1, 1, n]);
     const styleTtl = new ort.Tensor('float32', style.ttl.data, style.ttl.dims);
     const styleDp = new ort.Tensor('float32', style.dp.data, style.dp.dims);
-    const seconds = ((await sessions.duration.run({ text_ids: textIds, style_dp: styleDp, text_mask: textMask })).duration.data as Float32Array)[0] / speed;
+    let t = performance.now();
+    const durationOut = (await sessions.duration.run({ text_ids: textIds, style_dp: styleDp, text_mask: textMask })).duration;
+    // The duration is one number; the output may be on the GPU when the session keeps its outputs there.
+    const durationData = (durationOut.getData ? await durationOut.getData() : durationOut.data) as Float32Array;
+    const seconds = durationData[0] / speed;
+    durationOut.dispose?.();
+    const durationMs = performance.now() - t;
+    t = performance.now();
     const textEmb = (await sessions.text.run({ text_ids: textIds, style_ttl: styleTtl, text_mask: textMask })).text_emb;
+    const textMs = performance.now() - t;
     const rate = config.ae.sample_rate;
     const chunk = config.ae.base_chunk_size * config.ttl.chunk_compress_factor;
     const dim = config.ttl.latent_dim * config.ttl.chunk_compress_factor;
     const frames = Math.max(1, Math.ceil(Math.floor(seconds * rate) / chunk));
-    let latent = noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames);
+    let latent = new ort.Tensor('float32', noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames), [1, dim, frames]);
     const latentMask = new ort.Tensor('float32', new Float32Array(frames).fill(1), [1, 1, frames]);
     const total = new ort.Tensor('float32', Float32Array.of(STEPS), [1]);
-    for (let step = 0; step < STEPS; step++) {
-      const out = await sessions.vector.run({
-        noisy_latent: new ort.Tensor('float32', latent, [1, dim, frames]),
-        text_emb: textEmb,
-        style_ttl: styleTtl,
-        latent_mask: latentMask,
-        text_mask: textMask,
-        current_step: new ort.Tensor('float32', Float32Array.of(step), [1]),
-        total_step: total,
-      });
-      latent = out.denoised_latent.data as Float32Array;
+    let vectorMs = 0;
+    try {
+      // Keep each step's latent where the runtime put it (on the GPU in the browser): the next
+      // pass and the vocoder take it as it is, with no download and upload between the graphs.
+      for (let step = 0; step < STEPS; step++) {
+        const stepStart = performance.now();
+        const out = await sessions.vector.run({
+          noisy_latent: latent,
+          text_emb: textEmb,
+          style_ttl: styleTtl,
+          latent_mask: latentMask,
+          text_mask: textMask,
+          current_step: new ort.Tensor('float32', Float32Array.of(step), [1]),
+          total_step: total,
+        });
+        vectorMs += performance.now() - stepStart;
+        const previous = latent;
+        latent = out.denoised_latent;
+        if (previous !== latent) previous.dispose?.();
+      }
+      t = performance.now();
+      const wav = (await sessions.vocoder.run({ latent })).wav_tts.data as Float32Array;
+      const vocoderMs = performance.now() - t;
+      const start = performance.now();
+      // New arrays of our own, so their buffers can be transferred to the main thread.
+      const samples = line.finish(wav, rate);
+      const visemes = line.visemes;
+      const finishMs = performance.now() - start;
+      return { samples, visemes, finishMs, timing: { duration: durationMs, text: textMs, vector: vectorMs, vocoder: vocoderMs, finish: finishMs } };
+    } finally {
+      latent.dispose?.();
+      textEmb.dispose?.();
+      styleTtl.dispose?.();
+      styleDp.dispose?.();
+      textIds.dispose?.();
+      textMask.dispose?.();
+      latentMask.dispose?.();
+      total.dispose?.();
     }
-    const wav = (await sessions.vocoder.run({ latent: new ort.Tensor('float32', latent, [1, dim, frames]) })).wav_tts.data as Float32Array;
-    const start = performance.now();
-    // New arrays of our own, so their buffers can be transferred to the main thread.
-    const samples = line.finish(wav, rate);
-    const visemes = line.visemes;
-    return { samples, visemes, finishMs: performance.now() - start };
   } finally {
     line.free();
   }

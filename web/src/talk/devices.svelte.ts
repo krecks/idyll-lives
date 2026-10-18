@@ -13,8 +13,8 @@
  * residents say hand-written lines; if even speech alone is too slow, voices are switched off
  * too (`applyReport`).
  *
- * Results are kept per model version and GPU (an M3 Pro, 2026-10-12: 0.5 s from asking for a
- * line to hearing it, speech made in a tenth of its length).
+ * Results are kept per model version, voice model and GPU (an M3 Pro, 2026-10-12: 0.5 s from
+ * asking for a line to hearing it, speech made in a tenth of its length).
  */
 
 import { ensureLlm, generateText, MODEL, unloadLlm } from '../llm';
@@ -23,7 +23,7 @@ import { settings } from '../settings/settings.svelte';
 import { toast } from '../ui/state.svelte';
 import { speechPieces } from '../voice/lines';
 import { SAMPLE_RATE } from '../voice/protocol';
-import { synthesize } from '../voice/service.svelte';
+import { MODEL_ID as VOICE_MODEL_ID, synthesize } from '../voice/service.svelte';
 import type { VoiceParams } from '../voice/voices';
 import { cleanLine } from './clean';
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from './prompt';
@@ -78,9 +78,9 @@ export interface DeviceReport {
   voicesOk: boolean;
 }
 
-/** Version 3: one test, everything on the GPU; older results (other setups and voices) are dropped. */
-const KEY = 'littlelives.deviceTests.3';
-const OLD_KEYS = ['littlelives.deviceTests', 'littlelives.deviceTests.2'];
+/** Version 4: results are kept per language model, voice model and GPU; older results are dropped. */
+const KEY = 'littlelives.deviceTests.4';
+const OLD_KEYS = ['littlelives.deviceTests', 'littlelives.deviceTests.2', 'littlelives.deviceTests.3'];
 /** A line must be written and spoken within this (the director gives a written line `MAX_WAIT_LLM_MS` in all). */
 const LINE_MS = WRITE_MS;
 /** Speech alone must be made within this (the voice speed test's "ok"). */
@@ -98,15 +98,15 @@ export const deviceTest = $state({
   stopping: false,
   /** The GPU's name ('none' without one; '' until known: results are kept per GPU). */
   gpu: '',
-  /** Results by model version and GPU (`reportKey`). */
+  /** Results by model version, voice model and GPU (`reportKey`). */
   reports: readReports(),
   /** Stopped this session: not started again on its own. */
   stopped: false,
 });
 
-/** Where the result for this computer is kept: per model version and GPU. */
+/** Where the result for this computer is kept: per model version, voice model and GPU. */
 export function reportKey(): string {
-  return `${MODEL.version}|${deviceTest.gpu}`;
+  return `${MODEL.version}|${VOICE_MODEL_ID}|${deviceTest.gpu}`;
 }
 
 /** The result on this computer, if it was tested. */
@@ -117,6 +117,18 @@ export function report(): DeviceReport | null {
 /** Whether the test found the model usable here. */
 export function usableHere(): boolean {
   return report()?.usable ?? false;
+}
+
+/**
+ * Firefox 158's WebGPU is much slower for these models on macOS (2026-10-18: 9.7 tokens a second,
+ * 3.5–4.5 s a line, against 160–170 and 0.38–0.42 s in Chromium, 114 and 0.71 s in Safari), so a
+ * test there that wrote the right text and was still too slow is the browser, not the computer.
+ * Says so (appended to the reason, or ''); the test still runs (a later Firefox may be faster).
+ * Not measured elsewhere: on other systems the computer may be the slow part.
+ */
+export function browserHint(x: TestResult): string {
+  const firefoxOnMac = /\bFirefox\//.test(navigator.userAgent) && /\bMacintosh\b/.test(navigator.userAgent);
+  return x.ran && x.ok && firefoxOnMac ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
 }
 
 function readReports(): Record<string, DeviceReport> {
@@ -344,11 +356,12 @@ export function applyReport(r: DeviceReport): void {
   }
   if (!r.usable && settings.voiceWriter === 'llm') {
     settings.voiceWriter = 'lines';
+    const hint = browserHint(r.result);
     toast(
       r.result.ran
-        ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.`
+        ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.${hint}`
         : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.`,
-      7000,
+      hint ? 9000 : 7000,
     );
   }
 }

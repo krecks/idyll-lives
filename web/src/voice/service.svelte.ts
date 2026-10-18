@@ -7,6 +7,7 @@
 import { untrack } from 'svelte';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker } from './protocol';
+import type { LineTiming } from './supertonic';
 import { parseVisemes, type VisemeTrack } from './visemes';
 import type { VoiceParams } from './voices';
 
@@ -42,6 +43,8 @@ export interface VoiceThreadStats {
   /** Time to make a line, last and average, ms. */
   lastMs: number;
   avgMs: number;
+  /** The last line's parts, ms (duration, text, vector, vocoder, shaping). */
+  lastTiming: LineTiming;
   /** Generation time ÷ audio length over all lines (lower is faster). */
   rtf: number;
   /** Share of the last few seconds the worker spent making speech, 0..1. */
@@ -55,7 +58,7 @@ export interface VoiceThreadStats {
 // Before `voiceStatus`, which reads stored results with them.
 const BENCH_KEY = 'littlelives.voiceBench';
 /** The model, its voices and the runtime: a new id discards old speed-test results and cached clips. */
-export const MODEL_ID = 'supertonic-3@3cadd1e+fp16w+8steps/ort-web@1.30.0';
+export const MODEL_ID = 'supertonic-3@3cadd1e+fp16w+6steps/ort-web@1.30.0';
 
 export const voiceStatus = $state({
   state: 'off' as ModelState,
@@ -82,7 +85,15 @@ const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error)
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
 /** Counters behind `voiceThreadStats` (not reactive: read by the overlay's timer). */
 const BUSY_WINDOW_MS = 5000;
-const counters = { loadMs: 0, lines: 0, totalMs: 0, lastMs: 0, audioSeconds: 0, recent: [] as { at: number; ms: number }[] };
+const counters = {
+  loadMs: 0,
+  lines: 0,
+  totalMs: 0,
+  lastMs: 0,
+  lastTiming: { duration: 0, text: 0, vector: 0, vocoder: 0, finish: 0 },
+  audioSeconds: 0,
+  recent: [] as { at: number; ms: number }[],
+};
 /** Times the engine broke and was started again this session (see `onMessage`). */
 const MAX_RESTARTS = 3;
 let restarts = 0;
@@ -105,6 +116,7 @@ function onMessage(msg: FromVoiceWorker): void {
     counters.lines++;
     counters.totalMs += msg.ms;
     counters.lastMs = msg.ms;
+    counters.lastTiming = msg.timing;
     counters.audioSeconds += msg.samples.length / SAMPLE_RATE;
     counters.recent.push({ at: now, ms: msg.ms });
     while (counters.recent.length && counters.recent[0].at < now - BUSY_WINDOW_MS) counters.recent.shift();
@@ -239,6 +251,7 @@ export function voiceThreadStats(): VoiceThreadStats {
     queued: pending.size,
     lastMs: counters.lastMs,
     avgMs: counters.lines ? counters.totalMs / counters.lines : 0,
+    lastTiming: counters.lastTiming,
     rtf: counters.audioSeconds ? counters.totalMs / 1000 / counters.audioSeconds : 0,
     busy: Math.min(1, recentMs / BUSY_WINDOW_MS),
     cachedClips: clips.size,
@@ -257,7 +270,15 @@ export function unloadVoice(): void {
 function unload(): void {
   worker?.terminate();
   worker = null;
-  Object.assign(counters, { loadMs: 0, lines: 0, totalMs: 0, lastMs: 0, audioSeconds: 0, recent: [] });
+  Object.assign(counters, {
+    loadMs: 0,
+    lines: 0,
+    totalMs: 0,
+    lastMs: 0,
+    lastTiming: { duration: 0, text: 0, vector: 0, vocoder: 0, finish: 0 },
+    audioSeconds: 0,
+    recent: [],
+  });
   for (const p of pending.values()) p.reject(new Error('voice unloaded'));
   pending.clear();
   waiters.forEach((w) => w.reject(new Error('voice unloaded')));

@@ -30,9 +30,9 @@ const ARLO = { ...plain, style: 'M1' };
 const CHILD = { style: 'F1', pitch: 1.3, depth: 1.08, speed: 1.04 };
 /**
  * Supertonic's output for `LINES` as `ARLO`, then line 2 as `CHILD` (SHA-256, first 12 hex
- * digits). Update them only on purpose (a new model, noise, shaping or phonemizer rule).
+ * digits). Update them only on purpose (a new model, noise, steps, shaping or phonemizer rule).
  */
-const GOLDEN = ['493b6baabe4e', 'd359c9f465fa', '77f38ff1358c', 'ca884920bdda'];
+const GOLDEN = ['8cff13df1304', '222e114d9825', '1f0834091af4', 'd5f80af5ed12'];
 
 const hash = (a) => createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 12);
 const same = (a, b) => a.length === b.length && Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
