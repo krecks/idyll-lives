@@ -119,6 +119,16 @@ export function usableHere(): boolean {
   return report()?.usable ?? false;
 }
 
+/**
+ * Firefox 158's WebGPU is much slower for these models on macOS (2026-10-18: 9.7 tokens a second,
+ * 3.5–4.5 s a line, against 160–200 and 0.25–0.4 s in Chromium, 114 and 0.7 s in Safari), so a
+ * failed test there is the browser, not the computer. Say so; the test still runs (a later
+ * Firefox may be faster).
+ */
+export function isFirefox(): boolean {
+  return /\bFirefox\//.test(navigator.userAgent);
+}
+
 function readReports(): Record<string, DeviceReport> {
   try {
     for (const key of OLD_KEYS) localStorage.removeItem(key);
@@ -344,11 +354,12 @@ export function applyReport(r: DeviceReport): void {
   }
   if (!r.usable && settings.voiceWriter === 'llm') {
     settings.voiceWriter = 'lines';
+    const hint = r.result.ran && isFirefox() ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
     toast(
       r.result.ran
-        ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.`
-        : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.`,
-      7000,
+        ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.${hint}`
+        : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.${hint}`,
+      hint ? 9000 : 7000,
     );
   }
 }

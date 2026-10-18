@@ -54,6 +54,11 @@ are at the end.*
   same test on an M1 Pro (2026-10-18, 8 passes): 0.86 s and 0.24 of its length — the model alone
   writes 96–98 tokens a second (`tools/llm/bench.mjs`; 76–81 with the game and the voices drawing
   on the same GPU).
+- **Browsers (M3 Pro, 2026-10-18, the device test):** Chrome/Brave 0.38–0.42 s a line (160–170
+  tokens/s); Safari 26.5 0.71 s (114 tokens/s); Firefox 158 3.5–4.5 s (9.7 tokens/s). Firefox's
+  WebGPU is much slower for both models here (speech 0.7 s against 0.18 s), so the test turns the
+  language model off there and the settings say why; voices still run. Not the computer: the
+  same Mac is fast in the other browsers.
 - **Download:** 216.7 MB once (the model 185.2, the runtime's WebGPU build 26.8, voices and text
   files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
