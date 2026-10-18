@@ -55,3 +55,22 @@ fn a_wall_they_can_go_round_sends_them_round() {
     assert!(w.sims[0].current().is_none(), "never got there");
     assert!(w.sims[0].pos[0] > 20.0, "ended at {:?}", w.sims[0].pos);
 }
+
+#[test]
+fn a_walker_nobody_watches_gives_up_on_their_next_turn() {
+    // A neighbour's home, and the view far from it: Ada takes a turn only every so often, and
+    // the wall goes up between two of them.
+    let lot = LOT.replace(r#""player":true"#, r#""player":false"#);
+    let mut w = World::from_json(CONTENT, &lot, 3).unwrap();
+    w.set_view(Some([100, 100, 110, 110]));
+    w.apply(Command::MoveTo { sim: 0, x: 21.5, z: 5.5 }).unwrap();
+    for _ in 0..21 {
+        w.tick_once();
+    }
+    assert!(w.sims[0].current().is_some(), "should still be on the way");
+    w.apply(Command::Build { household: 0, edits: wall(12, 0, 10) }).unwrap();
+    for _ in 0..200 {
+        w.tick_once();
+    }
+    assert!(w.sims[0].pos[0] < 12.0, "walked through the wall to {:?}", w.sims[0].pos);
+}

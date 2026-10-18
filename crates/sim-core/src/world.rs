@@ -598,12 +598,17 @@ pub struct Sim {
     pub(crate) follow_up: Option<Task>,
     /// The last few things they chose for themselves but couldn't get to (a plate on a counter
     /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
-    /// don't choose it again: uses, eating, cleaning, repairs, washing up and visits (see
-    /// `remember_unreachable`; object ids follow `remap_unreachable`). Not saved either.
+    /// don't choose it again: uses, eating, cleaning, repairs, washing up, visits, and people
+    /// for a short while (see `remember_unreachable`; object ids follow `remap_unreachable`).
+    /// Not saved either.
     pub(crate) unreachable: [Option<(TaskKind, u64)>; UNREACHABLE],
     /// Ticks the social they're on has spent waiting for its target, and following them since
     /// it first got there (see `conversation::update`). Not saved.
     pub(crate) social_waited: u32,
+    /// The `World::nav_version` their route was last checked against (see `step_sim`): a
+    /// resident nobody watches takes a turn only every so often, and a change between two of
+    /// them still catches up with them. Not saved (after a load, a walker routes again once).
+    pub(crate) nav_seen: u32,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -1090,8 +1095,6 @@ pub struct World {
     /// The walkable regions of the lot at `reach_version` (see `path::Reach`).
     pub(crate) reach: crate::path::Reach,
     pub(crate) reach_version: u32,
-    /// The navigation version walkers were last re-routed for (see `step_sim`).
-    pub(crate) nav_seen: u32,
     /// Bumped when the lot itself changes (walls, doors, windows, fences, coverings, floors),
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
@@ -1154,8 +1157,8 @@ pub(crate) struct Ctx<'a> {
     pub nav: NavGrid<'a>,
     /// Which tiles can reach which (see `path::Reach`): a goal elsewhere is refused at once.
     pub reach: &'a crate::path::Reach,
-    /// The house changed this tick in a way that can cut a walker's route short.
-    pub nav_changed: bool,
+    /// Bumped when the house changes in a way that can cut a walker's route short.
+    pub nav_version: u32,
     pub rels: &'a Relationships,
     pub briefs: &'a [SimBrief],
     pub households: &'a [Household],
@@ -1346,7 +1349,6 @@ impl World {
             nav_version: 1,
             reach: Default::default(),
             reach_version: 0,
-            nav_seen: 1,
             lot_version: 1,
             briefs: Vec::new(),
             exits: Vec::new(),
@@ -1762,6 +1764,7 @@ impl World {
             follow_up: None,
             unreachable: [None; UNREACHABLE],
             social_waited: 0,
+            nav_seen: 0,
             household: spawn.household,
             job,
             away_until: None,
@@ -2402,9 +2405,6 @@ impl World {
         }
         self.refresh_reach();
         self.refresh_index();
-        // Walkers whose route a change may have cut are looked at again this tick.
-        let nav_changed = self.nav_version != self.nav_seen;
-        self.nav_seen = self.nav_version;
         self.tick += 1;
         let tick = self.tick;
 
@@ -2468,6 +2468,7 @@ impl World {
                 dirt,
                 stairs,
                 reach,
+                nav_version,
                 ..
             } = self;
             let ctx = Ctx {
@@ -2476,7 +2477,7 @@ impl World {
                 content,
                 nav: NavGrid { lot, blocked, stairs },
                 reach,
-                nav_changed,
+                nav_version: *nav_version,
                 rels: relationships,
                 briefs,
                 households,
@@ -3276,8 +3277,10 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         return;
     }
 
-    // The house changed under them: a wall where they were going, or a door opened.
-    if ctx.nav_changed {
+    // The house changed under them since their last turn: a wall where they were going, or a
+    // door opened.
+    if sim.nav_seen != ctx.nav_version {
+        sim.nav_seen = ctx.nav_version;
         reroute_after_change(sim, ctx, objects);
     }
 
