@@ -221,7 +221,7 @@ impl World {
         self.items = s.items;
         self.items.version = version;
         self.refresh_stairs();
-        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_changed();
         self.rooms_layout_changed();
     }
 
@@ -1079,7 +1079,7 @@ impl World {
             return Err(e);
         }
         self.pay(h, cost);
-        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_changed();
         self.rooms_layout_changed();
         Ok(())
     }
@@ -1275,7 +1275,7 @@ impl World {
         if self.content.objects[obj.def].stairs {
             self.refresh_stairs();
         }
-        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_changed();
         self.rooms_layout_changed();
         obj
     }

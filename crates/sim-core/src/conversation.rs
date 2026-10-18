@@ -172,6 +172,7 @@ pub(crate) fn update(w: &mut World) {
         households,
         plots,
         tile_plot,
+        reach,
         ..
     } = w;
     let nav = NavGrid { lot, blocked, stairs };
@@ -219,7 +220,7 @@ pub(crate) fn update(w: &mut World) {
                 if gap <= s.distance + ENGAGE_SLACK {
                     set_phase(&mut sims[i], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[t].pos) > REPATH_DISTANCE {
-                    follow(&nav, &walk, sims, i, t, directed, content, objects);
+                    follow(&nav, reach, &walk, sims, i, t, directed, content, objects);
                 }
             }
             State::Waiting(ticks) => {
@@ -228,7 +229,7 @@ pub(crate) fn update(w: &mut World) {
                 if sims[i].pressed(content) {
                     end_activity(&mut sims[i], content, objects);
                 } else if gap > s.distance + ENGAGE_SLACK + 0.6 {
-                    follow(&nav, &walk, sims, i, t, directed, content, objects);
+                    follow(&nav, reach, &walk, sims, i, t, directed, content, objects);
                 } else if sims[t].available_for_social(content) {
                     engage(
                         content,
@@ -318,7 +319,7 @@ pub(crate) fn update(w: &mut World) {
                 if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
                     set_phase(&mut sims[j], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[l].pos) > REPATH_DISTANCE {
-                    chase(&nav, &walk, sims, j, l, content, objects);
+                    chase(&nav, reach, &walk, sims, j, l, content, objects);
                 }
             }
             (Joining::Routing { .. }, None) => {
@@ -328,7 +329,7 @@ pub(crate) fn update(w: &mut World) {
             }
             (Joining::Waiting(_), Some((t, _))) => {
                 if dist(sims[j].pos, middle(sims, l, t)) > JOIN_RANGE + 0.6 {
-                    chase(&nav, &walk, sims, j, l, content, objects);
+                    chase(&nav, reach, &walk, sims, j, l, content, objects);
                 } else if group(sims, content, l).len() >= MAX_GROUP {
                     end_activity(&mut sims[j], content, objects);
                 } else {
@@ -500,6 +501,7 @@ fn set_phase(sim: &mut Sim, phase: Phase) {
 #[allow(clippy::too_many_arguments)]
 fn follow<'a>(
     nav: &NavGrid,
+    reach: &crate::path::Reach,
     walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
     sims: &mut [Sim],
     i: usize,
@@ -512,15 +514,17 @@ fn follow<'a>(
     let open = walk(&sims[i], sims[i].tile());
     let allowed = directed || open.plot(nav, x, z).is_none_or(|p| open.open.get(p as usize).copied().unwrap_or(true));
     if allowed && sims[t].available_for_social(content) {
-        chase(nav, walk, sims, i, t, content, objects);
+        chase(nav, reach, walk, sims, i, t, content, objects);
     } else {
         end_activity(&mut sims[i], content, objects);
     }
 }
 
 /// Re-route toward a target that moved; give up if they're unreachable.
+#[allow(clippy::too_many_arguments)]
 fn chase<'a>(
     nav: &NavGrid,
+    reach: &crate::path::Reach,
     walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
     sims: &mut [Sim],
     i: usize,
@@ -532,6 +536,7 @@ fn chase<'a>(
     let rerouted = approach_tile(nav, target, sims[i].pos).and_then(|goal| {
         route(
             nav,
+            Some(reach),
             sims[i].pos,
             sims[i].tile(),
             goal,

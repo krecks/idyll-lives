@@ -366,6 +366,81 @@ impl NavGrid<'_> {
     }
 }
 
+/// Which walkable tiles can reach which: a label per tile, shared by every tile in one
+/// connected region. A goal in another region has no path, so a search for it is refused
+/// before it can flood the town (P3-08).
+///
+/// Labels are only meaningful against the `NavGrid` they were built from; `World` rebuilds
+/// them when the navigation version changes.
+#[derive(Default)]
+pub struct Reach {
+    label: Vec<u32>,
+    regions: u32,
+}
+
+impl Reach {
+    /// Labels the walkable regions of `nav`. One pass over the lot, in the same steps a walker
+    /// may take (so diagonal walls and stairs are respected), costs what one failed search
+    /// costs but is paid once per change to the house instead of once per unreachable goal.
+    pub fn build(nav: &NavGrid) -> Reach {
+        let lot = nav.lot;
+        let tiles = lot.width * lot.depth;
+        let mut label = vec![u32::MAX; tiles];
+        let mut queue = Vec::new();
+        let mut regions = 0;
+        for start in 0..tiles {
+            let (x, z) = ((start % lot.width) as i32, (start / lot.width) as i32);
+            if label[start] != u32::MAX || !nav.tile_free(x, z) {
+                continue;
+            }
+            label[start] = regions;
+            queue.push(start);
+            while let Some(t) = queue.pop() {
+                let (x, z) = ((t % lot.width) as i32, (t / lot.width) as i32);
+                for (nx, nz) in nav.neighbours(x, z) {
+                    let n = lot.tile_index(nx, nz);
+                    if label[n] == u32::MAX {
+                        label[n] = regions;
+                        queue.push(n);
+                    }
+                }
+            }
+            regions += 1;
+        }
+        Reach { label, regions }
+    }
+
+    /// How many separate walkable regions the lot has (an open lot has one).
+    pub fn regions(&self) -> u32 {
+        self.regions
+    }
+
+    /// The region of a tile, if it can be stood on.
+    fn of(&self, lot: &Lot, (x, z): (i32, i32)) -> Option<u32> {
+        if !lot.in_bounds(x, z) {
+            return None;
+        }
+        match self.label[lot.tile_index(x, z)] {
+            u32::MAX => None,
+            l => Some(l),
+        }
+    }
+
+    /// Whether `nav` can get from `a` to `b`. Unknown or out-of-bounds ends answer `true`: the
+    /// search itself decides, as before. A walker standing where something now stands (a wall
+    /// built over them) counts as able to reach the region of any tile they can step onto.
+    pub fn reaches(&self, nav: &NavGrid, a: (i32, i32), b: (i32, i32)) -> bool {
+        let Some(to) = self.of(nav.lot, b) else { return true };
+        match self.of(nav.lot, a) {
+            Some(from) => from == to,
+            None if nav.lot.in_bounds(a.0, a.1) => {
+                nav.neighbours(a.0, a.1).any(|n| self.of(nav.lot, n) == Some(to))
+            }
+            None => true,
+        }
+    }
+}
+
 /// Search state kept between searches: a big town is tens of thousands of tiles, too many to
 /// allocate and clear for every route. An entry counts only if stamped by the current search.
 #[derive(Default)]
@@ -437,6 +512,61 @@ mod tests {
         let file: LotFile =
             serde_json::from_str(r#"{"width":10,"depth":10,"walls":[[5,0,5,8]]}"#).unwrap();
         Lot::from_file(&file).unwrap()
+    }
+
+    /// A 10×10 lot with a closed 4×4 room in its middle.
+    fn lot_with_sealed_room(door: bool) -> Lot {
+        let bottom = if door {
+            r#"[1,5,3,5],[4,5,5,5]"#
+        } else {
+            r#"[1,5,5,5]"#
+        };
+        let json = format!(
+            r#"{{"width":10,"depth":10,"walls":[[1,1,5,1],{bottom},[1,1,1,5],[5,1,5,5]]}}"#
+        );
+        let file: LotFile = serde_json::from_str(&json).unwrap();
+        Lot::from_file(&file).unwrap()
+    }
+
+    #[test]
+    fn reach_labels_separate_regions() {
+        let lot = lot_with_sealed_room(false);
+        let blocked = nav_of(&lot);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        let reach = Reach::build(&nav);
+        assert_eq!(reach.regions(), 2, "the room is sealed off");
+        assert!(reach.reaches(&nav, (2, 2), (3, 3)));
+        assert!(!reach.reaches(&nav, (2, 2), (8, 8)));
+        assert!(!reach.reaches(&nav, (8, 8), (2, 2)));
+        // Standing on a tile something now blocks: a free neighbour decides.
+        let mut blocked = blocked;
+        blocked[lot.tile_index(2, 2)] = true;
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        assert!(reach.reaches(&nav, (2, 2), (3, 3)));
+        assert!(!reach.reaches(&nav, (2, 2), (8, 8)));
+    }
+
+    #[test]
+    fn a_door_joins_the_regions() {
+        let lot = lot_with_sealed_room(true);
+        let blocked = nav_of(&lot);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        let reach = Reach::build(&nav);
+        assert_eq!(reach.regions(), 1);
+        assert!(reach.reaches(&nav, (2, 2), (8, 8)));
+        assert!(nav.find_path((2, 2), (8, 8)).is_some());
     }
 
     #[test]

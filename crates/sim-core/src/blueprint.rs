@@ -613,7 +613,7 @@ impl World {
                 self.lot.set_floor((tx + dx) as u16, (tz + dz) as u16, c);
             }
             self.lot.compute_rooms();
-            self.structure_version = self.structure_version.wrapping_add(1);
+            self.nav_changed();
             self.rooms_layout_changed();
             self.refresh_rooms();
             // Everything else first, then what stands on tops.
