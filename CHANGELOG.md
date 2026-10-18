@@ -2,6 +2,17 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+### Simulation
+- **Goals nobody can reach are refused at once:** the lot's walkable regions are labelled once per change to the house, and a resident asking for a way to another region is turned down before the search starts. No more flooding the whole town for a bed behind a wall.
+- **People are remembered too:** a resident who couldn't get to someone they meant to talk to or join doesn't try again for half a second; things and places keep the content's retry time.
+- **Walkers go round a change, or give up:** when a wall, door, stair or thing placed in their way changes the route they were walking, they work out a new one from where they stand. If there is none, they stop, and remember it if they chose it themselves.
+- Looks, repairs and crops no longer rebuild what walkers can reach or the objects-by-plot index; only changes to walking do.
+
+### Settings
+- **Settings are versioned and migrated in order.** Values from a hand-edited, truncated or older file are put back in range (numbers, switches and choices) instead of being used as they are.
+
 ## 0.2.0 — 2026-10-13
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

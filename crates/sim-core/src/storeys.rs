@@ -81,7 +81,7 @@ impl World {
         self.stairs.depth = depth as i32;
         self.refresh_stairs();
         self.lot_version = self.lot_version.wrapping_add(1);
-        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_changed();
         self.rooms_layout_changed();
     }
 

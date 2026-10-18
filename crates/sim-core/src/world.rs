@@ -17,6 +17,8 @@ pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
 /// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
 pub(crate) const UNREACHABLE: usize = 4;
+/// How long a resident remembers that someone was out of reach: people move, so not long.
+pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = 10;
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
@@ -596,12 +598,17 @@ pub struct Sim {
     pub(crate) follow_up: Option<Task>,
     /// The last few things they chose for themselves but couldn't get to (a plate on a counter
     /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
-    /// don't choose it again: uses, eating, cleaning, repairs, washing up and visits (see
-    /// `remember_unreachable`; object ids follow `remap_unreachable`). Not saved either.
+    /// don't choose it again: uses, eating, cleaning, repairs, washing up, visits, and people
+    /// for a short while (see `remember_unreachable`; object ids follow `remap_unreachable`).
+    /// Not saved either.
     pub(crate) unreachable: [Option<(TaskKind, u64)>; UNREACHABLE],
     /// Ticks the social they're on has spent waiting for its target, and following them since
     /// it first got there (see `conversation::update`). Not saved.
     pub(crate) social_waited: u32,
+    /// The `World::nav_version` their route was last checked against (see `step_sim`): a
+    /// resident nobody watches takes a turn only every so often, and a change between two of
+    /// them still catches up with them. Not saved (after a load, a walker routes again once).
+    pub(crate) nav_seen: u32,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -860,12 +867,19 @@ impl Sim {
     }
 
     /// They couldn't get to what they chose for themselves (`kind`): not again until `until`.
-    /// Only what can't be reached for long is remembered (things, places and visits; people
-    /// move); the oldest memory makes way.
+    /// Only what can't be reached for long is remembered (things, places, visits, and people,
+    /// who move and so are given a short `until` by the caller); the oldest memory makes way.
     pub(crate) fn remember_unreachable(&mut self, kind: TaskKind, until: u64) {
         if !matches!(
             kind,
-            TaskKind::Use { .. } | TaskKind::Eat { .. } | TaskKind::Clean { .. } | TaskKind::Repair { .. } | TaskKind::Dishes { .. } | TaskKind::Visit { .. }
+            TaskKind::Use { .. }
+                | TaskKind::Eat { .. }
+                | TaskKind::Clean { .. }
+                | TaskKind::Repair { .. }
+                | TaskKind::Dishes { .. }
+                | TaskKind::Visit { .. }
+                | TaskKind::Social { .. }
+                | TaskKind::Join { .. }
         ) {
             return;
         }
@@ -888,7 +902,7 @@ impl Sim {
 }
 
 /// Whether two tasks are after the same thing (`Sim::unreachable`): the same use of an object,
-/// the same food, tile, broken object, dirty dish or house.
+/// the same food, tile, broken object, dirty dish, house or person.
 fn same_target(a: TaskKind, b: TaskKind) -> bool {
     match (a, b) {
         (TaskKind::Use { object, interaction }, TaskKind::Use { object: o, interaction: i }) => (object, interaction) == (o, i),
@@ -897,6 +911,8 @@ fn same_target(a: TaskKind, b: TaskKind) -> bool {
         (TaskKind::Repair { object }, TaskKind::Repair { object: o }) => object == o,
         (TaskKind::Dishes { item, .. }, TaskKind::Dishes { item: it, .. }) => item == it,
         (TaskKind::Visit { plot }, TaskKind::Visit { plot: p }) => plot == p,
+        (TaskKind::Social { target, social }, TaskKind::Social { target: t, social: s }) => (target, social) == (t, s),
+        (TaskKind::Join { leader }, TaskKind::Join { leader: l }) => leader == l,
         _ => false,
     }
 }
@@ -1071,6 +1087,14 @@ pub struct World {
     /// The seed the game started from (0: unknown, a save from before v23), for bug reports.
     pub seed: u32,
     pub(crate) structure_version: u32,
+    /// Bumped only when something a walker can or can't step through changes: walls, doors,
+    /// windows, stairs, storeys, and things placed or removed. Looks, repairs and crops don't
+    /// bump it, so the walkable regions (and the objects-by-plot index) needn't be rebuilt for
+    /// them. `structure_version` stays the one views and offers follow.
+    pub(crate) nav_version: u32,
+    /// The walkable regions of the lot at `reach_version` (see `path::Reach`).
+    pub(crate) reach: crate::path::Reach,
+    pub(crate) reach_version: u32,
     /// Bumped when the lot itself changes (walls, doors, windows, fences, coverings, floors),
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
@@ -1131,6 +1155,10 @@ pub struct World {
 pub(crate) struct Ctx<'a> {
     pub content: &'a Content,
     pub nav: NavGrid<'a>,
+    /// Which tiles can reach which (see `path::Reach`): a goal elsewhere is refused at once.
+    pub reach: &'a crate::path::Reach,
+    /// Bumped when the house changes in a way that can cut a walker's route short.
+    pub nav_version: u32,
     pub rels: &'a Relationships,
     pub briefs: &'a [SimBrief],
     pub households: &'a [Household],
@@ -1318,6 +1346,9 @@ impl World {
             rng,
             seed: 0,
             structure_version: 1,
+            nav_version: 1,
+            reach: Default::default(),
+            reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
             exits: Vec::new(),
@@ -1611,7 +1642,7 @@ impl World {
         if stairs {
             self.refresh_stairs();
         }
-        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_changed();
         self.rooms_layout_changed();
         Ok(self.objects.len() as u32 - 1)
     }
@@ -1733,6 +1764,7 @@ impl World {
             follow_up: None,
             unreachable: [None; UNREACHABLE],
             social_waited: 0,
+            nav_seen: 0,
             household: spawn.household,
             job,
             away_until: None,
@@ -2267,11 +2299,31 @@ impl World {
 
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
-        if self.object_index.version != self.structure_version {
-            self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.structure_version);
+        if self.object_index.version != self.nav_version {
+            self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.nav_version);
             let nav = NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs };
             self.object_index.links = crate::surface::Links::new(&self.content, &self.objects, &nav);
         }
+    }
+
+    /// Labels the walkable regions of the lot again if the navigation changed (see
+    /// `path::Reach`): an unreachable goal is then refused before a search can flood the town.
+    fn refresh_reach(&mut self) {
+        if self.reach_version == self.nav_version {
+            return;
+        }
+        let reach = {
+            let nav = NavGrid { lot: &self.lot, blocked: &self.blocked, stairs: &self.stairs };
+            crate::path::Reach::build(&nav)
+        };
+        self.reach = reach;
+        self.reach_version = self.nav_version;
+    }
+
+    /// Notes that something walkers can or can't step through changed, which views also see.
+    pub(crate) fn nav_changed(&mut self) {
+        self.structure_version = self.structure_version.wrapping_add(1);
+        self.nav_version = self.nav_version.wrapping_add(1);
     }
 
     /// Notes that the lot's rooms or their scores changed structurally (walls, coverings,
@@ -2351,6 +2403,7 @@ impl World {
         } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
             self.rescore_rooms();
         }
+        self.refresh_reach();
         self.refresh_index();
         self.tick += 1;
         let tick = self.tick;
@@ -2414,6 +2467,8 @@ impl World {
                 room_score,
                 dirt,
                 stairs,
+                reach,
+                nav_version,
                 ..
             } = self;
             let ctx = Ctx {
@@ -2421,6 +2476,8 @@ impl World {
                 dirt,
                 content,
                 nav: NavGrid { lot, blocked, stairs },
+                reach,
+                nav_version: *nav_version,
                 rels: relationships,
                 briefs,
                 households,
@@ -3140,6 +3197,33 @@ pub(crate) fn practise(sim: &mut Sim, content: &Content, skill: usize, per_hour:
     }
 }
 
+/// A wall or something they walk through moved while they were on their way: their waypoints
+/// may cross it now. Route again from where they stand, and if there's no way there any more,
+/// give up (remembering it, if they chose it themselves).
+fn reroute_after_change(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]) {
+    let Some(act) = sim.current.as_ref() else { return };
+    let Phase::Routing { waypoints, .. } = &act.phase else { return };
+    let Some(&target) = waypoints.last() else { return };
+    let task = act.task;
+    let goal = (target[0].floor() as i32, target[1].floor() as i32);
+    if let Some(waypoints) = walk_route(ctx, sim, goal, target) {
+        if let Some(act) = sim.current.as_mut() {
+            act.phase = Phase::Routing { waypoints, next: 0 };
+        }
+    } else {
+        let directed = task.directed;
+        end_activity(sim, ctx.content, objects);
+        if !directed {
+            let retry = if matches!(task.kind, TaskKind::Social { .. } | TaskKind::Join { .. }) {
+                PERSON_UNREACHABLE_TICKS
+            } else {
+                social::minutes_to_ticks(ctx.content.autonomy.retry_minutes)
+            };
+            sim.remember_unreachable(task.kind, ctx.tick + retry);
+        }
+    }
+}
+
 fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items, rng: &mut Rng) {
     let content = ctx.content;
     let minutes = sim.minutes();
@@ -3191,6 +3275,13 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     // At work: off the map until `life::update` brings them back.
     if sim.away_until.is_some() {
         return;
+    }
+
+    // The house changed under them since their last turn: a wall where they were going, or a
+    // door opened.
+    if sim.nav_seen != ctx.nav_version {
+        sim.nav_seen = ctx.nav_version;
+        reroute_after_change(sim, ctx, objects);
     }
 
     // A baby whose needs run low cries for someone (a thought bubble).
@@ -3276,7 +3367,12 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng) {
                     start_task(sim, task, ctx, objects, items);
                     if sim.current.is_none() && sim.follow_up.is_none() {
-                        let retry = social::minutes_to_ticks(content.autonomy.retry_minutes);
+                        // People move: don't hold a grudge against where they were for long.
+                        let retry = if matches!(task.kind, TaskKind::Social { .. } | TaskKind::Join { .. }) {
+                            PERSON_UNREACHABLE_TICKS
+                        } else {
+                            social::minutes_to_ticks(content.autonomy.retry_minutes)
+                        };
                         sim.remember_unreachable(task.kind, ctx.tick + retry);
                     }
                     // Catching up on a turn (`lod.rs`): they were idle until it was time to
@@ -3838,6 +3934,8 @@ fn pick_autonomous(
             (Choice::Repair(o), TaskKind::Repair { object }) => o != object,
             (Choice::Dishes(it), TaskKind::Dishes { item, .. }) => it != item,
             (Choice::Visit(p), TaskKind::Visit { plot }) => p != plot,
+            (Choice::Social(t, s), TaskKind::Social { target, social }) => (t, s) != (target, social),
+            (Choice::Join(l), TaskKind::Join { leader }) => l != leader,
             _ => true,
         });
     }
@@ -4095,19 +4193,26 @@ pub(crate) fn grounds<'a>(
 /// `route` for `sim`, keeping out of other people's gardens (see `grounds`).
 pub(crate) fn walk_route(ctx: &Ctx, sim: &Sim, goal: (i32, i32), target: [f32; 2]) -> Option<Vec<[f32; 2]>> {
     let grounds = grounds(ctx.tile_plot, ctx.plots, ctx.households, &ctx.nav, sim, goal);
-    route(&ctx.nav, sim.pos, sim.tile(), goal, target, Some(&grounds))
+    route(&ctx.nav, Some(ctx.reach), sim.pos, sim.tile(), goal, target, Some(&grounds))
 }
 
 /// Smoothed waypoints from `pos` to `target`, or None if unreachable; round the gardens
-/// `grounds` keeps them out of, if any.
+/// `grounds` keeps them out of, if any. With `reach`, a goal in another walkable region is
+/// refused before the search starts (it would flood the town and still find nothing).
 pub(crate) fn route(
     nav: &NavGrid,
+    reach: Option<&crate::path::Reach>,
     pos: [f32; 2],
     start: (i32, i32),
     goal: (i32, i32),
     target: [f32; 2],
     grounds: Option<&Grounds>,
 ) -> Option<Vec<[f32; 2]>> {
+    if let Some(reach) = reach
+        && !reach.reaches(nav, start, goal)
+    {
+        return None;
+    }
     let path = nav.find_path_with(start, goal, grounds)?;
     let mut waypoints = nav.smooth_with(&path, grounds);
     // The first waypoint is the centre of the current tile; skip it when we can head on directly.
@@ -4775,7 +4880,7 @@ fn nearest(
     near.sort_by(|a, b| a.0.total_cmp(&b.0));
     let (_, object, interaction) = near.into_iter().take(3).find(|&(_, o, _)| {
         let (fx, fz) = approach(&objects[o as usize]);
-        route(&ctx.nav, sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5], None).is_some()
+        route(&ctx.nav, Some(ctx.reach), sim.pos, sim.tile(), (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5], None).is_some()
     })?;
     Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: true })
 }
@@ -5140,6 +5245,28 @@ mod tests {
         assert_eq!(q.len(), MAX_QUEUE + 2);
     }
 
+    /// A one-room home with a household and a fridge, for build and recolour.
+    const HOME_LOT: &str = r#"{"width":12,"depth":12,
+        "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[6.5,11.5]}],
+        "households":[{"name":"Ada","plot":0,"player":true}],
+        "objects":[{"def":"fridge","x":1,"z":1,"rot":0}],
+        "sims":[{"name":"Ada","household":0,"x":3.5,"z":5.5}]}"#;
+
+    #[test]
+    fn only_what_walkers_step_through_moves_the_navigation() {
+        let mut w = World::from_json(CONTENT, HOME_LOT, 7).unwrap();
+        let (nav, structure) = (w.nav_version, w.structure_version);
+        // A new colour changes how it looks, not where anyone can walk.
+        w.recolor(0, 0, Colors::new()).unwrap();
+        assert_eq!(w.nav_version, nav, "a recolour isn't a change to walking");
+        assert_ne!(w.structure_version, structure, "but views must rebuild");
+        // A wall is.
+        let wall = crate::command::EdgeEdit::new(crate::command::EdgeAxis::V, 6, 0, crate::command::EdgeKind::Wall);
+        w.build(0, &[wall]).unwrap();
+        assert_eq!(w.nav_version, nav + 1);
+        assert_eq!(w.structure_version, structure + 2);
+    }
+
     #[test]
     fn what_they_couldnt_get_to_is_remembered_a_while() {
         let mut w = world();
@@ -5148,14 +5275,18 @@ mod tests {
         s.remember_unreachable(TaskKind::Repair { object: 1 }, 100);
         s.remember_unreachable(TaskKind::Visit { plot: 2 }, 50);
         s.remember_unreachable(TaskKind::Clean { x: 4, z: 5 }, 200);
-        // People move: never remembered. Something remembered again just lasts longer.
-        s.remember_unreachable(TaskKind::Social { target: 1, social: 0 }, 300);
-        s.remember_unreachable(TaskKind::Visit { plot: 2 }, 80);
+        // People are remembered too, for as short a while as the caller gives them.
+        s.remember_unreachable(TaskKind::Social { target: 1, social: 0 }, 80);
         assert_eq!(s.unreachable_now(60).count(), 4);
+        assert!(s.unreachable_now(60).any(|k| matches!(k, TaskKind::Social { target: 1, .. })));
+        assert!(!s.unreachable_now(60).any(|k| matches!(k, TaskKind::Visit { .. })), "the shortest-lived made way");
         assert!(s.couldnt_reach(3, 60) && s.couldnt_reach(1, 99) && !s.couldnt_reach(1, 100) && !s.couldnt_reach(2, 0));
+        // Saying the same thing again just lasts longer.
+        s.remember_unreachable(TaskKind::Repair { object: 1 }, 300);
+        assert!(s.couldnt_reach(1, 299));
         // Full: the one that runs out first makes way.
         s.remember_unreachable(TaskKind::Eat { item: Some(7), seat: None, plate: None, stage: 0 }, 300);
-        assert!(!s.unreachable_now(0).any(|k| matches!(k, TaskKind::Visit { .. })));
+        assert!(!s.unreachable_now(0).any(|k| matches!(k, TaskKind::Social { .. })), "the shortest-lived made way");
         // Object 1 is gone and the ids after it shift down.
         s.remap_unreachable(|o| if o == 1 { None } else { Some(if o > 1 { o - 1 } else { o }) });
         assert!(s.couldnt_reach(2, 0) && !s.couldnt_reach(3, 0) && !s.couldnt_reach(1, 0));

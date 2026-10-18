@@ -4,8 +4,8 @@
 //! Residents only use what's at home, in public places and off the plots, or, as guests, what's
 //! on the plot they're visiting (see `world::access`). The index lists exactly those objects per
 //! plot, in id order, so choices come out as they did from a scan of the whole town. It is
-//! derived from `World::object_plot` and rebuilt when the structure changes (objects bought,
-//! sold, broken or mended, a game loaded); see `World::refresh_index`.
+//! derived from `World::object_plot` and rebuilt when the navigation changes (objects bought,
+//! sold or moved, walls built, a game loaded); see `World::refresh_index`.
 
 use crate::world::Plot;
 
@@ -20,7 +20,7 @@ pub(crate) struct ObjectIndex {
     shared: Vec<u32>,
     /// Seats at tables and the like (`surface::Links`), set by `World::refresh_index`.
     pub links: crate::surface::Links,
-    /// The `World::structure_version` it was built for.
+    /// The `World::nav_version` it was built for.
     pub version: u32,
 }
 
