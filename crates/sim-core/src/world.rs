@@ -2700,7 +2700,7 @@ impl World {
                         self.content.objects[obj.def].name
                     )));
                 }
-                if let Some(required) = missing_requirement(&self.content, &self.object_plot, &self.objects, object, inter) {
+                if let Some(required) = missing_requirement(&self.content, &self.object_plot, None, &self.objects, object, inter) {
                     return Err(Error::new(format!(
                         "{} needs a working object on this lot that provides {required}",
                         inter.label
@@ -3341,10 +3341,12 @@ pub(crate) fn access_in(households: &[Household], plots: &[Plot], sim: &Sim, plo
 }
 
 /// The first thing `inter` requires that no working object on `object`'s plot provides, if any
-/// (content `requires` / `provides`): a table's coffee needs a coffee machine.
+/// (content `requires` / `provides`): a table's coffee needs a coffee machine. With `index`
+/// (current during a tick) only that plot's objects are looked at.
 fn missing_requirement<'a>(
     content: &'a Content,
     object_plot: &[Option<u32>],
+    index: Option<&ObjectIndex>,
     objects: &[ObjectInstance],
     object: u32,
     inter: &crate::content::Interaction,
@@ -3353,10 +3355,14 @@ fn missing_requirement<'a>(
         return None;
     }
     let plot = object_plot.get(object as usize).copied().flatten();
-    let provided = objects
-        .iter()
-        .filter(|o| object_plot.get(o.id as usize).copied().flatten() == plot && !o.broken())
-        .fold(0, |m, o| m | content.objects[o.def].provides);
+    let provides = |o: &ObjectInstance| if o.broken() { 0 } else { content.objects[o.def].provides };
+    let provided = match (plot, index) {
+        (Some(p), Some(index)) => index.on(p).iter().fold(0, |m, &o| m | provides(&objects[o as usize])),
+        _ => objects
+            .iter()
+            .filter(|o| object_plot.get(o.id as usize).copied().flatten() == plot)
+            .fold(0, |m, o| m | provides(o)),
+    };
     let missing = inter.requires & !provided;
     if missing == 0 {
         return None;
@@ -3364,14 +3370,8 @@ fn missing_requirement<'a>(
     (0..content.tags.len()).find(|&i| missing & (1 << i) != 0).map(|i| content.tags[i].as_str())
 }
 
-fn requirements_met(
-    content: &Content,
-    object_plot: &[Option<u32>],
-    objects: &[ObjectInstance],
-    object: u32,
-    inter: &crate::content::Interaction,
-) -> bool {
-    missing_requirement(content, object_plot, objects, object, inter).is_none()
+fn requirements_met(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
+    missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
 }
 
 fn pick_autonomous(
@@ -3491,7 +3491,7 @@ fn pick_autonomous(
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
                 || (inter.needs_table && !at_table)
-                || !requirements_met(content, ctx.object_plot, objects, obj.id, inter)
+                || !requirements_met(ctx, objects, obj.id, inter)
                 || !obj.allows(inter, sim.id)
                 || !obj.can_use_for(sim.id, &content.objects[obj.def], i)
             {
@@ -4431,7 +4431,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
         if objects[object as usize].broken()
-            || !requirements_met(content, ctx.object_plot, objects, object, inter)
+            || !requirements_met(ctx, objects, object, inter)
             || !objects[object as usize].allows(inter, sim.id)
         {
             // (An order to close it on someone who got there first: the player is told.)
@@ -4587,7 +4587,7 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
         let startable = |&(n, _): &(usize, &crate::content::Interaction)| !free || o.can_use_for(sim.id, def, n);
         for (_, i) in def.interactions.iter().enumerate().filter(startable).filter(|(_, i)| {
             i.autonomous && !i.cares() && i.recipe.is_none_or(possible)
-                && requirements_met(ctx.content, ctx.object_plot, objects, o.id, i)
+                && requirements_met(ctx, objects, o.id, i)
         }) {
             found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
         }
@@ -4644,7 +4644,7 @@ fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_m
         let fills = content.objects[o.def]
             .interactions
             .iter()
-            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(content, ctx.object_plot, objects, o.id, i))
+            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, objects, o.id, i))
             .fold(0u32, |m, i| (0..content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(m, |m, n| m | 1 << n));
         if fills == 0 {
             continue;
@@ -4764,7 +4764,7 @@ fn nearest(
             let def = &content.objects[o.def];
             let i = (0..def.interactions.len()).find(|&i| {
                 fits(&def.interactions[i])
-                    && requirements_met(content, ctx.object_plot, objects, o.id, &def.interactions[i])
+                    && requirements_met(ctx, objects, o.id, &def.interactions[i])
                     && o.allows(&def.interactions[i], sim.id)
                     && o.can_use_for(sim.id, def, i)
             })?;
