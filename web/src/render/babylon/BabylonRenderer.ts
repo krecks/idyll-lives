@@ -82,6 +82,7 @@ import type {
   RendererDeps,
   RenderFailure,
   RenderStats,
+  Shading,
   TownShot,
   ViewRect,
   WallMode,
@@ -93,6 +94,7 @@ import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary } from './materials';
+import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
 import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
@@ -365,6 +367,8 @@ export class BabylonRenderer implements Renderer {
   private framedView = '';
 
   private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 60 };
+  /** The shading the scene's materials were prepared for (`softLook.ts`); the setting's at start. */
+  private shading: Shading = shadingFromSettings();
   /** Draws frames in whole display refreshes, at most the frame rate cap (Babylon's frame requester). */
   private readonly pacer = new FramePacer();
   /** Stops watching the device pixel ratio (see `applyResolution`). */
@@ -1112,7 +1116,16 @@ export class BabylonRenderer implements Renderer {
   }
 
   configure(options: LiveRenderOptions): void {
+    // Taken before the merge, which would otherwise hide the change.
+    const shading = options.shading;
     this.options = { ...this.options, ...options };
+    if (shading !== undefined && shading !== this.shading) {
+      // The plugin sets its define while the shaders are prepared: marking the materials dirty is
+      // enough, frozen or not, and the next frames draw the other way.
+      this.shading = shading;
+      refreshSoftLook();
+      this.resetSnapshot();
+    }
     const s = Math.max(0.25, options.cameraSensitivity);
     this.camera.angularSensibilityX = this.camera.angularSensibilityY = 1000 / s;
     this.camera.panningSensibility = 90 / s;

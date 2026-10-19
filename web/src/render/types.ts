@@ -114,6 +114,12 @@ export interface RendererDeps {
   backend: 'auto' | 'webgl';
 }
 
+/**
+ * How lit surfaces are drawn (`babylon/softLook.ts`): `soft`, the game's painterly shading, or
+ * `classic`, the PBR shading it replaced.
+ */
+export type Shading = 'soft' | 'classic';
+
 /** Settings that can change while a game is running. */
 export interface LiveRenderOptions {
   /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`babylon/resolution.ts`). */
@@ -123,6 +129,11 @@ export interface LiveRenderOptions {
   fpsCap: number;
   /** Reduce motion (the setting or the system's): decorative movement in the scene stands still. */
   reducedMotion?: boolean;
+  /**
+   * How lit surfaces are drawn (`babylon/softLook.ts`): `soft`, the game's painterly shading, or
+   * `classic`, the PBR shading it replaced. Absent: leave the scene's shading as it is.
+   */
+  shading?: Shading;
 }
 
 /** Translucent preview of an object being placed in buy mode. */

@@ -11,7 +11,9 @@
  *   resting face, a half and a full blink) / viseme;
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
- * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`.
+ * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`;
+ * - The residents are shaded in the game's soft look (`softLook.ts`); `?look=classic` (dev only)
+ *   draws the PBR shading they had before, to compare.
  * Sets `window.__ready` once everything is drawn.
  */
 

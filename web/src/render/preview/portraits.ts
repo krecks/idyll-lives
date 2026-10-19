@@ -10,6 +10,7 @@
 
 import { Color4, FreeCamera, RenderTargetTexture, Vector3 } from '../babylon/core';
 import type { StageDirection } from '../babylon/characters';
+import { shadingFromSettings } from '../babylon/softLook';
 import type { SimLook } from '../types';
 import type { Studio } from './studio';
 
@@ -60,7 +61,7 @@ interface Batch {
   cams: { x: number; y: number; z: number }[];
 }
 
-/** Cache key: everything that changes the picture (not the height: framing follows the head; not the voice). */
+/** Cache key: everything that changes the picture, the shading included (not the height: framing follows the head; not the voice). */
 export function lookKey(look: SimLook): string {
   const a = look.appearance as unknown as Record<string, unknown>;
   const sorted = Object.keys(a)
@@ -69,7 +70,7 @@ export function lookKey(look: SimLook): string {
     .map((k) => [k, a[k]]);
   // Without garments the outfit comes from the Sim's id (older saves).
   const legacy = !a.top;
-  return JSON.stringify([look.gender, sorted, legacy ? (look.id ?? 0) : null]);
+  return JSON.stringify([look.gender, sorted, legacy ? (look.id ?? 0) : null, shadingFromSettings()]);
 }
 
 /** Portrait URLs by look key, least recently used first (survives engine restarts). */
