@@ -234,7 +234,7 @@ uniform vec4 wallCutParams;
 }
 
 /** Rectangles of windowless rooms the materials test (see `DigState.rects`). */
-export const WINDOWLESS_RECTS = 8;
+export const WINDOWLESS_RECTS = 12;
 
 /**
  * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in
@@ -253,10 +253,11 @@ export class DigState {
   readonly lit = new Vector4(0, 0.1, 0.1, 0);
   /**
    * Rooms without windows on the storey in view, as dark as the basement by day: `rects` holds
-   * up to `WINDOWLESS_RECTS` rectangles (x0, z0, x1, z1, in metres), `band` the heights they
-   * reach (y0, y1) and in `band.z` how many there are.
+   * up to `WINDOWLESS_RECTS` rectangles (x0, z0, x1, z1, in metres) within `bounds` (the same),
+   * `band` the heights they reach (y0, y1) and in `band.z` how many there are.
    */
   readonly rects = new Float32Array(WINDOWLESS_RECTS * 4);
+  readonly bounds = new Vector4(0, 0, 0, 0);
   readonly band = new Vector4(0, 0, 0, 0);
 }
 
@@ -285,16 +286,17 @@ class UndergroundPlugin extends MaterialPluginBase {
   }
 
   override getUniforms(): { externalUniforms: string[] } {
-    return { externalUniforms: ['undergroundRect', 'undergroundLit', 'windowlessBand', 'windowlessRects'] };
+    return { externalUniforms: ['undergroundRect', 'undergroundLit', 'windowlessBand', 'windowlessBounds', 'windowlessRects'] };
   }
 
   override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const effect = subMesh.effect;
     if (!effect) return;
-    const { rect, under, lit, band, rects } = this.state;
+    const { rect, under, lit, band, bounds, rects } = this.state;
     effect.setFloat4('undergroundRect', rect.x, rect.y, rect.z, rect.w);
     effect.setFloat4('undergroundLit', lit.x, lit.y, lit.z, under ? 1 : 0);
     effect.setFloat4('windowlessBand', band.x, band.y, band.z, 0);
+    effect.setFloat4('windowlessBounds', bounds.x, bounds.y, bounds.z, bounds.w);
     effect.setFloatArray4('windowlessRects', rects);
   }
 
@@ -304,12 +306,13 @@ class UndergroundPlugin extends MaterialPluginBase {
     const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: wgsl
-        ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessRects: array<${v4}, ${WINDOWLESS_RECTS}>;`
-        : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;\nuniform ${v4} windowlessBand;\nuniform ${v4} windowlessRects[${WINDOWLESS_RECTS}];`,
+        ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessBounds: ${v4};\nuniform windowlessRects: array<${v4}, ${WINDOWLESS_RECTS}>;`
+        : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;\nuniform ${v4} windowlessBand;\nuniform ${v4} windowlessBounds;\nuniform ${v4} windowlessRects[${WINDOWLESS_RECTS}];`,
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
 ${wgsl ? 'var underground' : 'vec3 underground'} = ${v3}(1.0);
 if (${u}undergroundLit.w > 0.5 && ${p}.x > ${u}undergroundRect.x && ${p}.x < ${u}undergroundRect.z && ${p}.z > ${u}undergroundRect.y && ${p}.z < ${u}undergroundRect.w) { underground = ${u}undergroundLit.xyz; }
-if (${p}.y > ${u}windowlessBand.x && ${p}.y < ${u}windowlessBand.y) {
+// (Only near the rooms: the rest of the scene skips the loop.)
+if (${p}.y > ${u}windowlessBand.x && ${p}.y < ${u}windowlessBand.y && ${p}.x > ${u}windowlessBounds.x && ${p}.x < ${u}windowlessBounds.z && ${p}.z > ${u}windowlessBounds.y && ${p}.z < ${u}windowlessBounds.w) {
   for (${wgsl ? 'var i = 0' : 'int i = 0'}; i < ${WINDOWLESS_RECTS}; i++) {
     if (${wgsl ? 'f32(i)' : 'float(i)'} >= ${u}windowlessBand.z) { break; }
     ${wgsl ? 'let' : 'vec4'} r = ${u}windowlessRects[i];
