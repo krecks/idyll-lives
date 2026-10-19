@@ -1,7 +1,7 @@
 /**
- * Builds renderable templates from asset entries: glTF files, or nothing. Each
- * template is drawn with thin instances (one draw call per mesh, however many
- * copies exist).
+ * Builds renderable templates from asset entries: glTF files, or a plain box when there's no
+ * file or it doesn't load. Each template is drawn with thin instances (one draw call per mesh,
+ * however many copies exist).
  *
  * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
  * (tint slot, finish) so a model costs one draw call per distinct finish. Boxes get rounded
@@ -72,6 +72,8 @@ export interface ModelTemplate {
    * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
+  /** Its file didn't load (it's drawn as a box): a cache should build it again next time rather than keep it. */
+  failed?: boolean;
 }
 
 /**
@@ -200,19 +202,38 @@ export async function buildModel(
   footprint: [number, number],
   options: BuildOptions = {},
 ): Promise<ModelTemplate> {
-  if (entry?.url) {
-    // Far off, the far version (without moving parts); the full one if that fails.
-    const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
-    for (const url of far ? [far, entry.url] : [entry.url]) {
-      try {
-        return await loadGltf(scene, name, entry, url, footprint, options.resize);
-      } catch (err) {
-        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'nothing'}`, err);
-      }
+  if (!entry?.url) {
+    // A missing key was warned about when it was looked up (`AssetRegistry.get`); an entry without a file, here.
+    if (entry && !unfiled.has(name)) console.warn(`[render] '${name}' has no model file, drawing a box`);
+    unfiled.add(name);
+    return standIn(scene, name, footprint);
+  }
+  // Far off, the far version (without moving parts); the full one if that fails.
+  const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
+  for (const url of far ? [far, entry.url] : [entry.url]) {
+    try {
+      return await loadGltf(scene, name, entry, url, footprint, options.resize);
+    } catch (err) {
+      console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'a box'}`, err);
     }
   }
-  // Nothing to draw: a model is a file, or it isn't there.
-  return { meshes: [], tints: [], bones: [], height: 0 };
+  return { ...standIn(scene, name, footprint), failed: true };
+}
+
+/** Models already warned about for having no file (one warning each). */
+const unfiled = new Set<string>();
+
+/**
+ * A plain neutral box most of the footprint's size, for a model with no file or whose file didn't
+ * load: the thing stays in view and can still be clicked.
+ */
+function standIn(scene: Scene, name: string, [w, d]: [number, number]): ModelTemplate {
+  const part: PrimitivePart = { shape: 'box', size: [w * 0.8, 0.8, d * 0.8], at: [0, 0.4, 0], color: '#B8B2AA' };
+  const groups = new PartGroups(scene);
+  groups.addPart(part, 0, 0);
+  const { meshes, tints, bones } = groups.build(name);
+  const { lo, hi } = partBox(part);
+  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline: { minX: lo[0], maxX: hi[0], minZ: lo[2], maxZ: hi[2] } };
 }
 
 /** Share of a model's height above which everything rises with it (seats, tops, backs; sim-core `Top::of`). */

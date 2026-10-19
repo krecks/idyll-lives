@@ -53,7 +53,7 @@ export interface PrimitivePart {
 
 export interface ModelEntry {
   type: 'model';
-  /** glTF/GLB file. A key without one, or a file that fails to load, draws nothing. */
+  /** glTF/GLB file. A key without one, or a file that fails to load, draws a plain box. */
   url?: string;
   /**
    * Its far version (`<id>.far.glb`, about a quarter of the triangles, no moving parts), drawn

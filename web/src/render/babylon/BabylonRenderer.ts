@@ -317,6 +317,8 @@ export class BabylonRenderer implements Renderer {
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
+  /** Keys of templates whose file didn't load (drawn as boxes): the next world build tries the file again. */
+  private readonly failedTemplates = new Set<string>();
   /** Landscape shadow casters (the landscape survives lot switches; rebuilt only for a different town). */
   private natureCasters: Mesh[] = [];
   /** Landscapes by town (seed and size), and which one each layer shows. */
@@ -3885,9 +3887,20 @@ export class BabylonRenderer implements Renderer {
   /** Cached template by key; marks it as used by the world being built. */
   private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
     let t = this.templates.get(key);
+    if (t && this.failedTemplates.has(key) && !this.templatesInUse.has(key)) {
+      // Its file didn't load last time: try again, and let its box go.
+      this.failedTemplates.delete(key);
+      void t.then(disposeTemplate);
+      t = undefined;
+    }
     if (!t) {
-      t = build();
-      this.templates.set(key, t);
+      const built = (t = build());
+      this.templates.set(key, built);
+      void built.then((template) => {
+        if (this.templates.get(key) !== built) return;
+        if (template.failed) this.failedTemplates.add(key);
+        else this.failedTemplates.delete(key);
+      });
     }
     this.templatesInUse.add(key);
     return t.then((template) => {
@@ -3909,6 +3922,7 @@ export class BabylonRenderer implements Renderer {
         }
         this.templates.delete(key);
         this.paintedTemplates.delete(key);
+        this.failedTemplates.delete(key);
         for (const mesh of meshes) mesh.dispose(false, false);
       });
     }
@@ -4437,6 +4451,11 @@ export class BabylonRenderer implements Renderer {
  * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
+/** Disposes a template's meshes (its materials are shared and stay). */
+function disposeTemplate(template: ModelTemplate): void {
+  for (const mesh of [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)]) mesh.dispose(false, false);
+}
+
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
