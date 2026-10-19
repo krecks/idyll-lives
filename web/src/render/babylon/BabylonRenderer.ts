@@ -1618,7 +1618,7 @@ export class BabylonRenderer implements Renderer {
     }
     if (walls.length || diagonals.length) {
       const view = this.view ? { ...this.view, z: this.view.z + this.rowOf(this.storey) } : null;
-      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true });
+      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true, standing: world.diagonals });
       if (house) next.push(...house.meshes);
       hole = this.holeFor(standing);
     }
