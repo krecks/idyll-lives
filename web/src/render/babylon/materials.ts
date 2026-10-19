@@ -288,8 +288,12 @@ export class DigState {
   private readonly bytes = new Uint8Array(MASK_SIZE * MASK_SIZE);
 
   constructor(scene: Scene) {
-    // One byte per tile, read whole (no filtering between tiles).
-    this.mask = RawTexture.CreateRTexture(this.bytes, MASK_SIZE, MASK_SIZE, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_UNSIGNED_BYTE);
+    // One byte per tile, read whole (no filtering between tiles, no mipmaps). WebGL1 has no
+    // one-channel red format: a luminance one is read the same (`.r`).
+    const engine = scene.getEngine();
+    const format = !engine.isWebGPU && engine.version === 1 ? Constants.TEXTUREFORMAT_LUMINANCE : Constants.TEXTUREFORMAT_R;
+    this.mask = new RawTexture(this.bytes, MASK_SIZE, MASK_SIZE, format, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_UNSIGNED_BYTE);
+    this.mask.wrapU = this.mask.wrapV = Constants.TEXTURE_CLAMP_ADDRESSMODE;
     this.mask.name = 'windowlessMask';
   }
 
@@ -378,8 +382,9 @@ class UndergroundPlugin extends MaterialPluginBase {
     const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
     const B = WINDOWLESS_BITS;
     // The tile under the fragment (its byte), and where in it the fragment is (for a split one).
-    // (GLSL ES 3 only: WebGL1, should Babylon fall back to it, has no texelFetch or integer bit
-    // operations, and draws the rooms in daylight rather than not at all.)
+    // WebGL1 (GLSL ES 1.00) has no texelFetch or integer bit operations: it samples the texel's
+    // centre (nearest, no mipmaps) and tests the bits with float maths.
+    const bit = (m: string, b: number) => `mod(floor(${m} / ${b}.0), 2.0) > 0.5`;
     const windowless = wgsl
       ? `
   let wlT = ${p}.xz - ${u}windowlessArea.xy;
@@ -405,6 +410,19 @@ class UndergroundPlugin extends MaterialPluginBase {
     if (!wlDark && wlM > 1) {
       bool wlOne = (wlM & ${B.dn}) != 0 ? wlF.x + wlF.y > 1.0 : wlF.y > wlF.x;
       wlDark = (wlM & (wlOne ? ${B.half1} : ${B.half0})) != 0;
+    }
+    if (wlDark) { underground = undergroundLit.xyz; }
+  }
+#else
+  vec2 wlT = ${p}.xz - windowlessArea.xy;
+  if (wlT.x >= 0.0 && wlT.y >= 0.0 && wlT.x < windowlessArea.z && wlT.y < windowlessArea.w) {
+    vec2 wlC = floor(wlT);
+    float wlM = floor(texture2D(windowlessMask, (wlC + 0.5) / ${MASK_SIZE}.0).r * 255.0 + 0.5);
+    vec2 wlF = wlT - wlC;
+    bool wlDark = ${bit('wlM', B.tile)};
+    if (!wlDark && wlM > 1.5) {
+      bool wlOne = ${bit('wlM', B.dn)} ? wlF.x + wlF.y > 1.0 : wlF.y > wlF.x;
+      wlDark = wlOne ? ${bit('wlM', B.half1)} : ${bit('wlM', B.half0)};
     }
     if (wlDark) { underground = undergroundLit.xyz; }
   }
