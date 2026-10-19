@@ -122,6 +122,14 @@ const PANEL_DOOR: Pick<DoorStyleDef, 'leaf' | 'color'> = { leaf: 'panel' };
 /** Door leaf size (m): width and thickness; it stands from 0.01 m to just under the head. */
 const LEAF_W = 0.8;
 const LEAF_T = 0.045;
+/**
+ * A leaf that would open less than this much of its quarter turn slides into the wall instead
+ * (see `doorway`): below 60 degrees a leaf hinged at a jamb reaches past the middle of the opening,
+ * across the way residents walk through.
+ */
+const SLIDE_BELOW = 2 / 3;
+/** How much of a leaf slid into the wall still shows at the jamb (m): its edge. */
+const POCKET_SHOW = 0.02;
 
 /** A wall's look as the structure sends it (absent fields: the default). */
 interface Look {
@@ -250,8 +258,8 @@ export interface StoreyBuild {
   landings?: ReadonlySet<number>;
   /** Build mode's preview: walls, doors and windows only, uncut (they stand while walls are down). */
   preview?: boolean;
-  /** A preview's diagonal walls already standing (see `build`): not drawn, but looked up like its own. */
-  standing?: readonly DiagonalWall[];
+  /** A preview's walls, openings and diagonal walls already standing (see `build`): not drawn, but looked up like its own. */
+  standing?: Pick<WorldStructure, 'walls' | 'openings' | 'diagonals'>;
 }
 
 export interface HouseBuild {
@@ -272,7 +280,8 @@ export interface HouseBuild {
 
 /**
  * A door leaf that swings: drawn open (as every other leaf), its meshes turn about the hinge
- * (their pivot) by up to `close` radians to shut it. Positions are in the storey's metres.
+ * (their pivot) by up to `close` radians to shut it. One that slides is turned shut and moves by
+ * up to `slide`. Positions are in the storey's metres.
  */
 export interface DoorLeaf {
   meshes: Mesh[];
@@ -285,6 +294,8 @@ export interface DoorLeaf {
   front: boolean;
   /** The bathroom it opens into (0: none): shut while someone is in there. */
   bath: number;
+  /** A leaf that slides into the wall instead (it could swing only a little way open): how far, open. */
+  slide?: [number, number];
 }
 
 /** What a doorway needs to know of a leaf that swings, before its meshes exist. */
@@ -538,7 +549,7 @@ export class HouseBuilder {
     // posts mitre and its leaves keep clear as in the house.
     const diagAt = new Map<number, DiagonalWall>();
     for (const d of world.diagonals ?? []) diagAt.set(d.z * W + d.x, d);
-    const standingAt = storey.standing && new Map(storey.standing.map((d) => [d.z * W + d.x, d]));
+    const standingAt = storey.standing && new Map((storey.standing.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
     const diagonal = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < D ? (diagAt.get(z * W + x) ?? standingAt?.get(z * W + x)) : undefined);
     /** Room at a world point (the half of a split tile it lies in). */
     const roomP = (px: number, pz: number): number => {
@@ -571,10 +582,22 @@ export class HouseBuilder {
         : e.x >= view.x && e.x <= view.x + view.w && e.z >= view.z && e.z < view.z + view.d);
     for (const e of world.walls) if (edgeInView(e)) edges.set(e.axis, e.x, e.z, 'wall');
     for (const o of world.openings) if (edgeInView(o)) edges.set(o.axis, o.x, o.z, o.kind);
+    // A preview's straight walls and openings standing round it, like its diagonals: in every
+    // lookup (runs and pairs, heights, posts, where leaves stand, shutters) as in the house, but
+    // drawn only where its own walls are (`drawn`).
+    const own = storey.standing ? new Edges(W + 8) : undefined;
+    if (own) for (const e of [...world.walls, ...world.openings]) own.set(e.axis, e.x, e.z, 'wall');
+    const standing = <E extends { axis: 'h' | 'v'; x: number; z: number }>(list: readonly E[] | undefined): E[] => (own ? (list ?? []).filter((e) => edgeInView(e) && !own.get(e.axis, e.x, e.z)) : []);
+    const standingWalls = standing(storey.standing?.walls);
+    const standingOpenings = standing(storey.standing?.openings);
+    for (const e of standingWalls) edges.set(e.axis, e.x, e.z, 'wall');
+    for (const o of standingOpenings) edges.set(o.axis, o.x, o.z, o.kind);
+    /** Whether a wall stands on an edge and is drawn here (a preview's own, not one standing round it). */
+    const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!(own ?? edges).get(axis, x, z) && !!edges.get(axis, x, z);
     // Looks: face coverings and form from the wall list, the style from the opening.
     const looks = new Map<string, Look>();
-    for (const e of world.walls) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
-    for (const o of world.openings) {
+    for (const e of [...standingWalls, ...world.walls]) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
+    for (const o of [...standingOpenings, ...world.openings]) {
       if (o.style || o.sill !== undefined || o.head !== undefined) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
     }
     const lookOf = (axis: 'h' | 'v', x: number, z: number): Look => looks.get(`${axis}:${x}:${z}`) ?? {};
@@ -730,10 +753,11 @@ export class HouseBuilder {
     // Covered faces: one bucket per finish (tinted per covering), and natural-wood door leaves.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
     const doorWood = new Geo();
-    // Front doors and bathroom doors swing (each leaf its own meshes); the others stand open.
+    // Front doors and bathroom doors move (each leaf its own meshes; a preview draws them at
+    // rest); the others stand open.
     const swinging: { spec: SwingSpec & { bath: number }; trim: Geo; wood: Geo; glass: Geo }[] = [];
     const bathOf = (rooms: [number, number]) => rooms.find((r) => r && kinds.get(r) === 'bath') ?? 0;
-    const swings = (front: boolean, rooms: [number, number]) => !storey.preview && (front || bathOf(rooms) !== 0);
+    const moves = (front: boolean, rooms: [number, number]) => front || bathOf(rooms) !== 0;
     const swing = (spec: SwingSpec) => {
       const leaf = { spec: { ...spec, bath: bathOf(spec.rooms) }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
       swinging.push(leaf);
@@ -907,6 +931,20 @@ export class HouseBuilder {
     /** The tile in front of door edge (axis, x, z) on the side `into`. */
     const tileInFront = (axis: 'h' | 'v', x: number, z: number, into: number): [number, number] => (axis === 'h' ? [x, into > 0 ? z : z - 1] : [into > 0 ? x : x - 1, z]);
     /**
+     * The wall a leaf of a door's run can slide open into past the run's end `end` (-1: its first;
+     * see `doorway`), as its cutaway mask; undefined if none: a plain full-height wall goes on
+     * there. A wall with a door at its other end too is the pocket of the door before it (a leaf
+     * each would overlap), whatever either needs, so the house and its previews agree. (Inside the
+     * wall, a leaf keeps clear of whatever stands or hangs by it, and of diagonals meeting it.)
+     */
+    const pocket = (axis: 'h' | 'v', x: number, z: number, run: Run, end: -1 | 1): number | undefined => {
+      const next = end < 0 ? run.start - 1 : run.start + run.len;
+      const [bx, bz] = axis === 'h' ? [next, z] : [x, next];
+      if (edges.get(axis, bx, bz) !== 'wall' || heightOf(axis, bx, bz) < H) return undefined;
+      if (end < 0 && edges.get(axis, axis === 'h' ? bx - 1 : bx, axis === 'h' ? bz : bz - 1) === 'door') return undefined;
+      return edgeMask(axis, bx, bz);
+    };
+    /**
      * Whether a door (its whole run) swings the other way from usual (see `doorway`): when
      * diagonal walls cross tiles in front of it on the usual side and none on the other.
      */
@@ -928,6 +966,7 @@ export class HouseBuilder {
     const bounds = view ?? { x: 0, z: 0, w: W, d: D };
     for (const axis of ['h', 'v'] as const) {
       for (const [x, z, kind] of edges.all(axis)) {
+        if (!drawn(axis, x, z)) continue;
         if (kind === 'wall') {
           segment(axis, x, z, 0, heightOf(axis, x, z), Cut.Clamp);
         } else if (kind === 'window') {
@@ -948,7 +987,7 @@ export class HouseBuilder {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const geos = { wood: doorWood, glass, swings, swing, ahead, slant, flip: flipped(axis, x, z, run) };
+          const geos = { wood: doorWood, glass, moves, swing: storey.preview ? undefined : swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -962,6 +1001,8 @@ export class HouseBuilder {
         const vd = edges.get('v', x, z - 1);
         const vu = edges.get('v', x, z);
         if (!hl && !hr && !vd && !vu) continue;
+        // (A preview's only where its own walls end, shaped by those standing there too.)
+        if (own && !drawn('h', x - 1, z) && !drawn('h', x, z) && !drawn('v', x, z - 1) && !drawn('v', x, z)) continue;
         // Corners where a diagonal meets get a mitred post (below); inside a wide window or a
         // double door there's none.
         if (diagonalAtNode(x, z) || inRun(x, z)) continue;
@@ -1184,8 +1225,8 @@ export class HouseBuilder {
         const diags = diagonalsAt(x, z).filter(({ d }) => inView(d.x, d.z));
         if (!diags.length) continue;
         // (A preview's only where its own walls meet, not round every diagonal standing.)
-        const own = diags.some(({ d }) => diagAt.has(d.z * W + d.x)) || edges.get('h', x - 1, z) || edges.get('h', x, z) || edges.get('v', x, z - 1) || edges.get('v', x, z);
-        if (standingAt && !own) continue;
+        const ours = diags.some(({ d }) => diagAt.has(d.z * W + d.x)) || drawn('h', x - 1, z) || drawn('h', x, z) || drawn('v', x, z - 1) || drawn('v', x, z);
+        if (standingAt && !ours) continue;
         const walls: { dir: P2; kind: EdgeKind; mask: number; group: 0 | 1; height: number }[] = diags.map(({ d, dir }) => ({
           dir,
           kind: d.kind === 'door' ? 'wall' : d.kind,
@@ -1754,10 +1795,11 @@ export class HouseBuilder {
     geos: {
       wood: Geo;
       glass: (room: number) => Geo;
-      swings?: (front: boolean, rooms: [number, number]) => boolean;
+      moves?: (front: boolean, rooms: [number, number]) => boolean;
       swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo };
       ahead?: (into: number) => boolean;
       slant?: (into: number) => readonly Obstacle[] | undefined;
+      pocket?: (end: -1 | 1) => number | undefined;
       flip?: boolean;
     },
     style: number | undefined,
@@ -1787,11 +1829,11 @@ export class HouseBuilder {
     // run is to keep clear of diagonal walls in front (`geos.flip`).
     const usual = outdoorA ? 1 : -1;
     const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
-    const swings = !!geos.swings?.(front, rooms);
+    const moves = !!geos.moves?.(front, rooms);
     // A leaf that shuts fills its opening (a double door's up to the middle); one that stands
     // open for good keeps the usual width.
     const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
-    const width = swings ? fill : LEAF_W;
+    const width = moves ? fill : LEAF_W;
     // (Open, it reaches from T + 0.01 off its wall line; the wall ahead's face is 1 - T away.)
     const clear = 1 - T - (T + 0.01) - 0.01;
     /**
@@ -1808,6 +1850,8 @@ export class HouseBuilder {
       const at = (l: number) => (axis === 'h' ? z : x) + into * (T + 0.01 + l);
       const hinge = far ? base + 1 - (last ? T : 0) - 0.02 - LEAF_T : base + (run.len > 1 && last ? 0 : T) + 0.02;
       const jamb = far ? hinge + LEAF_T : hinge;
+      // Shut, it spans this much along the wall.
+      const [lo, hi] = far ? [jamb - width, jamb] : [jamb, jamb + width];
       const across = far ? -1 : 1;
       const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
       const [from, to]: P2[] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
@@ -1816,7 +1860,7 @@ export class HouseBuilder {
       const ahead = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
       const obstacles = geos.slant?.(into);
       const room = obstacles ? slantClear([line(SLANT_SKIP), line(width)], line(width - 0.095), pivot, close, obstacles) : 1;
-      return { into, at, hinge, close, pivot, ahead, room };
+      return { far, into, at, hinge, lo, hi, close, pivot, ahead, room };
     };
     // The second leaf of a double door hangs on the far jamb, the others on the near one. Short of
     // a diagonal, a single door hangs on whichever lets it open further (its usual one when even),
@@ -1828,29 +1872,53 @@ export class HouseBuilder {
       const other = hang(!usualFar, into);
       return other.room > hung.room ? other : hung;
     };
-    let hung = best(geos.flip ? -usual : usual);
-    // One that can't open at all swings the other way; failing that, it has no leaf (rather than
-    // one through the wall).
-    if (hung.room === 0) {
-      const other = best(-hung.into);
-      if (other.room === 0) return;
-      hung = other;
+    // How far each way lets it open (`ahead` matters only to a leaf as wide as the opening).
+    const reach = (h: ReturnType<typeof hang>) => (moves ? Math.min(h.ahead, h.room) : h.room);
+    const sides = [best(geos.flip ? -usual : usual), best(geos.flip ? usual : -usual)];
+    const [a, b] = sides.map(reach);
+    // The way it opens furthest (the usual one when even). Short of `SLIDE_BELOW` either way (it
+    // would stand across the way through), it slides into the wall instead, a pocket door, where
+    // a plain wall goes on past an end of the run (`geos.pocket`): shut in the doorway as ever,
+    // open with its edge just showing at the jamb. Past its hinge's end if it can (a double door's
+    // leaves each past their own end). Short of that it swings part way after all, or has no leaf
+    // if it can't even open `MIN_SWING` (rather than one in the way).
+    const hung = b > a ? sides[1] : sides[0];
+    const opens = Math.max(a, b);
+    const { far, into, at, hinge, lo, hi, close, pivot } = hung;
+    let slide: [number, number] | undefined;
+    let leafMask = mask;
+    if (opens < SLIDE_BELOW) {
+      const ends: (-1 | 1)[] = run.len > 1 ? [first ? -1 : 1] : far ? [1, -1] : [-1, 1];
+      for (const end of ends) {
+        const wall = geos.pocket?.(end);
+        if (wall === undefined) continue;
+        const by = end < 0 ? run.start + T - hi + POCKET_SHOW : run.start + run.len - T - lo - POCKET_SHOW;
+        slide = axis === 'h' ? [by, 0] : [0, by];
+        // Hidden whenever the doorway's wall or the one it slides into is cut away.
+        leafMask = mask | wall;
+        break;
+      }
     }
-    const { into, at, hinge, close, pivot } = hung;
+    if (!slide && opens < MIN_SWING) return;
     // The leaf's glass belongs to the room it stands in (opening outdoors, the one it shuts).
     const roomOn = (side: number) => (axis === 'h' ? roomP(x + 0.5, z + side * 0.25) : roomP(x + side * 0.25, z + 0.5));
     const inside = roomOn(into) || roomOn(-into);
-    const own = swings ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens: Math.min(hung.ahead, hung.room), front, rooms }) : undefined;
+    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slide }) : undefined;
     const glass = own ? own.glass : geos.glass(inside);
-    // One that stands open for good stands as far open as it can: turned about the pivot as
-    // `swingDoors` turns one that swings, drawn in a frame across the leaf (`a`: its thickness
-    // from the hinge, `d`: out from the wall), as a diagonal door's leaf is.
-    const turn = own ? 0 : close * (1 - hung.room);
-    const [ox, oz] = turnY(axis === 'h' ? [hinge, z] : [x, hinge], pivot, turn);
+    // One that moves is drawn open and turned (and slid) by `swingDoors`. One that doesn't (or
+    // any in a preview) is drawn at rest, as `swingDoors` would leave it: turned about the pivot
+    // in a frame across the leaf (`a`: its thickness from the hinge, `d`: out from the wall), as a
+    // diagonal door's leaf is. At rest a front door is shut, the others open: slid into the wall,
+    // or as far open as they go.
+    const shut = moves && front;
+    const turn = own ? 0 : shut || slide ? close : close * (1 - opens);
+    const [sx, sz] = slide && !own && !shut ? slide : [0, 0];
+    const [tx, tz] = turnY(axis === 'h' ? [hinge, z] : [x, hinge], pivot, turn);
+    const [ox, oz] = [tx + sx, tz + sz];
     const [ux, uz] = turnY(axis === 'h' ? [1, 0] : [0, 1], [0, 0], turn);
     const f = new WallFrame(ox, oz, ox + ux, oz + uz);
     const out = (l: number) => (axis === 'h' ? into : -into) * (T + 0.01 + l);
-    this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
+    this.leaf(style, front, scheme, leafMask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         if (turn !== 0) return f.box(g, s0, s1, y0, y1, Math.min(out(l0), out(l1)), Math.max(out(l0), out(l1)));
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
@@ -2035,7 +2103,10 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
 
 /** How much of a leaf by its hinge `slantClear` leaves out (metres): it stays in the jamb and the corner post. */
 const SLANT_SKIP = 0.2;
-/** Least a double door's leaf by a diagonal opens before it tries its other jamb (a fraction of its quarter turn). */
+/**
+ * Least a double door's leaf by a diagonal opens before it tries its other jamb (a fraction of its
+ * quarter turn); a leaf that can't open this far, nor slide, isn't drawn.
+ */
 const MIN_SWING = 10 / 90;
 
 /** Something a door leaf keeps clear of: a segment on the ground, `r` its half thickness. */

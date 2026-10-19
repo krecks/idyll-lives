@@ -481,7 +481,8 @@ export class BabylonRenderer implements Renderer {
   /** Their tiles, as `DigState` gets them while the game world is shown (null: none in view). */
   private dimming: DarkTiles | null = null;
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
-  private doors: { leaf: DoorLeaf; open: number }[] = [];
+  /** `base`: where the leaf's meshes stand (lifted to their storey), before any slide. */
+  private doors: { leaf: DoorLeaf; open: number; base: Vector3 }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
@@ -1662,7 +1663,7 @@ export class BabylonRenderer implements Renderer {
     }
     if (walls.length || diagonals.length) {
       const view = this.view ? { ...this.view, z: this.view.z + this.rowOf(this.storey) } : null;
-      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true, standing: world.diagonals });
+      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true, standing: world });
       if (house) next.push(...house.meshes);
       hole = this.holeFor(standing);
     }
@@ -3484,7 +3485,7 @@ export class BabylonRenderer implements Renderer {
     }
     this.lotRooms = built.rooms;
     this.lotSurfaces = built.surfaces;
-    this.doors = built.doors.map((leaf) => ({ leaf, open: -1 }));
+    this.doors = built.doors.map((leaf) => ({ leaf, open: -1, base: leaf.meshes[0]?.position.clone() ?? Vector3.Zero() }));
     this.refreshLaid();
     return built.casters;
   }
@@ -3732,9 +3733,14 @@ export class BabylonRenderer implements Renderer {
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
       door.open = open;
-      // Eased: quick off the frame, slowing as it meets the jamb or the wall.
-      const turn = leaf.close * (1 - leaf.opens * open * open * (3 - 2 * open));
-      for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
+      // turned shut and slides into the wall (from where its storey has it).
+      const k = ease(open);
+      const { slide } = leaf;
+      for (const mesh of leaf.meshes) {
+        if (slide) mesh.position.set(door.base.x + slide[0] * k, door.base.y, door.base.z + slide[1] * k);
+        mesh.rotation.y = slide ? leaf.close : leaf.close * (1 - leaf.opens * k);
+      }
       moved = true;
     }
     if (!moved) return;
@@ -4758,6 +4764,11 @@ export class BabylonRenderer implements Renderer {
  * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
+/** Smoothstep: eases 0..1 in and out. */
+function ease(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
