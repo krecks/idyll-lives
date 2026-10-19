@@ -251,6 +251,8 @@ interface NatureSet {
   pending: number;
   /** Its plants being built again with the files that came (`refreshNature`), one file after another. */
   refreshing: Promise<void>;
+  /** Those plants, built and not shown yet. */
+  coming: Mesh[];
 }
 
 export class BabylonRenderer implements Renderer {
@@ -341,8 +343,6 @@ export class BabylonRenderer implements Renderer {
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
-  /** Landscape shadow casters (the landscape survives lot switches; rebuilt only for a different town). */
-  private natureCasters: Mesh[] = [];
   /** Landscapes by town (seed and size), and which one each layer shows. */
   private readonly natures = new Map<string, NatureSet>();
   private readonly natureIn: Record<'world' | 'town', NatureSet | null> = { world: null, town: null };
@@ -375,6 +375,8 @@ export class BabylonRenderer implements Renderer {
   private sliceStart = 0;
   /** World/overview builds in progress; snapshot recording waits until there are none. */
   private builds = 0;
+  /** Landscapes' plants being built again in play (`rebuildNature`): they're paced too. */
+  private refreshes = 0;
   private snapshotGeneration = 0;
   /** A snapshot recording to start, or to make again, before the next frame draws (see `applySnapshotDue`). */
   private snapshotDue: 'record' | 'reset' | null = null;
@@ -938,13 +940,12 @@ export class BabylonRenderer implements Renderer {
     // The residents' data downloads alongside the lot (it is first needed after it, in `buildSims`).
     void this.characters.init();
     // The landscape depends only on the town, not on which lot is viewed (and may be the overview's).
-    const nature = await perfTimeAsync('render: nature', async () => {
+    // (Its shadow casters join the shadow map's list as it has them, `landscapeCasters`.)
+    await perfTimeAsync('render: nature', async () => {
       const n = await this.useNature('world', world);
       // No grass through floors of rooms built (or furniture bought) since the lawn was scattered.
       perfTime('nature: refreshLawn', () => n.landscape.refreshLawn(world));
-      return n;
     });
-    this.natureCasters = this.quality.landscapeShadows ? nature.casters : [];
     this.templatesInUse.clear();
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
@@ -1004,7 +1005,6 @@ export class BabylonRenderer implements Renderer {
         ...templates,
         // Sims' small details (eyes, brows) don't cast sun shadows.
         ...this.characters.casters(),
-        ...this.natureCasters,
         ...streetCasters,
       ]),
     ];
@@ -2571,7 +2571,7 @@ export class BabylonRenderer implements Renderer {
     copyPose(p, cam);
     cam.targetScreenOffset.set(0, 0);
     const map = this.shadows.getShadowMap()!;
-    map.renderList = [...this.baseCasters, ...this.wallCasters];
+    map.renderList = [...this.baseCasters, ...this.wallCasters, ...this.landscapeCasters()];
     this.scene.render();
     cam.layerMask = LAYER_TOWN;
     cam.alpha = w.alpha;
@@ -2662,7 +2662,7 @@ export class BabylonRenderer implements Renderer {
   private updateShadowList(): void {
     const map = this.shadows.getShadowMap()!;
     if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...((this.quality.landscapeShadows && this.natureIn.town?.casters) || [])];
-    else map.renderList = [...this.baseCasters, ...this.wallCasters];
+    else map.renderList = [...this.baseCasters, ...this.wallCasters, ...this.landscapeCasters()];
     this.sunShadows.moved();
   }
 
@@ -2677,7 +2677,7 @@ export class BabylonRenderer implements Renderer {
     let set = this.natures.get(key);
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity);
-      const created: NatureSet = { key, landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
+      const created: NatureSet = { key, landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve(), coming: [] };
       created.ready = landscape.build(this.scene, this.deps.assets, world, () => this.pace()).then((nature) => {
         perfTime('nature: meshes', () => {
           created.meshes = nature.meshes;
@@ -2742,15 +2742,21 @@ export class BabylonRenderer implements Renderer {
   }
 
   /**
-   * Interior lamps never light the landscapes kept (keeps their shaders simple), nor `coming`
-   * (plants not drawn yet). Only when that changes: setting the lists marks every material dirty.
+   * Interior lamps never light the landscapes kept (keeps their shaders simple), nor the plants
+   * being built again for them (`NatureSet.coming`). Only when that changes: setting the lists
+   * marks every material dirty.
    */
-  private excludeLandscape(coming: readonly Mesh[] = []): void {
-    const landscape = new Set([...[...this.natures.values()].flatMap((n) => n.meshes), ...coming, this.skyDome.mesh]);
+  private excludeLandscape(): void {
+    const landscape = new Set([...[...this.natures.values()].flatMap((n) => [...n.meshes, ...n.coming]), this.skyDome.mesh]);
     if (landscape.size !== this.lightExcluded.size || [...landscape].some((m) => !this.lightExcluded.has(m))) {
       this.lightExcluded = landscape;
       this.lib.excludeFromLights([...this.roomLights, ...(this.lampCluster ? [this.lampCluster] : [])], landscape);
     }
+  }
+
+  /** The landscape's shadow casters in the game (the woods near the town), as the world's landscape has them now. */
+  private landscapeCasters(): Mesh[] {
+    return (this.quality.landscapeShadows && this.natureIn.world?.casters) || [];
   }
 
   /** A model file that failed has come: each landscape's plants built without it are built again (`rebuildNature`). */
@@ -2763,22 +2769,37 @@ export class BabylonRenderer implements Renderer {
   /**
    * Builds again the plants of `set` built without the file at `url` (nothing, where it failed;
    * the full model, where a far version did), in slices between frames and unseen, and swaps them
-   * in once their shaders are ready: the rest of the landscape stays as it is, and what they
-   * replace is drawn until then and disposed after. No world is built again for it.
+   * in once their shaders are ready for every pass that draws them: the rest of the landscape
+   * stays as it is, and what they replace is drawn until then and disposed after. No world is
+   * built again for it.
    */
   private async rebuildNature(set: NatureSet, url: string): Promise<void> {
-    await set.ready.catch(() => {});
+    try {
+      await set.ready;
+    } catch {
+      // (Its first build failed: there's nothing to build again into.)
+      return;
+    }
     const gone = () => this.disposed || this.natures.get(set.key) !== set;
     if (gone()) return;
-    const built = await set.landscape.rebuild(this.scene, this.deps.assets, url, this.slicer());
+    this.refreshes++;
+    let built;
+    try {
+      built = await set.landscape.rebuild(this.scene, this.deps.assets, url, () => this.pace());
+    } finally {
+      this.refreshes--;
+    }
     if (!built) return;
     if (!gone()) {
       for (const mesh of built.meshes) this.prepareNature(mesh);
-      this.excludeLandscape(built.meshes);
-      await this.meshesReady(built.meshes);
-      // (A world build takes the landscape's casters as it goes: swapped between builds.)
+      set.coming = built.meshes;
+      this.excludeLandscape();
+      const casters = new Set(built.casters);
+      await this.meshesReady(built.meshes, (mesh) => this.quality.landscapeShadows && casters.has(mesh));
+      // (A world build takes the landscape as it was: swapped between builds.)
       while (this.worldBuilds) await this.worldBuilds.catch(() => {});
     }
+    set.coming = [];
     if (gone()) {
       for (const mesh of built.meshes) mesh.dispose(false, false);
       return;
@@ -2790,32 +2811,56 @@ export class BabylonRenderer implements Renderer {
     for (const mesh of replaced) set.only.delete(mesh);
     for (const [mesh, only] of built.only) set.only.set(mesh, only);
     this.showNature(set);
-    if (this.natureIn.world === set) {
-      this.natureCasters = this.quality.landscapeShadows ? set.casters : [];
-      const casters = this.quality.landscapeShadows ? built.casters : [];
-      this.baseCasters = [...this.baseCasters.filter((m) => !replaced.has(m)), ...casters];
-    }
     this.updateShadowList();
-    for (const mesh of replaced) mesh.dispose(false, false);
-    this.excludeLandscape();
+    for (const mesh of replaced) {
+      mesh.dispose(false, false);
+      // (Disposing takes it off the lamps' lists: the new ones are on them already.)
+      this.lightExcluded.delete(mesh);
+    }
     this.resetSnapshot();
   }
 
-  /** Waits (a frame at a time, a second or two at most) until `meshes`' shaders are ready, so they're drawn from the first frame they're shown. */
-  private async meshesReady(meshes: readonly Mesh[]): Promise<void> {
-    for (let k = 0; k < MESH_READY_FRAMES && !this.disposed && meshes.some((m) => !m.isDisposed() && !m.isReady(true)); k++) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+  /**
+   * Waits (a frame at a time, a second or two at most) until `meshes`' shaders are ready for every
+   * pass that will draw them, so they're drawn whole from the first frame they're shown: the view,
+   * the sun's shadow map for those that will cast (`casts`), and the reflections live now.
+   */
+  private async meshesReady(meshes: readonly Mesh[], casts: (mesh: Mesh) => boolean): Promise<void> {
+    for (let k = 0; k < MESH_READY_FRAMES && !this.disposed && meshes.some((m) => !m.isDisposed() && !this.drawReady(m, casts(m))); k++) {
+      // (As `pace` waits: a hidden tab draws nothing, so it waits with it.)
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     }
   }
 
-  /** A `pace` for work done during play (not behind a menu): it lets a frame be drawn every `BUILD_SLICE_MS`. */
-  private slicer(): () => Promise<void> {
-    let start = performance.now();
-    return async () => {
-      if (performance.now() - start < BUILD_SLICE_MS) return;
-      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-      start = performance.now();
-    };
+  /**
+   * Whether `mesh`'s shaders are ready for the passes that will draw it: the view, the sun's
+   * shadow map (`caster`: its depth shader) and each reflection live now (its clip-plane
+   * variant). Asking compiles what's missing, before the mesh is shown.
+   */
+  private drawReady(mesh: Mesh, caster: boolean): boolean {
+    if (!mesh.isReady(true)) return false;
+    const engine = this.engine;
+    const pass = engine.currentRenderPassId;
+    const clip = this.scene.clipPlane;
+    try {
+      if (caster) {
+        for (const id of this.shadows.getShadowMap()!.renderPassIds) {
+          engine.currentRenderPassId = id;
+          for (const sub of mesh.subMeshes) if (!this.shadows.isReady(sub, mesh.hasThinInstances, sub.getMaterial()?.needAlphaBlendingForMesh(mesh) ?? false)) return false;
+        }
+      }
+      for (const texture of this.mirrors.reflecting) {
+        this.scene.clipPlane = texture.mirrorPlane;
+        for (const id of texture.renderPassIds) {
+          engine.currentRenderPassId = id;
+          if (!mesh.isReady(true)) return false;
+        }
+      }
+    } finally {
+      engine.currentRenderPassId = pass;
+      this.scene.clipPlane = clip;
+    }
+    return true;
   }
 
   private readonly renderFrame = () => {
@@ -4510,8 +4555,8 @@ export class BabylonRenderer implements Renderer {
    * nothing is waiting to draw) the build runs straight through.
    */
   private async pace(): Promise<void> {
-    // A world or the overview is being built (behind a menu): let the frames it runs behind go on.
-    if ((!this.worldBuilding && this.builds === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
+    // A world or the overview is being built (behind a menu), or plants in play: let the frames it runs behind go on.
+    if ((!this.worldBuilding && this.builds === 0 && this.refreshes === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
   }

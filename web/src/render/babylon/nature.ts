@@ -304,21 +304,24 @@ export class Landscape {
    * it. Not while `build` or another `rebuild` runs.
    */
   async rebuild(scene: Scene, assets: AssetRegistry, url: string, pace?: () => Promise<void>): Promise<NatureRebuild | null> {
-    const stale = this.batches.filter((b) => b.built.failed?.includes(url));
+    const stale = this.batches.filter((b) => b.again && b.built.failed?.includes(url));
     if (!stale.length) return null;
     const fresh: Batch[] = [];
-    for (const b of stale) fresh.push({ ...b, built: await instanced(scene, assets, b.key, b.matrices, b.lod, b.fixed, b.cell, pace) });
+    for (const { again, casts } of stale) {
+      const { key, matrices, lod, fixed, cell } = again!;
+      fresh.push(batch(again!, casts, await instanced(scene, assets, key, matrices, lod, fixed, cell, pace)));
+    }
     const replaced = gather(stale).meshes;
     const commit = () => {
       this.batches = this.batches.map((b) => fresh[stale.indexOf(b)] ?? b);
       const going = new Set(replaced);
       this.lawn = this.lawn.filter((layer) => !layer.meshes.some((mesh) => going.has(mesh)));
-      for (const b of fresh) {
-        if (!b.tiles) continue;
-        const layers = lawnLayers(b.built, b.matrices, b.tiles);
+      stale.forEach(({ again }, i) => {
+        if (!again!.tiles) return;
+        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles);
         this.lawn.push(...layers);
         if (this.lawnMask) this.hideLawn(layers, this.lawnMask);
-      }
+      });
     };
     return { ...gather(fresh), replaced, commit };
   }
@@ -512,7 +515,7 @@ export class Landscape {
     ] as const) {
       for (const [key, list] of bucket) {
         const lod = casts ? 0 : 1;
-        this.batches.push({ key, matrices: list, lod, fixed: true, cell: sector, casts, built: await instanced(scene, assets, key, list, lod, true, sector, pace) });
+        this.batches.push(batch({ key, matrices: list, lod, fixed: true, cell: sector }, casts, await instanced(scene, assets, key, list, lod, true, sector, pace)));
       }
     }
   }
@@ -579,7 +582,7 @@ export class Landscape {
       ['model.flowers', thin(flowers), thin(flowerTiles), undefined],
     ] as const) {
       const built = await instanced(scene, assets, key, matrices, 0, false, cell, pace);
-      this.batches.push({ key, matrices, lod: 0, fixed: false, cell, casts: false, tiles, built });
+      this.batches.push(batch({ key, matrices, lod: 0, fixed: false, cell, tiles }, false, built));
       this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);
@@ -659,18 +662,29 @@ interface Instanced {
   failed?: string[];
 }
 
-/** One model's plants: `instanced`'s arguments, kept by the landscape with what it built, for `rebuild`. */
+/** One model's plants, as the landscape keeps them. */
 interface Batch {
+  built: Instanced;
+  /** Its parts drawn whole cast shadows (the woods near the town). */
+  casts: boolean;
+  /** What it was built from, kept only while it's built without a file (`built.failed`), to build it again when that comes (`rebuild`). */
+  again?: BatchSource;
+}
+
+/** `instanced`'s arguments for a model's plants. */
+interface BatchSource {
   key: string;
   matrices: Matrix[];
   lod: 0 | 1;
   fixed: boolean;
   cell?: (x: number, z: number) => string;
-  /** Its parts drawn whole cast shadows (the woods near the town). */
-  casts: boolean;
   /** The lawn's: each instance's town tile (-1 outside the town), for `refreshLawn`. */
   tiles?: readonly number[];
-  built: Instanced;
+}
+
+/** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
+function batch(source: BatchSource, casts: boolean, built: Instanced): Batch {
+  return { built, casts, ...(built.failed ? { again: source } : {}) };
 }
 
 /** A landscape's plants built again (`Landscape.rebuild`): the new meshes, the ones they replace, and the swap. */
@@ -785,8 +799,7 @@ async function instanced(
     await pace?.();
   }
   perfEnd(span);
-  const shared = template.meshes.filter((mesh) => !split.includes(mesh));
-  return template.failed ? { shared, whole: split, cells, failed: template.failed } : { shared, whole: split, cells };
+  return { shared: template.meshes.filter((mesh) => !split.includes(mesh)), whole: split, cells, ...(template.failed ? { failed: template.failed } : {}) };
 }
 
 // ---- Garden dressing ------------------------------------------------------------------
