@@ -466,7 +466,7 @@ fn asset_entries() -> AssetEntries {
         let m: serde_json::Value =
             serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let dir = path.parent().unwrap().to_path_buf();
-        // A manifest without `entries` has none (as check_glb.py reads it).
+        // A manifest without `entries` has none (as the gate, crates/tools/src/checkglb.rs, reads it).
         let entries = match &m["entries"] {
             serde_json::Value::Null => &serde_json::Map::new(),
             e => e.as_object().unwrap_or_else(|| panic!("{path:?}: `entries` is {e}, not an object")),
