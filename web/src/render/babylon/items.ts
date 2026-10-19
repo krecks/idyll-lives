@@ -101,7 +101,7 @@ export class ItemLayer {
   private template(key: string): Promise<ModelTemplate> {
     let t = this.templates.get(key);
     if (!t) {
-      t = buildModel(this.scene, `item:${key}`, this.assets.get(key, 'model'), [1, 1], { radius: 0.12 });
+      t = buildModel(this.scene, `item:${key}`, this.assets.get(key, 'model'), [1, 1]);
       this.templates.set(key, t);
     }
     return t;

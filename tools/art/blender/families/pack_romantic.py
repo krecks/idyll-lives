@@ -1,9 +1,8 @@
 # The romantic pack (P15): the candlelit bistro table, the heart-shaped petal tub, the rose-gold vanity, the
-# moonlight gramophone, the love-letter bureau and the rose-arbour swing, over their primitive-part placeholders
-# (`tools/art/pack_romantic.py`, `packs/romantic/manifest.json`), which stay the fallback.
+# moonlight gramophone, the love-letter bureau and the rose-arbour swing.
 # Notes: pack_romantic.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), with its moving parts: the candle flames grow (`candles`), the tub fills with petals on the water
 # (`fill`), the vanity's drawer opens (`drawer_open`), the gramophone's tone arm swings onto the record (`needle`)
 # while the platter turns (`platter`, a loop), the bureau's writing flap drops (`fall_front`) and the arbour's
@@ -493,12 +492,11 @@ FAMILY = G.Family(
      G.Model('roseArbourSwing', roseArbourSwing, size=(1.844, 2.63, 0.821), key='model.romantic.roseArbourSwing',
              centre=(0, 0.0), motions={'uses': {'tendRoses': 'cut'}, 'loops': {'swing': 'swing'}, 'ride': 'swing'},
              paint=[('frame', 'Body'), ('cushion', 'Fabric')])],
-    comment='Blender-built romantic pack models (tools/art/blender/families/pack_romantic.py). Replaces the '
-            'primitive-part placeholders of packs/romantic by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each moves while it is used: the candles light, the tub fills with petals, the vanity\'s '
-            'drawer opens, the gramophone\'s arm drops onto the turning record, the bureau\'s flap drops and the '
-            'arbour swing sways while a bloom is cut.',
+    comment='Blender-built romantic pack models (tools/art/blender/families/pack_romantic.py). Listed in '
+            'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
+            'draw call per finish group. Each moves while it is used: the candles light, the tub fills '
+            'with petals, the vanity\'s drawer opens, the gramophone\'s arm drops onto the turning record, '
+            'the bureau\'s flap drops and the arbour swing sways while a bloom is cut.',
 )
 
 if __name__ == '__main__':

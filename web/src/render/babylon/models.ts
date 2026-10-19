@@ -1,11 +1,12 @@
 /**
- * Builds renderable templates from asset entries: glTF files when provided,
- * otherwise placeholder primitives from the manifest. Each template is drawn
- * with thin instances (one draw call per mesh, however many copies exist).
+ * Builds renderable templates from asset entries: glTF files, or nothing. Each
+ * template is drawn with thin instances (one draw call per mesh, however many
+ * copies exist).
  *
- * Placeholder parts are merged per (tint slot, finish) so a model costs one draw call per
- * distinct finish. Boxes get rounded edges so they catch highlights; every part gets
- * metre-scale UVs so textured finishes (fabric, wood, bark) tile at a realistic density.
+ * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
+ * (tint slot, finish) so a model costs one draw call per distinct finish. Boxes get rounded
+ * edges so they catch highlights; every part gets metre-scale UVs so textured finishes
+ * (fabric, wood, bark) tile at a realistic density.
  *
  * glTF entries may also carry (see `ModelExtras`):
  * - `fit`: scale the model (non-uniformly if needed) into an exact W x H x D box, bottom on the
@@ -13,10 +14,10 @@
  *   footprint and seat/bed heights.
  * - `materials`: restyle the file's materials by name: tint them, or replace them with one of the
  *   game's finishes (`material.finish.*`, vertex-coloured, box-projected UVs in metres). Replaced
- *   parts merge with placeholder parts of the same finish, so a flat-coloured kit model costs a few
+ *   parts merge with primitive parts of the same finish, so a flat-coloured kit model costs a few
  *   draw calls and matches the rest of the furniture. Style variants reuse one file this way. A
- *   material with `mirror` is mirror glass: its face reflects (`mirrors`), as placeholder parts' do.
- * - `parts`: extra placeholder primitives drawn with the file (books on a shelf, pillows, a lamp).
+ *   material with `mirror` is mirror glass: its face reflects (`mirrors`), as primitive parts' do.
+ * - `parts`: extra primitive parts drawn with the file (books on a shelf, pillows, a lamp).
  */
 
 import {
@@ -40,12 +41,12 @@ import type { AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground, prefetch } from '../../assets/stream';
 import { paintSlots } from '../../assets/paint';
-import type { ModelEntry, PlaceholderPart, Vec3 } from '../../assets/types';
+import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
 
-export type TintSlot = NonNullable<PlaceholderPart['tint']>;
-export type BoneName = NonNullable<PlaceholderPart['bone']>;
+export type TintSlot = NonNullable<PrimitivePart['tint']>;
+export type BoneName = NonNullable<PrimitivePart['bone']>;
 
 export interface ModelTemplate {
   /** Meshes in model space; each receives the same instance matrices. */
@@ -177,11 +178,9 @@ export interface MirrorSurface {
 export interface BuildOptions {
   /** 0 = full detail, 1 = reduced tessellation for distant instances (a file: its `far` version, if it has one). */
   lod?: 0 | 1;
-  /** Only seen from afar (the town overview): a file's `far` version, if it has one; a placeholder as it is. */
+  /** Only seen from afar (the town overview): a file's `far` version, if it has one. */
   far?: boolean;
-  /** Things on a top: the radius (m) of the disc they take, for the stand-in when the model is missing. */
-  radius?: number;
-  /** Resized by the player: drawn at this size (see `resizeParts`). */
+  /** Resized by the player: drawn at this size (see `resizeMaps`). */
   resize?: Resize;
 }
 
@@ -208,16 +207,12 @@ export async function buildModel(
       try {
         return await loadGltf(scene, name, entry, url, footprint, options.resize);
       } catch (err) {
-        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'placeholder'}`, err);
+        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'nothing'}`, err);
       }
     }
   }
-  const parts = entry?.placeholder ?? fallbackParts(footprint, options.radius);
-  const resized = options.resize ? resizeParts(parts, footprint, options.resize) : parts;
-  // Built ahead (`buildAhead`): in stretches of idle time.
-  const stretch = aheadStretch;
-  if (stretch) return (stretch.build = buildPlaceholderAhead(scene, name, resized, options.lod ?? 0, stretch));
-  return buildPlaceholder(scene, name, resized, options.lod ?? 0);
+  // Nothing to draw: a model is a file, or it isn't there.
+  return { meshes: [], tints: [], bones: [], height: 0 };
 }
 
 /** Share of a model's height above which everything rises with it (seats, tops, backs; sim-core `Top::of`). */
@@ -225,44 +220,6 @@ const RISE_FROM = 0.4;
 /** Along the floor: the band at each edge (m, at most this share of half the width) that moves with the edge unstretched. */
 const EDGE_BAND = 0.35;
 const EDGE_SHARE = 0.4;
-/** Parts smaller than this share of the width (or height) move without stretching. */
-const SMALL = 0.15;
-
-/**
- * Smart resizing for a model of `from` tiles drawn at `resize`: along the floor, the parts at
- * each edge (legs, side panels, frames) move out with it, keeping their thickness, while the
- * middle stretches (a table top, a sofa's cushions); upward, everything above `RISE_FROM` of its
- * height rises by the extra height and what spans that line (legs, a wardrobe's body) stretches
- * to meet it. Small parts only move. Parts turned off the model's axes only move, too.
- */
-export function resizeParts(parts: readonly PlaceholderPart[], from: readonly [number, number], resize: Resize): PlaceholderPart[] {
-  if (!resizes(from, resize)) return [...parts];
-  // Each part's turn and axis-aligned box in model space.
-  const boxes = parts.map(partBox);
-  const bottom = Math.min(...boxes.map((b) => b.lo[1]));
-  const top = Math.max(...boxes.map((b) => b.hi[1]));
-  const { maps, span } = resizeMaps(from, resize, bottom, top);
-  const widths = [from[0], span, from[1]];
-  return parts.map((p, i) => {
-    const { lo, hi, along } = boxes[i];
-    const at = [...p.at] as Vec3;
-    const size = [...p.size] as Vec3;
-    for (let k = 0; k < 3; k++) {
-      const map = maps[k];
-      const length = hi[k] - lo[k];
-      const j = along[k];
-      if (j < 0 || length < SMALL * widths[k]) {
-        // Moves as a whole: its middle goes where the map takes it.
-        at[k] = map(p.at[k]);
-        continue;
-      }
-      const [a, b] = [map(lo[k]), map(hi[k])];
-      at[k] = (a + b) / 2;
-      size[j] = Math.max(0.005, p.size[j] + (b - a) - length);
-    }
-    return { ...p, at, size };
-  });
-}
 
 /** Whether `resize` changes a model of `from` tiles. */
 function resizes(from: readonly [number, number], resize: Resize): boolean {
@@ -299,9 +256,9 @@ function resizeMaps(from: readonly [number, number], resize: Resize, bottom: num
 }
 
 /**
- * A file's geometry resized as `resizeParts` resizes parts, point by point: the edges move out
- * keeping their thickness, the middle stretches, and what lies above the rise line rises (a
- * triangle across it stretches). Normals follow the stretch.
+ * A file's geometry resized by `resizeMaps`, point by point: the edges move out keeping their
+ * thickness, the middle stretches, and what lies above the rise line rises (a triangle across it
+ * stretches). Normals follow the stretch.
  */
 function resizeData(data: VertexData, maps: ((v: number) => number)[], slopes: ((v: number) => number)[]): void {
   const pos = data.positions!;
@@ -320,41 +277,13 @@ function resizeData(data: VertexData, maps: ((v: number) => number)[], slopes: (
   }
 }
 
-function buildPlaceholder(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1): ModelTemplate {
-  const groups = new PartGroups(scene);
-  parts.forEach((part, index) => groups.addPart(part, lod, index));
-  return placeholderTemplate(parts, groups, groups.build(name));
-}
-
-/**
- * `buildPlaceholder` for a model built ahead: part by part, then group by group, while its stretch
- * of idle time lasts, and on in the next idle moment. The pieces stay hidden until it's whole.
- * Nothing (an empty model) if the scene is let go meanwhile.
- */
-async function buildPlaceholderAhead(scene: Scene, name: string, parts: PlaceholderPart[], lod: 0 | 1, stretch: Stretch): Promise<ModelTemplate> {
-  const groups = new PartGroups(scene);
-  for (const [index, part] of parts.entries()) {
-    if (stretch.spent && !(await stretch.next(scene))) return { meshes: [], tints: [], bones: [], height: 0 };
-    groups.addPart(part, lod, index).setEnabled(false);
-  }
-  const built = await groups.buildAhead(name, stretch);
-  return built ? placeholderTemplate(parts, groups, built) : { meshes: [], tints: [], bones: [], height: 0 };
-}
-
-function placeholderTemplate(parts: PlaceholderPart[], groups: PartGroups, { meshes, tints, bones }: BuiltGroups): ModelTemplate {
-  const mirrors = parts.filter((p) => p.mirror).map(mirrorSurface);
-  const boxes = parts.map(partBox);
-  const outline = boxes.length ? { minX: Math.min(...boxes.map((b) => b.lo[0])), maxX: Math.max(...boxes.map((b) => b.hi[0])), minZ: Math.min(...boxes.map((b) => b.lo[2])), maxZ: Math.max(...boxes.map((b) => b.hi[2])) } : undefined;
-  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline, ...(mirrors.length ? { mirrors } : {}) };
-}
-
 /**
  * A part's exact bounds in model space (`lo`, `hi`: along x, y, z), turned as `partMesh` turns it:
  * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent
  * (check_glb.py `part_box` measures the same). And which of its own axes lies along each model axis
  * (-1: none; it's turned off the axes).
  */
-function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: number[] } {
+function partBox(p: PrimitivePart): { lo: number[]; hi: number[]; along: number[] } {
   const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
   const m = Matrix.FromQuaternionToRef(Quaternion.FromEulerAngles(rx, ry, rz), new Matrix()).m;
   // R[j][k]: model axis k of local axis j (row j: where local axis j goes).
@@ -362,7 +291,7 @@ function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: numbe
   const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(r(j, k)) > 0.999) ?? -1);
   const [sx, sy, sz] = p.size;
   const ellipsoid = (k: number, ax: number, ay: number, az: number) => Math.hypot(r(0, k) * ax, r(1, k) * ay, r(2, k) * az);
-  const shape = p.shape as PlaceholderPart['shape'] | 'torus' | 'lathe';
+  const shape = p.shape as PrimitivePart['shape'] | 'torus' | 'lathe';
   let lo: number[];
   let hi: number[];
   if (shape === 'cylinder' || shape === 'cone') {
@@ -378,7 +307,7 @@ function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: numbe
     hi = [0, 1, 2].map((k) => Math.max(...points.map((q) => dot(q, k))));
   } else if (shape === 'lathe') {
     // Each profile point (radius, y) is a ring, scaled by the size.
-    const profile = (p as PlaceholderPart & ExtraShapes).profile ?? [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]];
+    const profile = (p as PrimitivePart & ExtraShapes).profile ?? [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]];
     lo = [0, 1, 2].map((k) => Math.min(...profile.map(([d, y]) => r(1, k) * y * sy - d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
     hi = [0, 1, 2].map((k) => Math.max(...profile.map(([d, y]) => r(1, k) * y * sy + d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
   } else {
@@ -401,7 +330,7 @@ function partBox(p: PlaceholderPart): { lo: number[]; hi: number[]; along: numbe
 }
 
 /** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. */
-function mirrorSurface(p: PlaceholderPart): MirrorSurface {
+function mirrorSurface(p: PrimitivePart): MirrorSurface {
   const [sx, sy, sz] = p.size;
   const round = p.shape === 'cylinder';
   // The face's normal before the part turns: a disc's axis (y), a box's thinnest side.
@@ -442,7 +371,7 @@ class PartGroups {
     return info.plain ? { alpha: encodeFinish(info.roughness, info.metallic), group: PLAIN } : { alpha: 1, group: key };
   }
 
-  addPart(part: PlaceholderPart, lod: 0 | 1, index: number): Mesh {
+  addPart(part: PrimitivePart, lod: 0 | 1, index: number): Mesh {
     const { alpha, group } = this.finish(part.material ?? DEFAULT_FINISH);
     const mesh = partMesh(this.scene, part, lod, index, alpha);
     const box = partBox(part);
@@ -462,17 +391,6 @@ class PartGroups {
   build(name: string): BuiltGroups {
     const built: BuiltGroups = { meshes: [], tints: [], bones: [] };
     for (const group of this.groups.values()) this.merge(name, group, built);
-    return built;
-  }
-
-  /** `build` in stretches of idle time (see `buildPlaceholderAhead`); the meshes show once all are merged. */
-  async buildAhead(name: string, stretch: Stretch): Promise<BuiltGroups | null> {
-    const built: BuiltGroups = { meshes: [], tints: [], bones: [] };
-    for (const group of this.groups.values()) {
-      if (stretch.spent && !(await stretch.next(this.scene))) return null;
-      this.merge(name, group, built)?.setEnabled(false);
-    }
-    for (const mesh of built.meshes) mesh.setEnabled(true);
     return built;
   }
 
@@ -500,14 +418,14 @@ interface BuiltGroups {
 /** Group key for parts drawn with the shared plain finish. */
 const PLAIN = 'plain';
 
-function partMesh(scene: Scene, p: PlaceholderPart, lod: 0 | 1, index: number, alpha: number): Mesh {
+function partMesh(scene: Scene, p: PrimitivePart, lod: 0 | 1, index: number, alpha: number): Mesh {
   const [sx, sy, sz] = p.size;
   const lo = lod === 1;
   let mesh: Mesh;
   let shade: ((nx: number, ny: number, nz: number) => number) | null = null;
   // `torus` and `lathe` extend the manifest schema (see `ExtraShapes`).
-  const ext = p as PlaceholderPart & ExtraShapes;
-  switch (p.shape as PlaceholderPart['shape'] | 'torus' | 'lathe') {
+  const ext = p as PrimitivePart & ExtraShapes;
+  switch (p.shape as PrimitivePart['shape'] | 'torus' | 'lathe') {
     case 'torus':
       // size: [outer diameter x, tube thickness, outer diameter z].
       mesh = MeshBuilder.CreateTorus('part', { diameter: Math.max(sx - sy, 1e-3), thickness: sy, tessellation: p.segments ?? (lo ? 12 : 24) }, scene);
@@ -576,7 +494,7 @@ function partMesh(scene: Scene, p: PlaceholderPart, lod: 0 | 1, index: number, a
   return mesh;
 }
 
-/** Placeholder shapes beyond the base schema. */
+/** Shapes beyond the base schema. */
 interface ExtraShapes {
   /**
    * `lathe`: profile [radius, y] points in unit space (radius 0..0.5, y -0.5..0.5), revolved
@@ -811,12 +729,6 @@ function blobMesh(scene: Scene, sx: number, sy: number, sz: number, amount: numb
   return mesh;
 }
 
-/** A neutral box when a model key is missing entirely (for something on a top, a small one its size). */
-function fallbackParts([w, d]: [number, number], radius?: number): PlaceholderPart[] {
-  if (radius) return [{ shape: 'cylinder', size: [radius * 1.8, radius * 1.6, radius * 1.8], at: [0, radius * 0.8, 0], color: '#B8B2AA' }];
-  return [{ shape: 'box', size: [w * 0.8, 0.8, d * 0.8], at: [0, 0.4, 0], color: '#B8B2AA' }];
-}
-
 /** Optional model entry fields beyond the base schema (read defensively; see the file header). */
 interface ModelExtras {
   /** Exact size [width x, height y, depth z] in metres after `rotationY`; replaces `scale`. */
@@ -825,8 +737,8 @@ interface ModelExtras {
   align?: 'centre' | 'back';
   /** Restyles materials by glTF material name; `*` applies to every material not listed. */
   materials?: Record<string, MaterialOverride>;
-  /** Extra placeholder primitives drawn with the model (in the final, fitted space). */
-  parts?: PlaceholderPart[];
+  /** Extra primitive parts drawn with the model (in the final, fitted space). */
+  parts?: PrimitivePart[];
   /** When the file's clips play (`objectMotion.ts`). */
   motions?: MotionsEntry;
 }
@@ -968,41 +880,10 @@ export function prefetchModels(entries: Iterable<ModelEntry | undefined>): void 
 
 /** Idle time (ms) left below which `buildAhead` waits for the next idle moment. */
 const IDLE_SLICE_MS = 6;
-/**
- * Longest stretch of work (ms) on a model built ahead before it waits for the next idle moment.
- * A whole tree or park table takes 10–15 ms on a fast laptop and three times that on a slow one.
- */
-const AHEAD_STRETCH_MS = 4;
-/** Longest wait (ms) for an idle moment once a model is under way, so it's never left half made for long. */
-const AHEAD_WAIT_MS = 200;
-
-/** The work on one model built ahead, in stretches of idle time. */
-class Stretch {
-  private until = performance.now() + AHEAD_STRETCH_MS;
-  /** It waited for more idle time: `build` is done when the model is whole. */
-  waited = false;
-  build: Promise<unknown> | null = null;
-
-  get spent(): boolean {
-    return performance.now() >= this.until;
-  }
-
-  /** Waits for the next idle moment, for another stretch; false if the scene was let go meanwhile. */
-  async next(scene: Scene): Promise<boolean> {
-    this.waited = true;
-    await new Promise<void>((resolve) => idle(() => resolve(), AHEAD_WAIT_MS));
-    this.until = performance.now() + AHEAD_STRETCH_MS;
-    return !scene.isDisposed;
-  }
-}
-
-/** Set while `buildAhead` runs a job: the generated model it builds goes in stretches of idle time. */
-let aheadStretch: Stretch | null = null;
 
 /**
  * Runs `jobs` in idle moments, as many as fit in each, until they are done or `current()` turns
- * false: generated models built ahead without holding up a frame. A model that takes longer than
- * a stretch goes on in the next idle moments, and the next job waits for it.
+ * false: models built ahead without holding up a frame.
  */
 export function buildAhead(jobs: (() => void)[], current: () => boolean): void {
   const more = () => {
@@ -1011,13 +892,7 @@ export function buildAhead(jobs: (() => void)[], current: () => boolean): void {
   const step = (deadline?: IdleDeadline) => {
     if (!current()) return;
     while (jobs.length) {
-      const stretch = (aheadStretch = new Stretch());
-      try {
-        jobs.shift()!();
-      } finally {
-        aheadStretch = null;
-      }
-      if (stretch.waited) return void stretch.build?.then(more, more);
+      jobs.shift()!();
       if (!deadline || deadline.timeRemaining() < IDLE_SLICE_MS) break;
     }
     more();
@@ -1232,7 +1107,7 @@ function namedFinish(name: string, lib?: MaterialLibrary): MaterialOverride | un
   return finish && (!lib || lib.hasFinish(finish)) ? { finish } : undefined;
 }
 
-/** A tint slot in a material's name: `tunic#body` is tinted as a placeholder part with `tint: 'body'` is. */
+/** A tint slot in a material's name: `tunic#body` is tinted as a primitive part with `tint: 'body'` is. */
 const TINT_IN_NAME = /#(body|skin|hair)(?=@|\||$)/;
 
 /** The tint slot a file's material carries in its name (`TINT_IN_NAME`), or null. */
@@ -1284,7 +1159,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   const pieces = file.pieces.filter((p) => !overrideFor(p.material)?.hide).map((p) => ({ data: copyData(p.data).transform(space), full: p.full && copyData(p.full).transform(space), material: p.material, part: p.part }));
   if (fit && pieces.length) space = space.multiply(fitInto(pieces.map((p) => p.data), fit, extras.align ?? 'centre', [ox, oy, oz]));
   const boxes = pieces.map((p) => dataBox(p.data));
-  // Resized by the player as placeholders are; each moving part's pivot goes where its hinge went.
+  // Resized by the player as primitive parts are; each moving part's pivot goes where its hinge went.
   const pivots = file.parts.map((p) => Vector3.TransformCoordinates(p.pivot, space));
   const shifts = pivots.map(() => Vector3.Zero());
   if (resize && boxes.length && resizes(footprint, resize)) {
@@ -1335,7 +1210,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   const lo = (k: number) => Math.min(...boxes.map((b) => b.lo[k]));
   const hi = (k: number) => Math.max(...boxes.map((b) => b.hi[k]));
   const outline = boxes.length ? { minX: lo(0), maxX: hi(0), minZ: lo(2), maxZ: hi(2) } : undefined;
-  // Mirror glass: the pieces of a `mirror` material (on a moving part, following it), and placeholder parts drawn with the file.
+  // Mirror glass: the pieces of a `mirror` material (on a moving part, following it), and primitive parts drawn with the file.
   const mirrors = [
     ...pieces.flatMap(({ data, material, part }, i) => {
       const side = overrideFor(material)?.mirror;
@@ -1406,7 +1281,7 @@ function buildClips(clips: Map<string, ModelClip>, space: Matrix, shifts: Vector
 
 /**
  * The reflecting face of a file's mirror glass (`MaterialOverride.mirror`), as `mirrorSurface` of a
- * placeholder part: across the glass's thinnest side, a hair in front of the face towards `side`
+ * primitive part: across the glass's thinnest side, a hair in front of the face towards `side`
  * (front: +z, or +x / +y for glass turned that way). Round if its triangles facing that way cover
  * well under its box (a disc covers π/4 of its square).
  */
@@ -1517,8 +1392,8 @@ function fitInto(pieces: VertexData[], [w, h, d]: Vec3, align: 'centre' | 'back'
 }
 
 /**
- * A copy of a file's geometry in placeholder form (positions, normals, metre UVs, vertex colour
- * carrying the finish), so it merges with placeholder parts of the same finish. `full`, the same
+ * A copy of a file's geometry as a primitive part (positions, normals, metre UVs, vertex colour
+ * carrying the finish), so it merges with primitive parts of the same finish. `full`, the same
  * geometry where a part grown from nothing is grown, gives the normals, winding and UVs its flat rest
  * shape can't (a textured finish's normal map draws nothing on UVs collapsed along an axis).
  */

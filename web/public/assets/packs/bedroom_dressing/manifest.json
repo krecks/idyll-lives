@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built bedroom dressing models (tools/art/blender/families/bedroom_dressing.py): the cheval mirror, the dressing table, the wall mirror and the standing mirror. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each mirror's glass maps to a `mirror` material, so the game reflects the room in it live. The dressing table slides its drawer out (`drawer_open`) while a resident gets ready.",
+  "$comment": "Blender-built bedroom dressing models (tools/art/blender/families/bedroom_dressing.py): the cheval mirror, the dressing table, the wall mirror and the standing mirror. Listed in the base manifest's packs. Each mirror's glass maps to a `mirror` material, so the game reflects the room in it live. The dressing table slides its drawer out (`drawer_open`) while a resident gets ready.",
   "version": 1,
   "entries": {
     "model.mirror": {

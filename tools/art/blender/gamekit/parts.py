@@ -9,7 +9,7 @@ from mathutils import Matrix, Vector
 from .scene import meshes
 
 # The (game x, depth) the model being built is centred on: its Model's `centre`, set by Family.make, so
-# `settle()` stands a floor model where its placeholder stands (a counter's back on the wall).
+# `settle()` stands a floor model where the game expects it (a counter's back on the wall).
 CENTRE = (0.0, 0.0)
 
 

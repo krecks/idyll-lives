@@ -1,15 +1,14 @@
 # Neat pack — notes
 
 `pack_neat.py` builds the six P13 neat models into `web/public/assets/models/pack_neat/` and their entries in
-`packs/pack_neat/manifest.json`, an override pack listed after `packs/neat/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_neat.py`, in `packs/neat`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_neat/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Neat until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
-keeping its footprint, its wall side (backs on the wall face at depth −0.43; the placeholders' were at −0.455) and
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+keeping its footprint, its wall side (backs on the wall face at depth −0.43; the old parts' were at −0.455) and
 the desk chair's seat at 0.45 m. The entry console and the rain shower tower stood 2 cm into the wall; they are
-centred on their `Model` `centre` now (`G.settle()`), backs on the face. The placeholders of the wall-standing ones (`tools/art/pack_neat.py`, `pack_shapes.to_wall`) stand with their backs
-on the wall face too, so the fallback, the model and the wall agree within a centimetre.
+centred on their `Model` `centre` now (`G.settle()`), backs on the face, as the wall-standing ones' old parts
+stood, so the model and the wall agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -32,7 +31,7 @@ and home.
 - The shower: plain plus its glass on the still body, the rain plain: 3. Its bench is plain teak and its towels
   satin, so no textured finish.
 - The portholes, the robot dock's bin window and the mop dock's panel are plain gloss (no glass draw); the
-  console's mirror is `chrome`, as on the placeholder (not live mirror glass, which would be a draw of its own).
+  console's mirror is `chrome`, as on the old part (not live mirror glass, which would be a draw of its own).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
@@ -48,7 +47,7 @@ robot (`appliance`) and the shower's tiles (`tile`).
 
 `check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open, the desk's bin from behind (the sitter's side).
-Gallery: each next to its placeholder. In play (`wants-asking`, WebGPU, each bought in the living room and used by
+Gallery: each next to its old part. In play (`wants-asking`, WebGPU, each bought in the living room and used by
 the resident): the mop comes out of its dock (`mop`), the washer's door opens (`laundry`), the rain runs over the
 resident (`steamShower`), the resident sits at the desk (`sort`), the robot rolls out and home (`program`) and the
 key tray drawer opens and shuts (`tidy`). At night (`office-night`, WebGL): the desk at all four facings in the

@@ -1,7 +1,7 @@
 # Hobbies
 
 The nineteen hobby models are built by `tools/art/blender/families/hobbies.py` (notes: `families/hobbies.md`), each
-where its placeholder stands, so seats and stools stay where the game seats residents. The dartboard hangs at its
+at the height the game seats residents, so seats and stools stay where it puts them. The dartboard hangs at its
 real height. Most hobbies move a part while a resident uses them: the piano's fallboard, the chess pawn, the pool
 rack, the vice, the telescope's tube, the presser foot and the scrapbook (use clips); the drums' cymbals, the
 foosball rods, the arcade joystick, the sewing machine's handwheel and the pottery wheel turn in a loop while in use
@@ -17,7 +17,6 @@ table face the room, as tables do.
 ## H1. Music (6)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -41,7 +40,6 @@ table face the room, as tables do.
 ## H2. Games (6)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -64,7 +62,6 @@ table face the room, as tables do.
 ## H3. Crafts and science (7)
 
 - **Family:** `tools/art/blender/families/hobbies.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -81,5 +78,4 @@ table face the room, as tables do.
   resident moves on.
 - The sewing table's "Table" colours its top and chair; "Legs" colours its legs, apron and drawer (dark wood as
   made).
-- At rest the pottery wheel's lump is lower than the placeholder's full pot (`check_glb.py` warns of it, as
-  expected).
+- At rest the pottery wheel's lump sits lower than a full pot.

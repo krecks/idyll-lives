@@ -2,15 +2,14 @@
 
 `shops.py` builds the five CM4 shop and café models into `web/public/assets/models/shops/` and their entries in
 `packs/shops/manifest.json`: the shop counter (`model.shopCounter`), the bakery case (`model.bakeryCase`), the grocery
-shelves (`model.groceryShelf`), the café table (`model.cafeTable`) and the café chair (`model.cafeChair`). They replace
-the primitive-part placeholders of `tools/art/community.py`, which stay as the fallback. Built 2026-10-14; they sit in
+shelves (`model.groceryShelf`), the café table (`model.cafeTable`) and the café chair (`model.cafeChair`). Built 2026-10-14; they sit in
 Validate › Shops until checked in play (back to community / shops).
 
 They stand on town lots, seen from far and by the dozen, so each has a far version (`far=0.25`: `<id>.far.glb`, the
-model at rest, joined and decimated to a quarter). Each is built where its placeholder stands (`F`, game axes): the
+model at rest, joined and decimated to a quarter). Each is built where the game places it (`F`, game axes): the
 counter, the case and the shelves back on their 2 × 1 tiles (`G.settle(centre=False)` and `centre=` on the `Model`),
 the counter's worktop and the case's deck at the back on the wall face (−0.43: their parts are placed 4 cm forward,
-`GameFrame(shift=0.04)`, as are their placeholders, which reached 4 cm into the wall before),
+`GameFrame(shift=0.04)`, as are the old parts, which reached 4 cm into the wall before),
 the table centred, the chair's seat 2 cm forward. The family checks the café table's top (0.745 m) and the chair's
 seat (0.47 m, 2 cm forward) against `content/community.json` before it builds.
 
@@ -44,7 +43,7 @@ resident is still eating. The door is plain glass with no handle, so the model s
 - **Grocery shelves**: a metal gondola (sides, back, a dark kick plate and top cap) with four shelves, dark lips and
   price tags; packets with labels, tins and jars on three shelves and sandwich packs (triangles with a filling and a
   sticker) on the bottom one. Its back is on the wall face (−0.43), its front 5 cm past its tile's middle: centred on
-  game depth −0.19, within 2 cm of its placeholder.
+  game depth −0.19, within 2 cm of its old part.
 - **Café table**: a round marble top (`gloss`) on a cast-iron column with a knop, a spider under the top and three
   curved feet. Its top is at 0.745 m, the content's `surface.height`.
 - **Café chair**: a bentwood chair (`wood`) with a cane seat (`fabric`): one bent piece runs from the back feet up into

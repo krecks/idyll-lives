@@ -19,9 +19,9 @@
  *   game builds it (no porch, chimney, garage, car or garden dressing), and nothing else.
  * - Static: generated once per town layout and kept across structure versions of the viewed
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
- *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the community
- *   things, see `assets/community/manifest.json`), a few dozen draw calls for the whole street.
- * - Primitive builds only (no downloads), plus a CC0 concrete texture for the sidewalks.
+ *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
+ *   things, see `assets/packs/street/manifest.json`), a few dozen draw calls for the whole street.
+ * - Blender-built models only (no downloads), plus a CC0 concrete texture for the sidewalks.
  */
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
@@ -66,10 +66,10 @@ const RAIL_WOOD = '#8A6F52';
  */
 const LOT_CLEARANCE = { picket: 0.4, rail: 0.4, hedge: 0.8 };
 
-/** Model keys of the thin-instanced foliage (street pack, see `assets/street/manifest.json`). */
+/** Model keys of the thin-instanced foliage (the street and trees packs). */
 const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
 type FoliageKind = keyof typeof FOLIAGE;
-/** Props drawn from manifest models (community pack); a missing one is left out. */
+/** Props drawn from manifest models (the street and town packs); a missing one is left out. */
 const PROP = {
   bench: 'model.street.bench',
   planter: 'model.street.planter',

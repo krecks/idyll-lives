@@ -1,8 +1,7 @@
-# The garden decor (`model.garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`),
-# over the primitive-part placeholders of `nature.py`, which stay the fallback.
+# The garden decor (`model.garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`).
 #
 # Built at their real size, in Blender axes (front -Y), each stood on the floor and centred by
-# `G.settle`; the sizes are the placeholders', within each model's tolerance.
+# `G.settle`; the sizes are the old parts', within each model's tolerance.
 #
 # Run:  python3 -B tools/art/blender/build.py garden_decor [--only gnome] [--preview]
 import os
@@ -16,7 +15,7 @@ M = G.Palette(
     stone=('#B9B2A6', 'matte'),
     stone_dark=('#8F887C', 'matte'),
     stone_warm=('#C6BCA9', 'matte'),
-    water=('#6FA8C0', 'gloss'),         # opaque, like the placeholders' water
+    water=('#6FA8C0', 'gloss'),         # opaque, like the old parts' water
     moss=('#5E8A3C', 'foliage'),
     leaf=('#4E7A34', 'foliage'),
     wood=('#9A7444', 'wood'),
@@ -92,9 +91,9 @@ def fountain():
     return G.settle([G.join_all('fountain')])
 
 
-# The lantern's hexagons are regular and turned as the placeholder's (Babylon cylinders): corners to the
+# The lantern's hexagons are regular and turned as the old part's (Babylon cylinders): corners to the
 # sides (x), flats to the front and back, so it is 0.54 m across its roof's corners and 0.47 deep, as the
-# placeholder. (Blender starts a circle at +y; `rot` turns it 30 degrees.)
+# old part. (Blender starts a circle at +y; `rot` turns it 30 degrees.)
 
 
 def lantern():
@@ -158,7 +157,7 @@ def boulder():
     return G.settle([G.join_all('boulder')])
 
 
-# (width, height, depth): the placeholders' bounds, and how far each model may be from them
+# (width, height, depth): the old parts' bounds, and how far each model may be from them
 TOLERANCE = 0.1
 
 FAMILY = G.Family(
@@ -176,12 +175,11 @@ FAMILY = G.Family(
      G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE,
              paint=[('stone', 'Large boulder'), ('stone_dark', 'Middle boulder'), ('stone_warm', 'Small boulder')])],
     pack='gardenDecor',
-    comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a '
-            'two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part '
-            'placeholders of nature.py by key; listed in the base manifest\'s packs. The placeholder is kept as a '
-            'fallback if a file fails to load. Each file\'s materials map by name onto the game\'s finishes '
-            '(`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one '
-            'per finish group) and lights like the rest of the garden.',
+    comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird '
+            'bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Listed in '
+            'the base manifest\'s packs. Each file\'s materials map by name onto the game\'s finishes '
+            '(`materials`, see render/babylon/models.ts), so a model costs one draw call per finish group '
+            'and lights like the rest of the garden.',
 )
 
 if __name__ == '__main__':

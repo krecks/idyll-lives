@@ -1,9 +1,8 @@
 # The cheerful pack (P2): the sunburst jukebox, the spotlight karaoke machine, the fizz & sunshine mocktail cart,
-# the rainbow hammock, the sunrise stretch lamp and the confetti party booth, over their primitive-part
-# placeholders (`tools/art/pack_cheerful.py`, `packs/cheerful/manifest.json`), which stay the fallback.
+# the rainbow hammock, the sunrise stretch lamp and the confetti party booth.
 # Notes: pack_cheerful.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), one moving part each: the jukebox's record swings up into the window (`record`), the microphone
 # rises on its stand (`mic_up`), the cocktail shaker tips (`shake`), the hammock sways with its sleeper
 # (`sway`, a loop they ride), the sun rises in the lamp's frame (`sunrise`; its sky glows at night) and the
@@ -616,11 +615,11 @@ FAMILY = G.Family(
      G.Model('partyBooth', partyBooth, size=(1.9, 1.64, 1.83), key='model.cheerful.partyBooth',
              centre=(0, -0.015), motions={'uses': {'party': 'curtain'}, 'hold': 1.5},
              paint=[('booth', 'Body'), ('piping', 'Trim'), ('curtain', 'Curtain')])],
-    comment='Blender-built cheerful pack models (tools/art/blender/families/pack_cheerful.py). Replaces the '
-            'primitive-part placeholders of packs/cheerful by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each has one moving part: the record swings up, the microphone rises, the shaker tips, '
-            'the hammock sways (a loop its sleeper rides), the sun rises (its sky glowing at night) and the curtain is drawn.',
+    comment='Blender-built cheerful pack models (tools/art/blender/families/pack_cheerful.py). Listed in '
+            'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
+            'draw call per finish group. Each has one moving part: the record swings up, the microphone '
+            'rises, the shaker tips, the hammock sways (a loop its sleeper rides), the sun rises (its sky '
+            'glowing at night) and the curtain is drawn.',
 )
 
 if __name__ == '__main__':

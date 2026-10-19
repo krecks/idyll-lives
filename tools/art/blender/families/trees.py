@@ -1,11 +1,10 @@
 # The garden's trees (G5): the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 # magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`,
-# `model.spruce`, `model.cypress`) and the potted lemon tree (`model.garden.lemonTree`), over the primitive-part
-# placeholders of `nature.py`, which stay the fallback.
+# `model.spruce`, `model.cypress`) and the potted lemon tree (`model.garden.lemonTree`).
 #
 # Crowns are leafy lumps (`plants.lump`) spread over an ellipsoid, lighter on top, round a dark core, on bark limbs;
 # conifers stacked cones. Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints.
-# Trees stand on every lot and by the thousand in the woods, so each costs what its placeholder does, and each has a
+# Trees stand on every lot and by the thousand in the woods, so each costs what its old part does, and each has a
 # far version (`far_of`: the same build at low detail, a third of the clumps), which the far woods and the town
 # overview draw.
 #
@@ -118,7 +117,7 @@ def limbs(P, rng, base, tips, d, material=None):
 
 
 def xy(p):
-    """A point from the placeholders' game axes (x, height, depth) to Blender's (x, depth, height); trees are round,
+    """A point from the old parts' game axes (x, height, depth) to Blender's (x, depth, height); trees are round,
     so the mirror doesn't matter."""
     return (p[0], p[2], p[1])
 
@@ -345,12 +344,12 @@ FAMILY = G.Family(
      G.Model('cypress', cypress, size=(2.12, 7.95, 2.05), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
      G.Model('lemonTree', lemon_tree, size=(1.288, 2.374, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
              paint=[('body', 'Pot')], motions={'uses': {'pick': 'pick'}})],
-    comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' oaks, maples, '
-            'birches, pines and spruces, and the potted lemon tree. Replaces the primitive-part placeholders of nature.py '
-            'by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a file fails to load. '
-            'Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints. Each has a far '
-            'version (`far`), which the far woods and the town overview draw. Clips: an apple or a lemon shrinks away '
-            'while it is picked, the Japanese maple\'s stray sprigs while it is shaped.',
+    comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' '
+            'oaks, maples, birches, pines and spruces, and the potted lemon tree. Listed in the base '
+            'manifest\'s packs. Leaves are on `foliage` and trunks on `bark`, which the nature shader '
+            'sways and tints. Each has a far version (`far`), which the far woods and the town overview '
+            'draw. Clips: an apple or a lemon shrinks away while it is picked, the Japanese maple\'s stray '
+            'sprigs while it is shaped.',
 )
 
 if __name__ == '__main__':

@@ -1,11 +1,9 @@
 # The bedroom's storage: the nightstands and small storage (BR2: the nightstand, the modern, drum and
 # three-drawer nightstands, the nightstand with a lamp, the blanket chest, the laundry hamper and the
 # bed-end bench) and the wardrobes and drawers (BR3: the dresser, the wardrobe, the tall chest of
-# drawers, the low dresser, the single wardrobe and the armoire). Each replaces the primitive-part
-# placeholder of `catalog.py` / `catalog2.py`, which stays the fallback if the file fails to load.
-# Notes: bedroom_storage.md.
+# drawers, the low dresser, the single wardrobe and the armoire). Notes: bedroom_storage.md.
 #
-# The parts are placed in game axes (`F`, no shift), where each placeholder stands: most stand against
+# The parts are placed in game axes (`F`, no shift), where the game places it: most stand against
 # the back of their tile, their backs on the wall face (game depth -0.43), so they're built in place and
 # settled with `centre=False` (`centre=` on each Model). Their tops are the content's `surface` heights.
 # The BR3 pieces open for a resident choosing an outfit: a drawer slides out 30 cm (`drawer_open`), or
@@ -63,7 +61,7 @@ M = G.Palette(
     vase=('#8A5A38', 'wood'),        # a turned wooden vase
 )
 
-F = G.GameFrame()        # game numbers as they are: the models stand where their placeholders do
+F = G.GameFrame()        # game numbers as they are: the models stand where the game places them
 WALL = -0.43             # the wall's face, the back of anything against it
 
 DRAWER_SECONDS = 0.9     # a drawer slides out 30 cm in this long
@@ -561,12 +559,11 @@ FAMILY = G.Family(
      G.Model('armoire', armoire, size=(1.86, 2.109, 0.628), key=_key('armoire'), centre=(0, -0.1162),
              motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
              paint=[('mahogany', 'Body'), ('brass', 'Handles')])],
-    comment='Blender-built bedroom storage (tools/art/blender/families/bedroom_storage.py): the nightstands, '
-            'the blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and '
-            'wardrobes (BR3). Replaces the primitive-part placeholders by key; listed in the base manifest\'s '
-            'packs. The placeholder is kept as a fallback if a file fails to load. A dresser or chest slides '
-            'its middle drawer out 30 cm (`drawer_open`), a wardrobe swings its doors open (`doors_open`, '
-            '`door_open`) while a resident picks an outfit.',
+    comment='Blender-built bedroom storage (tools/art/blender/families/bedroom_storage.py): the '
+            'nightstands, the blanket chest, the laundry hamper and the bed-end bench (BR2), and the '
+            'dressers, chests and wardrobes (BR3). Listed in the base manifest\'s packs. A dresser or '
+            'chest slides its middle drawer out 30 cm (`drawer_open`), a wardrobe swings its doors open '
+            '(`doors_open`, `door_open`) while a resident picks an outfit.',
 )
 
 if __name__ == '__main__':

@@ -41,7 +41,7 @@ you started yourself. Pictures, and `<what>.json` with what each one shows, go t
 
 | Check | Does |
 |---|---|
-| `gallery` | `/gallery.html?keys=…` from the front right; with `--placeholder` also with every `.glb` answered 404 (the fallback the game draws), and the two side by side in `…-side.png`. `--alpha --beta --radius --target --cols` |
+| `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols` |
 | `clips` | `/clips.html?keys=…` held at each of `--times` (default `0,0.3,0.6,1,99`; 99 is open), one picture each. `--clip --colors --target` |
 | `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money, buys `--object` at `--at x,z,rot` (`--turn`, `--colors`), sends `--use` (an interaction id or index) for `--sim`, waits up to `--wait` s until `__sims()` says the resident is at it and using it, then takes `--shots` pictures `--every` ms, logging the resident's pose and the clips playing on it. The camera follows the resident (`--radius`, `--beta`, `--alpha`, `--y`). |
 
@@ -49,7 +49,7 @@ Common options: `--quality low|medium|high` (`?quality=`), `--renderer webgl`, `
 `--extra 'k=v&k=v'`, `--headed` (a window, only to measure timing).
 
 ```sh
-node tools/bench/check.mjs gallery --port 5227 --keys model.dartboard,model.tableClock --placeholder
+node tools/bench/check.mjs gallery --port 5227 --keys model.dartboard,model.tableClock
 node tools/bench/check.mjs clips --port 5227 --keys model.fridge --clip door_open --times 0,0.2,0.4,99
 node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
 node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 24,17,1 --state office-night --renderer webgl --quality low

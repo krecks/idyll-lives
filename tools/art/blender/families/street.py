@@ -1,13 +1,12 @@
 # The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the flower
 # tub, the street-name sign, the bus-stop sign, the pot by a front door, the garden path light, and the foliage of
-# the street (`hedge`, `flowers`), over the primitive-part placeholders of `tools/art/community.py` (the props) and
-# `web/public/assets/street/manifest.json` (the hedge and the flowers), which stay the fallback. Notes: street.md.
+# the street (`hedge`, `flowers`). Notes: street.md.
 #
 # render/babylon/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
 # to hundreds of copies, and the town overview draws them again from afar: each is small (a few hundred to a
 # thousand triangles), takes one or two draw calls, and has a far version, its own build at low detail
 # (`G.far_of`). They are still; the leaves and flowers are on the `foliage` finish, so the nature shader sways them
-# in the wind as it did the placeholders'. The path light's lens glows at night.
+# in the wind as it did the old parts'. The path light's lens glows at night.
 #
 # Run:  python3 -B tools/art/blender/build.py street [--only bench] [--preview]
 import math
@@ -36,7 +35,7 @@ M = G.Palette(
     hedge_dark=('#4D7531', 'foliage'),
     bed=('#4E7432', 'foliage'),        # the flowers' leafy clumps
     bed_light=('#5C8438', 'foliage'),
-    red=('#D9483B', 'foliage'),        # flowers: on foliage, as the placeholders', so they sway with the leaves
+    red=('#D9483B', 'foliage'),        # flowers: on foliage, as the old parts', so they sway with the leaves
     yellow=('#F2C14E', 'foliage'),
     pink=('#E9A6B4', 'foliage'),
     rose=('#E8678A', 'foliage'),
@@ -50,7 +49,7 @@ M = G.Palette(
     ink=('#3A3F45', 'matte'),        # the timetable's lines, the bus's wheels
     terracotta=('#B5653F', 'satin'),   # the door pot
     lamp=('#2B2C2E', 'metal'),         # the path light's post and cap
-    # the path light's frosted lens: glows at night (E8), where the placeholder's glass bulb was
+    # the path light's frosted lens: glows at night (E8), where the old part's glass bulb was
     lens=('#FFF1CF', 'satin', {'glow': '#FFD9A0'}),
 )
 
@@ -122,7 +121,7 @@ def flowerTub():
     F = G.GameFrame()
     _tub(F)
     rng = random.Random(81)
-    # a leafy mound over the soil, and flowers in five colours on it, the placeholder's five where it had them
+    # a leafy mound over the soil, and flowers in five colours on it, the old part's five where it had them
     lump('mound', 0.27, F.at(0, 0.39, 0), M.leaf, scale=(1, 1, 0.25), noise=0.16, segments=12, rings=7)
     for i, (x, z) in enumerate(((0.2, 0.2), (-0.21, 0.19), (0.21, -0.2), (-0.2, -0.2))):
         lump(f'leaves{i}', 0.11, F.at(x, 0.4, z), [M.leaf_dark, M.leaf_light][i % 2], scale=(1, 1, 0.6), noise=0.2, seed=i * 2.3,
@@ -247,7 +246,7 @@ def pathLight():
 
 # --- the street foliage --------------------------------------------------------------------------------------
 def hedge():
-    """A clipped hedge block with a softer, lumpy top (the placeholder's three blobs)."""
+    """A clipped hedge block with a softer, lumpy top (the old part's three blobs)."""
     F = G.GameFrame()
     F.box('block', 1.25, 0.84, 0.62, (0, 0.42, 0), M.hedge, bevel=low(0.14, 0.0), bevel_segments=2)
     for i, (x, w, mat) in enumerate(((-0.34, 0.3, M.hedge_dark), (0.0, 0.3, M.hedge), (0.32, 0.32, M.hedge_light))):
@@ -291,13 +290,13 @@ FAMILY = G.Family(
      G.Model('pathLight', pathLight, size=(0.18, 0.56, 0.18), far=far_of(pathLight)),
      G.Model('hedge', hedge, size=(1.275, 1.035, 0.62), far=far_of(hedge)),
      G.Model('flowers', flowers, size=(0.6, 0.343, 0.52), far=far_of(flowers))],
-    comment='Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter '
-            'with its little tree, the flower tub, the street-name sign, the bus-stop sign, the door pot, the garden '
-            'path light, the street hedge and the flower clump that render/babylon/street.ts draws as thin instances '
-            'along the kerbs and front gardens. Replaces the primitive-part placeholders of tools/art/community.py and '
-            'street/manifest.json by key; listed in the base manifest\'s packs after them. The placeholder is kept as '
-            'a fallback if a file fails to load. Each has a far version for the town overview. Leaves and flowers are '
-            'on the foliage finish, so they sway in the wind; the path light\'s lens glows at night.',
+    comment='Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, '
+            'the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, '
+            'the door pot, the garden path light, the street hedge and the flower clump that '
+            'render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Listed '
+            'in the base manifest\'s packs. Each has a far version for the town overview. Leaves and '
+            'flowers are on the foliage finish, so they sway in the wind; the path light\'s lens glows at '
+            'night.',
 )
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built living room media (tools/art/blender/families/media.py): the TVs, the home cinema, the stereo, the boombox and the electric fireplace. The placeholder is drawn if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "$comment": "Blender-built living room media (tools/art/blender/families/media.py): the TVs, the home cinema, the stereo, the boombox and the electric fireplace. The materials map onto the game's finishes so a model costs one draw call per finish group.",
   "version": 1,
   "entries": {
     "model.tv": {

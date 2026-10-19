@@ -1,16 +1,15 @@
 # Media — notes
 
 `media.py` builds the eight L4 living-room media models (docs/objects/living.md) into `web/public/assets/models/media/` and
-their entries in `packs/media/manifest.json`, an override pack over the base manifest (`tv`, furniture.py `tv_set`),
+their entries in `packs/media/manifest.json`, an override pack over the base manifest (`tv`, the old `tv_set`),
 `catalog/manifest.json` (`tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`) and `catalog2/manifest.json`
-(`tvStandLow`, `fireplaceElectric`). Their primitive-part placeholders stay as the fallback. Built 2026-10-16; they sit
+(`tvStandLow`, `fireplaceElectric`). Built 2026-10-16; they sit
 in Validate › Media until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`), its
-back on the wall face (-0.43). The placeholders of the portable TV, the bench, the home cinema, the stereo and the
-fireplace reached 1.5–6 cm into the wall; they are moved forward onto its face (`shift(…, dz=…)` in catalog.py and
-catalog2.py). Residents watch standing on the tile in front (the `watch` pose), so every screen faces the front (+Z), as
-the placeholders' do and as housegen expects (`"opposite": "sofa"`).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`), its
+back on the wall face (-0.43). The old parts of the portable TV, the bench, the home cinema, the stereo and the
+fireplace reached 1.5–6 cm into the wall; they are moved forward onto its face (`shift(…, dz=…)`). Residents watch standing on the tile in front (the `watch` pose), so every screen faces the front (+Z), as
+the old parts did and as housegen expects (`"opposite": "sofa"`).
 
 | Model | Moving parts and clip | Played by |
 |---|---|---|
@@ -38,13 +37,13 @@ night each for a few pixels).
 
 **The bench's TV lift.** A 0.7 m TV can't hide in a 0.49 m bench, so the lift sits in a hood at the bench's back, as
 wide as the TV and 0.31 m above the top: at rest the hood is closed by the lid on the TV's top edge; for `watch` the
-TV rises 60 cm (its screen's middle at 1.03 m, the placeholder's at 0.95). The model is 0.80 m high at rest against the
-placeholder's 1.33 (`check_glb` warns of the height).
+TV rises 60 cm (its screen's middle at 1.03 m, the old part's at 0.95). The model is 0.80 m high at rest
+against the old part's 1.33.
 
 **The fire's floor cushion.** "Warm up by the fire" sits the resident (`pose: sit`), and with no seat they sat at the
 default 0.45 m in the footprint's middle, in mid-air with their back to the fire. The model has a floor cushion in front
 (0.14 m high, 0.29 m forward) and `characters.ts` `SEATS.fireplaceElectric` (`h: 0.14, fwd: 0.3, back: true`) seats them
-on it, facing the flames; the placeholder has the cushion too. The model's depth is 0.92 m (the placeholder's surround
+on it, facing the flames; the old part had the cushion too. The model's depth is 0.92 m (the old part's surround
 0.40; `check_glb` warns).
 
 Other warnings left, by design: the portable TV's height (1.28 m with its ears out, 1.13 at rest), the wall TV floating
@@ -62,7 +61,7 @@ above its origin (it hangs on the wall).
 | `model.fireplaceElectric` | 1.76 × 1.31 × 0.92 m | 3,580 | 3 | Surround (`surround`), Firebox (`firebox`) |
 
 `check_glb.py`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
-gallery next to the placeholders; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
+gallery next to the old parts; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
 and used (the portable TV, the bench and the home cinema watched with their clips, the stereo danced to, the boombox
 listened to, the fire warmed up by on its cushion, the TV and the wall TV watched); all eight in the living room by day
 and at night on WebGPU and WebGL (the screens glowing at night); the portable TV turned four ways and the stereo two;

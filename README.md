@@ -124,7 +124,7 @@ Main thread                                   Sim worker
 | `crates/sim-wasm` | JS bindings | Contain game logic |
 | `web/src/core` | Worker, bridge, protocol, snapshot channel | Render or touch the DOM |
 | `web/src/render` | Everything drawn; `types.ts` is the contract | Contain game rules; allocate per frame |
-| `web/src/assets` | Key → file/placeholder resolution | Hard-code art anywhere else |
+| `web/src/assets` | Key → file resolution | Hard-code art anywhere else |
 | `web/src/ui` | Svelte components, design tokens (`theme.css`) | Talk to the worker directly (use `services.controls`) |
 | `web/src/game` | Wiring and input (the only place that knows every module) | Grow logic that belongs in a module |
 
@@ -140,12 +140,12 @@ Main thread                                   Sim worker
 All art is referenced by **key**, never by path:
 
 - `web/public/content/base.json`: gameplay data. Objects name their model key (`"model": "model.fridge"`); needs name their icon key.
-- `web/public/assets/manifest.json`: maps keys to files or placeholders.
+- `web/public/assets/manifest.json`: maps keys to files.
 
-To use a real model, add a `url` to the entry (the placeholder stays as the fallback):
+A model entry is its file:
 
 ```json
-"model.fridge": { "type": "model", "url": "models/fridge.glb", "scale": 1, "rotationY": 0, "placeholder": [ … ] }
+"model.fridge": { "type": "model", "url": "models/fridge.glb", "scale": 1, "rotationY": 0 }
 ```
 
 To ship a whole art set without editing the base manifest, create a pack and list it under `"packs"` (or load it with `?pack=`):

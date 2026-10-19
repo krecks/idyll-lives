@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built romantic pack models (tools/art/blender/families/pack_romantic.py). Replaces the primitive-part placeholders of packs/romantic by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut.",
+  "$comment": "Blender-built romantic pack models (tools/art/blender/families/pack_romantic.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut.",
   "version": 1,
   "entries": {
     "model.romantic.candlelitTable": {

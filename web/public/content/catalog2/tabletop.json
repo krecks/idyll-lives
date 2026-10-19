@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Small things that stand on tops (the `surface` layer): kitchenware, tableware, books, plants, ornaments, bath and desk things, toys. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "$comment": "Catalogue 2: Small things that stand on tops (the `surface` layer): kitchenware, tableware, books, plants, ornaments, bath and desk things, toys. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
   "objects": [
     {
       "id": "kettle",

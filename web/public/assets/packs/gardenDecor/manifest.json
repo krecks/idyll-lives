@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs the draw calls of its placeholder (one per finish group) and lights like the rest of the garden.",
+  "$comment": "Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Listed in the base manifest's packs. Each file's materials map by name onto the game's finishes (`materials`, see render/babylon/models.ts), so a model costs one draw call per finish group and lights like the rest of the garden.",
   "version": 1,
   "entries": {
     "model.garden.gnome": {

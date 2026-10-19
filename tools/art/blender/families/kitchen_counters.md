@@ -17,8 +17,6 @@ shelves (`model.kitchenShelfWall`), the pedal bin (`model.trashCan`) and the rec
 K6 (2026-10-14): the kitchen island (`model.kitchenIsland`), the small island (`model.islandSmall`), the long
 island (`model.islandLong`), the bar counter (`model.barSegment`) and the bar end (`model.barEnd`).
 
-They replace the primitive-part placeholders of `catalog.py` / `catalog2.py`, which stay as the fallback.
-
 ## Materials
 
 | Material | Finish | Used for |
@@ -79,7 +77,7 @@ rest pose where it is.
 
 A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and
 `settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check_glb` reports it as floating,
-which is fine on a wall. A floor thing stands where its placeholder stands, its back on the wall (below).
+which is fine on a wall. A floor thing stands where the game places it, its back on the wall (below).
 
 The wall cabinets are `cupboard` stations (content `stations`): clean things are put away in the nearest cupboard or
 counter, a wall cabinet over a counter before the counter (cooking `putAwayAt`), and its doors swing open 100° in
@@ -126,20 +124,22 @@ Also from the review: the butcher block's knife drawer has its box; the wall cab
 doors; the pot rail's brackets start at the wall face (0.22 m deep); the recycling bins' colour parts are
 the left, middle and right bin (each with its lid) and the handles.
 
-All match their placeholder bounds (`check_glb.py`: 0 failed; Khronos glTF validator: 0 errors,
-0 warnings each). The eight K4 counters sit in Validate › Counters, the eleven K5 things in
+`check_glb.py`: 0 failed; its warnings are the wall cabinets, the range hood, the spice rack, the pot rail and the
+wall shelf floating above their origins (wall things), and 4 draw calls on the glass wall cabinet and the recycling
+bins. Khronos glTF validator: 0 errors, 0 warnings each. The eight K4 counters sit in Validate › Counters, the
+eleven K5 things in
 Validate › Kitchen Storage and the five K6 islands and bars in Validate › Islands & Bars, until
 checked in play.
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
-appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
-2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
+appliances lines up, and its top is under its content `surface`. Since the
+2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
-catalog2.py `shallow`). Islands stand free, centred.
+the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old `shallow`). Islands stand free, centred.
 
 ## Rebuild
 

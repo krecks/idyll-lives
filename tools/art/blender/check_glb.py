@@ -23,10 +23,10 @@ PREVIEW = os.path.join(HERE, 'previews')
 CONTENT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'content'))
 
 # Triangles at full detail by the model's largest side (m): (up to, target, most). About the
-# placeholders' median and 90th percentile in each class, so a model from Blender costs what the
+# primitive parts' median and 90th percentile in each class, so a model costs what the
 # primitive models cost today (docs/design/objects.md, "Budgets").
 TRIANGLES = [(0.35, 1500, 3000), (1.0, 4000, 8000), (2.5, 8000, 16000), (math.inf, 12000, 24000)]
-# Draw calls per model (each its own in the sun's shadow map too): placeholders take 1-3.
+# Draw calls per model (each its own in the sun's shadow map too): aim for 1-3.
 DRAWS = (3, 4)
 # Extensions the game's loader can read (no Draco: its decoder isn't shipped).
 EXTENSIONS = {'KHR_materials_emissive_strength', 'KHR_mesh_quantization', 'KHR_texture_transform',
@@ -288,68 +288,6 @@ def check_clips(gltf, binary, entry):
     return errors, warnings
 
 
-def part_turn(p):
-    """A placeholder part's turn as rows (row j: where its own axis j goes), as models.ts `partBox` turns it:
-    Babylon's Quaternion.FromEulerAngles(x, y, z), yaw y, pitch x, roll z."""
-    rx, ry, rz = (math.radians(a) for a in p.get('rotate', [0, 0, 0]))
-    cy, sy_, cp, sp, cr, sr = math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2), math.cos(rz / 2), math.sin(rz / 2)
-    x = cy * sp * cr + sy_ * cp * sr
-    y = sy_ * cp * cr - cy * sp * sr
-    z = cy * cp * sr - sy_ * sp * cr
-    w = cy * cp * cr + sy_ * sp * sr
-    return [[1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (z * x - y * w)],
-            [2 * (x * y - z * w), 1 - 2 * (z * z + x * x), 2 * (y * z + x * w)],
-            [2 * (z * x + y * w), 2 * (y * z - x * w), 1 - 2 * (y * y + x * x)]]
-
-
-def part_box(p):
-    """A placeholder part's exact bounds (lo, hi) in game axes, turned (models.ts `partBox`, which this
-    must match): a box by its corners, a cylinder or cone by its rings' corners (its segments), a sphere,
-    blob, capsule, torus or lathe by the round shape's own extent."""
-    m = part_turn(p)
-    sx, sy, sz = p['size']
-    shape = p.get('shape', 'box')
-    def ellipsoid(k, rx, ry, rz):
-        return math.sqrt((m[0][k] * rx) ** 2 + (m[1][k] * ry) ** 2 + (m[2][k] * rz) ** 2)
-    if shape in ('cylinder', 'cone'):
-        # Babylon's CreateCylinder: rings of `segments` corners from angle 0, scaled in x and z.
-        n = p.get('segments') or (16 if shape == 'cone' else 20)
-        top = p.get('taper', 0 if shape == 'cone' else 1)
-        points = [((r / 2) * sx * math.cos(2 * math.pi * j / n), y, (r / 2) * sz * math.sin(2 * math.pi * j / n))
-                  for r, y in ((1, -sy / 2), (top, sy / 2)) for j in range(n)]
-        lo = [min(sum(q[j] * m[j][k] for j in range(3)) for q in points) for k in range(3)]
-        hi = [max(sum(q[j] * m[j][k] for j in range(3)) for q in points) for k in range(3)]
-        return [p['at'][k] + lo[k] for k in range(3)], [p['at'][k] + hi[k] for k in range(3)]
-    if shape in ('sphere', 'blob'):
-        half = [ellipsoid(k, sx / 2, sy / 2, sz / 2) for k in range(3)]
-    elif shape == 'capsule':
-        # Babylon's CreateCapsule: `sy` tall overall, radius sx/2, then scaled to sz in z.
-        half = [abs(m[1][k]) * max(0.0, sy / 2 - sx / 2) + ellipsoid(k, sx / 2, sx / 2, sz / 2) for k in range(3)]
-    elif shape == 'torus':
-        # A ring (sx - sy across) swept by a tube sy thick, then scaled to sz in z.
-        q, ring, tube = sz / sx, (sx - sy) / 2, sy / 2
-        half = [math.hypot(m[0][k] * ring, m[2][k] * ring * q) + ellipsoid(k, tube, tube, tube * q) for k in range(3)]
-    elif shape == 'lathe':
-        # Each profile point (radius, y) is a ring, scaled by the size.
-        profile = p.get('profile') or [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]]
-        lo = [min(m[1][k] * y * sy - r * math.hypot(m[0][k] * sx, m[2][k] * sz) for r, y in profile) for k in range(3)]
-        hi = [max(m[1][k] * y * sy + r * math.hypot(m[0][k] * sx, m[2][k] * sz) for r, y in profile) for k in range(3)]
-        return [p['at'][k] + lo[k] for k in range(3)], [p['at'][k] + hi[k] for k in range(3)]
-    else:
-        half = [sum(abs(m[j][k]) * p['size'][j] for j in range(3)) / 2 for k in range(3)]
-    return [p['at'][k] - half[k] for k in range(3)], [p['at'][k] + half[k] for k in range(3)]
-
-
-def placeholder_box(parts):
-    """The placeholder's bounds (lo, hi) in game axes, from its parts' exact turned bounds (`part_box`)."""
-    lo, hi = [math.inf] * 3, [-math.inf] * 3
-    for p in parts:
-        plo, phi = part_box(p)
-        lo = [min(lo[k], plo[k]) for k in range(3)]
-        hi = [max(hi[k], phi[k]) for k in range(3)]
-    return lo, hi
-
-
 def content_objects():
     """{model key: {'footprint', 'layer', 'outside', 'stairs'}} for the content's objects (web/public/content), for
     the wall checks: where the wall's face is (a footprint's back, `WALL` in) and what stands against one."""
@@ -402,7 +340,7 @@ def accessor(gltf, binary, index):
 def grown(gltf, binary, held=()):
     """{node: {'scale': …}}: the parts a clip scales up from rest (G.grow: darts, a pot thrown, water), at
     their largest key, so what is only small or flattened at rest is measured as it shows. Not by the clips
-    `held` names (`open`, `night`: a state of its own, a sofa bed pulled out; the placeholder is at rest)."""
+    `held` names (`open`, `night`: a state of its own, a sofa bed pulled out; the model is at rest)."""
     nodes, out = gltf.get('nodes', []), {}
     for a in gltf.get('animations', []):
         if a.get('name') in held:
@@ -576,8 +514,8 @@ def check(entry, finishes, path, far=None, facts=None):
                 far_warnings.append(' x '.join(f'{d:.2f}' for d in far_info['dims']) + ' m, the full model ' + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m')
             summary += f'  (far: {far_info["tris"]} tris)'
         errors += [f'far: {e}' for e in far_errors]
-        # (What it says of the placeholder, it says of the full model too.)
-        warnings += [f'far: {w}' for w in far_warnings if 'placeholder' not in w]
+        # (What it says of the far version, it says of the full model too.)
+        warnings += [f'far: {w}' for w in far_warnings]
     return errors, warnings, summary
 
 
@@ -619,7 +557,7 @@ def check_file(entry, finishes, path, facts=None):
             errors.append(f'material {name!r} is mirror glass, but no material of the file')
         elif ov.get('mirror') and ov.get('finish') in SEE_THROUGH:
             warnings.append(f'mirror glass {name!r} is see-through ({ov["finish"]}): where nothing reflects (Medium, Low) '
-                            'it shows what is behind it; map it to gloss, as the placeholders\' mirrors')
+                            'it shows what is behind it; map it to gloss')
         glow = ov.get('glow')
         if glow is not None and not (isinstance(glow, str) and len(glow) == 7 and glow[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in glow[1:])):
             errors.append(f'material {name!r}: `glow` is a colour, #rrggbb, not {glow!r}')
@@ -696,39 +634,26 @@ def check_file(entry, finishes, path, facts=None):
     lo, hi = [v * scale for v in lo], [v * scale for v in hi]
     dims = [hi[k] - lo[k] for k in range(3)]
     # As it shows: the parts a clip grows (hidden or small at rest: darts, a pot thrown) grown, for what
-    # is compared with the placeholder (sizes, centre, the wall).
+    # is compared with the footprint (the wall, what the floor hides).
     motions = entry.get('motions') or {}
     slo, shi, sparts = bounds(gltf, grown(gltf, binary, {motions.get('open'), motions.get('night')}))
     slo, shi = [v * scale for v in slo], [v * scale for v in shi]
-    sdims = [shi[k] - slo[k] for k in range(3)]
     layer = (facts or {}).get('layer', 'floor')
     if not entry.get('fit') and not entry.get('offset'):
-        # Centred on the footprint, or where its placeholder is (a wall bed at the back of its tiles).
-        plo, phi = placeholder_box(entry['placeholder']) if entry.get('placeholder') else ([0] * 3, [0] * 3)
-        # (Unless its placeholder reaches as far down: a rock sunk in the ground, the marker round its middle.)
-        if lo[1] < -0.005 and not (entry.get('placeholder') and lo[1] >= plo[1] - 0.01):
+        # Centred on the footprint (or on its `centre`: a wall bed at the back of its tiles).
+        # A model the game sinks may reach below the floor by its `sink` (the woods' rock, the marker).
+        if lo[1] < -0.005 - entry.get('sink', 0):
             errors.append(f'reaches {-lo[1] * 100:.1f} cm below the floor (origin on the floor, y = 0)')
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
-        for k, axis in ((0, 'x'), (2, 'z')):
-            c = (slo[k] + shi[k]) / 2
-            if abs(c) > 0.02 and abs(c - (plo[k] + phi[k]) / 2) > 0.02:
-                warnings.append(f'off centre by {c * 100:.1f} cm in {axis}: centred on (x {(slo[0] + shi[0]) / 2:.3f}, depth {(slo[2] + shi[2]) / 2:.3f}), '
-                                f'its placeholder on ({(plo[0] + phi[0]) / 2:.3f}, {(plo[2] + phi[2]) / 2:.3f}) (origin at the footprint centre, or its placeholder\'s)')
         # Against a wall: the wall's face is `WALL` into the footprint's back tile. A wall thing, or a floor
-        # thing indoors whose placeholder stands there, has its back on it, the model's and the placeholder's.
+        # thing indoors that stands against one, has its back on it.
         # (A rug lies under the wall: it may reach in. Stairs reach their footprint's back edge, where the floor
         # above goes on from the top step: no wall.)
         if facts and (layer == 'wall' or (layer == 'floor' and not facts['outside'] and not facts.get('stairs'))):
             face = -facts['footprint'][1] / 2 + WALL
             if slo[2] < face - 0.01:
                 warnings.append(f'reaches {(face - slo[2]) * 100:.1f} cm into the wall (its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f})')
-            if entry.get('placeholder'):
-                if plo[2] < face - 0.01:
-                    warnings.append(f'its placeholder reaches {(face - plo[2]) * 100:.1f} cm into the wall (its back at depth {plo[2]:.3f}, the wall\'s face at {face:.2f})')
-                if plo[2] <= face + 0.03 and slo[2] > max(plo[2], face) + 0.02:
-                    warnings.append(f'stands {(slo[2] - max(plo[2], face)) * 100:.1f} cm off the wall, where its placeholder stands against it '
-                                    f'(its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f}; README trap "Against a wall, on the floor")')
         # Thin on the floor: a house's floor hides what lies under `FLOOR_TOP` (a mat, a belt), the whole
         # model or a moving part (as it shows, grown).
         if layer in ('floor', 'rug') and lo[1] <= 0.005:
@@ -737,13 +662,6 @@ def check_file(entry, finishes, path, facts=None):
             for part, top in flat:
                 what = 'it' if part is None else f'moving part {gltf["nodes"][part].get("name", part)}'
                 warnings.append(f'{what} reaches only {top * 100:.1f} cm up: a house\'s floor is drawn 1 cm up and hides it (make it reach {FLOOR_TOP * 100:.1f} cm)')
-    if entry.get('placeholder') and not entry.get('fit'):
-        plo, phi = placeholder_box(entry['placeholder'])
-        for k, axis in enumerate('xyz'):
-            want = phi[k] - plo[k]
-            if want > 0.05 and abs(sdims[k] - want) > 0.1 * want:
-                warnings.append(f'{axis} size {sdims[k]:.2f} m, its placeholder {want:.2f} m (only the fallback, drawn if the file fails to load, '
-                                'has the placeholder\'s size: clicking follows the drawn model, the contact shadow the footprint)')
     # Parts flattened to nothing at rest whose flat shape shows (README trap "Grown from nothing").
     def opaque(index):
         mat = materials[index] if index is not None else {'name': ''}
@@ -785,18 +703,16 @@ def check_file(entry, finishes, path, facts=None):
 def main(argv):
     keys = [a for a in argv if a.startswith('model.')]
     stack = manifests(os.path.join(ASSETS, 'manifest.json'))
-    entries, finishes, stale = {}, {}, {}
+    entries, finishes = {}, {}
     facts = content_objects()
     for path, m in stack:
         for key, entry in m['entries'].items():
             if entry.get('type') == 'model':
-                # A pack's entry replaces the entry, keeping its placeholder and `vary` unless it gives its own
-                # (registry.ts `extended`): a copy of the placeholder must follow the original.
+                # A pack's entry replaces the entry, keeping its `vary` unless it gives its own
+                # (registry.ts `extended`).
                 old = entries.get(key, (None, None))[0]
-                if old and old.get('placeholder') and entry.get('placeholder') and old['placeholder'] != entry['placeholder']:
-                    stale[key] = os.path.relpath(path, ASSETS)
                 if old:
-                    entry = {**{k: old[k] for k in ('placeholder', 'vary') if k in old}, **entry}
+                    entry = {**{k: old[k] for k in ('vary',) if k in old}, **entry}
                 entries[key] = (entry, path)
             elif entry.get('type') == 'material' and key.startswith('material.finish.'):
                 finishes[key] = not entry.get('texture') and entry.get('alpha', 1) >= 1
@@ -814,8 +730,6 @@ def main(argv):
             errors, warnings, summary = check(entry, finishes, path, far, facts.get(key))
         except (OSError, ValueError, KeyError, IndexError) as err:
             errors, warnings, summary = [f'cannot read {path}: {err}'], [], ''
-        if key in stale:
-            warnings.append(f'its placeholder in {stale[key]} differs from the one it overrides (copy the current one)')
         failed += bool(errors)
         checked.append(path)
         print(f'{"FAIL" if errors else "ok  "} {key:28s} {summary}')

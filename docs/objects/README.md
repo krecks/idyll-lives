@@ -1,9 +1,9 @@
 # Objects
 
 Every object in the game, 541 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
-with the moving parts it can show. The primitive-part placeholders stay as the fallback, and the keys never changed,
-so saves and content need no migration. All 541 were built and checked in play by 2026-10-17, as were the 36 models
-that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
+with the moving parts it can show. Blender is the only source: the primitive parts the models replaced are gone, and
+the keys never changed, so saves and content need no migration. All 541 were built and checked in play by 2026-10-17,
+as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
 (`families/ground.py`). Every model key in the manifests has a `.glb`.
 
@@ -89,14 +89,14 @@ notes and scripts refer to them by these names.
 | E5 | Per-use hold | `motions.uses: {use: [{clip, hold}, clip]}`: several clips per use, each with its own `hold` (a shower's door shuts after 1 s while the water runs) |
 | E6 | Mirrors from files | a material's `"mirror": "front"` (gamekit: `glass=('#hex', 'glass', 'front')`) |
 | E7 | Level of detail | an entry's `far` file, `<id>.far.glb`; `G.Model(far=0.25)` writes it (trees, hedges, street props, the farm) |
-| E8 | Finishes by name, packs that extend, night glow | materials named `stone@matte`; a pack entry without `placeholder` keeps the one it overrides; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) follows the lamp level, never emissive at noon |
+| E8 | Finishes by name, packs that extend, night glow | materials named `stone@matte`; a pack entry without `vary` keeps the one it overrides; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) follows the lamp level, never emissive at noon |
 | C1 | Content: things that stay open | interactions with `when` / `leaves` (`docs/content-packs.md`): the futon, the sofa bed, the washing line and the hot tub stay open (`crates/sim-core/tests/open_objects.rs`) |
 
 Added after, in the same spirit:
 - **Riders:** `motions.ride: clip`: residents sitting or lying on the object move with that clip's part (a rocking
   chair's seat, a swing, a hammock, an office chair's swivel).
 - **Mirrors and glow on moving parts:** a mirror cabinet's door reflects as it swings, a laptop's lid glows as it moves.
-- **Tint slots by name:** `tunic#body` (with a finish: `tunic@fabric#body`), as a placeholder part's `tint`.
+- **Tint slots by name:** `tunic#body` (with a finish: `tunic@fabric#body`), as a `parts` entry's `tint`.
 - **Beds** (`characters.ts` `BEDS`): `fwd` (m) lies the sleeper forward (the sofa bed), `foot` ends the quilt (the car
   bed), `across` lies a napper along a two-seat seat; content `whole` gives a use every slot of its object (a nap on
   the window seat).
@@ -111,9 +111,9 @@ Added after, in the same spirit:
 
 Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs/design/objects.md`. In short:
 
-1. **Read** the placeholder builder and the content entry. The size, the top height (`tools/art/catalog2.py`
-   `TOPS`), the seat height (`SEATS`), the mattress height (`BEDS`, `BLANKET_BEDS` in
-   `web/src/render/babylon/characters.ts`) and the light position (`LIGHTS`) are facts the model must keep.
+1. **Read** the content entry and the notes of the family it belongs in. The size, the top height (`surface`), the
+   seat height (`seat`), the mattress height (`BEDS`, `BLANKET_BEDS` in `web/src/render/babylon/characters.ts`) and
+   the light position (`light`) are facts the model must keep; the family script asserts them.
 2. **Build** in a family (copy `families/_template.py`, or add to an existing family):
    - one material per part, named for what it is;
    - `paint` with labelled parts, the main part first, e.g. `[('body', 'Cabinet'), ('stone', 'Worktop')]`;
@@ -139,7 +139,7 @@ An object is right when it has been checked in play and looks and moves right:
 - check the neighbours that share code you touched (a pose, a `BEDS` entry, a family helper).
 
 Tools:
-- `/gallery.html?keys=…` next to the placeholder (with the `.glb` requests answered 404), and the clips bench
+- `/gallery.html?keys=…` (WebGPU and `&renderer=webgl`), and the clips bench
   (`/clips.html`, T0) at t=0 and t=99 first: it finds clips that show nothing faster than play does.
 - `tools/bench/check.mjs gallery | clips | play` runs the checks headless at 1 % volume on its own port. In the page,
   `__sims()` says where residents are and what they use; `__addFunds`, `__camera`, `__controls.follow` with zoom;

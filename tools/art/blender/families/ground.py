@@ -2,16 +2,15 @@
 # wildflowers (`model.flowers`), drawn by the thousand as thin instances on every unpaved tile and round the town
 # (render/babylon/nature.ts `lawns`); the rock scattered in the woods (`model.rock`, nature.ts `forests`, always
 # its far version there, without a shadow); and the sparkle star over the selected resident (`model.marker`,
-# BabylonRenderer `setupMarker`). Over their primitive-part placeholders (`nature.py` for the tuft and the
-# flowers, `models.py` for the rock and the marker), which stay the fallback. Notes: ground.md.
+# BabylonRenderer `setupMarker`). Notes: ground.md.
 #
-# The lawn's two cost what their placeholders do (the tuft 24 triangles, of which the camera draws half, where the
-# placeholder's 36 were mostly degenerate cone tips and hidden caps; the flowers 156 in one draw call where the
-# placeholder took 192 in two): every part on `foliage`, which the nature shader sways and tints per instance, the
+# The lawn's two cost what the old parts do (the tuft 24 triangles, of which the camera draws half, where the
+# old part's 36 were mostly degenerate cone tips and hidden caps; the flowers 156 in one draw call where the
+# old part took 192 in two): every part on `foliage`, which the nature shader sways and tints per instance, the
 # flowers' heads with their stems. Each has a far version (`far_of`). The rock is two lumps cut flat a little
 # under the ground, its far version (what the woods draw) 56 triangles. The marker is one closed pillow-shaped
 # star, which the game draws in its own unlit material with an outline pushed out along its normals (inverted
-# hull): built smooth, its normals worked out from its shape, its origin at its middle, as the placeholder's.
+# hull): built smooth, its normals worked out from its shape, its origin at its middle, as the old part's.
 #
 # Run:  python3 -B tools/art/blender/build.py ground [--only marker] [--preview]
 import math
@@ -30,7 +29,7 @@ import gamekit as G  # noqa: E402
 from gamekit.far import far_of, low  # noqa: E402
 
 M = G.Palette(
-    # the grass tuft: the placeholder's three greens and nature.py's fourth
+    # the grass tuft: the old part's three greens and the fourth
     blade=('#7C9E44', 'foliage'),
     blade_light=('#8AAE4C', 'foliage'),
     blade_pale=('#98BA56', 'foliage'),
@@ -38,7 +37,7 @@ M = G.Palette(
     # the wildflowers: on `foliage` too, so the heads sway with their stems (one draw call)
     leaf=('#5E8436', 'foliage'),
     stem=('#4F7A30', 'foliage'),
-    # (brighter than the placeholder's satin heads: the foliage finish's leaf texture darkens what it is on)
+    # (brighter than the old part's satin heads: the foliage finish's leaf texture darkens what it is on)
     petal_white=('#FFFFFF', 'foliage'),
     petal_yellow=('#FFD84A', 'foliage'),
     petal_violet=('#B48CF0', 'foliage'),
@@ -94,7 +93,7 @@ def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5):
     `lean` degrees from upright towards `yaw` (degrees round from game +x) and bending `bend` more by its tip,
     `length` long, with one joint. A flat ribbon drawn from both sides: two faces back to back (each side its own
     vertices and normals), of which the camera only ever draws the one turned to it, so a tuft costs the GPU what
-    the placeholder's thin cones did (a closed blade of three sides drew three times the triangles and measured
+    the old part's thin cones did (a closed blade of three sides drew three times the triangles and measured
     0.9 ms more over the village's lawns on WebGL). 6 triangles; 2 in a far version (no joint).
     """
     h = Vector((-math.cos(math.radians(yaw)), -math.sin(math.radians(yaw)), 0))   # game (cos, sin) on the ground
@@ -124,8 +123,8 @@ def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5):
 # ---- the grass tuft --------------------------------------------------------------------------------------------
 
 def grassTuft():
-    """Four bent blades from a few millimetres round the middle, leaning out, in four greens (the placeholder's
-    three cones and nature.py's fourth colour): 24 triangles, 12 of them facing the camera."""
+    """Four bent blades from a few millimetres round the middle, leaning out, in four greens (the old part's
+    three cones and the fourth colour): 24 triangles, 12 of them facing the camera."""
     rng = random.Random(41)
     colours = [M.blade, M.blade_light, M.blade_pale, M.blade_mid]
     for i in range(4):
@@ -208,14 +207,14 @@ def flower(name, at, radius, tilt, yaw, petals, eye):
     return obj
 
 
-# Where the placeholder's three flowers stand: (game x, depth), height, petals, eye.
+# Where the old part's three flowers stand: (game x, depth), height, petals, eye.
 FLOWERS = [((0.03, 0.02), 0.26, 'petal_white', 'eye'), ((-0.04, 0.03), 0.22, 'petal_yellow', 'eye_orange'),
            ((0.0, -0.05), 0.19, 'petal_violet', 'eye')]
 
 
 def flowers():
     """Wildflowers: five low leaves round three stems with a white, a yellow and a violet head where the
-    placeholder's stand, every part on `foliage`: 156 triangles in one draw call (the placeholder: 192 in two)."""
+    old part's stand, every part on `foliage`: 156 triangles in one draw call (the old part: 192 in two)."""
     rng = random.Random(42)
     for i in range(5):
         yaw = i * 72 + rng.uniform(-20, 20)
@@ -231,8 +230,8 @@ def flowers():
 
 # ---- the rock --------------------------------------------------------------------------------------------------
 
-ROCK_CENTRE = (0.085, 0.01)   # game (x, depth): the placeholder's middle
-GROUND = -0.115   # the placeholder's lumps reach this far under the ground: the rock is cut flat there
+ROCK_CENTRE = (0.085, 0.01)   # game (x, depth): the old part's middle
+GROUND = -0.115   # the rock's lumps reach this far under the ground: it is cut flat there
 
 
 def _cut(obj, co, no, flat=True):
@@ -277,18 +276,18 @@ def _stone(name, radius, at, material, scale, seed, top, subdivisions, fractures
 
 
 def rock():
-    """A grey boulder and a lighter one leaning on it, lumpy (the placeholder's two blobs, where they stand), a few
+    """A grey boulder and a lighter one leaning on it, lumpy (the old part's two blobs, where they stand), a few
     faces split off flat, cut off under the ground, both plain matte: one draw call. Its far version, what the woods
     draw (some hundreds of them), is two icosahedra lumped the same way, without the split faces (each cut adds
     triangles): 56 triangles, few enough for the woods to keep drawing them as one mesh (nature.ts
-    `SPLIT_TRIANGLES`), as the placeholder's."""
+    `SPLIT_TRIANGLES`), as the old part's."""
     fractures = [((0.35, -0.2, 1), 0.07), ((-0.9, 0.3, 0.35), 0.06), ((0.2, 1, 0.1), 0.05)]
     # (Far off, an icosahedron, its corners on the round and its faces inside it: a little wider to fill the same box.)
     _stone('rock_main', 0.5, (0, 0, 0), M.stone, low((1.0, 0.85, 0.8), (1.08, 0.95, 0.8)), 1.3, 0.435, low(3, 1),
            low(fractures, []))
     _stone('rock_side', 0.25, (-0.42, -0.22, 0), M.stone_light, (1.0, 0.9, 0.9), 3.7, 0.24, low(2, 1),
            low([((-0.5, -0.6, 1), 0.04)], []))
-    # Centred where the placeholder's lumps are (game x 8.5 cm, depth 1 cm), by hand: a far version is built
+    # Centred where the old part's lumps are (game x 8.5 cm, depth 1 cm), by hand: a far version is built
     # without the Model's `centre` set.
     obj = G.join_all('rock')
     lo, hi = G.measure([obj])
@@ -299,7 +298,7 @@ def rock():
 
 # ---- the selection marker --------------------------------------------------------------------------------------
 
-# The placeholder's star: rays (half-length, half-width at the middle, half-depth at the middle) up, down and
+# The old part's star: rays (half-length, half-width at the middle, half-depth at the middle) up, down and
 # to the sides, as lathes whose radius eases to the tip as (1 - u) ** 1.6, round a core 5 cm round and 3 cm deep.
 RAYS = [(0.17, 0.0425, 0.025), (0.115, 0.0375, 0.0225)]
 CORE = (0.05, 0.03)
@@ -360,11 +359,11 @@ def _outline(samples=4000, keep=96):
 def marker():
     """
     The selection marker: a soft four-point sparkle star, tall rays up and down and shorter ones to the sides,
-    their flanks concave, round a rounder core, as the placeholder's lathes and sphere but one closed, smooth
+    their flanks concave, round a rounder core, as the old part's lathes and sphere but one closed, smooth
     shell (its front and back meet at the outline), which gives the game's pushed-out outline no seams. In the
     game's frame it lies across x (right) and y (up), thin in z, which the game turns to the camera; its origin
-    is its middle, as the placeholder's. Its normals come from the shell's shape (`normal`). 1,344 triangles
-    (the placeholder: 1,936).
+    is its middle, as the old part's. Its normals come from the shell's shape (`normal`). 1,344 triangles
+    (the old part: 1,936).
     """
     outline = _outline()
     n, rings = len(outline), 4
@@ -435,10 +434,10 @@ FAMILY = G.Family(
     [G.Model('grassTuft', grassTuft, size=(0.121, 0.293, 0.135), key='model.grassTuft', far=far_of(grassTuft)),
      G.Model('flowers', flowers, size=(0.143, 0.274, 0.165), key='model.flowers', far=far_of(flowers)),
      G.Model('rock', rock, size=(1.137, 0.55, 0.829), key='model.rock', centre=ROCK_CENTRE, floor=False, far=far_of(rock),
-             tolerance=0.05),
-     G.Model('marker', marker, size=(0.23, 0.34, 0.064), key='model.marker', floor=False)],
-    comment='The lawn\'s grass tuft and wildflowers, the woods\' rocks and the selection marker, built in Blender '
-            '(tools/art/blender/families/ground.py) over the primitive-part placeholders of nature.py and models.py.',
+             tolerance=0.05, sink=-GROUND),
+     G.Model('marker', marker, size=(0.23, 0.34, 0.064), key='model.marker', floor=False, sink=0.17)],
+    comment='The lawn\'s grass tuft and wildflowers, the woods\' rocks and the selection marker, built in '
+            'Blender (tools/art/blender/families/ground.py).',
 )
 
 if __name__ == '__main__':

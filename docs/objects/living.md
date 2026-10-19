@@ -14,7 +14,6 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 ## L1. Sofas and sectionals (12)
 
 - **Family:** `tools/art/blender/families/living.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -39,12 +38,11 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   the resident on the pulled-out bed, legs on the mattress.
 - The wall bed folds down and up, and is slept in under the game's blanket; the last one up folds it away. Its
   lying pose was checked with the other beds (heels and buttocks about 4 cm into the mattress, legs on it).
-- Where a placeholder had no frame (the `sofa_run` sofas, the sofa bed), there is no Frame colour part.
+- Where the old parts had no frame (the `sofa_run` sofas, the sofa bed), there is no Frame colour part.
 
 ## L2. Armchairs and small seats (11)
 
 - **Family:** `tools/art/blender/families/living.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -73,7 +71,6 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 ## L3. Coffee and side tables (9)
 
 - **Family:** `tools/art/blender/families/living.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -99,7 +96,6 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 ## L4. Media (8)
 
 - **Family:** `tools/art/blender/families/media.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -128,11 +124,10 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 ## L5. Shelves (9)
 
 - **Family:** `tools/art/blender/families/living.py` (notes: `families/living.md`)
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face (the base placeholder stands 6 cm forward to match). |
+| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face. |
 | `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Top 0.9 (content `surface`); a back panel. |
 | `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Brass knobs on the cupboard doors. |
 | `shelvingIndustrial` Industrial shelving | 2x1 · floor | — | living / shelves | Frame, Shelves | Static | Static. Top 1.83 (content `surface`); boards 53 cm deep, back on the wall face. |
@@ -153,11 +148,10 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 ## L6. Stairs (1)
 
 - **Family:** `tools/art/blender/families/living.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `stairs` Staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 steps of 0.2 × 4/14 m where the placeholder's are, oak treads on white risers between closed strings, an iron railing each side. Placed by build mode and housegen, not the buy catalog. |
+| `stairs` Staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 steps of 0.2 × 4/14 m, oak treads on white risers between closed strings, an iron railing each side. Placed by build mode and housegen, not the buy catalog. |
 
 **In play** (signed off 2026-10-16):
 - Bought in all four facings and coloured (treads, railing; by day and night, WebGPU and Low WebGL).

@@ -254,9 +254,9 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 ## 6. Assets (replaceable by design)
 
 - **Everything is referenced by key.** Content and code ask for `model.fridge`, `icon.need.hunger`, `material.wall` or `look.coral`, never for a file path.
-- **`web/public/assets/manifest.json`** maps keys to files (`url`) or to placeholder primitives. Entry types: `model`, `material`, `icon`, `image`, `sprite`, `look`.
+- **`web/public/assets/manifest.json`** maps keys to files (`url`). Entry types: `model`, `material`, `icon`, `image`, `sprite`, `look`.
 - **Override packs:** manifests listed in `packs` (or passed as `?pack=…`) override keys, so a new art set is a folder plus one line, with no code changes.
-- **Graceful fallback:** a missing model becomes a neutral box and a missing icon a neutral glyph, so broken art never breaks the game.
+- **Graceful fallback:** a missing model draws nothing and a missing icon a neutral glyph, so broken art never breaks the game.
 - Format for real art: **glTF 2.0**. The loader bakes transforms so thin instancing keeps working.
 - **Compression is automatic (0.19):** production builds run `tools/assets/optimize.mjs` (KTX2 ETC1S textures, meshopt geometry, gzipped character data; cached in `web/.assets`, index `assets/optimized.json`), and loaders fall back to the source file if a copy fails. Sources stay editable; the dev server serves them, and `LL_ASSETS=source` builds without copies. Decoders are self-hosted in `public/decoders/` (`pnpm decoders` after a Babylon upgrade), because cross-origin isolation blocks Babylon's CDN. Packs outside `public/assets` load as they are.
 - Starting library: CC0 packs (Quaternius, Kenney, Poly Haven); a **modular character system** (body + head + hair + outfits on one skeleton) for the household creator.
@@ -330,7 +330,7 @@ The snapshot memory layout is **defined once in Rust** (`sim-core/src/snapshot.r
 
 | Release | Theme | Done when |
 |---|---|---|
-| v0.3 | **Objects built in Blender** (the owner's decision, 2026-10-13) | New objects are made in Blender and exported as glTF, as the standard. The pipeline is `tools/art/blender` on the branch `v0.3/garden-decor` (six garden decor models over their placeholders, as a pack); the standard goes into `docs/design/objects.md` once it is reviewed. The code-built placeholder models stay as fallbacks, or move over in time. |
+| v0.3 | **Objects built in Blender** (the owner's decision, 2026-10-13) | New objects are made in Blender and exported as glTF, as the standard. The pipeline is `tools/art/blender`; the standard is in `docs/design/objects.md`. |
 | v0.3 | **Stable object ids** | Every object keeps an id of its own for life, so selling or moving one shifts nothing. That replaces the remapping of follow-ups, queues and unreachable things and the `seen` guard on commands that 0.2.0 uses, and saves keep their ids across a reload. |
 | v0.3 | **Unreachable goals** ✅ | A goal in an area the resident can't reach is refused before A* floods the town, instead of capping the search (P3-08). People join the unreachable memory (Social, Join). Walkers re-route when walls change. `structure_version` is split so a change refreshes only what it touched. Settings get a version and ordered migrations. *(Done: merged to `main` 2026-10-19.)* |
 | v0.3 | **Calling out** ✅ | Nobody crosses the house or the lot for a chat: a resident only starts one with someone within earshot (the same room, the next one near a doorway, the garden; walls and windows stop a call). They call the other's name (a bubble, and the voice for the inspected resident), the other turns to them, and the two meet halfway. A chat the player orders from further off walks only until the other is in earshot. A target too busy to come is walked up to and waited for, as before. *(Done: merged to `main` 2026-10-19.)* |

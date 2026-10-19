@@ -1,12 +1,11 @@
 # Slob pack — notes
 
 `pack_slob.py` builds the six P16 slob models into `web/public/assets/models/pack_slob/` and their entries in
-`packs/pack_slob/manifest.json`, an override pack listed after `packs/slob/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_slob.py`, in `packs/slob`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Slob until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
-backs on the wall's face where they stand against one. Seats keep the placeholder's: the beanbag's dimple and the
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+backs on the wall's face where they stand against one. Seats keep the old part's: the beanbag's dimple and the
 nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the middle.
 
 | Model | Moving part and clip | Played by |
@@ -27,7 +26,7 @@ it (`ride: recline`), tipping back with it.
 - the nightstand's padded top and the spritz station's towels and laundry are `fabric` (3);
 - the recliner is leatherette satin, its two moving parts the 2nd and 3rd draw; the mini-fridge's door is plain
   gloss, no glass;
-- the spritz station's round mirror is chrome, as the placeholder's (no mirror glass: it is not the point here).
+- the spritz station's round mirror is chrome, as the old part's (no mirror glass: it is not the point here).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

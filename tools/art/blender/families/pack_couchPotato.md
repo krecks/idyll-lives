@@ -2,20 +2,18 @@
 
 `pack_couchPotato.py` builds the six P3 couch potato models into `web/public/assets/models/pack_couchPotato/` and
 their entries in `packs/pack_couchPotato/manifest.json`, an override pack listed after
-`packs/couchPotato/manifest.json`. Their primitive-part placeholders (`tools/art/pack_couchPotato.py`, in
-`packs/couchPotato`) stay as the fallback. Built 2026-10-14; they sit in Validate › Couch Potato until checked in play.
+`packs/couchPotato/manifest.json`. Built 2026-10-14; they sit in Validate › Couch Potato until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 The cinema wall and the game console stood 2–3 cm into the wall; they are centred on their `Model` `centre` now
-(`G.settle()`), their backs on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_couchPotato.py`, `pack_shapes.to_wall`) stand with their backs
-on the wall face too, so the fallback, the model and the wall agree within a centimetre.
+(`G.settle()`), their backs on the wall face at −0.43, as the wall-standing ones' old parts stood, so the model
+and the wall agree within a centimetre.
 The screens the residents watch (the cinema's, the console's) stand on the wall at the back of the footprint, the
 seats in front of them, the sitters facing the object's back (content `"seat": {"height": 0.45, "forward": 0.05,
 "facing": "back"}` for the cinema, `"forward": 0.12` for the console, as the piano and the writer's bureau). Each is
-built as the placeholder first stood (the seats at the back, the screen at the front edge facing them, its oak back to
+built as the old part first stood (the seats at the back, the screen at the front edge facing them, its oak back to
 the room) and turned round (`_turn_round`), so its oak back is on the wall and the console's tray slides out the other
-way (+Z game, towards the players); the placeholders (`tools/art/pack_couchPotato.py`, `furniture.turned`, then
-`to_wall`) are turned the same. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
+way (+Z game, towards the players); the old parts were turned the same way. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
 the console's sit 8 cm further back than before, against the loveseat's back, so the knees stay under the shelf.
 
 | Model | Moving parts and clip | Played by |
@@ -39,10 +37,10 @@ the console's sit 8 cm further back than before, against the loveseat's back, so
   pouf is plain satin to keep it at 4. `check_glb` warns "4 draw calls, aim for 3 at most": that is the ambient part.
 
 Other warnings left, by design:
-- the recliner's depth (0.76 m, placeholder 0.89 m): the placeholder has its footrest out at rest; here it is
-  folded and rises in `recline`. The recliner stands 3 cm further from the wall than the placeholder's back, so the
+- the recliner's depth (0.76 m, old part 0.89 m): the old part had its footrest out at rest; here it is
+  folded and rises in `recline`. The recliner stands 3 cm further from the wall than the old part's back, so the
   back tips without going into it (its top comes to about the wall's face);
-- the snack fridge's width (0.58 m, placeholder 0.69 m): the placeholder's bowl of crisps hangs half off the lid;
+- the snack fridge's width (0.58 m, old part 0.69 m): the old part's bowl of crisps hung half off the lid;
   here it sits on it.
 
 The plan's "A drifting blobs (E2)" is built (`drift`). The lamp does not glow at night (no `glow`, not asked); a glow
@@ -62,7 +60,7 @@ The painted materials: the cinema `cinema_frame` (the console between the seats)
 `fit_stand`, `fit_mat`, `board`; the lamp `lamp_metal`, `pouf`, `vessel`.
 
 `check_glb.py`: 6 models, 0 failed, the 3 warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
-gallery next to the placeholders; the clips bench at rest and open on WebGPU (the cinema and console from behind),
+gallery next to the old parts; the clips bench at rest and open on WebGPU (the cinema and console from behind),
 colours on WebGPU and WebGL; in play (`wants-asking`, WebGPU by day): every use, by the household's resident in
 turn: the cinema (seated, the curtains drawn apart and closed after), the recliner (footrest up, back tipped), the
 fridge (fetched), the console (seated, playing), the workout game (standing on the mat) and the lava lamp (seated,

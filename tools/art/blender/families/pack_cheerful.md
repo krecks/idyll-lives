@@ -1,11 +1,10 @@
 # Cheerful pack — notes
 
 `pack_cheerful.py` builds the six P2 cheerful models into `web/public/assets/models/pack_cheerful/` and their
-entries in `packs/pack_cheerful/manifest.json`, an override pack listed after `packs/cheerful/manifest.json`. Their
-primitive-part placeholders (`tools/art/pack_cheerful.py`, in `packs/cheerful`) stay as the fallback. Built
+entries in `packs/pack_cheerful/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sit in Validate › Cheerful until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 with one moving part. Flat shapes (the jukebox's arch, the lamp's hills, the booth's pleated curtains, the hammock's
 sling) are meshes made from points in the family (`_slab`, `_ring`, `_pleats`, `_obj`).
 
@@ -53,15 +52,15 @@ The painted materials: the jukebox `cherry`, `amber`; the karaoke `speaker`, `sp
 booth `booth`, `piping`, `curtain`.
 
 `check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Checked: the gallery
-next to the placeholders; the clips bench at rest and open on WebGPU and WebGL (the jukebox from behind, the
+next to the old parts; the clips bench at rest and open on WebGPU and WebGL (the jukebox from behind, the
 hammock's sway at its furthest from the side); colours on the clips bench; in play (`wants-asking`, WebGPU by day):
 the party booth used (the curtain draws aside and closes after its hold), the hammock swung in (the resident lies
-across the sling, as on the placeholder, and rides the sway), the jukebox danced to (the record up, back down
+across the sling, as on the old part, and rides the sway), the jukebox danced to (the record up, back down
 after), the karaoke, the cart and the lamp used (the sun up while stretching); four facings of the jukebox and a
 turned booth in the yard; `office-night` on WebGL and WebGPU (the lamp's sky glowing).
 
 Residents lie across the hammock (the game lays them along the footprint's depth, and the 2x1 sling runs
-across): kept from the placeholder, as the footprint is fixed.
+across): kept from the old part, as the footprint is fixed.
 
 ## Rebuild
 

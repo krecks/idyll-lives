@@ -1,5 +1,4 @@
-# The play and yard things (docs/objects/outdoor.md OU4), over their primitive-part placeholders (`catalog.py`,
-# `catalog2.py`), which stay the fallback. Notes: yard.md.
+# The play and yard things (docs/objects/outdoor.md OU4). Notes: yard.md.
 #
 # The sandpit (`model.sandbox`), whose sand castle grows while one is built (`castle`); the bike rack
 # (`model.bikeRack`), whose bike lifts its back wheel onto the stand (`wheel_up`) and turns it (`wheel_turn`, a loop)
@@ -10,7 +9,7 @@
 # (`model.clothesline`), whose washing is pegged out (`washing`) and stays out until taken in (`open`); the log
 # store (`model.firewoodStack`).
 #
-# Each is built in place where its placeholder stands (`F`, game axes), and each has a far version for the town
+# Each is built in place where the game places it (`F`, game axes), and each has a far version for the town
 # overview (`far=`).
 #
 # Run:  python3 -B tools/art/blender/build.py yard [--only sandbox] [--preview]
@@ -918,12 +917,12 @@ FAMILY = G.Family(
              paint=[('posts', 'Posts'), ('washing', 'Washing')]),
      G.Model('firewoodStack', firewoodStack, size=(1.0, 1.095, 0.377), centre=(0, -0.238), key='model.firewoodStack', far=0.25,
              paint=[('iron', 'Shelter')])],
-    comment='Blender-built play and yard things (tools/art/blender/families/yard.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised '
-            'bed\'s crop grows and is picked, the shed\'s and the greenhouse\'s doors open (and the vent), the compost '
-            'bin\'s lid lifts and the washing goes out on the line and stays out.',
+    comment='Blender-built play and yard things (tools/art/blender/families/yard.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and '
+            'turns it, the raised bed\'s crop grows and is picked, the shed\'s and the greenhouse\'s doors '
+            'open (and the vent), the compost bin\'s lid lifts and the washing goes out on the line and '
+            'stays out.',
 )
 
 if __name__ == '__main__':

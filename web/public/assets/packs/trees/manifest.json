@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods' oaks, maples, birches, pines and spruces, and the potted lemon tree. Replaces the primitive-part placeholders of nature.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints. Each has a far version (`far`), which the far woods and the town overview draw. Clips: an apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.",
+  "$comment": "Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods' oaks, maples, birches, pines and spruces, and the potted lemon tree. Listed in the base manifest's packs. Leaves are on `foliage` and trunks on `bark`, which the nature shader sways and tints. Each has a far version (`far`), which the far woods and the town overview draw. Clips: an apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.",
   "version": 1,
   "entries": {
     "model.tree": {

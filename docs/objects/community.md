@@ -1,6 +1,6 @@
 # Community and farm
 
-Town things, built over the primitive-part placeholders of `tools/art/community.py`, which stay the fallback. Five
+Town things, built in Blender. Five
 families: `families/playground.py` (notes: `playground.md`), `families/street_furniture.py` (`street_furniture.md`),
 `families/stalls.py` (`stalls.md`), `families/shops.py` (`shops.md`) and `families/farm.py` (`farm.md`). The street's
 dressing props (`model.street.*`, `families/street.py`) aren't buyable and aren't listed here.
@@ -8,8 +8,8 @@ dressing props (`model.street.*`, `families/street.py`) aren't buyable and aren'
 They stand on town lots (the park lots, `houses.json` `parks`; the farm things on farm lots, placed by id in
 `web/src/game/town.ts` `farmstead`). They are seen from far and by the hundred, so
 every model has a far version (E7): the model at rest, joined and decimated (`far=0.25`), or built by hand where that
-looked bad (the chess table, the barn, the silo, the tractor). Each is built where its placeholder stands, at the
-content's seat and top heights. Check them on a town lot (the `town-things` lot) as well as in a house.
+looked bad (the chess table, the barn, the silo, the tractor). Each is built to the content's seat and top
+heights. Check them on a town lot (the `town-things` lot) as well as in a house.
 
 Moving parts: the seesaw, spring rider and merry-go-round loop while ridden (E1); the town fountain's water runs and
 the scarecrow sways (ambient, E2, off on Low); the coop's hatch shuts at night (E3); the rest open, drop or slide for
@@ -18,7 +18,6 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 ## CM1. Playground (8)
 
 - **Family:** `tools/art/blender/families/playground.py`
-- **Placeholders:** `tools/art/community.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -51,7 +50,6 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 ## CM2. Street furniture (10)
 
 - **Family:** `tools/art/blender/families/street_furniture.py`
-- **Placeholders:** `tools/art/community.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -79,7 +77,6 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 ## CM3. Food stalls and vending (5)
 
 - **Family:** `tools/art/blender/families/stalls.py`
-- **Placeholders:** `tools/art/community.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -98,7 +95,6 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 ## CM4. Shops and café (5)
 
 - **Family:** `tools/art/blender/families/shops.py`
-- **Placeholders:** `tools/art/community.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -122,7 +118,6 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 ## CM5. Farm (8)
 
 - **Family:** `tools/art/blender/families/farm.py`
-- **Placeholders:** `tools/art/community.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

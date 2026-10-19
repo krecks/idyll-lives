@@ -1,8 +1,7 @@
 # The bedroom's beds (BR1): the double bed (`model.bed`), the single (`model.bedSingle`), the bunk bed
 # (`model.bedBunk`), the futon (`model.bedFuton`), the upholstered king (`model.bedKing`), the oak double
 # (`model.bedDouble`), the upholstered queen (`model.bedQueenUpholstered`), the four-poster
-# (`model.bedCanopy`) and the daybed (`model.bedDaybed`), over their primitive-part placeholders
-# (`furniture.py`, `catalog.py`, `catalog2.py`), which stay the fallback. Notes: bedroom.md.
+# (`model.bedCanopy`) and the daybed (`model.bedDaybed`). Notes: bedroom.md.
 #
 # Each bed's mattress is centred on its footprint, its top at the height the renderer lays sleepers
 # at (characters.ts `BEDS`; `BUNKS` for the bunk's two). Its head end stands on the wall's face (depth
@@ -305,7 +304,7 @@ def bedKing():
 
 # ---------------------------------------------------------------- the oak double
 
-DOUBLE_TOP = 0.52  # its placeholder's mattress top (characters.ts BEDS['bedDouble'])
+DOUBLE_TOP = 0.52  # the old part's mattress top (characters.ts BEDS['bedDouble'])
 
 
 def bedDouble():
@@ -393,7 +392,7 @@ def bedCanopy():
 
 # ---------------------------------------------------------------- the daybed
 
-DAYBED_TOP = 0.51  # its placeholder's mattress top (characters.ts BEDS['bedDaybed'])
+DAYBED_TOP = 0.51  # the old part's mattress top (characters.ts BEDS['bedDaybed'])
 
 
 def bedDaybed():
@@ -463,11 +462,10 @@ FAMILY = G.Family(
              paint=_paint('frame_walnut', 'headboard_walnut', 'bedding_rust')),
      G.Model('bedDaybed', bedDaybed, size=(0.96, 0.84, 1.91), key='model.bedDaybed', centre=(0.0, 0.025),
              paint=_paint('frame_white', 'back_white', 'bedding_sage'))],
-    comment='Blender-built bedroom models (tools/art/blender/families/bedroom.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The beds turn their duvet down (`turn_down`) while a resident sleeps or naps; the '
-            'futon unfolds into a bed (`unfold`) and stays open.',
+    comment='Blender-built bedroom models (tools/art/blender/families/bedroom.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. The beds turn their duvet down (`turn_down`) while a resident sleeps or '
+            'naps; the futon unfolds into a bed (`unfold`) and stays open.',
 )
 
 if __name__ == '__main__':

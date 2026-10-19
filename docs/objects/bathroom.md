@@ -7,12 +7,11 @@ sinks, the B1 toilets, the B2 showers, the B3 baths and the B5 storage and mirro
 Water here grows the same way: a stream built full length, scaled to 0.001 so it hides at rest, and `G.grow`n for
 the whole use (`water_on`, `tap_on`; the bath's water rises with `fill`). Mirror glass is in the file (E6), a flat
 piece of the `mirror` material; the nearest mirror on screen reflects live (two on High). Floor things stand with
-their backs on the wall face (game depth -0.43), as their placeholders.
+their backs on the wall face (game depth -0.43).
 
 ## Sinks (5)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -31,14 +30,13 @@ their backs on the wall face (game depth -0.43), as their placeholders.
 ## B1. Toilets (5)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `toilet` Toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`: the lid swings up 100° as the use starts and down as it ends. |
 | `toiletCompact` Compact toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`. |
 | `toiletSmart` Smart toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`: lid and seat rise on their own (slower, 0.8 s). |
-| `toiletClassic` Classic toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`; the close-coupled cistern (the content and placeholder: no high cistern and chain) and wooden seat are static. |
+| `toiletClassic` Classic toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`; the close-coupled cistern (the content: no high cistern and chain) and wooden seat are static. |
 | `toiletWallHung` Wall-hung toilet | 1x1 · floor | use:toilet | bathroom / toilets | Bowl, Seat & lid, Cistern | Use | `lid_up`. |
 
 **In play** (signed off 2026-10-16):
@@ -47,14 +45,13 @@ their backs on the wall face (game depth -0.43), as their placeholders.
 - `lid_up` plays in full (0.58 s; the smart toilet's 0.79 s) as the resident sits and shuts as they get up; the
   resident sits on the seat, leaning forward (the shared `toilet` pose).
 - On the wall-hung and smart toilets "Cistern" colours the boxing panel. The colour studio's "In use" lifts the lid.
-- Seat tops are at the content's seat height (0.43–0.45 m); the wall-hung one follows the content, not its old
-  0.6 m placeholder.
+- Seat tops are at the content's seat height (0.43–0.45 m); the wall-hung one follows the content, not the old
+  0.6 m cistern.
 - Nothing needed fixing.
 
 ## B2. Showers (4)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -74,7 +71,6 @@ their backs on the wall face (game depth -0.43), as their placeholders.
 ## B3. Baths (3)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -93,7 +89,6 @@ their backs on the wall face (game depth -0.43), as their placeholders.
 ## B4. Laundry (6)
 
 - **Family:** `tools/art/blender/families/laundry.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -114,7 +109,6 @@ their backs on the wall face (game depth -0.43), as their placeholders.
 ## B5. Bathroom storage and mirrors (3)
 
 - **Family:** `tools/art/blender/families/bathroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

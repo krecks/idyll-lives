@@ -1,5 +1,4 @@
-# The tabletop things: small things that stand on tops (the `surface` layer), over the primitive-part
-# placeholders of `catalog2.py`, which stay the fallback. Notes: tabletop.md.
+# The tabletop things: small things that stand on tops (the `surface` layer). Notes: tabletop.md.
 #
 #   TT1 kitchenware: kettle, toaster, blender, standMixer, espressoMachineSmall, knifeBlock, utensilCrock,
 #       cuttingBoard, breadBin, spiceJars, cookieJar
@@ -10,7 +9,7 @@
 #   TT5 bath, desk and toys: soapSet, towelStack, perfumeTray, deskOrganiser, laptopClosed, monitor,
 #       stuffedToy, toyBlocks
 #
-# Each stands on its base, centred (the renderer lifts it to its host's top), at its placeholder's size. They
+# Each stands on its base, centred (the renderer lifts it to its host's top), at the old part's size. They
 # have no uses, so no clips, and every finish is a plain one (wood, fabric and leaves drawn satin or matte),
 # so each costs one draw call. The exceptions: the cookie jar, the wine glasses and the snow globe are
 # see-through `glass` (two); the kettle's lid, the bread bin's roll-top and the laptop's lid are parts of
@@ -215,7 +214,7 @@ def arc_shell(name, r_out, r_in, length, a0, a1, at, material, segments=12):
 
 def done(name, mirror=False):
     """A still model: everything joined into one node, stood on the floor and centred. `mirror` flips it left
-    to right, for one built the other way round from its placeholder."""
+    to right, for one built the other way round from its old part."""
     obj = G.join_all(name)
     if mirror:
         obj.data.transform(Matrix.Scale(-1, 4, Vector((1, 0, 0))))
@@ -919,10 +918,10 @@ FAMILY = G.Family(
         T('toyBlocks', toyBlocks, (0.222, 0.2, 0.171), [('block_a', 'Block 1'), ('block_b', 'Block 2'),
                                                        ('block_c', 'Block 3')]),
     ],
-    comment='Blender-built tabletop things (tools/art/blender/families/tabletop.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes, so each costs one draw call (the '
-            'see-through ones and the parts kept for a use to come one more, the alarm clock\'s two hands two more).',
+    comment='Blender-built tabletop things (tools/art/blender/families/tabletop.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes, so each costs one draw call '
+            '(the see-through ones and the parts kept for a use to come one more, the alarm clock\'s two '
+            'hands two more).',
 )
 
 if __name__ == '__main__':

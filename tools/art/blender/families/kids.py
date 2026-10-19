@@ -1,5 +1,4 @@
-# The kids' things (docs/objects/kids.md), over their primitive-part placeholders (`catalog.py`, `catalog2.py`,
-# `furniture.py`), which stay the fallback. Notes: kids.md.
+# The kids' things (docs/objects/kids.md). Notes: kids.md.
 #
 # KD1 baby and kids' beds: the crib with its changing table (`model.crib`), the kids' bed (`model.kidsBed`),
 #   the race car bed (`model.kidsBedCar`) and the high chair (`model.highChair`).
@@ -8,10 +7,10 @@
 # KD3 kids' study and art: the kids' desk, table and chair, the picture-book shelf, the chalkboard easel and
 #   the kids' easel.
 #
-# Each is built where its placeholder stands (`F`, game axes: x, height, depth; front +depth), then stood on
+# Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), then stood on
 # the floor (`G.settle(centre=False)`, `centre=` on its `Model`), so seats, mattresses and wall backs stay
 # where the game puts residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`,
-# `BEDS`; catalog2.py `TOPS`, `SEATS`).
+# `BEDS`; the content's `surface` and `seat`).
 #
 # Run:  python3 -B tools/art/blender/build.py kids [--only crib] [--preview]
 import math
@@ -230,7 +229,7 @@ def _arc(r, a0, a1, n, cx=0.0, cy=0.0):
 
 
 def _place(forward=0.0):
-    """Stands the model on the floor where it was built (over its placeholder) and prints its centre;
+    """Stands the model on the floor where it was built (over where it stood) and prints its centre;
     `forward` (game depth, m) moves it towards the front first: its back onto the wall face."""
     for o in G.meshes():
         o.location.y -= forward
@@ -1144,10 +1143,10 @@ FAMILY = G.Family(
         G.Model('kidsEasel', kidsEasel, size=(0.66, 1.208, 0.634), key='model.kidsEasel', centre=(0.0, 0.0),
                 motions={'uses': {'paint': 'painting'}}, paint=[('easel', 'Easel')]),
     ],
-    comment='Blender-built kids\' things (tools/art/blender/families/kids.py): the crib, the beds and the high '
-            'chair, the toys, and the kids\' study and art things. Replaces the primitive-part placeholders by '
-            'key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a file fails to '
-            'load, and the materials map onto the game\'s finishes so a model costs one draw call per finish group.',
+    comment='Blender-built kids\' things (tools/art/blender/families/kids.py): the crib, the beds and the '
+            'high chair, the toys, and the kids\' study and art things. Listed in the base manifest\'s '
+            'packs. The materials map onto the game\'s finishes so a model costs one draw call per finish '
+            'group.',
 )
 
 if __name__ == '__main__':

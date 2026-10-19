@@ -1,14 +1,14 @@
 # Garden plants and trees
 
-Plants and trees keep the shape of their old pipeline (`tools/art/nature.py`: foliage cards that sway in the shader,
-`vary` for natural variation, `*.far` keys for distance). A Blender plant has its leaves on the `foliage` finish (and
-trunks on `bark`), drawn with the shared finish materials the nature shader hooks, so they sway and tint in the wind
-as the placeholders did; the trunk or pot is a mesh. Wind sway is the shader's job; clips only show a resident's use.
+Plants and trees keep the shape of the old pipeline (foliage cards that sway in the shader, `vary` for natural
+variation, `far` files for distance). A plant has its leaves on the `foliage` finish (and trunks on `bark`), drawn
+with the shared finish materials the nature shader hooks, so they sway and tint in the wind; the trunk or pot is a
+mesh. Wind sway is the shader's job; clips only show a resident's use.
 
 `families/plants.py` builds the houseplants, flowers, shrubs and edibles (notes: `plants.md`); `families/trees.py` the
 trees (notes: `trees.md`), with the shapes and helpers of `plants.py`. The flowers, shrubs, edibles and trees each have
 a far version, the same build at low detail (`far_of`). The shrubs dress every lot (`natureDecor`) and the bush the
-woods, so they cost what their placeholders did. The far woods draw a file's own far version where it has one
+woods, so they stay cheap. The far woods draw a file's own far version where it has one
 (`nature.ts` `forests`), so the woods and the town match.
 
 Colour parts: each houseplant's pot ("Pot"); each mound bed's soil mound ("Bed"), and its petals where they are all
@@ -23,7 +23,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 ## G1. Houseplants (10)
 
 - **Family:** `tools/art/blender/families/plants.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -47,7 +46,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 ## G2. Flowers (15)
 
 - **Family:** `tools/art/blender/families/plants.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -79,7 +77,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 ## G3. Shrubs (11)
 
 - **Family:** `tools/art/blender/families/plants.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -108,7 +105,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 ## G4. Edibles (5)
 
 - **Family:** `tools/art/blender/families/plants.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -131,7 +127,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 ## G5. Trees (12)
 
 - **Family:** `tools/art/blender/families/trees.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -154,5 +149,5 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 - The apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
   for "Shape the maple" (`trim`), in all four facings, shutting after the use.
 - Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across on a one-tile
-  footprint) reach through the house's wall. The game lets a tree stand that close, and the placeholders were as
-  wide.
+  footprint) reach through the house's wall. The game lets a tree stand that close, and no model can be
+  narrower without losing its shape.

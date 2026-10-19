@@ -1,8 +1,6 @@
-# The example pack (P5): the chef's stove and the whirlpool tub of `content/packs/example.json`, over their
-# primitive-part placeholders (`tools/art/furniture.py` `chef_stove`, `whirlpool`, in the base manifest), which
-# stay the fallback. Notes: pack_example.md.
+# The example pack (P5): the chef's stove and the whirlpool tub of `content/packs/example.json`. Notes: pack_example.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`). The stove's left oven door drops (`oven_open`) and a knob turns as a ring of gas flame grows on the
 # front burner (`burner_on`); the tub's water rises (`fill`) and bubbles well up through it while it lasts
 # (`bubbles`, a loop).
@@ -325,11 +323,10 @@ FAMILY = G.Family(
      G.Model('whirlpoolTub', whirlpoolTub, size=(1.86, 0.929, 1.86), key='model.whirlpoolTub',
              motions={'uses': {'soak': 'fill'}, 'loops': {'soak': 'bubbles'}},
              paint=[('shell', 'Tub'), ('wood', 'Surround'), ('pillow', 'Headrests')])],
-    comment='Blender-built example pack models (tools/art/blender/families/pack_example.py). Replaces the '
-            'primitive-part placeholders of the chef\'s stove and the whirlpool tub (base manifest) by key; the '
-            'placeholder is kept as a fallback if a file fails to load, and the materials map onto the game\'s '
-            'finishes so a model costs one draw call per finish group. The stove\'s oven door drops and its front '
-            'burner lights; the tub fills and bubbles while residents soak.',
+    comment='Blender-built example pack models (tools/art/blender/families/pack_example.py). Listed in '
+            'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
+            'draw call per finish group. The stove\'s oven door drops and its front burner lights; the tub '
+            'fills and bubbles while residents soak.',
 )
 
 if __name__ == '__main__':

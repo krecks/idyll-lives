@@ -1,12 +1,11 @@
 # Romantic pack — notes
 
 `pack_romantic.py` builds the six P15 romantic models into `web/public/assets/models/pack_romantic/` and their
-entries in `packs/pack_romantic/manifest.json`, an override pack listed after `packs/romantic/manifest.json`. Their
-primitive-part placeholders (`tools/art/pack_romantic.py`, in `packs/romantic`) stay as the fallback. Built
+entries in `packs/pack_romantic/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sit in Validate › Romantic until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-Seats keep the placeholder's: the diners and the writer at 0.45 on the footprint's middle line, the bathers at
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Seats keep the old part's: the diners and the writer at 0.45 on the footprint's middle line, the bathers at
 0.35 (`characters.ts` `SEATS`/`BEDS` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0.
 
 | Model | Moving part and clip | Played by |
@@ -35,7 +34,7 @@ the moving parts the rest:
 
 The heart tub is two prisms over a heart curve (`_prism`): the shell, hollow inside a smaller heart, on a plinth,
 its floor at 0.2 m. Seated bathers (the renderer's chair pose at 0.35 m) put their shins down through the front of
-the shell at x = ±0.5 where the heart narrows, as they do in the placeholder: the pose, not the model.
+the shell at x = ±0.5 where the heart narrows, as they do in the old part: the pose, not the model.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

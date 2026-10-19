@@ -1682,7 +1682,7 @@ export class Characters {
     const at = key.indexOf('#');
     const built =
       at < 0
-        ? buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { radius: 0.1 }).then((t) => ({ meshes: t.meshes, top: [0, 0, 0] as const }))
+        ? buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1]).then((t) => ({ meshes: t.meshes, top: [0, 0, 0] as const }))
         : this.partProp(key.slice(0, at), ...partColors(key.slice(at + 1)));
     void built.then((p) => {
       if (!p) return;
@@ -1700,7 +1700,7 @@ export class Characters {
   /**
    * Moving part `part` of model `model` on its own (a held instrument), in the part's own frame (its node's
    * origin and axes at rest), painted in `colors` as the object is; and its top (the highest point: a mop's
-   * handle); null if the model has no such part (a placeholder: nothing is drawn, and nothing is hidden on
+   * handle); null if the model has no such part (nothing is drawn, and nothing is hidden on
    * the object either).
    */
   private async partProp(model: string, part: string, colors?: PartColors): Promise<{ meshes: Mesh[]; top: readonly [number, number, number] } | null> {

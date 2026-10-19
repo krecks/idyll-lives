@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and rugs. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
+  "$comment": "Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
   "version": 1,
   "entries": {
     "model.printFramed": {

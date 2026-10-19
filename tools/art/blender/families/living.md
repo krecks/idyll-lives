@@ -3,14 +3,11 @@
 `living.py` builds the living room's models into `web/public/assets/models/living/` and their entries in
 `packs/living/manifest.json`: the fold-down wall bed (`model.wallBed`), the sofa bed (`model.sofaBed`), the ten
 L1 sofas and sectionals, the eleven L2 armchairs and small seats, the nine L3 coffee and side tables and the L6
-staircase (`model.stairs`). These
-replace the primitive-part placeholders
-of `furniture_prims.py` (the classic sofa, the armchair), `catalog.py` and `catalog2.py`, which stay as the
-fallback. Built 2026-10-14; they sit in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
+staircase (`model.stairs`). Built 2026-10-14; they sit in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
 
 ## The sofas and sectionals (L1)
 
-Each copies its placeholder where it stands (`F`, game axes), its back on the wall's face, and is settled in place
+Each is built where the old part stood (`F`, game axes), its back on the wall's face, and is settled in place
 (`G.settle(centre=False)`, `centre=` on its `Model`). Two nodes each:
 
 - **`sofa`**: the upholstery (base, arms, back), any show-wood or metal frame, the back cushions, the pillows and
@@ -38,22 +35,21 @@ sofa's 0.425 m.
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
 WebGL, day and night, all four facings across the set): residents sit on each, and `sink_in` plays and holds.
 
-- The sectional modules are 1.00 m wide, so they butt up in a row; the arms are where the placeholders have them
+- The sectional modules are 1.00 m wide, so they butt up in a row; the arms are where the old parts had them
   (`sectionalArmLeft`'s on +x, the sitter's left).
-- Where a placeholder had no frame (the `sofa_run` sofas), there is no Frame colour part, as on the sofa bed.
+- Where an old part had no frame (the `sofa_run` sofas), there is no Frame colour part, as on the sofa bed.
 - The pillows lean on the back cushions; the seat sinking leaves them where they are (1 cm into the cushion at
   rest, so the gap is small).
 
 ## The armchairs and small seats (L2)
 
-Built as the sofas are, from their placeholders (`furniture_prims.py` `armchair_bergere`, `catalog.py`,
-`catalog2.py`). Most have a still part and a `seat` that sinks 2 cm (`sink_in`) for `sit` (and `read`).
+Built as the sofas are, from the old primitive parts (`armchair_bergere` and the rest). Most have a still part and a `seat` that sinks 2 cm (`sink_in`) for `sit` (and `read`).
 
 - **Recliner** (`recline`, `footrest_up`, for relax and doze): a skirted base and arms (still); the seat cushion and
   the back as one part (`seat`) turning back 25° about the sitter's hips (content seat 0.44 m, forward 0), with
   `ride` on it, so the resident reclines with it; the padded footrest, folded flat against the front of the base at
   rest, swings up 80°. It stands 13 cm off the wall's face, so the tipped back stops 4 cm short of the wall; the
-  hips (content `seat.forward` 0.12) and its placeholder (`catalog2.py`, drawn at rest) moved forward with it.
+  hips (content `seat.forward` 0.12) and the old part (drawn at rest) moved forward with it.
 - **Rocking chair** (`rock`, a loop for relax and read, `ride`): the whole chair rocks ±6° in 1.4 s about the
   rockers' centre of curvature (1 m above the floor), so the rockers roll on the floor; the rockers are flat bent
   strips.
@@ -80,17 +76,16 @@ WebGL at night: residents sit, recline, rock and flop on each, and each clip pla
 
 ## The coffee and side tables (L3)
 
-Copied from their placeholders, tops at the content `surface` heights (0.42 m for the coffee tables, 0.51–0.80 m
+Copied from the old parts, tops at the content `surface` heights (0.42 m for the coffee tables, 0.51–0.80 m
 for the side, nesting and console tables). Still, but for two:
 
 - **Coffee table** (`drawer_open` for magazine, `hold` 2.5 s): a drawer in the front apron, a magazine in it,
-  slides out 30 cm. `check_glb.py` warns its placeholder is 6 cm taller (it had magazines on the top; they're in
-  the drawer now).
+  slides out 30 cm. It is 6 cm lower than the old part (that one had magazines on the top; they're in the
+  drawer now).
 - **Nesting tables**: the small oak table is a part of its own (`small_table`), so a clip can pull it out once it
   has a use.
-- **Side table**: the catalog pack's placeholder (catalog.py `side_table`, oak with a drawer and a brass knob) is the
-  one drawn, over the base manifest's (furniture_prims.py); the model copies the catalog one. `check_glb.py` warns the
-  two placeholders differ (they did before the model).
+- **Side table**: the model copies the catalog pack's `side_table` (oak with a drawer and a brass knob), which stood
+  in front of the base manifest's version; the two differed before the model, as `check_glb.py` warned.
 - What stands on the tops (a plant, vases, magazines, a box) is plain finish, so it costs no draw call.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -110,8 +105,8 @@ facings across the set; the drawer opening while a resident flips through a maga
 
 ## The shelves (L5)
 
-Built where their placeholders stand (`bookshelf` in the base manifest, `catalog.py`, `catalog2.py`), each with its
-back on the wall's face (depth -0.43); the placeholders moved 3–6 cm forward with them (they reached into the wall),
+Built where the game places them stood (`bookshelf` and the rest), each with its
+back on the wall's face (depth -0.43); the old parts moved 3–6 cm forward with them (they reached into the wall),
 the corner bookcase's and the ladder shelf's redrawn as the models are. Tops at the content `surface` heights: the
 low bookcase 0.90 m, the cube shelf 0.80 m, the industrial shelving 1.83 m (the content rectangles are unchanged; the
 models' tops now start at the wall's face, 1–4 cm in front of the rectangles' backs).
@@ -123,7 +118,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
   its spine, and tips out 25° in 0.6 s for read, study and homework (as each offers them), back at the end of the
   use. 1 draw.
 - **Corner bookcase**: a white bookcase with a teal back and quarter-round open shelves round its right end, to the
-  wall (the placeholder had square ones); the placeholder draws them as boxes.
+  wall (the old part had square ones); the old part draws them as boxes.
 - **Ladder shelf**: two rails leaning on the wall (on its face at the top, 32 cm out at the floor), four boards
   through them, 6 cm proud of their fronts and back to the wall, narrowing upwards. Colour parts Frame and Shelves
   (it has no back).
@@ -147,7 +142,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 | `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own) |
 
 `check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
-placeholders, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
+old parts, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
 all nine bought in the house across the four facings, coloured, on WebGPU by day and WebGL with the night light.
 
 ## The staircase (L6)
@@ -155,16 +150,16 @@ all nine bought in the house across the four facings, coloured, on WebGPU by day
 Built 2026-10-16; in Validate › Stairs until signed off (back to Living › Stairs). Build mode's Stairs tool and the
 house generator place it (`cfg.stairs`), not the buy catalog, which leaves stairs out: the Validate group shows empty.
 
-- **Steps where the placeholder's are**: 14 steps of 0.2 m up and 4/14 m deep over the 1 × 4 footprint, the first
+- **Steps where the old ones are**: 14 steps of 0.2 m up and 4/14 m deep over the 1 × 4 footprint, the first
   starting at the front edge, the top of the last (2.8 m, house.ts `WALL_HEIGHT`) level with the floor above at the
   back edge. Residents are drawn rising evenly from the foot of the first step to the top of the last (sim-core
-  `World::sim_height`), as over the placeholder, so their feet meet the treads as before. The same flight serves
+  `World::sim_height`), as over the old part, so their feet meet the treads as before. The same flight serves
   stairs up and stairs down to the basement, at every facing.
 - **Oak treads** (0.03 m, their tops the steps' tops; each but the first reaches 2 cm past the riser below: the first
   stays inside the footprint) on **white risers**, between **closed strings** cut level on the floor in front and
   with the floor above at the back; a **black iron railing** each side on the strings (x ±0.40, inside the tile's
-  wall face): a newel at the foot and the head, two balusters a step and a sloping handrail where the placeholder's
-  rails are (0.7 m above the nosings). The flight is solid underneath, as the placeholder.
+  wall face): a newel at the foot and the head, two balusters a step and a sloping handrail where the old part's
+  rails are (0.7 m above the nosings). The flight is solid underneath, as the old part was.
 - `check_glb.py` no longer takes the stairs' back for a wall (content `stairs`): it is the top of the flight, where
   the floor above goes on.
 

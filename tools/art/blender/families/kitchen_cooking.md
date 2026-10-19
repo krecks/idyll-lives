@@ -6,12 +6,11 @@ the six **K2 cookers** — the electric cooker (`model.stoveElectric`), the gas 
 own tower (`model.wallOven`), the range cooker (`model.rangeCooker`), the hob counter (`model.cooktopCounter`)
 and the microwave counter (`model.microwave`) — and the four **K3 small appliances** — the coffee machine
 (`model.coffeeMachine`), the breakfast counter (`model.breakfastCounter`) and the two dishwashers
-(`model.dishwasher`, `model.dishwasherCompact`). They replace the primitive-part placeholders of
-`catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14.
+(`model.dishwasher`, `model.dishwasherCompact`). Built 2026-10-14.
 
 A cooker is a box on the floor with a hob on top and an oven below; a small appliance is a counter with a
 machine on it, or a dishwasher under a worktop. The parts are placed in game axes (`F`, a `GameFrame`),
-and each model stands where its placeholder stands, its back on the wall (below).
+and each model stands where the game places it, its back on the wall (below).
 
 ## Materials
 
@@ -86,8 +85,9 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 | `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes) |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
-moving parts each cost one). All match their placeholder bounds (`check_glb.py`: 31 models, 0 failed;
-Khronos glTF validator: 0 errors, 0 warnings each). The ten sit in Validate › Cookers and
+moving parts each cost one). `check_glb.py`: 31 models, 0 failed; its four warnings are those same draw counts
+(the stove, the range cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
+each). The ten sit in Validate › Cookers and
 Validate › Appliances until checked in play.
 
 ## Rebuild
@@ -99,13 +99,13 @@ python3 -B tools/art/blender/build.py kitchen_cooking --preview  # previews/<id>
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
-appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
-2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
+appliances lines up, and its top is under its content `surface`. Since the
+2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
-catalog2.py `shallow`). Islands stand free, centred.
+the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old `shallow`). Islands stand free, centred.
 
 Also from the review: the hob clips (`knob_on`, `burner_on`) last the whole use, and only `oven_open`
 shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `oven_cavity` face just inside its closed door,

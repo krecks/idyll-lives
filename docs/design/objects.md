@@ -29,11 +29,9 @@ gate below, so the review does.
    in the family's `G.Palette`; the pack entry's `materials` is written from it.
 3. Stay in budget: 1–3 draw calls (finish groups), triangles for the size class below.
 4. Build with `python3 -B tools/art/blender/build.py <family>` (Blender 5.2 LTS): it exports, and
-5. registers the model in the family's pack with `url` and `materials` (it keeps the entry below's
-   placeholder as the fallback), then
+5. registers the model in the family's pack with `url` and `materials`, then
 6. runs `check_glb.py` (no errors). Run the Khronos glTF validator too (no errors or warnings).
-7. Look at it next to its placeholder in the gallery, on a lot by day and at night, on WebGPU and
-   WebGL2, and in the catalog. Credit it. Commit only the files you changed.
+7. Look at it in the gallery, on a lot by day and at night, on WebGPU and WebGL2, and in the catalog. Credit it. Commit only the files you changed.
 
 ## Tools and folders
 
@@ -65,8 +63,8 @@ gate below, so the review does.
 
 - **1 unit = 1 metre.** Blender is Z up; the exporter's +Y up makes Blender (x, y, z) the game's
   (−x, z, −y). The front faces −Y in Blender (Blender's front view, numpad 1, is the player's view
-  of the front) and +Z in the game. Coordinates copied from a placeholder flip x: a part on the
-  placeholder's +x side goes at −x in Blender.
+  of the front) and +Z in the game. Coordinates written the other way round flip x: a part on the
+  right of a front view goes at −x in Blender.
 - **Origin** at the footprint's centre, on the floor: the lowest point at y = 0 for things on the
   floor. Things on a top stand on y = 0 at their middle (the game lifts them to the top); things on
   a wall have their back on the wall face, z = −0.43 in a 1-deep footprint, at their real height;
@@ -84,9 +82,8 @@ gate below, so the review does.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width. Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
-  family script assert them against the content JSON, as `tools/art/catalog2.py` does for
-  primitive models with `TOPS`, `SEATS`, `LIGHTS` and `surface_of`, `seat_of`, `radius_of`. The
-  content stays the truth for the simulation; the script keeps the two in line.
+  family script assert them against the content JSON (`_template.py` `tops`). The content stays the
+  truth for the simulation; the script keeps the two in line.
 
 ## Budgets
 
@@ -103,10 +100,9 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 
 - **Things placed many times** (garden plants, park and street props, anything the town has dozens
   of) aim for half the target: the town overview draws every lot's outdoor objects at full detail.
-- **Draw calls:** one per finish group (below). Aim for 1–3, at most 4; the placeholders mostly
-  take 1–3 (median 2, at most 5). Each also draws once more in the sun's shadow map, which in
-  live play is redrawn every frame while residents are in view (graphics.md). As files came, the
-  six garden models took 30 draws where their placeholders took 10; mapped to finishes they take 9.
+- **Draw calls:** one per finish group (below). Aim for 1–3, at most 4. Each also draws once more
+  in the sun's shadow map, which in live play is redrawn every frame while residents are in view
+  (graphics.md). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
@@ -157,7 +153,7 @@ room has.
   linear values Blender and glTF use. (The first export wrote sRGB values as linear: every colour
   came out pale, and white-blue at night.)
 - **One-sided.** Meshes are closed and materials one-sided (`gamekit.mat` sets it).
-- **Water** is `gloss`, opaque, like the placeholders'. Real glass is `glass`: its own draw call,
+- **Water** is `gloss`, opaque. Real glass is `glass`: its own draw call,
   drawn after everything else.
 - **No emissive materials.** A lamp's light is the content's `light`, which also lights the lamp's
   own shade at night; an emissive surface glows at noon as well.
@@ -168,8 +164,8 @@ room has.
   it moves with it. In gamekit:
   `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`.
 - **Tints** (`body`, `skin`, `hair`) are for character parts; no object model uses one. A file's
-  material carries one in its name, `tunic#body` (with a finish: `tunic@fabric#body`), as a
-  placeholder part's `tint`: the template's `tints` say so. Nothing draws by them today (residents
+  material carries one in its name, `tunic#body` (with a finish: `tunic@fabric#body`): a tint slot,
+  as the template's `tints` say. Nothing draws by them today (residents
   have their own rig and outfits).
 - **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
   removed on 2026-10-14). Another look of the same thing is another object with its own model (the
@@ -195,11 +191,11 @@ room has.
   will come back for the objects it suits, decided per object.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
-  glass: its face reflects the room, as placeholder parts with `mirror` do (the quality's
+  glass: its face reflects the room, as `mirror` parts did (the quality's
   `mirrors`: the nearest on screen, one on Low and Medium, two on High). Make the glass a flat piece, on the still body or on one moving part
   (a mirror cabinet's door: the reflection swings with it); the face is across its thinnest side,
   square or round as drawn. In gamekit, the palette takes the side: `glass=('#DCE6EA', 'gloss',
-  'front')`. Map it to `gloss`, as the placeholders' mirrors: the mirrors past the nearest show their
+  'front')`. Map it to `gloss`, as mirrors always were: the mirrors past the nearest show their
   glass, and see-through `glass` would show what is behind it. `check_glb.py` fails glass split over
   two parts and warns of glass that isn't flat or is see-through.
 
@@ -216,9 +212,8 @@ room has.
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
 - **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance, for the far
-  woods too: a file's `far`, or a placeholder built at the low level of detail. A file's
-  parts on `foliage` and `bark` take the nature shader's wind and tint, as the placeholders' do
-  (`families/plants.py`).
+  woods too: a file's `far` (`families/plants.py`). Its parts on `foliage` and `bark` take the nature
+  shader's wind and tint.
 
 ## Moving parts
 
@@ -366,16 +361,15 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   a node's transform or doesn't start at rest, a `motions` clip the file doesn't have, textures over
   1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, over 3
   draws or the triangle target, unmapped, double-sided, see-through or emissive materials, unused
-  UVs, an off-centre or floating origin, a size 10 % off the placeholder's, and a pack whose copy of
-  the placeholder no longer matches the entry it overrides. Plain Python, so CI can run it; inside
+  UVs and a floating origin. Plain Python, so
+  CI can run it; inside
   Blender, `-- --preview` also renders each file re-imported.
 - **The Khronos glTF validator**: no errors and no warnings. It is on npm as `gltf-validator`
   (Apache-2.0); install it outside the repo and run `validateBytes` over the files, or drop them on
   the validator's web page.
 - **Looking at it** (headless Chrome for Testing on the real GPU, as graphics.md's runner; not
   `chrome-headless-shell`, which draws in software):
-  - `/gallery.html?keys=model.<family>.<id>` (WebGPU), and the same with the `.glb` requests
-    failing (Playwright `page.route` answering 404), which draws the placeholder: side by side.
+  - `/gallery.html?keys=model.<family>.<id>` (WebGPU), and the same with `&renderer=webgl`.
   - A lot with the object on it (`?state=<name>` from a test dump, or a bench state with objects
     added), `&hour=13` and `&hour=22`, WebGPU and `&renderer=webgl`.
   - The catalog picture (`render/preview/items.ts`, WebGL2).
@@ -396,16 +390,13 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "model.garden.gnome": { "type": "model", "url": "../../models/garden/gnome.glb", "materials": { "*": { "finish": "material.finish.satin" } } }
   ```
-  A pack's entry replaces the base entry, keeping its placeholder (the fallback when the file fails
-  to load) and `vary` unless it gives its own (registry.ts `extended`); the base entry's other fields
-  are copied in. The family script writes its pack from the manifests at export time (`G.write_pack`,
-  called by the build), never by hand; `check_glb.py` warns when a pack's own copy of a placeholder
-  has gone stale. `scale`, `rotationY`, `offset` and `fit` are for
+  A pack's entry replaces the base entry, keeping its `vary` unless it gives its own (registry.ts
+  `extended`); the base entry's other fields are copied in. The family script writes its pack from the
+  manifests at export time (`G.write_pack`, called by the build), never by hand. `scale`, `rotationY`,
+  `offset` and `fit` are for
   third-party files; a model built to this standard needs none of them. `parts` adds primitive
   parts drawn with the file.
-- **A new object** also needs its content definition (footprint, interactions, price, category)
-  and, if it is new to the game, a placeholder: the fallback when the file fails, simple primitive
-  parts are enough.
+- **A new object** also needs its content definition (footprint, interactions, price, category).
 
 ## Catalog pictures
 
@@ -428,19 +419,18 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 - [ ] Every material mapped to a finish; 1–3 draw calls; triangles within the target for its size (half for things placed many times).
 - [ ] No emissive, no see-through except `glass`, no textures of its own unless needed (then ≤ 512 px).
 - [ ] `check_glb.py` passes; the Khronos validator reports nothing.
-- [ ] Gallery next to the placeholder; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
+- [ ] Gallery; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
-- [ ] Pack entry with `url` and `materials` (written by the build; the placeholder is the entry's below); base manifest lists the pack.
+- [ ] Pack entry with `url` and `materials` (written by the build); base manifest lists the pack.
 - [ ] CREDITS.md updated; only the changed `.glb` files committed; previews not committed.
 
-## The placeholders: kept as the fallback
+## Every model is a Blender file
 
 **Every object is migrated** (2026-10-17): each has a Blender file, signed off in play, and so do the
-things residents carry, the town's street props and the ground's tufts, rocks and marker. **Keep every
-placeholder**, as the fallback drawn when a file fails to load. They cost nothing to download (they are
-in the bundled manifests), take 1–3 draw calls, resize smartly, carry mirrors and have a reduced build for
-distance. Each model kept its key, so saves and content didn't change. A new object gets a Blender file
-from the start, and a placeholder of a few boxes of it at rest (`tools/art/blender/README.md`).
+things residents carry, the town's street props and the ground's tufts, rocks and marker. The
+primitive-part entries they replaced are gone from the manifests (2026-10-18), so Blender is the only
+source; the models still stand where those parts stood, so each kept its key and saves and content
+didn't change. A new object gets a Blender file from the start.
 
 ## Before Blender is the standard
 
@@ -457,11 +447,11 @@ work for files.
 4. ~~**Level of detail** for files.~~ Done: an entry's `far` file, `<id>.far.glb`, is what LOD 1 and
    the town overview draw (`G.Model(far=…)` writes it).
 5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
-   like placeholder parts do (`fileMirror`).
+   as `mirror` parts did (`fileMirror`).
 6. ~~**Finishes by name.**~~ Done: a material named `stone@matte` maps itself (`namedFinish`), and
    `tunic#body` carries a tint slot (`namedTint`).
-7. ~~**Packs that extend.**~~ Done: a pack entry without `placeholder` (or `vary`) keeps the one of the
-   entry it overrides (registry.ts `extended`); gamekit's packs no longer copy them.
+7. ~~**Packs that extend.**~~ Done: a pack entry without `vary` keeps the one of the entry it
+   overrides (registry.ts `extended`); gamekit's packs no longer copy it.
 8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and
    its room's lights.
 9. **Quantised geometry** in `optimize.mjs` for files from Blender.

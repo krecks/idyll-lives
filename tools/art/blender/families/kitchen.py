@@ -1,9 +1,8 @@
-# The kitchen: the top-freezer fridge (`model.fridge`), over the primitive-part placeholder of
-# `furniture_prims.py` (`fridge_classic`), which stays the fallback. Notes: kitchen.md.
+# The kitchen: the top-freezer fridge (`model.fridge`). Notes: kitchen.md.
 #
 # A cabinet and two doors, each door its own node turning on its hinge, with a clip per door: the game
 # opens the fridge door while a resident takes food or a drink out (`motions`). At rest both are closed.
-# Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
+# Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py kitchen [--preview]
 import math
@@ -63,7 +62,7 @@ M = G.Palette(
     wine2=('#E3D9A0', 'gloss'),      # white wine bottles
 )
 
-# The placeholder's back sits 9.4 cm behind the middle of its tile (`furniture_prims.BACK = -0.455`);
+# The old part's back sits 9.4 cm behind the middle of its tile (the old `BACK = -0.455`);
 # the model is centred on its tile, so every game depth is shifted back by that much.
 F = G.GameFrame(shift=0.094)
 
@@ -158,7 +157,7 @@ def fridge():
     # the freezer door over the fridge door, a clip each
     freezer = _door('door_freezer', 1.51, 0.556, 1.274, 1.524, badge=True)
     door = _door('door_fridge', 0.643, 1.146, 0.804, 1.164)
-    G.settle()   # where its placeholder stands (`centre`), its back on the wall
+    G.settle()   # where the game places it (`centre`), its back on the wall
     G.swing(freezer, 'freezer_open', FREEZER_ANGLE, DOOR_SECONDS)
     G.swing(door, 'fridge_open', FRIDGE_ANGLE, DOOR_SECONDS)
 
@@ -285,7 +284,7 @@ def counterSinkDouble():
 
 
 # --- K1: the rest of the fridge family ---------------------------------------------------------------
-# Five more fridges, built to their placeholders' sizes with the classic fridge's mechanics: a door
+# Five more fridges, built to the old parts' sizes with the classic fridge's mechanics: a door
 # hinged on one edge (`G.hinged`) with `G.swing`, and a `hold` so it shuts while the resident is busy.
 # The French-door freezer and the wine fridge's top rack slide (`G.slide`).
 
@@ -612,7 +611,7 @@ def _fridgeMiniRetro():
     feet, vents at the back of its sides, and one door over the whole front with a brass D handle, raised
     gold letters ("MARIE") and a die-cut unicorn sticker."""
     Fp = G.GameFrame(shift=0.0)
-    front = 0.115   # the door's face; the handle reaches the placeholder's front (0.15)
+    front = 0.115   # the door's face; the handle reaches the old part's front (0.15)
     with G.new_parts() as still:
         # the cabinet: one rounded shell, its inside cut out through the front and lined
         cab = Fp.box('cabinet', 0.57, 0.81, 0.50, (0, 0.455, -0.18), M.pink, bevel=0.05, bevel_segments=4)
@@ -711,8 +710,8 @@ def _wineFridge():
     G.slide(rack, 'door_open', (0, -0.15, 0), seconds=1.5)
 
 
-# A floor thing against a wall is centred where its placeholder stands (`centre`): its back on the wall,
-# its top under its content `surface` (catalog2.py TOPS).
+# A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
+# its top under its content `surface`.
 FAMILY = G.Family(
     'kitchen', M,
     [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge', centre=(0, -0.069),
@@ -751,14 +750,13 @@ FAMILY = G.Family(
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinets'), ('stone', 'Worktop'), ('metal', 'Basins'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')])],
-    comment='Blender-built kitchen models (tools/art/blender/families/kitchen.py). Replaces the '
-            'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
-            'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
-            'a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from '
-            'the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and '
-            'swing it open while a resident takes food or a drink (`motions`); the French-door freezer and the '
-            'wine fridge\'s top rack slide, and the built-in freezer door and French freezer drawer carry clips '
-            'no use plays yet.',
+    comment='Blender-built kitchen models (tools/art/blender/families/kitchen.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a '
+            'resident washes up. The fridges (K1) each hinge a door built closed and swing it open while '
+            'a resident takes food or a drink (`motions`); the French-door freezer and the wine fridge\'s '
+            'top rack slide, and the built-in freezer door and French freezer drawer carry clips no use '
+            'plays yet.',
 )
 
 if __name__ == '__main__':

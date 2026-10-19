@@ -1,16 +1,15 @@
 # Loner pack — notes
 
 `pack_loner.py` builds the six P11 loner models into `web/public/assets/models/pack_loner/` and their entries in
-`packs/pack_loner/manifest.json`, an override pack listed after `packs/loner/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_loner.py`, in `packs/loner`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_loner/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Loner until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 keeping its footprint, its wall side (the pod, the bench and the hatch against the wall face at depth −0.43, the
 sauna at −0.93 in its 1 × 2) and the seats at 0.45 m (the pod's cushion, the radio and puzzle chairs at the tile's
 middle, the sauna's bench). The pod stood 3 cm into the wall; it is centred on its `Model` `centre` now
-(`G.settle()`), its back on the face. The placeholders of the wall-standing ones (`tools/art/pack_loner.py`, `pack_shapes.to_wall`) stand with their backs
-on the wall face too, so the fallback, the model and the wall agree within a centimetre.
+(`G.settle()`), its back on the face, as the wall-standing ones' old parts stood, so the model and the wall
+agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -32,13 +31,13 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
 - The bonsai bench: its leaves (`leaf`, foliage) take the textured draw; the trunk is plain satin (no bark) and the
   bench plain satin teak. The twig is `leaf` only.
 - The sauna: textured cedar plus plain on the still body, and the door's glass and its plain cedar pull: 4. The
-  glass is the point (the resident is seen sweating inside); the side windows of the placeholder are solid cedar
+  glass is the point (the resident is seen sweating inside); the side windows of the old part are solid cedar
   (a fifth draw otherwise).
 - The hatch: plain slate cabinet with a textured oak ledge and cap; the door plain.
 
 **Warnings left (`check_glb`):**
-- `shortwaveRadio`: height 1.33 m against the placeholder's 1.77 m. The antenna is down at rest and reaches 1.77 m
-  when `antenna` runs it up for `airwaves`; the placeholder always has it up.
+- `shortwaveRadio`: height 1.33 m against the old part's 1.77 m. The antenna is down at rest and reaches 1.77 m
+  when `antenna` runs it up for `airwaves`; the old part always has it up.
 - `soloSauna`: 4 draw calls (above).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |

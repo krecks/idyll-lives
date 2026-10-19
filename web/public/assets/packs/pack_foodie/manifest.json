@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Replaces the primitive-part placeholders of packs/foodie by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts aside for the peel as the fire grows, and the island's drawer pulls out.",
+  "$comment": "Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts aside for the peel as the fire grows, and the island's drawer pulls out.",
   "version": 1,
   "entries": {
     "model.foodie.herbGarden": {

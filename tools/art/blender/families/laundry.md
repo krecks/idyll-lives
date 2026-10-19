@@ -3,13 +3,12 @@
 `laundry.py` builds the six B4 laundry models into `web/public/assets/models/laundry/` and their entries in
 `packs/laundry/manifest.json`: the washing machine (`model.laundryWasher`), the tumble dryer
 (`model.laundryDryer`), the towel rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry
-basket (`model.laundryBasket`) and the bath mat (`model.bathMat`). They replace the primitive-part placeholders
-of `catalog.py` / `catalog2.py`, which stay as the fallback. Built 2026-10-14; they sit in Validate › Laundry
+basket (`model.laundryBasket`) and the bath mat (`model.bathMat`). Built 2026-10-14; they sit in Validate › Laundry
 until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 `Model`): the machines, the ladder and the basket against the wall, the mat flat and centred. The washer, the
-dryer and the towel ladder were built 3 cm into the wall, as their placeholders; they and the placeholders stand
+dryer and the towel ladder were built 3 cm into the wall, as the old parts; they and the old parts stand
 on the wall face now (`G.GameFrame(shift=0.03)`, 2026-10-14). The machines keep 4 draw calls (cabinet, door ring,
 door glass, drum): an opaque window would save one, but then the drum can't be seen turning.
 
@@ -36,7 +35,7 @@ turning.
 - **Towel rail** (wall): two chrome bars on posts and wall plates, a bath towel over the top bar and a hand
   towel over the lower one. It hangs at its real height (bars at 0.95 and 1.2 m), its back on the wall face:
   `G.settle(centre=False, floor=False)` and `floor=False` on its `Model`. `check_glb.py` warns that it floats
-  (right for a wall thing) and that it's 2 cm shallower than its placeholder.
+  (right for a wall thing) and that it's 2 cm shallower than its old part.
 - **Towel ladder**: two birch rails leaning 10.66° back to the wall, five rungs, a towel over three of them.
 - **Laundry basket**: a wicker tub (`fabric`) with a rim, woven bands and side handles, clean washing on top.
 - **Bath mat** (rug): a soft mat with a raised pile and two stripes, 2.5 cm high.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). Replaces the primitive-part placeholders of packs/natureLover by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: a lettuce is picked from the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower runs, the cloche lifts and the glasshouse's door and vent open.",
+  "$comment": "Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: a lettuce is picked from the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower runs, the cloche lifts and the glasshouse's door and vent open.",
   "version": 1,
   "entries": {
     "model.natureLover.veggieBed": {

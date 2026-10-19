@@ -1,10 +1,9 @@
 # The playground (CM1): the slide (`model.slide`), the climbing frame (`model.climbingFrame`), the seesaw
 # (`model.seesaw`), the spring rider (`model.springRider`), the merry-go-round (`model.merryGoRound`), the
 # basketball hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and the park chess
-# table (`model.parkChessTable`), over the primitive-part placeholders of `tools/art/community.py`, which stay
-# the fallback. Notes: playground.md.
+# table (`model.parkChessTable`). Notes: playground.md.
 #
-# Each is built where its placeholder stands (`F`, game axes) and stood on the floor without moving it across
+# Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
 # (`G.settle(centre=False)`, `centre=` on its `Model`), so the seats stay where the content puts its riders:
 # `seat` heights and forward offsets in web/public/content/community.json, slots spread across the width.
 # Town things, seen from far: every model has a far version (`far=0.25`).
@@ -579,14 +578,13 @@ FAMILY = G.Family(
              paint=[('table_top', 'Table'), ('concrete', 'Legs')]),
      G.Model('parkChessTable', parkChessTable, size=(0.8, 0.855, 0.88), key='model.parkChessTable', centre=(0, 0.02),
              motions=CHESS, far=parkChessTableFar, paint=[('stone', 'Table'), ('stool', 'Stools')])],
-    comment='Blender-built playground (tools/art/blender/families/playground.py): a slide, a climbing frame, a '
-            'seesaw, a spring rider, a merry-go-round, a basketball hoop, a ping-pong table and a park chess '
-            'table. Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base '
-            'manifest\'s packs. The placeholder is kept as a fallback if a file fails to load, and the materials '
-            'map onto the game\'s finishes so a model costs one draw call per finish group. The seesaw\'s plank, '
-            'the spring rider\'s horse and the merry-go-round\'s platform go round while played on, carrying their '
-            'riders (`ride`); the hoop\'s net swishes after a shot and a pawn moves on the chess table. Each has a '
-            'far version for the town overview.',
+    comment='Blender-built playground (tools/art/blender/families/playground.py): a slide, a climbing '
+            'frame, a seesaw, a spring rider, a merry-go-round, a basketball hoop, a ping-pong table and '
+            'a park chess table. Listed in the base manifest\'s packs. The materials map onto the game\'s '
+            'finishes so a model costs one draw call per finish group. The seesaw\'s plank, the spring '
+            'rider\'s horse and the merry-go-round\'s platform go round while played on, carrying their '
+            'riders (`ride`); the hoop\'s net swishes after a shot and a pawn moves on the chess table. '
+            'Each has a far version for the town overview.',
 )
 
 if __name__ == '__main__':

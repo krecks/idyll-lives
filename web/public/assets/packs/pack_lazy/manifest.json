@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built lazy pack models (tools/art/blender/families/pack_lazy.py). Replaces the primitive-part placeholders of packs/lazy by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bed's head rises, the pod's hood swings over, the quilt lifts, a locker door opens, the plate shakes and the tablet tilts up.",
+  "$comment": "Blender-built lazy pack models (tools/art/blender/families/pack_lazy.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bed's head rises, the pod's hood swings over, the quilt lifts, a locker door opens, the plate shakes and the tablet tilts up.",
   "version": 1,
   "entries": {
     "model.lazy.snoozecloudBed": {

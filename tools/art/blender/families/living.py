@@ -12,13 +12,13 @@
 # Built in game coordinates (`F`: x, height, depth; front +depth), the bed in its down pose, then
 # turned up to rest.
 #
-# The sofa bed is a boxy two-seater against the wall (its placeholder's size), whose mattress, folded
+# The sofa bed is a boxy two-seater against the wall (the old part's size), whose mattress, folded
 # away inside the base under the seat at rest, pulls out forward over the seat and onto the floor in front
 # (`bed_out`), held out while the object is open (dozing on it, "Pull out the bed"; "Fold the bed away").
 # Sleepers lie with their heads on the seat and the rest on the mattress (characters.ts BEDS['sofaBed']:
 # its top and how far forward).
 #
-# The sofas and sectionals copy their placeholders (catalog.py, catalog2.py, furniture_prims.py), where
+# The sofas and sectionals copy the old primitive parts, where
 # they stand. Their seat cushions are a part of their own that sinks 2 cm while sat or dozed on (`sink_in`).
 # The armchairs too, but for the recliner (it reclines), the rocking chair (it rocks) and the bean bag.
 #
@@ -59,7 +59,7 @@ M = G.Palette(
     pillow_cream=('#EFE5D3', 'fabric'),
     bedding=('#F2EFEA', 'fabric'),      # the pulled-out mattress, made up
     # L1, the sofas and sectionals: per model its upholstery (the main part), its cushions, its legs and
-    # any show-wood or metal frame, the colours of its placeholder
+    # any show-wood or metal frame, the colours of its old part
     linen=('#DCD5CA', 'fabric'),         # the classic camel-back sofa
     linen_cushion=('#DCD5CA', 'fabric'),
     walnut=('#6E4E36', 'wood'),          # its show-wood: the back rail, the apron, the scroll faces
@@ -238,7 +238,7 @@ def wall_bed():
     G.swing(bed, 'bed_down', 90, seconds=SECONDS, axis='X')
 
 
-# The sofa bed: 2 x 1 tiles, its back on the wall's face (depth -0.43), 1.86 m wide like its placeholder.
+# The sofa bed: 2 x 1 tiles, its back on the wall's face (depth -0.43), 1.86 m wide like its old part.
 SB_BACK, SB_FRONT, SB_W = -0.43, 0.40, 1.86
 SB_SEAT = 0.45          # the seat cushion's top (content seat height 0.44)
 SB_MATTRESS = 0.44      # the pulled-out mattress's top: characters.ts BEDS['sofaBed'].h
@@ -277,7 +277,7 @@ def sofa_bed():
     G.grow(mattress, 'bed_out', seconds=1.2, axis='Y')
 
 
-# L1, the sofas and sectionals. Each is built where its placeholder stands, its back on the wall's face,
+# L1, the sofas and sectionals. Each is built where the game places it, its back on the wall's face,
 # and settled in place. Two nodes: the sofa (upholstery, frame, back cushions, pillows, legs) and its seat
 # cushions (`seat`, origin on their underside), which `sink_in` squashes 2 cm while it's sat or dozed on.
 SINK = 0.02
@@ -311,7 +311,7 @@ def _pillow(name, x, y, z, mat, turn=0, w=0.4, h=0.36):
 
 
 def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=None, pillows=(), extra=None):
-    """A sofa or a sectional's module `w` wide (catalog2.py `sofa_run`): a base, arms on the `arms` sides
+    """A sofa or a sectional's module `w` wide (the old `sofa_run`): a base, arms on the `arms` sides
     (-1 at -x), back rests along the back and/or a side ('left' at -x, 'right' at +x), seat and back
     cushions, pillows (x, depth, palette name, turn) and tapered legs; `extra()` adds to the still part.
     Returns the seat."""
@@ -355,12 +355,12 @@ def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=Non
 
 
 def _settled(seat):
-    G.settle()  # on its Model's `centre`: built in the placeholder's numbers, its back moved onto the wall face
+    G.settle()  # on its Model's `centre`: built in the old part's numbers, its back moved onto the wall face
     _sink(seat)
 
 
 def sofa_classic():
-    """The classic sofa (furniture_prims.py `sofa_classic`): a camel back in channels under a walnut
+    """The classic sofa (the old `sofa_classic`): a camel back in channels under a walnut
     rail, scroll arms with carved faces, an apron rail with a shell, cabriole legs; two seat cushions."""
     with G.new_parts() as still:
         F.box('deck', 1.7, 0.18, 0.775, (0, 0.27, -0.048), M.linen, bevel=0.05, bevel_segments=3)
@@ -413,7 +413,7 @@ def _cabriole(name, x, z, h, mat, sx, sz):
 
 
 def _box_sofa(up, cush, legs, w, pillows=(), n=2):
-    """The loveseat and the lounge chair (catalog.py `sofa`, box arms): a base on tapered legs, box arms, a
+    """The loveseat and the lounge chair (the old `sofa`, box arms): a base on tapered legs, box arms, a
     back, `n` seat and back cushions, `w` wide and 0.84 deep; pillows (x, material, turn) against the back."""
     z, depth, back_h = -0.04, 0.84, 0.82
     z0, z1 = z - depth / 2, z + depth / 2
@@ -447,7 +447,7 @@ def loveseat():
 
 
 def sofa_three():
-    """The three-seat sofa (catalog.py `sofa3`): a deep base, three seat and three back cushions, two
+    """The three-seat sofa (the old `sofa3`): a deep base, three seat and three back cushions, two
     pillows and a throw folded over the right-hand seat."""
     with G.new_parts() as still:
         F.box('base', 2.82, 0.2, 0.86, (0, 0.22, -0.03), M.stone, bevel=0.05)
@@ -472,7 +472,7 @@ def sofa_three():
 
 
 def sofa_design():
-    """The designer sofa (catalog.py `design_sofa`): a slim deck on splayed brass legs, a tilted back with
+    """The designer sofa (the old `design_sofa`): a slim deck on splayed brass legs, a tilted back with
     buttons, slim arms with brass caps and a brass rail along the front."""
     z = -0.04
     with G.new_parts() as still:
@@ -529,7 +529,7 @@ def chaise():
 # L2, the armchairs and small seats. Built as the sofas are; the seats sink in (`sink_in`) but for the
 # recliner (`recline`), the rocking chair (`rock`), the bean bag (`squash`) and the designer chair (still).
 def armchair_bergere():
-    """The armchair (furniture_prims.py `armchair_bergere`): an arched back in channels inside a walnut
+    """The armchair (the old `armchair_bergere`): an arched back in channels inside a walnut
     frame, padded arms on open walnut supports, cabriole legs; its seat cushion sinks in."""
     zb = -0.445
 
@@ -570,7 +570,7 @@ def armchair_lounge():
 
 
 def armchair_leather():
-    """The leather armchair (catalog.py): black leather cushions in an open teak frame, the front legs
+    """The leather armchair (the old part): black leather cushions in an open teak frame, the front legs
     running up into the arms."""
     with G.new_parts() as still:
         _cushion('back_cushion', 0.58, 0.5, 0.12, (0, 0.69, -0.3), M.leather, rot=(-14, 0, 0))
@@ -593,7 +593,7 @@ def armchair_leather():
 
 
 def armchair_design():
-    """The designer lounge chair (catalog.py): walnut shells with leather cushions on a five-star swivel
+    """The designer lounge chair (the old part): walnut shells with leather cushions on a five-star swivel
     base. Still."""
     F.cyl('column', 0.04, 0.2, (0, 0.17, 0.0), M.alu, verts=16)
     F.box('seat_shell', 0.66, 0.04, 0.6, (0, 0.32, 0.02), M.ply, rot=(-5, 0, 0), bevel=0.015)
@@ -616,7 +616,7 @@ def armchair_design():
 
 
 def armchair_wingback():
-    """The wingback armchair (catalog2.py): a sofa_run seat with arms, wings either side of a tall back."""
+    """The wingback armchair (the old part): a sofa_run seat with arms, wings either side of a tall back."""
     def wings():
         for s in (-1, 1):
             F.box(f'wing{s}', 0.16, 0.4, 0.3, (s * 0.34, 0.86, -0.3), M.forest, bevel=0.06, bevel_segments=3)
@@ -687,7 +687,7 @@ def rocking_chair():
 
 
 def pouf():
-    """The leather pouf (catalog.py): buttoned dark leather on short legs; the buttoned top sinks in."""
+    """The leather pouf (the old part): buttoned dark leather on short legs; the buttoned top sinks in."""
     with G.new_parts() as still:
         _cushion('body', 0.72, 0.34, 0.5, (0, 0.26, 0), M.pouf_leather)
         for x in (-0.3, 0.3):
@@ -705,7 +705,7 @@ def pouf():
 
 
 def ottoman():
-    """The tufted ottoman (catalog2.py): a navy drum on little walnut feet, its buttoned top sinking in."""
+    """The tufted ottoman (the old part): a navy drum on little walnut feet, its buttoned top sinking in."""
     with G.new_parts() as still:
         F.cyl('drum', 0.31, 0.36, (0, 0.22, 0), M.navy, verts=32, bevel=0.03, bevel_segments=3)
         for x, z in ((-0.2, -0.2), (0.2, -0.2), (-0.2, 0.2), (0.2, 0.2)):
@@ -722,7 +722,7 @@ def ottoman():
 
 
 def floor_cushion():
-    """The floor cushion (catalog2.py): a round mustard cushion with piping and a button; all of it sinks."""
+    """The floor cushion (the old part): a round mustard cushion with piping and a button; all of it sinks."""
     def cushions():
         F.cyl('cushion', 0.31, 0.12, (0, 0.06, 0), M.mustard, verts=32, bevel=0.04, bevel_segments=3)
         G.torus('piping', 0.285, 0.025, at=F.at(0, 0.1, 0), material=M.mustard_piping, major_segments=32, minor_segments=8)
@@ -732,7 +732,7 @@ def floor_cushion():
 
 
 def bean_bag():
-    """The bean bag (catalog2.py): a slumped bag with a raised back and a dent to sit in; it flattens 15 %
+    """The bean bag (the old part): a slumped bag with a raised back and a dent to sit in; it flattens 15 %
     when flopped into (`squash`)."""
     with G.new_parts() as parts:
         F.sphere('bag', 0.42, (0, 0.23, 0.02), M.bag, scale=(1, 1, 0.46 / 0.84), segments=28, rings=16)
@@ -744,10 +744,10 @@ def bean_bag():
 
 
 # L6, the staircase (base manifest `model.stairs`): a flight of 14 steps up one storey (house.ts WALL_HEIGHT
-# 2.8) over its 1 × 4 footprint, climbed from the front (+depth) to the back, every step where the placeholder
+# 2.8) over its 1 × 4 footprint, climbed from the front (+depth) to the back, every step where the old part
 # has it: 0.2 m up and 4/14 m deep, the first starting at the footprint's front edge, the last level with the
 # floor above at the back edge. Residents are drawn rising evenly along the flight (sim-core
-# `World::sim_height`), from the foot of the first step to the top of the last, as over the placeholder.
+# `World::sim_height`), from the foot of the first step to the top of the last, as over the old part.
 STEPS = 14
 RISE = 2.8 / STEPS                  # 0.2
 RUN = 4.0 / STEPS                   # 0.2857
@@ -756,7 +756,7 @@ NOSING = 0.02                       # how far a tread reaches past the riser und
 STEP_W = 0.77                       # the steps, between the strings
 STRING_X, STRING_T = 0.4025, 0.035  # the closed strings each side (to x ±0.42, inside the tile's wall face)
 STRING_UP, STRING_DOWN = 0.12, 0.15  # how far the strings stand above the nosings' line and below the steps'
-RAIL = 0.58                         # the handrail's middle above the strings' top (the placeholder's rail height)
+RAIL = 0.58                         # the handrail's middle above the strings' top (the old part's rail height)
 
 
 def _string(name, x0, x1, material):
@@ -783,7 +783,7 @@ def _string(name, x0, x1, material):
 def stairs():
     """The staircase: oak treads with a rounded nosing on white risers, between closed white strings; a black
     iron railing each side, a square newel at the foot and the head, two balusters a step and a sloping
-    handrail, where the placeholder's rails are."""
+    handrail, where the old part's rails were."""
     for i in range(1, STEPS + 1):
         front, back = 2 - (i - 1) * RUN, 2 - i * RUN
         y = i * RISE
@@ -819,7 +819,7 @@ def stairs():
 
 
 # L3, the coffee and side tables: still, but for the coffee table's drawer (`drawer_open`, a magazine in it,
-# for the magazine use). Their tops stay at the content `surface` heights (catalog2.py `TOPS`).
+# for the magazine use). Their tops stay at the content `surface` heights (the old `TOPS`).
 def _legs4(xs, zs, h, t, mat, y0=0.0):
     for x in xs:
         for z in zs:
@@ -827,7 +827,7 @@ def _legs4(xs, zs, h, t, mat, y0=0.0):
 
 
 def coffee_table():
-    """The coffee table (catalog.py `coffee_table`, classic): an oak top at 0.42 on tapered legs, aprons and
+    """The coffee table (the old `coffee_table`, classic): an oak top at 0.42 on tapered legs, aprons and
     a slatted shelf; a drawer in the front apron."""
     t, h = 0.04, 0.38
     with G.new_parts() as still:
@@ -856,7 +856,7 @@ def coffee_table():
 
 
 def coffee_table_glass():
-    """The glass coffee table (catalog.py `glass_table`): a glass top and shelf in a chrome frame, a plant and
+    """The glass coffee table (the old `glass_table`): a glass top and shelf in a chrome frame, a plant and
     a vase."""
     F.box('top', 1.3, 0.02, 0.74, (0, 0.41, 0), M.glass, bevel=0.008)
     F.box('shelf', 1.2, 0.012, 0.64, (0, 0.12, 0), M.glass, bevel=0.005)
@@ -875,7 +875,7 @@ def coffee_table_glass():
 
 
 def coffee_table_marble():
-    """The marble side table (catalog.py): a round marble top on a brass tulip foot, a vase and a magazine."""
+    """The marble side table (the old part): a round marble top on a brass tulip foot, a vase and a magazine."""
     F.cyl('top', 0.44, 0.04, (0, 0.4, 0), M.marble, verts=48, bevel=0.006)
     G.revolve('foot', [(0, -0.5), (0.5, -0.5), (0.5, -0.43), (0.2, -0.25), (0.11, 0.2), (0.18, 0.5), (0, 0.5)],
               at=F.at(0, 0.19, 0), material=M.brass, segments=32, scale=(0.56, 0.56, 0.38))
@@ -888,7 +888,7 @@ def coffee_table_marble():
 
 
 def side_table():
-    """The side table (catalog.py `side_table`, classic, which the catalog pack draws over the base one): an oak
+    """The side table (the old `side_table`, classic, which the catalog pack draws over the base one): an oak
     top at 0.55 over a drawer box with a brass knob, a lower shelf, tapered legs."""
     F.box('top', 0.55, 0.03, 0.45, (0, 0.535, 0), M.oak, bevel=0.01)
     F.box('drawer_box', 0.46, 0.08, 0.36, (0, 0.48, 0), M.oak, bevel=0.006)
@@ -903,7 +903,7 @@ def side_table():
 
 
 def coffee_table_round():
-    """The round coffee table (catalog2.py): a cream top at 0.42 on an oak drum."""
+    """The round coffee table (the old part): a cream top at 0.42 on an oak drum."""
     F.cyl('top', 0.42, 0.04, (0, 0.4, 0), M.cream_gloss, verts=48, bevel=0.008)
     F.cone('drum', 0.3, 0.255, 0.36, (0, 0.2, 0), M.oak, verts=40)
     F.cyl('plinth', 0.35, 0.02, (0, 0.01, 0), M.oak, verts=40)
@@ -912,7 +912,7 @@ def coffee_table_round():
 
 
 def coffee_table_long():
-    """The long coffee table (catalog2.py): a walnut top at 0.42 and shelf on black legs, a box and a book."""
+    """The long coffee table (the old part): a walnut top at 0.42 and shelf on black legs, a box and a book."""
     F.box('top', 1.66, 0.04, 0.72, (0, 0.4, 0), M.walnut_warm, bevel=0.012)
     F.box('shelf', 1.5, 0.025, 0.58, (0, 0.14, 0), M.walnut_warm, bevel=0.008)
     _legs4((-0.76, 0.76), (-0.3, 0.3), 0.38, 0.05, M.black_metal)
@@ -923,7 +923,7 @@ def coffee_table_long():
 
 
 def nesting_tables():
-    """The nesting tables (catalog2.py): a white table at 0.51 on black legs, a smaller oak one under it (a
+    """The nesting tables (the old part): a white table at 0.51 on black legs, a smaller oak one under it (a
     part of its own, for a clip pulling it out when it gets a use)."""
     with G.new_parts() as big:
         F.box('top', 0.56, 0.025, 0.46, (0, 0.5, -0.02), M.white_gloss, bevel=0.008)
@@ -941,7 +941,7 @@ def nesting_tables():
 
 
 def side_table_round():
-    """The round side table (catalog2.py): a stone top at 0.56 on a brass stem and disc foot."""
+    """The round side table (the old part): a stone top at 0.56 on a brass stem and disc foot."""
     F.cyl('top', 0.26, 0.03, (0, 0.545, 0), M.stone_top, verts=40, bevel=0.006)
     F.cyl('stem', 0.03, 0.5, (0, 0.28, 0), M.brass, verts=16)
     F.cyl('foot', 0.18, 0.03, (0, 0.015, 0), M.brass, verts=36, bevel=0.006)
@@ -950,7 +950,7 @@ def side_table_round():
 
 
 def console_table():
-    """The console table (catalog2.py): a narrow oak top at 0.8 against the wall, a low shelf with two baskets,
+    """The console table (the old part): a narrow oak top at 0.8 against the wall, a low shelf with two baskets,
     on black legs."""
     F.box('top', 1.8, 0.035, 0.56, (0, 0.78, -0.18), M.oak, bevel=0.01)
     F.box('shelf', 1.7, 0.025, 0.48, (0, 0.22, -0.18), M.oak, bevel=0.006)
@@ -1069,7 +1069,7 @@ def _quarter(name, cx, cz, r, y0, y1, material, segments=10):
 
 def _bookcase(w, h, d, frame, back, n, x=0.0, t=0.022, top_t=0.03, plinth=0.06):
     """An open bookcase w × h × d at x, its back on the wall's face: two sides, a top, a bottom board on a
-    recessed kick, a back panel between the sides and n - 1 shelves, n even spaces (catalog2.py `bookcase`).
+    recessed kick, a back panel between the sides and n - 1 shelves, n even spaces (the old `bookcase`).
     Returns the tops books stand on (the bottom's first), the front's depth and the space between shelves."""
     zf, zm = WALL + d, WALL + d / 2
     for s in (-1, 1):
@@ -1121,7 +1121,7 @@ def bookshelf():
 
 
 def bookcase_low():
-    """The low bookcase (catalog.py): oak, 0.92 wide, its top at 0.9 (content `surface`); two shelves of
+    """The low bookcase (the old part): oak, 0.92 wide, its top at 0.9 (content `surface`); two shelves of
     books, a plant on top."""
     tops, zf, _ = _bookcase(0.92, 0.9, 0.38, M.oak, M.oak_back, 2)
     front = zf - 0.025
@@ -1133,7 +1133,7 @@ def bookcase_low():
 
 
 def bookcase_wide():
-    """The library bookcase (catalog.py): oak, 1.86 wide and 2 high, cupboards under open shelves of books,
+    """The library bookcase (the old part): oak, 1.86 wide and 2 high, cupboards under open shelves of books,
     plants and a vase; brass knobs."""
     w, h, d = 1.86, 2.0, 0.42
     zf, zm = WALL + d, WALL + d / 2
@@ -1169,7 +1169,7 @@ def bookcase_wide():
 
 
 def shelving_industrial():
-    """The industrial shelving (catalog.py): five oak boards on black steel posts and angles, its top at
+    """The industrial shelving (the old part): five oak boards on black steel posts and angles, its top at
     1.83 (content `surface`); a cross brace behind, books, boxes and a plant."""
     zb, zf = WALL, 0.10
     zm, d = (zb + zf) / 2, zf - zb
@@ -1200,7 +1200,7 @@ def shelving_industrial():
 
 
 def bookcase_tall():
-    """The tall bookcase (catalog2.py): walnut, 0.9 wide and 2 high, six spaces of books and ornaments, a dark
+    """The tall bookcase (the old part): walnut, 0.9 wide and 2 high, six spaces of books and ornaments, a dark
     back."""
     tops, zf, gap = _bookcase(0.9, 2.0, 0.34, M.walnut_warm, M.walnut_back, 6)
     front, zm = zf - 0.02, WALL + 0.17
@@ -1219,7 +1219,7 @@ def bookcase_tall():
 
 
 def bookcase_corner():
-    """The corner bookcase (catalog2.py): a white bookcase with a teal back and, round its right end,
+    """The corner bookcase (the old part): a white bookcase with a teal back and, round its right end,
     quarter-round open shelves to the wall, with a plant and a vase on them."""
     x0, x1, r = -0.42, 0.14, 0.34      # the bookcase's sides; the end shelves' radius
     tops, zf, gap = _bookcase(x1 - x0, 1.9, r, M.shelf_white, M.shelf_teal, 5, x=(x0 + x1) / 2)
@@ -1241,7 +1241,7 @@ def bookcase_corner():
 
 
 def cube_shelf():
-    """The cube shelf (catalog2.py): four open white cubes, a pale back, two fabric bins, books and a box; its
+    """The cube shelf (the old part): four open white cubes, a pale back, two fabric bins, books and a box; its
     top at 0.8 (content `surface`)."""
     w, h, d, t = 0.8, 0.8, 0.36, 0.022
     zf, zm = WALL + d, WALL + d / 2
@@ -1271,7 +1271,7 @@ def _ladder_back(y):
 
 
 def ladder_shelf():
-    """The ladder shelf (catalog2.py): two oak rails leaning on the wall, four boards through them narrowing
+    """The ladder shelf (the old part): two oak rails leaning on the wall, four boards through them narrowing
     upwards, a plant and a basket, books, vases and a picture."""
     t = 0.036   # the rails, front to back
     outline = [(_ladder_back(0), 0.0), (_ladder_back(0) + t, 0.0), (_ladder_back(LADDER_H) + t, LADDER_H),
@@ -1307,7 +1307,7 @@ DOOR_HINGE = (-0.4, -0.022)    # (game x, depth)
 
 
 def display_cabinet():
-    """The display cabinet (catalog2.py): a walnut vitrine on a plinth and feet under a cornice, a pale back,
+    """The display cabinet (the old part): a walnut vitrine on a plinth and feet under a cornice, a pale back,
     three glass shelves of ornaments behind a brass-framed glass door (its own part, still)."""
     zm = WALL + 0.22
     with G.new_parts() as body:
@@ -1347,17 +1347,6 @@ def display_cabinet():
     G.settle(centre=False)
 
 
-# The wall bed folded, as the placeholder draws it (the fallback when the file fails to load).
-_D, _MID = CAB_FRONT - BACK, (BACK + CAB_FRONT) / 2
-PLACEHOLDER = [
-    {'shape': 'box', 'size': [1.66, 2.17, _D], 'at': [0, 1.085, _MID], 'color': '#E9E4DA', 'material': 'material.finish.satin'},
-    {'shape': 'box', 'size': [1.98, 0.05, _D + 0.03], 'at': [0, 2.195, _MID + 0.015], 'color': '#E9E4DA', 'material': 'material.finish.satin'},
-    {'shape': 'box', 'size': [0.15, 2.17, _D], 'at': [-0.905, 1.085, _MID], 'color': '#D8D1C4', 'material': 'material.finish.matte'},
-    {'shape': 'box', 'size': [0.15, 2.17, _D], 'at': [0.905, 1.085, _MID], 'color': '#D8D1C4', 'material': 'material.finish.matte'},
-    {'shape': 'box', 'size': [1.36, 0.12, 0.12], 'at': [0, 2.0, CAB_FRONT + 0.04], 'color': '#E9E4DA', 'material': 'material.finish.satin'},
-    {'shape': 'box', 'size': [0.5, 0.03, 0.04], 'at': [0, 1.45, CAB_FRONT + 0.04], 'color': '#8D8F92', 'material': 'material.finish.metal'},
-]
-
 SECTIONAL = [('greige', 'Upholstery'), ('greige_cushion', 'Cushions'), ('espresso_legs', 'Legs')]
 
 FAMILY = G.Family(
@@ -1368,8 +1357,7 @@ FAMILY = G.Family(
              motions={'uses': {'sleep': 'bed_down', 'nap': 'bed_down', 'foldDown': 'bed_down'}, 'open': 'bed_down'},
              # The books keep their own colours.
              paint=[('body', 'Cabinet'), ('frame', 'Bed frame'), ('mattress', 'Mattress'), ('pillow', 'Pillows'),
-                    ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')],
-             placeholder=PLACEHOLDER),
+                    ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')]),
      G.Model('sofaBed', sofa_bed, key='model.sofaBed', size=(1.86, 0.83, 0.83), centre=(0, -0.015),
              # Out while the sofa bed is open, from the moment a use that opens it starts.
              motions={'uses': {'doze': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
@@ -1476,9 +1464,8 @@ FAMILY = G.Family(
              paint=[('oak', 'Frame'), ('oak_shelf', 'Shelves')]),
      G.Model('displayCabinet', display_cabinet, key='model.displayCabinet', size=(0.86, 1.91, 0.45), centre=(0, -0.205),
              paint=[('vitrine', 'Frame'), ('vitrine_back', 'Back')])],
-    comment='Blender-built living room models (tools/art/blender/families/living.py). New objects with a '
-            'Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the '
-            'game\'s finishes so a model costs one draw call per finish group.',
+    comment='Blender-built living room models (tools/art/blender/families/living.py). The materials map '
+            'onto the game\'s finishes so a model costs one draw call per finish group.',
 )
 
 if __name__ == '__main__':

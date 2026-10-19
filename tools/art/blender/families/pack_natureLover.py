@@ -1,9 +1,8 @@
 # The nature lover pack (P12): the raised veggie bed, the potting bench, the bird feeder post, the garden
-# hammock, the cedar outdoor shower, the moss terrarium and the fern glasshouse, over their primitive-part
-# placeholders (`tools/art/pack_natureLover.py`, `packs/natureLover/manifest.json`), which stay the fallback.
+# hammock, the cedar outdoor shower, the moss terrarium and the fern glasshouse.
 # Notes: pack_natureLover.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): a lettuce is picked from the veggie bed (`harvest`) whose crop follows its growth stage (`grow`), a
 # seedling comes up in a pot (`seedling`), a bird lands on the feeder (`bird`), the hammock sways (`sway`, a
 # loop the resident rides), the shower runs (`water_on`), the terrarium's glass lid lifts (`lid_open`) and the
@@ -648,12 +647,11 @@ FAMILY = G.Family(
      G.Model('glasshouse', glasshouse, size=(1.887, 2.481, 1.86), key='model.natureLover.glasshouse',
              motions={'uses': {'unwind': 'door_open', 'orchids': 'door_open'}},
              paint=[('cedar', 'Wood'), ('frame', 'Frame'), ('cushion', 'Cushions')])],
-    comment='Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). Replaces '
-            'the primitive-part placeholders of packs/natureLover by key; the placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each moves while it is used: a lettuce is picked from the veggie bed (whose crop follows '
-            'its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower runs, the cloche '
-            'lifts and the glasshouse\'s door and vent open.',
+    comment='Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). '
+            'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '
+            'costs one draw call per finish group. Each moves while it is used: a lettuce is picked from '
+            'the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the '
+            'hammock sways, the shower runs, the cloche lifts and the glasshouse\'s door and vent open.',
 )
 
 if __name__ == '__main__':

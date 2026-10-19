@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built energetic pack models (tools/art/blender/families/pack_energetic.py). Replaces the primitive-part placeholders of packs/energetic by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The bike's cranks turn and the trampoline's mat dips while used (loops), the net sways, the blender's lid lifts, the rain grows and the pod's canopy lowers; the bouldering wall is still.",
+  "$comment": "Blender-built energetic pack models (tools/art/blender/families/pack_energetic.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The bike's cranks turn and the trampoline's mat dips while used (loops), the net sways, the blender's lid lifts, the rain grows and the pod's canopy lowers; the bouldering wall is still.",
   "version": 1,
   "entries": {
     "model.energetic.boulderingWall": {

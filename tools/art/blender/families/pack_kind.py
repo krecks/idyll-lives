@@ -1,9 +1,8 @@
 # The kind pack (P9): the neighbourly baking counter, the community giving jar, the gift-knitting rocker, the
-# welcome tea table, the songbird feeding station and the hearthside quilted settee, over their primitive-part
-# placeholders (`tools/art/pack_kind.py`, `packs/kind/manifest.json`), which stay the fallback.
+# welcome tea table, the songbird feeding station and the hearthside quilted settee.
 # Notes: pack_kind.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the range's oven door drops (`oven_open`), a coin slides into the jar's slot (`coin`), the rocker
 # rocks with its knitter on it (`rock`, a loop), the teapot pours (`pour`), the feeder's roof lifts for a refill
 # (`lid_open`) and songbirds fly out to the tray and the bath (`bird`), and the settee's cushions sink (`sink_in`).
@@ -527,11 +526,11 @@ FAMILY = G.Family(
      G.Model('hearthSettee', hearthSettee, size=(1.9, 0.945, 0.828), key='model.kind.hearthSettee',
              centre=(0, -0.016), motions={'uses': {'curlUp': 'sink_in', 'quiltNap': 'sink_in'}},
              paint=[('body', 'Body'), ('quilt', 'Fabric')])],
-    comment='Blender-built kind pack models (tools/art/blender/families/pack_kind.py). Replaces the primitive-part '
-            'placeholders of packs/kind by key; the placeholder is kept as a fallback if a file fails to load, and the '
-            'materials map onto the game\'s finishes so a model costs one draw call per finish group. Each moves while '
-            'it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours, the '
-            'feeder\'s roof lifts and songbirds fly out, and the settee\'s cushions sink.',
+    comment='Blender-built kind pack models (tools/art/blender/families/pack_kind.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each moves while it is used: the oven door drops, a coin drops into the '
+            'jar, the rocker rocks, the teapot pours, the feeder\'s roof lifts and songbirds fly out, and '
+            'the settee\'s cushions sink.',
 )
 
 if __name__ == '__main__':

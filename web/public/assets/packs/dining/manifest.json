@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built dining tables, chairs, stools and storage (tools/art/blender/families/dining.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Table tops stand at the content's surface heights and seats where the game seats residents; the stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail shaker lifts and tips while a drink is mixed (`shake`).",
+  "$comment": "Blender-built dining tables, chairs, stools and storage (tools/art/blender/families/dining.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Table tops stand at the content's surface heights and seats where the game seats residents; the stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail shaker lifts and tips while a drink is mixed (`shake`).",
   "version": 1,
   "entries": {
     "model.diningTable": {

@@ -1,9 +1,8 @@
 # The lazy pack (P10): the snoozecloud adjustable bed, the daydream nap pod, the heated quilt table, the doorstep
-# delivery locker, the effortless vibration plate and the smart-home command hub, over their primitive-part
-# placeholders (`tools/art/pack_lazy.py`, `packs/lazy/manifest.json`), which stay the fallback.
+# delivery locker, the effortless vibration plate and the smart-home command hub.
 # Notes: pack_lazy.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the bed's head section rises (`head_up`), the pod's hood swings half over (`hood`), the quilt's edge
 # lifts (`quilt`), a locker door opens (`door_open`), the plate's deck shakes (`shake`, a loop) and the tablet
 # tilts up on its dock (`screen_up`).
@@ -397,11 +396,10 @@ FAMILY = G.Family(
      G.Model('smartHub', smartHub, size=(0.6, 0.806, 0.842), key='model.lazy.smartHub', centre=(0, -0.009),
              motions={'uses': {'program': 'screen_up', 'story': 'screen_up'}},
              paint=[('wood', 'Body'), ('speaker', 'Speaker')])],
-    comment='Blender-built lazy pack models (tools/art/blender/families/pack_lazy.py). Replaces the primitive-part '
-            'placeholders of packs/lazy by key; the placeholder is kept as a fallback if a file fails to load, and the '
-            'materials map onto the game\'s finishes so a model costs one draw call per finish group. Each moves while '
-            'it is used: the bed\'s head rises, the pod\'s hood swings over, the quilt lifts, a locker door opens, the '
-            'plate shakes and the tablet tilts up.',
+    comment='Blender-built lazy pack models (tools/art/blender/families/pack_lazy.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each moves while it is used: the bed\'s head rises, the pod\'s hood swings '
+            'over, the quilt lifts, a locker door opens, the plate shakes and the tablet tilts up.',
 )
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kids' things (tools/art/blender/families/kids.py): the crib, the beds and the high chair, the toys, and the kids' study and art things. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "$comment": "Blender-built kids' things (tools/art/blender/families/kids.py): the crib, the beds and the high chair, the toys, and the kids' study and art things. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group.",
   "version": 1,
   "entries": {
     "model.crib": {

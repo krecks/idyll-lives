@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn and the paper lantern sways all the time near the camera (`idle`).",
+  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn and the paper lantern sways all the time near the camera (`idle`).",
   "version": 1,
   "entries": {
     "model.ceilingPendant": {

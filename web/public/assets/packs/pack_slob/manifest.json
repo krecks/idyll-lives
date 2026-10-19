@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built slob pack models (tools/art/blender/families/pack_slob.py). Replaces the primitive-part placeholders of packs/slob by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick waggles, and the recliner reclines and swings its cup holder out.",
+  "$comment": "Blender-built slob pack models (tools/art/blender/families/pack_slob.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick waggles, and the recliner reclines and swings its cup holder out.",
   "version": 1,
   "entries": {
     "model.slob.microwaveCart": {

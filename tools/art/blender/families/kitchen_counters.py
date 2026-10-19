@@ -1,16 +1,15 @@
 # The kitchen's base counters (K4): the plain counter and its corner, the counter end with open
 # shelves, the outer corner counter, the drawer counter, the open-shelf counter, the butcher block and
-# the marble counter. Each replaces the primitive-part placeholder of `catalog.py` / `catalog2.py`,
-# which stays the fallback if the file fails to load. Notes: kitchen_counters.md.
+# the marble counter. Notes: kitchen_counters.md.
 #
 # A base counter is a plinth, a carcass and a worktop; the front carries a drawer over two doors (the
 # plain, corner and marble counters), four drawers, one door, or nothing (the open shelves). The four
 # with a `sandwich` use slide their top drawer out 25 cm. The parts are placed in game axes (`F`): the
-# placeholder's depths are shifted back by the placeholder's depth centre, so the model is centred on
-# its tile (see GameFrame). There is one worktop height, 0.95, the content's `surface` (catalog2.py CT),
+# old part's depths are shifted back by the old part's depth centre, so the model is centred on
+# its tile (see GameFrame). There is one worktop height, 0.95, the content's `surface`,
 # for the catalogue counters (`_unit66`) and the catalog2 ones (`_unit79`) alike. There is one depth, the
-# catalogue's 0.66: the catalog2 counters keep their placeholder's old 0.79-deep numbers and are drawn
-# 0.66 deep through `COUNTER66` (as catalog2.py `shallow`), so the fronts of a mixed run line up. Every
+# catalogue's 0.66: the catalog2 counters keep the old 0.79-deep numbers and are drawn
+# 0.66 deep through `COUNTER66` (as the old `shallow`), so the fronts of a mixed run line up. Every
 # back stands on the wall face (-0.43).
 #
 # Run:  python3 -B tools/art/blender/build.py kitchen_counters [--preview]
@@ -67,7 +66,7 @@ DOOR_SECONDS = 1.6   # a cupboard door swings in this long
 DOOR_HOLD = 2.5      # seconds a pantry's doors stay open once a use starts
 WALL_DOOR_SECONDS = 0.8   # a wall cabinet's door swings open in this long, while clean things are put away
 # catalog2's 0.79-deep counter numbers (worktop -0.48..0.31, carcass -0.46..0.24) as drawn: 0.66 deep, the
-# worktop -0.43..0.23 and the carcass -0.41..0.19 (catalog2.py COUNTER66; gamekit GameFrame `depths`)
+# worktop -0.43..0.23 and the carcass -0.41..0.19 (the old `COUNTER66`; gamekit GameFrame `depths`)
 COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
 
 
@@ -287,7 +286,7 @@ def counterMarble():
 # and shelf are still. A wall thing sits on the wall face (z = WALL)
 # at its real height: `floor=False`, centred in x and depth.
 
-WALL = -0.43   # the back face of a wall thing, in game depth (catalog.py WALL, docs/design/objects.md)
+WALL = -0.43   # the back face of a wall thing, in game depth (docs/design/objects.md)
 
 
 def _case(F, w, h, d, x, y, zback, material, back=None, t=0.02, p='case'):
@@ -659,8 +658,8 @@ def barEnd():
     G.settle()
 
 
-# A floor thing against a wall is centred where its placeholder stands (`centre`): its back on the wall,
-# its top under its content `surface` (catalog2.py TOPS).
+# A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
+# its top under its content `surface`.
 FAMILY = G.Family(
     'kitchen_counters', M,
     [G.Model('counter', counter, size=(1.0, 0.95, 0.66), key='model.counter', centre=(0, -0.10),
@@ -742,15 +741,14 @@ FAMILY = G.Family(
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')]),
      G.Model('barEnd', barEnd, size=(1.0, 1.06, 0.89), key='model.barEnd', centre=(0, 0.015),
              paint=[('walnut', 'Cabinet'), ('oak', 'Worktop')])],
-    comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). '
-            'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The '
-            'placeholder is kept as a fallback if a file fails to load. Each counter is a plinth, a '
-            'carcass and a worktop (to 0.95): the plain, corner and marble counters carry a '
-            'drawer over two doors and slide it out 25 cm (`drawer_open`) while a resident makes a '
-            'sandwich, as does the butcher block\'s knife drawer. The tall and wall storage (K5) adds a '
-            'larder whose doors swing open for a snack; the islands and bars (K6) add freestanding '
-            'islands with their cupboards at the front and a worktop overhanging the back for stools, and slatted bars with a top at '
-            '1.06, the kitchen island sliding a drawer out between its stools for a sandwich.',
+    comment='Blender-built kitchen base counters (tools/art/blender/families/kitchen_counters.py). Listed '
+            'in the base manifest\'s packs. Each counter is a plinth, a carcass and a worktop (to 0.95): '
+            'the plain, corner and marble counters carry a drawer over two doors and slide it out 25 cm '
+            '(`drawer_open`) while a resident makes a sandwich, as does the butcher block\'s knife drawer. '
+            'The tall and wall storage (K5) adds a larder whose doors swing open for a snack; the islands '
+            'and bars (K6) add freestanding islands with their cupboards at the front and a worktop '
+            'overhanging the back for stools, and slatted bars with a top at 1.06, the kitchen island '
+            'sliding a drawer out between its stools for a sandwich.',
 )
 
 if __name__ == '__main__':

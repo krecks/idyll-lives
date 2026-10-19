@@ -1,17 +1,16 @@
-# Placing parts in the game's axes. Placeholder parts (the manifests' `placeholder`, the art scripts in
-# tools/art) are written as (x, height, depth) with the front at +depth; Blender is (x, y, z) with the
-# front at -y and the game's x mirrored. A GameFrame takes the game's numbers as they are:
+# Placing parts in the game's axes. The content and the old primitive parts wrote (x, height, depth) with
+# the front at +depth; Blender is (x, y, z) with the front at -y and the game's x mirrored. A GameFrame
+# takes the game's numbers as they are:
 #
 #   F = G.GameFrame(shift=0.094)
 #   F.box('door', 0.728, 1.146, 0.04, (0, 0.643, 0.195), M.body, bevel=0.01)   # w, h, d at (x, y, z)
 #
-# `shift` moves every depth forward (+z, to the front) by that much, a negative one back: a placeholder
-# built against the back of its tile (furniture_prims.BACK), its parts' depths centred on -shift, is drawn
-# centred on the tile this way. `depths` redraws a placeholder's numbers at
-# another depth: pairs (game depth, drawn depth), ascending; depths between two pairs are mapped
-# linearly, beyond the ends moved as the end is. A box's back and front are mapped, so it keeps its
-# place between them; anything else moves by its middle (the 0.79-deep kitchen counters drawn 0.66
-# deep, as catalog2.py `shallow`).
+# `shift` moves every depth forward (+z, to the front) by that much, a negative one back: a thing built
+# against the back of its tile (BACK = -0.455), its parts' depths centred on -shift, is drawn centred on
+# the tile this way. `depths` redraws a thing's numbers at another depth: pairs (game depth, drawn
+# depth), ascending; depths between two pairs are mapped linearly, beyond the ends moved as the end is.
+# A box's back and front are mapped, so it keeps its place between them; anything else moves by its
+# middle (the 0.79-deep kitchen counters drawn 0.66 deep, as the old `shallow`).
 from . import shapes
 
 

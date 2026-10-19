@@ -21,7 +21,7 @@ previews/         renders from --preview (ignored by git)
    sections for what you touch.
 2. **Find the facts the game already has.** For an object that exists:
    - its content entry (`grep -rn '"id": "<id>"' web/public/content`);
-   - its placeholder (the manifest entry `model.<id>`), whose size you must match.
+   - its model (`web/public/assets/models/<family>/<id>.glb`), whose size and heights it keeps.
 
    For a new object, decide the footprint first; it fixes where the game puts residents (below).
 3. **Build and look.** Run `build.py <family> --preview`, then open the PNGs in `previews/` (you can read
@@ -69,8 +69,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 | Origin | middle of the footprint, on the floor | the same: `G.settle()` puts it there |
 
 - **Game coordinates.** `G.GameFrame(shift)` takes game numbers as they are (`F.box(name, w, h, d, (x, y, z), M.colour)`).
-  Use it to copy a placeholder's parts or content heights. `shift` moves every depth forward (+z; a negative
-  one back), to draw a placeholder built against the back of its tile centred on it.
+  Use it to copy content heights. `shift` moves every depth forward (+z; a negative one back), to draw a thing
+  built against the back of its tile centred on it.
 - **Footprint.** `[w, d]` in whole 1 m tiles, before turning. A 2 × 3 object runs from −1 to +1 across and
   −1.5 to +1.5 deep.
 - **Against a wall.** Its back is on the wall's face, 7 cm into the tile: at depth −0.43 in a 1-deep
@@ -87,8 +87,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 1. **Copy** `families/_template.py` to `families/<family>.py`, or add a model to an existing family.
    Families group what belongs together. A family's models go to
    `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`; the build
-   writes both, so never edit a pack by hand. A pack entry keeps the `placeholder` (the fallback) and
-   `vary` of the entry it overrides; the build doesn't copy them.
+   writes both, so never edit a pack by hand. A pack entry keeps the `vary` of the entry it overrides; the
+   build doesn't copy it.
 2. **Palette.** One material per colour, named for what it is, with its finish:
    `M = G.Palette(body=('#F3F3F1', 'gloss'), handle=('#D0D3D6', 'chrome'))`.
    - The names become the material names in the file.
@@ -102,7 +102,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      On a still part with no other plain material it costs a draw call (objects.md, "Hardware is metal").
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'gloss', 'front')`. Make it a flat
      piece, on the still body or one moving part (a cabinet's door); the game reflects the room in the
-     nearest mirror on screen (two on High). Keep it `gloss`, as the placeholders' mirrors: the others
+     nearest mirror on screen (two on High). Keep it `gloss`, as the mirrored parts always were: the others
      show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
@@ -116,10 +116,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    built in place and uses `G.settle(centre=False)`, with `centre=(x, depth)` on its `Model`.
 4. **Declare it**: `G.Model('<id>', build, size=(w, h, d), key='model.<id>', paint=[('body', 'Cabinet'), ('stone', 'Worktop')])`.
    - `size` is asserted after the build, within 2 % (`tolerance`). It's the real size, never stretched.
-     Take it from the placeholder, or from the `[gamekit]` line once the model is right.
+     Take it from the content, or from the `[gamekit]` line once the model is right.
    - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.
-   - A key the manifests don't have yet needs a `placeholder`: a few primitive boxes of the model at
-     rest, drawn if the file fails to load.
    - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
      to a quarter of the triangles (all but what stands within 1 cm of the floor, so it keeps its
      feet), drawn where it's only seen from afar (the town overview, the far woods). For what is placed
@@ -252,8 +250,8 @@ How the parts work:
   a clip that nothing plays, fails a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
-  a warning to check. A part a clip grows (darts, a pot thrown) is measured grown where the model is
-  compared with its placeholder; one flattened to nothing at rest warns if its flat shape shows (traps).
+  a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
+  nothing at rest warns if its flat shape shows (traps).
 - **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
   way round, a `rock` at its furthest).
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
@@ -270,7 +268,7 @@ with its own dev server on a port you give it (options and the rules for ports a
 [tools/bench/README.md](../../bench/README.md)). Pictures go to `bench-results/check-<time>/` or `--out`:
 
 ```sh
-node tools/bench/check.mjs gallery --port 5227 --keys model.<id> --placeholder   # model | placeholder, side by side
+node tools/bench/check.mjs gallery --port 5227 --keys model.<id> --cols 4
 node tools/bench/check.mjs clips --port 5227 --keys model.<id> --times 0,0.3,0.6,1,99
 node tools/bench/check.mjs play --port 5227 --object <id> --at 23,14,0 --use <interaction> --shots 6
 ```
@@ -282,8 +280,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 
 - **Gallery.** `/gallery.html?keys=model.<id>&cols=4` shows the models from the front right, as close as
   frames them, at their middle height (so things on a wall are in view). `&alpha=…&beta=…&radius=…` and
-  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera. Answer the `.glb` requests
-  with 404 (`page.route`) to see the placeholders.
+  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera.
 - **Clips bench.** `/clips.html?keys=model.<id>` plays every clip of the model in turn, as the game plays
   it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the time. A
   button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a
@@ -317,13 +314,11 @@ never one that's already running) and drive Playwright headless with full Chrome
 ## Traps (each of these happened)
 
 - **Wall face.** A model built on the tile's back edge sits inside the house wall. Wall faces are 7 cm in.
-  The gate warns of a model or placeholder (indoors, or on the wall layer) whose back reaches over 1 cm
-  past the face.
+  The gate warns of a model (indoors, or on the wall layer) whose back reaches over 1 cm past the face.
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
-  and off its content `surface`. Give its `Model` its placeholder's `centre` (`G.settle()` centres it
-  there), as the kitchen families do. The gate warns when the placeholder's back is at the wall face and
-  the model's stands over 2 cm in front of it; a failed size or centre check prints the measured centre,
-  to copy into `centre=`.
+  and off its content `surface`. Give its `Model` a `centre` (`G.settle()` centres it there), as the kitchen
+  families do: the back of a counter or a fridge is 0.43 m in from the middle of its tile. A failed size or
+  centre check prints the measured centre, to copy into `centre=`.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
   reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it
@@ -335,9 +330,8 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Size check.** It counts everything at rest: knobs, handles, a folded bed's foot rail. Set `size` from
   the measured `[gamekit]` line once the model looks right.
 - **Off-centre models.** These need `centre=` on the `Model`. Otherwise the size check fails.
-- **Clicking.** An object is clicked by its drawn outline at rest (the file's, not the placeholder's),
-  never past its tiles. An object held open is clicked by its whole tiles. The contact shadow follows the
-  footprint, so only the fallback has the placeholder's size.
+- **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
+  is clicked by its whole tiles. The contact shadow follows the footprint.
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
 - **Room kind.** A `sleep` interaction turns a living room into a bedroom.
 - **Mirrors past the nearest.** Only the nearest mirror on screen reflects (two on High). Mirror glass
@@ -354,7 +348,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `scene.py` | `reset`, `meshes`, the paths (`ASSETS`, `PREVIEWS`), `cosd`/`sind`; warns off Blender 5.2 |
 | `materials.py` | `Palette` (colour + finish), `mat` (one material by hand), `FINISHES` (read from the base manifest) |
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
-| `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a placeholder's numbers at another depth (the kitchen counters' one depth) |
+| `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |

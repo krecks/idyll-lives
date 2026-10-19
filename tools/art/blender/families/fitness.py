@@ -1,9 +1,8 @@
 # The home gym: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the exercise bike
-# (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`), over their
-# primitive-part placeholders (`objects_extra.py`, `furniture.py`, `catalog.py`), which stay the fallback.
+# (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`).
 # Notes: fitness.md.
 #
-# Each is built where its placeholder stands (`F`, game axes). The treadmill's belt slats run back under the
+# Each is built where the game places it (`F`, game axes). The treadmill's belt slats run back under the
 # runner while it is used (`belt_run`, a loop: one slat on, home unseen under the hood and the rear cap). The
 # bike's cranks and pedals turn while it is cycled (`pedals_turn`, a loop). The yoga mat lies rolled up and
 # unrolls flat for yoga (`unroll`), rolling up again at the end. The lift draws the weight in the
@@ -110,7 +109,7 @@ BAR_DELAY = 0.8
 
 
 def weightBench():
-    F = G.GameFrame(shift=0.02)   # 2 cm forward of its placeholder: the rack's back on the wall's face
+    F = G.GameFrame(shift=0.02)   # 2 cm forward of its old part: the rack's back on the wall's face
     with G.new_parts() as parts:
         F.box('pad', 0.3, 0.09, 1.22, (0, 0.455, -0.12), M.pads, bevel=0.03)
         F.box('board', 0.27, 0.02, 1.18, (0, 0.4, -0.12), M.dark, bevel=0.005)
@@ -281,11 +280,10 @@ FAMILY = G.Family(
              motions={'uses': {'yoga': 'unroll'}}, paint=[('mat', 'Mat')]),
      G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.71), key='model.dumbbells', centre=(0, 0.025),
              motions={'uses': {'lift': 'pair_off'}}, paint=[('frame', 'Rack'), ('plate', 'Weights')])],
-    comment='Blender-built home gym (tools/art/blender/families/fitness.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) '
-            'while used; the yoga mat unrolls (`unroll`) for yoga.',
+    comment='Blender-built home gym (tools/art/blender/families/fitness.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals '
+            '(`pedals_turn`) while used; the yoga mat unrolls (`unroll`) for yoga.',
 )
 
 if __name__ == '__main__':

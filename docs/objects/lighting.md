@@ -6,7 +6,7 @@ height; the floor and table lamps stand centred (the arc lamp's base in the back
 so its arc reaches out over the room).
 
 The light itself is the content's `light` (height, range, intensity, tiles); the model only shows where it comes
-from, and must put its bulb where `tools/art/catalog2.py` `LIGHTS` says. `_bulb` asserts each bulb within 25 cm of
+from, and must put its bulb at its `light.height`. `_bulb` asserts each bulb within 25 cm of
 `light.height` (most are within 8 cm); it doesn't check `at`. Across, the light is at the footprint's middle unless
 the content's `light.at` [x, z] (object frame) moves it: the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0)
 put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb, which
@@ -22,7 +22,6 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 ## LT1. Ceiling lights (7)
 
 - **Family:** `tools/art/blender/families/lighting.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -45,7 +44,6 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 ## LT2. Wall lights (3)
 
 - **Family:** `tools/art/blender/families/lighting.py`
-- **Placeholders:** `tools/art/catalog.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -66,7 +64,6 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 ## LT3. Floor lamps (5)
 
 - **Family:** `tools/art/blender/families/lighting.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -86,7 +83,6 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 ## LT4. Table lamps (6)
 
 - **Family:** `tools/art/blender/families/lighting.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

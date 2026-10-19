@@ -1,9 +1,8 @@
 # The neat pack (P13): the steam mop dock, the stacked laundry centre, the rainfall steam shower, the
-# label-and-sort organizer desk, the robot vacuum and its dock and the tidy entry console, over their
-# primitive-part placeholders (`tools/art/pack_neat.py`, `packs/neat/manifest.json`), which stay the fallback.
+# label-and-sort organizer desk, the robot vacuum and its dock and the tidy entry console.
 # Notes: pack_neat.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), one moving part each: the mop leaves its dock for the hands (`mop_off`), the washer's door swings open
 # (`door_open`), the rain falls (`water_on`), a bin slides out of the desk's hutch (`drawer_open`), the robot
 # rolls out of its dock and turns (`vacuum_out`) and the console's key tray drawer slides out (`tray`).
@@ -461,11 +460,11 @@ FAMILY = G.Family(
              centre=(-0.005, -0.262),
              motions={'uses': {'tidy': 'tray'}},
              paint=[('body', 'Body'), ('birch', 'Wood')])],
-    comment='Blender-built neat pack models (tools/art/blender/families/pack_neat.py). Replaces the primitive-part '
-            'placeholders of packs/neat by key; the placeholder is kept as a fallback if a file fails to load, and '
-            'the materials map onto the game\'s finishes so a model costs one draw call per finish group. Each '
-            'moves one part while it is used: the mop leaves its dock for the resident\'s hands, the washer\'s door opens, the rain falls, '
-            'a bin slides out, the robot rolls out and the key tray drawer opens.',
+    comment='Blender-built neat pack models (tools/art/blender/families/pack_neat.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each moves one part while it is used: the mop leaves its dock for the '
+            'resident\'s hands, the washer\'s door opens, the rain falls, a bin slides out, the robot rolls '
+            'out and the key tray drawer opens.',
 )
 
 if __name__ == '__main__':

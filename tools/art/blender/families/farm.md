@@ -4,12 +4,11 @@
 entries in `packs/farm/manifest.json`: the red barn (`model.farm.barn`), the grain silo (`model.farm.silo`), the
 little tractor (`model.farm.tractor`), the round hay bale (`model.farm.hayBale`), the stack of hay bales
 (`model.farm.hayStack`), the scarecrow (`model.farm.scarecrow`), the water trough (`model.farm.trough`) and the
-chicken coop (`model.farm.coop`). They replace the primitive-part placeholders of `tools/art/community.py` ("Farm"),
-which stay as the fallback. Built 2026-10-14; they sit in Validate › Farm until checked in play.
+chicken coop (`model.farm.coop`). Built 2026-10-14; they sit in Validate › Farm until checked in play.
 
 They stand on the farm lots of farm worlds, placed by id in `web/src/game/town.ts` `farmstead` (the farmyard behind
 the house, hay on the fallow field, a scarecrow in a crop row), not by category or group. Each is built in the game's
-axes (`F`) and centred on its footprint by `G.settle`; the sizes are the placeholders', within 3 %.
+axes (`F`) and centred on its footprint by `G.settle`; the sizes are the old parts', within 3 %.
 
 ## Far versions (E7)
 
@@ -44,7 +43,7 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
   Straw pokes out at the hands, ankles, waist and neck. A sack head tied at the neck has a stitched face and a
   floppy hat with a band.
 - **Trough**: an oval galvanised stock tank with corrugated sides and a rolled rim, full of water, on two skids. A
-  float valve hangs inside the rim at one end, so the tank stays at the placeholder's 0.65 m.
+  float valve hangs inside the rim at one end, so the tank stays at the old part's 0.65 m.
 - **Coop**: a wooden house on four legs with a red gable roof and ridge cap. White corner boards, a wired window
   on each side, a nest box with a sloping lid on the back, and a ramp with cleats up to the pop hole.
 

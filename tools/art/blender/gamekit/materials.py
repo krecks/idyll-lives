@@ -80,7 +80,7 @@ class Palette:
     skin, hair, fabric, wood, bark, foliage, glass). A third says more of it (the pack entry's
     material fields):
       mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'gloss', 'front')` (or 'back'),
-        on a flat part; gloss, as the placeholders' mirrors (only High reflects live);
+        on a flat part; gloss, as mirrors always were (only High reflects live);
       a lamp's shade or a screen that glows, in a colour: `shade=('#F2E6CC', 'fabric',
         {'glow': '#FFD9A0'})`; a screen that's lit only while it's used adds `screen`: `{'glow':
         '#7FC4FF', 'screen': True}`.

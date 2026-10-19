@@ -1,10 +1,8 @@
 # The town's shop fittings and café furniture (CM4): the shop counter with its till, the bakery case,
-# the grocery shelves, the café table and the bentwood café chair. Each replaces the primitive-part
-# placeholder of `tools/art/community.py` (content: web/public/content/community.json), which stays the
-# fallback if the file fails to load. Notes: shops.md.
+# the grocery shelves, the café table and the bentwood café chair. Notes: shops.md.
 #
 # They stand on town lots, seen from far and by the dozen, so each has a far version (`far=0.25`, E7).
-# The parts are placed in game axes (`F`), where the placeholders stand: the counter, the case and the
+# The parts are placed in game axes (`F`), where the game places them: the counter, the case and the
 # shelves sit back on their 2 x 1 tiles as theirs do (`G.settle(centre=False)` and `centre=` on the
 # Model), the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the front
 # for `treat` (`till`), and the bakery case's back glass door slides aside for `pastry` (`door`).
@@ -228,7 +226,7 @@ def shopCounter():
                       M.coin, verts=8)
     drawer = G.join(drawer, 'cash_drawer', origin=F.at(TX, TOP + 0.03, DZ))
 
-    G.settle(centre=False)  # back on its tiles, where the placeholder stands
+    G.settle(centre=False)  # back on its tiles, where the game places it
     G.slide(drawer, 'till', (0, -0.2, 0), seconds=TILL_SECONDS)
 
 
@@ -431,11 +429,10 @@ FAMILY = G.Family(
              paint=[('marble', 'Top'), ('iron', 'Frame')], far=_FAR),
      G.Model('cafeChair', cafeChair, size=(0.446, 0.952, 0.472), key='model.cafeChair', centre=(0, -0.008),
              paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_FAR)],
-    comment='Blender-built shop fittings and café furniture for the town (tools/art/blender/families/shops.py). '
-            'Replaces the primitive-part placeholders of tools/art/community.py by key; listed in the base '
-            'manifest\'s packs. The placeholder is kept as a fallback if a file fails to load. Each has a far '
-            'version for the town overview. The till\'s cash drawer slides out (`till`) while a resident buys '
-            'a treat; the bakery case\'s back glass door slides aside (`door`) for a pastry.',
+    comment='Blender-built shop fittings and café furniture for the town '
+            '(tools/art/blender/families/shops.py). Listed in the base manifest\'s packs. Each has a far '
+            'version for the town overview. The till\'s cash drawer slides out (`till`) while a resident '
+            'buys a treat; the bakery case\'s back glass door slides aside (`door`) for a pastry.',
 )
 
 if __name__ == '__main__':

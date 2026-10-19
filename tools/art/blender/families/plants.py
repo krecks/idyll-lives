@@ -1,6 +1,5 @@
 # The garden's plants: G1, the houseplants (`model.plant` and `model.garden.monstera`, `fiddleFig`, `snakePlant`,
-# `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), G2 the flowers, G3 the shrubs and G4 the edibles (below), over the
-# primitive-part placeholders of `furniture.py` and `nature.py`, which stay the fallback. The outdoor ones each have
+# `cacti`, `succulents`, `bostonFern`, `palm`, `orchid`, `bonsai`), G2 the flowers, G3 the shrubs and G4 the edibles (below). The outdoor ones each have
 # a far version: the same build at low detail (`far_of`).
 #
 # Leaves are closed, thin, bent blades (`leaf`) on the `foliage` finish, stems and trunks swept tubes
@@ -48,7 +47,7 @@ BASE = dict(
     bloom5=('#F4F1EA', 'satin'),
     centre=('#F6C21E', 'satin'),        # flower centres
     centre_dark=('#3A2A1E', 'matte'),
-    blossom=('#F8901C', 'foliage'),     # flowers drawn leafy, as the placeholders' (marigolds, lupins, forget-me-nots)
+    blossom=('#F8901C', 'foliage'),     # flowers drawn leafy, as the old parts' (marigolds, lupins, forget-me-nots)
     blossom2=('#FCBA1E', 'foliage'),
     blossom3=('#F4F0F2', 'foliage'),
     blossom4=('#6C8CF0', 'foliage'),
@@ -801,7 +800,7 @@ def flowerbed():
 
 # ---- shrubs (G3) -------------------------------------------------------------------------------------
 # Shrubs dress every lot (nature.ts `natureDecor`: the bush, hedge, hydrangea, roses, lavender and boxwood) and the
-# bush the woods, as thin instances, so they cost what their placeholders do (a few hundred triangles) and each has
+# bush the woods, as thin instances, so they cost what the old parts did (a few hundred triangles) and each has
 # a far version, a quarter of that.
 
 SHRUB = ['#44703A', '#517E3E', '#5E8C44', '#6E9A4A', '#7EA852']
@@ -891,7 +890,7 @@ def street_hedge():
     """Clipped hedge segment of the streets and hedged lots: the garden hedge's block, still (rows overlap,
     street.ts spaces them about 1.05 m apart)."""
     P = palette(leaf=SHRUB[1], leaf_light=SHRUB[2], stem=SHRUB[3])
-    hedge_block(P, 1.5, 0.915, 0.85)                     # 1.55 x 1.0 x 0.85 m over all, as its placeholder
+    hedge_block(P, 1.5, 0.915, 0.85)                     # 1.55 x 1.0 x 0.85 m over all, as its old part
     return G.settle([G.join_all('hedge')])
 
 
@@ -1236,7 +1235,7 @@ def pumpkins():
     return _crop(still, (0, 0, 0.04), leaves, crop)
 
 
-# (width, height, depth) as measured; each within 10 % of its placeholder's bounds (check_glb warns beyond).
+# (width, height, depth) as measured; each within 10 % of the old part's bounds (check_glb warns beyond).
 TOLERANCE = 0.03
 BED = [('bed', 'Bed')]
 
@@ -1304,13 +1303,13 @@ FAMILY = G.Family(
              paint=[('body', 'Bed')], motions={'uses': {'pickHerbs': 'harvest'}}),
      G.Model('pumpkins', pumpkins, size=(1.112, 0.269, 0.947), key='model.garden.pumpkins', tolerance=TOLERANCE, far=far_of(pumpkins),
              paint=BED, motions={'growth': 'grow'})],
-    comment='Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. '
-            'Replaces the primitive-part placeholders of furniture.py and nature.py by key; listed in the base manifest\'s '
-            'packs. The placeholder is kept as a fallback if a file fails to load. Leaves and stems are on the `foliage` '
-            'finish, so the nature shader sways and tints them as it does the placeholders\'. The outdoor ones have a far '
-            'version (`far`). Clips: the bonsai\'s sprig and the clipped shrubs\' sprigs shrink away while they are '
-            'trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the '
-            'crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).'
+    comment='Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, '
+            'G3 shrubs and G4 edibles. Listed in the base manifest\'s packs. Leaves and stems are on the '
+            '`foliage` finish, so the nature shader sways and tints them. The outdoor ones have a far '
+            'version (`far`). Clips: the bonsai\'s sprig and the clipped shrubs\' sprigs shrink away while '
+            'they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil '
+            'while they are picked; the crops grow from seedlings to ripe and lose their crop when '
+            'harvested (`motions.growth`).'
 )
 
 if __name__ == '__main__':

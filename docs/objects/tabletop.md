@@ -1,9 +1,9 @@
 # Tabletop
 
 Small things that stand on tops (`surface` layer, 1×1). All 39 are built by `tools/art/blender/families/tabletop.py`
-(notes: `families/tabletop.md`), over the placeholders of `tools/art/catalog2.py`. The origin is at the base,
-centred, and the renderer lifts each to its host's top. Each keeps within 10 % of its placeholder's size, so the
-content's `radius` (the disc it takes on a top) still holds; the four widest (`plateSet`, `teapotSet`,
+(notes: `families/tabletop.md`). The origin is at the base,
+centred, and the renderer lifts each to its host's top. Each keeps within 10 % of the `radius` the content gives it
+(the disc it takes on a top), so a thing still fits where the game puts it; the four widest (`plateSet`, `teapotSet`,
 `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit on a counter's top with its edge margin and go on
 tables and desks.
 
@@ -23,7 +23,6 @@ sits on the top, turns with its facing and lights right at night.
 ## TT1. Kitchenware (11)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -49,7 +48,6 @@ sits on the top, turns with its facing and lights right at night.
 ## TT2. Tableware (7)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -69,7 +67,6 @@ sits on the top, turns with its facing and lights right at night.
 ## TT3. Books and small plants (7)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -91,7 +88,6 @@ sits on the top, turns with its facing and lights right at night.
 ## TT4. Small ornaments (6)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -110,7 +106,6 @@ sits on the top, turns with its facing and lights right at night.
 ## TT5. Bath, desk and toys (8)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
