@@ -106,6 +106,7 @@ import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placem
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
+import { smooth } from './characters/clips/ik';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
@@ -174,8 +175,6 @@ const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 /** Seconds a door takes to swing open or shut, and how near (metres) someone walking opens it. */
 const DOOR_SWING = 0.45;
 const DOOR_REACH = 1.3;
-/** How much of its opening a sliding door spends stepping out onto the wall's face, before it slides. */
-const DOOR_STEP_OUT = 0.25;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -3561,7 +3560,6 @@ export class BabylonRenderer implements Renderer {
     if (!this.doors.length) return;
     const movers = this.movers;
     const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
-    const ease = (t: number) => t * t * (3 - 2 * t);
     let moved = false;
     for (const door of this.doors) {
       const { leaf } = door;
@@ -3578,18 +3576,15 @@ export class BabylonRenderer implements Renderer {
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
       door.open = open;
-      // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides
-      // steps out onto the wall's face first, then slides along it; one with no wall to slide
-      // along is hidden while open.
+      // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
+      // turned shut and slides into the wall; one that can't open is hidden while open (not
+      // `setEnabled`: that's the storeys').
+      const eased = smooth(open);
       const { slide } = leaf;
-      if (slide === 'hide') for (const mesh of leaf.meshes) mesh.isVisible = open < 0.5;
-      else if (slide) {
-        const out = ease(Math.min(1, open / DOOR_STEP_OUT));
-        const by = ease(Math.max(0, (open - DOOR_STEP_OUT) / (1 - DOOR_STEP_OUT)));
-        for (const mesh of leaf.meshes) mesh.position.set(slide.out[0] * out + slide.by[0] * by, 0, slide.out[1] * out + slide.by[1] * by);
-      } else {
-        const turn = leaf.close * (1 - leaf.opens * ease(open));
-        for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      for (const mesh of leaf.meshes) {
+        if (slide) mesh.position.set(slide[0] * eased, 0, slide[1] * eased);
+        if (leaf.hide) mesh.isVisible = open < 0.5;
+        mesh.rotation.y = slide || leaf.hide ? leaf.close : leaf.close * (1 - leaf.opens * eased);
       }
       moved = true;
     }
