@@ -35,7 +35,7 @@ interface Entry<T> {
 export class TemplateCache<T extends CachedTemplate | null> {
   private readonly entries = new Map<string, Entry<T>>();
   /** Set aside by `invalidate`, to be disposed by `disposeStale`. */
-  private stale: NonNullable<T>[] = [];
+  private stale: { key: string; template: NonNullable<T> }[] = [];
 
   constructor(private readonly scene: Scene) {}
 
@@ -88,14 +88,20 @@ export class TemplateCache<T extends CachedTemplate | null> {
     for (const [key, entry] of this.entries) yield [key, entry.promise];
   }
 
-  /** Every template built, by key. */
-  *builtEntries(): IterableIterator<[string, T]> {
-    for (const [key, entry] of this.entries) if (entry.built) yield [key, entry.built.value];
+  /** Calls `fn` with every template built and its key (no allocation: for each frame). */
+  forEachBuilt(fn: (value: T, key: string) => void): void {
+    this.entries.forEach((entry, key) => entry.built && fn(entry.built.value, key));
   }
 
-  /** The templates set aside and not yet disposed. */
-  get staleTemplates(): readonly NonNullable<T>[] {
-    return this.stale;
+  /**
+   * Hides the templates set aside (until `disposeStale`), or the one set aside under `key`: once what
+   * replaces them is placed, so the two are never drawn at once.
+   */
+  hideStale(key?: string): void {
+    for (const s of this.stale) {
+      if (key !== undefined && s.key !== key) continue;
+      for (const mesh of [...s.template.meshes, ...(s.template.glows ?? []).map((g) => g.mesh)]) mesh.setEnabled(false);
+    }
   }
 
   /**
@@ -113,7 +119,7 @@ export class TemplateCache<T extends CachedTemplate | null> {
       const t = entry.built.value;
       if (!t?.failed?.includes(url)) continue;
       this.entries.delete(key);
-      this.stale.push(t);
+      this.stale.push({ key, template: t });
       keys.push(key);
     }
     return keys;
@@ -128,16 +134,16 @@ export class TemplateCache<T extends CachedTemplate | null> {
       const t = entry.built?.value;
       if (!t?.failed) continue;
       this.entries.delete(key);
-      this.stale.push(t);
+      this.stale.push({ key, template: t });
     }
     this.disposeStale();
   }
 
-  /** Disposes the templates set aside (their materials are shared and stay); whether there were any. */
-  disposeStale(): boolean {
-    const stale = this.stale;
-    this.stale = [];
-    for (const t of stale) for (const mesh of [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)]) mesh.dispose(false, false);
-    return stale.length > 0;
+  /** Disposes the templates set aside, or those under `keys` (their materials are shared and stay); whether there were any. */
+  disposeStale(keys?: readonly string[]): boolean {
+    const going = keys ? this.stale.filter((s) => keys.includes(s.key)) : this.stale;
+    this.stale = keys ? this.stale.filter((s) => !keys.includes(s.key)) : [];
+    for (const { template: t } of going) for (const mesh of [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)]) mesh.dispose(false, false);
+    return going.length > 0;
   }
 }

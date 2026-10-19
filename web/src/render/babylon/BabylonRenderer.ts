@@ -330,6 +330,8 @@ export class BabylonRenderer implements Renderer {
   /** When the first of the files waiting came (`performance.now()`): the wait for more is capped from then. */
   private filesSince = 0;
   private unlistenFiles: (() => void) | null = null;
+  /** `dispose` has run: nothing more is built. */
+  private disposed = false;
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
@@ -521,9 +523,8 @@ export class BabylonRenderer implements Renderer {
    * away from then on, until one of those files comes (`ghostFileArrived`).
    */
   private readonly ghostUnfiled = new Map<string, string[]>();
-  /** What the ghost was last built from (`loadGhost`'s arguments), and the files the one shown was built without. */
+  /** What the ghost was last built from (`loadGhost`'s arguments). */
   private ghostArgs: Parameters<BabylonRenderer['loadGhost']> | null = null;
-  private ghostFailed: string[] = [];
   /** The model in hand (without its resizing). */
   private ghostModel = '';
   private ghostMeshes: Mesh[] = [];
@@ -791,7 +792,7 @@ export class BabylonRenderer implements Renderer {
     this.setupHelpers();
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
-    this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content);
+    this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, true);
     this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
@@ -973,6 +974,8 @@ export class BabylonRenderer implements Renderer {
     const streetCasters = await perfTimeAsync('render: street furniture', () => this.street.build(world, this.view, () => this.pace()));
     await perfTimeAsync('render: objects', async () => {
       await this.buildObjects(world);
+      // What replaces the boxes of files that came is placed now: they're hidden (and go at the end).
+      this.templates.hideStale();
       this.pullUpChairs(world);
       this.hideHeld();
       await this.pace();
@@ -2330,6 +2333,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
@@ -3640,6 +3644,8 @@ export class BabylonRenderer implements Renderer {
       this.decorMeshes.add(mesh);
       mesh.isVisible = this.storey >= 0;
     }
+    // (In place of a box set aside for a file that came, if there was one.)
+    this.templates.hideStale(`deco:${key}`);
     this.resetSnapshot();
   }
 
@@ -3986,23 +3992,25 @@ export class BabylonRenderer implements Renderer {
    */
   private async refreshModels(): Promise<void> {
     while (this.worldBuilds) await this.worldBuilds.catch(() => {});
+    if (this.disposed) return;
     const urls = [...this.filesArrived];
     this.filesArrived.clear();
     if (!urls.length) return;
-    let stale = false;
+    // Only what the world draws now makes it build again; the rest is just built afresh when asked for.
+    let drawn = false;
     for (const url of urls) {
       const keys = this.templates.invalidate(url);
-      // The garden's dressing is the lot layer's, kept while the lot is the same: build that again too.
-      if (keys.some((k) => k.startsWith('deco:'))) this.lotKey = '';
-      // (The street builds again with the world, its layout key cleared.)
-      if (this.street.invalidate(url)) stale = true;
-      if (keys.length) stale = true;
+      // The lot layer (the garden's dressing) is kept while the lot is the same: build that again too.
+      if (keys.some((k) => this.lotTemplates.has(k))) this.lotKey = '';
+      if (keys.some((k) => this.templatesInUse.has(k))) drawn = true;
+      // Those the world doesn't draw (put away, hidden) go now.
+      this.templates.disposeStale(keys.filter((k) => !this.templatesInUse.has(k)));
+      // (The street builds again with the world, its layout key cleared, if it draws one.)
+      if (this.street.invalidate(url)) drawn = true;
     }
     this.refreshTown(urls);
-    if (!stale) return;
-    // No session (back in the menus): nothing draws the old templates, and no world is built.
-    if (!this.lastWorld) this.templates.disposeStale();
-    else void this.setWorld(this.lastWorld, this.view).catch(() => {});
+    // (No session: back in the menus, `clear` let the world go, and `templatesInUse` with it.)
+    if (drawn && this.lastWorld) void this.setWorld(this.lastWorld, this.view).catch(() => {});
   }
 
   /**
@@ -4125,7 +4133,6 @@ export class BabylonRenderer implements Renderer {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
       }
-      this.ghostFailed = unfiled ?? template.failed ?? [];
       for (const mesh of this.ghostMeshes) mesh.dispose(false, false);
       for (const mesh of template.meshes) {
         mesh.parent = this.ghostRoot;
@@ -4143,9 +4150,10 @@ export class BabylonRenderer implements Renderer {
 
   /** A file that failed for the ghost has come: its models are built with it again, and the thing in hand, if it's one, now (its box stays until then). */
   private ghostFileArrived(url: string): void {
+    // (The thing in hand is a box while its model is unfiled.)
+    const inHand = !!this.ghostUnfiled.get(this.ghostModel)?.includes(url);
     for (const [model, files] of this.ghostUnfiled) if (files.includes(url)) this.ghostUnfiled.delete(model);
-    if (!this.ghostFailed.includes(url) || !this.ghostArgs) return;
-    this.ghostFailed = [];
+    if (!inHand || !this.ghostArgs) return;
     if (this.ghostShown) this.loadGhost(...this.ghostArgs);
     // Put away: built afresh when next taken in hand.
     else this.ghostKey = '';

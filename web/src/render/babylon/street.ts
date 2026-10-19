@@ -468,6 +468,8 @@ export class Street {
   /** Footprints of public places' things by model key, and the boxes they're drawn as without their files (see `look`). */
   private readonly footprints = new Map<string, [number, number]>();
   private readonly standIns = new Map<string, StandIn>();
+  /** Keys of the templates the last build draws (see `invalidate`). */
+  private used = new Set<string>();
   private readonly glowMat: StandardMaterial;
   private readonly poolMat: StandardMaterial;
   /** What glows at night on the models drawn (a path light's lens: a template's `glows`), and each instance's strength. */
@@ -939,6 +941,7 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => withGlows(t).forEach((m) => m.setEnabled(false)));
     this.glows = [];
+    this.used = new Set(batches.filter(([, items]) => items.length).map(([key]) => key));
     for (const [key, items, cast] of batches) {
       await pace?.();
       const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), this.standIns.get(key), pace));
@@ -966,18 +969,22 @@ export class Street {
   private drawn: Mesh[] = [];
 
   /**
-   * A model file that failed has come: what was built without it (a box, or nothing) is built again
-   * by the next `build`, which this makes rebuild the street. Called between builds (one running holds
-   * the templates it was given); true if anything was drawn without it.
+   * A model file that failed has come: what was built without it (a box, or nothing) is built afresh
+   * when next asked for. If the street draws one, the next `build` rebuilds it (true); otherwise the
+   * old ones just go. Called between builds (one running holds the templates it was given).
    */
   invalidate(url: string): boolean {
-    if (!this.templates.invalidate(url).length) return false;
+    const keys = this.templates.invalidate(url);
+    // (Those not drawn are hidden already.)
+    this.templates.disposeStale(keys.filter((k) => !this.used.has(k)));
+    if (!keys.some((k) => this.used.has(k))) return false;
     this.key = '';
     return true;
   }
 
   /** Removes what was built (the foliage templates are kept, hidden, for the next build). */
   clear(): void {
+    this.used.clear();
     for (const mesh of this.meshes) mesh.dispose(false, false);
     this.meshes = [];
     this.casters = [];
@@ -1205,6 +1212,8 @@ export class Street {
       mesh.freezeWorldMatrix();
       this.glows.push({ mesh, colors });
     }
+    // (In place of a box set aside for a file that came, if there was one: never both at once.)
+    this.templates.hideStale(key);
     perfEnd(meshSpan);
     await pace?.();
     return items.length ? t.meshes : [];

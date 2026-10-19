@@ -97,15 +97,18 @@ export class TownOverview {
   }
 
   /**
-   * A model file that failed has come: the next `build` builds the town again (even the same one),
-   * with what was drawn without the file (a box, or nothing) built afresh. Called between builds;
-   * true if anything was drawn without it.
+   * A model file that failed has come: what was built without it (a box, or nothing) is built afresh
+   * when next asked for, and if the overview draws one, the next `build` builds the town again (even
+   * the same one; true). Called between builds.
    */
   invalidate(url: string): boolean {
-    let stale = this.templates.invalidate(url).length > 0;
-    for (const street of this.streets) stale = street.invalidate(url) || stale;
-    if (stale) this.key = '';
-    return stale;
+    const keys = this.templates.invalidate(url);
+    // Those the overview doesn't draw (hidden) go now; it's built again only for those it does.
+    this.templates.disposeStale(keys.filter((k) => !this.templatesInUse.has(k)));
+    let drawn = keys.some((k) => this.templatesInUse.has(k));
+    for (const street of this.streets) drawn = street.invalidate(url) || drawn;
+    if (drawn) this.key = '';
+    return drawn;
   }
 
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. */

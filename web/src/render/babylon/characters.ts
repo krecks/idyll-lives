@@ -1137,17 +1137,24 @@ export class Characters {
     private readonly lib: MaterialLibrary,
     /** For seats content describes (`seat`) and what can be sat or lain on. */
     private readonly content?: Content,
+    /**
+     * Builds again the props drawn without a model file that came (the game's): the scene then tries
+     * failed files in the background (`onModelFileArrived`). Off for the preview studio and the debug pages.
+     */
+    refreshProps = false,
   ) {
     this.props = new TemplateCache(scene);
     // A model file that failed has come: the props drawn without it (small blocks) are built again,
     // and the blocks go once they are (hidden at once: the frame no longer moves them).
-    this.unlisten = onModelFileArrived(scene, (url) => {
-      const keys = this.props.invalidate(url);
-      if (!keys.length) return;
-      for (const p of this.props.staleTemplates) for (const mesh of p.meshes) mesh.isVisible = false;
-      const dispose = () => this.props.disposeStale();
-      void Promise.all(keys.map((key) => this.props.get(key, () => this.buildProp(key)))).then(dispose, dispose);
-    });
+    this.unlisten = refreshProps
+      ? onModelFileArrived(scene, (url) => {
+          const keys = this.props.invalidate(url);
+          if (!keys.length) return;
+          this.props.hideStale();
+          const dispose = () => this.props.disposeStale();
+          void Promise.all(keys.map((key) => this.props.get(key, () => this.buildProp(key)))).then(dispose, dispose);
+        })
+      : () => {};
   }
 
   /** Loads the character set and creates the pose texture; false if unavailable. */
@@ -1704,6 +1711,16 @@ export class Characters {
     void this.props.get(key, () => this.buildProp(key));
     return null;
   }
+
+  /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
+  private readonly showProp = (p: Prop | null, key: string): void => {
+    if (!p) return;
+    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
+    for (const mesh of p.meshes) {
+      mesh.isVisible = used;
+      if (used) mesh.thinInstanceBufferUpdated('matrix');
+    }
+  };
 
   /** Builds prop `key` (`prop`); without its file, a small block (it's built again when the file comes). */
   private async buildProp(key: string): Promise<Prop | null> {
@@ -2505,15 +2522,7 @@ export class Characters {
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
     }
-    // (A prop nobody holds or works with isn't drawn: no draw call for its empty instances.)
-    for (const [key, p] of this.props.builtEntries()) {
-      if (!p) continue;
-      const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
-      for (const mesh of p.meshes) {
-        mesh.isVisible = used;
-        if (used) mesh.thinInstanceBufferUpdated('matrix');
-      }
-    }
+    this.props.forEachBuilt(this.showProp);
     this.pullChairs();
     this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;
