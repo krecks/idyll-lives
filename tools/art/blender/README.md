@@ -323,9 +323,9 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
   and off its content `surface`. Give its `Model` a `centre` (`G.settle()` centres it there), as the kitchen
   families do: the back of a counter or a fridge is 0.43 m in from the middle of its tile. A failed size or
-  centre check prints the measured centre, to copy into `centre=`. The gate warns of a thing as tall as
-  the wall (content `fillsWall`) whose back is over 2 cm off the face; nothing in the content says a
-  counter stands against one, so check those by eye.
+  centre check prints the measured centre, to copy into `centre=`. No content fact says a thing stands
+  against a wall (a counter and an island have the same top; `fillsWall` only keeps the wall over it
+  clear), so the gate can't tell one standing off it: check by eye.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
   reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it

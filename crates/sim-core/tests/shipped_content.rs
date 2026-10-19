@@ -466,11 +466,19 @@ fn asset_entries() -> AssetEntries {
         let m: serde_json::Value =
             serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let dir = path.parent().unwrap().to_path_buf();
-        for (key, entry) in m["entries"].as_object().unwrap() {
+        // A manifest without `entries` has none (as check_glb.py reads it).
+        let entries = match &m["entries"] {
+            serde_json::Value::Null => &serde_json::Map::new(),
+            e => e.as_object().unwrap_or_else(|| panic!("{path:?}: `entries` is {e}, not an object")),
+        };
+        for (key, entry) in entries {
             out.insert(key.clone(), (entry.clone(), dir.clone()));
         }
         for pack in m["packs"].as_array().into_iter().flatten() {
-            walk(&dir.join(pack.as_str().unwrap()), out);
+            let pack = pack
+                .as_str()
+                .unwrap_or_else(|| panic!("{path:?}: `packs` lists {pack}, not a manifest's path"));
+            walk(&dir.join(pack), out);
         }
     }
     let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/assets");

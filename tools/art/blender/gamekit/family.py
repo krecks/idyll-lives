@@ -13,7 +13,7 @@ from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
 # (export.py, imported above, puts check_glb.py's folder on the path.)
-from check_glb import misspelt, played  # the gate's readings of keys and `motions`, shared
+from check_glb import known_keys, played  # the gate's readings of keys and `motions`, shared
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
 FAR_FEET = 0.01
@@ -121,9 +121,15 @@ class Family:
                 sys.exit(f'{self.name}: no model {", ".join(sorted(unknown))}')
         models = [m for m in self.models if only is None or m.id in only]
         # A key the game wouldn't draw is a misspelt `key=`: refused before any model is built or exported, so
-        # no file is written for an entry the pack then can't take.
+        # no file is written for an entry the pack then can't take. The keys it knows: the content's, the
+        # manifests' and this pack's own (listed in `packs` or not), read once and handed to write_pack.
+        known = None
         if '--preview' not in args:
-            unknown = misspelt([self.key(m) for m in models if not m.code], ASSETS)
+            try:
+                known = known_keys(ASSETS, os.path.join(ASSETS, 'packs', self.pack, 'manifest.json'))
+            except ValueError as err:
+                sys.exit(f'{self.name}: cannot read the content or the manifests: {err}')
+            unknown = sorted(self.key(m) for m in models if not m.code and self.key(m) not in known)
             if unknown:
                 sys.exit(f'{self.name}: no content object or item names {", ".join(unknown)} and no manifest has it: '
                          'a misspelt key=? (a model the game draws by code takes code=True)')
@@ -162,7 +168,7 @@ class Family:
             entries[self.key(model)] = entry
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
         if entries and '--no-pack' not in args:
-            path = write_pack(self.pack, entries, self.comment, code={self.key(m) for m in models if m.code})
+            path = write_pack(self.pack, entries, self.comment, code={self.key(m) for m in models if m.code}, known=known)
             print(f'[gamekit] wrote {os.path.relpath(path, ASSETS)}')
 
     def make_far(self, model, objs):

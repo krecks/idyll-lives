@@ -367,12 +367,14 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   doesn't have, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no
   use plays, over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
   materials, unused UVs, a floating origin, a model off its entry's `centre` (which the build writes
-  from the `Model`) by over 2 cm at rest, one that reaches over 1 cm into the wall, one as tall as
-  the wall (content `fillsWall`) whose back stands over 2 cm off it, one indoors (on the floor, a wall
-  or the ceiling, without `vary`) that reaches over 2 cm past its footprint, a thing on a top that
-  reaches more than 10 % past its content `radius` from its origin (its farthest vertex), and a floor
-  model or moving part lower than the floor drawn over it. Plain Python, so CI can run it; inside
-  Blender, `-- --preview` also renders each file re-imported.
+  from the `Model`) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the
+  wall, one indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past
+  its footprint, a thing on a top that reaches more than 10 % past its content `radius` from its
+  origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
+  drawn over it; each against every content object that draws the model. No content fact says a thing
+  stands against a wall, so one standing off it isn't caught. Plain Python, so CI can run it; inside
+  Blender, `-- --preview` also renders each file re-imported. A content file or manifest it can't read
+  is a FAIL naming the file.
 - **`cargo test -p sim-core --test shipped_content`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.

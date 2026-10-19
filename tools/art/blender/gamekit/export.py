@@ -11,7 +11,7 @@ from .scene import ASSETS, meshes
 # The gate's readings, shared: the manifests as the game stacks them, and which keys the game draws.
 # (gamekit/__init__ imports this module first, so this puts check_glb.py's folder on the path for family.py too.)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from check_glb import manifests, misspelt  # noqa: E402
+from check_glb import known_keys, manifests  # noqa: E402
 
 
 def export_glb(path, objects=None, texcoords=False, clips=False):
@@ -50,7 +50,7 @@ def materials_used(objs=None):
     return {s.material.name for o in (objs if objs is not None else meshes()) for s in o.material_slots if s.material}
 
 
-def write_pack(pack, entries, comment, code=()):
+def write_pack(pack, entries, comment, code=(), known=None):
     """
     Writes the override pack `packs/<pack>/manifest.json` and lists it in the base manifest's `packs`.
     `entries` is {key: fields}, e.g. {'url', 'materials', 'motions', 'paint'}. The game keeps the `vary`
@@ -60,7 +60,7 @@ def write_pack(pack, entries, comment, code=()):
     A new key must be one the game draws: a content object's or item's model, one a manifest has, or
     one of `code` (keys the game draws by code: `Model(code=True)`). Anything else is a misspelt `key=`,
     which would write an entry nothing draws (the object a box). `Family.run` refuses those before it
-    builds anything; this is the backstop.
+    builds anything and passes the keys it knows (`known`, check_glb `known_keys`); this is the backstop.
     """
     path = os.path.join(ASSETS, 'packs', pack, 'manifest.json')
     rel = os.path.relpath(path, ASSETS)
@@ -68,14 +68,15 @@ def write_pack(pack, entries, comment, code=()):
         base = json.load(f)
     # The model entries of every manifest but this pack, later ones overriding (the game's order).
     below = {k: e for p, m in manifests(os.path.join(ASSETS, 'manifest.json')) if os.path.relpath(p, ASSETS) != rel
-             for k, e in m.get('entries', {}).items() if e.get('type') == 'model'}
+             for k, e in (m.get('entries') or {}).items() if e.get('type') == 'model'}
     try:
         with open(path) as f:
             kept = json.load(f)['entries']
     except FileNotFoundError:
         kept = {}
-    for key in misspelt(entries, ASSETS):
-        if key not in kept and key not in code:
+    known = known_keys(ASSETS, path) if known is None else known
+    for key in entries:
+        if key not in known and key not in code:
             raise ValueError(f'{key}: no content object names this model and no manifest has it: a misspelt key=? '
                              '(a model the game draws by code: Model(code=True))')
     for key, fields in entries.items():
