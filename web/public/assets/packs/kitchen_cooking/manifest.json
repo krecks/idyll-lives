@@ -44,6 +44,10 @@
           "material": "hob",
           "label": "Hob"
         }
+      ],
+      "centre": [
+        0,
+        -0.0995
       ]
     },
     "model.stoveGas": {
@@ -98,6 +102,10 @@
           "material": "grate",
           "label": "Hob"
         }
+      ],
+      "centre": [
+        0,
+        -0.078
       ]
     },
     "model.wallOven": {
@@ -136,6 +144,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.077
       ]
     },
     "model.rangeCooker": {
@@ -187,6 +199,10 @@
           "material": "grate",
           "label": "Hob"
         }
+      ],
+      "centre": [
+        0,
+        -0.0525
       ]
     },
     "model.cooktopCounter": {
@@ -233,6 +249,10 @@
           "material": "hob",
           "label": "Hob"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.microwave": {
@@ -286,6 +306,10 @@
           "material": "charcoal",
           "label": "Microwave"
         }
+      ],
+      "centre": [
+        0,
+        -0.095
       ]
     },
     "model.coffeeMachine": {
@@ -339,6 +363,10 @@
           "material": "charcoal",
           "label": "Machine"
         }
+      ],
+      "centre": [
+        0,
+        -0.097
       ]
     },
     "model.breakfastCounter": {
@@ -393,6 +421,10 @@
           "material": "charcoal",
           "label": "Blender"
         }
+      ],
+      "centre": [
+        0,
+        -0.097
       ]
     },
     "model.dishwasher": {
@@ -437,6 +469,10 @@
           "material": "steel",
           "label": "Panel"
         }
+      ],
+      "centre": [
+        0,
+        -0.088
       ]
     },
     "model.dishwasherCompact": {
@@ -481,6 +517,10 @@
           "material": "steel",
           "label": "Panel"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     }
   }

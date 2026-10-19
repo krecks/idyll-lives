@@ -60,6 +60,10 @@
           "material": "teal",
           "label": "Mop"
         }
+      ],
+      "centre": [
+        -0.006,
+        -0.076
       ]
     },
     "model.neat.laundryCenter": {
@@ -148,6 +152,10 @@
           "material": "appliance",
           "label": "Washer & dryer"
         }
+      ],
+      "centre": [
+        0.01,
+        -0.127
       ]
     },
     "model.neat.rainShowerTower": {
@@ -214,6 +222,10 @@
           "material": "teak",
           "label": "Bench"
         }
+      ],
+      "centre": [
+        0,
+        0.02
       ]
     },
     "model.neat.organizerDesk": {
@@ -282,6 +294,10 @@
           "material": "pastel_c",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.039
       ]
     },
     "model.neat.robotVacuumDock": {
@@ -413,6 +429,10 @@
           "material": "birch",
           "label": "Wood"
         }
+      ],
+      "centre": [
+        -0.005,
+        -0.262
       ]
     }
   }

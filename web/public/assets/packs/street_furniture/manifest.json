@@ -39,6 +39,10 @@
           "label": "Frame"
         }
       ],
+      "centre": [
+        0,
+        -0.036
+      ],
       "far": "../../models/street_furniture/parkBench.far.glb"
     },
     "model.drinkingFountain": {
@@ -93,6 +97,10 @@
           "material": "body",
           "label": "Bin"
         }
+      ],
+      "centre": [
+        0,
+        -0.034
       ],
       "far": "../../models/street_furniture/litterBin.far.glb"
     },
@@ -192,6 +200,10 @@
           "material": "body",
           "label": "Frame"
         }
+      ],
+      "centre": [
+        0,
+        -0.05
       ],
       "far": "../../models/street_furniture/noticeBoard.far.glb"
     },

@@ -74,6 +74,10 @@
           "material": "liner",
           "label": "Inside"
         }
+      ],
+      "centre": [
+        0,
+        -0.069
       ]
     },
     "model.farmhouseSink": {
@@ -134,6 +138,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.095
       ]
     },
     "model.counterSinkDouble": {
@@ -194,6 +202,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.fridgeMini": {
@@ -248,6 +260,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.128
       ]
     },
     "model.fridgeBuiltIn": {
@@ -305,6 +321,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.099
       ]
     },
     "model.fridgeFrenchDoor": {
@@ -360,6 +380,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.052
       ]
     },
     "model.fridgeRetro": {
@@ -436,6 +460,10 @@
           "material": "mint2",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.067
       ]
     },
     "model.wineFridge": {
@@ -488,6 +516,10 @@
           "material": "doorframe",
           "label": "Door frame"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.fridgeMiniRetro": {
@@ -570,6 +602,10 @@
           "material": "pink2",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.14
       ]
     }
   }

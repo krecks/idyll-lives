@@ -32,6 +32,10 @@
           "material": "drawers",
           "label": "Drawers"
         }
+      ],
+      "centre": [
+        0,
+        -0.085
       ]
     },
     "model.deskCorner": {
@@ -117,6 +121,10 @@
           "material": "shelf",
           "label": "Shelf"
         }
+      ],
+      "centre": [
+        0,
+        -0.115
       ]
     },
     "model.deskExecutive": {
@@ -163,6 +171,10 @@
           "material": "inlay",
           "label": "Desk pad"
         }
+      ],
+      "centre": [
+        0,
+        -0.0445
       ]
     },
     "model.computerDesk": {
@@ -260,6 +272,10 @@
           "material": "chair",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.0142
       ]
     },
     "model.deskWriting": {
@@ -333,6 +349,10 @@
           "material": "chair_sage",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.0142
       ]
     },
     "model.deskLaptop": {
@@ -408,6 +428,10 @@
           "material": "chair",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.0142
       ]
     },
     "model.computerGaming": {
@@ -476,6 +500,10 @@
           "material": "chair_gamer",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.016
       ]
     },
     "model.chairExecutive": {
@@ -519,6 +547,10 @@
           "material": "leather",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.0276
       ]
     },
     "model.chairTask": {
@@ -566,6 +598,10 @@
           "material": "mesh",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        0.0445
       ]
     },
     "model.officeChair": {
@@ -604,6 +640,10 @@
           "material": "upholstery",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        -0.0162
       ]
     },
     "model.filingCabinet": {
@@ -650,6 +690,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.11
       ]
     },
     "model.whiteboard": {
@@ -698,6 +742,10 @@
           "material": "aluminium",
           "label": "Frame"
         }
+      ],
+      "centre": [
+        0,
+        -0.395
       ]
     },
     "model.corkboard": {
@@ -744,6 +792,10 @@
           "material": "cork_frame",
           "label": "Frame"
         }
+      ],
+      "centre": [
+        0,
+        -0.4135
       ]
     }
   }

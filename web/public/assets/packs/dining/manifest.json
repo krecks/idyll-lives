@@ -55,6 +55,10 @@
           "material": "legs_oakd",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.016
       ]
     },
     "model.bistroSet": {
@@ -102,6 +106,10 @@
           "material": "seat_sage",
           "label": "Seats"
         }
+      ],
+      "centre": [
+        0,
+        0.024
       ]
     },
     "model.diningGlass": {
@@ -157,6 +165,10 @@
           "material": "legs_chrome",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.024
       ]
     },
     "model.diningOak": {
@@ -212,6 +224,10 @@
           "material": "legs_oakd",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.021
       ]
     },
     "model.tableSquare2": {
@@ -473,6 +489,10 @@
           "material": "seat_sage",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.05
       ]
     },
     "model.stoolBarHigh": {
@@ -506,6 +526,10 @@
           "material": "leather",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.046
       ]
     },
     "model.diningChair": {
@@ -528,6 +552,10 @@
           "material": "seat_sage",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        -0.002
       ]
     },
     "model.chairWood": {
@@ -550,6 +578,10 @@
           "material": "seat_honey",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.035
       ]
     },
     "model.chairUpholstered": {
@@ -572,6 +604,10 @@
           "material": "upholstery",
           "label": "Upholstery"
         }
+      ],
+      "centre": [
+        0,
+        0.032
       ]
     },
     "model.chairModern": {
@@ -594,6 +630,10 @@
           "material": "shell",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.032
       ]
     },
     "model.chairWindsor": {
@@ -616,6 +656,10 @@
           "material": "seat_windsor",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.041
       ]
     },
     "model.chairBentwood": {
@@ -638,6 +682,10 @@
           "material": "seat_bent",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.041
       ]
     },
     "model.chairFolding": {
@@ -663,6 +711,10 @@
           "material": "seat_teal",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.06
       ]
     },
     "model.chairArm": {
@@ -685,6 +737,10 @@
           "material": "seat_sage",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.035
       ]
     },
     "model.benchDining": {
@@ -707,6 +763,10 @@
           "material": "seat_oak",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.05
       ]
     },
     "model.sideboard": {
@@ -754,6 +814,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.096
       ]
     },
     "model.buffet": {
@@ -798,6 +862,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.096
       ]
     },
     "model.chinaCabinet": {
@@ -848,6 +916,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.156
       ]
     },
     "model.barCart": {
@@ -903,6 +975,10 @@
           "material": "tray",
           "label": "Trays"
         }
+      ],
+      "centre": [
+        -0.017,
+        0
       ]
     }
   }

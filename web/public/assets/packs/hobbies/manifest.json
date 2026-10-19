@@ -51,6 +51,10 @@
           "material": "piano_trim",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.016499999999999997
       ]
     },
     "model.ukulele": {
@@ -103,6 +107,10 @@
           "material": "stand",
           "label": "Stand"
         }
+      ],
+      "centre": [
+        0,
+        0.065
       ]
     },
     "model.guitarElectric": {
@@ -166,6 +174,10 @@
           "material": "amp",
           "label": "Amp"
         }
+      ],
+      "centre": [
+        0,
+        -0.128
       ]
     },
     "model.keyboardDigital": {
@@ -215,6 +227,10 @@
           "material": "kb_trim",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ]
     },
     "model.drumKit": {
@@ -252,6 +268,10 @@
           "material": "chrome",
           "label": "Hardware"
         }
+      ],
+      "centre": [
+        0.0076,
+        0.0125
       ]
     },
     "model.guitarAcoustic": {
@@ -310,6 +330,10 @@
           "material": "stand",
           "label": "Stand"
         }
+      ],
+      "centre": [
+        0,
+        -0.0217
       ]
     },
     "model.chessTable": {
@@ -352,6 +376,10 @@
           "material": "chair_wood",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        0.025
       ]
     },
     "model.poolTable": {
@@ -470,6 +498,10 @@
           "material": "foos_trim",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        0.0375
       ]
     },
     "model.dartboard": {
@@ -518,6 +550,10 @@
           "material": "cabinet",
           "label": "Cabinet"
         }
+      ],
+      "centre": [
+        0,
+        -0.393
       ]
     },
     "model.arcadeCabinet": {
@@ -574,6 +610,10 @@
           "material": "art",
           "label": "Art"
         }
+      ],
+      "centre": [
+        0,
+        0.006
       ]
     },
     "model.puzzleTable": {
@@ -622,6 +662,10 @@
           "material": "chair_wood",
           "label": "Stool"
         }
+      ],
+      "centre": [
+        0.0025,
+        0.0155
       ]
     },
     "model.easel": {
@@ -691,6 +735,10 @@
           "material": "easel_metal",
           "label": "Metal"
         }
+      ],
+      "centre": [
+        0.0318,
+        -0.0347
       ]
     },
     "model.workbench": {
@@ -745,6 +793,10 @@
           "material": "bench_steel",
           "label": "Metal"
         }
+      ],
+      "centre": [
+        0,
+        -0.0975
       ]
     },
     "model.telescope": {
@@ -781,6 +833,10 @@
           "material": "tripod",
           "label": "Tripod"
         }
+      ],
+      "centre": [
+        0,
+        0.026
       ]
     },
     "model.sewingTable": {
@@ -844,6 +900,10 @@
           "material": "machine",
           "label": "Machine"
         }
+      ],
+      "centre": [
+        0,
+        0.025
       ]
     },
     "model.chemistrySet": {
@@ -901,6 +961,10 @@
           "material": "glass",
           "label": "Glassware"
         }
+      ],
+      "centre": [
+        0,
+        -0.18
       ]
     },
     "model.potteryWheel": {
@@ -949,6 +1013,10 @@
           "material": "stool",
           "label": "Stool"
         }
+      ],
+      "centre": [
+        0,
+        0.03
       ]
     },
     "model.craftTable": {
@@ -1009,6 +1077,10 @@
           "material": "craft_metal",
           "label": "Metal"
         }
+      ],
+      "centre": [
+        0,
+        0.005
       ]
     }
   }

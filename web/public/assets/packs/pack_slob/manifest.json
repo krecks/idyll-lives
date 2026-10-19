@@ -70,6 +70,10 @@
           "material": "body",
           "label": "Body"
         }
+      ],
+      "centre": [
+        0.011,
+        -0.0386
       ]
     },
     "model.slob.beanbag": {
@@ -118,6 +122,10 @@
           "material": "bag",
           "label": "Body"
         }
+      ],
+      "centre": [
+        0,
+        0.007
       ]
     },
     "model.slob.snackNightstand": {
@@ -190,6 +198,10 @@
           "material": "pad",
           "label": "Top"
         }
+      ],
+      "centre": [
+        0.021,
+        0.031
       ]
     },
     "model.slob.spritzStation": {
@@ -249,6 +261,10 @@
           "material": "shelf",
           "label": "Body"
         }
+      ],
+      "centre": [
+        0.069,
+        -0.031
       ]
     },
     "model.slob.arcadeCabinet": {
@@ -316,6 +332,10 @@
           "material": "side",
           "label": "Sides"
         }
+      ],
+      "centre": [
+        0.031,
+        -0.039
       ]
     },
     "model.slob.gamingRecliner": {
@@ -378,6 +398,10 @@
           "material": "stripe",
           "label": "Stripes"
         }
+      ],
+      "centre": [
+        0.005,
+        0.01
       ]
     }
   }

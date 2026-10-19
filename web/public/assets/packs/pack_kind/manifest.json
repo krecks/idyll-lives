@@ -101,6 +101,10 @@
           "material": "cabinet",
           "label": "Cupboards"
         }
+      ],
+      "centre": [
+        -0.002,
+        -0.113
       ]
     },
     "model.kind.givingJar": {
@@ -161,6 +165,10 @@
           "material": "ribbon",
           "label": "Fabric"
         }
+      ],
+      "centre": [
+        0.101,
+        0.057
       ]
     },
     "model.kind.knittingRocker": {
@@ -211,6 +219,10 @@
           "material": "cushion",
           "label": "Fabric"
         }
+      ],
+      "centre": [
+        0.09,
+        0.007
       ]
     },
     "model.kind.welcomeTeaTable": {
@@ -378,6 +390,10 @@
           "material": "roof",
           "label": "Roof"
         }
+      ],
+      "centre": [
+        0,
+        0.012
       ]
     },
     "model.kind.hearthSettee": {
@@ -433,6 +449,10 @@
           "material": "quilt",
           "label": "Fabric"
         }
+      ],
+      "centre": [
+        0,
+        -0.016
       ]
     }
   }

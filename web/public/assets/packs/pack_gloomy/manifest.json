@@ -86,6 +86,10 @@
           "material": "ink",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.025
       ]
     },
     "model.gloomy.cello": {
@@ -148,6 +152,10 @@
           "material": "varnish",
           "label": "Cello"
         }
+      ],
+      "centre": [
+        0.06,
+        0.091
       ]
     },
     "model.gloomy.journalDesk": {
@@ -222,6 +230,10 @@
           "material": "plum",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        0.043
       ]
     },
     "model.gloomy.rainLamp": {
@@ -280,6 +292,10 @@
           "material": "umbrella",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        0.039
       ]
     },
     "model.gloomy.windowSeat": {
@@ -354,6 +370,10 @@
           "material": "frame",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.077
       ]
     },
     "model.gloomy.soakingTub": {
@@ -414,6 +434,10 @@
           "material": "ledge",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.005
       ]
     }
   }

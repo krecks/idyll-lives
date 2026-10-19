@@ -36,6 +36,10 @@
           "label": "Roof"
         }
       ],
+      "centre": [
+        0,
+        0.0024
+      ],
       "far": "../../models/playground/slide.far.glb"
     },
     "model.climbingFrame": {
@@ -74,6 +78,10 @@
           "material": "rope",
           "label": "Net"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ],
       "far": "../../models/playground/climbingFrame.far.glb"
     },
@@ -168,6 +176,10 @@
           "label": "Spring"
         }
       ],
+      "centre": [
+        0,
+        0.0387
+      ],
       "far": "../../models/playground/springRider.far.glb"
     },
     "model.merryGoRound": {
@@ -261,6 +273,10 @@
           "label": "Hoop"
         }
       ],
+      "centre": [
+        0,
+        0.016
+      ],
       "far": "../../models/playground/basketballHoop.far.glb"
     },
     "model.pingPongTable": {
@@ -341,6 +357,10 @@
           "material": "stool",
           "label": "Stools"
         }
+      ],
+      "centre": [
+        0,
+        0.02
       ],
       "far": "../../models/playground/parkChessTable.far.glb"
     }

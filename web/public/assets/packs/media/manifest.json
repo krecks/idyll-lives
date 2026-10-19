@@ -44,6 +44,10 @@
           "material": "tv_oak",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.21
       ]
     },
     "model.tvWall": {
@@ -79,6 +83,10 @@
           "material": "wall_bar",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.379
       ]
     },
     "model.tvRetro": {
@@ -116,6 +124,10 @@
           "material": "retro_bezel",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.1884
       ]
     },
     "model.tvStandLow": {
@@ -159,6 +171,10 @@
           "material": "bench_tv",
           "label": "TV"
         }
+      ],
+      "centre": [
+        0,
+        -0.198
       ]
     },
     "model.homeCinema": {
@@ -215,6 +231,10 @@
           "material": "cinema_oak",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.206
       ]
     },
     "model.stereo": {
@@ -296,6 +316,10 @@
           "material": "stereo_dark",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.22
       ]
     },
     "model.boombox": {
@@ -429,6 +453,10 @@
           "material": "firebox",
           "label": "Firebox"
         }
+      ],
+      "centre": [
+        0,
+        0.03
       ]
     }
   }

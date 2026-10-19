@@ -71,6 +71,10 @@
           "material": "cloth",
           "label": "Tablecloth"
         }
+      ],
+      "centre": [
+        0,
+        0.087
       ]
     },
     "model.romantic.heartTub": {
@@ -134,6 +138,10 @@
           "material": "cloth",
           "label": "Fabric"
         }
+      ],
+      "centre": [
+        -0.017,
+        0.004
       ]
     },
     "model.romantic.vanity": {
@@ -194,6 +202,10 @@
           "material": "rosegold",
           "label": "Rose gold"
         }
+      ],
+      "centre": [
+        0,
+        -0.019
       ]
     },
     "model.romantic.gramophone": {
@@ -256,6 +268,10 @@
           "material": "horn",
           "label": "Horn"
         }
+      ],
+      "centre": [
+        0.041,
+        -0.079
       ]
     },
     "model.romantic.letterBureau": {
@@ -311,6 +327,10 @@
           "material": "fabric",
           "label": "Fabric"
         }
+      ],
+      "centre": [
+        0,
+        0.087
       ]
     },
     "model.romantic.roseArbourSwing": {

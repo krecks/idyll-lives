@@ -77,6 +77,10 @@
           "material": "metal",
           "label": "Handle"
         }
+      ],
+      "centre": [
+        0,
+        -1.135
       ]
     },
     "model.sofaBed": {
@@ -134,6 +138,10 @@
           "material": "pillow_cream",
           "label": "Second pillow"
         }
+      ],
+      "centre": [
+        0,
+        -0.015
       ]
     },
     "model.sofa": {
@@ -189,6 +197,10 @@
           "material": "pillow_sage",
           "label": "Second pillow"
         }
+      ],
+      "centre": [
+        0,
+        -0.0215
       ]
     },
     "model.loveseat": {
@@ -231,6 +243,10 @@
           "material": "pillow_cream",
           "label": "Pillow"
         }
+      ],
+      "centre": [
+        0,
+        -0.01
       ]
     },
     "model.sofaThree": {
@@ -322,6 +338,10 @@
           "material": "brass_legs",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        -0.02
       ]
     },
     "model.sofaThreeSeat": {
@@ -371,6 +391,10 @@
           "material": "pillow_mustard",
           "label": "Second pillow"
         }
+      ],
+      "centre": [
+        0,
+        0.01
       ]
     },
     "model.sectionalMiddle": {
@@ -406,6 +430,10 @@
           "material": "espresso_legs",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.01
       ]
     },
     "model.sectionalArmLeft": {
@@ -441,6 +469,10 @@
           "material": "espresso_legs",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.01
       ]
     },
     "model.sectionalArmRight": {
@@ -476,6 +508,10 @@
           "material": "espresso_legs",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        0.01
       ]
     },
     "model.sectionalCorner": {
@@ -518,6 +554,10 @@
           "material": "pillow_mustard",
           "label": "Pillow"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ]
     },
     "model.chaise": {
@@ -560,6 +600,10 @@
           "material": "throw_oat",
           "label": "Throw"
         }
+      ],
+      "centre": [
+        0,
+        0.02
       ]
     },
     "model.armchair": {
@@ -608,6 +652,10 @@
           "material": "pillow_sage",
           "label": "Pillow"
         }
+      ],
+      "centre": [
+        0,
+        -0.0315
       ]
     },
     "model.armchairLounge": {
@@ -642,6 +690,10 @@
           "material": "oak_legs",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        -0.01
       ]
     },
     "model.armchairLeather": {
@@ -670,6 +722,10 @@
           "material": "leather",
           "label": "Upholstery"
         }
+      ],
+      "centre": [
+        0,
+        -0.004
       ]
     },
     "model.armchairDesign": {
@@ -702,6 +758,10 @@
           "material": "alu",
           "label": "Base"
         }
+      ],
+      "centre": [
+        0,
+        -0.004
       ]
     },
     "model.armchairWingback": {
@@ -737,6 +797,10 @@
           "material": "walnut_warm",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0,
+        -0.03
       ]
     },
     "model.recliner": {
@@ -772,6 +836,10 @@
           "material": "tan_cushion",
           "label": "Cushions & footrest"
         }
+      ],
+      "centre": [
+        0,
+        0.05
       ]
     },
     "model.rockingChair": {
@@ -801,6 +869,10 @@
           "material": "rocker_cushion",
           "label": "Cushion"
         }
+      ],
+      "centre": [
+        0,
+        0.05
       ]
     },
     "model.pouf": {
@@ -930,6 +1002,10 @@
           "material": "bag_seat",
           "label": "Seat"
         }
+      ],
+      "centre": [
+        0,
+        0.018
       ]
     },
     "model.coffeeTable": {
@@ -1124,6 +1200,10 @@
           "material": "black_metal",
           "label": "Legs"
         }
+      ],
+      "centre": [
+        0.005,
+        0.025
       ]
     },
     "model.sideTableRound": {
@@ -1175,6 +1255,10 @@
           "material": "basket",
           "label": "Baskets"
         }
+      ],
+      "centre": [
+        0,
+        -0.15
       ]
     },
     "model.bookshelf": {
@@ -1240,6 +1324,10 @@
           "material": "shelf_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.2425
       ]
     },
     "model.bookcaseLow": {
@@ -1306,6 +1394,10 @@
           "material": "oak_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.24
       ]
     },
     "model.bookcaseWide": {
@@ -1386,6 +1478,10 @@
           "material": "oak_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.195
       ]
     },
     "model.shelvingIndustrial": {
@@ -1456,6 +1552,10 @@
           "material": "oak_shelf",
           "label": "Shelves"
         }
+      ],
+      "centre": [
+        0,
+        -0.165
       ]
     },
     "model.bookcaseTall": {
@@ -1526,6 +1626,10 @@
           "material": "walnut_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.26
       ]
     },
     "model.bookcaseCorner": {
@@ -1592,6 +1696,10 @@
           "material": "shelf_teal",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0.03,
+        -0.26
       ]
     },
     "model.cubeShelf": {
@@ -1650,6 +1758,10 @@
           "material": "cube_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.25
       ]
     },
     "model.ladderShelf": {
@@ -1714,6 +1826,10 @@
           "material": "oak_shelf",
           "label": "Shelves"
         }
+      ],
+      "centre": [
+        0,
+        -0.252
       ]
     },
     "model.displayCabinet": {
@@ -1763,6 +1879,10 @@
           "material": "vitrine_back",
           "label": "Back"
         }
+      ],
+      "centre": [
+        0,
+        -0.205
       ]
     },
     "model.stairs": {

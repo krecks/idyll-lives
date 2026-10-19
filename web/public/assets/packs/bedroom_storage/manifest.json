@@ -34,6 +34,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1958
       ]
     },
     "model.nightstandModern": {
@@ -71,6 +75,10 @@
           "material": "iron",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.116
       ]
     },
     "model.nightstandRound": {
@@ -102,6 +110,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.0498
       ]
     },
     "model.nightstandDrawers": {
@@ -142,6 +154,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.116
       ]
     },
     "model.nightstandLamp": {
@@ -183,6 +199,10 @@
           "material": "shade",
           "label": "Shade"
         }
+      ],
+      "centre": [
+        0,
+        -0.1958
       ]
     },
     "model.cedarChest": {
@@ -255,6 +275,10 @@
           "material": "wicker",
           "label": "Hamper"
         }
+      ],
+      "centre": [
+        0,
+        -0.2
       ]
     },
     "model.benchBedEnd": {
@@ -335,6 +359,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.16
       ]
     },
     "model.wardrobe": {
@@ -394,6 +422,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.117
       ]
     },
     "model.chestOfDrawers": {
@@ -437,6 +469,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1025
       ]
     },
     "model.dresserLow": {
@@ -483,6 +519,10 @@
           "material": "iron",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1125
       ]
     },
     "model.wardrobeSingle": {
@@ -532,6 +572,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1215
       ]
     },
     "model.armoire": {
@@ -581,6 +625,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1162
       ]
     }
   }

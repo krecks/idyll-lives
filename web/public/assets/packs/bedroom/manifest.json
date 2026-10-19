@@ -50,6 +50,10 @@
           "material": "bedding_cream",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.009
       ]
     },
     "model.bedSingle": {
@@ -94,6 +98,10 @@
           "material": "bedding_sage",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.02
       ]
     },
     "model.bedBunk": {
@@ -156,6 +164,10 @@
           "material": "bedding_teal",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.015
       ]
     },
     "model.bedFuton": {
@@ -199,6 +211,10 @@
           "material": "bedding_futon",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.025
       ]
     },
     "model.bedKing": {
@@ -249,6 +265,10 @@
           "material": "bedding_cream",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.02
       ]
     },
     "model.bedDouble": {
@@ -293,6 +313,10 @@
           "material": "bedding_blue",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.014
       ]
     },
     "model.bedQueenUpholstered": {
@@ -340,6 +364,10 @@
           "material": "bedding_oat",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.015
       ]
     },
     "model.bedCanopy": {
@@ -387,6 +415,10 @@
           "material": "bedding_rust",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.0175
       ]
     },
     "model.bedDaybed": {
@@ -422,6 +454,10 @@
           "material": "bedding_sage",
           "label": "Bedding"
         }
+      ],
+      "centre": [
+        0.0,
+        0.025
       ]
     }
   }

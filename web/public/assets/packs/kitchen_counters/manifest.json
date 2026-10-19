@@ -38,6 +38,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.counterCorner": {
@@ -79,6 +83,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        0.035
       ]
     },
     "model.counterEnd": {
@@ -123,6 +131,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.counterCornerOuter": {
@@ -161,6 +173,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        -0.095,
+        -0.1
       ]
     },
     "model.counterDrawers": {
@@ -199,6 +215,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.counterOpenShelf": {
@@ -242,6 +262,10 @@
           "material": "worktop",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.butcherBlock": {
@@ -330,6 +354,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.1
       ]
     },
     "model.pantry": {
@@ -385,6 +413,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.115
       ]
     },
     "model.pantryTall": {
@@ -440,6 +472,10 @@
           "material": "brass",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.08
       ]
     },
     "model.wallCabinet": {
@@ -474,6 +510,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.2405
       ]
     },
     "model.wallCabinetGlass": {
@@ -514,6 +554,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.227
       ]
     },
     "model.wallCabinetCorner": {
@@ -551,6 +595,10 @@
           "material": "chrome",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.227
       ]
     },
     "model.rangeHood": {
@@ -579,6 +627,10 @@
           "material": "trim",
           "label": "Trim"
         }
+      ],
+      "centre": [
+        0,
+        -0.1725
       ]
     },
     "model.spiceRack": {
@@ -621,6 +673,10 @@
           "material": "oak",
           "label": "Rack"
         }
+      ],
+      "centre": [
+        0,
+        -0.377
       ]
     },
     "model.potRail": {
@@ -646,6 +702,10 @@
           "material": "copper",
           "label": "Pots"
         }
+      ],
+      "centre": [
+        0,
+        -0.32
       ]
     },
     "model.kitchenShelfWall": {
@@ -695,6 +755,10 @@
           "material": "oakd",
           "label": "Brackets"
         }
+      ],
+      "centre": [
+        0,
+        -0.31
       ]
     },
     "model.trashCan": {
@@ -726,6 +790,10 @@
           "material": "lid",
           "label": "Lid"
         }
+      ],
+      "centre": [
+        0,
+        -0.247
       ]
     },
     "model.recyclingBins": {
@@ -781,6 +849,10 @@
           "material": "lid",
           "label": "Handles"
         }
+      ],
+      "centre": [
+        0,
+        -0.212
       ]
     },
     "model.kitchenIsland": {
@@ -815,6 +887,10 @@
           "material": "worktop",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        0.0495
       ]
     },
     "model.islandSmall": {
@@ -843,6 +919,10 @@
           "material": "worktop",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        0.0255
       ]
     },
     "model.islandLong": {
@@ -871,6 +951,10 @@
           "material": "worktop",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        0.0255
       ]
     },
     "model.barSegment": {
@@ -896,6 +980,10 @@
           "material": "oak",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ]
     },
     "model.barEnd": {
@@ -921,6 +1009,10 @@
           "material": "oak",
           "label": "Worktop"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ]
     }
   }

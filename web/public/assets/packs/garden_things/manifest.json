@@ -111,6 +111,10 @@
           "label": "Box"
         }
       ],
+      "centre": [
+        0,
+        -0.09
+      ],
       "far": "../../models/garden_things/planterBox.far.glb"
     },
     "model.birdhouse": {
@@ -193,6 +197,10 @@
           "material": "feeder",
           "label": "Feeders"
         }
+      ],
+      "centre": [
+        0,
+        -0.1694
       ]
     },
     "model.dogHouse": {
@@ -230,6 +238,10 @@
           "material": "roof",
           "label": "Roof"
         }
+      ],
+      "centre": [
+        0,
+        -0.003
       ]
     },
     "model.sundial": {

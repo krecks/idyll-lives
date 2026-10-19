@@ -54,6 +54,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.121
       ]
     },
     "model.sinkPedestal": {
@@ -103,6 +107,10 @@
           "material": "chrome",
           "label": "Tap"
         }
+      ],
+      "centre": [
+        0,
+        -0.195
       ]
     },
     "model.vanityDouble": {
@@ -157,6 +165,10 @@
           "material": "trim",
           "label": "Plinth"
         }
+      ],
+      "centre": [
+        0,
+        -0.149
       ]
     },
     "model.sinkVessel": {
@@ -218,6 +230,10 @@
           "material": "towel",
           "label": "Towels"
         }
+      ],
+      "centre": [
+        0,
+        -0.16
       ]
     },
     "model.sinkConsole": {
@@ -261,6 +277,10 @@
           "material": "fabric",
           "label": "Towel"
         }
+      ],
+      "centre": [
+        0,
+        -0.188
       ]
     },
     "model.toilet": {
@@ -301,6 +321,10 @@
           "material": "cistern",
           "label": "Cistern"
         }
+      ],
+      "centre": [
+        0,
+        -0.092
       ]
     },
     "model.toiletCompact": {
@@ -347,6 +371,10 @@
           "material": "cistern",
           "label": "Cistern"
         }
+      ],
+      "centre": [
+        0.09,
+        -0.1145
       ]
     },
     "model.toiletSmart": {
@@ -399,6 +427,10 @@
           "material": "panel",
           "label": "Cistern"
         }
+      ],
+      "centre": [
+        0,
+        -0.073
       ]
     },
     "model.toiletClassic": {
@@ -439,6 +471,10 @@
           "material": "cistern",
           "label": "Cistern"
         }
+      ],
+      "centre": [
+        0,
+        -0.074
       ]
     },
     "model.toiletWallHung": {
@@ -482,6 +518,10 @@
           "material": "boxing",
           "label": "Cistern"
         }
+      ],
+      "centre": [
+        0,
+        -0.0975
       ]
     },
     "model.shower": {
@@ -532,6 +572,10 @@
           "material": "tile",
           "label": "Tiles"
         }
+      ],
+      "centre": [
+        0,
+        0.02
       ]
     },
     "model.showerStall": {
@@ -592,6 +636,10 @@
           "material": "tile",
           "label": "Tiles"
         }
+      ],
+      "centre": [
+        0,
+        0.02
       ]
     },
     "model.showerWalkIn": {
@@ -648,6 +696,10 @@
           "material": "slate_wall",
           "label": "Wall"
         }
+      ],
+      "centre": [
+        0,
+        0.03
       ]
     },
     "model.showerRain": {
@@ -695,6 +747,10 @@
           "material": "wall_stone",
           "label": "Walls"
         }
+      ],
+      "centre": [
+        0,
+        0.035
       ]
     },
     "model.bathtub": {
@@ -897,6 +953,10 @@
           "material": "cab_door",
           "label": "Frame"
         }
+      ],
+      "centre": [
+        0,
+        -0.33
       ]
     },
     "model.mirrorRound": {
@@ -923,6 +983,10 @@
           "material": "leather",
           "label": "Strap"
         }
+      ],
+      "centre": [
+        0,
+        -0.407
       ]
     },
     "model.bathCabinetTall": {
@@ -973,6 +1037,10 @@
           "material": "towel_blue",
           "label": "Towels"
         }
+      ],
+      "centre": [
+        0,
+        -0.24
       ]
     }
   }

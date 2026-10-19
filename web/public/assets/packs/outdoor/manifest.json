@@ -22,6 +22,10 @@
           "material": "park_slats",
           "label": "Slats"
         }
+      ],
+      "centre": [
+        0,
+        0.011
       ]
     },
     "model.patioSet": {
@@ -50,6 +54,10 @@
           "material": "bistro",
           "label": "Slats"
         }
+      ],
+      "centre": [
+        0,
+        0.05
       ]
     },
     "model.picnicTable": {
@@ -115,6 +123,10 @@
           "material": "garden_white",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        -0.052
       ]
     },
     "model.patioTableRound": {
@@ -169,6 +181,10 @@
           "material": "teak",
           "label": "Top"
         }
+      ],
+      "centre": [
+        0,
+        -0.04
       ]
     },
     "model.patioChair": {
@@ -191,6 +207,10 @@
           "material": "cushion",
           "label": "Cushion"
         }
+      ],
+      "centre": [
+        0,
+        0.042
       ]
     },
     "model.adirondackChair": {
@@ -206,6 +226,10 @@
           "material": "adirondack",
           "label": "Chair"
         }
+      ],
+      "centre": [
+        0,
+        -0.038
       ]
     },
     "model.benchGarden3": {
@@ -228,6 +252,10 @@
           "material": "bench_slats",
           "label": "Slats"
         }
+      ],
+      "centre": [
+        0,
+        -0.021
       ]
     },
     "model.outdoorBar": {
@@ -260,6 +288,10 @@
           "material": "steel",
           "label": "Foot rail"
         }
+      ],
+      "centre": [
+        0,
+        0.015
       ]
     },
     "model.parasol": {
@@ -333,6 +365,10 @@
           "material": "towel",
           "label": "Towel"
         }
+      ],
+      "centre": [
+        0,
+        0.007
       ]
     },
     "model.hammock": {
@@ -485,6 +521,10 @@
           "material": "tub_cover",
           "label": "Cover"
         }
+      ],
+      "centre": [
+        0,
+        0.008
       ]
     },
     "model.grill": {
@@ -533,6 +573,10 @@
           "material": "kettle_lid",
           "label": "Lid"
         }
+      ],
+      "centre": [
+        0,
+        0.013
       ]
     },
     "model.grillStation": {
@@ -594,6 +638,10 @@
           "material": "hood",
           "label": "Hood"
         }
+      ],
+      "centre": [
+        0,
+        -0.125
       ]
     },
     "model.firePit": {
@@ -639,6 +687,10 @@
           "material": "pit_stones",
           "label": "Stones"
         }
+      ],
+      "centre": [
+        -0.001,
+        -0.009
       ]
     }
   }
