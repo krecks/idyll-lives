@@ -81,8 +81,9 @@ class Palette:
     material fields):
       mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'gloss', 'front')` (or 'back'),
         on a flat part; gloss, as the placeholders' mirrors (only High reflects live);
-      a lamp's shade or a screen that glows at night, in a colour: `shade=('#F2E6CC', 'fabric',
-        {'glow': '#FFD9A0'})`.
+      a lamp's shade or a screen that glows, in a colour: `shade=('#F2E6CC', 'fabric',
+        {'glow': '#FFD9A0'})`; a screen that's lit only while it's used adds `screen`: `{'glow':
+        '#7FC4FF', 'screen': True}`.
     """
 
     def __init__(self, **colours):
@@ -115,15 +116,20 @@ class Palette:
 
 def _extra(name, more):
     """A palette colour's third element as the material's extra pack fields: 'front' / 'back' (a
-    mirror's side), or {'mirror': ..., 'glow': '#rrggbb'}."""
+    mirror's side), or {'mirror': ..., 'glow': '#rrggbb', 'screen': True}."""
     if not more:
         return {}
     extra = {'mirror': more[0]} if isinstance(more[0], str) else dict(more[0])
-    unknown = set(extra) - {'mirror', 'glow'}
+    unknown = set(extra) - {'mirror', 'glow', 'screen'}
     if len(more) > 1 or unknown:
-        raise ValueError(f'{name}: after the finish, a mirror\'s side or {{"mirror", "glow"}}, not {more}')
+        raise ValueError(f'{name}: after the finish, a mirror\'s side or {{"mirror", "glow", "screen"}}, not {more}')
     if extra.get('mirror') not in (None, 'front', 'back'):
         raise ValueError(f'{name}: a mirror reflects to the front or the back, not {extra["mirror"]!r}')
+    if 'screen' in extra:
+        if not isinstance(extra['screen'], bool):
+            raise ValueError(f'{name}: `screen` is true or false, not {extra["screen"]!r}')
+        if not extra.get('glow'):
+            raise ValueError(f'{name}: a screen needs a `glow` colour')
     return extra
 
 

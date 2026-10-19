@@ -9,9 +9,11 @@ use crate::index::ObjectIndex;
 use crate::lot::{BondRaw, Lot, LotFile, SimSpawn};
 use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
-use serde::{Deserialize, Serialize};
 use crate::social::{self, ActiveFeeling, EventLog, Prefer, Relationships};
-use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, ai, conversation};
+use crate::{
+    Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, ai, conversation,
+};
+use serde::{Deserialize, Serialize};
 
 pub const MAX_SIMS: usize = 64;
 pub const MAX_QUEUE: usize = 6;
@@ -587,6 +589,9 @@ pub struct Sim {
     /// The tile they sat or lay down from (where they stand back up): the tile an object is
     /// used from can change while they're on it (see `surface::approach_tile`).
     pub(crate) seated_from: Option<(i32, i32)>,
+    /// The seat they took to use another object (content `seatNear`: the sofa while watching
+    /// TV). Not saved: the task finds a seat again after a load.
+    pub use_seat: Option<u32>,
     pub needs: [f32; MAX_NEEDS],
     pub feelings: Vec<ActiveFeeling>,
     /// Set while another Sim is talking to this one.
@@ -730,6 +735,7 @@ impl Sim {
         self.visiting = None;
         self.pose = Pose::Stand;
         self.seated_from = None;
+        self.use_seat = None;
     }
 
     /// Grown up (may work, fall in love, move, have children).
@@ -1768,6 +1774,7 @@ impl World {
             yaw: 0.0,
             pose: Pose::Stand,
             seated_from: None,
+            use_seat: None,
             needs,
             feelings: Vec::new(),
             engaged_with: None,
@@ -2517,6 +2524,7 @@ impl World {
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
+        self.broadcast();
         self.apply_messes();
         self.wake_for_crying_babies();
         conversation::update(self);
@@ -2541,6 +2549,136 @@ impl World {
         }
         if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
             self.grow(GROWTH_STEP_MINUTES as f32);
+        }
+    }
+
+    /// Gives nearby residents a share of what a use gives (content `broadcast`: hearing the TV
+    /// from the sofa, or while eating at the table). Only positive gains carry, and not to the
+    /// resident using it, who gets the whole of it.
+    fn broadcast(&mut self) {
+        let content = &self.content;
+        struct Source {
+            object: u32,
+            room: u16,
+            storey: i32,
+            plot: Option<u32>,
+            pos: [f32; 2],
+            gains: [f32; MAX_NEEDS],
+            share: f32,
+            range: f32,
+            user: u32,
+        }
+        let mut sources: Vec<Source> = Vec::new();
+        for sim in &self.sims {
+            if !sim.here() || sim.away_until.is_some() {
+                continue;
+            }
+            let Some(act) = sim.current() else { continue };
+            if !matches!(act.phase, Phase::Using { .. }) {
+                continue;
+            }
+            let TaskKind::Use {
+                object,
+                interaction,
+            } = act.task.kind
+            else {
+                continue;
+            };
+            let Some(obj) = self.objects.get(object as usize) else {
+                continue;
+            };
+            let inter = &content.objects[obj.def].interactions[interaction];
+            if inter.broadcast <= 0.0 {
+                continue;
+            }
+            let pos = obj.centre(content);
+            let (x, z) = (pos[0].floor() as i32, pos[1].floor() as i32);
+            let ground = self.ground_z(z);
+            let room = if self.lot.in_bounds(x, ground) {
+                self.lot.room_at(x, ground)
+            } else {
+                crate::lot::OUTDOORS
+            };
+            let quality = content.object_rules.quality_factor(obj.quality);
+            sources.push(Source {
+                object,
+                room,
+                storey: self.storey_of(z),
+                plot: self.object_plot.get(object as usize).copied().flatten(),
+                pos,
+                gains: inter.gain_per_minute.map(|g| g * quality),
+                share: inter.broadcast,
+                range: inter.broadcast_range,
+                user: sim.id,
+            });
+        }
+        if sources.is_empty() {
+            return;
+        }
+        let rooms: Vec<u16> = self
+            .sims
+            .iter()
+            .map(|s| {
+                let (x, z) = s.tile();
+                let ground = self.ground_z(z);
+                if self.lot.in_bounds(x, ground) {
+                    self.lot.room_at(x, ground)
+                } else {
+                    crate::lot::OUTDOORS
+                }
+            })
+            .collect();
+        let storeys: Vec<i32> = self
+            .sims
+            .iter()
+            .map(|s| self.storey_of(s.tile().1))
+            .collect();
+        let plots: Vec<Option<u32>> = self
+            .sims
+            .iter()
+            .map(|s| {
+                let (x, z) = s.tile();
+                self.plot_at(x, z)
+            })
+            .collect();
+        let asleep: Vec<bool> = self.sims.iter().map(|s| s.asleep(content)).collect();
+        for (i, sim) in self.sims.iter_mut().enumerate() {
+            if !sim.here() || sim.away_until.is_some() || sim.steps == 0 || asleep[i] {
+                continue;
+            }
+            let minutes = sim.minutes();
+            // Two residents watching the same screen are one source, not two.
+            let mut heard: Vec<u32> = Vec::new();
+            for src in &sources {
+                if src.user == sim.id
+                    || heard.contains(&src.object)
+                    || (src.plot.is_some() && plots[i] != src.plot)
+                {
+                    continue;
+                }
+                // Another resident watching the same screen has their own share of it already.
+                if let Some(act) = sim.current()
+                    && let TaskKind::Use { object, .. } = act.task.kind
+                    && object == src.object
+                {
+                    continue;
+                }
+                if storeys[i] != src.storey {
+                    continue;
+                }
+                let same_room = src.room != crate::lot::OUTDOORS && rooms[i] == src.room;
+                let near = (sim.pos[0] - src.pos[0]).hypot(sim.pos[1] - src.pos[1]) <= src.range;
+                if !same_room && !near {
+                    continue;
+                }
+                heard.push(src.object);
+                for n in 0..content.needs.len() {
+                    let gain = src.gains[n] * src.share * minutes * sim.mods.need_gain[n];
+                    if gain > 0.0 {
+                        sim.needs[n] = (sim.needs[n] + gain).clamp(0.0, 1.0);
+                    }
+                }
+            }
         }
     }
 
@@ -4032,6 +4170,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         let kind = TaskKind::Cook { recipe, step: 0, station: None, origin: Some(object), servings: 0, skipped: 0, minutes: 0 };
         return crate::cooking::start(sim, Task { kind, ..task }, ctx, objects, items);
     }
+    let mut reserved_seat = None;
     let (target, goal, tags) = match task.kind {
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
             return crate::cooking::start(sim, task, ctx, objects, items);
@@ -4070,7 +4209,21 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if !obj.allows(inter, sim.id) {
                 return;
             }
-            let t = ctx.index.links.approach_of(object).unwrap_or_else(|| obj.front_tile(content));
+            if inter.seat_near > 0.0 {
+                reserved_seat = seat_near_object(sim, ctx, objects, object, inter.seat_near);
+            }
+            let t = match reserved_seat {
+                Some(seat) => ctx
+                    .index
+                    .links
+                    .approach_of(seat)
+                    .unwrap_or_else(|| objects[seat as usize].front_tile(content)),
+                None => ctx
+                    .index
+                    .links
+                    .approach_of(object)
+                    .unwrap_or_else(|| obj.front_tile(content)),
+            };
             let tags = inter.tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
         }
@@ -4163,7 +4316,17 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             ([goal.0 as f32 + 0.5, goal.1 as f32 + 0.5], goal, content.socials[social].tags)
         }
     };
+    // A place on the seat for the use (two housemates don't both sit on the same sofa).
+    if let Some(seat) = reserved_seat.take() {
+        let slots = content.objects[objects[seat as usize].def].slots;
+        if objects[seat as usize].reserve(sim.id, slots) {
+            sim.use_seat = Some(seat);
+        }
+    }
     let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
+        if let Some(seat) = sim.use_seat.take() {
+            objects[seat as usize].release(sim.id);
+        }
         return;
     };
     if let TaskKind::Visit { plot } = task.kind {
@@ -4182,6 +4345,9 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
         if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction) {
+            if let Some(seat) = sim.use_seat.take() {
+                objects[seat as usize].release(sim.id);
+            }
             return;
         }
         // Off to bed (they can get there): the toilet first, out of habit, and then they
@@ -4192,6 +4358,9 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             && let Some(first) = habit(sim, ctx, objects, HabitTime::Bed, ctx.object_plot[object as usize])
         {
             objects[object as usize].release(sim.id);
+            if let Some(seat) = sim.use_seat.take() {
+                objects[seat as usize].release(sim.id);
+            }
             return start_task(sim, first, ctx, objects, items);
         }
     }
@@ -4201,6 +4370,58 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         phase: Phase::Routing { waypoints, next: 0 },
         tags,
     });
+}
+
+/// The nearest free seat within `range` metres of `object` (content `seatNear`), one they may
+/// sit on here. Seats are the sitting interactions residents eat in (`cooking.seatTags`).
+fn seat_near_object(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    object: u32,
+    range: f32,
+) -> Option<u32> {
+    let content = ctx.content;
+    let plot = ctx.object_plot.get(object as usize).copied().flatten();
+    let rules = &content.cooking;
+    let (tx, tz) = ctx
+        .index
+        .links
+        .approach_of(object)
+        .unwrap_or_else(|| objects[object as usize].front_tile(content));
+    let target = [tx as f32 + 0.5, tz as f32 + 0.5];
+    let sits = |o: &ObjectInstance| {
+        content.objects[o.def].interactions.iter().any(|i| {
+            i.pose == Pose::Sit
+                && i.tags & rules.seat_tags != 0
+                && i.tags & rules.seat_avoid == 0
+                && !i.baby
+        })
+    };
+    objects
+        .iter()
+        .filter(|o| o.id != object)
+        .filter(|o| {
+            plot.is_none_or(|p| ctx.object_plot.get(o.id as usize).copied().flatten() == Some(p))
+        })
+        .filter(|o| !o.broken() && o.can_use(sim.id, content.objects[o.def].slots) && sits(o))
+        .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
+        .map(|o| {
+            let (fx, fz) = ctx
+                .index
+                .links
+                .approach_of(o.id)
+                .unwrap_or_else(|| o.front_tile(content));
+            (
+                o.id,
+                ctx.nav
+                    .stairs
+                    .distance([fx as f32 + 0.5, fz as f32 + 0.5], target),
+            )
+        })
+        .filter(|&(_, d)| d <= range)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(o, _)| o)
 }
 
 /// Where `sim` may walk on the way to tile `goal` (see `path::Grounds`): home, the place
@@ -4646,16 +4867,25 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             let obj = &objects[object as usize];
             let inter = &content.objects[obj.def].interactions[interaction];
             let c = obj.centre(content);
-            if inter.pose == Pose::Stand && !inter.inside {
+            if let Some(seat) = sim.use_seat {
+                // Watching from the sofa: sit on the seat, facing the way it faces, and step
+                // back off where they came from (see `end_activity`).
+                let s = &objects[seat as usize];
+                sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
+                sim.pos = s.slot_position(content, s.slot_of(sim.id).unwrap_or(0));
+                sim.yaw = s.yaw();
+                sim.pose = Pose::Sit;
+            } else if inter.pose == Pose::Stand && !inter.inside {
                 sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
+                sim.pose = inter.pose;
             } else {
                 // Onto the seat or bed, or into the shower, facing the way it faces; they step
                 // back off where they came from (see `end_activity`).
                 sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
                 sim.pos = obj.slot_position(content, obj.slot_of(sim.id).unwrap_or(0));
                 sim.yaw = obj.yaw();
+                sim.pose = inter.pose;
             }
-            sim.pose = inter.pose;
             act.phase = Phase::Using { elapsed: 0.0 };
             // Opened or closed as the use starts (a wall bed folds down as they lie down).
             if let Some(open) = inter.leaves
@@ -4974,6 +5204,11 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
     }
+    if let Some(seat) = sim.use_seat.take()
+        && let Some(o) = objects.get_mut(seat as usize)
+    {
+        o.release(sim.id);
+    }
     sim.seated_from = None;
     sim.pose = Pose::Stand;
     sim.idle_ticks = 0;
@@ -5140,6 +5375,48 @@ mod tests {
         w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
         assert!(!w.objects[1].in_use());
         assert_eq!(w.sims[0].pose, Pose::Stand);
+    }
+
+    #[test]
+    fn watching_tv_sits_on_a_nearby_sofa_and_broadcasts() {
+        const TV: &str = r#"{
+            "needs":[{"id":"fun","label":"Fun","decayPerHour":0.1},
+                     {"id":"hunger","label":"Hunger","decayPerHour":0.1}],
+            "objects":[
+              {"id":"tv","name":"TV","interactions":[
+                {"id":"watch","label":"Watch TV","minutes":60,"seatNear":5,"broadcast":0.5,
+                 "broadcastRange":6,"effects":{"fun":0.6},"tags":["screen"]}]},
+              {"id":"sofa","name":"Sofa","interactions":[
+                {"id":"relax","label":"Relax","minutes":30,"pose":"sit",
+                 "effects":{"fun":0.1},"tags":["lounge"]}]}]}"#;
+        const TV_LOT: &str = r#"{"width":12,"depth":12,
+            "objects":[{"def":"tv","x":2,"z":2,"rot":0},{"def":"sofa","x":5,"z":2,"rot":0}],
+            "sims":[{"name":"Ada","x":7.5,"z":7.5},{"name":"Bo","x":3.5,"z":3.5}]}"#;
+        let mut w = World::from_json(TV, TV_LOT, 7).unwrap();
+        w.apply(Command::Use {
+            sim: 0,
+            object: 0,
+            interaction: 0,
+        })
+        .unwrap();
+        run_ticks(&mut w, TICKS_PER_SECOND * 30);
+        assert_eq!(w.sims[0].use_seat, Some(1), "sat on the sofa");
+        assert_eq!(w.sims[0].pose, Pose::Sit);
+        assert_eq!(w.objects[0].users().next(), Some(0));
+        // Bo, in the room doing something else, hears it too.
+        w.sims[1].needs[0] = 0.5;
+        w.broadcast();
+        assert!(
+            w.sims[1].needs[0] > 0.5,
+            "heard the TV: {}",
+            w.sims[1].needs[0]
+        );
+
+        // Saved mid-watch, the watch goes on after loading: the seat is found again.
+        let mut loaded = World::from_save_json(TV, &w.save_json()).unwrap();
+        run_ticks(&mut loaded, 5);
+        assert_eq!(loaded.sims[0].use_seat, Some(1), "sat on the sofa again");
+        assert_eq!(loaded.sims[0].pose, Pose::Sit);
     }
 
     #[test]

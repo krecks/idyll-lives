@@ -65,12 +65,12 @@ export interface ModelTemplate {
   /** Its moving parts (a file's animated nodes: a fridge's doors) and the clips that move them. */
   motion?: ModelMotion;
   /**
-   * What glows at night (a lamp's shade, a screen: materials with `glow`): a copy of those faces
-   * drawn added on top, per moving part (-1: the still body), off until the renderer gives each
-   * instance its strength (thin instance `color`, 0..1) and turns it on. Not in `meshes`: nothing
-   * else draws them.
+   * What glows (materials with `glow`: a lamp's shade at night, a screen while it's watched): a copy
+   * of those faces drawn added on top, per moving part (-1: the still body), off until the renderer
+   * gives each instance its strength (thin instance `color`, 0..1) and turns it on. `screen` marks
+   * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
-  glows?: { mesh: Mesh; part: number }[];
+  glows?: { mesh: Mesh; part: number; screen?: boolean }[];
 }
 
 /**
@@ -953,10 +953,12 @@ interface MaterialOverride {
    */
   mirror?: 'front' | 'back';
   /**
-   * Glows at night in this colour (sRGB hex; a lamp's shade, a screen), as the lamps come on and
-   * out with its room's lights (`TemplateGlow`); unlit by day. On the still body.
+   * Glows in this colour (sRGB hex): a lamp's shade at night, as the lamps come on and out with its
+   * room's lights (`TemplateGlow`); a screen while a resident uses it, with `screen`.
    */
   glow?: string;
+  /** A screen: lit only while a resident uses the object (a TV, a monitor), not with the room. */
+  screen?: boolean;
 }
 
 /** Downloads the files of these models in the background, so they're at hand when shown. */
@@ -1341,13 +1343,17 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
     }),
     ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
   ];
-  // What glows at night: its faces again, in the glow's colour, a mesh per part they're on.
+  // What glows (a lamp's shade at night, a screen while it's used): its faces again, in the glow's
+  // colour, a mesh per part they're on.
   const glowing = Map.groupBy(
     pieces.filter(({ material }) => overrideFor(material)?.glow),
     ({ part }) => part,
   );
   const glows = [...glowing].map(([part, list]) => ({
     part,
+    // A screen (a TV, a monitor: its `screen`, `crt` or `projection` material, or a manifest's
+    // `screen`) is only lit while someone is using it; a lamp's shade or a fire glows with its room.
+    screen: list.some(({ material }) => overrideFor(material)?.screen ?? /screen|crt|projection/i.test(material?.name ?? '')),
     mesh: glowMesh(scene, `${name}|glow${part < 0 ? '' : `|${file.parts[part].name}`}`, list.map(({ data, material }) => ({ data, color: overrideFor(material)!.glow! }))),
   }));
   return {

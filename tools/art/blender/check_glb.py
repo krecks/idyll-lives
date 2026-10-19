@@ -623,6 +623,11 @@ def check_file(entry, finishes, path, facts=None):
         glow = ov.get('glow')
         if glow is not None and not (isinstance(glow, str) and len(glow) == 7 and glow[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in glow[1:])):
             errors.append(f'material {name!r}: `glow` is a colour, #rrggbb, not {glow!r}')
+        if 'screen' in ov:
+            if not isinstance(ov['screen'], bool):
+                errors.append(f'material {name!r}: `screen` is true or false, not {ov["screen"]!r}')
+            elif ov['screen'] and glow is None:
+                errors.append(f'material {name!r}: `screen` needs a `glow` colour')
     lo, hi = [math.inf] * 3, [-math.inf] * 3
     tris, groups = 0, set()
     # Per problem, the materials that have it.

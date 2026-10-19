@@ -826,6 +826,9 @@
           "label": "Watch TV",
           "anim": "watch",
           "minutes": 60,
+          "seatNear": 4,
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "effects": {
             "fun": 0.75
           },

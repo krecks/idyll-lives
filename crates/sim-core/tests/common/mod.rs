@@ -5,9 +5,9 @@
 #![allow(dead_code)]
 
 use serde_json::{Value, json};
-use sim_core::{MINUTES_PER_TICK, World, clock};
 use sim_core::social::FORMER;
 use sim_core::world::{Phase, Sim, TaskKind};
+use sim_core::{MINUTES_PER_TICK, World, clock};
 
 fn content_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content")
@@ -186,7 +186,9 @@ pub fn check(w: &World) {
                 TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
                 _ => false,
-            });
+            }) || (s.use_seat == Some(o.id)
+                && s.current()
+                    .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
             assert!(
                 ok,
                 "object {} is held by {} who isn't using it",

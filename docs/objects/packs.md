@@ -80,7 +80,11 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The cinema wall and the console are built turned round (`_turn_round`), the screen on the wall face and the seats
   in front (content `seat` `forward` 0.05 for the cinema, 0.12 for the console, so the knees stay under the
   console's shelf). Two sitters face the picture in all four facings; the placeholders are turned the same.
-- The lava lamp doesn't glow at night (no `glow`); its fourth draw is the ambient wax.
+- Both cinema uses broadcast 35% of their fun to residents in the room (or within 6 m): someone at the snack fridge
+  hears the film while they eat.
+- The cinema's and the console's screens (the `picture`/`picture_b` materials) and the workout game's TV (`tv_screen`)
+  glow and flicker while a resident uses them (`screen` in the model's manifest), day or night; the lava lamp still
+  doesn't glow at night (no `glow`), and its fourth draw is the ambient wax.
 
 ## P4. Energetic (7)
 

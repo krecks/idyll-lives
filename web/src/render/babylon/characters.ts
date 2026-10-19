@@ -2307,7 +2307,7 @@ export class Characters {
       rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
       else if (pose === Pose.Sit) {
-        const seat = (useObj ?? this.objectAt(rig.x, rig.z))?.seat;
+        const seat = this.seatUnder(rig, useObj)?.seat;
         // A seat facing the object's back (`SEATS` `back`, content `seat.facing`): turned round, facing into it (a
         // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
@@ -2593,7 +2593,7 @@ export class Characters {
       }
       hands = tag === 'lift' ? HANDS.grip : HANDS.open;
     } else if (pose === Pose.Sit) {
-      const obj = (known ? useObj : null) ?? this.objectAt(rig.x, rig.z);
+      const obj = known ? this.seatUnder(rig, useObj) : this.objectAt(rig.x, rig.z);
       const seat = obj?.seat ?? DEFAULT_SEAT;
       const sp = this.sitPelvis.get(rig.body.name)!;
       rootY = seat.h - sp.y * rig.scale;
@@ -3794,6 +3794,14 @@ export class Characters {
     const texture = this.texture.getInternalTexture();
     if (lo < 0 || !texture) return;
     (this.scene.getEngine() as Engine | WebGPUEngine).updateTextureData(texture, data.subarray(lo * stride, (hi + 1) * stride), 0, lo, this.width, hi - lo + 1);
+  }
+
+  /** The seat a sitting Sim is on: the object they use if it's a seat, else the seat under them
+   * (content `seatNear`: watching TV from the sofa). */
+  private seatUnder(rig: SimRig, useObj: PlacedObject | null | undefined): PlacedObject | null {
+    if (useObj && useObj.restful) return useObj;
+    const under = this.objectAt(rig.x, rig.z);
+    return under ?? useObj ?? null;
   }
 
   private objectAt(x: number, z: number): PlacedObject | null {

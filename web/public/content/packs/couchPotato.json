@@ -52,6 +52,8 @@
           "anim": "watch",
           "minutes": 90,
           "pose": "sit",
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "autonomous": true,
           "effects": { "fun": 0.95, "comfort": 0.4, "social": 0.1 },
           "tags": ["entertainment", "screen", "cozy"],
@@ -64,6 +66,8 @@
           "anim": "watch",
           "minutes": 60,
           "pose": "sit",
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "autonomous": true,
           "effects": { "fun": 0.85, "comfort": 0.1 },
           "tags": ["entertainment", "screen"]
