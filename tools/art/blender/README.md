@@ -118,6 +118,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `size` is asserted after the build, within 2 % (`tolerance`). It's the real size, never stretched.
      Take it from the content, or from the `[gamekit]` line once the model is right.
    - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.
+     The build refuses a new key that no content object or item names and no manifest has (a misspelt
+     `key=`).
    - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
      to a quarter of the triangles (all but what stands within 1 cm of the floor, so it keeps its
      feet), drawn where it's only seen from afar (the town overview, the far woods). For what is placed
@@ -150,8 +152,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - `BEDS`: mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
-  - `cargo test -p sim-core --test shipped_content` checks every object's model is in the manifests,
-    every interaction has an animation, and the categories and groups exist.
+  - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file
+    once the manifests are stacked (a pack left out of `packs` fails it), every interaction has an
+    animation, and the categories and groups exist.
   - Changed the sim? Run `cargo test -p sim-core`, then `npm run wasm` in `web/` before testing in the
     browser.
 

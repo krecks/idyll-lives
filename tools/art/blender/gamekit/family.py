@@ -47,7 +47,8 @@ class Model:
                  middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
                  that stands against a wall (a counter, a fridge) takes (0, -0.43 + depth / 2), so its back is
                  on the wall face (-0.43) and it meets the wall and its neighbours, and its content `surface`
-                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069)
+                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into the entry, for
+                 the gate (check_glb.py: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
@@ -141,6 +142,8 @@ class Family:
                 entry['parts'] = model.parts
             if model.sink:
                 entry['sink'] = model.sink
+            if tuple(model.centre) != (0, 0):
+                entry['centre'] = list(model.centre)
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'

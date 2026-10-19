@@ -2,10 +2,14 @@
 # ("Optimisation and registration").
 import json
 import os
+import sys
 
 import bpy
 
 from .scene import ASSETS, meshes
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from check_glb import content_keys  # noqa: E402  (the gate's reading of which models the content draws, shared)
 
 
 def export_glb(path, objects=None, texcoords=False, clips=False):
@@ -51,6 +55,9 @@ def write_pack(pack, entries, comment):
     of the entry it overrides (registry.ts `extended`); any other fields of that entry are copied, read
     from the manifests now so the copy can't go stale. A key with no entry below is written as it is.
     Entries of the pack that aren't given are kept.
+    A new key must be one the game draws: a content object's or item's model, or one another manifest
+    has. Anything else is a misspelt `key=`, which would write an entry nothing draws (the object a box).
+    A key the pack already keeps may be rebuilt (the game's own models, drawn by code: the rock, the marker).
     """
     path = os.path.join(ASSETS, 'packs', pack, 'manifest.json')
     rel = os.path.relpath(path, ASSETS)
@@ -62,11 +69,15 @@ def write_pack(pack, entries, comment):
             kept = json.load(f)['entries']
     except FileNotFoundError:
         kept = {}
+    named = content_keys()
+    for key in entries:
+        if key not in named and key not in below and key not in kept:
+            raise ValueError(f'{key}: no content object names this model and no manifest has it: a misspelt key=?')
     for key, fields in entries.items():
         under = below.get(key)
         entry = {'type': 'model', **fields}
         for k, v in (under or {}).items():
-            if k not in entry and k not in ('url', 'far', 'materials', 'motions', 'paint', 'vary', 'sink'):
+            if k not in entry and k not in ('url', 'far', 'materials', 'motions', 'paint', 'vary', 'sink', 'centre'):
                 entry[k] = v
         kept[key] = entry
     manifest = {'$comment': comment, 'version': 1, 'entries': kept}

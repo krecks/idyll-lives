@@ -45,7 +45,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   band, edges over 40° kept sharp): the plate, bowl, pots, pan, pizza, rolls, the cupcake, and the sausages (laid
   down, their grill marks as bands). Wedges and the sandwich halves are `prism`s over their outline. Lumpy food is
   `G.boulder` at one or two subdivisions.
-- **Sizes** within 10 % of the old part on every axis (the gate's warning). The pan's handle runs to the back as the
-  old part's (whose crossbar was across, likely by mistake), 2 cm longer.
+- **Sizes** within 10 % of the old part on every axis (as the gate checked while the old parts were there). The
+  pan's handle runs to the back as the old part's (whose crossbar was across, likely by mistake), 2 cm longer.
 - **The old `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a flat wedge
   on the plate.

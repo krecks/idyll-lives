@@ -1,9 +1,10 @@
 # The gate for the game's glTF models (docs/design/objects.md, "Validation"): reads every .glb a
 # model entry of the manifests uses (the base manifest and its packs, later ones overriding) with
-# that entry, and checks what the game needs of it. Errors exit 1; warnings are printed.
+# that entry, and checks what the game needs of it, and that every model the content draws has a
+# file. Errors exit 1; warnings are printed.
 #
 #   python3 -I -B tools/art/blender/check_glb.py                       every .glb the manifests use
-#   python3 -I -B tools/art/blender/check_glb.py model.garden.gnome …  only these keys
+#   python3 -I -B tools/art/blender/check_glb.py model.garden.gnome …  only these keys (model., item., tool.)
 #
 # Plain Python, no Blender needed. Run inside Blender with `-- --preview`, it also re-imports each
 # file and renders it to tools/art/blender/previews/rt_<name>.png, so export problems show:
@@ -288,32 +289,47 @@ def check_clips(gltf, binary, entry):
     return errors, warnings
 
 
-def content_objects():
-    """{model key: {'footprint', 'layer', 'outside', 'stairs'}} for the content's objects (web/public/content), for
-    the wall checks: where the wall's face is (a footprint's back, `WALL` in) and what stands against one."""
-    found, categories = {}, {}
-    for root, _dirs, files in os.walk(CONTENT):
-        for name in sorted(files):
-            if not name.endswith('.json'):
-                continue
-            try:
-                with open(os.path.join(root, name)) as f:
-                    data = json.load(f)
-            except (OSError, ValueError):
-                continue
-            if not isinstance(data, dict):
-                continue
-            for c in data.get('buyCategories') or []:
-                categories[c.get('id')] = c
-            for o in data.get('objects') or []:
-                if isinstance(o, dict) and o.get('model'):
-                    found.setdefault(o['model'], o)
+def content():
+    """(objects, items, buyCategories) of the game's content: base.json and the files its `include` lists,
+    merged as the game merges them (sim_core::merge_content: each file's lists after the ones before)."""
+    def read(name):
+        with open(os.path.join(CONTENT, name)) as f:
+            return json.load(f)
+    base = read('base.json')
+    files = [base] + [read(name) for name in base.get('include', [])]
+    return tuple([d for f in files for d in f.get(k) or []] for k in ('objects', 'items', 'buyCategories'))
+
+
+def content_keys(defs=None):
+    """{model key: what draws it ('object fridge')}: the model each content object draws (its `model`, or
+    `model.<id>`) and each item (its `model`, or `item.<id>`), as the renderer picks them. The game's own
+    models (the rock, the marker, the street's) are drawn by code and aren't here."""
+    objects, items, _ = defs or content()
+    keys = {}
+    for kind, prefix, found in (('object', 'model', objects), ('item', 'item', items)):
+        for d in found:
+            keys.setdefault(d.get('model') or f'{prefix}.{d["id"]}', f'{kind} {d["id"]}')
+    return keys
+
+
+def content_objects(defs=None):
+    """{model key: {'id', 'footprint', 'layer', 'outside', 'stairs', 'radius', 'surface'}} for the content's
+    objects (the first to draw each model), for the checks against what the game does with it: where the
+    wall's face is (a footprint's back, `WALL` in), what stands against one, the disc a thing on a top takes."""
+    objects, _items, cats = defs or content()
+    categories = {c.get('id'): c for c in cats}
     out = {}
-    for key, o in found.items():
+    for o in objects:
+        key = o.get('model') or f'model.{o["id"]}'
+        if key in out:
+            continue
         c = categories.get(o.get('category'), {})
         group = next((g for g in c.get('groups') or [] if g.get('id') == o.get('group')), {})
-        out[key] = {'footprint': o.get('footprint', [1, 1]), 'layer': o.get('layer', 'floor'),
-                    'outside': group.get('outside', c.get('outside', False)), 'stairs': bool(o.get('stairs'))}
+        # The disc a thing on a top takes (content.ts `radius`: default 0.12, kept within 0.02-0.45).
+        radius = max(0.02, min(0.45, o.get('radius', 0.12)))
+        out[key] = {'id': o['id'], 'footprint': o.get('footprint', [1, 1]), 'layer': o.get('layer', 'floor'),
+                    'outside': group.get('outside', c.get('outside', False)), 'stairs': bool(o.get('stairs')),
+                    'radius': radius, 'surface': o.get('surface')}
     return out
 
 
@@ -634,18 +650,27 @@ def check_file(entry, finishes, path, facts=None):
     lo, hi = [v * scale for v in lo], [v * scale for v in hi]
     dims = [hi[k] - lo[k] for k in range(3)]
     # As it shows: the parts a clip grows (hidden or small at rest: darts, a pot thrown) grown, for what
-    # is compared with the footprint (the wall, what the floor hides).
+    # is compared with the content (the footprint, the wall, what the floor hides, a top's disc).
     motions = entry.get('motions') or {}
     slo, shi, sparts = bounds(gltf, grown(gltf, binary, {motions.get('open'), motions.get('night')}))
     slo, shi = [v * scale for v in slo], [v * scale for v in shi]
     layer = (facts or {}).get('layer', 'floor')
     if not entry.get('fit') and not entry.get('offset'):
-        # Centred on the footprint (or on its `centre`: a wall bed at the back of its tiles).
-        # A model the game sinks may reach below the floor by its `sink` (the woods' rock, the marker).
+        # On the floor (y = 0). A model the game sinks may reach below it by its `sink` (the woods' rock, the marker).
         if lo[1] < -0.005 - entry.get('sink', 0):
             errors.append(f'reaches {-lo[1] * 100:.1f} cm below the floor (origin on the floor, y = 0)')
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
+        # Centred where its `Model` says (`centre`, which the build writes when it isn't the middle: a fridge
+        # against the wall, a wall bed at the back of its tiles), at rest as `G.settle` centres it (grown, the
+        # dartboard's darts and the unrolled yoga mat reach forward). Many models are built in place, off the
+        # middle, and have none: they aren't checked.
+        centre = entry.get('centre')
+        if centre:
+            at = ((lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2)
+            if max(abs(at[0] - centre[0]), abs(at[1] - centre[1])) > 0.02:
+                warnings.append(f'centred on (x {at[0]:.3f}, depth {at[1]:.3f}), its entry\'s `centre` is ({centre[0]:.3f}, {centre[1]:.3f}): '
+                                'rebuild it (the build writes `centre` from its Model)')
         # Against a wall: the wall's face is `WALL` into the footprint's back tile. A wall thing, or a floor
         # thing indoors that stands against one, has its back on it.
         # (A rug lies under the wall: it may reach in. Stairs reach their footprint's back edge, where the floor
@@ -654,6 +679,28 @@ def check_file(entry, finishes, path, facts=None):
             face = -facts['footprint'][1] / 2 + WALL
             if slo[2] < face - 0.01:
                 warnings.append(f'reaches {(face - slo[2]) * 100:.1f} cm into the wall (its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f})')
+            # Meant to stand against it (its `centre` puts its back on the face, as for a counter or a fridge),
+            # it does (README trap "Against a wall, on the floor").
+            back = centre[1] - (hi[2] - lo[2]) / 2 if centre else None
+            if back is not None and back <= face + 0.03 and slo[2] > max(back, face) + 0.02:
+                warnings.append(f'stands {(slo[2] - max(back, face)) * 100:.1f} cm off the wall, where its `centre` puts its back on it '
+                                f'(its back at depth {slo[2]:.3f}, the wall\'s face at {face:.2f}; README trap "Against a wall, on the floor")')
+        # Within its footprint: a thing indoors on the floor, a wall or the ceiling that reaches past its tiles
+        # overlaps what stands next to it (a fan's blades another's). Outside, trees, hedges and parasols
+        # spread over their neighbours, and a model with `vary` is drawn larger or smaller anyway; a rug
+        # may reach under the wall, and a thing on a top takes its disc (below).
+        if facts and layer in ('floor', 'wall', 'ceiling') and not facts['outside'] and 'vary' not in entry:
+            w, d = facts['footprint']
+            over = max(-w / 2 - slo[0], shi[0] - w / 2, -d / 2 - slo[2], shi[2] - d / 2)
+            if over > 0.02:
+                warnings.append(f'reaches {over * 100:.1f} cm past its {w} x {d} footprint (x {slo[0]:.2f} to {shi[0]:.2f}, '
+                                f'depth {slo[2]:.2f} to {shi[2]:.2f}): it overlaps what stands next to it')
+        # On a top: the game keeps the disc of its content `radius` clear on its host, so it is no wider.
+        if facts and layer == 'surface':
+            half = max(shi[0] - slo[0], shi[2] - slo[2]) / 2
+            if half > 1.1 * facts['radius']:
+                warnings.append(f'{half * 2:.2f} m across, wider than the {facts["radius"] * 2:.2f} m disc its content `radius` '
+                                f'({facts["radius"]:.2f} m) keeps on a top: it overlaps what stands next to it (give it a larger radius)')
         # Thin on the floor: a house's floor hides what lies under `FLOOR_TOP` (a mat, a belt), the whole
         # model or a moving part (as it shows, grown).
         if layer in ('floor', 'rug') and lo[1] <= 0.005:
@@ -701,10 +748,11 @@ def check_file(entry, finishes, path, facts=None):
 
 
 def main(argv):
-    keys = [a for a in argv if a.startswith('model.')]
+    keys = [a for a in argv if a.startswith(('model.', 'item.', 'tool.'))]
     stack = manifests(os.path.join(ASSETS, 'manifest.json'))
     entries, finishes = {}, {}
-    facts = content_objects()
+    defs = content()
+    facts, named = content_objects(defs), content_keys(defs)
     for path, m in stack:
         for key, entry in m['entries'].items():
             if entry.get('type') == 'model':
@@ -720,9 +768,30 @@ def main(argv):
                     SEE_THROUGH.add(key)
     failed = 0
     checked = []
+    # What can't be read at all: a model the content draws (or the command line names) that no manifest has,
+    # or whose entry has no file once the packs are stacked (its pack missing from `packs`), and a file that
+    # is no .glb. The game draws a box for each.
+    problems = {}
+    for key in sorted(set(named) | set(keys)):
+        if keys and key not in keys:
+            continue
+        what = named.get(key, 'the command line')
+        url = entries.get(key, ({}, None))[0].get('url', '')
+        if key not in entries:
+            problems[key] = f'{what} names it, but no manifest has a model entry {key}'
+        elif not url:
+            problems[key] = f'{what} names it, but its entry has no `url` once the packs are stacked (is its pack in the base manifest\'s `packs`?)'
+    for key, (entry, _manifest) in entries.items():
+        url = entry.get('url', '')
+        if url and not url.lower().endswith('.glb') and '://' not in url and (not keys or key in keys):
+            problems[key] = f'its file {url} is no .glb: the game\'s models are glTF binaries'
+    for key, problem in sorted(problems.items()):
+        failed += 1
+        print(f'FAIL {key}')
+        print(f'       error: {problem}')
     for key, (entry, manifest) in sorted(entries.items()):
         url = entry.get('url', '')
-        if (keys and key not in keys) or not url.lower().endswith('.glb') or '://' in url:
+        if (keys and key not in keys) or key in problems or not url or '://' in url:
             continue
         path = os.path.normpath(os.path.join(os.path.dirname(manifest), url))
         far = os.path.normpath(os.path.join(os.path.dirname(manifest), entry['far'])) if entry.get('far') else None
@@ -737,7 +806,7 @@ def main(argv):
             print(f'       error: {e}')
         for w in warnings:
             print(f'       warning: {w}')
-    print(f'{len(checked)} models, {failed} failed')
+    print(f'{len(checked)} models, {failed} failed' + (f' ({len(problems)} without a file it can read)' if problems else ''))
     if '--preview' in argv:
         preview(checked)
     return 1 if failed else 0
