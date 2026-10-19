@@ -46,7 +46,7 @@ export class TownOverview {
   private readonly streets: [Street, Street];
   private current = 0;
   private ground: Mesh[] = [];
-  private readonly templates = new TemplateCache<ModelTemplate>();
+  private readonly templates: TemplateCache<ModelTemplate>;
   private readonly templatesInUse = new Set<string>();
   private key = '';
   /** Shadow casters of the overview (without the landscape). */
@@ -80,6 +80,7 @@ export class TownOverview {
     private readonly lib: MaterialLibrary,
     camera: ArcRotateCamera,
   ) {
+    this.templates = new TemplateCache(scene);
     this.streets = [new Street(scene, assets, house, LAYER_TOWN), new Street(scene, assets, house, LAYER_TOWN)];
     const mat = (this.glowMaterial = new StandardMaterial('lotGlow', scene));
     // Unlit: the output is emissive x vertex colour x instance colour.

@@ -8,9 +8,14 @@
  * What was set aside may still be drawn (its thin instances are the old build's), so the owner calls
  * `invalidate` only between its builds and `disposeStale` once a build after it has finished: the
  * new build draws the new template, and nothing points at the old one any more.
+ *
+ * A template still being built when its file comes can't be told apart yet: it's noted, and if it
+ * turns out to be built without the file, the scene's listeners are told of the file again
+ * (`retellModelFileArrived`), so its owner invalidates it as it would have.
  */
 
-import type { Mesh } from './core';
+import type { Mesh, Scene } from './core';
+import { retellModelFileArrived } from './models';
 
 /** What a cache keeps: a template's meshes (and its glows'), and the files it was built without. */
 export interface CachedTemplate {
@@ -23,12 +28,16 @@ interface Entry<T> {
   promise: Promise<T>;
   /** Once built. */
   built?: { value: T };
+  /** Files that came while it was being built (`invalidate`). */
+  came?: Set<string>;
 }
 
 export class TemplateCache<T extends CachedTemplate | null> {
   private readonly entries = new Map<string, Entry<T>>();
   /** Set aside by `invalidate`, to be disposed by `disposeStale`. */
   private stale: NonNullable<T>[] = [];
+
+  constructor(private readonly scene: Scene) {}
 
   /** The template under `key`, built by `build` the first time it's asked for (or the first time since it was set aside). */
   get(key: string, build: () => Promise<T>): Promise<T> {
@@ -38,7 +47,13 @@ export class TemplateCache<T extends CachedTemplate | null> {
     this.entries.set(key, entry);
     // (A build that throws stays cached as it is, as it always has; its rejection is the caller's.)
     entry.promise.then(
-      (value) => (entry.built = { value }),
+      (value) => {
+        entry.built = { value };
+        // Built without a file that came meanwhile: told again, now that it can be invalidated.
+        const missed = entry.came && value?.failed?.filter((url) => entry.came!.has(url));
+        entry.came = undefined;
+        if (missed?.length && this.entries.get(key) === entry && !this.scene.isDisposed) for (const url of missed) retellModelFileArrived(this.scene, url);
+      },
       () => {},
     );
     return entry.promise;
@@ -78,20 +93,44 @@ export class TemplateCache<T extends CachedTemplate | null> {
     for (const [key, entry] of this.entries) if (entry.built) yield [key, entry.built.value];
   }
 
+  /** The templates set aside and not yet disposed. */
+  get staleTemplates(): readonly NonNullable<T>[] {
+    return this.stale;
+  }
+
   /**
    * The file at `url` has come: the templates built without it are set aside (still drawn where they
-   * are, until `disposeStale`) and the next `get` of their keys builds them again. Their keys.
+   * are, until `disposeStale`) and the next `get` of their keys builds them again. Their keys. (One
+   * still being built is noted: see above.)
    */
   invalidate(url: string): string[] {
     const keys: string[] = [];
     for (const [key, entry] of this.entries) {
-      const t = entry.built?.value;
+      if (!entry.built) {
+        (entry.came ??= new Set()).add(url);
+        continue;
+      }
+      const t = entry.built.value;
       if (!t?.failed?.includes(url)) continue;
       this.entries.delete(key);
       this.stale.push(t);
       keys.push(key);
     }
     return keys;
+  }
+
+  /**
+   * Disposes the templates built without their files and forgets them, so they're built (and their
+   * files tried) afresh when next asked for: for when nothing draws them any more (the session ended).
+   */
+  dropFailed(): void {
+    for (const [key, entry] of this.entries) {
+      const t = entry.built?.value;
+      if (!t?.failed) continue;
+      this.entries.delete(key);
+      this.stale.push(t);
+    }
+    this.disposeStale();
   }
 
   /** Disposes the templates set aside (their materials are shared and stay); whether there were any. */

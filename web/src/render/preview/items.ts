@@ -81,6 +81,8 @@ class ItemThumbnails implements ItemPreviews {
   private running = false;
   private releaseTimer = 0;
   private store: Promise<Cache | null> | null = null;
+  /** Pictures of a box (their files failed) handed out, by job key: not kept, let go when replaced (`boxPictures`). */
+  private readonly boxed = new Map<string, string[]>();
 
   constructor(private readonly assets: AssetRegistry) {}
 
@@ -129,6 +131,16 @@ class ItemThumbnails implements ItemPreviews {
       console.warn('[preview] item stage unavailable', err);
       return null;
     }
+  }
+
+  /**
+   * The pictures of a box last handed out for `key` (`urls`, or none now): the ones they replace are
+   * let go, so a model whose file keeps failing holds one set of pictures, not one per request.
+   */
+  private boxPictures(key: string, urls: string[] | null): void {
+    for (const u of this.boxed.get(key) ?? []) URL.revokeObjectURL(u);
+    if (urls) this.boxed.set(key, urls);
+    else this.boxed.delete(key);
   }
 
   /** Keeps what was drawn, even if whoever asked has gone meanwhile. */
@@ -216,6 +228,7 @@ class ItemThumbnails implements ItemPreviews {
           (urls) => {
             // A box drawn for a file that failed is shown but not kept (here or between visits): the
             // next request draws the thing again, with its file if it has come.
+            if (urls) this.boxPictures(job.key, boxed ? urls : null);
             if (urls && !boxed) this.remember(job, urls);
             for (const w of job.waiters) w(urls);
           },

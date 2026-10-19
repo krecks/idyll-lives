@@ -45,7 +45,7 @@ export interface PlacedItem {
 const MIN_PICK = 0.3;
 
 export class ItemLayer {
-  private readonly templates = new TemplateCache<ModelTemplate>();
+  private readonly templates: TemplateCache<ModelTemplate>;
   /** Per model in use: its instance matrices. */
   private readonly buffers = new Map<string, Float32Array>();
   private readonly mold: Mesh;
@@ -75,11 +75,14 @@ export class ItemLayer {
     mold.thinInstanceSetBuffer('matrix', this.moldMatrices, 16, false);
     mold.thinInstanceCount = 0;
     this.mold = mold;
+    this.templates = new TemplateCache(scene);
     // A model file that failed has come: the items drawn without it (a block, or nothing) are built again.
-    onModelFileArrived(scene, (url) => {
+    this.unlisten = onModelFileArrived(scene, (url) => {
       if (this.templates.invalidate(url).length) void this.rebuild();
     });
   }
+
+  private readonly unlisten: () => void;
 
   /** New items from the simulation. */
   set(items: readonly ItemPlacement[]): void {
@@ -97,6 +100,8 @@ export class ItemLayer {
   clear(): void {
     this.items = [];
     void this.rebuild();
+    // Those built without their files are built (and their files tried) afresh in the next session.
+    this.templates.dropFailed();
   }
 
   private modelOf(def: string): string {
@@ -111,7 +116,11 @@ export class ItemLayer {
   private async rebuild(): Promise<void> {
     const generation = ++this.generation;
     const view = this.view;
-    if (!view) return;
+    if (!view) {
+      // Nothing is drawn yet: the blocks of files that came can go.
+      this.templates.disposeStale();
+      return;
+    }
     const shown = this.items.filter((it) => it.state !== 'stored' && view.shown(view.storeyOf(it.z)) && view.inView(it.x, view.groundZ(it.z)));
     const byModel = Map.groupBy(shown, (it) => this.modelOf(it.def));
     this.buildElsewhere(generation);
@@ -202,6 +211,7 @@ export class ItemLayer {
   }
 
   dispose(): void {
+    this.unlisten();
     this.mold.dispose();
     for (const [, t] of this.templates) void t.then((template) => template.meshes.forEach((mesh) => mesh.dispose()));
     this.templates.clear();

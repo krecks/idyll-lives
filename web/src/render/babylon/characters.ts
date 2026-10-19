@@ -1060,7 +1060,9 @@ export class Characters {
    * Things Sims carry (content `items`, by model) and tools on the station they cook at (`tool.*`):
    * one template per model, one thin instance (matrix) per Sim row; null for a part its model doesn't have.
    */
-  private readonly props = new TemplateCache<Prop | null>();
+  private readonly props: TemplateCache<Prop | null>;
+  /** Stops listening for model files that come (`onModelFileArrived`). */
+  private readonly unlisten: () => void;
   /** Per Sim row: the model of what it carries and of the tool in front of it, as last drawn. */
   private readonly heldProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly toolProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
@@ -1136,11 +1138,13 @@ export class Characters {
     /** For seats content describes (`seat`) and what can be sat or lain on. */
     private readonly content?: Content,
   ) {
+    this.props = new TemplateCache(scene);
     // A model file that failed has come: the props drawn without it (small blocks) are built again,
-    // and the blocks go once they are.
-    onModelFileArrived(scene, (url) => {
+    // and the blocks go once they are (hidden at once: the frame no longer moves them).
+    this.unlisten = onModelFileArrived(scene, (url) => {
       const keys = this.props.invalidate(url);
       if (!keys.length) return;
+      for (const p of this.props.staleTemplates) for (const mesh of p.meshes) mesh.isVisible = false;
       const dispose = () => this.props.disposeStale();
       void Promise.all(keys.map((key) => this.props.get(key, () => this.buildProp(key)))).then(dispose, dispose);
     });
@@ -1663,6 +1667,11 @@ export class Characters {
     });
   }
 
+  /** Stops listening for model files (the renderer goes; the scene's meshes go with it). */
+  dispose(): void {
+    this.unlisten();
+  }
+
   /** Removes the Sims (end of a session); meshes stay cached. */
   clear(): void {
     this.sims = [];
@@ -1678,6 +1687,8 @@ export class Characters {
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
     }
+    // Props built without their files are built (and their files tried) afresh in the next session.
+    this.props.dropFailed();
   }
 
   // --- carried things and tools ------------------------------------------------------------

@@ -204,6 +204,11 @@ export interface BuildOptions {
    * pictures. The landscape, foliage, kerbside props and the selection marker draw nothing then.
    */
   standIn?: StandIn;
+  /**
+   * False: a file that fails isn't tried again in the background for this build, as nothing would
+   * build it again when it comes (the landscape, the selection marker). Default true.
+   */
+  retry?: boolean;
 }
 
 /** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
@@ -244,7 +249,7 @@ export async function buildModel(
     const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
     for (const url of far ? [far, entry.url] : [entry.url]) {
       try {
-        const template = await loadGltf(scene, name, entry, url, footprint, options.resize);
+        const template = await loadGltf(scene, name, entry, url, footprint, options.resize, options.retry !== false);
         return failed.length ? { ...template, failed } : template;
       } catch (err) {
         failed.push(url);
@@ -983,13 +988,13 @@ function idle(fn: (deadline?: IdleDeadline) => void, timeout = 2000): void {
 
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
- * A model being built is wanted now: background downloads wait for it. One tried again after it
- * failed (`later`) is a background download itself.
+ * A model being built is wanted `now`: background downloads wait for it. One tried again after it
+ * failed runs in the background slot it was given (`scheduleRetry`).
  */
-function importModel(url: string, scene: Scene, later = false): ReturnType<typeof ImportMeshAsync> {
+function importModel(url: string, scene: Scene, now: boolean): ReturnType<typeof ImportMeshAsync> {
   // Clips stay still: they're read (`readClips`), not played.
   const options = { pluginOptions: { gltf: { animationStartMode: 0 } } } as Parameters<typeof ImportMeshAsync>[2];
-  return (later ? background : foreground)(async () => {
+  const load = async () => {
     const copy = optimizedUrl(url);
     if (copy === url) return ImportMeshAsync(url, scene, options);
     try {
@@ -998,7 +1003,8 @@ function importModel(url: string, scene: Scene, later = false): ReturnType<typeo
       console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
       return ImportMeshAsync(url, scene, options);
     }
-  });
+  };
+  return now ? foreground(load) : load();
 }
 
 /**
@@ -1081,26 +1087,38 @@ export function onModelFileArrived(scene: Scene, fn: (url: string) => void): () 
 }
 
 /**
- * The file at `url` as imported into `scene`, once. A failed import isn't kept, so each build tries
- * it again (none is held back or failed at once because of an earlier failure), and it's tried in the
- * background too (`scheduleRetry`). Only the import counts as the file failing, not a build from it
- * (`buildFromFile`): a file that loads but can't be built isn't fetched again.
+ * Tells `scene`'s listeners (`onModelFileArrived`) again that the file at `url` has come: a template
+ * still being built when it came turned out to be built without it (`TemplateCache`).
  */
-function loadFile(scene: Scene, url: string, later = false): Promise<LoadedFile> {
+export function retellModelFileArrived(scene: Scene, url: string): void {
+  tellArrived(filesOf(scene), url);
+}
+
+/**
+ * The file at `url` as imported into `scene`, once. A failed import isn't kept, so each build tries
+ * it again (none is held back or failed at once because of an earlier failure), and for a build that
+ * asks (`retry`) it's tried in the background too (`scheduleRetry`). Only the import counts as the
+ * file failing, not a build from it (`buildFromFile`): a file that loads but can't be built isn't
+ * fetched again. A background try imports in the slot it was given (`now` false), not as a load
+ * someone waits for; a build that wants the file meanwhile shares the download already under way.
+ */
+function loadFile(scene: Scene, url: string, retry: boolean, now = true): Promise<LoadedFile> {
   const state = filesOf(scene);
   let file = state.files.get(url);
   if (!file) {
-    const loading = importFile(scene, url, later);
+    const loading = importFile(scene, url, now);
     state.files.set(url, (file = loading));
     // (Both outcomes are handled here; whoever asked handles the rejection it's given.)
     loading.then(
       () => fileArrived(state, url),
-      () => {
-        if (state.files.get(url) === loading) state.files.delete(url);
-        if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
-        scheduleRetry(scene, state, url);
-      },
+      () => state.files.get(url) === loading && state.files.delete(url),
     );
+  }
+  if (retry) {
+    file.catch(() => {
+      if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
+      scheduleRetry(scene, state, url);
+    });
   }
   return file;
 }
@@ -1111,6 +1129,10 @@ function fileArrived(state: SceneFiles, url: string): void {
   if (!f) return;
   clearTimeout(f.timer);
   state.failed.delete(url);
+  tellArrived(state, url);
+}
+
+function tellArrived(state: SceneFiles, url: string): void {
   for (const fn of [...state.arrived]) {
     try {
       fn(url);
@@ -1127,15 +1149,18 @@ function scheduleRetry(scene: Scene, state: SceneFiles, url: string): void {
   f.timer = setTimeout(() => {
     f.timer = undefined;
     f.tries++;
-    // A build loading it right now makes this try (its outcome counts the same).
-    if (scene.isDisposed || state.files.has(url)) return;
-    // `loadFile` notes the outcome (and sets the next try); the rejection itself is nobody's to handle.
-    loadFile(scene, url, true).catch(() => {});
+    // It waits its turn behind what's on screen. By then the file may have come, or a build be
+    // loading it (that build's outcome is this try, and sets the next).
+    void background(async () => {
+      if (scene.isDisposed || !state.failed.has(url) || state.files.has(url)) return;
+      // `loadFile` notes the outcome (and sets the next try); the rejection itself is nobody's to handle.
+      await loadFile(scene, url, true, false).catch(() => {});
+    }).catch(() => {});
   }, RETRY_AFTER_MS[f.tries]);
 }
 
-async function importFile(scene: Scene, url: string, later = false): Promise<LoadedFile> {
-  const result = await importModel(url, scene, later);
+async function importFile(scene: Scene, url: string, now: boolean): Promise<LoadedFile> {
+  const result = await importModel(url, scene, now);
   for (const group of result.animationGroups) group.stop();
   // The nodes the clips move: each, with all below it, is a moving part.
   const moved = [...new Set(result.animationGroups.flatMap((g) => g.targetedAnimations.map((t) => t.target)))].filter((t): t is TransformNode => t instanceof TransformNode);
@@ -1307,8 +1332,8 @@ function fileMaterial(lib: MaterialLibrary, material: Material | null, ov: Mater
   return copy;
 }
 
-async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: string, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
-  const file = await loadFile(scene, url);
+async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: string, footprint: [number, number], resize: Resize | undefined, retry: boolean): Promise<ModelTemplate> {
+  const file = await loadFile(scene, url, retry);
   // What the build makes, let go of if it throws part way. It runs without a break, so nothing else
   // adds meshes meanwhile.
   const made: AbstractMesh[] = [];

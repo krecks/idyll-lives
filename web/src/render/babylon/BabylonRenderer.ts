@@ -182,8 +182,13 @@ const LAMP_SWITCH_FADE = 0.25;
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
 const PREVIEW_CAPACITY = 128;
-/** How long (ms) after a failed model file comes the world is built again with it (more often come together, after an outage). */
-const FILES_SETTLE_MS = 500;
+/**
+ * How long (ms) after a failed model file comes the world is built again with it: the wait starts
+ * over with each file that comes (after an outage many come one after another, for one rebuild),
+ * but lasts at most `FILES_WAIT_MS` from the first.
+ */
+const FILES_SETTLE_MS = 1500;
+const FILES_WAIT_MS = 5000;
 
 interface PlacedObject {
   id: number;
@@ -318,10 +323,13 @@ export class BabylonRenderer implements Renderer {
    * is expensive). Templates not used by the current world are disabled, not disposed. One built
    * without its file is built again when the file comes (`refreshModels`).
    */
-  private readonly templates = new TemplateCache<ModelTemplate>();
+  private templates!: TemplateCache<ModelTemplate>;
   /** Files that failed and have since come, waiting for `refreshModels` (a moment later: several often come together). */
   private readonly filesArrived = new Set<string>();
   private filesTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the first of the files waiting came (`performance.now()`): the wait for more is capped from then. */
+  private filesSince = 0;
+  private unlistenFiles: (() => void) | null = null;
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
@@ -726,6 +734,7 @@ export class BabylonRenderer implements Renderer {
     // Babylon's own clock (particles: the build effects' sparkles and dust) steps at most as far as the game's.
     Scene.MaxDeltaTime = MAX_FRAME_MS;
     const scene = (this.scene = new Scene(this.engine));
+    this.templates = new TemplateCache(scene);
     if (new URLSearchParams(location.search).has('profile')) {
       // Where a slow frame's time goes: shadow/render targets, active-mesh evaluation, the draw phase.
       const t: Record<string, number> = {};
@@ -791,7 +800,7 @@ export class BabylonRenderer implements Renderer {
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // A model file that failed has come: what was drawn without it (a box, or nothing) is built again.
-    onModelFileArrived(scene, (url) => this.fileArrived(url));
+    this.unlistenFiles = onModelFileArrived(scene, (url) => this.fileArrived(url));
     // Reflections show the game world (not the shadow-only copies or the overview).
     const q = this.quality;
     this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
@@ -991,6 +1000,8 @@ export class BabylonRenderer implements Renderer {
     this.applyWallMode();
     this.applyStoreys();
     this.showItems();
+    // Built without the boxes of files that came (set aside before this build began, `refreshModels`): they go.
+    if (this.templates.disposeStale()) this.resetSnapshot();
     this.lastLightMinute = -1;
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
@@ -2291,6 +2302,10 @@ export class BabylonRenderer implements Renderer {
     this.wallCasters = [];
     this.walls = this.wallsLow = null;
     this.retireTemplates(new Set());
+    // Those built without their files are built (and their files tried) afresh in the next session,
+    // and no session's world is built again for a file that comes meanwhile (`refreshModels`).
+    this.templates.dropFailed();
+    this.lastWorld = null;
     this.placed = [];
     this.motion.clear();
     this.wallItemsHidden.clear();
@@ -2323,6 +2338,12 @@ export class BabylonRenderer implements Renderer {
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
     this.unwatchPixelRatio?.();
+    this.unlistenFiles?.();
+    if (this.filesTimer) clearTimeout(this.filesTimer);
+    this.filesTimer = null;
+    this.filesArrived.clear();
+    this.characters?.dispose();
+    this.items?.dispose();
     this.overview?.dispose();
     this.engine.dispose();
   }
@@ -2331,6 +2352,14 @@ export class BabylonRenderer implements Renderer {
 
   get townShown(): boolean {
     return this.townMode;
+  }
+
+  /** Builds the overview of `world` (if it isn't already), with its highlights and out of the house's lamps. */
+  private async buildOverview(overview: TownOverview, world: WorldStructure): Promise<void> {
+    await overview.build(world, () => this.pace());
+    if (this.townHighlight) overview.setHighlight(this.townHighlight);
+    // Interior lamps of the game's house never reach the overview.
+    this.lib.excludeFromLights([...this.roomLights, ...(this.lampCluster ? [this.lampCluster] : [])], new Set<Mesh>(overview.meshes));
   }
 
   showTown(world: WorldStructure, minute: number): Promise<void> {
@@ -2349,10 +2378,7 @@ export class BabylonRenderer implements Renderer {
         // The camera keeps a clear view over the hills (and out of the mountains).
         overview.rig.ground = (x, z) => nature.landscape.heightAt(x, z);
         perfPhase('render: town overview');
-        await perfTimeAsync('render: town overview', () => overview.build(world, () => this.pace()));
-        if (this.townHighlight) overview.setHighlight(this.townHighlight);
-        // Interior lamps of the game's house never reach the overview.
-        this.lib.excludeFromLights([...this.roomLights, ...(this.lampCluster ? [this.lampCluster] : [])], new Set<Mesh>(overview.meshes));
+        await perfTimeAsync('render: town overview', () => this.buildOverview(overview, world));
       } finally {
         this.endBuild();
       }
@@ -3052,7 +3078,8 @@ export class BabylonRenderer implements Renderer {
    * bright sky) and a faint additive glow disc behind it. All face the camera.
    */
   private async setupMarker(): Promise<void> {
-    const template = await buildModel(this.scene, 'model.marker', this.deps.assets.get('model.marker', 'model'), [1, 1]);
+    // (Built once: a file that fails isn't tried again.)
+    const template = await buildModel(this.scene, 'model.marker', this.deps.assets.get('model.marker', 'model'), [1, 1], { retry: false });
     const mat = new PBRMaterial('marker', this.scene);
     mat.unlit = true;
     mat.albedoColor = Color3.White();
@@ -3961,18 +3988,24 @@ export class BabylonRenderer implements Renderer {
   /** A model file that failed has come: things drawn without it are built again in a moment (`refreshModels`), and the ghost now. */
   private fileArrived(url: string): void {
     this.ghostFileArrived(url);
+    const now = performance.now();
+    if (!this.filesArrived.size) this.filesSince = now;
     this.filesArrived.add(url);
     if (this.filesTimer) clearTimeout(this.filesTimer);
-    this.filesTimer = setTimeout(() => {
-      this.filesTimer = null;
-      void this.refreshModels();
-    }, FILES_SETTLE_MS);
+    this.filesTimer = setTimeout(
+      () => {
+        this.filesTimer = null;
+        void this.refreshModels();
+      },
+      Math.max(0, Math.min(FILES_SETTLE_MS, this.filesSince + FILES_WAIT_MS - now)),
+    );
   }
 
   /**
    * Builds again what was drawn without the files that have come: the world (once no build is
-   * running: one holds the templates it was given), the game's street and the town overview's. The
-   * old templates (the boxes) are disposed once the world is built without them.
+   * running: one holds the templates it was given; and only while a session's world is shown), the
+   * game's street and the town overview's. The old templates (the boxes) are disposed at the end of
+   * the next world build that finishes (`buildWorld`).
    */
   private async refreshModels(): Promise<void> {
     while (this.worldBuilds) await this.worldBuilds.catch(() => {});
@@ -3988,16 +4021,37 @@ export class BabylonRenderer implements Renderer {
       if (this.street.invalidate(url)) stale = true;
       if (keys.length) stale = true;
     }
-    // The overview between its builds; built again now if it's on screen, else the next time it's shown.
+    this.refreshTown(urls);
+    if (!stale) return;
+    // No session (back in the menus): nothing draws the old templates, and no world is built.
+    if (!this.lastWorld) this.templates.disposeStale();
+    else void this.setWorld(this.lastWorld, this.view).catch(() => {});
+  }
+
+  /**
+   * The overview, between its builds: what was drawn without `urls` is built again now if the overview
+   * is still on screen as last asked for (no newer request, not left: no new ticket is taken, so it
+   * never comes back after `hideTown`), else the next time it's shown.
+   */
+  private refreshTown(urls: string[]): void {
     const overview = this.overview;
-    if (overview) {
-      this.townQueue = this.townQueue.then(() => {
+    if (!overview) return;
+    const ticket = this.townTicket;
+    this.townQueue = this.townQueue
+      .then(async () => {
         const town = urls.map((url) => overview.invalidate(url)).some(Boolean);
-        if (town && this.townMode && this.townWorld) void this.showTown(this.townWorld, this.townMinute).catch(() => {});
-      });
-    }
-    if (stale && this.lastWorld) await this.setWorld(this.lastWorld, this.view).catch(() => {});
-    if (this.templates.disposeStale()) this.resetSnapshot();
+        const world = this.townWorld;
+        if (!town || !world || !this.townMode || ticket !== this.townTicket) return;
+        this.beginBuild();
+        try {
+          await this.buildOverview(overview, world);
+        } finally {
+          this.endBuild();
+        }
+        this.updateShadowList();
+        this.resetSnapshot();
+      })
+      .catch(() => {});
   }
 
   /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */

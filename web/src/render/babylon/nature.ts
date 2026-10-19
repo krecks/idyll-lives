@@ -654,7 +654,8 @@ async function instanced(
 ): Promise<Instanced> {
   if (matrices.length === 0) return { shared: [], whole: [], cells: [] };
   await pace?.();
-  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod }));
+  // (The landscape isn't built again when a file that failed comes, so it isn't tried in the background.)
+  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod, retry: false }));
   await pace?.();
   const groups = new Map<string, number[]>();
   if (cell) {

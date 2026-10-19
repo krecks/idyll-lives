@@ -56,7 +56,8 @@ export interface ModelEntry {
   /**
    * glTF/GLB file. A key without one, or a file that fails to load, draws a plain box (things placed,
    * held, carried or pictured; `BuildOptions.standIn`) or nothing (the landscape, foliage). A file that
-   * fails is tried again in the background, and drawn once it comes.
+   * fails is tried again in the background and drawn once it comes, except the landscape's and the
+   * selection marker's (`BuildOptions.retry`): those stay out until the game is reloaded.
    */
   url?: string;
   /**

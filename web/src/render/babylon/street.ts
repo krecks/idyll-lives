@@ -464,7 +464,7 @@ export class Street {
   private meshes: Mesh[] = [];
   private casters: Mesh[] = [];
   /** Thin-instanced models by key (foliage, props, public places' things), kept hidden between builds. */
-  private readonly templates = new TemplateCache<ModelTemplate>();
+  private readonly templates: TemplateCache<ModelTemplate>;
   /** Footprints of public places' things by model key, and the boxes they're drawn as without their files (see `look`). */
   private readonly footprints = new Map<string, [number, number]>();
   private readonly standIns = new Map<string, StandIn>();
@@ -497,6 +497,7 @@ export class Street {
     private readonly look?: ObjectLook,
   ) {
     this.lib = MaterialLibrary.for(scene);
+    this.templates = new TemplateCache(scene);
     const glow = (this.glowMat = new StandardMaterial('streetLampGlass', scene));
     glow.disableLighting = true;
     glow.diffuseColor = Color3.Black();
