@@ -45,8 +45,9 @@ class Model:
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
                  middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
-                 that stands against a wall (a counter, a fridge) takes (0, -0.43), its back on the wall face,
-                 so it meets the wall and its neighbours, and its content `surface` stays on its top
+                 that stands against a wall (a counter, a fridge) takes (0, -0.43 + depth / 2), so its back is
+                 on the wall face (-0.43) and it meets the wall and its neighbours, and its content `surface`
+                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)

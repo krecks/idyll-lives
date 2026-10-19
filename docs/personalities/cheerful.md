@@ -1,6 +1,6 @@
 # Cheerful: music, parties and sunshine
 
-Pack: `web/public/content/packs/cheerful.json` · models: `web/public/assets/packs/cheerful/manifest.json`
+Pack: `web/public/content/packs/cheerful.json` · models: `web/public/assets/packs/pack_cheerful/manifest.json`
 
 **What they want.** Cheerful residents already get a flat mood bonus. This pack gives that good mood
 something to do: they gravitate to `party` (×1.8) and `music` (×1.6) items, learn Charisma 10%

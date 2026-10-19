@@ -1,6 +1,6 @@
 # Outgoing: content pack design note
 
-Pack: `web/public/content/packs/outgoing.json` · models: `web/public/assets/packs/outgoing/manifest.json`
+Pack: `web/public/content/packs/outgoing.json` · models: `web/public/assets/packs/pack_outgoing/manifest.json`
 
 **What the outgoing resident wants:** company. The trait makes Social fall ×1.3 faster, likes `social`
 ×1.4, learns Charisma ×1.2 and starts with Charisma 2. The pack gives them places where the

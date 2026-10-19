@@ -1,5 +1,5 @@
 # Romantic: content pack design note
-Pack: `web/public/content/packs/romantic.json` · models: `web/public/assets/packs/romantic/manifest.json`
+Pack: `web/public/content/packs/romantic.json` · models: `web/public/assets/packs/pack_romantic/manifest.json`
 
 **What the romantic wants:** love, and the setting for it. The trait already prefers `romantic`
 socials (×1.8), is easier to woo (+0.12 acceptance) and starts with Creativity 1. The pack gives

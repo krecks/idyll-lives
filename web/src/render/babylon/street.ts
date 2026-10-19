@@ -21,7 +21,7 @@
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
  *   things, see `assets/packs/street/manifest.json`), a few dozen draw calls for the whole street.
- * - Blender-built models only (no downloads), plus a CC0 concrete texture for the sidewalks.
+ * - Models built in Blender (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
  */
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';

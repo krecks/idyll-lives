@@ -1,6 +1,6 @@
 # Neat: content pack design note
 
-Pack: `web/public/content/packs/neat.json` · models: `web/public/assets/packs/neat/manifest.json`
+Pack: `web/public/content/packs/neat.json` · models: `web/public/assets/packs/pack_neat/manifest.json`
 
 **What a neat resident wants:** to feel clean (hygiene decays 1.2× faster) and to keep the home in
 order (base trait already likes `hygiene` 1.5 and `chores` 1.6). In the base game almost no

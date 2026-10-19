@@ -63,8 +63,9 @@ gate below, so the review does.
 
 - **1 unit = 1 metre.** Blender is Z up; the exporter's +Y up makes Blender (x, y, z) the game's
   (−x, z, −y). The front faces −Y in Blender (Blender's front view, numpad 1, is the player's view
-  of the front) and +Z in the game. Coordinates written the other way round flip x: a part on the
-  right of a front view goes at −x in Blender.
+  of the front) and +Z in the game. So x runs the other way in the game's numbers (the content's,
+  `G.GameFrame`'s): a part on the right of a front view is at +x in Blender and at −x in the game
+  (the fridge's handle: `F` x −0.3, Blender x +0.3).
 - **Origin** at the footprint's centre, on the floor: the lowest point at y = 0 for things on the
   floor. Things on a top stand on y = 0 at their middle (the game lifts them to the top); things on
   a wall have their back on the wall face, z = −0.43 in a 1-deep footprint, at their real height;
@@ -82,7 +83,8 @@ gate below, so the review does.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width. Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
-  family script assert them against the content JSON (`_template.py` `tops`). The content stays the
+  family script assert them against the content JSON (`families/lighting.py` reads each lamp's
+  `light.height` from the content and `_near_light` checks its bulb against it). The content stays the
   truth for the simulation; the script keeps the two in line.
 
 ## Budgets
@@ -206,7 +208,7 @@ room has.
 - **Far versions:** a model's entry may name a second file, `"far": "../../models/<family>/<id>.far.glb"`,
   at about a quarter of the triangles and standing still (no moving parts). It is drawn where the
   model is only seen from afar: the town overview behind the menus (its gardens and street,
-  `BuildOptions.far`) and the far woods (`lod` 1). Placeholders there stay as they are. In gamekit,
+  `BuildOptions.far`) and the far woods (`lod` 1). A model without one is drawn whole there. In gamekit,
   `G.Model(..., far=0.25)` writes it from the model at rest (joined, decimated to that share, without
   what only shows while it moves), or `far=build_function` builds one of its own; `check_glb.py`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the

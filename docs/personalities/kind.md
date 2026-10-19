@@ -1,6 +1,6 @@
 # Kind: content pack design note
 
-Pack: `web/public/content/packs/kind.json` · models: `web/public/assets/packs/kind/manifest.json`
+Pack: `web/public/content/packs/kind.json` · models: `web/public/assets/packs/pack_kind/manifest.json`
 
 **What a kind resident wants:** to do small good things for others and to make home a warm place
 for company. The base trait only touches socials (friendly 1.3, makeup 1.6), so at home a kind resident

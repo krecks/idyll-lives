@@ -1,6 +1,6 @@
 # Couch Potato: "Drawn to the TV and the sofa. Not in a hurry."
 
-Pack: `web/public/content/packs/couchPotato.json` · models: `web/public/assets/packs/couchPotato/manifest.json`
+Pack: `web/public/content/packs/couchPotato.json` · models: `web/public/assets/packs/pack_couchPotato/manifest.json`
 
 ## What they want
 Screens, soft seats and snacks within reach. The base trait already has `screen` ×1.8, `lounge` ×1.4,

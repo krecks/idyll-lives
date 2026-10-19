@@ -2,7 +2,7 @@
 
 `dining.py` builds the kitchen's **K7 dining tables**, **K8 chairs and stools** and **K9 dining storage** into
 `web/public/assets/models/dining/` and their entries in `packs/dining/manifest.json` (listed in the base
-manifest's `packs`, after `catalog` and `catalog2`, whose entries it overrides).
+manifest's `packs`, and the only manifest that defines these keys).
 
 K7 (2026-10-14): the dining table with its two chairs (`model.diningTable`, base manifest), the bistro set
 (`model.bistroSet`), the glass and farmhouse dining sets (`model.diningGlass`, `model.diningOak`) and the second

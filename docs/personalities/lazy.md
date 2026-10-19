@@ -1,6 +1,6 @@
 # Lazy: content pack design note
 
-Pack: `web/public/content/packs/lazy.json` · models: `web/public/assets/packs/lazy/manifest.json`
+Pack: `web/public/content/packs/lazy.json` · models: `web/public/assets/packs/pack_lazy/manifest.json`
 
 **What the lazy resident wants:** comfort without effort. The trait makes energy fall faster (×1.2), slows
 walking (×0.85) and Strength/Endurance learning (×0.8), and likes `rest` (×1.6). The pack gives them

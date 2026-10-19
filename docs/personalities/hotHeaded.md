@@ -1,6 +1,6 @@
 # Hot-headed: content pack design note
 
-Pack: `web/public/content/packs/hotHeaded.json` · models: `web/public/assets/packs/hotHeaded/manifest.json`
+Pack: `web/public/content/packs/hotHeaded.json` · models: `web/public/assets/packs/pack_hotHeaded/manifest.json`
 
 **What a hot-headed resident wants:** "Quick to anger and slow to forgive." The base trait loves `mean`
 socials (2.2×) and dislikes `makeup` (0.5×), and the `angry` emotion pushes `mean` to 3.5×. The pack

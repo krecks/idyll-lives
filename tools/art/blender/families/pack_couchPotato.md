@@ -1,8 +1,8 @@
 # Couch potato pack — notes
 
 `pack_couchPotato.py` builds the six P3 couch potato models into `web/public/assets/models/pack_couchPotato/` and
-their entries in `packs/pack_couchPotato/manifest.json`, an override pack listed after
-`packs/couchPotato/manifest.json`. Built 2026-10-14; they sit in Validate › Couch Potato until checked in play.
+their entries in `packs/pack_couchPotato/manifest.json`, a pack listed in the base manifest's `packs` (the
+trait's only model manifest). Built 2026-10-14; they sit in Validate › Couch Potato until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 The cinema wall and the game console stood 2–3 cm into the wall; they are centred on their `Model` `centre` now
