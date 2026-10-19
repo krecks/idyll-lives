@@ -1,6 +1,7 @@
 //! Lamps switched on and off (`sim_core::lights`): the player per lamp, residents per room as
 //! they come and go after dark (on into a dark room, off as the last one awake leaves or goes to
-//! sleep), saved; fires and the garden aren't theirs to switch.
+//! sleep), saved; fires and the garden aren't theirs to switch. A room without windows is dark by
+//! day too.
 
 mod common;
 
@@ -15,13 +16,14 @@ const CONTENT: &str = r#"{
       {"id":"bed","name":"Bed","price":100,"footprint":[2,2],"interactions":[{"id":"sleep","label":"Sleep","minutes":60,"pose":"lie","effects":{"energy":1.0},"tags":["sleep"]}]}],
     "economy":{"startingFunds":1000}}"#;
 
-/// Two rooms side by side, a door between them and one out: room A (x 1–4) with two lamps and a
-/// fire, room B (x 5–8) with a lamp and a bed; a lamp in the garden.
+/// Two rooms side by side, a door between them and one out: room A (x 1–4) with a window, two
+/// lamps and a fire, room B (x 5–8) without windows, with a lamp and a bed; a lamp in the garden.
 const TOWN: &str = r#"{"width":14,"depth":12,
     "plots":[{"name":"Home","x":0,"z":0,"w":14,"d":12,"entry":[12.5,10.5]}],
     "households":[{"name":"Player","plot":0,"player":true}],
     "walls":[[1,1,9,1],[1,5,9,5],[1,1,1,5],[5,1,5,5],[9,1,9,5]],
     "doors":[{"x":5,"z":2,"axis":"z"},{"x":2,"z":5,"axis":"x"}],
+    "windows":[{"x":3,"z":1,"axis":"x"}],
     "objects":[{"def":"lamp","x":1,"z":1},{"def":"lamp","x":4,"z":1},{"def":"fire","x":2,"z":1},
                {"def":"lamp","x":8,"z":1},{"def":"bed","x":6,"z":2},{"def":"lamp","x":12,"z":8}],
     "sims":[{"name":"Ada","x":12.5,"z":9.5}]}"#;
@@ -159,6 +161,17 @@ fn by_day_nothing_goes_on_until_it_gets_dark() {
     tick(&mut w, 10);
     assert!(A.iter().all(|&l| on(&w, l)), "on as night falls, Ada in the room");
     assert!(!on(&w, B), "not in the empty room");
+}
+
+#[test]
+fn a_room_without_windows_is_dark_by_day() {
+    let mut w = world_at(12.0);
+    assert!(lights::windowless(&w, w.lot.room_at(6, 3)) && !lights::windowless(&w, w.lot.room_at(3, 3)));
+    go(&mut w, IN_B);
+    assert!(on(&w, B), "on as Ada comes into B by day");
+    go(&mut w, IN_A);
+    assert!(!on(&w, B), "off as she leaves");
+    assert!(A.iter().all(|&l| !on(&w, l)), "A has a window: no lamps by day");
 }
 
 #[test]

@@ -32,6 +32,7 @@ import type { DoorStyleDef, FloorCoveringDef, RoofColorDef, RoofStyleDef, WallCo
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { LAYER_SHADOW_ONLY } from './layers';
 import { MaterialLibrary } from './materials';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 
@@ -1294,6 +1295,16 @@ export class HouseBuilder {
       }
     }
 
+    // ---- a ceiling only the sun's shadow map sees -------------------------------------
+    // Rooms are open at the top (no ceilings, and the roof hides with the walls cut away): this
+    // lid over the indoor tiles keeps the sun out of them but through windows and doorways, in
+    // every wall mode. Just under the wall tops, clear of the floor of a storey above.
+    const lid = new Geo();
+    if (!storey.preview && Number.isFinite(minX)) {
+      const indoor = (x: number, z: number) => (inView(x, z) && (room(x, z) !== 0 || !!diagonal(x, z)?.rooms.some((r) => r !== 0)) ? 1 : 0);
+      for (const r of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) lid.box(r.x0 - T, H - 0.12, r.z0 - T, r.x1 + T, H - 0.04, r.z1 + T);
+    }
+
     // ---- garden: foundation shrubs and a few lot trees --------------------------------
     // The player's own lot gets no automatic border: they plant their garden themselves, and
     // building a room there shouldn't make flowers appear around it.
@@ -1354,12 +1365,13 @@ export class HouseBuilder {
     const meshes: Mesh[] = [];
     const casters: Mesh[] = [];
     const roofs: Mesh[] = [];
-    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean } = {}) => {
+    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean; shadowOnly?: boolean } = {}) => {
       const cut = !storey.preview && (opts.cut ?? true);
       const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
       if (!mesh) return;
       mesh.material = typeof key === 'string' ? this.material(key, cut) : key;
-      mesh.receiveShadows = true;
+      mesh.receiveShadows = !opts.shadowOnly;
+      if (opts.shadowOnly) mesh.layerMask = LAYER_SHADOW_ONLY;
       mesh.isPickable = false;
       meshes.push(mesh);
       if (opts.cast) casters.push(mesh);
@@ -1387,6 +1399,7 @@ export class HouseBuilder {
     add(roof, 'roof', M.roof, { cut: false, cast: true, roof: true });
     add(roofTrim, 'roofTrim', M.trim, { cut: false, cast: true, roof: true });
     add(gables, 'gables', scheme.brick ? M.brick : M.siding, { cut: false, cast: true, roof: true });
+    add(lid, 'ceilingShadow', M.trim, { cut: false, cast: true, shadowOnly: true });
     return { meshes, casters, roofs, rooms: roomTiles, shrubs, trees, surfaces };
   }
 
@@ -1808,7 +1821,7 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
  * Covers the indoor tiles of a bounding box with a few rectangles (greedy, row-major). Leftovers
  * smaller than `minArea` tiles (e.g. a single-tile porch notch) don't get their own roof.
  */
-function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
+export function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
   const w = x1 - x0;
   const covered = new Uint8Array(w * (z1 - z0));
   const indoor = (x: number, z: number) => room(x, z) !== 0;
