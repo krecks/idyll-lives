@@ -97,9 +97,9 @@ import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
 import { buildFences } from './fences';
 import { applyShaderFixes } from './shaderFixes';
-import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, indoorRects, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
+import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
-import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
+import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
 import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate, type StandIn } from './models';
@@ -447,12 +447,12 @@ export class BabylonRenderer implements Renderer {
   /** Rooms without windows in the whole town (as sim-core `lights::windowless`), for the lot it was found for. */
   private windowless: { rooms: ReadonlySet<number>; of: readonly unknown[] } = { rooms: new Set(), of: [] };
   /**
-   * The windowless rooms of the storey in view kept out of daylight (`DigState.rects`): their
+   * The windowless rooms of the storey in view kept out of daylight (`DigState.mask`): their
    * lamps are lit by day as at night, and a fill (no lamp there) only while someone awake is in.
    */
   private dimmed = new Set<number>();
-  /** What `DigState` gets for them (heights, count, bounds, rectangles) while the game world is shown. */
-  private dimming = { band: [0, 0, 0], bounds: [0, 0, 0, 0], rects: new Float32Array(WINDOWLESS_RECTS * 4) };
+  /** Their tiles, as `DigState` gets them while the game world is shown (null: none in view). */
+  private dimming: DarkTiles | null = null;
   /** Bumped as `dimming` changes; what the materials were last given (and whether the game was shown then). */
   private dimmingVersion = 0;
   private dimmingApplied = { version: -1, on: false };
@@ -2263,7 +2263,7 @@ export class BabylonRenderer implements Renderer {
     this.doors = [];
     this.dimmed = new Set();
     this.windowless = { rooms: new Set(), of: [] };
-    this.dimming.band.fill(0);
+    this.dimming = null;
     this.dimmingVersion++;
     this.applyDimming();
     this.lotTemplates.clear();
@@ -3364,8 +3364,8 @@ export class BabylonRenderer implements Renderer {
 
   /**
    * Finds the rooms without windows (`windowless`), and keeps those of the storey in view out of
-   * daylight as the basement is (`dimmed`): each as rectangles for the materials, a room whole or
-   * not at all (with too many rectangles the smallest rooms keep their daylight, lamps as usual).
+   * daylight as the basement is (`dimmed`): every one of their tiles in view, on the materials'
+   * mask (`DigState.darken`).
    */
   private markWindowless(world: WorldStructure, view: ViewRect | null): void {
     const W = world.width;
@@ -3389,60 +3389,42 @@ export class BabylonRenderer implements Renderer {
     const dark = this.windowless.rooms;
 
     const dimmed = new Set<number>();
-    const { band, bounds, rects } = this.dimming;
-    const before = [...band, ...bounds, ...rects];
-    band.fill(0);
+    const before = this.dimming;
+    let dimming: DarkTiles | null = null;
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
       const [vw, vd] = [view.w, view.d];
-      // The view's tiles: the windowless room on a whole one (0: none), and the halves of tiles
-      // split by a diagonal wall that belong to one (x, z, which half, room).
-      const whole = new Int32Array(vw * vd);
-      const parts: [number, number, number, number][] = [];
+      // The view's tiles: dark whole, or the halves of one split by a diagonal wall that are.
+      const tiles = new Uint8Array(vw * vd);
       const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
+      const B = WINDOWLESS_BITS;
       for (let z = 0; z < vd; z++) {
         for (let x = 0; x < vw; x++) {
           const i = (z + view.z + row) * W + x + view.x;
           const d = diagonals.get(i);
           if (!d) {
-            if (dark.has(world.rooms[i])) whole[z * vw + x] = world.rooms[i];
+            if (!dark.has(world.rooms[i])) continue;
+            tiles[z * vw + x] = B.tile;
+            dimmed.add(world.rooms[i]);
             continue;
           }
-          d.rooms.forEach((r, h) => dark.has(r) && parts.push([x + view.x, z + view.z, (d.axis === 'dp' ? 0 : 2) + h, r]));
+          let bits = 0;
+          d.rooms.forEach((r, h) => {
+            if (!dark.has(r)) return;
+            bits |= h === 0 ? B.half0 : B.half1;
+            dimmed.add(r);
+          });
+          if (bits) tiles[z * vw + x] = bits | (d.axis === 'dn' ? B.dn : 0);
         }
       }
-      // Each room's share: its tiles (halves count half) and what its rectangles would take.
-      const share = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number; halves: number }>();
-      const grow = (r: number, x: number, z: number, n: number, half: number) => {
-        const b = share.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1, halves: 0 };
-        b.n += n;
-        b.halves += half;
-        [b.x0, b.z0, b.x1, b.z1] = [Math.min(b.x0, x), Math.min(b.z0, z), Math.max(b.x1, x + 1), Math.max(b.z1, z + 1)];
-        share.set(r, b);
-      };
-      whole.forEach((r, i) => r && grow(r, (i % vw) + view.x, Math.floor(i / vw) + view.z, 1, 0));
-      for (const [x, z, , r] of parts) grow(r, x, z, 0.5, 1);
-      const at = (x: number, z: number) => whole[(z - view.z) * vw + x - view.x];
-      let count = 0;
-      const add = (r: readonly [number, number, number, number], x0: number, z0: number, x1: number, z1: number) => {
-        rects.set(r, count * 4);
-        if (count === 0) bounds.splice(0, 4, x0, z0, x1, z1);
-        else bounds.splice(0, 4, Math.min(bounds[0], x0), Math.min(bounds[1], z0), Math.max(bounds[2], x1), Math.max(bounds[3], z1));
-        count++;
-      };
-      // Biggest rooms first, each whole (its tiles' rectangles and its halves) or not at all.
-      for (const [r, b] of [...share].sort((p, q) => q[1].n - p[1].n)) {
-        const own = indoorRects((x, z) => (at(x, z) === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
-        if (count + own.length + b.halves > WINDOWLESS_RECTS) continue;
-        for (const q of own) add([q.x0, q.z0, q.x1, q.z1], q.x0, q.z0, q.x1, q.z1);
-        for (const [x, z, half, h] of parts) if (h === r) add([x, z, -1 - half, 0], x, z, x + 1, z + 1);
-        dimmed.add(r);
-      }
       // From under the floor of the storey in view to just under the next one's.
-      if (count) band.splice(0, 3, this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, count);
+      if (dimmed.size) dimming = { x0: view.x, z0: view.z, w: vw, d: vd, y0: this.storey * WALL_HEIGHT - 0.5, y1: (this.storey + 1) * WALL_HEIGHT - 0.02, tiles };
     }
     this.dimmed = dimmed;
-    if ([...band, ...bounds, ...rects].some((v, i) => v !== before[i])) this.dimmingVersion++;
+    this.dimming = dimming;
+    const same = (a: DarkTiles | null, b: DarkTiles | null) =>
+      a === b || (!!a && !!b && a.x0 === b.x0 && a.z0 === b.z0 && a.w === b.w && a.d === b.d && a.y0 === b.y0 && a.y1 === b.y1 && a.tiles.every((t, i) => t === b.tiles[i]));
+    if (!same(before, dimming)) this.dimmingVersion++;
     this.applyDimming();
   }
 
@@ -3459,11 +3441,7 @@ export class BabylonRenderer implements Renderer {
     const on = !this.townMode;
     if (this.dimmingApplied.version === this.dimmingVersion && this.dimmingApplied.on === on) return;
     this.dimmingApplied = { version: this.dimmingVersion, on };
-    const dig = this.lib.dig;
-    const { band, bounds, rects } = this.dimming;
-    dig.band.set(band[0], band[1], on ? band[2] : 0, 0);
-    dig.bounds.set(bounds[0], bounds[1], bounds[2], bounds[3]);
-    dig.rects.set(rects);
+    this.lib.dig.darken(on ? this.dimming : null);
     this.resetSnapshot();
   }
 

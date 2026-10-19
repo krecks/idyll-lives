@@ -24,15 +24,18 @@
 
 import {
   Color3,
+  Constants,
   CubeTexture,
   MaterialPluginBase,
   PBRMaterial,
+  RawTexture,
   ShaderLanguage,
   StandardMaterial,
   Texture,
   Vector4,
   type AbstractEngine,
   type AbstractMesh,
+  type BaseTexture,
   type Light,
   type Material,
   type MaterialDefines,
@@ -233,10 +236,32 @@ uniform vec4 wallCutParams;
   }
 }
 
-/** Rectangles of windowless rooms the materials test (see `DigState.rects`). */
-export const WINDOWLESS_RECTS = 32;
-/** The halves of a split tile in `DigState.rects` (tile-local u = x, v = z): a 'dp' wall's, then a 'dn' wall's (as slanted.ts `halfTriangle`). */
-export const WINDOWLESS_HALVES = ['dp0', 'dp1', 'dn0', 'dn1'] as const;
+/**
+ * The bits of a tile in the windowless rooms' mask (`DigState.darken`): dark whole, or the halves
+ * of a tile split by a diagonal wall that are, and which way the wall runs. In tile-local
+ * u = x - x0, v = z - z0, a 'dp' wall's half 0 is v < u (half 1 v > u), a 'dn' wall's u + v < 1
+ * (half 1 u + v > 1), as slanted.ts `halfTriangle` has them.
+ */
+export const WINDOWLESS_BITS = { tile: 1, half0: 2, half1: 4, dn: 8 } as const;
+
+/** Tiles kept out of daylight (`DigState.darken`): `w` by `d` of them from (x0, z0), heights y0 to y1. */
+export interface DarkTiles {
+  x0: number;
+  z0: number;
+  w: number;
+  d: number;
+  y0: number;
+  y1: number;
+  /** A byte per tile (`WINDOWLESS_BITS`), row by row. */
+  tiles: Uint8Array;
+}
+
+/** One byte per tile, read whole (no filtering between tiles). */
+function maskTexture(scene: Scene, w: number, d: number): RawTexture {
+  const texture = new RawTexture(new Uint8Array(w * d), w, d, Constants.TEXTUREFORMAT_R, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_UNSIGNED_BYTE);
+  texture.name = 'windowlessMask';
+  return texture;
+}
 
 /**
  * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in
@@ -254,19 +279,47 @@ export class DigState {
   under = false;
   readonly lit = new Vector4(0, 0.1, 0.1, 0);
   /**
-   * Rooms without windows on the storey in view, as dark as the basement by day: `rects` holds
-   * up to `WINDOWLESS_RECTS` rectangles (x0, z0, x1, z1, in metres) within `bounds` (the same),
-   * `band` the heights they reach (y0, y1) and in `band.z` how many there are. A half of a tile
-   * split by a diagonal wall is (x0, z0, -1 - half, 0), `half` as `WINDOWLESS_HALVES` has it.
+   * Rooms without windows on the storey in view, as dark as the basement by day: `mask` has a
+   * byte per tile of `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`), `band`
+   * the heights it reaches (y0, y1; nowhere while both are 0). With nothing dark it's one empty
+   * texel, so every material always has a texture to read.
    */
-  readonly rects = new Float32Array(WINDOWLESS_RECTS * 4);
-  readonly bounds = new Vector4(0, 0, 0, 0);
+  mask: RawTexture;
+  readonly area = new Vector4(0, 0, 0, 0);
   readonly band = new Vector4(0, 0, 0, 0);
+  private readonly empty: RawTexture;
+  /** The view's own mask, made again only when the view's size changes. */
+  private sized: RawTexture | null = null;
+
+  constructor(private readonly scene: Scene) {
+    this.mask = this.empty = maskTexture(scene, 1, 1);
+  }
+
+  /**
+   * Keeps daylight out of the tiles `dark` marks, or out of nowhere (null). The uniforms and,
+   * with another texture, the materials' bindings change: a WebGPU snapshot must re-record.
+   */
+  darken(dark: DarkTiles | null): void {
+    if (!dark) {
+      this.mask = this.empty;
+      this.band.set(0, 0, 0, 0);
+      return;
+    }
+    const size = this.sized?.getSize();
+    if (!this.sized || size?.width !== dark.w || size.height !== dark.d) {
+      this.sized?.dispose();
+      this.sized = maskTexture(this.scene, dark.w, dark.d);
+    }
+    this.sized.update(dark.tiles);
+    this.mask = this.sized;
+    this.area.set(dark.x0, dark.z0, dark.w, dark.d);
+    this.band.set(dark.y0, dark.y1, 0, 0);
+  }
 }
 
 /**
  * Keeps daylight out of a basement in view (`DigState.under`), and out of the rooms without
- * windows on the storey in view (`DigState.rects`): inside them the sun and the sky fill (the
+ * windows on the storey in view (`DigState.mask`): inside them the sun and the sky fill (the
  * directional and hemispheric lights) and the environment are scaled down to `DigState.lit`, so
  * only the lamps (point lights) light them, day and night.
  */
@@ -289,48 +342,78 @@ class UndergroundPlugin extends MaterialPluginBase {
   }
 
   override getUniforms(): { externalUniforms: string[] } {
-    return { externalUniforms: ['undergroundRect', 'undergroundLit', 'windowlessBand', 'windowlessBounds', 'windowlessRects'] };
+    return { externalUniforms: ['undergroundRect', 'undergroundLit', 'windowlessBand', 'windowlessArea'] };
+  }
+
+  override getSamplers(samplers: string[]): void {
+    samplers.push('windowlessMask');
+  }
+
+  override isReadyForSubMesh(): boolean {
+    return this.state.mask.isReady();
+  }
+
+  // (Not in `getActiveTextures`: the mask is shared, and a material disposed with its textures mustn't take it along.)
+  override hasTexture(texture: BaseTexture): boolean {
+    return texture === this.state.mask;
+  }
+
+  override bindForSubMesh(ubo: UniformBuffer): void {
+    ubo.setTexture('windowlessMask', this.state.mask);
   }
 
   override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const effect = subMesh.effect;
     if (!effect) return;
-    const { rect, under, lit, band, bounds, rects } = this.state;
+    const { rect, under, lit, band, area } = this.state;
     effect.setFloat4('undergroundRect', rect.x, rect.y, rect.z, rect.w);
     effect.setFloat4('undergroundLit', lit.x, lit.y, lit.z, under ? 1 : 0);
-    effect.setFloat4('windowlessBand', band.x, band.y, band.z, 0);
-    effect.setFloat4('windowlessBounds', bounds.x, bounds.y, bounds.z, bounds.w);
-    // (Nothing to test, nothing to upload: the loop doesn't run.)
-    if (band.z > 0) effect.setFloatArray4('windowlessRects', rects);
+    effect.setFloat4('windowlessBand', band.x, band.y, 0, 0);
+    effect.setFloat4('windowlessArea', area.x, area.y, area.z, area.w);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
     if (shaderType !== 'fragment') return null;
     const wgsl = shaderLanguage === ShaderLanguage.WGSL;
     const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
+    const B = WINDOWLESS_BITS;
+    // The tile under the fragment (its byte), and where in it the fragment is (for a split one).
+    const windowless = wgsl
+      ? `
+  let wlT = ${p}.xz - ${u}windowlessArea.xy;
+  if (wlT.x >= 0.0 && wlT.y >= 0.0 && wlT.x < ${u}windowlessArea.z && wlT.y < ${u}windowlessArea.w) {
+    let wlC = floor(wlT);
+    let wlM = u32(textureLoad(windowlessMask, vec2<i32>(wlC), 0).r * 255.0 + 0.5);
+    let wlF = wlT - wlC;
+    var wlDark = (wlM & ${B.tile}u) != 0u;
+    if (!wlDark && wlM > 1u) {
+      let wlOne = select(wlF.y > wlF.x, wlF.x + wlF.y > 1.0, (wlM & ${B.dn}u) != 0u);
+      wlDark = (wlM & select(${B.half0}u, ${B.half1}u, wlOne)) != 0u;
+    }
+    if (wlDark) { underground = ${u}undergroundLit.xyz; }
+  }`
+      : `
+  vec2 wlT = ${p}.xz - windowlessArea.xy;
+  if (wlT.x >= 0.0 && wlT.y >= 0.0 && wlT.x < windowlessArea.z && wlT.y < windowlessArea.w) {
+    vec2 wlC = floor(wlT);
+    int wlM = int(texelFetch(windowlessMask, ivec2(wlC), 0).r * 255.0 + 0.5);
+    vec2 wlF = wlT - wlC;
+    bool wlDark = (wlM & ${B.tile}) != 0;
+    if (!wlDark && wlM > 1) {
+      bool wlOne = (wlM & ${B.dn}) != 0 ? wlF.x + wlF.y > 1.0 : wlF.y > wlF.x;
+      wlDark = (wlM & (wlOne ? ${B.half1} : ${B.half0})) != 0;
+    }
+    if (wlDark) { underground = undergroundLit.xyz; }
+  }`;
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: wgsl
-        ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessBounds: ${v4};\nuniform windowlessRects: array<${v4}, ${WINDOWLESS_RECTS}>;`
-        : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;\nuniform ${v4} windowlessBand;\nuniform ${v4} windowlessBounds;\nuniform ${v4} windowlessRects[${WINDOWLESS_RECTS}];`,
+        ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessArea: ${v4};\nvar windowlessMask: texture_2d<f32>;`
+        : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;\nuniform ${v4} windowlessBand;\nuniform ${v4} windowlessArea;\nuniform highp sampler2D windowlessMask;`,
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
 ${wgsl ? 'var underground' : 'vec3 underground'} = ${v3}(1.0);
 if (${u}undergroundLit.w > 0.5 && ${p}.x > ${u}undergroundRect.x && ${p}.x < ${u}undergroundRect.z && ${p}.z > ${u}undergroundRect.y && ${p}.z < ${u}undergroundRect.w) { underground = ${u}undergroundLit.xyz; }
-// (Only near the rooms: the rest of the scene skips the loop.)
-if (${p}.y > ${u}windowlessBand.x && ${p}.y < ${u}windowlessBand.y && ${p}.x > ${u}windowlessBounds.x && ${p}.x < ${u}windowlessBounds.z && ${p}.z > ${u}windowlessBounds.y && ${p}.z < ${u}windowlessBounds.w) {
-  for (${wgsl ? 'var i = 0' : 'int i = 0'}; i < ${WINDOWLESS_RECTS}; i++) {
-    if (${wgsl ? 'f32(i)' : 'float(i)'} >= ${u}windowlessBand.z) { break; }
-    ${wgsl ? 'let' : 'vec4'} r = ${u}windowlessRects[i];
-    if (r.z < 0.0) {
-      // Half a tile (see WINDOWLESS_HALVES): which side of its diagonal.
-      ${wgsl ? 'let t' : 'vec2 t'} = ${p}.xz - r.xy;
-      ${wgsl ? 'let k' : 'float k'} = -r.z - 1.0;
-      ${wgsl ? 'var inside' : 'bool inside'} = false;
-      if (t.x > 0.0 && t.x < 1.0 && t.y > 0.0 && t.y < 1.0) {
-        if (k < 0.5) { inside = t.y < t.x; } else if (k < 1.5) { inside = t.y > t.x; } else if (k < 2.5) { inside = t.x + t.y < 1.0; } else { inside = t.x + t.y > 1.0; }
-      }
-      if (inside) { underground = ${u}undergroundLit.xyz; }
-    } else if (${p}.x > r.x && ${p}.x < r.z && ${p}.z > r.y && ${p}.z < r.w) { underground = ${u}undergroundLit.xyz; }
-  }
+// (Only at the storey's heights: the rest of the scene doesn't read the mask.)
+if (${p}.y > ${u}windowlessBand.x && ${p}.y < ${u}windowlessBand.y) {${windowless}
 }
 `,
       // Each light's colour as it's read (lamps, the point lights, keep theirs).
@@ -509,7 +592,7 @@ export class MaterialLibrary {
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
   /** The ground dug away over a basement in view (see `digInto`). */
-  readonly dig = new DigState();
+  readonly dig: DigState;
   private readonly dug = new WeakSet<Material>();
 
   /** Makes `material` (the landscape's ground and lawn) follow `dig`. */
@@ -528,6 +611,7 @@ export class MaterialLibrary {
   onRefrozen: (() => void) | null = null;
 
   private constructor(private readonly scene: Scene) {
+    this.dig = new DigState(scene);
     scene.onAfterRenderObservable.add(() => {
       if (this.refreezeFrames === 0 || --this.refreezeFrames > 0) return;
       for (const m of this.thawed) m.freeze();
