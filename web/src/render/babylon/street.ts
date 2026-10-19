@@ -24,7 +24,7 @@
  * - Blender-built models only (no downloads), plus a CC0 concrete texture for the sidewalks.
  */
 
-import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
+import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Light, type Material, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
@@ -486,6 +486,8 @@ export class Street {
     private readonly house: HouseBuilder,
     /** Camera layer of everything this street draws (see layers.ts); default: the game world. */
     private readonly layerMask?: number,
+    /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
+    private readonly lived = false,
     /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
     private readonly look?: ObjectLook,
   ) {
@@ -576,7 +578,7 @@ export class Street {
       const home = L.kind === 'home' && !view;
       if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
       // (Only the game's street follows who's up: the menus' town keeps every window lit.)
-      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && this.layerMask === undefined });
+      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && this.lived });
     }
     const sil = perfTime('street: silhouettes', () => this.house.silhouettes(specs, world.openings ?? [], world));
     await pace?.();
@@ -915,9 +917,9 @@ export class Street {
       this.meshes.push(poolMesh);
     }
     add(shadows, 'streetShadows', this.lib.contactShadow());
-    // Interior lamps of the viewed house never reach the street (keeps its shaders simple): the
-    // room lights, or the clustered container holding them. Left out as soon as the meshes exist.
-    const interior = this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
+    // Interior lamps of the viewed house never reach the street (keeps its shaders simple), left
+    // out as soon as the meshes exist.
+    const interior = this.interiorLights();
     this.lib.excludeFromLights(interior, new Set(this.meshes));
     perfEnd(meshesSpan);
     await pace?.();
@@ -992,17 +994,21 @@ export class Street {
   private drawWindows(): void {
     for (const mesh of this.windowMeshes) mesh.dispose(false, false);
     this.windowMeshes = [];
-    // Kept out of the viewed house's interior lights, as the rest of the street.
-    const interior = this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
     for (const lit of [true, false]) {
       const mesh = this.house.neighbourWindows(this.homes.filter((h) => h.up === lit).map((h) => h.panes), lit);
       if (!mesh) continue;
       if (this.layerMask !== undefined) mesh.layerMask = this.layerMask;
-      this.lib.excludeFromLights(interior, new Set([mesh]));
       mesh.freezeWorldMatrix();
       this.windowMeshes.push(mesh);
     }
+    // Kept out of the viewed house's interior lights, as the rest of the street.
+    this.lib.excludeFromLights(this.interiorLights(), new Set(this.windowMeshes));
     if (this.drawn.length) this.drawn = [...this.drawn.filter((m) => !m.isDisposed()), ...this.windowMeshes];
+  }
+
+  /** The viewed house's interior lights (the room lights, or the clustered container holding them), which never reach the street. */
+  private interiorLights(): Light[] {
+    return this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
   }
 
   /** Forgets the neighbours' houses and their glass. */

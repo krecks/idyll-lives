@@ -749,7 +749,7 @@ export class BabylonRenderer implements Renderer {
       roofColors: c.roofColors,
     });
     // Public places seen from another lot show their things in the open (as the overview does).
-    this.street = new Street(scene, this.deps.assets, this.house, undefined, (def) => {
+    this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
       const d = this.deps.content.object(def);
       return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1] };
     });
@@ -3399,45 +3399,54 @@ export class BabylonRenderer implements Renderer {
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
       const [vw, vd] = [view.w, view.d];
-      // The view's tiles: the windowless room on a whole one (0: none), and the tiles split by a
-      // diagonal wall with a windowless room on both halves.
+      // The view's tiles: the windowless room on a whole one (0: none), and the halves of tiles
+      // split by a diagonal wall that belong to one (x, z, which half, room).
       const whole = new Int32Array(vw * vd);
-      const split: [number, number, number, number][] = [];
+      const parts: [number, number, number, number][] = [];
+      const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
       for (let z = 0; z < vd; z++) {
         for (let x = 0; x < vw; x++) {
           const i = (z + view.z + row) * W + x + view.x;
-          const h = halves.get(i);
-          if (h) {
-            if (dark.has(h[0]) && dark.has(h[1])) split.push([x + view.x, z + view.z, h[0], h[1]]);
-          } else if (dark.has(world.rooms[i])) whole[z * vw + x] = world.rooms[i];
+          const d = diagonals.get(i);
+          if (!d) {
+            if (dark.has(world.rooms[i])) whole[z * vw + x] = world.rooms[i];
+            continue;
+          }
+          d.rooms.forEach((r, h) => dark.has(r) && parts.push([x + view.x, z + view.z, (d.axis === 'dp' ? 0 : 2) + h, r]));
         }
       }
-      const spans = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number }>();
-      whole.forEach((r, i) => {
-        if (!r) return;
-        const [x, z] = [(i % vw) + view.x, Math.floor(i / vw) + view.z];
-        const b = spans.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1 };
-        b.n++;
+      // Each room's share: its tiles (halves count half) and what its rectangles would take.
+      const share = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number; halves: number }>();
+      const grow = (r: number, x: number, z: number, n: number, half: number) => {
+        const b = share.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1, halves: 0 };
+        b.n += n;
+        b.halves += half;
         [b.x0, b.z0, b.x1, b.z1] = [Math.min(b.x0, x), Math.min(b.z0, z), Math.max(b.x1, x + 1), Math.max(b.z1, z + 1)];
-        spans.set(r, b);
-      });
+        share.set(r, b);
+      };
+      whole.forEach((r, i) => r && grow(r, (i % vw) + view.x, Math.floor(i / vw) + view.z, 1, 0));
+      for (const [x, z, , r] of parts) grow(r, x, z, 0.5, 1);
+      const at = (x: number, z: number) => whole[(z - view.z) * vw + x - view.x];
+      // Biggest rooms first, each whole or not at all.
+      let budget = WINDOWLESS_RECTS;
+      for (const [r, b] of [...share].sort((p, q) => q[1].n - p[1].n)) {
+        const need = indoorRects((x, z) => (at(x, z) === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1).length + b.halves;
+        if (need > budget) continue;
+        budget -= need;
+        dimmed.add(r);
+      }
+      // Then their tiles together (rooms side by side share rectangles) and their halves.
       let count = 0;
-      const add = (x0: number, z0: number, x1: number, z1: number) => {
-        rects.set([x0, z0, x1, z1], count * 4);
+      const add = (r: readonly [number, number, number, number], x0: number, z0: number, x1: number, z1: number) => {
+        rects.set(r, count * 4);
         if (count === 0) bounds.splice(0, 4, x0, z0, x1, z1);
         else bounds.splice(0, 4, Math.min(bounds[0], x0), Math.min(bounds[1], z0), Math.max(bounds[2], x1), Math.max(bounds[3], z1));
         count++;
       };
-      // Biggest rooms first, each whole or not at all.
-      for (const [r, b] of [...spans].sort((p, q) => q[1].n - p[1].n)) {
-        const own = indoorRects((x, z) => (whole[(z - view.z) * vw + x - view.x] === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
-        if (count + own.length > WINDOWLESS_RECTS) continue;
-        for (const q of own) add(q.x0, q.z0, q.x1, q.z1);
-        dimmed.add(r);
+      if (dimmed.size) {
+        for (const q of indoorRects((x, z) => (dimmed.has(at(x, z)) ? 1 : 0), view.x, view.z, view.x + vw, view.z + vd, 1)) add([q.x0, q.z0, q.x1, q.z1], q.x0, q.z0, q.x1, q.z1);
+        for (const [x, z, half, r] of parts) if (dimmed.has(r)) add([x, z, -1 - half, 0], x, z, x + 1, z + 1);
       }
-      // A split tile where both rooms are kept dark is too, as far as there's room for it (a
-      // half with outdoors or a lit room keeps its daylight).
-      for (const [x, z, a, c] of split) if (count < WINDOWLESS_RECTS && dimmed.has(a) && dimmed.has(c)) add(x, z, x + 1, z + 1);
       // From under the floor of the storey in view to just under the next one's.
       if (count) band.splice(0, 3, this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, count);
     }
@@ -3445,6 +3454,14 @@ export class BabylonRenderer implements Renderer {
     this.dimmingVersion++;
     this.applyDimming();
   }
+
+  /** Life stage ids of babies (content `baby`: they don't count as someone up, as in sim-core). */
+  private babyStages(): ReadonlySet<string> {
+    const stages = this.deps.content.lifeStages;
+    if (this.babies?.of !== stages) this.babies = { of: stages, ids: new Set(stages.filter((s) => s.baby).map((s) => s.id)) };
+    return this.babies.ids;
+  }
+  private babies: { of: readonly unknown[]; ids: ReadonlySet<string> } | null = null;
 
   /** The windowless rooms' darkness on the materials (`dimming`): none while the menus' town is shown. */
   private applyDimming(): void {
@@ -3496,7 +3513,7 @@ export class BabylonRenderer implements Renderer {
       const pz = curr[o + k.z];
       if (curr[o + k.moving] !== 0) movers.push(px, pz);
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
-      const baby = world.sims[i]?.stage === 'baby';
+      const baby = this.babyStages().has(world.sims[i]?.stage ?? '');
       // `z` is in lot rows: upper storeys have rooms of their own there.
       const x = Math.floor(px);
       const z = Math.floor(pz);
@@ -3541,7 +3558,7 @@ export class BabylonRenderer implements Renderer {
       if (open === door.open) continue;
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall.
-      const turn = leaf.close * (1 - open * open * (3 - 2 * open));
+      const turn = leaf.close * (1 - leaf.opens * open * open * (3 - 2 * open));
       for (const mesh of leaf.meshes) mesh.rotation.y = turn;
       moved = true;
     }

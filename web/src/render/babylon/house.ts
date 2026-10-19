@@ -277,8 +277,9 @@ export interface DoorLeaf {
   meshes: Mesh[];
   /** The middle of its doorway. */
   centre: [number, number];
-  /** Turn about y that shuts it. */
+  /** Turn about y that shuts it, and how much of it back it swings open (1: all the way, against the wall). */
   close: number;
+  opens: number;
   /** A front door (outdoors on one side): shut unless someone comes through. */
   front: boolean;
   /** The bathroom it opens into (0: none): shut while someone is in there. */
@@ -1347,11 +1348,9 @@ export class HouseBuilder {
       for (const d of world.diagonals ?? []) {
         if (!inView(d.x, d.z) || (d.rooms[0] !== 0) === (d.rooms[1] !== 0)) continue;
         const corners = halfTriangle(d.axis, d.rooms[0] !== 0 ? 0 : 1);
-        for (const y of [H - 0.12, H - 0.04]) {
-          const pts = corners.map(([fx, fz]): V3 => [d.x + fx, y, d.z + fz]);
-          lid.poly(pts, [0, 1, 0]);
-          lid.poly([...pts].reverse(), [0, -1, 0]);
-        }
+        const at = (y: number) => corners.map(([fx, fz]): V3 => [d.x + fx, y, d.z + fz]);
+        lid.poly(at(H - 0.04), [0, 1, 0]);
+        lid.poly(at(H - 0.12).reverse(), [0, -1, 0]);
       }
     }
 
@@ -1730,11 +1729,15 @@ export class HouseBuilder {
     const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
     const [from, to]: [number, number][] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
     const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
-    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, front, rooms });
+    // A leaf that shuts fills its opening (a double door's up to the middle). Open, a double
+    // door's leaf would reach past a wall a tile in front: then it opens only as far as clears it.
+    const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
+    const clear = 1 - 2 * T - 0.03;
+    const opens = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
+    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms });
     const glass = own ? own.glass : geos.glass(inside);
-    // A leaf that shuts fills its opening (a double door's up to the middle, unless a wall a tile
-    // in front leaves it less room when open); one that stands open for good keeps the usual width.
-    const width = !own ? LEAF_W : run.len > 1 && !geos.ahead?.(into) ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
+    // (One that stands open for good keeps the usual width.)
+    const width = own ? fill : LEAF_W;
     this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
