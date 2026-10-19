@@ -252,16 +252,12 @@ export interface DarkTiles {
   d: number;
   y0: number;
   y1: number;
-  /** A byte per tile (`WINDOWLESS_BITS`), row by row. */
+  /** A byte per tile (`WINDOWLESS_BITS`), row by row; not changed once given to `darken`. */
   tiles: Uint8Array;
 }
 
-/** One byte per tile, read whole (no filtering between tiles). */
-function maskTexture(scene: Scene, w: number, d: number): RawTexture {
-  const texture = new RawTexture(new Uint8Array(w * d), w, d, Constants.TEXTUREFORMAT_R, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_UNSIGNED_BYTE);
-  texture.name = 'windowlessMask';
-  return texture;
-}
+/** The mask's side in tiles: a storey of a lot is at most 256 tiles each way (sim-core `lot.rs`). */
+const MASK_SIZE = 256;
 
 /**
  * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in
@@ -280,40 +276,44 @@ export class DigState {
   readonly lit = new Vector4(0, 0.1, 0.1, 0);
   /**
    * Rooms without windows on the storey in view, as dark as the basement by day: `mask` has a
-   * byte per tile of `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`), `band`
-   * the heights it reaches (y0, y1; nowhere while both are 0). With nothing dark it's one empty
-   * texel, so every material always has a texture to read.
+   * byte per tile of `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`) in its
+   * corner, `band` the heights it reaches (y0, y1; nowhere while both are 0). One texture of a
+   * fixed size, never swapped, so the materials' bindings stay as they are.
    */
-  mask: RawTexture;
+  readonly mask: RawTexture;
   readonly area = new Vector4(0, 0, 0, 0);
   readonly band = new Vector4(0, 0, 0, 0);
-  private readonly empty: RawTexture;
-  /** The view's own mask, made again only when the view's size changes. */
-  private sized: RawTexture | null = null;
+  /** What `mask` holds (uploaded only when that changes), and its bytes as uploaded. */
+  private shown: DarkTiles | null = null;
+  private readonly bytes = new Uint8Array(MASK_SIZE * MASK_SIZE);
 
-  constructor(private readonly scene: Scene) {
-    this.mask = this.empty = maskTexture(scene, 1, 1);
+  constructor(scene: Scene) {
+    // One byte per tile, read whole (no filtering between tiles).
+    this.mask = RawTexture.CreateRTexture(this.bytes, MASK_SIZE, MASK_SIZE, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_UNSIGNED_BYTE);
+    this.mask.name = 'windowlessMask';
   }
 
   /**
-   * Keeps daylight out of the tiles `dark` marks, or out of nowhere (null). The uniforms and,
-   * with another texture, the materials' bindings change: a WebGPU snapshot must re-record.
+   * Keeps daylight out of the tiles `dark` marks, or out of nowhere (null). Returns whether that
+   * changed anything: the uniforms then change, and a WebGPU snapshot must re-record.
    */
-  darken(dark: DarkTiles | null): void {
-    if (!dark) {
-      this.mask = this.empty;
-      this.band.set(0, 0, 0, 0);
-      return;
+  darken(dark: DarkTiles | null): boolean {
+    const [y0, y1] = dark ? [dark.y0, dark.y1] : [0, 0];
+    let changed = this.band.x !== y0 || this.band.y !== y1;
+    this.band.set(y0, y1, 0, 0);
+    if (!dark) return changed;
+    const was = this.shown;
+    if (was !== dark && (!was || was.w !== dark.w || was.d !== dark.d || dark.tiles.some((t, i) => t !== was.tiles[i]))) {
+      for (let z = 0; z < dark.d; z++) this.bytes.set(dark.tiles.subarray(z * dark.w, (z + 1) * dark.w), z * MASK_SIZE);
+      this.mask.update(this.bytes);
+      this.shown = dark;
+      changed = true;
     }
-    const size = this.sized?.getSize();
-    if (!this.sized || size?.width !== dark.w || size.height !== dark.d) {
-      this.sized?.dispose();
-      this.sized = maskTexture(this.scene, dark.w, dark.d);
+    if (this.area.x !== dark.x0 || this.area.y !== dark.z0 || this.area.z !== dark.w || this.area.w !== dark.d) {
+      this.area.set(dark.x0, dark.z0, dark.w, dark.d);
+      changed = true;
     }
-    this.sized.update(dark.tiles);
-    this.mask = this.sized;
-    this.area.set(dark.x0, dark.z0, dark.w, dark.d);
-    this.band.set(dark.y0, dark.y1, 0, 0);
+    return changed;
   }
 }
 
@@ -378,6 +378,8 @@ class UndergroundPlugin extends MaterialPluginBase {
     const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
     const B = WINDOWLESS_BITS;
     // The tile under the fragment (its byte), and where in it the fragment is (for a split one).
+    // (GLSL ES 3 only: WebGL1, should Babylon fall back to it, has no texelFetch or integer bit
+    // operations, and draws the rooms in daylight rather than not at all.)
     const windowless = wgsl
       ? `
   let wlT = ${p}.xz - ${u}windowlessArea.xy;
@@ -393,6 +395,7 @@ class UndergroundPlugin extends MaterialPluginBase {
     if (wlDark) { underground = ${u}undergroundLit.xyz; }
   }`
       : `
+#ifdef WEBGL2
   vec2 wlT = ${p}.xz - windowlessArea.xy;
   if (wlT.x >= 0.0 && wlT.y >= 0.0 && wlT.x < windowlessArea.z && wlT.y < windowlessArea.w) {
     vec2 wlC = floor(wlT);
@@ -404,7 +407,8 @@ class UndergroundPlugin extends MaterialPluginBase {
       wlDark = (wlM & (wlOne ? ${B.half1} : ${B.half0})) != 0;
     }
     if (wlDark) { underground = undergroundLit.xyz; }
-  }`;
+  }
+#endif`;
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: wgsl
         ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessArea: ${v4};\nvar windowlessMask: texture_2d<f32>;`

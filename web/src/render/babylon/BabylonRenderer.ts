@@ -453,9 +453,6 @@ export class BabylonRenderer implements Renderer {
   private dimmed = new Set<number>();
   /** Their tiles, as `DigState` gets them while the game world is shown (null: none in view). */
   private dimming: DarkTiles | null = null;
-  /** Bumped as `dimming` changes; what the materials were last given (and whether the game was shown then). */
-  private dimmingVersion = 0;
-  private dimmingApplied = { version: -1, on: false };
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: DoorLeaf; open: number }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
@@ -2264,7 +2261,6 @@ export class BabylonRenderer implements Renderer {
     this.dimmed = new Set();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
-    this.dimmingVersion++;
     this.applyDimming();
     this.lotTemplates.clear();
     this.lotRooms = null;
@@ -3389,13 +3385,18 @@ export class BabylonRenderer implements Renderer {
     const dark = this.windowless.rooms;
 
     const dimmed = new Set<number>();
-    const before = this.dimming;
     let dimming: DarkTiles | null = null;
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
       const [vw, vd] = [view.w, view.d];
-      // The view's tiles: dark whole, or the halves of one split by a diagonal wall that are.
+      // The view's tiles: dark whole, or the halves of one split by a diagonal wall that are; and
+      // the box round the dark ones (x0, z0, x1, z1, in the view), all the materials are given.
       const tiles = new Uint8Array(vw * vd);
+      const box = [vw, vd, 0, 0];
+      const mark = (x: number, z: number, bits: number) => {
+        tiles[z * vw + x] = bits;
+        box.splice(0, 4, Math.min(box[0], x), Math.min(box[1], z), Math.max(box[2], x + 1), Math.max(box[3], z + 1));
+      };
       const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
       const B = WINDOWLESS_BITS;
       for (let z = 0; z < vd; z++) {
@@ -3404,7 +3405,7 @@ export class BabylonRenderer implements Renderer {
           const d = diagonals.get(i);
           if (!d) {
             if (!dark.has(world.rooms[i])) continue;
-            tiles[z * vw + x] = B.tile;
+            mark(x, z, B.tile);
             dimmed.add(world.rooms[i]);
             continue;
           }
@@ -3414,17 +3415,19 @@ export class BabylonRenderer implements Renderer {
             bits |= h === 0 ? B.half0 : B.half1;
             dimmed.add(r);
           });
-          if (bits) tiles[z * vw + x] = bits | (d.axis === 'dn' ? B.dn : 0);
+          if (bits) mark(x, z, bits | (d.axis === 'dn' ? B.dn : 0));
         }
       }
-      // From under the floor of the storey in view to just under the next one's.
-      if (dimmed.size) dimming = { x0: view.x, z0: view.z, w: vw, d: vd, y0: this.storey * WALL_HEIGHT - 0.5, y1: (this.storey + 1) * WALL_HEIGHT - 0.02, tiles };
+      if (dimmed.size) {
+        const [x0, z0, w, d] = [box[0], box[1], box[2] - box[0], box[3] - box[1]];
+        const crop = new Uint8Array(w * d);
+        for (let z = 0; z < d; z++) crop.set(tiles.subarray((z0 + z) * vw + x0, (z0 + z) * vw + x0 + w), z * w);
+        // From under the floor of the storey in view to just under the next one's.
+        dimming = { x0: view.x + x0, z0: view.z + z0, w, d, y0: this.storey * WALL_HEIGHT - 0.5, y1: (this.storey + 1) * WALL_HEIGHT - 0.02, tiles: crop };
+      }
     }
     this.dimmed = dimmed;
     this.dimming = dimming;
-    const same = (a: DarkTiles | null, b: DarkTiles | null) =>
-      a === b || (!!a && !!b && a.x0 === b.x0 && a.z0 === b.z0 && a.w === b.w && a.d === b.d && a.y0 === b.y0 && a.y1 === b.y1 && a.tiles.every((t, i) => t === b.tiles[i]));
-    if (!same(before, dimming)) this.dimmingVersion++;
     this.applyDimming();
   }
 
@@ -3438,11 +3441,7 @@ export class BabylonRenderer implements Renderer {
 
   /** The windowless rooms' darkness on the materials (`dimming`): none while the menus' town is shown. */
   private applyDimming(): void {
-    const on = !this.townMode;
-    if (this.dimmingApplied.version === this.dimmingVersion && this.dimmingApplied.on === on) return;
-    this.dimmingApplied = { version: this.dimmingVersion, on };
-    this.lib.dig.darken(on ? this.dimming : null);
-    this.resetSnapshot();
+    if (this.lib.dig.darken(this.townMode ? null : this.dimming)) this.resetSnapshot();
   }
 
   /**
