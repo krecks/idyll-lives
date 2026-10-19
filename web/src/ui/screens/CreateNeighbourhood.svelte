@@ -64,7 +64,9 @@
   function rerollHousehold(i: number) {
     if (!town) return;
     const households = [...town.households];
-    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length) };
+    // (A name no other household here has.)
+    const taken = households.filter((_, j) => j !== i).map((h) => h.household.name);
+    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length, taken) };
     town = { ...town, households };
   }
 

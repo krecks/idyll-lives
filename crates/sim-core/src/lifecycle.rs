@@ -411,7 +411,13 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     let mut spawns = Vec::new();
     let mut bonds = Vec::new();
     let mut taken: Vec<String> = Vec::new();
-    let surname = pick(&mut w.rng, &content.names.last).cloned().unwrap_or_else(|| "Newcomer".into());
+    // A family name no household in town has (any, once every one is taken).
+    let used: Vec<&str> = w.sims.iter().filter(|s| s.here()).filter_map(|s| w.households.get(s.household as usize)).map(|h| h.name.as_str()).collect();
+    let free: Vec<&String> = content.names.last.iter().filter(|n| !used.contains(&n.as_str())).collect();
+    let surname = match pick(&mut w.rng, &free) {
+        Some(n) => (*n).clone(),
+        None => pick(&mut w.rng, &content.names.last).cloned().unwrap_or_else(|| "Newcomer".into()),
+    };
     let at = w.plots[plot as usize].arrival_point();
     for k in 0..size {
         let content = &w.content;
