@@ -101,7 +101,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -180,6 +180,16 @@ const LAMP_SWITCH_FADE = 0.25;
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
 const PREVIEW_CAPACITY = 128;
+/** A model whose file didn't load is tried again by a later world build, at most this often (ms) and this many times in all. */
+const FILE_RETRY_MS = 30_000;
+const FILE_TRIES = 3;
+
+/** A cached model template (`BabylonRenderer.template`). */
+interface CachedTemplate {
+  promise: Promise<ModelTemplate>;
+  /** Its file didn't load: how many builds have tried it, and when the last one finished (ms). */
+  failed?: { tries: number; at: number };
+}
 
 interface PlacedObject {
   id: number;
@@ -313,12 +323,10 @@ export class BabylonRenderer implements Renderer {
    * Built model templates by key, kept across lot switches and sessions (building them
    * is expensive). Templates not used by the current world are disabled, not disposed.
    */
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  private readonly templates = new Map<string, CachedTemplate>();
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
-  /** Keys of templates whose file didn't load (drawn as boxes): the next world build tries the file again. */
-  private readonly failedTemplates = new Set<string>();
   /** Landscape shadow casters (the landscape survives lot switches; rebuilt only for a different town). */
   private natureCasters: Mesh[] = [];
   /** Landscapes by town (seed and size), and which one each layer shows. */
@@ -3851,7 +3859,9 @@ export class BabylonRenderer implements Renderer {
     const colors = this.objectColors(o);
     const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize })];
+    // Without its file, a box in its place, so it can still be seen and clicked.
+    const standIn = { layer: def?.layer, radius: def?.layer === 'surface' ? this.deps.content.radius(def) : undefined };
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn })];
   }
 
   /** Bumped by each world build: an older pass of `warmTemplates` stops. */
@@ -3875,9 +3885,7 @@ export class BabylonRenderer implements Renderer {
     for (const model of DECOR_MODELS) if (generated(model)) queue.set(`deco:${model}`, () => this.decorModel(model));
     const jobs = [...queue].filter(([key]) => !this.templates.has(key)).map(([key, build]) => () => {
       if (this.templates.has(key)) return;
-      const t = build();
-      this.templates.set(key, t);
-      void t.then((template) => {
+      void this.cache(key, build()).promise.then((template) => {
         if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
       });
     });
@@ -3886,44 +3894,49 @@ export class BabylonRenderer implements Renderer {
 
   /** Cached template by key; marks it as used by the world being built. */
   private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
-    let t = this.templates.get(key);
-    if (t && this.failedTemplates.has(key) && !this.templatesInUse.has(key)) {
-      // Its file didn't load last time: try again, and let its box go.
-      this.failedTemplates.delete(key);
-      void t.then(disposeTemplate);
-      t = undefined;
-    }
-    if (!t) {
-      const built = (t = build());
-      this.templates.set(key, built);
-      void built.then((template) => {
-        if (this.templates.get(key) !== built) return;
-        if (template.failed) this.failedTemplates.add(key);
-        else this.failedTemplates.delete(key);
+    let cached = this.templates.get(key);
+    const failed = cached?.failed;
+    if (!cached) cached = this.cache(key, build());
+    else if (failed && failed.tries < FILE_TRIES && performance.now() - failed.at >= FILE_RETRY_MS && !this.templatesInUse.has(key)) {
+      // Its file didn't load: try it again, keeping what stands in for it unless the file comes.
+      const old = cached.promise;
+      const retried = build().then(async (fresh) => {
+        const before = await old;
+        disposeTemplate(fresh.failed ? fresh : before);
+        return fresh.failed ? before : fresh;
       });
+      cached = this.cache(key, retried, failed.tries);
     }
     this.templatesInUse.add(key);
-    return t.then((template) => {
+    return cached.promise.then((template) => {
       for (const mesh of template.meshes) mesh.setEnabled(true);
       return template;
     });
   }
 
+  /** Caches a template being built under `key`, noting once built whether its file failed (`tries` before this one). */
+  private cache(key: string, promise: Promise<ModelTemplate>, tries = 0): CachedTemplate {
+    const cached: CachedTemplate = { promise };
+    this.templates.set(key, cached);
+    void promise.then((template) => {
+      if (template.failed) cached.failed = { tries: tries + 1, at: performance.now() };
+    });
+    return cached;
+  }
+
   /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
   private retireTemplates(keep: Set<string>): void {
-    for (const [key, t] of this.templates) {
+    for (const [key, cached] of this.templates) {
       if (keep.has(key)) continue;
-      void t.then((template) => {
+      void cached.promise.then((template) => {
         if (this.templatesInUse.has(key)) return;
-        const meshes = [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)];
-        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
-          for (const mesh of meshes) mesh.setEnabled(false);
+        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== cached) {
+          for (const mesh of withGlows(template)) mesh.setEnabled(false);
           return;
         }
         this.templates.delete(key);
         this.paintedTemplates.delete(key);
-        this.failedTemplates.delete(key);
-        for (const mesh of meshes) mesh.dispose(false, false);
+        disposeTemplate(template);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -3931,7 +3944,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Meshes of the templates in use (for shadows and freezing). */
   private async templateMeshes(): Promise<Mesh[]> {
-    const lists = await Promise.all([...this.templatesInUse].map((k) => this.templates.get(k)!));
+    const lists = await Promise.all([...this.templatesInUse].map((k) => this.templates.get(k)!.promise));
     return lists.flatMap((t) => t.meshes);
   }
 
@@ -4451,11 +4464,6 @@ export class BabylonRenderer implements Renderer {
  * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
-/** Disposes a template's meshes (its materials are shared and stay). */
-function disposeTemplate(template: ModelTemplate): void {
-  for (const mesh of [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)]) mesh.dispose(false, false);
-}
-
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
@@ -4483,6 +4491,11 @@ function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.beta = from.beta;
   to.radius = from.radius;
   to.target.copyFrom(from.target);
+}
+
+/** Disposes a template's meshes (its materials are shared and stay). */
+function disposeTemplate(template: ModelTemplate): void {
+  for (const mesh of withGlows(template)) mesh.dispose(false, false);
 }
 
 /** Ray vs axis-aligned box (slab test). Returns distance or Infinity. */

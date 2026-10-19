@@ -26,13 +26,12 @@
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
-import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
-import { buildModel, placementVariation, type ModelTemplate } from './models';
+import { buildModel, placementVariation, withGlows, type ModelTemplate } from './models';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 interface Rect {
@@ -83,8 +82,6 @@ const PROP = {
 } as const;
 /** A thin instance: x, z, scale across, scale up, yaw. */
 type Inst = [number, number, number, number, number];
-/** A template's meshes and its glows' (what hiding it hides). */
-const withGlows = (t: ModelTemplate): Mesh[] => [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)];
 /** Shop awnings: stripe colours. */
 const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
 /** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */
@@ -1100,7 +1097,7 @@ export class Street {
     let template = this.templates.get(key);
     if (!template) {
       // The overview's street (on a layer of its own) is seen from afar: files' far versions.
-      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined });
+      template = buildModel(this.scene, `street:${key}`, this.assets.get(key, 'model'), footprint, { far: this.layerMask !== undefined });
       this.templates.set(key, template);
     }
     const t = await perfTimeAsync(`street: model ${key}`, () => template);

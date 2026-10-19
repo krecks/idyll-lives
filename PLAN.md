@@ -256,7 +256,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 - **Everything is referenced by key.** Content and code ask for `model.fridge`, `icon.need.hunger`, `material.wall` or `look.coral`, never for a file path.
 - **`web/public/assets/manifest.json`** maps keys to files (`url`). Entry types: `model`, `material`, `icon`, `image`, `sprite`, `look`.
 - **Override packs:** manifests listed in `packs` (or passed as `?pack=…`) override keys, so a new art set is a folder plus one line, with no code changes.
-- **Graceful fallback:** a missing model draws nothing and a missing icon a neutral glyph, so broken art never breaks the game.
+- **Graceful fallback:** a missing model draws nothing (a placed object, a plain box in its place, so it can still be clicked) and a missing icon a neutral glyph, so broken art never breaks the game.
 - Format for real art: **glTF 2.0**. The loader bakes transforms so thin instancing keeps working.
 - **Compression is automatic (0.19):** production builds run `tools/assets/optimize.mjs` (KTX2 ETC1S textures, meshopt geometry, gzipped character data; cached in `web/.assets`, index `assets/optimized.json`), and loaders fall back to the source file if a copy fails. Sources stay editable; the dev server serves them, and `LL_ASSETS=source` builds without copies. Decoders are self-hosted in `public/decoders/` (`pnpm decoders` after a Babylon upgrade), because cross-origin isolation blocks Babylon's CDN. Packs outside `public/assets` load as they are.
 - Starting library: CC0 packs (Quaternius, Kenney, Poly Haven); a **modular character system** (body + head + hair + outfits on one skeleton) for the household creator.

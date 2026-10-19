@@ -4,7 +4,7 @@
 `web/public/assets/models/dining/` and their entries in `packs/dining/manifest.json` (listed in the base
 manifest's `packs`, and the only manifest that defines these keys).
 
-K7 (2026-10-14): the dining table with its two chairs (`model.diningTable`, base manifest), the bistro set
+K7 (2026-10-14): the dining table with its two chairs (`model.diningTable`), the bistro set
 (`model.bistroSet`), the glass and farmhouse dining sets (`model.diningGlass`, `model.diningOak`) and the second
 catalogue's chair-less tables: `tableSquare2`, `tableBistroRound`, `tableDining4`, `tableDining6`,
 `tableBanquet8`, `tableRound4`, `tableSquare8`, `tableFarmhouse6`, `tableBarHigh`.

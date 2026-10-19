@@ -333,10 +333,12 @@ class ItemStudio {
    * (the image URLs, one per angle) settles later, so the next model can be built meanwhile.
    */
   async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]> } | null> {
-    const entry = assets.has(model, 'model') ? assets.get(model, 'model') : undefined;
+    const entry = assets.get(model, 'model');
     const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint);
     const meshes = template.meshes;
     try {
+      // A file that failed to load gets no picture (asked for again later), never a saved one of what stood in.
+      if (template.failed) return null;
       const identity = Matrix.Identity().asArray() as unknown as Float32Array;
       for (const mesh of meshes) {
         mesh.parent = this.root;

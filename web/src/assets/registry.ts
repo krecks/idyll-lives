@@ -29,6 +29,8 @@ export class AssetRegistry {
     for (const [url, manifest] of manifests.flat()) {
       for (const [key, entry] of Object.entries(manifest.entries)) registry.entries.set(key, extended(registry.entries.get(key), resolveUrls(entry, url)));
     }
+    // A model without a file draws nothing (a placed object, a box): said once per key, here.
+    for (const [key, entry] of registry.entries) if (entry.type === 'model' && !entry.url) console.warn(`[assets] '${key}' has no model file`);
     return registry;
   }
 

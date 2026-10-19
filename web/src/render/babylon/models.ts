@@ -1,7 +1,7 @@
 /**
- * Builds renderable templates from asset entries: glTF files, or a plain box when there's no
- * file or it doesn't load. Each template is drawn with thin instances (one draw call per mesh,
- * however many copies exist).
+ * Builds renderable templates from asset entries: glTF files, or nothing when there's no file or
+ * it doesn't load (a plain box for the lot's placed objects, `BuildOptions.standIn`). Each template
+ * is drawn with thin instances (one draw call per mesh, however many copies exist).
  *
  * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
  * (tint slot, finish) so a model costs one draw call per distinct finish. Boxes get rounded
@@ -37,7 +37,7 @@ import {
   type Scene,
 } from './core';
 import './loaders';
-import type { AnimationGroup, Material, Node } from './core';
+import type { AbstractMesh, AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground, prefetch } from '../../assets/stream';
 import { paintSlots } from '../../assets/paint';
@@ -72,8 +72,13 @@ export interface ModelTemplate {
    * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
-  /** Its file didn't load (it's drawn as a box): a cache should build it again next time rather than keep it. */
+  /** Its file didn't load (it's drawn as nothing, or a stand-in box): a cache may build it again later rather than keep it. */
   failed?: boolean;
+}
+
+/** A template's meshes and its glows' (all it draws). */
+export function withGlows(t: ModelTemplate): Mesh[] {
+  return [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)];
 }
 
 /**
@@ -184,6 +189,19 @@ export interface BuildOptions {
   far?: boolean;
   /** Resized by the player: drawn at this size (see `resizeMaps`). */
   resize?: Resize;
+  /**
+   * A plain box to draw when the model has no file or its file fails, so the thing stays in view and
+   * can be clicked: the lot's placed objects ask for one. Everything else (plants, the street, things
+   * held or carried, pictures) draws nothing then.
+   */
+  standIn?: StandIn;
+}
+
+/** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
+export interface StandIn {
+  layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
+  /** Things on a top: the radius (m) of the disc they take (content `radius`). */
+  radius?: number;
 }
 
 /** A player's resizing: its own size (metres across and deep, before turning) and how much taller. */
@@ -202,33 +220,40 @@ export async function buildModel(
   footprint: [number, number],
   options: BuildOptions = {},
 ): Promise<ModelTemplate> {
-  if (!entry?.url) {
-    // A missing key was warned about when it was looked up (`AssetRegistry.get`); an entry without a file, here.
-    if (entry && !unfiled.has(name)) console.warn(`[render] '${name}' has no model file, drawing a box`);
-    unfiled.add(name);
-    return standIn(scene, name, footprint);
-  }
-  // Far off, the far version (without moving parts); the full one if that fails.
-  const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
-  for (const url of far ? [far, entry.url] : [entry.url]) {
-    try {
-      return await loadGltf(scene, name, entry, url, footprint, options.resize);
-    } catch (err) {
-      console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : 'a box'}`, err);
+  if (entry?.url) {
+    // Far off, the far version (without moving parts); the full one if that fails.
+    const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
+    for (const url of far ? [far, entry.url] : [entry.url]) {
+      try {
+        return await loadGltf(scene, name, entry, url, footprint, options.resize);
+      } catch (err) {
+        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : options.standIn ? 'a box' : 'nothing'}`, err);
+      }
     }
   }
-  return { ...standIn(scene, name, footprint), failed: true };
+  // No file (the registry said so, once per key) or it failed: nothing, or the box asked for.
+  const template = options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
+  return entry?.url ? { ...template, failed: true } : template;
 }
 
-/** Models already warned about for having no file (one warning each). */
-const unfiled = new Set<string>();
+/** A wall's face, in from the back edge of the tile (m): things on a wall have their back on it. */
+const WALL_FACE = 0.07;
 
 /**
- * A plain neutral box most of the footprint's size, for a model with no file or whose file didn't
- * load: the thing stays in view and can still be clicked.
+ * A plain neutral box standing in for a model (`BuildOptions.standIn`), placed as the model would be:
+ * most of the footprint on the floor, a thin mat for a rug, a small block on a top, a panel at eye
+ * height on the wall face, a block hanging from the ceiling; taller as the player made it.
  */
-function standIn(scene: Scene, name: string, [w, d]: [number, number]): ModelTemplate {
-  const part: PrimitivePart = { shape: 'box', size: [w * 0.8, 0.8, d * 0.8], at: [0, 0.4, 0], color: '#B8B2AA' };
+function standIn(scene: Scene, name: string, [w, d]: [number, number], { layer, radius }: StandIn, resize?: Resize): ModelTemplate {
+  const up = (resize?.tall ?? 0) / 100;
+  const box = (size: Vec3, at: Vec3): PrimitivePart => ({ shape: 'box', size, at, color: '#B8B2AA' });
+  const r = (radius ?? 0.12) * 1.6;
+  const part =
+    layer === 'surface' ? box([r, r + up, r], [0, (r + up) / 2, 0])
+    : layer === 'rug' ? box([w * 0.9, 0.02, d * 0.9], [0, 0.01, 0])
+    : layer === 'wall' ? box([w * 0.8, 0.6 + up, 0.06], [0, 1.5 + up / 2, -d / 2 + WALL_FACE + 0.03])
+    : layer === 'ceiling' ? box([w * 0.5, 0.3 + up, d * 0.5], [0, 2.8 - (0.3 + up) / 2, 0])
+    : box([w * 0.8, 0.8 + up, d * 0.8], [0, (0.8 + up) / 2, 0]);
   const groups = new PartGroups(scene);
   groups.addPart(part, 0, 0);
   const { meshes, tints, bones } = groups.build(name);
@@ -1161,8 +1186,24 @@ function fileMaterial(lib: MaterialLibrary, material: Material | null, ov: Mater
 }
 
 async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: string, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
-  const extras = entry as ModelEntry & ModelExtras;
   const file = await loadFile(scene, url);
+  // What the build makes, let go of if it throws part way. It runs without a break, so nothing else
+  // adds meshes meanwhile.
+  const made: AbstractMesh[] = [];
+  const watching = scene.onNewMeshAddedObservable.add((mesh) => made.push(mesh));
+  try {
+    return buildFromFile(scene, name, entry, file, footprint, resize);
+  } catch (err) {
+    for (const mesh of made) if (!mesh.isDisposed()) mesh.dispose(false, false);
+    throw err;
+  } finally {
+    scene.onNewMeshAddedObservable.remove(watching);
+  }
+}
+
+/** `loadGltf` once the file is in. */
+function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize?: Resize): ModelTemplate {
+  const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const s = fit ? 1 : (entry.scale ?? 1);
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
