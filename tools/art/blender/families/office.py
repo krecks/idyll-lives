@@ -16,7 +16,7 @@
 # The executive desk's middle drawer and the filing cabinet's top drawer are parts of their own, still: no use
 # opens them yet, so a clip can be added once content gives them one.
 #
-# Run:  python3 -B tools/art/blender/build.py office [--only deskSimple] [--preview]
+# Run:  cargo art office [--only deskSimple] [--preview]
 import math
 import os
 import sys

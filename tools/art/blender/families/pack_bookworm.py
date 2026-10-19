@@ -7,7 +7,7 @@
 # its rail (`ladder`), the bureau's writing flap drops (`fall_front`), the teapot pours (`pour`), the fire
 # grows in the grate (`flames`) and the top book of the bedside stack opens (`book_up`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_bookworm [--only readingNook] [--preview]
+# Run:  cargo art pack_bookworm [--only readingNook] [--preview]
 import os
 import random
 import sys

@@ -51,7 +51,7 @@ that say what they colour: the blender `blend_cab` "Frame", `blend_door` "Doors"
 | `model.energetic.contrastShower` | 0.90 × 2.15 × 0.90 m | 2,944 | 3 | Frame, Tiles, Mat |
 | `model.energetic.recoveryPod` | 0.86 × 1.18 × 1.86 m | 2,900 | 3 | Frame, Pads, Boots |
 
-`check_glb.py`: 7 models, 0 failed, 2 warnings, both by design:
+`check-glb`: 7 models, 0 failed, 2 warnings, both by design:
 - the trampoline's height (0.63 m, old part 0.83 m): the old part's ball sat on the mat; here it is on the
   grass by a leg (a ball on the mat would float while it dips);
 - the recovery pod's height (1.18 m, old part 0.82 m): the old part showed the canopy closed; here it stands
@@ -68,6 +68,6 @@ canopy closed over the head and lifted after), the wall climbed, the shower (rai
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_energetic            # the seven .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_energetic --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_energetic            # the seven .glb, the pack, check-glb
+cargo art pack_energetic --preview  # previews/<id>.png, <id>@<clip>.png
 ```

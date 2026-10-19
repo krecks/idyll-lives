@@ -66,7 +66,7 @@ the growth pose (`partPose`).
 
 - **No use yet:** "(+use)" in a table marks a part built separately for a clip that needs an interaction first, so the
   clip can be added without remodelling.
-- **Rules every clip keeps (`check_glb.py`):**
+- **Rules every clip keeps (`cargo check-glb`):**
   - node transforms only (no skins or morph targets), starting at rest;
   - about 1 s long (the gate warns of a use clip over 3 s);
   - 1–3 draw calls (4 at most);
@@ -82,7 +82,7 @@ notes and scripts refer to them by these names.
 | Name | What it is | Use it as |
 |---|---|---|
 | T0 | Clips bench and gamekit helpers | `/clips.html?keys=model.<id>` (`&clip=`, `&t=`, `&renderer=webgl`): every clip of each model in a loop (rest, play, hold, back), a button per clip, `t` to hold a time for screenshots. `G.spin(obj, clip, turns, seconds, axis)` (whole turns ending at rest), `G.rock(…, degrees, …)` (out, back past rest, home), `G.squash(obj, clip, scale, seconds)` (to any size and back: cushions, a held weight hidden), `G.grow`; the boulder shape is `G.boulder` |
-| E1 | Loops while in use | `motions.loops: {use: clip}`: repeats rest to rest for as long as the use lasts, finishes its round, never plays back. Runs on game time (stops when paused). `check_glb` fails a loop that doesn't end at rest |
+| E1 | Loops while in use | `motions.loops: {use: clip}`: repeats rest to rest for as long as the use lasts, finishes its round, never plays back. Runs on game time (stops when paused). `cargo check-glb` fails a loop that doesn't end at rest |
 | E2 | Ambient clips | `motions.idle: clip`, looping always; drawn only within `ambientRange` of the camera (Low 0, Medium 40 m, High 60 m), off on Low, shadows not redrawn for them. 94 ambient things cost 0.09 ms (clips) and 0.15–0.3 ms (frame) of CPU on an M3 Pro (`docs/design/graphics.md`) |
 | E3 | Night state | `motions.night: clip`, held while the lamp level is up, dusk to dawn (`house.ts`, `BabylonRenderer.ts`); curtains stay drawn over sleepers |
 | E4 | Growth state | content `grows: {days, fallow}`, harvest `"when": "ripe"`, `"leaves": "picked"`; `motions.growth: clip`, made with `G.stages` (ripe at rest, then picked, growing, planted). The sim advances the stage, the renderer holds the clip there |
@@ -119,8 +119,8 @@ Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs
    - `paint` with labelled parts, the main part first, e.g. `[('body', 'Cabinet'), ('stone', 'Worktop')]`;
    - the moving parts joined one per part (`G.join`), and the clips from `G.swing` / `G.slide` / `G.grow` (plus
      `spin`, `rock`, `squash`).
-3. **Preview** (`build.py <family> --preview`) and look at every model at rest and with every clip.
-4. **Export** (`python3 -B tools/art/blender/build.py <family> [--only <id>]`). `check_glb.py` must say `0 failed`;
+3. **Preview** (`cargo art <family> --preview`) and look at every model at rest and with every clip.
+4. **Export** (`cargo art <family> [--only <id>]`). The gate (`cargo check-glb`) must say `0 failed`;
    read every warning. The Khronos validator must report 0 errors and 0 warnings.
 5. **Test.** `cargo test -p sim-core --test shipped_content`, and the whole `sim-core` suite if content changed.
 6. **Check it in play** (below).
@@ -153,17 +153,17 @@ Tools:
   each. In a shared checkout, build a commit from `HEAD` plus your own hunks, and write a shared file only after the
   new text is built and parsed.
 
-## Validate and `validate.py`
+## Validate and `cargo content`
 
 While the objects were built, each set went into a temporary **Validate** buy category (a group per set) to be found
 and checked in one place, and back home once checked. The category and its icon (`icon.category.validate`) were
-removed when the last set left. `tools/content/validate.py` moves items in and out by id, keeping the content files'
-formatting:
+removed when the last set left. `cargo content` (`crates/tools/src/content.rs`) moves items in and out by id, keeping
+the content files' formatting:
 
 ```
-python3 -B tools/content/validate.py list
-python3 -B tools/content/validate.py in <id>... --group <group> [--label "Label"]
-python3 -B tools/content/validate.py out --group <group> [--to <category>/<group>] [--dry-run]
+cargo content list
+cargo content in <id>... --group <group> [--label "Label"]
+cargo content out --group <group> [--to <category>/<group>] [--dry-run]
 ```
 
 Without `--to`, `out` sends each item to the **Home** column of the tables on these pages. To use it again, add the
@@ -222,6 +222,6 @@ time; fix them before the next large check.
 - A spot table per check house: wall spots with and without windows, plain 2-wide walls, the yard.
 - Debug states for what play can't stage quickly: a ripe crop or a `__debugSet` for growth and needs, a two-storey
   house with a basement (stairs), a two-resident house (double beds, bunks), `family-night` (children at night).
-- `check_glb.py` could flag coplanar faces of different materials in one part (three z-fight fixes: duvet end, chest
+- `cargo check-glb` could flag coplanar faces of different materials in one part (three z-fight fixes: duvet end, chest
   lid, bread bin) and parts scaled to a sliver at rest that are still visible.
 - `gamekit` smooth-shades cylinders without a bevel, so flat caps can shade like domes (the bread bin).

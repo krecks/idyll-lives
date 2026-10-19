@@ -46,7 +46,7 @@ each at night).
 "Upholstery" (the plan's second colour part) fits the bar's stool tops, the sectional's cushions and the desk
 chair; the stage and the dance floor take their speakers instead, the photo wall its cork board.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
 clip at rest and open on WebGPU and WebGL (the dance floor mid-loop, each tile set up in turn); the bar coloured
 there. In play (`wants-asking`, WebGPU, in the yard): the sectional (hangOut, seated), the dance floor (dance,
 the loop going), the bar (mixDrinks) and the video-call corner (call, seated facing the desk, the ring up) used by
@@ -56,6 +56,6 @@ bought coloured; the same at night (`office-night`, WebGL).
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_outgoing            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_outgoing --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_outgoing            # the six .glb, the pack, check-glb
+cargo art pack_outgoing --preview  # previews/<id>.png, <id>@<clip>.png
 ```

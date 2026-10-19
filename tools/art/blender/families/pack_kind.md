@@ -52,7 +52,7 @@ parts the rest. So that it stays at 3:
 The range sits on the wall's face (−0.43), 2.5 cm forward of the old part's; the jar is 3.5 cm taller with the
 coin standing in its slot; the rocker's yarn basket stands 2 cm further out.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every clip
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every clip
 at rest and open on WebGPU and WebGL (the rocker from the side, the coin close up). In play (`wants-asking`, WebGPU):
 each object used by a resident: the oven door open while the pie bakes, the coin, the knitter rocking, the tea
 poured, the feeder's roof up for the refill and the songbirds out while watched, the settee's cushions; all six
@@ -62,6 +62,6 @@ turned in the yard (the settee to all four facings, the range to 1, 2 and 3); co
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_kind            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_kind --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_kind            # the six .glb, the pack, check-glb
+cargo art pack_kind --preview  # previews/<id>.png, <id>@<clip>.png
 ```

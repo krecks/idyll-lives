@@ -6,7 +6,7 @@
 # in game axes (`F`): the old depths are shifted back by their depth centre, so
 # the model is centred on its tile (see GameFrame).
 #
-# Run:  python3 -B tools/art/blender/build.py kitchen_cooking [--preview]
+# Run:  cargo art kitchen_cooking [--preview]
 import os
 import sys
 

@@ -51,7 +51,7 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 | `model.lazy.vibePlate` | 0.67 × 1.16 × 0.76 m | 1,380 | 2 | Body, Trim, Deck |
 | `model.lazy.smartHub` | 0.60 × 0.81 × 0.84 m | 2,236 | 3 | Body (the table), Speaker |
 
-`check_glb.py`: 6 models, 0 failed; one warning (the pod's depth, above). Khronos validator: 0 errors, 0 warnings
+`check-glb`: 6 models, 0 failed; one warning (the pod's depth, above). Khronos validator: 0 errors, 0 warnings
 each. Clips bench: every clip at rest and open on WebGPU and WebGL (the bed from the side, the quilt from behind).
 In play (`wants-asking`, WebGPU): each object used by a resident: the bed's head rising as they lie down for a lie-in
 and settling, the pod's hood over a power nap, sitting tucked in at the quilt table (the flap's lift seen on the clips bench; in play the poufs hide it), the locker door open for a takeout,
@@ -61,6 +61,6 @@ one or two; colours on the clips bench; at night (`office-night`, WebGL) in the 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_lazy            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_lazy --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_lazy            # the six .glb, the pack, check-glb
+cargo art pack_lazy --preview  # previews/<id>.png, <id>@<clip>.png
 ```

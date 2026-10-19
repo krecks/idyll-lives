@@ -8,7 +8,7 @@
 # (`sway`, a loop they ride), the sun rises in the lamp's frame (`sunrise`; its sky glows at night) and the
 # booth's side curtain is drawn aside (`curtain`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_cheerful [--only jukebox] [--preview]
+# Run:  cargo art pack_cheerful [--only jukebox] [--preview]
 import math
 import os
 import sys

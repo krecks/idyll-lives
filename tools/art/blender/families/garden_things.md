@@ -55,7 +55,7 @@ red kennel, iron), so each build makes its own palette (`_own`), as `street_furn
 | lampPost | 0.32 × 2.73 × 0.32 | 744 (far 182) | 1 | Post, Lantern |
 | stringLights | 1.97 × 2.37 × 0.25 | 2524 | 3 | Posts, Bulbs |
 
-`check_glb.py`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on each file and far version.
+`check-glb`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on each file and far version.
 
 **In the game** (2026-10-16, headless, WebGPU and WebGL2): the gallery next to the old parts; the clips bench
 (`fish`, `surface`, `ripple`, `bird`, `sway`); in play, all nine bought in House 0's garden (`bathroom-check`), the

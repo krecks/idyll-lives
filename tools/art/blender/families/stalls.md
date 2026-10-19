@@ -61,12 +61,12 @@ Draw calls: the carts take the plain body, the fabric awning or parasol and the 
 body, its glass and the snack; the drinks machine the body and the can (plus one at night for the glow); the stall
 wood, fabric and plain.
 
-`check_glb.py`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for all ten files (the
+`check-glb`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for all ten files (the
 models and their far versions).
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py stalls            # the five .glb and .far.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py stalls --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art stalls            # the five .glb and .far.glb, the pack, check-glb
+cargo art stalls --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

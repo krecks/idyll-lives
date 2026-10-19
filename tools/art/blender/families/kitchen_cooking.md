@@ -85,7 +85,7 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 | `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes) |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
-moving parts each cost one). `check_glb.py`: 31 models, 0 failed; its four warnings are those same draw counts
+moving parts each cost one). `check-glb`: 31 models, 0 failed; its four warnings are those same draw counts
 (the stove, the range cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
 each). The ten sit in Validate › Cookers and
 Validate › Appliances until checked in play.
@@ -93,8 +93,8 @@ Validate › Appliances until checked in play.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py kitchen_cooking            # the .glbs, the pack, check_glb
-python3 -B tools/art/blender/build.py kitchen_cooking --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kitchen_cooking            # the .glbs, the pack, check-glb
+cargo art kitchen_cooking --preview  # previews/<id>.png, <id>@<clip>.png
 ```
 
 ## Where it stands (review, 2026-10-14)

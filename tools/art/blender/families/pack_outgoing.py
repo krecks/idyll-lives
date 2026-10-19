@@ -8,7 +8,7 @@
 # (`ring_light`), the dance floor's tiles pulse up and down in a checkerboard (`tiles`, a loop) and a new
 # photo grows on the board (`photo`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_outgoing [--only partyBar] [--preview]
+# Run:  cargo art pack_outgoing [--only partyBar] [--preview]
 import math
 import os
 import sys

@@ -7,7 +7,7 @@
 # Model), the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the front
 # for `treat` (`till`), and the bakery case's back glass door slides aside for `pastry` (`door`).
 #
-# Run:  python3 -B tools/art/blender/build.py shops [--preview]
+# Run:  cargo art shops [--preview]
 import json
 import math
 import os

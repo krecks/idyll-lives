@@ -80,11 +80,11 @@ washer would need a laundry loop in the sim.)
 | `model.wardrobeSingle` | 0.90 × 2.28 × 0.62 m | 2,220 | 2 | Body, Handles (a box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py bedroom_storage            # every .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py bedroom_storage --preview  # previews/dresser.png, dresser@drawer_open.png, …
+cargo art bedroom_storage            # every .glb, the pack, check-glb
+cargo art bedroom_storage --preview  # previews/dresser.png, dresser@drawer_open.png, …
 ```

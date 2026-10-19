@@ -85,12 +85,12 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
 | `model.potteryWheel` | 0.70 × 0.54 × 0.92 m | 2,836 | 3 | Wheel, Stool |
 | `model.craftTable` | 1.70 × 0.90 × 0.89 m | 2,460 | 3 | Wood, Metal |
 
-`check_glb.py`: 19 models, 0 failed; the warnings are the five above (the dartboard's three, the pool table's
+`check-glb`: 19 models, 0 failed; the warnings are the five above (the dartboard's three, the pool table's
 depth, the pottery wheel's height). Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py hobbies            # the nineteen .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py hobbies --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art hobbies            # the nineteen .glb, the pack, check-glb
+cargo art hobbies --preview  # previews/<id>.png, <id>@<clip>.png
 ```

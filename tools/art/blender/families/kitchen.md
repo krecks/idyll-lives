@@ -16,7 +16,7 @@ the fridge** (normal food), separated by a real divider.
   `GameFrame`) and standing where the game places it (`centre=(0, -0.094)`), its back on the wall
 - 4,286 triangles, 3 nodes (`cabinet`, `door_freezer`, `door_fridge`), 3 draw calls (one per node), 14
   materials, no UVs
-- `check_glb.py`: ok, with one warning (below). Khronos glTF validator: 0 errors, 0 warnings.
+- `check-glb`: ok, with one warning (below). Khronos glTF validator: 0 errors, 0 warnings.
 
 The cabinet is five panels (sides, top, bottom, back), so the doors open onto an interior, not a solid
 block. Inside are a matte liner on all five faces, a gloss **divider** at game height 1.234 (the freezer's
@@ -52,7 +52,7 @@ doors move at one speed, but each has its own angle:
 
 The pack's `motions` plays `fridge_open` for the `fetch`, `cook` and `drink` animation tags (snacks, a
 meal's ingredients, a cold drink, putting dishes away), as the K1 fridges do, and holds it for 3.5 s. `freezer_open` plays for no use
-yet, because no interaction takes frozen food: that is `check_glb.py`'s one warning.
+yet, because no interaction takes frozen food: that is `check-glb`'s one warning.
 
 ## The sinks
 
@@ -68,7 +68,7 @@ tag covers both the `wash` and `washUp` interactions).
 | `model.farmhouseSink` | 1.000 × 1.253 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
 | `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
-`check_glb.py`: 0 failed; its warnings are the fridges' `freezer_open` clip, which no use plays, and 4 draw calls
+`check-glb`: 0 failed; its warnings are the fridges' `freezer_open` clip, which no use plays, and 4 draw calls
 on the French-door and wine fridges. Khronos validator: 0 errors, 0 warnings.
 
 ## The K1 fridges
@@ -87,7 +87,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
 
 The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no
-interaction takes frozen food: `check_glb.py` warns of both (as it does for `model.fridge`'s freezer).
+interaction takes frozen food: `check-glb` warns of both (as it does for `model.fridge`'s freezer).
 `fridgeFrenchDoor` and `wineFridge` take 4 draw calls (the most allowed, one per moving part plus the
 still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sit in Validate ›
 Fridges until checked in play.
@@ -95,8 +95,8 @@ Fridges until checked in play.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py kitchen            # fridge.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py kitchen --preview  # previews/fridge.png, fridge@<clip>.png
+cargo art kitchen            # fridge.glb, the pack, check-glb
+cargo art kitchen --preview  # previews/fridge.png, fridge@<clip>.png
 ```
 
 ## Where it stands (review, 2026-10-14)

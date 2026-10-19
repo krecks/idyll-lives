@@ -19,7 +19,7 @@
 # doors are parts of their own, hinged; one of each (the china cabinet's left glazed door) swings open while a
 # resident puts clean things away there (they are `cupboard` stations), the others are still.
 #
-# Run:  python3 -B tools/art/blender/build.py dining [--only barStool] [--preview]
+# Run:  cargo art dining [--only barStool] [--preview]
 import math
 import os
 import sys

@@ -22,7 +22,7 @@
 # they stand. Their seat cushions are a part of their own that sinks 2 cm while sat or dozed on (`sink_in`).
 # The armchairs too, but for the recliner (it reclines), the rocking chair (it rocks) and the bean bag.
 #
-# Run:  python3 -B tools/art/blender/build.py living [--only sofaBed] [--preview]
+# Run:  cargo art living [--only sofaBed] [--preview]
 import math
 import os
 import random

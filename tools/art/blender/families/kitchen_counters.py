@@ -12,7 +12,7 @@
 # 0.66 deep through `COUNTER66` (as the old `shallow`), so the fronts of a mixed run line up. Every
 # back stands on the wall face (-0.43).
 #
-# Run:  python3 -B tools/art/blender/build.py kitchen_counters [--preview]
+# Run:  cargo art kitchen_counters [--preview]
 import os
 import sys
 

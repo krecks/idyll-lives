@@ -7,7 +7,7 @@
 # (`door_open`), the rain falls (`water_on`), a bin slides out of the desk's hutch (`drawer_open`), the robot
 # rolls out of its dock and turns (`vacuum_out`) and the console's key tray drawer slides out (`tray`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_neat [--only steamMopDock] [--preview]
+# Run:  cargo art pack_neat [--only steamMopDock] [--preview]
 import os
 import random
 import sys

@@ -8,7 +8,7 @@
 # loop the resident rides), the shower runs (`water_on`), the terrarium's glass lid lifts (`lid_open`) and the
 # glasshouse's door and roof vent open (`door_open`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_natureLover [--only veggieBed] [--preview]
+# Run:  cargo art pack_natureLover [--only veggieBed] [--preview]
 import math
 import os
 import random

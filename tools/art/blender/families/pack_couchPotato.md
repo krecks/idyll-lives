@@ -34,7 +34,7 @@ the console's sit 8 cm further back than before, against the loveseat's back, so
 - The workout game's mat and towel are the body's `fabric`, the board plain.
 - The lava lamp: the still body plain plus its `glass` (the lamp's vessel: the blobs show through it), the rising
   wax one part, the drifting wax another: 4 draws, the extra one for the ambient drift (E2) the plan asks for; the
-  pouf is plain satin to keep it at 4. `check_glb` warns "4 draw calls, aim for 3 at most": that is the ambient part.
+  pouf is plain satin to keep it at 4. `check-glb` warns "4 draw calls, aim for 3 at most": that is the ambient part.
 
 Other warnings left, by design:
 - the recliner's depth (0.76 m, old part 0.89 m): the old part had its footrest out at rest; here it is
@@ -59,7 +59,7 @@ The painted materials: the cinema `cinema_frame` (the console between the seats)
 `console`, `gamer`, `mustard`; the recliner `plinth`, `plush`, `throw`; the fridge `mint`, `lid`; the workout game
 `fit_stand`, `fit_mat`, `board`; the lamp `lamp_metal`, `pouf`, `vessel`.
 
-`check_glb.py`: 6 models, 0 failed, the 3 warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
+`check-glb`: 6 models, 0 failed, the 3 warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
 gallery next to the old parts; the clips bench at rest and open on WebGPU (the cinema and console from behind),
 colours on WebGPU and WebGL; in play (`wants-asking`, WebGPU by day): every use, by the household's resident in
 turn: the cinema (seated, the curtains drawn apart and closed after), the recliner (footrest up, back tipped), the
@@ -70,6 +70,6 @@ on WebGL (the lava lamp used at night, its glass and wax drawn).
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_couchPotato            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_couchPotato --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_couchPotato            # the six .glb, the pack, check-glb
+cargo art pack_couchPotato --preview  # previews/<id>.png, <id>@<clip>.png
 ```

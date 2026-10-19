@@ -7,7 +7,7 @@
 # (`candle`); the rain runs down the lamp's lines (`rain`) over a pool that ripples all the time (`ripple`,
 # ambient); the window seat's cushion sinks (`sink_in`); the tub fills (`fill`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_gloomy [--only cello] [--preview]
+# Run:  cargo art pack_gloomy [--only cello] [--preview]
 import os
 import random
 import sys

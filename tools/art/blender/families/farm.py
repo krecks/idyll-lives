@@ -7,7 +7,7 @@
 # Built in the game's axes (`F`: x, height, depth; front +depth), then stood on the floor and centred on the
 # footprint (`G.settle`), the sizes the old parts'.
 #
-# Run:  python3 -B tools/art/blender/build.py farm [--only barn] [--preview]
+# Run:  cargo art farm [--only barn] [--preview]
 import math
 import os
 import sys

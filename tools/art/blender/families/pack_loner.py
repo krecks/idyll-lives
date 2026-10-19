@@ -7,7 +7,7 @@
 # antenna extends (`antenna`), a patch of the puzzle grows (`pieces`), a twig of the bonsai shrinks away
 # (`trim`), the sauna's glass door opens and shuts (`door_open`) and the delivery hatch opens (`hatch`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_loner [--only quietPod] [--preview]
+# Run:  cargo art pack_loner [--only quietPod] [--preview]
 import os
 import random
 import sys

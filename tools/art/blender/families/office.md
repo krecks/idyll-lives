@@ -63,12 +63,12 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
 | `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 | 2 | Board, Frame |
 | `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 | 2 | Board, Frame |
 
-`check_glb.py`: 14 models, 0 failed. Its warnings, all expected: the two boards float (wall things). Khronos
+`check-glb`: 14 models, 0 failed. Its warnings, all expected: the two boards float (wall things). Khronos
 validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py office            # the fourteen .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py office --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art office            # the fourteen .glb, the pack, check-glb
+cargo art office --preview  # previews/<id>.png, <id>@<clip>.png
 ```

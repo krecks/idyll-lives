@@ -48,7 +48,7 @@ moving part one more. So that it stays at 3:
 The desk's lamp is a little lower than the old part's (1.02 m against 1.11 m), the only size that differs by more
 than 2 %.
 
-`check_glb.py`: 6 models, 0 failed, no warnings (the crate's slats are unbevelled to keep it under 4,000 triangles).
+`check-glb`: 6 models, 0 failed, no warnings (the crate's slats are unbevelled to keep it under 4,000 triangles).
 Khronos validator: 0 errors, 0 warnings each. Clips bench: every clip at rest and open on WebGPU and WebGL (the bag
 from the side, the drawer from behind). In play (`wants-asking`, WebGPU): the drums played, the bag pounded, the
 plunge, the desk, the crate and the cushion used, each clip playing (the crate's lid shut again after its hold);
@@ -58,6 +58,6 @@ all six turned to rot 2 in the yard, the plunge and drums to rot 0, 1 and 3; col
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_hotHeaded            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_hotHeaded --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_hotHeaded            # the six .glb, the pack, check-glb
+cargo art pack_hotHeaded --preview  # previews/<id>.png, <id>@<clip>.png
 ```

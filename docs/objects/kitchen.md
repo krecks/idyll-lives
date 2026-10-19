@@ -48,7 +48,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
   fridge pulls its lever first, the French-door fridge opens only its right door for a cold drink.
 - Gourmet also needs a stove and a counter (its prep and cook steps); checked with both bought.
 - The three freezers (`model.fridge`, the built-in, the French-door) carry clips no use plays: no interaction takes
-  frozen food yet (`check_glb.py` warns of each).
+  frozen food yet (`cargo check-glb` warns of each).
 - The colour studio's "In use" opens the door, so the fridge's "Inside" colour can be seen.
 
 ## K2. Cookers (6)

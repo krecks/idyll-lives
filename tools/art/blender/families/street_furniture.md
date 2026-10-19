@@ -42,7 +42,7 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
 - **Town fountain** (`water_run`, `idle`): the water runs all the time near the camera (not on Low). Two parts move
   in one clip of 1.2 s, each a `G.squash(..., back=True)` pulse that ends where it starts: the jet on the top knob
   rises to 1.3 times its height and falls back, and the splashes where the eight streams land in the basin bob up
-  to 1.8 times theirs. The streams spilling from both bowls are still, on the body. `check_glb.py` gives no loop
+  to 1.8 times theirs. The streams spilling from both bowls are still, on the body. `check-glb` gives no loop
   warning: a pulse comes back to rest exactly.
 - The lamp, the bench, the bin, the shelter, the notice board and the statue are still.
 
@@ -97,11 +97,11 @@ Decimate modifier). Their far versions sit on the floor at the full model's size
 | `model.fountainTown` | 2.96 × 2.47 × 2.94 m | 5,784 | 1,430 | 3 | Stone |
 | `model.townStatue` | 1.80 × 3.39 × 1.80 m | 2,476 | 614 | 1 | Statue |
 
-Draws are counted as `check_glb.py` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
+Draws are counted as `check-glb` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
 glass), the drinking fountain and the post box (body, the moving part), the notice board (plain, wood), the town
 fountain (body, jet, splashes). The lamp and the phone box take one more at night for their glow.
 
-`check_glb.py`: 10 models, 0 failed. Two warnings, both expected:
+`check-glb`: 10 models, 0 failed. Two warnings, both expected:
 
 - **Phone box: 4 draw calls** (the most allowed, as the washer): the kiosk, its glazing, the door and the door's
   glazing. The plan's folding door would be two moving leaves, each with its own glass: 6 draws, over the limit, so
@@ -116,6 +116,6 @@ Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py street_furniture            # the ten .glb and .far.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py street_furniture --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art street_furniture            # the ten .glb and .far.glb, the pack, check-glb
+cargo art street_furniture --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

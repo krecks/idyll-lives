@@ -11,7 +11,7 @@
 # door opens and shuts behind the caller (`door_open`); the town fountain's water runs all the time near the
 # camera (`water_run`, ambient). The rest are still.
 #
-# Run:  python3 -B tools/art/blender/build.py street_furniture [--only postBox] [--preview]
+# Run:  cargo art street_furniture [--only postBox] [--preview]
 import os
 import sys
 

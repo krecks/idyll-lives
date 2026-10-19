@@ -49,7 +49,7 @@ Body is the table's gold legs, the tub's shell, the vanity's and bureau's ivory,
 arbour's paint; Fabric the chairs' velvet, the towels, the pouf and the swing's cushion. The gramophone has no
 fabric; its second part is the horn.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. (Its mirror-flatness check reused the name `size`, the file's size
+`check-glb`: 6 models, 0 failed, no warnings. (Its mirror-flatness check reused the name `size`, the file's size
 for the summary line, so any model with mirror glass crashed the gate; renamed.) Khronos validator: 0 errors,
 0 warnings each. Clips bench: every clip at rest and open on WebGPU and WebGL, the bureau and the gramophone's arm
 from behind, the swing mid-rock from the side, the cut bloom zoomed. In play (`wants-asking`, WebGPU, in the yard):
@@ -60,6 +60,6 @@ bureau turned; the table, tub and arbour bought coloured; the same at night (`of
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_romantic            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_romantic --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_romantic            # the six .glb, the pack, check-glb
+cargo art pack_romantic --preview  # previews/<id>.png, <id>@<clip>.png
 ```

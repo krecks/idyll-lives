@@ -51,7 +51,7 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
 
 - **Scarecrow**: `sway`, ambient (`motions: {'idle': 'sway'}`). The whole scarecrow is one node, its origin at the
   foot of the post. `G.rock` tips it 2.5° to each side about Blender Y over 3 s (a slow sway is longer than 1 s;
-  `check_glb.py` doesn't mind) and ends where it starts.
+  `check-glb` doesn't mind) and ends where it starts.
 - **Coop** (`close`, `night`): the pop-hole hatch is its own node (`hatch`, in `coop_trim`), its origin the middle
   of its top edge. By day it stands 32 cm up its runners, the dark pop hole open for the hens; from dusk to dawn
   `close` slides it down over the hole (1 s), as a keeper shuts the hens in. The coop has no use, so the night is
@@ -85,12 +85,12 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 | `model.farm.trough` | 1.84 × 0.66 × 0.74 m | 1,012 | 208 | 1 |
 | `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 760 | 168 | 3 (walls wood + plain, the hatch) |
 
-`check_glb.py`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for all 16 files (the
+`check-glb`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for all 16 files (the
 models and their far versions).
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py farm            # the 8 .glb and 8 .far.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py farm --preview  # previews/<id>.png, <id>.far.png, scarecrow@sway.png
+cargo art farm            # the 8 .glb and 8 .far.glb, the pack, check-glb
+cargo art farm --preview  # previews/<id>.png, <id>.far.png, scarecrow@sway.png
 ```

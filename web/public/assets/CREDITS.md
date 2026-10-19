@@ -475,19 +475,19 @@ pan and the food on the grill that stand on a station while a resident cooks; ov
 
 | File | What | How |
 |---|---|---|
-| `textures/sky/clouds.png` | Cloud band of the sky | `tools/art/clouds.py` (procedural noise) |
+| `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)
 
 The residents are generated in code (original, CC0): their bodies at every life stage, faces and
-their expressions and visemes, eyes, hair, beards and clothes by `tools/characters/prim`
-(`build.py` writes `rig.json` and the `.bin` files), and their animation clips by
-`render/babylon/characters/clips` (baked when the game loads). Bed blankets are generated at
-runtime in `render/babylon/characters/blanket.ts`. No downloaded models, textures or animations
-are used. The facial expressions (`MOODS` in `render/babylon/characters/face.ts`) and the idle
-micro-expressions (`MICRO`) are adapted from the expressions of TalkingHead by Mika Suominen (MIT,
-https://github.com/met4citizen/TalkingHead).
+their expressions and visemes, eyes, hair, beards and clothes by `cargo characters`
+(`crates/tools/src/characters`; `cargo characters build` writes `rig.json` and the `.bin` files),
+and their animation clips by `render/babylon/characters/clips` (baked when the game loads). Bed
+blankets are generated at runtime in `render/babylon/characters/blanket.ts`. No downloaded models,
+textures or animations are used. The facial expressions (`MOODS` in
+`render/babylon/characters/face.ts`) and the idle micro-expressions (`MICRO`) are adapted from the
+expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen/TalkingHead).
 
 ## Street and gardens (`street/`)
 

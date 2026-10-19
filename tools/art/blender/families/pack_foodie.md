@@ -30,7 +30,7 @@ dome or the door).
 - the lectern and the island keep `wood` (walnut; the stools' oak) beside their plain finishes and one moving part.
 
 The pizza oven has three moving parts (door, peel, fire: the plan's door and peel for `bakePizza`, flames for
-`warmUp`), so its body is all plain (the logs satin, not bark): 4 draws, `check_glb.py`'s one warning. The fire
+`warmUp`), so its body is all plain (the logs satin, not bark): 4 draws, `check-glb`'s one warning. The fire
 shows through the grille door (a solid door would hide it for `warmUp`); `bakePizza` also lights it, so the door
 comes off a burning oven (the plan names `flames` for `warmUp` only).
 
@@ -45,7 +45,7 @@ comes off a burning oven (the plan names `flames` for `warmUp` only).
 
 The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the old part's.
 
-`check_glb.py`: 6 models, 0 failed; the pizza oven's 4-draw warning above. Khronos validator: 0 errors, 0 warnings
+`check-glb`: 6 models, 0 failed; the pizza oven's 4-draw warning above. Khronos validator: 0 errors, 0 warnings
 each. Gallery next to the old parts; clips bench at rest and open on WebGPU and WebGL, coloured (pantry, oven).
 In play (`wants-asking`, WebGPU): the pizza oven baked in the yard (door down, peel in, fire, all back after),
 the island sat at for a bite, the pantry opened for a snack, the herbs tended, the cookbook read (the page over),
@@ -55,6 +55,6 @@ the espresso bar used (the resident hides the stream from the camera; seen on th
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_foodie            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_foodie --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_foodie            # the six .glb, the pack, check-glb
+cargo art pack_foodie --preview  # previews/<id>.png, <id>@<clip>.png
 ```

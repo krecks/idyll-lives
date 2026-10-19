@@ -11,7 +11,7 @@
 # the three-drawer nightstand's top drawer slides out for an outfit too, the chest's lid lifts for a
 # blanket and the hamper's while the washing is sorted; the rest are static.
 #
-# Run:  python3 -B tools/art/blender/build.py bedroom_storage [--preview]
+# Run:  cargo art bedroom_storage [--preview]
 import os
 import sys
 

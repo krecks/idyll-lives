@@ -23,7 +23,7 @@ things, seen from far: every model has a far version (`far=0.25`; the chess tabl
 - **Merry-go-round** (2 × 2): a 1.9 m red platform 0.25 m up (the content's seat 0.26 m), four bent rails and a centre
   column; the hub stays still. `spin` turns the platform (`platform`) once in 3.5 s: a whole turn, so riders carried
   round never snap back at the loop's end, and well under a turn a second. `motions`: `{'loops': {'spin': 'spin'},
-  'ride': 'spin'}`. `check_glb.py` has no clip-length check; 3.5 s is longer than the usual "about 1 s", needed for a
+  'ride': 'spin'}`. `check-glb` has no clip-length check; 3.5 s is longer than the usual "about 1 s", needed for a
   whole turn at a believable speed.
 - **Basketball hoop**: a post on a ballast base at the back of its tile, a backboard and the rim at 2.94 m. The net
   (`net`, a diamond mesh of thin strands, `fabric`) is its own part hung from the rim: `swish` sways it 9° and
@@ -65,13 +65,13 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 | `model.pingPongTable` | 1.90 × 0.95 × 0.99 m | 1,148 (276) | 1 | Table, Legs |
 | `model.parkChessTable` | 0.80 × 0.85 × 0.88 m | 3,468 (1,216) | 2 | Table, Stools |
 
-`check_glb.py`: 8 models, 0 failed, no warnings (the seesaw, built for 2 × 1 tiles, was widened to the content's
+`check-glb`: 8 models, 0 failed, no warnings (the seesaw, built for 2 × 1 tiles, was widened to the content's
 3 × 1 with its seats at ±0.75 m, so picking and the shadow match the model). Khronos
 validator: 0 errors, 0 warnings on all 16 files.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py playground            # the 16 .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py playground --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art playground            # the 16 .glb, the pack, check-glb
+cargo art playground --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

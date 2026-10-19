@@ -7,7 +7,7 @@
 # hoop's net sways (`swish`), the blender's lid lifts and settles (`lid`), the shower's rain grows (`water_on`)
 # and the recovery pod's canopy lowers over the resident (`canopy`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_energetic [--only trampoline] [--preview]
+# Run:  cargo art pack_energetic [--only trampoline] [--preview]
 import math
 import os
 import sys

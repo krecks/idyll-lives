@@ -101,7 +101,7 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 | `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 5,608 | 4 | `door_open` (putting clean things away, `fetch`) |
 | `model.barCart` | 0.77 × 1.09 × 0.45 m | 4,468 | 3 | `shake` 0.6 s (mix, `hold` 1.5 s) |
 
-`check_glb.py`: 29 models, 0 failed; two warnings, the sideboard's and the china cabinet's 4 draw calls. Khronos
+`check-glb`: 29 models, 0 failed; two warnings, the sideboard's and the china cabinet's 4 draw calls. Khronos
 validator: 0 errors, 0 warnings each. Seen in the gallery next to their files (WebGPU), the clips bench (WebGPU and
 WebGL2), the pose bench (`/poses.html?seats=…`: a man and a woman on every chair, stool, bench and set) and in play
 (stools sat on with the swivel playing, WebGPU and WebGL2; the bar cart's shake; the oak and bistro sets sat at;
@@ -110,6 +110,6 @@ the storage against the wall). All 29 sit in Validate › Tables, Chairs and Din
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py dining            # the .glbs, the pack, check_glb
-python3 -B tools/art/blender/build.py dining --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art dining            # the .glbs, the pack, check-glb
+cargo art dining --preview  # previews/<id>.png, <id>@<clip>.png
 ```

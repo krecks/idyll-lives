@@ -12,7 +12,7 @@
 # star, which the game draws in its own unlit material with an outline pushed out along its normals (inverted
 # hull): built smooth, its normals worked out from its shape, its origin at its middle, as the old part's.
 #
-# Run:  python3 -B tools/art/blender/build.py ground [--only marker] [--preview]
+# Run:  cargo art ground [--only marker] [--preview]
 import math
 import os
 import random

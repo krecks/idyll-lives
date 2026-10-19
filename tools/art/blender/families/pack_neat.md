@@ -45,7 +45,7 @@ and home.
 The plan's colour part is "Body" for all six: the white frames and docks (`body`), the robot's white dock and
 robot (`appliance`) and the shower's tiles (`tile`).
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open, the desk's bin from behind (the sitter's side).
 Gallery: each next to its old part. In play (`wants-asking`, WebGPU, each bought in the living room and used by
 the resident): the mop comes out of its dock (`mop`), the washer's door opens (`laundry`), the rain runs over the
@@ -56,6 +56,6 @@ yard, the laundry centre, mop dock, robot, shower and console coloured.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_neat            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_neat --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_neat            # the six .glb, the pack, check-glb
+cargo art pack_neat --preview  # previews/<id>.png, <id>@<clip>.png
 ```

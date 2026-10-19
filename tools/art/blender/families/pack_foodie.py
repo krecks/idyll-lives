@@ -7,7 +7,7 @@
 # and the peel slides in (`door_off`) as the fire grows (`flames`), and the island's drawer pulls out
 # (`drawer_open`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_foodie [--only pizzaOven] [--preview]
+# Run:  cargo art pack_foodie [--only pizzaOven] [--preview]
 import math
 import os
 import random

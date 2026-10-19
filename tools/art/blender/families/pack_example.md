@@ -21,7 +21,7 @@ middle, facing the front), with the water up to 0.65.
 `{'uses': {'soak': 'fill'}, 'loops': {'soak': 'bubbles'}}`. The bubbles' rise takes as long as `fill` from the same
 origin, so on the first round they ride up on the rising water instead of floating over an empty tub.
 
-**Draw calls: 4 each** (`check_glb.py` warns "aim for 3"), on purpose:
+**Draw calls: 4 each** (`check-glb` warns "aim for 3"), on purpose:
 - the stove: its body (all plain finishes) plus the door, the knob and the flame, the plan's "knob and flame ring" —
   as the gas range and the range cooker (`kitchen_cooking.py`) do;
 - the tub: its body (plain, plus the surround's `wood`) plus the water and the bubbles — the plan's extra loop (E1).
@@ -35,7 +35,7 @@ The old part's step was buried in the tub's surround; there is none.
 | `model.chefStove` | 1.62 × 2.55 × 0.66 m | 6,828 | 4 | Body, Handles & knobs, Tiles |
 | `model.whirlpoolTub` | 1.86 × 0.93 × 1.86 m | 7,104 | 4 | Tub, Surround, Headrests |
 
-`check_glb.py`: 2 models, 0 failed; the two 4-draw warnings above. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 2 models, 0 failed; the two 4-draw warnings above. Khronos validator: 0 errors, 0 warnings each.
 Clips bench at rest, open and mid-loop on WebGPU and WebGL, coloured. In play (`wants-asking`, WebGPU): the stove in
 the living room cooked on (door down, then shut, flame on throughout); the tub in the yard soaked in (water up,
 bubbles, the resident sitting in the water). At night (`office-night`, WebGL): the stove in all four facings and
@@ -44,6 +44,6 @@ the tub in the yard.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_example            # the two .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_example --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_example            # the two .glb, the pack, check-glb
+cargo art pack_example --preview  # previews/<id>.png, <id>@<clip>.png
 ```

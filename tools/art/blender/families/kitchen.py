@@ -4,7 +4,7 @@
 # opens the fridge door while a resident takes food or a drink out (`motions`). At rest both are closed.
 # Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 #
-# Run:  python3 -B tools/art/blender/build.py kitchen [--preview]
+# Run:  cargo art kitchen [--preview]
 import math
 import os
 import sys

@@ -11,7 +11,7 @@
 # piano): each is built as its old part first stood (the seats at the back, the screen at the front edge facing
 # them) and turned round (`_turn_round`), as is its old part.
 #
-# Run:  python3 -B tools/art/blender/build.py pack_couchPotato [--only recliner] [--preview]
+# Run:  cargo art pack_couchPotato [--only recliner] [--preview]
 import math
 import os
 import sys

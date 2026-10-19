@@ -8,7 +8,7 @@
 # ready. The wall mirror is on the wall layer: built at its real height, its back on the wall face.
 # Built to the old parts' sizes, in their numbers: the parts are placed in game axes (`F`).
 #
-# Run:  python3 -B tools/art/blender/build.py bedroom_dressing [--preview]
+# Run:  cargo art bedroom_dressing [--preview]
 import math
 import os
 import sys

@@ -29,7 +29,7 @@ cacti (gallery, WebGPU). Heights are from the floor (the still part's origin), s
 
 The one moving part: a twig and a tuft of leaves sticking out of the top pad, all on `foliage` (one draw call),
 its origin where it leaves the pad. `trim` squashes it to nothing in 0.8 s; `motions.uses.prune` plays it for the
-whole prune (the game brings it back after). It is the model's fourth draw call (`check_glb` warns: aim for 3).
+whole prune (the game brings it back after). It is the model's fourth draw call (`check-glb` warns: aim for 3).
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
@@ -44,7 +44,7 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 | `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,632 | 3 |
 | `model.garden.bonsai` | 0.62 × 0.97 × 0.41 m | 1,260 | 4 |
 
-`check_glb.py`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
+`check-glb`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
 each.
 
 **By a wall, turned any way.** Houseplants turn freely (15° steps), so a plant's leaves stay within 44 cm of its
@@ -91,7 +91,7 @@ the old part's pot narrowed to the model's 40 cm on 2026-10-15).
 | `model.garden.geraniums` | 0.42 × 0.65 × 0.47 m | 1,648 | 2 |
 | `model.garden.flowerBox` | 0.95 × 0.73 × 0.50 m | 2,912 | 2 |
 
-`check_glb.py`: 15 models, 0 failed, no size warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 15 models, 0 failed, no size warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Far versions
 
@@ -137,7 +137,7 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
 | `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,120 | 480 | 2 |
 | `model.garden.hosta` | 0.62 × 0.84 × 0.68 m | 676 | 234 | 2 |
 
-`check_glb.py`: the family's 36 models, 0 failed; its one warning is the bonsai's 4 draw calls. (The grass's and
+`check-glb`: the family's 36 models, 0 failed; its one warning is the bonsai's 4 draw calls. (The grass's and
 hosta's old parts were widened to their models on 2026-10-15: they were 13 % and 11 % narrower.)
 Khronos validator: 0 errors, 0 warnings on every new file.
 
@@ -164,12 +164,12 @@ the planter (plain, to stay within three draw calls), the soil mound, straw or p
 | `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,294 | 444 | 3 |
 | `model.garden.pumpkins` | 1.11 × 0.27 × 0.95 m | 1,174 | 542 | 3 |
 
-`check_glb.py`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Each stage checked in
+`check-glb`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Each stage checked in
 play from a state with all four crops at each (picked, planted, growing, ripe).
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py plants            # the .glb files, the pack, check_glb
-python3 -B tools/art/blender/build.py plants --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art plants            # the .glb files, the pack, check-glb
+cargo art plants --preview  # previews/<id>.png, <id>@<clip>.png
 ```

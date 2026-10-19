@@ -19,7 +19,7 @@ top (content `stand.height`, 0.156 m), as it does for the trampoline.
   That is slower than a jog, but faster would blur: at the fastest game speed (2.5×) the slats already move a third
   of their pitch a frame at 30 frames a second (it was 0.2 m/s, which read as a belt creeping along). The game
   jumps the loop home at the end of each round; the slats then stand where their neighbours were, and the first
-  and last are under the motor hood and the rear roller cap, so it doesn't show. `check_glb.py` warns that the
+  and last are under the motor hood and the rear roller cap, so it doesn't show. `check-glb` warns that the
   loop ends 10 cm from where it starts: right for a belt.
 
 ## The exercise bike
@@ -74,11 +74,11 @@ is never two of it.
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 768 | 3 | Mat |
 | `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 3 | Rack, Weights |
 
-`check_glb.py`: 5 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 5 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py fitness            # the five .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py fitness --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art fitness            # the five .glb, the pack, check-glb
+cargo art fitness --preview  # previews/<id>.png, <id>@<clip>.png
 ```

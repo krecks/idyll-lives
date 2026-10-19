@@ -55,12 +55,12 @@ The rain barrel and the log store are still.
 - The greenhouse: the still body takes plain and glass; the door and the vent are glass, one draw each. Their edges
   are a white material in the glass finish (`glass_bar`), so each stays one draw yet shows an edge; the door has
   no handle (a metal one would be a second draw on it), as the nature lover's glasshouse. Its plants are plain
-  satin (a foliage draw would make 5). `check_glb.py` warns of the 4.
+  satin (a foliage draw would make 5). `check-glb` warns of the 4.
 - The washing is all fabric, its pegs too (a plain peg would be a second draw on the part).
 - The compost bin's lid has a wooden grip, not metal: not furniture hardware, and metal would be a fourth draw.
 
 **Grown from nothing**: the washing is 6 mm thick and its pegs 12 mm, inside the 16 mm line: flattened onto the
-line at rest, it is inside the line and doesn't show (`check_glb.py` warned when it was 12 mm against a 1 cm line).
+line at rest, it is inside the line and doesn't show (`check-glb` warned when it was 12 mm against a 1 cm line).
 The castle is flattened 2 cm down in the sand.
 
 **Left out from the old parts**: the watering can by the barrel and the log store's chopping block (both first
@@ -78,7 +78,7 @@ built, then dropped: the gate warned the models stood 7 cm off the old parts' ce
 | clothesline | 2.76 × 1.80 × 0.76 | 4972 | 684 | 3 | Posts, Washing |
 | firewoodStack | 1.00 × 1.10 × 0.38 | 2220 | 548 | 2 | Shelter |
 
-`check_glb.py`: 0 failed; one warning, the greenhouse's 4 draws. Khronos validator: 0 errors, 0 warnings on every
+`check-glb`: 0 failed; one warning, the greenhouse's 4 draws. Khronos validator: 0 errors, 0 warnings on every
 file and far file.
 
 **In the game** (2026-10-16, headless, WebGPU and WebGL2, by day and at 22:00): the gallery next to the old parts;
@@ -90,6 +90,6 @@ with the bed ripe: the crop went with the harvest, the bed bare after); the colo
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py yard            # every .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py yard --preview  # previews/sandbox.png, sandbox@castle.png, …
+cargo art yard            # every .glb, the pack, check-glb
+cargo art yard --preview  # previews/sandbox.png, sandbox@castle.png, …
 ```
