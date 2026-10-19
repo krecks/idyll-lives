@@ -12,7 +12,7 @@
 # Each is built in place where the game placed it (`F`, game axes), so the seat heights (content `seat`)
 # and the tops things stand on (content `surface`) stay where the game has them.
 #
-# Run:  python3 -B tools/art/blender/build.py outdoor [--only bench] [--preview]
+# Run:  cargo art outdoor [--only bench] [--preview]
 import math
 import os
 import sys

@@ -1,7 +1,7 @@
 # The manifests and the content as the game reads them, for the Blender side: which keys a build may write
 # (`known_keys`), which clips an entry's `motions` plays (`played`), and where each model is centred
 # (centres.json). Plain Python, no bpy: the gate (crates/tools/src/checkglb.rs, `cargo check-glb`) reads the
-# same files the same way, and check_glb.py imports these.
+# same files the same way.
 import json
 import os
 

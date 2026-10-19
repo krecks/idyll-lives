@@ -15,7 +15,7 @@
 #   basketballHoop the net sways and stretches after each shot (`swish`, 1.4 s into the use, then every 3.2 s)
 #   parkChessTable a white pawn slides one square on (`move`)
 #
-# Run:  python3 -B tools/art/blender/build.py playground [--only seesaw] [--preview]
+# Run:  cargo art playground [--only seesaw] [--preview]
 import math
 import os
 import sys

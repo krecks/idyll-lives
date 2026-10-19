@@ -72,6 +72,9 @@ fp16/q4f16 raised the median 10.4 to 11-12 ms, p95 about 20 ms, no frame over 50
 
 ## Scripts
 
+The Python scripts (`*.py` below) were removed on 2026-10-20; they are in git history before that
+commit. The `.mjs` scripts and `browser/` stay.
+
 Scratch folder: `$WORK` (default the session scratchpad `voices-multi/`) holds downloads (`dl/`),
 derived models (`models/`), the Node project with onnxruntime-web 1.30 and playwright-core
 (`node/`), the Python venv (`.venv`: onnx, onnxruntime, praat-parselmouth, kaldi-native-fbank,

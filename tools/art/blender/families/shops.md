@@ -60,14 +60,14 @@ resident is still eating. The door is plain glass with no handle, so the model s
 | `model.cafeChair` | 0.45 × 0.95 × 0.47 m | 1,840 (460) | 2 | Frame, Seat |
 
 Draws: the counter's still body is wood and plain parts (2) plus the cash drawer (1); the case's still body is plain
-and glass (2) plus the back door's glass (1). `check_glb.py`: 5 models, 0 failed, no warnings. Khronos validator: 0
+and glass (2) plus the back door's glass (1). `check-glb`: 5 models, 0 failed, no warnings. Khronos validator: 0
 errors, 0 warnings on all ten files (models and far versions).
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py shops            # the five .glb and their .far.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py shops --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art shops            # the five .glb and their .far.glb, the pack, check-glb
+cargo art shops --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
 ```
 
 The Workbench previews draw glass opaque: the case's bakes and its back door only show in the game (the clips bench,

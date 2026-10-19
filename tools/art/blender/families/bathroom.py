@@ -12,7 +12,7 @@
 # its tap's stream and its water, which fills while a resident bathes.
 # Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 #
-# Run:  python3 -B tools/art/blender/build.py bathroom [--preview]
+# Run:  cargo art bathroom [--preview]
 import math
 import os
 import sys

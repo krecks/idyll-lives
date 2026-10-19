@@ -26,7 +26,7 @@
 #                  (content `held`), from this part, upright as built (its lean on the stand is the node's turn)
 # The digital piano is still.
 #
-# Run:  python3 -B tools/art/blender/build.py hobbies [--only piano] [--preview]
+# Run:  cargo art hobbies [--only piano] [--preview]
 import math
 import os
 import sys

@@ -12,7 +12,7 @@
 # where the game puts residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`,
 # `BEDS`; the content's `surface` and `seat`).
 #
-# Run:  python3 -B tools/art/blender/build.py kids [--only crib] [--preview]
+# Run:  cargo art kids [--only crib] [--preview]
 import math
 import os
 import sys

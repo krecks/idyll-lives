@@ -1,6 +1,6 @@
 /**
  * Faces as morph weights: ARKit face units and the voice engine's visemes, authored as shapes of
- * the residents' generated faces (lids, brows, lips, teeth, tongue; tools/characters/prim/face.py).
+ * the residents' generated faces (lids, brows, lips, teeth, tongue; crates/tools/src/characters/face.rs).
  *
  * An expression is a mood (`MOODS`: whole-face recipes, one per emotion) plus a small `Face` of
  * adjustments (a resting smile, lids, gaze). Both mix into a target the face settles towards

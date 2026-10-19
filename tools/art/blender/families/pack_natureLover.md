@@ -52,7 +52,7 @@ parts start at full size and shrink, which works.
 
 **The harvest is down into the soil, not a uniform shrink.** The lettuce has two clips (`grow` and `harvest`); the
 exporter samples a clip's unkeyed scale axes from the scene's last state, so a uniform `harvest` left `grow`
-starting at 0.001 across (check_glb: "starts away from where the file has it"). `harvest` keys only the height, and
+starting at 0.001 across (check-glb: "starts away from where the file has it"). `harvest` keys only the height, and
 the lettuce sits 2 cm into the soil, so flattened it is hidden.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -65,7 +65,7 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 | `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 2,140 | 3 | Wood |
 | `model.natureLover.glasshouse` | 1.89 × 2.48 × 1.86 m | 7,496 | 4 | Wood, Frame, Cushions |
 
-`check_glb.py`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
+`check-glb`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
 draw calls (above).
 Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open (the veggie bed's `harvest` alone, `&clip=`), the
@@ -81,6 +81,6 @@ lying direction is the engine's, not the model's.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_natureLover            # the seven .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_natureLover --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_natureLover            # the seven .glb, the pack, check-glb
+cargo art pack_natureLover --preview  # previews/<id>.png, <id>@<clip>.png
 ```

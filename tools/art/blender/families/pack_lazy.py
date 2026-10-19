@@ -7,7 +7,7 @@
 # lifts (`quilt`), a locker door opens (`door_open`), the plate's deck shakes (`shake`, a loop) and the tablet
 # tilts up on its dock (`screen_up`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_lazy [--only napPod] [--preview]
+# Run:  cargo art pack_lazy [--only napPod] [--preview]
 import math
 import os
 import sys

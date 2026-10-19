@@ -3,7 +3,7 @@
 # Built at their real size, in Blender axes (front -Y), each stood on the floor and centred by
 # `G.settle`; the sizes are the old parts', within each model's tolerance.
 #
-# Run:  python3 -B tools/art/blender/build.py garden_decor [--only gnome] [--preview]
+# Run:  cargo art garden_decor [--only gnome] [--preview]
 import os
 import sys
 

@@ -8,7 +8,7 @@
 # (`G.far_of`). They are still; the leaves and flowers are on the `foliage` finish, so the nature shader sways them
 # in the wind as it did the old parts'. The path light's lens glows at night.
 #
-# Run:  python3 -B tools/art/blender/build.py street [--only bench] [--preview]
+# Run:  cargo art street [--only bench] [--preview]
 import math
 import os
 import random

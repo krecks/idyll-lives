@@ -8,7 +8,7 @@
 # while the platter turns (`platter`, a loop), the bureau's writing flap drops (`fall_front`) and the arbour's
 # swing sways with its riders (`swing`, a loop) while a bloom is cut (`cut`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_romantic [--only heartTub] [--preview]
+# Run:  cargo art pack_romantic [--only heartTub] [--preview]
 import math
 import os
 import sys

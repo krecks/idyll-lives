@@ -35,7 +35,7 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
   (a fifth draw otherwise).
 - The hatch: plain slate cabinet with a textured oak ledge and cap; the door plain.
 
-**Warnings left (`check_glb`):**
+**Warnings left (`check-glb`):**
 - `shortwaveRadio`: height 1.33 m against the old part's 1.77 m. The antenna is down at rest and reaches 1.77 m
   when `antenna` runs it up for `airwaves`; the old part always has it up.
 - `soloSauna`: 4 draw calls (above).
@@ -52,7 +52,7 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
 The plan's colour parts are "Body, Wood" for all six; the sauna is all wood, so its parts are the cedar (Wood)
 and the dark cedar trim (the door pull).
 
-`check_glb.py`: 6 models, 0 failed, the two warnings above. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 6 models, 0 failed, the two warnings above. Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL), every clip at rest and open, the radio's dial from behind; colours
 on the bench (`&colors=`). In play (`wants-asking`, WebGPU): all six bought in the living room; the pod (`retreat`:
 the hood swings over the seated reader), the sauna (`sweat`: the door opens and shuts after 1.5 s with the resident
@@ -62,6 +62,6 @@ seated inside), the radio (`tune`) and the hatch (`order`: it opens as the resid
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_loner            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_loner --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_loner            # the six .glb, the pack, check-glb
+cargo art pack_loner --preview  # previews/<id>.png, <id>@<clip>.png
 ```

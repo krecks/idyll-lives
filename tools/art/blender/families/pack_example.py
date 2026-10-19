@@ -5,7 +5,7 @@
 # front burner (`burner_on`); the tub's water rises (`fill`) and bubbles well up through it while it lasts
 # (`bubbles`, a loop).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_example [--only chefStove] [--preview]
+# Run:  cargo art pack_example [--only chefStove] [--preview]
 import os
 import sys
 

@@ -7,7 +7,7 @@
 # rocks with its knitter on it (`rock`, a loop), the teapot pours (`pour`), the feeder's roof lifts for a refill
 # (`lid_open`) and songbirds fly out to the tray and the bath (`bird`), and the settee's cushions sink (`sink_in`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_kind [--only givingJar] [--preview]
+# Run:  cargo art pack_kind [--only givingJar] [--preview]
 import math
 import os
 import sys

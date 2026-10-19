@@ -16,7 +16,7 @@
 # their own, hinged where they would open, for a use to come (two); the alarm clock's hour and minute hands
 # tell the game's time (`motions.clock`; three).
 #
-# Run:  python3 -B tools/art/blender/build.py tabletop [--only kettle] [--preview]
+# Run:  cargo art tabletop [--only kettle] [--preview]
 import math
 import os
 import sys

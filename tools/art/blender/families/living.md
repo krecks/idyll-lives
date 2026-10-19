@@ -32,7 +32,7 @@ sofa's 0.425 m.
 | `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 1,412 | 3 | Upholstery, Cushions, Legs, Pillow |
 | `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 1,144 | 3 | Upholstery, Cushions, Legs, Throw |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
 WebGL, day and night, all four facings across the set): residents sit on each, and `sink_in` plays and holds.
 
 - The sectional modules are 1.00 m wide, so they butt up in a row; the arms are where the old parts had them
@@ -71,7 +71,7 @@ Built as the sofas are, from the old primitive parts (`armchair_bergere` and the
 | `model.floorCushion` | 0.62 × 0.14 × 0.62 m | 1,120 | 1 | Cushion, Piping, Button |
 | `model.beanBag` | 0.84 × 0.70 × 0.84 m | 1,824 | 1 | Bag, Seat |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
 WebGL at night: residents sit, recline, rock and flop on each, and each clip plays.
 
 ## The coffee and side tables (L3)
@@ -85,7 +85,7 @@ for the side, nesting and console tables). Still, but for two:
 - **Nesting tables**: the small oak table is a part of its own (`small_table`), so a clip can pull it out once it
   has a use.
 - **Side table**: the model copies the catalog pack's `side_table` (oak with a drawer and a brass knob), which stood
-  in front of the base manifest's version; the two differed before the model, as `check_glb.py` warned.
+  in front of the base manifest's version; the two differed before the model, as `check-glb` warned.
 - What stands on the tops (a plant, vases, magazines, a box) is plain finish, so it costs no draw call.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -100,7 +100,7 @@ for the side, nesting and console tables). Still, but for two:
 | `model.sideTableRound` | 0.52 × 0.56 × 0.52 m | 964 | 1 | Top, Base |
 | `model.consoleTable` | 1.80 × 0.80 × 0.56 m | 1,024 | 3 | Top, Legs, Baskets |
 
-`check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
+`check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
 facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
 
 ## The shelves (L5)
@@ -141,7 +141,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 | `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 2,340 | 3 | Frame, Shelves | — |
 | `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own) |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
 old parts, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
 all nine bought in the house across the four facings, coloured, on WebGPU by day and WebGL with the night light.
 
@@ -160,14 +160,14 @@ house generator place it (`cfg.stairs`), not the buy catalog, which leaves stair
   with the floor above at the back; a **black iron railing** each side on the strings (x ±0.40, inside the tile's
   wall face): a newel at the foot and the head, two balusters a step and a sloping handrail where the old part's
   rails are (0.7 m above the nosings). The flight is solid underneath, as the old part was.
-- `check_glb.py` no longer takes the stairs' back for a wall (content `stairs`): it is the top of the flight, where
+- `check-glb` no longer takes the stairs' back for a wall (content `stairs`): it is the top of the flight, where
   the floor above goes on.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.stairs` | 0.86 × 3.68 × 4.00 m | 3,400 | 2 | Treads, Railing |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Seen in play (WebGPU, and WebGL2 at
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Seen in play (WebGPU, and WebGL2 at
 night): generated houses with a flight up (facing 2) and flights down to the basement (facings 0, 1 and 3), a
 resident walking up and down each; the stairwell from the floor above and from the ground over stairs down; the
 colour studio.
@@ -175,6 +175,6 @@ colour studio.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py living            # the .glb files, the pack, check_glb
-python3 -B tools/art/blender/build.py living --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art living            # the .glb files, the pack, check-glb
+cargo art living --preview  # previews/<id>.png, <id>@<clip>.png
 ```

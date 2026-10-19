@@ -6,7 +6,7 @@ Wall Decor, Ornaments and Textiles until checked in play.
 
 Each is built where the game places it (`F`, game axes):
 - **Wall things** (the pictures, the clocks, the shelf, the curtains) hang at their real height with their back on the
-  wall face: `G.settle(centre=False, floor=False)`, `floor=False` and `centre=` on the `Model`. `check_glb.py` warns
+  wall face: `G.settle(centre=False, floor=False)`, `floor=False` and `centre=` on the `Model`. `check-glb` warns
   that they float (right on a wall).
 - **The hanging plant** hangs from the ceiling (2.8 m), centred, `floor=False`.
 - **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
@@ -64,11 +64,11 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 | `model.rugRunner` | 0.80 × 0.02 × 2.80 m | 944 | 1 | Rug |
 | `model.rugPattern` | 2.84 × 0.02 × 1.86 m | 1,916 | 1 | Rug |
 
-`check_glb.py`: 22 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 22 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py decor            # the 22 .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py decor --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art decor            # the 22 .glb, the pack, check-glb
+cargo art decor --preview  # previews/<id>.png, <id>@<clip>.png
 ```

@@ -7,7 +7,7 @@
 # loads it (`door_open`, held 2.5 s), and the drum's face behind the glass, which turns for the whole use
 # (`drum_spin`, a loop). The rail hangs on the wall at its real height; the rest are still.
 #
-# Run:  python3 -B tools/art/blender/build.py laundry [--only laundryWasher] [--preview]
+# Run:  cargo art laundry [--only laundryWasher] [--preview]
 import os
 import sys
 

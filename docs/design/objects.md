@@ -28,14 +28,14 @@ gate below, so the review does.
 2. Name materials for what they are (`stone`, `water`, `tunic`), each with one of the game's finishes,
    in the family's `G.Palette`; the pack entry's `materials` is written from it.
 3. Stay in budget: 1–3 draw calls (finish groups), triangles for the size class below.
-4. Build with `python3 -B tools/art/blender/build.py <family>` (Blender 5.2 LTS): it exports, and
+4. Build with `cargo art <family>` (Blender 5.2 LTS): it exports, and
 5. registers the model in the family's pack with `url` and `materials`, then
-6. runs `check_glb.py` (no errors). Run the Khronos glTF validator too (no errors or warnings).
+6. runs the gate, `cargo check-glb` (no errors). Run the Khronos glTF validator too (no errors or warnings).
 7. Look at it in the gallery, on a lot by day and at night, on WebGPU and WebGL2, and in the catalog. Credit it. Commit only the files you changed.
 
 ## Tools and folders
 
-- **Blender 5.2 LTS**, run from scripts by `build.py` (`Blender --background --factory-startup --python
+- **Blender 5.2 LTS**, run from scripts by `cargo art` (`Blender --background --factory-startup --python
   families/<family>.py`). `gamekit` warns on another version. The committed files were exported with 5.2.2 (glTF I/O
   5.2.40). A new LTS is adopted by re-exporting every family and checking the shots, in one commit.
 - **Scripts are the source.** A model is built by Python on `gamekit` (primitives, `revolve`,
@@ -47,11 +47,11 @@ gate below, so the review does.
 | What | Where | Name |
 |---|---|---|
 | Shared toolkit | `tools/art/blender/gamekit/` | `import gamekit as G` |
-| The runner | `tools/art/blender/build.py` | `build.py <family> [--only <id>] [--preview]` |
+| The runner | `crates/tools/src/art.rs` | `cargo art <family> [--only <id>] [--preview]` |
 | A family's script | `tools/art/blender/families/<family>.py` | `garden_decor.py` builds `model.garden.*`; `_template.py` to copy |
 | The models | `web/public/assets/models/<family>/<id>.glb` | the key's last part: `model.garden.gnome` → `garden/gnome.glb` |
 | Their manifest entries | `web/public/assets/packs/<family>/manifest.json`, listed in the base manifest's `packs` | |
-| Previews (`build.py <family> --preview`, `check_glb.py -- --preview`) | `tools/art/blender/previews/` (ignored by git) | `<id>.png`, `<id>@<clip>.png`, `rt_<id>.png` |
+| Previews (`cargo art <family> --preview`, `cargo check-glb --preview`) | `tools/art/blender/previews/` (ignored by git) | `<id>.png`, `<id>@<clip>.png`, `rt_<id>.png` |
 
   Inside the file: one mesh object per model, named as the id (one per moving part, below); one
   material per colour, named for what it is. Material names are the keys the manifest maps, so renaming one is a manifest change.
@@ -93,7 +93,7 @@ Measured on 813 primitive models as the game's loader builds them (LOD 0), and s
 Blender model costs what a primitive one does today. Every object kind is drawn with thin
 instances, so these costs are per kind of object in view, plus the triangles of each copy.
 
-| Largest side | Placeholders today: triangles (median / 90th pct.) | Target | Most (`check_glb.py` fails above) |
+| Largest side | Placeholders today: triangles (median / 90th pct.) | Target | Most (`cargo check-glb` fails above) |
 |---|---|---|---|
 | under 0.35 m | 1,326 / 3,048 | 1,500 | 3,000 |
 | 0.35–1 m | 3,688 / 9,116 | 4,000 | 8,000 |
@@ -147,7 +147,7 @@ room has.
   The file's base colour becomes the part's colour; its roughness and metalness are ignored (the
   finish decides), so choose the finish, not a number. An unmapped material keeps the file's own
   PBR material: a draw call of its own, a look that doesn't match the furniture, and (today) a
-  material left behind each time the model is rebuilt. `check_glb.py` warns of each one.
+  material left behind each time the model is rebuilt. `cargo check-glb` warns of each one.
 - **Finishes by name.** A material named `<name>@<finish>` (`stone@matte`, `leaf@foliage`) is drawn
   with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
   with gamekit, whose palettes write the map themselves.
@@ -198,7 +198,7 @@ room has.
   (a mirror cabinet's door: the reflection swings with it); the face is across its thinnest side,
   square or round as drawn. In gamekit, the palette takes the side: `glass=('#DCE6EA', 'gloss',
   'front')`. Map it to `gloss`, as mirrors always were: the mirrors past the nearest show their
-  glass, and see-through `glass` would show what is behind it. `check_glb.py` fails glass split over
+  glass, and see-through `glass` would show what is behind it. `cargo check-glb` fails glass split over
   two parts and warns of glass that isn't flat or is see-through.
 
 ## Level of detail
@@ -210,7 +210,7 @@ room has.
   model is only seen from afar: the town overview behind the menus (its gardens and street,
   `BuildOptions.far`) and the far woods (`lod` 1). A model without one is drawn whole there. In gamekit,
   `G.Model(..., far=0.25)` writes it from the model at rest (joined, decimated to that share, without
-  what only shows while it moves), or `far=build_function` builds one of its own; `check_glb.py`
+  what only shows while it moves), or `far=build_function` builds one of its own; `cargo check-glb`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
 - **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance, for the far
@@ -272,7 +272,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```
 - **Loops:** `loops` names the clip a use plays round and round while it lasts (a rocking chair, a
   washer's drum), by interaction id or animation tag. It goes from rest to rest (`G.rock`, `G.spin`:
-  `check_glb.py` fails a loop that ends away from where it starts), never plays backwards, and when the
+  `cargo check-glb` fails a loop that ends away from where it starts), never plays backwards, and when the
   use ends it finishes its round and stops at rest. A use can play `uses` clips and a loop together.
   ```json
   "motions": { "loops": { "relax": "rocking", "read": "rocking" }, "ride": "rocking" }
@@ -356,7 +356,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 
 ## Validation
 
-- **`python3 -I -B tools/art/blender/check_glb.py`** reads every `.glb` the manifests use, with
+- **`cargo check-glb`** (`crates/tools/src/checkglb.rs`) reads every `.glb` the manifests use, with
   its entry and its content object, and exits 1 on an error. Errors: a model the content draws (an
   object's `model` or `model.<id>`, an item's `model` or `item.<id>`) that no manifest has, or whose
   entry has no `url` once the packs are stacked (its pack missing from `packs`); an empty `model`; a
@@ -374,9 +374,9 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it; each against every content object that draws the model. No content fact says a thing
-  stands against a wall, so one standing off it isn't caught. Plain Python, so CI can run it; inside
-  Blender, `-- --preview` also renders each file re-imported. A content file or manifest it can't read
-  is a FAIL naming the file.
+  stands against a wall, so one standing off it isn't caught. It needs no Blender, so CI runs it (in
+  `cargo test -p ll-tools`); `--preview` also has Blender re-import each file and render it. A
+  content file or manifest it can't read is a FAIL naming the file.
 - **`cargo test -p sim-core --test shipped_content`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.
@@ -432,12 +432,12 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 
 ## Review checklist
 
-- [ ] Built by a family script in `tools/art/blender/families/` on `gamekit`, Blender 5.2 LTS; re-exports with `build.py <family>`.
+- [ ] Built by a family script in `tools/art/blender/families/` on `gamekit`, Blender 5.2 LTS; re-exports with `cargo art <family>`.
 - [ ] Real size, no stretching; origin at the footprint centre on the floor (or the layer's rule); front −Y in Blender.
 - [ ] Inside its footprint; heights and tops agree with the content (`seat`, `surface`, `light`, `slots`).
 - [ ] Every material mapped to a finish; 1–3 draw calls; triangles within the target for its size (half for things placed many times).
 - [ ] No emissive, no see-through except `glass`, no textures of its own unless needed (then ≤ 512 px).
-- [ ] `check_glb.py` passes; the Khronos validator reports nothing.
+- [ ] `cargo check-glb` passes; the Khronos validator reports nothing.
 - [ ] Gallery; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
 - [ ] Pack entry with `url` and `materials` (written by the build); base manifest lists the pack.
@@ -475,4 +475,5 @@ work for files.
 8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and
    its room's lights.
 9. **Quantised geometry** in `optimize.mjs` for files from Blender.
-10. **CI** runs `check_glb.py` (it needs no Blender) with the other checks.
+10. ~~**CI**~~ Done: CI runs `cargo test -p ll-tools`, which includes the gate over every shipped
+    model (it needs no Blender), with the other checks.

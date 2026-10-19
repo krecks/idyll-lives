@@ -11,7 +11,7 @@
 #   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
 #   - the curtains are drawn closed at night (`close`), on cloth tabs over the rail.
 #
-# Run:  python3 -B tools/art/blender/build.py decor [--only wallClock] [--preview]
+# Run:  cargo art decor [--only wallClock] [--preview]
 import math
 import os
 import sys

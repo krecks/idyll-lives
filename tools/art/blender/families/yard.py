@@ -12,7 +12,7 @@
 # Each is built in place where the game places it (`F`, game axes), and each has a far version for the town
 # overview (`far=`).
 #
-# Run:  python3 -B tools/art/blender/build.py yard [--only sandbox] [--preview]
+# Run:  cargo art yard [--only sandbox] [--preview]
 import math
 import os
 import random

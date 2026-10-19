@@ -104,4 +104,4 @@ Several sessions (and agents) often work at once, each in its own worktree:
   content and probes there, never in the repo.
 - **Shared files.** Write a shared file only after its new text is built and parsed (`t = fix(s);
   json.loads(t); open(p, 'w').write(t)`: opening it for writing first empties it, and once emptied
-  `furniture.json`). Moving items into Validate and back: `tools/content/validate.py`, which does that.
+  `furniture.json`). Moving items into Validate and back: `cargo content`, which does that.

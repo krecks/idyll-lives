@@ -8,7 +8,7 @@
 # flowers stay still. Each model's pot is its `body`, the part the player colours. Only the bonsai moves:
 # a stray sprig shrinks away while a resident prunes it (`trim`).
 #
-# Run:  python3 -B tools/art/blender/build.py plants [--only monstera] [--preview]
+# Run:  cargo art plants [--only monstera] [--preview]
 import math
 import os
 import random
@@ -1235,7 +1235,7 @@ def pumpkins():
     return _crop(still, (0, 0, 0.04), leaves, crop)
 
 
-# (width, height, depth) as measured; each within 10 % of the old part's bounds (check_glb warns beyond).
+# (width, height, depth) as measured; each within 10 % of the old part's bounds (`cargo check-glb` warns beyond).
 TOLERANCE = 0.03
 BED = [('bed', 'Bed')]
 

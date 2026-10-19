@@ -8,7 +8,7 @@
 # unrolls flat for yoga (`unroll`), rolling up again at the end. The lift draws the weight in the
 # hands (content `held`), so the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
 #
-# Run:  python3 -B tools/art/blender/build.py fitness [--only treadmill] [--preview]
+# Run:  cargo art fitness [--only treadmill] [--preview]
 import math
 import os
 import sys

@@ -51,7 +51,7 @@ until checked in play.
   clamp up from each to the frame's bottom, a rear bar and a strut to a plate on the frame's back. Where its
   the game places it (`centre=(0, -0.155)`: the frame 5 cm behind the middle, the strut behind it).
 
-`check_glb.py`: 0 failed. Warning: the wall mirror "floats
+`check-glb`: 0 failed. Warning: the wall mirror "floats
 93.6 cm above its origin" (it is on the wall, as it should be). Khronos validator: 0 errors, 0 warnings each.
 
 ## In the game
@@ -65,6 +65,6 @@ shows the seated resident.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py bedroom_dressing            # every .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py bedroom_dressing --preview  # previews/mirror.png, dressingTable@drawer_open.png, …
+cargo art bedroom_dressing            # every .glb, the pack, check-glb
+cargo art bedroom_dressing --preview  # previews/mirror.png, dressingTable@drawer_open.png, …
 ```

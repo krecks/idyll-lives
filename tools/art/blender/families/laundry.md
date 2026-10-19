@@ -27,14 +27,14 @@ interaction id, as the `clean` tag is shared with other chores). The washing on 
 dryer's basket of dry washing) is plain satin, so it costs no draw call.
 
 **Draw calls: 4** each (the most allowed, as the microwave): the cabinet, the door ring, the door's glass and
-the drum. `check_glb.py` warns of it. An opaque window would save one, but then the drum couldn't be seen
+the drum. `check-glb` warns of it. An opaque window would save one, but then the drum couldn't be seen
 turning.
 
 ## The rest
 
 - **Towel rail** (wall): two chrome bars on posts and wall plates, a bath towel over the top bar and a hand
   towel over the lower one. It hangs at its real height (bars at 0.95 and 1.2 m), its back on the wall face:
-  `G.settle(centre=False, floor=False)` and `floor=False` on its `Model`. `check_glb.py` warns that it floats
+  `G.settle(centre=False, floor=False)` and `floor=False` on its `Model`. `check-glb` warns that it floats
   (right for a wall thing) and that it's 2 cm shallower than its old part.
 - **Towel ladder**: two birch rails leaning 10.66° back to the wall, five rungs, a towel over three of them.
 - **Laundry basket**: a wicker tub (`fabric`) with a rim, woven bands and side handles, clean washing on top.
@@ -49,11 +49,11 @@ turning.
 | `model.laundryBasket` | 0.54 × 0.39 × 0.42 m | 3,872 | 2 | Basket, Rim & weave |
 | `model.bathMat` | 0.76 × 0.03 × 0.50 m | 592 | 1 | Mat, Pile |
 
-`check_glb.py`: 6 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 6 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py laundry            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py laundry --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art laundry            # the six .glb, the pack, check-glb
+cargo art laundry --preview  # previews/<id>.png, <id>@<clip>.png
 ```

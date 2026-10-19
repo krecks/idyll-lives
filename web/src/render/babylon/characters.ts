@@ -1,7 +1,7 @@
 /**
  * Sims as skinned, animated characters (bodies, faces, hair and clothes generated in code by
- * `tools/characters/prim`, clips made in code in `characters/clips`; format in
- * docs/characters-format.md).
+ * `cargo characters` (crates/tools/src/characters), clips made in code in `characters/clips`;
+ * format in docs/characters-format.md).
  *
  * GPU / performance model:
  * - One mesh per (body, part) — body, eyes, brows, lashes, teeth, tongue, each hairstyle and each garment

@@ -33,7 +33,7 @@ night each for a few pixels).
   cabinet, the oak top, the mantel) plus the plain group, plus the moving part. The portable TV's speaker grille is
   wooden slats over plain cloth (a `fabric` grille would have been a fourth).
 - The stereo: wood and plain, the tray and the pulsing cones: 4. The fourth is the E1 loop the plan asks for;
-  `check_glb` warns "4 draw calls, aim for 3 at most".
+  `check-glb` warns "4 draw calls, aim for 3 at most".
 
 **The bench's TV lift.** A 0.7 m TV can't hide in a 0.49 m bench, so the lift sits in a hood at the bench's back, as
 wide as the TV and 0.31 m above the top: at rest the hood is closed by the lid on the TV's top edge; for `watch` the
@@ -44,7 +44,7 @@ against the old part's 1.33.
 default 0.45 m in the footprint's middle, in mid-air with their back to the fire. The model has a floor cushion in front
 (0.14 m high, 0.29 m forward) and `characters.ts` `SEATS.fireplaceElectric` (`h: 0.14, fwd: 0.3, back: true`) seats them
 on it, facing the flames; the old part had the cushion too. The model's depth is 0.92 m (the old part's surround
-0.40; `check_glb` warns).
+0.40; `check-glb` warns).
 
 Other warnings left, by design: the portable TV's height (1.28 m with its ears out, 1.13 at rest), the wall TV floating
 above its origin (it hangs on the wall).
@@ -60,7 +60,7 @@ above its origin (it hangs on the wall).
 | `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 | 3 | Body (`boombox_body`), Trim (`boombox_trim`) |
 | `model.fireplaceElectric` | 1.76 × 1.31 × 0.92 m | 3,580 | 3 | Surround (`surround`), Firebox (`firebox`) |
 
-`check_glb.py`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
+`check-glb`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
 gallery next to the old parts; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
 and used (the portable TV, the bench and the home cinema watched with their clips, the stereo danced to, the boombox
 listened to, the fire warmed up by on its cushion, the TV and the wall TV watched); all eight in the living room by day
@@ -70,6 +70,6 @@ colours on the painted parts.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py media            # the eight .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py media --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art media            # the eight .glb, the pack, check-glb
+cargo art media --preview  # previews/<id>.png, <id>@<clip>.png
 ```

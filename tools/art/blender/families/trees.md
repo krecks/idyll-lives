@@ -15,7 +15,7 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 - **Trunk on the origin:** crowns are built round the trunk, so `settle` moves a lopsided crown's bounds only by a
   few centimetres.
 - **Clips:** `pick` shrinks one apple (or lemon) at the front for `pick`; `trim` the Japanese maple's stray sprigs
-  for `shape`. Each is one more draw call (the apple and lemon trees come to four; `check_glb` warns).
+  for `shape`. Each is one more draw call (the apple and lemon trees come to four; `check-glb` warns).
 
 ## Far versions and the woods
 
@@ -40,7 +40,7 @@ primitive parts). The town overview draws them too.
 | `model.cypress` | 2.12 × 7.95 × 2.05 m | 1,496 | 370 | 2 |
 | `model.garden.lemonTree` | 1.29 × 2.37 × 1.34 m | 1,736 | 698 | 4 |
 
-`check_glb.py`: 12 models, 0 failed; its one warning is the lemon tree's 4 draw calls. The sizes were held to the
+`check-glb`: 12 models, 0 failed; its one warning is the lemon tree's 4 draw calls. The sizes were held to the
 old parts' bounds as they were built (those bounds counted each turned blob's or cone's whole box: the
 spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were drawn in a little to match (`spread`
 0.75 to 0.71 and 0.78 to 0.74, 2026-10-15). Khronos validator: 0 errors, 0 warnings on all 24 files.
@@ -48,6 +48,6 @@ spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were d
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py trees            # the .glb files, the pack, check_glb
-python3 -B tools/art/blender/build.py trees --preview  # previews/<id>.png, <id>.far.png, <id>@<clip>.png
+cargo art trees            # the .glb files, the pack, check-glb
+cargo art trees --preview  # previews/<id>.png, <id>.far.png, <id>@<clip>.png
 ```

@@ -1,7 +1,7 @@
 /**
  * Turns a Sim's appearance (creator colours, hairstyle, gender) into its outfit: which garments it
  * wears (ids from the body's `garments`; the shell parts `top.*`, `bottom.*`, `shoes.*` of those
- * that have one, see tools/characters/prim/clothes.py) and the per-Sim shader parameters (skin
+ * that have one, see crates/tools/src/characters/clothes.rs) and the per-Sim shader parameters (skin
  * colour, top, bottom and shoe colours, the cuts that paint the clothes on the body, hair colour).
  * The top follows the creator's outfit colour; shoes keep their own unless one is chosen. Garments
  * and colours chosen in the household creator (`appearance.top`, `bottom`, `shoes`, `bottomColor`,

@@ -36,7 +36,7 @@ only manifest that defines these keys.
 | `model.sinkVessel` | 0.84 × 1.16 × 0.54 m | 1,920 | 3 | counter with a raised vessel bowl and a folded towel |
 | `model.sinkConsole` | 0.60 × 1.06 × 0.48 m | 1,108 | 3 | open console on two legs, oval bowl |
 
-`check_glb.py`: 0 failed; Khronos validator: 0 errors, 0 warnings. Each
+`check-glb`: 0 failed; Khronos validator: 0 errors, 0 warnings. Each
 lists the parts the player may colour in `paint`, the `body` first.
 
 ## The double vanity has no mirrors
@@ -76,7 +76,7 @@ old part (`catalog.double_vanity`) has none either.
 | `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,600 | 3 | Bowl, Seat & lid (wood), Cistern |
 | `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,088 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel and flush plate) |
 
-`check_glb.py`: 0 failed; its warnings are the two wall mirrors floating above their origins (wall things). The
+`check-glb`: 0 failed; its warnings are the two wall mirrors floating above their origins (wall things). The
 compact and wall-hung toilets stood 2.5 and 5 cm into the wall; they stand on the wall face now (2026-10-14), the
 classic one's moved back 2 cm onto it, and the wall-hung one's seat is at 0.45 m, not 0.6. Khronos validator: 0
 errors, 0 warnings each.
@@ -110,7 +110,7 @@ Validate › Showers until checked in play.
 | `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
 | `model.showerRain` | 0.94 × 2.19 × 0.93 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## B3 — the baths
 
@@ -139,7 +139,7 @@ Validate › Baths until checked in play.
 | `model.bathtubClawfoot` | 1.73 × 1.02 × 0.83 m | 4,428 | 3 | Tub, Feet, Taps, Towel |
 | `model.bathtubFreestanding` | 1.89 × 0.92 × 0.84 m | 2,248 | 3 | Tub, Taps, Towel |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## B5 — bathroom storage and mirrors
 
@@ -148,7 +148,7 @@ Validate › Bathroom Storage until checked in play. The mirror cabinet's door o
 their teeth there, and the tall cabinet's upper door while one takes a fresh towel; the round mirror is still.
 
 - **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
-  face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check_glb.py` warns that they
+  face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check-glb` warns that they
   float, which is right for a wall thing.
 - **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`gloss`, `'front'`). Only the High
   preset reflects live (`mirrors: 2`); on Medium and Low it's plain pale gloss, as the old parts' mirrors. It
@@ -170,11 +170,11 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 | `model.mirrorRound` | 0.64 × 0.77 × 0.05 m | 1,528 | 1 | Frame, Strap |
 | `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 2,260 | 2 | Cabinet, Frame, Towels |
 
-`check_glb.py`: 0 failed. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py bathroom            # every .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py bathroom --preview  # previews/sink.png, sink@water_on.png, …
+cargo art bathroom            # every .glb, the pack, check-glb
+cargo art bathroom --preview  # previews/sink.png, sink@water_on.png, …
 ```

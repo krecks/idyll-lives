@@ -7,14 +7,16 @@ finishes, moving parts, what to look at) are in [docs/design/objects.md](../../.
 The content fields are in [docs/content-packs.md](../../../docs/content-packs.md).
 
 ```
-build.py          the runner (plain python3): runs Blender on a family, then the gate
-check_glb.py      the gate (plain python3): every .glb the manifests use, against its entry
 centres.json      where each model built here is centred at rest, for the gate only (the build writes it)
 gamekit/          the toolkit every family imports as G
 families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
                   bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
 previews/         renders from --preview (ignored by git)
 ```
+
+The runner and the gate are Rust (`crates/tools`): `cargo art` runs Blender on a family, then the gate;
+`cargo check-glb` (no Blender) checks every .glb the manifests use against its entry. The Python left
+here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
 
 ## Working as an agent: the loop
 
@@ -25,10 +27,10 @@ previews/         renders from --preview (ignored by git)
    - its model (`web/public/assets/models/<family>/<id>.glb`), whose size and heights it keeps.
 
    For a new object, decide the footprint first; it fixes where the game puts residents (below).
-3. **Build and look.** Run `build.py <family> --preview`, then open the PNGs in `previews/` (you can read
+3. **Build and look.** Run `cargo art <family> --preview`, then open the PNGs in `previews/` (you can read
    images). Iterate until it looks right from the front and each clip looks right open.
-4. **Export.** Run `build.py <family>`, which exports, writes the pack and runs `check_glb.py`. It must
-   say `0 failed`; read every warning.
+4. **Export.** Run `cargo art <family>`, which exports, writes the pack and runs the gate
+   (`cargo check-glb`). It must say `0 failed`; read every warning.
 5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
    the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
 6. **Wire it in** outside this folder when the object is new (below). Run
@@ -47,24 +49,27 @@ game. Report what you checked, and anything you didn't.
 ## Commands
 
 ```sh
-python3 -B tools/art/blender/build.py kitchen                  # build, export, register, check
-python3 -B tools/art/blender/build.py kitchen --only fridge    # one model
-python3 -B tools/art/blender/build.py garden_decor --preview   # previews/<id>.png (+ <id>@<clip>.png), no export
-python3 -B tools/art/blender/build.py --all                    # every family (not _template)
-python3 -B tools/art/blender/build.py _template --preview      # the template only previews
-python3 -I -B tools/art/blender/check_glb.py [model.fridge …]  # the gate alone
-python3 -B tools/art/blender/build.py --centres                # centres.json from every family, no Blender
+cargo art kitchen                  # build, export, register, check
+cargo art kitchen --only fridge    # one model
+cargo art garden_decor --preview   # previews/<id>.png (+ <id>@<clip>.png), no export
+cargo art kitchen --no-pack        # export without writing the pack
+cargo art --all                    # every family (not _template)
+cargo art _template --preview      # the template only previews
+cargo art --centres                # centres.json from every family (runs Blender, builds nothing)
+cargo check-glb [model.fridge …]   # the gate alone (no Blender)
+cargo check-glb --keys             # the keys a build may write
+cargo check-glb --preview          # the gate, then Blender renders each file re-imported (rt_<name>.png)
 ```
 
 `centres.json` holds each model's `centre` (key → `[x, depth]`; `[0, 0]`, the middle, for most): where
 `G.settle()` centred it, so the gate can tell a file that is off it (a stale export, a part moved). The
 game doesn't read it, so it stays out of the packs it downloads. A build writes its models' lines.
-`--centres` writes every family's, reading the family scripts with Blender's modules stood in for (no
-Blender, no build): run it after changing a `centre=` without rebuilding (the gate then warns of each
-file off its new centre), or after adding or removing models. A key it doesn't list isn't built here (a
-third-party file), and its centre isn't checked. Commit it with the models.
+`--centres` writes every family's (Blender runs `gamekit/centres.py`, which imports the family scripts
+without building anything): run it after changing a `centre=` without rebuilding (the gate then warns
+of each file off its new centre), or after adding or removing models. A key it doesn't list isn't built
+here (a third-party file), and its centre isn't checked. Commit it with the models.
 
-`build.py` finds Blender in `$BLENDER`, then `/Applications/Blender.app`, then `PATH`. It prints the
+`cargo art` finds Blender in `$BLENDER`, then `/Applications/Blender.app`, then `PATH`. It prints the
 `[gamekit]` lines (sizes, triangles, what was built) and, when a build fails, the Python traceback. It
 exits 1 if a build or the gate fails. Run Blender only through it (or with `--background
 --factory-startup --python-exit-code 1`), so the export settings stay fixed and errors aren't swallowed.
@@ -144,9 +149,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      lifts the model off the floor. Draw every random number the full build draws, so the far version's
      parts stand where the model's do (`families/plants.py`, `trees.py`). The gate fails a far version
      whose lowest point is more than 0.5 cm off the model's.
-5. **Look**: `build.py <family> --preview`, then open `previews/<id>.png`. The preview looks at the front
+5. **Look**: `cargo art <family> --preview`, then open `previews/<id>.png`. The preview looks at the front
    three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
-6. **Export**: `build.py <family>`.
+6. **Export**: `cargo art <family>`.
 
 ### Wiring a new object into the game
 
@@ -261,7 +266,7 @@ How the parts work:
   ambient (`idle`), `night`, `open` and `growth` clips keep their own pace (a merry-go-round's round in
   3.5 s) and aren't checked; an ambient clip runs on game time and is off on Low. The clock is the
   residents' animation time. Clock hands are the exception: the game's time sets them, on every preset.
-- **Checks.** The build fails if `motions` names a clip the model doesn't have. `check_glb.py` warns of
+- **Checks.** The build fails if `motions` names a clip the model doesn't have. `cargo check-glb` warns of
   a clip that nothing plays, fails a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
@@ -361,7 +366,7 @@ never one that's already running) and drive Playwright headless with full Chrome
   mapped to see-through `glass` showed the brass behind a round mirror and the door behind a cabinet's:
   map it to `gloss`.
 - **Exports.** They differ on every run, so commit only what you meant to change.
-- **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `build.py`
+- **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `cargo art`
   passes it.
 
 ## The toolkit (`gamekit/`)

@@ -49,11 +49,11 @@ of 13 (the path light's glass and the planter's bark are gone), and a third of t
 bench 820 against 8,820, the sign 944 against 2,784, the planter 1,092 against 3,144); the path light is the one with
 more (308 against 120).
 
-`check_glb.py`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on all eighteen files.
+`check-glb`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on all eighteen files.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py street            # the nine .glb and .far.glb, the pack, check_glb
-python3 -B tools/art/blender/build.py street --preview  # previews/<id>.png, <id>.far.png
+cargo art street            # the nine .glb and .far.glb, the pack, check-glb
+cargo art street --preview  # previews/<id>.png, <id>.far.png
 ```

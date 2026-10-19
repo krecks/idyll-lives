@@ -1,9 +1,9 @@
 # A family to copy: a toy chest whose lid swings open and whose drawer slides out. Copy this file to
 # families/<family>.py, rename the family, models and key, and build:
 #
-#   python3 -B tools/art/blender/build.py _template --preview     this template: previews only
-#   python3 -B tools/art/blender/build.py <family> --preview      yours: look at previews/<id>.png
-#   python3 -B tools/art/blender/build.py <family>                export, register, check
+#   cargo art _template --preview     this template: previews only
+#   cargo art <family> --preview      yours: look at previews/<id>.png
+#   cargo art <family>                export, register, check
 #
 # The rules (size, budgets, finishes, moving parts) are docs/design/objects.md; the steps are README.md.
 import os

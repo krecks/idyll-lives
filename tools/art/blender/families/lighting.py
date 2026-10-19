@@ -10,7 +10,7 @@
 # height (`floor=False`). Two clips, both ambient (`idle`): the ceiling fan's blades turn, the paper lantern
 # sways. The rest are still.
 #
-# Run:  python3 -B tools/art/blender/build.py lighting [--only chandelier] [--preview]
+# Run:  cargo art lighting [--only chandelier] [--preview]
 import json
 import math
 import os

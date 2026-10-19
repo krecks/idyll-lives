@@ -44,7 +44,7 @@ Built 2026-10-14; they sit in Validate › Patio until signed off (back to Outdo
 | outdoorBar | 2.00 × 1.06 × 0.89 | 3052 | 2 | Body, Counter, Foot rail |
 | parasol | 2.21 × 2.46 × 2.21 | 1376 | 3 | Canopy, Pole, Edge |
 
-`check_glb.py`: 0 failed (the one warning above). Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed (the one warning above). Khronos validator: 0 errors, 0 warnings each.
 
 **In the game** (2026-10-14, headless, WebGPU and WebGL2): the gallery next to the old parts; the clips bench
 (`stir`); in play, all eleven bought in a garden (one chair at each of the four facings, three recoloured), a
@@ -81,7 +81,7 @@ Built 2026-10-14; in Validate › Loungers until signed off (back to Outdoor ›
 | swingSet | 1.92 × 1.97 × 0.91 | 1060 | 2 | Frame, Seats |
 | hotTubCedar | 1.89 × 0.92 × 1.90 | 3508 | 3 | Cedar, Cover |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 **In the game** (2026-10-14, headless WebGPU): all five bought; a resident sunbathing on the reclined lounger, lying
 in the hammock, riding the porch swing and the swing set (frames in a row show seat and resident moving together),
@@ -113,7 +113,7 @@ Built 2026-10-16; in Validate › Grills until signed off (back to Outdoor › C
 | grillStation | 1.66 × 1.20 × 0.66 | 3576 | 3 | Cart, Hood |
 | firePit | 0.93 × 0.62 × 0.91 | 2488 | 3 | Bowl, Stones |
 
-`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 **In the game** (2026-10-16, headless WebGPU and WebGL2): all three bought in a garden (the grill at all four facings, the station at three, the fire pit at three), by day
 and at night; a resident grilling dinner (lid up), grilling a feast at the station (hood up) and warming up by the
@@ -122,6 +122,6 @@ fire pit (flames up, sitting on its rim), by day and at night; the colour studio
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py outdoor            # every .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py outdoor --preview  # previews/bench.png, parasol@stir.png, …
+cargo art outdoor            # every .glb, the pack, check-glb
+cargo art outdoor --preview  # previews/bench.png, parasol@stir.png, …
 ```

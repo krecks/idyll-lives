@@ -76,7 +76,7 @@ rest pose where it is.
 ## K5 — tall and wall storage
 
 A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and
-`settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check_glb` reports it as floating,
+`settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check-glb` reports it as floating,
 which is fine on a wall. A floor thing stands where the game places it, its back on the wall (below).
 
 The wall cabinets are `cupboard` stations (content `stations`): clean things are put away in the nearest cupboard or
@@ -124,7 +124,7 @@ Also from the review: the butcher block's knife drawer has its box; the wall cab
 doors; the pot rail's brackets start at the wall face (0.22 m deep); the recycling bins' colour parts are
 the left, middle and right bin (each with its lid) and the handles.
 
-`check_glb.py`: 0 failed; its warnings are the wall cabinets, the range hood, the spice rack, the pot rail and the
+`check-glb`: 0 failed; its warnings are the wall cabinets, the range hood, the spice rack, the pot rail and the
 wall shelf floating above their origins (wall things), and 4 draw calls on the glass wall cabinet and the recycling
 bins. Khronos glTF validator: 0 errors, 0 warnings each. The eight K4 counters sit in Validate › Counters, the
 eleven K5 things in
@@ -144,6 +144,6 @@ the old `shallow`). Islands stand free, centred.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py kitchen_counters            # the .glbs, the pack, check_glb
-python3 -B tools/art/blender/build.py kitchen_counters --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kitchen_counters            # the .glbs, the pack, check-glb
+cargo art kitchen_counters --preview  # previews/<id>.png, <id>@<clip>.png
 ```

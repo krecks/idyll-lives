@@ -16,7 +16,7 @@
 #   boombox            the cassette door tips open and shuts (`cassette`, hold 1.2 s);
 #   fireplaceElectric  the flames grow from the log bed (`flames`, for relax; gloss, glowing at night).
 #
-# Run:  python3 -B tools/art/blender/build.py media [--only tvRetro] [--preview]
+# Run:  cargo art media [--only tvRetro] [--preview]
 import os
 import sys
 

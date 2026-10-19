@@ -32,7 +32,7 @@ The window seat's pane is opaque gloss with raindrops and runs on it, not see-th
 house wall, which glass would show.
 
 **Draw calls: 3 each, the record cabinet 4.** The cabinet's walnut (`wood`) body, its lid and the platter loop (the
-plan's extra "L the platter turns (E1)"): 4, `check_glb.py`'s one warning. Its lid pull is wood, not brass, so the
+plan's extra "L the platter turns (E1)"): 4, `check-glb`'s one warning. Its lid pull is wood, not brass, so the
 lid stays one draw. Elsewhere: the cello's body and stand `wood`, the cello itself one plain part; the desk `wood`,
 the chair's upholstery plain satin; the window seat all plain but its cushion part (`fabric` throw and cushion, a
 satin book); the tub's ledge `wood`, the rest plain.
@@ -48,7 +48,7 @@ satin book); the tub's ledge `wood`, the rest plain.
 
 The desk's apron runs only along its far edge and its ends (the old part's deep apron took the writer's hands).
 
-`check_glb.py`: 6 models, 0 failed; the record cabinet's 4-draw warning above. Khronos validator: 0 errors, 0
+`check-glb`: 6 models, 0 failed; the record cabinet's 4-draw warning above. Khronos validator: 0 errors, 0
 warnings each. Gallery next to the old parts; clips bench at rest, open and mid-loop on WebGPU and WebGL,
 coloured (cabinet, window seat). In play (`wants-asking`, WebGPU): the cello played (in the player's arms), the
 record played (lid up, record turning), brooding on the window seat, writing at the desk by the lit candle, watching
@@ -59,6 +59,6 @@ window seat.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_gloomy            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_gloomy --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_gloomy            # the six .glb, the pack, check-glb
+cargo art pack_gloomy --preview  # previews/<id>.png, <id>@<clip>.png
 ```

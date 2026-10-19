@@ -9,7 +9,7 @@
 # machines' lit signs (and the drinks machine's front) glow at night. They are placed on town lots and seen
 # from far, so each has a far version (`far=0.25`).
 #
-# Run:  python3 -B tools/art/blender/build.py stalls [--only iceCreamCart] [--preview]
+# Run:  cargo art stalls [--only iceCreamCart] [--preview]
 import math
 import os
 import sys

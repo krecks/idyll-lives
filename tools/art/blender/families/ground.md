@@ -28,7 +28,7 @@ group. The keys are unchanged.
   version is the same two built on icosahedra without the split faces, a little wider to fill the same box:
   56 triangles (the old part at that level: 40), few enough that the woods still draw all of them as one mesh
   (`SPLIT_TRIANGLES`: 36,000 over every rock of the village's woods). Centred where the old part was (game x 8.5 cm,
-  depth 1 cm: its `Model`'s `centre`, which the gate checks); its `sink` (0.115 m) is how far `check_glb.py` lets it reach under the floor.
+  depth 1 cm: its `Model`'s `centre`, which the gate checks); its `sink` (0.115 m) is how far `check-glb` lets it reach under the floor.
 - **Marker** (`model.marker`): the sparkle star over the selected resident (`BabylonRenderer` `setupMarker`), which
   the game draws in its own unlit material, shaded by its normals and tinted by mood, with an outline of the same
   mesh pushed out along its normals (an inverted hull), turned to the camera, bobbing and breathing. One closed
@@ -46,7 +46,7 @@ group. The keys are unchanged.
 | marker | 0.23 × 0.34 × 0.06 | 1,344 | — | 1 |
 
 The lawn always draws the full tuft and flowers (`lawns` builds them at level 0); their far versions are there for
-anything that draws them far off. `check_glb.py`: 4 models, 0 failed, no warnings. Khronos validator: 0 errors,
+anything that draws them far off. `check-glb`: 4 models, 0 failed, no warnings. Khronos validator: 0 errors,
 0 warnings on each file and far version.
 
 The spare `model.stove`, `model.plantSmall` and `model.ceilingLamp` went at the same time: nothing in

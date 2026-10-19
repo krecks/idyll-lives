@@ -8,7 +8,7 @@
 # far version (`far_of`: the same build at low detail, a third of the clumps), which the far woods and the town
 # overview draw.
 #
-# Run:  python3 -B tools/art/blender/build.py trees [--only oak] [--preview]
+# Run:  cargo art trees [--only oak] [--preview]
 import math
 import os
 import random

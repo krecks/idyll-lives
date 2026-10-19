@@ -8,7 +8,7 @@
 # (`spritz`), the arcade joystick waggles (`joystick`, a loop), and the recliner's back reclines (`recline`) and
 # its cup holder swings out (`cup_out`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_slob [--only beanbag] [--preview]
+# Run:  cargo art pack_slob [--only beanbag] [--preview]
 import os
 import random
 import sys

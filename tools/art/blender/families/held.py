@@ -11,7 +11,7 @@
 # Small and seen several at once: one draw call each (every finish a plain one), two for the wooden boards
 # (the chopping board, the tasting board, the pizza's board: `wood`), and 240 to 510 triangles.
 #
-# Run:  python3 -B tools/art/blender/build.py held [--only mealPot] [--preview]
+# Run:  cargo art held [--only mealPot] [--preview]
 #       HELD_MEASURE=1 … --preview   prints where each is built and its size, to copy into its `I(...)` line
 import math
 import os

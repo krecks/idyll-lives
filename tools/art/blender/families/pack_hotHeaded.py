@@ -7,7 +7,7 @@
 # (`sink_in`), the desk's drawer slides out (`drawer_open`) and the plunge tub's slatted cover rolls back into
 # its housing (`cover_off`).
 #
-# Run:  python3 -B tools/art/blender/build.py pack_hotHeaded [--only heavyBag] [--preview]
+# Run:  cargo art pack_hotHeaded [--only heavyBag] [--preview]
 import math
 import os
 import random

@@ -51,7 +51,7 @@ The painted materials: the jukebox `cherry`, `amber`; the karaoke `speaker`, `sp
 `mint`, `canopy`, `brass`; the hammock `wood`, `spreader`, `pillow`; the lamp `housing`, `lamp_metal`, `yoga`; the
 booth `booth`, `piping`, `curtain`.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Checked: the gallery
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Checked: the gallery
 next to the old parts; the clips bench at rest and open on WebGPU and WebGL (the jukebox from behind, the
 hammock's sway at its furthest from the side); colours on the clips bench; in play (`wants-asking`, WebGPU by day):
 the party booth used (the curtain draws aside and closes after its hold), the hammock swung in (the resident lies
@@ -65,6 +65,6 @@ across): kept from the old part, as the footprint is fixed.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_cheerful            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_cheerful --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_cheerful            # the six .glb, the pack, check-glb
+cargo art pack_cheerful --preview  # previews/<id>.png, <id>@<clip>.png
 ```

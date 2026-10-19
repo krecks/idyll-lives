@@ -10,7 +10,7 @@
 # lights' bulbs glow at night (E8), each bulb near its content `light.height`; the string sways (`sway`, ambient).
 # The planter box and the lamp post have far versions (the town overview). The rest are still.
 #
-# Run:  python3 -B tools/art/blender/build.py garden_things [--only sundial] [--preview]
+# Run:  cargo art garden_things [--only sundial] [--preview]
 import json
 import math
 import os

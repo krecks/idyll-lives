@@ -16,7 +16,7 @@
 #
 # Built in game coordinates (`F`: x, height, depth; front +depth).
 #
-# Run:  python3 -B tools/art/blender/build.py bedroom [--only bed] [--preview]
+# Run:  cargo art bedroom [--only bed] [--preview]
 import os
 import sys
 

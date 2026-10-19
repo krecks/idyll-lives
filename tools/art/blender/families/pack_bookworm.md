@@ -45,13 +45,13 @@ Book spines are plain satin, unbevelled boxes: a wall of books costs no draw cal
 
 The library wall has no fabric to colour; its second part is the ladder.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. In play
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. In play
 (`wants-asking`, WebGPU by day, `office-night` on WebGL at night): the nook and the lounge used, the cushion
 sinking and the fire growing; the bureau turned to three facings; colours on the clips bench.
 
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_bookworm            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_bookworm --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_bookworm            # the six .glb, the pack, check-glb
+cargo art pack_bookworm --preview  # previews/<id>.png, <id>@<clip>.png
 ```

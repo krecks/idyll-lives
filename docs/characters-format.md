@@ -1,18 +1,18 @@
 # Residents: the character format
 
-The residents (bodies, faces, hair, clothes) are generated in code by `tools/characters/prim`,
-and their animation clips are made in code in `web/src/render/babylon/characters/clips`. This page
-is the contract between the generator, the clips and the runtime
-(`web/src/render/babylon/characters*`). Everything here is original work.
+The residents (bodies, faces, hair, clothes) are generated in code by `cargo characters` (in Rust,
+`crates/tools/src/characters`), and their animation clips are made in code in
+`web/src/render/babylon/characters/clips`. This page is the contract between the generator, the
+clips and the runtime (`web/src/render/babylon/characters*`). Everything here is original work.
 
 ```
-python3 -B tools/characters/prim/build.py              # writes web/public/assets/characters, then runs check.py
-python3 -B tools/characters/prim/check.py [set dir]    # the set against this contract
+cargo characters build                                # writes web/public/assets/characters, then checks it
+cargo characters check [set dir]                      # the set against this contract
+cargo characters diff <a> <b>                         # two sets, within the quantisation
 node --experimental-strip-types tools/characters/check_clips.ts   # the clips against the rig
 ```
 
-The build is deterministic (seeded noise only): the same code gives the same bytes. Use `-B`:
-the repo tracks some `.pyc` files.
+The build is deterministic (seeded noise only): the same code gives the same bytes.
 
 ## Conventions
 
@@ -46,8 +46,8 @@ the repo tracks some `.pyc` files.
   Fingers match `/^(index|middle|ring|pinky|thumb|fingers)_0(\d)/`, legs `/^(thigh|calf|foot|ball)_/`.
 - `hand_*` is the wrist joint. `grip` (optional) is the left palm centre relative to the wrist; the
   right mirrors x.
-- Proportions per family and life stage are in `prim/rig.py` (`PROPORTIONS`). The stage heights stay
-  within 3% of `TARGET_HEIGHT` (what cribs, kids' beds, desks and seats were fitted to).
+- Proportions per family and life stage are in `rig.rs` (`proportions`). The stage heights stay
+  within 3% of `target_height` (what cribs, kids' beds, desks and seats were fitted to).
 - The reference skeleton for the clips is the male young adult: `sourcePelvis` is its pelvis rest
   position, and `reference` gives its body name and its thigh and shin lengths (for leg IK).
 
@@ -127,13 +127,13 @@ Every body has:
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
-The body (`prim/body.py`) is a control cage of superellipse rings (`prim/cage.py`; the head's cage
-in `prim/head.py`) fitted so its limit surface passes through the ring points and subdivided once
-(`prim/subdiv.py`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
+The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
+in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
+(`subdiv.rs`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
 4.5k), `lod.body` the cage at its limit plus the lids (budget 1.2k). Skin weights are set per ring
 and subdivide with the positions. Every stage of a family has the same cage.
 
-The head interface (`head_frame(family, stage)`, `prim/head.py`): `sdf` is a smooth signed distance
+The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
 to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
 front surface's z; `ears` boxes round the ears (hair goes round or over them); `centre` / `radii` a
 loose ellipsoid round the skull (with a margin; fit close things to `sdf`); eyes, mouth, brows,
@@ -152,7 +152,7 @@ hairline and chin as before.
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = cavity darkening (armpits,
 between fingers, under the chin, between the lips, deep in the hair; the mouth plate is 1), z = hair
-clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.py). Every
+clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.rs). Every
 stage uses the base stage's tone; the shader deepens the cavities with the resident's age
 (appearance texel 4 g).
 
@@ -274,9 +274,9 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 
 | What | Files |
 |---|---|
-| the contract | `prim/rig.py`, `prim/head.py` (the head interface), `prim/contract.py`, `prim/write.py`, `prim/build.py`, `prim/check.py`, `check_clips.ts`, `clips/dsl.ts`, this page |
-| body and clothes | `prim/body.py`, `prim/cage.py`, `prim/subdiv.py`, `prim/clothes.py`, `prim/garments.py`, `prim/meshops.py` |
-| face and hair | `prim/face.py`, `prim/hair.py`, `prim/prims.py`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
+| the contract | `rig.rs`, `head.rs` (the head interface), `contract.rs`, `write.rs`, `build.rs`, `check.rs`, `check_clips.ts`, `clips/dsl.ts`, this page |
+| body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
+| face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
 | clips | `clips/*` (with `clips/ik.ts`) |
 | the runtime | `characters.ts` (activities, seats, beds, carrying, faces), `characters/{data,pose,material,outfit,blanket}.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 

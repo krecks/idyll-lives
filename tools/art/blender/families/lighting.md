@@ -56,7 +56,7 @@ Not on Low (E2); at rest they look as the old part.
 
 ## Checks
 
-`check_glb.py`: 21 ok, 0 failed. Its warnings, all expected:
+`check-glb`: 21 ok, 0 failed. Its warnings, all expected:
 
 - the ceiling and wall lights float above their origin (they hang);
 - `floorLampSimple`, `lampTableSquare` and `lampLantern` are about half the old part's width: the gate

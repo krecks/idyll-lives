@@ -41,7 +41,7 @@ Body is the cart's red frame, the bag, the nightstand, the spritz station's purp
 the recliner's leatherette. The nightstand's top, the cabinet's side panels and the recliner's stripes are extra
 colour parts where they fit.
 
-`check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
 clip at rest and open on WebGPU and WebGL (the joystick mid-waggle). In play (`wants-asking`, WebGPU, in the yard):
 the beanbag (flop, seated), the recliner (marathon, seated), the nightstand (midnightSnack, seated on it, the
 drawer out), the cart (nuke) and the arcade (chaseHighScore) used by a resident; the arcade cabinet at all four
@@ -51,6 +51,6 @@ coloured; the same at night (`office-night`, WebGL).
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py pack_slob            # the six .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py pack_slob --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_slob            # the six .glb, the pack, check-glb
+cargo art pack_slob --preview  # previews/<id>.png, <id>@<clip>.png
 ```

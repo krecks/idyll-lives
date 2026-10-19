@@ -85,7 +85,7 @@ The train table's track is a circle (the old part's is an oval), so the train ca
 | `model.kidsChalkboard` | 0.66 × 0.96 × 0.53 m | 916 | 3 | Frame, Board |
 | `model.kidsEasel` | 0.66 × 1.21 × 0.63 m | 1,528 | 3 | Easel |
 
-`check_glb.py`: 20 models, 0 failed, no warnings. The toy box and the chest had the lid drawn open; they're shut
+`check-glb`: 20 models, 0 failed, no warnings. The toy box and the chest had the lid drawn open; they're shut
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
 into it; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat reached 3–7 cm into
 the wall; their backs are on the face now (2026-10-15). The crib, the pit
@@ -99,6 +99,6 @@ fifth of them.
 ## Rebuild
 
 ```
-python3 -B tools/art/blender/build.py kids            # the twenty .glb, the pack, check_glb
-python3 -B tools/art/blender/build.py kids --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kids            # the twenty .glb, the pack, check-glb
+cargo art kids --preview  # previews/<id>.png, <id>@<clip>.png
 ```
