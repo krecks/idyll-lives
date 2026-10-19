@@ -44,6 +44,8 @@ import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
+import { WALL_HALF, WALL_HEIGHT } from './house';
+import type { ObjectDef } from '../../content/content';
 
 export type TintSlot = NonNullable<PrimitivePart['tint']>;
 export type BoneName = NonNullable<PrimitivePart['bone']>;
@@ -191,17 +193,17 @@ export interface BuildOptions {
   resize?: Resize;
   /**
    * A plain box to draw when the model has no file or its file fails, so the thing stays in view and
-   * can be clicked: the lot's placed objects ask for one. Everything else (plants, the street, things
-   * held or carried, pictures) draws nothing then.
+   * can be clicked: the lot's placed objects ask for one, and buy mode's copy of one in hand. Everything
+   * else (plants, the street, things residents carry, pictures) draws nothing then.
    */
   standIn?: StandIn;
 }
 
 /** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
 export interface StandIn {
-  layer?: 'floor' | 'wall' | 'ceiling' | 'rug' | 'surface';
-  /** Things on a top: the radius (m) of the disc they take (content `radius`). */
-  radius?: number;
+  layer: ObjectDef['layer'];
+  /** Things on a top: the radius (m) of the disc they take (`Content.radius`). */
+  radius: number;
 }
 
 /** A player's resizing: its own size (metres across and deep, before turning) and how much taller. */
@@ -236,24 +238,24 @@ export async function buildModel(
   return entry?.url ? { ...template, failed: true } : template;
 }
 
-/** A wall's face, in from the back edge of the tile (m): things on a wall have their back on it. */
-const WALL_FACE = 0.07;
-
 /**
  * A plain neutral box standing in for a model (`BuildOptions.standIn`), placed as the model would be:
  * most of the footprint on the floor, a thin mat for a rug, a small block on a top, a panel at eye
  * height on the wall face, a block hanging from the ceiling; taller as the player made it.
  */
 function standIn(scene: Scene, name: string, [w, d]: [number, number], { layer, radius }: StandIn, resize?: Resize): ModelTemplate {
-  const up = (resize?.tall ?? 0) / 100;
+  // Its height as the player changed it, never flat or inside out (things shrink by up to a metre).
+  const tall = (h: number) => Math.max(0.1, h + (resize?.tall ?? 0) / 100);
   const box = (size: Vec3, at: Vec3): PrimitivePart => ({ shape: 'box', size, at, color: '#B8B2AA' });
-  const r = (radius ?? 0.12) * 1.6;
+  const r = radius * 1.6;
+  // On the wall: its back on the wall's face.
+  const face = -d / 2 + WALL_HALF;
   const part =
-    layer === 'surface' ? box([r, r + up, r], [0, (r + up) / 2, 0])
+    layer === 'surface' ? box([r, tall(r), r], [0, tall(r) / 2, 0])
     : layer === 'rug' ? box([w * 0.9, 0.02, d * 0.9], [0, 0.01, 0])
-    : layer === 'wall' ? box([w * 0.8, 0.6 + up, 0.06], [0, 1.5 + up / 2, -d / 2 + WALL_FACE + 0.03])
-    : layer === 'ceiling' ? box([w * 0.5, 0.3 + up, d * 0.5], [0, 2.8 - (0.3 + up) / 2, 0])
-    : box([w * 0.8, 0.8 + up, d * 0.8], [0, (0.8 + up) / 2, 0]);
+    : layer === 'wall' ? box([w * 0.8, tall(0.6), 0.06], [0, 1.2 + tall(0.6) / 2, face + 0.03])
+    : layer === 'ceiling' ? box([w * 0.5, tall(0.3), d * 0.5], [0, WALL_HEIGHT - tall(0.3) / 2, 0])
+    : box([w * 0.8, tall(0.8), d * 0.8], [0, tall(0.8) / 2, 0]);
   const groups = new PartGroups(scene);
   groups.addPart(part, 0, 0);
   const { meshes, tints, bones } = groups.build(name);
@@ -999,15 +1001,37 @@ interface FilePiece {
 /** Files imported per scene, by URL (they go with the scene). */
 const loadedFiles = new WeakMap<Scene, Map<string, Promise<LoadedFile>>>();
 
+/** A file that failed to load is fetched again at most this often (ms) and this many times in all. */
+const FILE_RETRY_MS = 30_000;
+const FILE_TRIES = 3;
+/** Files that failed to load, by URL: how many times, and when last (ms); gone once one loads. */
+const failedFiles = new Map<string, { tries: number; at: number }>();
+
+/**
+ * Whether a build of a model whose file is `url` could load it now: it loaded, it's never been
+ * asked for, or it failed and is due another try. Until then, builds fail at once without fetching.
+ */
+export function fileDue(url: string | undefined): boolean {
+  const failed = url ? failedFiles.get(url) : undefined;
+  return !!url && (!failed || (failed.tries < FILE_TRIES && performance.now() - failed.at >= FILE_RETRY_MS));
+}
+
 function loadFile(scene: Scene, url: string): Promise<LoadedFile> {
   const files = loadedFiles.get(scene) ?? new Map<string, Promise<LoadedFile>>();
   loadedFiles.set(scene, files);
   let file = files.get(url);
   if (!file) {
+    if (!fileDue(url)) return Promise.reject(new Error(`${url} failed to load; not tried again yet`));
     const loading = importFile(scene, url);
     files.set(url, (file = loading));
-    // One that failed is tried again by the next build.
-    loading.catch(() => files.get(url) === loading && files.delete(url));
+    // One that failed is tried again by a later build, when it's due.
+    loading.then(
+      () => failedFiles.delete(url),
+      () => {
+        if (files.get(url) === loading) files.delete(url);
+        failedFiles.set(url, { tries: (failedFiles.get(url)?.tries ?? 0) + 1, at: performance.now() });
+      },
+    );
   }
   return file;
 }

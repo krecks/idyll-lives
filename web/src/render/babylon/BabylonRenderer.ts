@@ -101,13 +101,13 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
+import { buildModel, fileDue, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
+import { installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -180,15 +180,15 @@ const LAMP_SWITCH_FADE = 0.25;
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
 const PREVIEW_CAPACITY = 128;
-/** A model whose file didn't load is tried again by a later world build, at most this often (ms) and this many times in all. */
-const FILE_RETRY_MS = 30_000;
-const FILE_TRIES = 3;
-
 /** A cached model template (`BabylonRenderer.template`). */
 interface CachedTemplate {
   promise: Promise<ModelTemplate>;
-  /** Its file didn't load: how many builds have tried it, and when the last one finished (ms). */
-  failed?: { tries: number; at: number };
+  /** Its file didn't load (it's drawn as a box, or nothing). */
+  failed?: boolean;
+  /** Being built again in the background, its file being due another try (`fileDue`). */
+  retry?: Promise<void>;
+  /** Built again with its file, hidden: the next world build draws it in place of the box. */
+  next?: ModelTemplate;
 }
 
 interface PlacedObject {
@@ -972,7 +972,6 @@ export class BabylonRenderer implements Renderer {
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
     prefetchModels(elsewhere.map((o) => this.objectModel(o)).filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
-    this.warmTemplates(elsewhere);
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -1317,7 +1316,7 @@ export class BabylonRenderer implements Renderer {
     }
     // A new thing in hand pops in; the same one resized just changes shape.
     const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
-    if (ghost.model + resizeKey(ghost.resize) + colorsKey(ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize, ghost.colors);
+    if (ghost.model + resizeKey(ghost.resize) + colorsKey(ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.def, ghost.resize, ghost.colors);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -2290,11 +2289,9 @@ export class BabylonRenderer implements Renderer {
     this.cameraPlaced = false;
     this.framedView = '';
     this.warmFrames = 0;
-    this.warmPass++;
   }
 
   dispose(): void {
-    this.warmPass++;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
@@ -3543,7 +3540,7 @@ export class BabylonRenderer implements Renderer {
   /** Garden dressing as thin instances of a cached template (`deco:` keys). */
   private async placeDecor(key: string, items: [number, number, number, number][]): Promise<void> {
     if (!items.length) return;
-    const template = await this.template(`deco:${key}`, () => this.decorModel(key));
+    const template = await this.template(`deco:${key}`, () => this.decorModel(key), this.deps.assets.get(key, 'model')?.url);
     const matrices = new Float32Array(items.length * 16);
     items.forEach(([x, z, s, yaw], i) => {
       Matrix.ComposeToRef(this.vScale.setAll(s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.qTmp), this.vTmp.set(x, 0, z), this.mOut);
@@ -3852,60 +3849,36 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** An object's template key, and how to build it. */
-  private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>] {
+  private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>, string | undefined] {
     const key = this.objectModel(o);
     const def = this.deps.content.object(o.def);
+    const entry = this.deps.assets.get(key, 'model');
     const resize = this.objectResize(o);
     const colors = this.objectColors(o);
-    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
+    const footprint = def?.footprint ?? [1, 1];
+    // Without its file, a box in its place, so it can still be seen and clicked; shaped by its kind
+    // (two kinds sharing a model get a box each).
+    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
+    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}|${standIn.layer ?? 'floor'}:${standIn.radius}:${footprint.join('x')}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    // Without its file, a box in its place, so it can still be seen and clicked.
-    const standIn = { layer: def?.layer, radius: def?.layer === 'surface' ? this.deps.content.radius(def) : undefined };
-    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn })];
+    return [id, () => buildModel(this.scene, key, painted(entry, colors), footprint, { resize, standIn }), entry?.url];
   }
-
-  /** Bumped by each world build: an older pass of `warmTemplates` stops. */
-  private warmPass = 0;
 
   /**
-   * Builds the other lots' generated furniture and every kind of garden plant ahead, a few per
-   * idle moment, kept hidden until a lot uses them: walking onto a lot (the camera following
-   * someone) then needn't stop to build them. Models from files only download ahead
-   * (`prefetchModels`); they build when shown.
+   * Cached template by key; marks it as used by the world being built. One whose file (`url`) didn't
+   * load stays as it is (a box) for this build, and is built again in the background when the file is
+   * due another try; a later build draws what that brings.
    */
-  private warmTemplates(objects: readonly ObjectPlacement[]): void {
-    const pass = ++this.warmPass;
-    const queue = new Map<string, () => Promise<ModelTemplate>>();
-    const generated = (model: string) => !this.deps.assets.has(model, 'model') || !this.deps.assets.get(model, 'model')?.url;
-    for (const o of objects) {
-      if (!generated(this.objectModel(o))) continue;
-      const [key, build] = this.objectTemplate(o);
-      queue.set(key, build);
-    }
-    for (const model of DECOR_MODELS) if (generated(model)) queue.set(`deco:${model}`, () => this.decorModel(model));
-    const jobs = [...queue].filter(([key]) => !this.templates.has(key)).map(([key, build]) => () => {
-      if (this.templates.has(key)) return;
-      void this.cache(key, build()).promise.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
-      });
-    });
-    buildAhead(jobs, () => pass === this.warmPass);
-  }
-
-  /** Cached template by key; marks it as used by the world being built. */
-  private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
+  private template(key: string, build: () => Promise<ModelTemplate>, url?: string): Promise<ModelTemplate> {
     let cached = this.templates.get(key);
-    const failed = cached?.failed;
     if (!cached) cached = this.cache(key, build());
-    else if (failed && failed.tries < FILE_TRIES && performance.now() - failed.at >= FILE_RETRY_MS && !this.templatesInUse.has(key)) {
-      // Its file didn't load: try it again, keeping what stands in for it unless the file comes.
-      const old = cached.promise;
-      const retried = build().then(async (fresh) => {
-        const before = await old;
-        disposeTemplate(fresh.failed ? fresh : before);
-        return fresh.failed ? before : fresh;
-      });
-      cached = this.cache(key, retried, failed.tries);
+    else if (cached.failed && !this.templatesInUse.has(key)) {
+      if (cached.next) {
+        // Its file came: drawn from this build on, and the box goes.
+        const old = cached.promise;
+        cached = this.cache(key, Promise.resolve(cached.next));
+        void old.then(disposeTemplate);
+      } else if (!cached.retry && fileDue(url)) this.retry(key, cached, build);
     }
     this.templatesInUse.add(key);
     return cached.promise.then((template) => {
@@ -3914,14 +3887,22 @@ export class BabylonRenderer implements Renderer {
     });
   }
 
-  /** Caches a template being built under `key`, noting once built whether its file failed (`tries` before this one). */
-  private cache(key: string, promise: Promise<ModelTemplate>, tries = 0): CachedTemplate {
+  /** Caches a template being built under `key`, noting once built whether its file failed. */
+  private cache(key: string, promise: Promise<ModelTemplate>): CachedTemplate {
     const cached: CachedTemplate = { promise };
     this.templates.set(key, cached);
-    void promise.then((template) => {
-      if (template.failed) cached.failed = { tries: tries + 1, at: performance.now() };
-    });
+    void promise.then((template) => (cached.failed = !!template.failed));
     return cached;
+  }
+
+  /** Builds a failed template again without holding up a world build; kept hidden in `next` if its file came. */
+  private retry(key: string, cached: CachedTemplate, build: () => Promise<ModelTemplate>): void {
+    cached.retry = build().then((fresh) => {
+      cached.retry = undefined;
+      if (fresh.failed || this.templates.get(key) !== cached) return disposeTemplate(fresh);
+      for (const mesh of withGlows(fresh)) mesh.setEnabled(false);
+      cached.next = fresh;
+    });
   }
 
   /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
@@ -3937,6 +3918,7 @@ export class BabylonRenderer implements Renderer {
         this.templates.delete(key);
         this.paintedTemplates.delete(key);
         disposeTemplate(template);
+        if (cached.next) disposeTemplate(cached.next);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -3993,7 +3975,7 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
-  private loadGhost(model: string, resize?: ObjectResize, colors?: PartColors): void {
+  private loadGhost(model: string, kind: string | undefined, resize?: ObjectResize, colors?: PartColors): void {
     const key = model + resizeKey(resize) + colorsKey(colors);
     this.ghostKey = key;
     // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
@@ -4003,7 +3985,10 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
-    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), colors), resize?.from ?? [1, 1], { resize }).then((template) => {
+    // Without its file, the box the placed thing would get.
+    const def = kind === undefined ? undefined : this.deps.content.object(kind);
+    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
+    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), colors), resize?.from ?? def?.footprint ?? [1, 1], { resize, standIn }).then((template) => {
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;

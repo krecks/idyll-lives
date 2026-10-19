@@ -337,8 +337,6 @@ class ItemStudio {
     const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint);
     const meshes = template.meshes;
     try {
-      // A file that failed to load gets no picture (asked for again later), never a saved one of what stood in.
-      if (template.failed) return null;
       const identity = Matrix.Identity().asArray() as unknown as Float32Array;
       for (const mesh of meshes) {
         mesh.parent = this.root;

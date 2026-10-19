@@ -137,7 +137,7 @@ def _freezer_food():
 
 
 def _door(name, y, h, handle_y0, handle_y1, badge=False):
-    """A door, rounded and proud of the opening, its handle on the left and its hinge on the right."""
+    """A door, rounded and proud of the opening, its handle on the right and its hinge on the left as seen from the front."""
     with G.new_parts() as parts:
         F.box(name, 0.728, h, 0.04, (0, y, 0.195), M.body, bevel=0.010)
         _bar(f'handle_{name}', -0.3, handle_y0, handle_y1, 0.215)
