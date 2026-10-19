@@ -3,7 +3,7 @@
 Small things that stand on tops (`surface` layer, 1×1). All 39 are built by `tools/art/blender/families/tabletop.py`
 (notes: `families/tabletop.md`). The origin is at the base,
 centred, and the renderer lifts each to its host's top. Each is no wider than the `radius` the content gives it
-(the disc it takes on a top; the gate warns of one over 10 % wider), so a thing still fits where the game puts it;
+(the disc it takes on a top; the gate warns of one reaching over 10 % past it), so a thing still fits where the game puts it;
 the four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit on a
 counter's top with its edge margin and go on tables and desks.
 

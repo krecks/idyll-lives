@@ -8,8 +8,10 @@ import bpy
 
 from .scene import ASSETS, meshes
 
+# The gate's readings, shared: the manifests as the game stacks them, and which keys the game draws.
+# (gamekit/__init__ imports this module first, so this puts check_glb.py's folder on the path for family.py too.)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from check_glb import content_keys  # noqa: E402  (the gate's reading of which models the content draws, shared)
+from check_glb import manifests, misspelt  # noqa: E402
 
 
 def export_glb(path, objects=None, texcoords=False, clips=False):
@@ -48,31 +50,34 @@ def materials_used(objs=None):
     return {s.material.name for o in (objs if objs is not None else meshes()) for s in o.material_slots if s.material}
 
 
-def write_pack(pack, entries, comment):
+def write_pack(pack, entries, comment, code=()):
     """
     Writes the override pack `packs/<pack>/manifest.json` and lists it in the base manifest's `packs`.
     `entries` is {key: fields}, e.g. {'url', 'materials', 'motions', 'paint'}. The game keeps the `vary`
     of the entry it overrides (registry.ts `extended`); any other fields of that entry are copied, read
     from the manifests now so the copy can't go stale. A key with no entry below is written as it is.
     Entries of the pack that aren't given are kept.
-    A new key must be one the game draws: a content object's or item's model, or one another manifest
-    has. Anything else is a misspelt `key=`, which would write an entry nothing draws (the object a box).
-    A key the pack already keeps may be rebuilt (the game's own models, drawn by code: the rock, the marker).
+    A new key must be one the game draws: a content object's or item's model, one a manifest has, or
+    one of `code` (keys the game draws by code: `Model(code=True)`). Anything else is a misspelt `key=`,
+    which would write an entry nothing draws (the object a box). `Family.run` refuses those before it
+    builds anything; this is the backstop.
     """
     path = os.path.join(ASSETS, 'packs', pack, 'manifest.json')
     rel = os.path.relpath(path, ASSETS)
     with open(os.path.join(ASSETS, 'manifest.json')) as f:
         base = json.load(f)
-    below = _entries_below(rel)
+    # The model entries of every manifest but this pack, later ones overriding (the game's order).
+    below = {k: e for p, m in manifests(os.path.join(ASSETS, 'manifest.json')) if os.path.relpath(p, ASSETS) != rel
+             for k, e in m.get('entries', {}).items() if e.get('type') == 'model'}
     try:
         with open(path) as f:
             kept = json.load(f)['entries']
     except FileNotFoundError:
         kept = {}
-    named = content_keys()
-    for key in entries:
-        if key not in named and key not in below and key not in kept:
-            raise ValueError(f'{key}: no content object names this model and no manifest has it: a misspelt key=?')
+    for key in misspelt(entries, ASSETS):
+        if key not in kept and key not in code:
+            raise ValueError(f'{key}: no content object names this model and no manifest has it: a misspelt key=? '
+                             '(a model the game draws by code: Model(code=True))')
     for key, fields in entries.items():
         under = below.get(key)
         entry = {'type': 'model', **fields}
@@ -92,18 +97,3 @@ def write_pack(pack, entries, comment):
             f.write('\n')
     return path
 
-
-def _entries_below(pack_rel):
-    """The model entries of every manifest but `pack_rel`, later ones overriding (the game's order)."""
-    out = {}
-
-    def walk(path):
-        rel = os.path.relpath(path, ASSETS)
-        with open(path) as f:
-            m = json.load(f)
-        if rel != pack_rel:
-            out.update({k: e for k, e in m.get('entries', {}).items() if e.get('type') == 'model'})
-        for p in m.get('packs', []):
-            walk(os.path.normpath(os.path.join(os.path.dirname(path), p)))
-    walk(os.path.join(ASSETS, 'manifest.json'))
-    return out

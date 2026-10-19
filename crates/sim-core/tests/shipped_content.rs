@@ -480,9 +480,10 @@ fn asset_entries() -> AssetEntries {
 }
 
 /// Every object's model (its `model`, or `model.<id>`) and every item's (its `model`, or
-/// `item.<id>`) is a model entry once the manifests are stacked, with a `url` whose file is there.
-/// (A url-less entry of the base manifest, overridden by a pack, is no model: drop the pack and the
-/// game draws a box.)
+/// `item.<id>`) is a model entry once the manifests are stacked, with a `url` whose file is there,
+/// and its far version's (`far`) if it has one. (A url-less entry of the base manifest, overridden by
+/// a pack, is no model: drop the pack and the game draws a box.) An empty `model` is refused: the
+/// renderer would look up "" (`def.model ?? model.<id>`).
 #[test]
 fn every_object_and_item_has_a_model_file() {
     let entries = asset_entries();
@@ -493,6 +494,7 @@ fn every_object_and_item_has_a_model_file() {
     for (what, def, prefix) in defs {
         let id = def["id"].as_str().unwrap();
         let key = def["model"].as_str().map_or_else(|| format!("{prefix}.{id}"), str::to_owned);
+        assert!(!key.is_empty(), "{what} {id}: its `model` is empty (leave it out to draw {prefix}.{id})");
         let Some((entry, dir)) = entries.get(&key) else {
             panic!("{what} {id}: its model {key} is in no manifest");
         };
@@ -503,10 +505,15 @@ fn every_object_and_item_has_a_model_file() {
             "{what} {id}: {key} has no url once the manifests are stacked \
              (is its pack in the base manifest's `packs`?)"
         );
-        assert!(
-            url.contains("://") || dir.join(url).is_file(),
-            "{what} {id}: {key}'s file {url} is missing (relative to {dir:?})"
-        );
+        for (field, file) in [("url", Some(url)), ("far", entry["far"].as_str())] {
+            let Some(file) = file.filter(|f| !f.contains("://")) else {
+                continue;
+            };
+            assert!(
+                dir.join(file).is_file(),
+                "{what} {id}: {key}'s {field} file {file} is missing (relative to {dir:?})"
+            );
+        }
     }
 }
 

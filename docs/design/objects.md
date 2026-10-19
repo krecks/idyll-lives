@@ -359,22 +359,26 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **`python3 -I -B tools/art/blender/check_glb.py`** reads every `.glb` the manifests use, with
   its entry and its content object, and exits 1 on an error. Errors: a model the content draws (an
   object's `model` or `model.<id>`, an item's `model` or `item.<id>`) that no manifest has, or whose
-  entry has no `url` once the packs are stacked (its pack missing from `packs`); a key on the command
-  line that no manifest has; a `url` that isn't a `.glb`; more than 4 draw calls after the `materials`
-  mapping (each moving part's counted apart), triangles over the most for the model's size, a model
-  below the floor, extensions the game can't read, skins, morph targets, a clip that animates
-  anything but a node's transform or doesn't start at rest, a `motions` clip the file doesn't have,
-  textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays,
-  over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive materials,
-  unused UVs, a floating origin, a model off its entry's `centre` (which the build writes from the
-  `Model`) by over 2 cm, one that reaches over 1 cm into the wall or, its `centre` putting its back
-  on the wall's face, stands over 2 cm off it, one indoors (on the floor, a wall or the ceiling,
-  without `vary`) that reaches over 2 cm past its footprint, a thing on a top over 10 % wider than its
-  content `radius`, and a floor model or moving part lower than the floor drawn over it. Plain
-  Python, so CI can run it; inside Blender, `-- --preview` also renders each file re-imported.
+  entry has no `url` once the packs are stacked (its pack missing from `packs`); an empty `model`; a
+  key on the command line that no manifest has; a `url` that isn't a `.glb`; more than 4 draw calls
+  after the `materials` mapping (each moving part's counted apart), triangles over the most for the
+  model's size, a model below the floor, extensions the game can't read, skins, morph targets, a clip
+  that animates anything but a node's transform or doesn't start at rest, a `motions` clip the file
+  doesn't have, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no
+  use plays, over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
+  materials, unused UVs, a floating origin, a model off its entry's `centre` (which the build writes
+  from the `Model`) by over 2 cm at rest, one that reaches over 1 cm into the wall, one as tall as
+  the wall (content `fillsWall`) whose back stands over 2 cm off it, one indoors (on the floor, a wall
+  or the ceiling, without `vary`) that reaches over 2 cm past its footprint, a thing on a top that
+  reaches more than 10 % past its content `radius` from its origin (its farthest vertex), and a floor
+  model or moving part lower than the floor drawn over it. Plain Python, so CI can run it; inside
+  Blender, `-- --preview` also renders each file re-imported.
 - **`cargo test -p sim-core --test shipped_content`** (in CI) fails when an object or item has no
-  model file once the manifests are stacked, as the game stacks them. The build (`write_pack`) refuses
-  a `key=` that no content object or item names, no other manifest has and its pack doesn't keep.
+  model file, or no `far` file where its entry names one, once the manifests are stacked as the game
+  stacks them, and on an empty `model`.
+- **The build** (`Family.run`, before it builds anything; `write_pack` again as a backstop) refuses a
+  `key=` that no content object or item names and no manifest has, unless its `Model` has
+  `code=True` (a model the game draws by code: a held `tool.*`, a street prop).
 - **The Khronos glTF validator**: no errors and no warnings. It is on npm as `gltf-validator`
   (Apache-2.0); install it outside the repo and run `validateBytes` over the files, or drop them on
   the validator's web page.

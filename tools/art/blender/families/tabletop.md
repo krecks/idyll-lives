@@ -9,8 +9,8 @@ Bath Bits) until checked in play, then go back to `tabletop` and their old group
 
 - **Origin at the base, centred** (the `surface` layer: the renderer lifts them to their host's top). `G.settle` puts
   them there.
-- **Size** no wider than the content's `radius` (the disc a thing takes on a top; the gate warns of one over 10 %
-  wider). The four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit
+- **Size** no wider than the content's `radius` (the disc a thing takes on a top; the gate warns of one reaching
+  over 10 % past it). The four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit
   on a counter's top with its edge margin, as before: they go on tables and desks.
 - **One draw call** where it can: every finish is a plain one. Wood is `satin` brown, towels and the teddy `matte`,
   leaves `satin` green, so none needs a textured finish. Glass that is seen through is `glass` (a second draw call):
