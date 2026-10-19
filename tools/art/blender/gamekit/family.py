@@ -8,12 +8,10 @@ import bpy
 
 from . import motion, parts
 from .export import export_glb, materials_used, stats, write_pack
+from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
 from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
-
-# (export.py, imported above, puts check_glb.py's folder on the path.)
-from check_glb import known_keys, played, write_centres  # the gate's readings of keys and `motions`, shared
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
 FAR_FEET = 0.01
@@ -48,7 +46,7 @@ class Model:
                  that stands against a wall (a counter, a fridge) takes (0, -0.43 + depth / 2), so its back is
                  on the wall face (-0.43) and it meets the wall and its neighbours, and its content `surface`
                  stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into centres.json (the
-                 middle too), for the gate only (check_glb.py: centred there, and against the wall)
+                 middle too), for the gate only (`cargo check-glb`: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
