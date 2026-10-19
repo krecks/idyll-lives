@@ -455,27 +455,71 @@ fn numbers(v: &serde_json::Value) -> Vec<f64> {
     v.as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect()
 }
 
-/// Every object's `model` is an entry of the asset manifest or of one of its packs.
-#[test]
-fn every_object_model_is_in_the_asset_manifests() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/assets");
-    let read = |p: &std::path::Path| -> serde_json::Value {
-        serde_json::from_str(&std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{p:?}: {e}")))
-            .unwrap_or_else(|e| panic!("{p:?}: {e}"))
-    };
-    let base = read(&dir.join("manifest.json"));
-    let mut keys: std::collections::HashSet<String> =
-        base["entries"].as_object().unwrap().keys().cloned().collect();
-    for pack in base["packs"].as_array().into_iter().flatten() {
-        let m = read(&dir.join(pack.as_str().unwrap()));
-        keys.extend(m["entries"].as_object().unwrap().keys().cloned());
+/// Asset entries by key, each with the folder of the manifest that gave it (its `url` is relative to it).
+type AssetEntries = std::collections::HashMap<String, (serde_json::Value, std::path::PathBuf)>;
+
+/// The asset manifests' entries as the game's registry stacks them (registry.ts): the base manifest,
+/// then each pack it lists (depth first, in order), a later entry replacing an earlier one's.
+fn asset_entries() -> AssetEntries {
+    fn walk(path: &std::path::Path, out: &mut AssetEntries) {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let m: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let dir = path.parent().unwrap().to_path_buf();
+        // A manifest without `entries` has none (as check_glb.py reads it).
+        let entries = match &m["entries"] {
+            serde_json::Value::Null => &serde_json::Map::new(),
+            e => e.as_object().unwrap_or_else(|| panic!("{path:?}: `entries` is {e}, not an object")),
+        };
+        for (key, entry) in entries {
+            out.insert(key.clone(), (entry.clone(), dir.clone()));
+        }
+        for pack in m["packs"].as_array().into_iter().flatten() {
+            let pack = pack
+                .as_str()
+                .unwrap_or_else(|| panic!("{path:?}: `packs` lists {pack}, not a manifest's path"));
+            walk(&dir.join(pack), out);
+        }
     }
-    for obj in raw_objects() {
-        if let Some(model) = obj["model"].as_str() {
+    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/assets");
+    let mut out = AssetEntries::new();
+    walk(&assets.join("manifest.json"), &mut out);
+    out
+}
+
+/// Every object's model (its `model`, or `model.<id>`) and every item's (its `model`, or
+/// `item.<id>`) is a model entry once the manifests are stacked, with a `url` whose file is there,
+/// and its far version's (`far`) if it has one. (A url-less entry of the base manifest, overridden by
+/// a pack, is no model: drop the pack and the game draws a box.) An empty `model` is refused: the
+/// renderer would look up "" (`def.model ?? model.<id>`).
+#[test]
+fn every_object_and_item_has_a_model_file() {
+    let entries = asset_entries();
+    let merged: serde_json::Value = serde_json::from_str(&content()).unwrap();
+    let objects = merged["objects"].as_array().unwrap().iter();
+    let items = merged["items"].as_array().into_iter().flatten();
+    let defs = objects.map(|o| ("object", o, "model")).chain(items.map(|i| ("item", i, "item")));
+    for (what, def, prefix) in defs {
+        let id = def["id"].as_str().unwrap();
+        let key = def["model"].as_str().map_or_else(|| format!("{prefix}.{id}"), str::to_owned);
+        assert!(!key.is_empty(), "{what} {id}: its `model` is empty (leave it out to draw {prefix}.{id})");
+        let Some((entry, dir)) = entries.get(&key) else {
+            panic!("{what} {id}: its model {key} is in no manifest");
+        };
+        assert_eq!(entry["type"], "model", "{what} {id}: {key} is no model entry");
+        let url = entry["url"].as_str().unwrap_or("");
+        assert!(
+            !url.is_empty(),
+            "{what} {id}: {key} has no url once the manifests are stacked \
+             (is its pack in the base manifest's `packs`?)"
+        );
+        for (field, file) in [("url", Some(url)), ("far", entry["far"].as_str())] {
+            let Some(file) = file.filter(|f| !f.contains("://")) else {
+                continue;
+            };
             assert!(
-                keys.contains(model),
-                "{}: model {model} is in no manifest",
-                obj["id"]
+                dir.join(file).is_file(),
+                "{what} {id}: {key}'s {field} file {file} is missing (relative to {dir:?})"
             );
         }
     }

@@ -12,8 +12,8 @@ from .parts import check_size, join
 from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from check_glb import played  # noqa: E402  (the gate's reading of `motions`, shared)
+# (export.py, imported above, puts check_glb.py's folder on the path.)
+from check_glb import known_keys, played  # the gate's readings of keys and `motions`, shared
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
 FAR_FEET = 0.01
@@ -47,10 +47,14 @@ class Model:
                  middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
                  that stands against a wall (a counter, a fridge) takes (0, -0.43 + depth / 2), so its back is
                  on the wall face (-0.43) and it meets the wall and its neighbours, and its content `surface`
-                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069)
+                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into the entry, for
+                 the gate (check_glb.py: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
+      code       True for a model the game draws by code, not for a content object or item (a held tool.*,
+                 a model.street.* prop, the woods' rock): its key needn't be one the content names. The build
+                 refuses any other key that no content object or item names and no manifest has (a misspelt `key=`)
       far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
                  town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
                  joined, decimated but for what stands on the floor, without what's hidden at rest), or a
@@ -60,12 +64,13 @@ class Model:
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
         self.centre, self.floor, self.sink = centre, floor, sink
         self.far = far
+        self.code = code
 
 
 class Family:
@@ -115,6 +120,19 @@ class Family:
             if unknown:
                 sys.exit(f'{self.name}: no model {", ".join(sorted(unknown))}')
         models = [m for m in self.models if only is None or m.id in only]
+        # A key the game wouldn't draw is a misspelt `key=`: refused before any model is built or exported, so
+        # no file is written for an entry the pack then can't take. The keys it knows: the content's, the
+        # manifests' and this pack's own (listed in `packs` or not), read once and handed to write_pack.
+        known = None
+        if '--preview' not in args:
+            try:
+                known = known_keys(ASSETS, os.path.join(ASSETS, 'packs', self.pack, 'manifest.json'))
+            except ValueError as err:
+                sys.exit(f'{self.name}: cannot read the content or the manifests: {err}')
+            unknown = sorted(self.key(m) for m in models if not m.code and self.key(m) not in known)
+            if unknown:
+                sys.exit(f'{self.name}: no content object or item names {", ".join(unknown)} and no manifest has it: '
+                         'a misspelt key=? (a model the game draws by code takes code=True)')
         entries = {}
         for model in models:
             objs = self.make(model)
@@ -141,6 +159,8 @@ class Family:
                 entry['parts'] = model.parts
             if model.sink:
                 entry['sink'] = model.sink
+            if tuple(model.centre) != (0, 0):
+                entry['centre'] = list(model.centre)
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
@@ -148,7 +168,7 @@ class Family:
             entries[self.key(model)] = entry
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
         if entries and '--no-pack' not in args:
-            path = write_pack(self.pack, entries, self.comment)
+            path = write_pack(self.pack, entries, self.comment, code={self.key(m) for m in models if m.code}, known=known)
             print(f'[gamekit] wrote {os.path.relpath(path, ASSETS)}')
 
     def make_far(self, model, objs):

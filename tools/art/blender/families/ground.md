@@ -27,8 +27,8 @@ group. The keys are unchanged.
   cut flat 11.5 cm under the ground as the old part's reach, plain matte (one draw call): 492 triangles. Its far
   version is the same two built on icosahedra without the split faces, a little wider to fill the same box:
   56 triangles (the old part at that level: 40), few enough that the woods still draw all of them as one mesh
-  (`SPLIT_TRIANGLES`: 36,000 over every rock of the village's woods). Centred where the old part is (game x 8.5 cm,
-  depth 1 cm); its `sink` (0.115 m) is how far `check_glb.py` lets it reach under the floor.
+  (`SPLIT_TRIANGLES`: 36,000 over every rock of the village's woods). Centred where the old part was (game x 8.5 cm,
+  depth 1 cm: its `Model`'s `centre`, which the gate checks); its `sink` (0.115 m) is how far `check_glb.py` lets it reach under the floor.
 - **Marker** (`model.marker`): the sparkle star over the selected resident (`BabylonRenderer` `setupMarker`), which
   the game draws in its own unlit material, shaded by its normals and tinted by mood, with an outline of the same
   mesh pushed out along its normals (an inverted hull), turned to the camera, bobbing and breathing. One closed
