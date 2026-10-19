@@ -77,6 +77,12 @@ jobs:
       - name: Simulation tests
         run: cargo test -p sim-core --locked
 
+      # The repo's tools (crates/tools): a fresh character build against the committed set and its
+      # checks, the object gate over every shipped model (no Blender), and the content and texture
+      # tools. Release, as the character build is slow unoptimised.
+      - name: Tool tests
+        run: cargo test -p ll-tools --release --locked
+
       # Examples are only compiled by cargo test; this one should also run (dev profile, so its
       # timings are rough).
       - name: Quick benchmark runs
