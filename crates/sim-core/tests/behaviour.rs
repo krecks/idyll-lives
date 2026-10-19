@@ -79,7 +79,8 @@ fn told_to_chat_while_about_to_drop_they_leave_the_other_be() {
 
 #[test]
 fn nobody_follows_someone_over_the_fence_for_a_chat() {
-    // Bob, from next door, is in Ann's garden; he heads home to watch TV as lonely Ann comes over.
+    // Bob, from next door, is in Ann's garden; he heads home to watch TV as lonely Ann (within
+    // earshot) calls out to him.
     let content = r#"{
         "needs":[{"id":"social","label":"Social","decayPerHour":0.1},{"id":"fun","label":"Fun","decayPerHour":0.05}],
         "objects":[{"id":"tv","name":"TV","interactions":[{"id":"watch","label":"Watch","minutes":60,"effects":{"fun":0.6}}]}],
@@ -89,20 +90,83 @@ fn nobody_follows_someone_over_the_fence_for_a_chat() {
         "plots":[{"name":"West","x":0,"z":0,"w":20,"d":10,"entry":[10.5,9.5]},{"name":"East","x":20,"z":0,"w":20,"d":10,"entry":[30.5,9.5]}],
         "households":[{"name":"Ann's","plot":0,"player":true},{"name":"Bob's","plot":1}],
         "objects":[{"def":"tv","x":34,"z":2,"rot":0}],
-        "sims":[{"name":"Ann","household":0,"x":2.5,"z":5.5},{"name":"Bob","household":1,"x":17.5,"z":5.5}],
+        "sims":[{"name":"Ann","household":0,"x":10.5,"z":5.5},{"name":"Bob","household":1,"x":17.5,"z":5.5}],
         "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
     let mut w = World::from_json(content, lot, 5).unwrap();
     w.sims[0].needs[..2].copy_from_slice(&[0.1, 1.0]);
     w.sims[1].needs[..2].copy_from_slice(&[1.0, 0.1]);
-    let mut went_after = false;
+    let (mut went_after, mut talked) = (false, false);
     for _ in 0..20 * 40 {
         w.tick_once();
         went_after |= matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Social { target: 1, .. }));
+        talked |= w.sims[1].engaged_with == Some(0);
         let (x, z) = w.sims[0].tile();
         assert_ne!(w.plot_at(x, z), Some(1), "Ann followed Bob into his garden for a chat");
     }
     assert!(went_after, "Ann never went to chat with Bob");
-    assert!(w.sims[1].engaged_with.is_none() && w.sims[0].current().is_none_or(|a| !matches!(a.task.kind, TaskKind::Social { .. })));
+    // (He turned when she called him, and they met on her side.)
+    assert!(talked, "Bob never came over to talk");
+}
+
+#[test]
+fn someone_calls_a_housemate_and_they_meet_halfway() {
+    let mut w = talk_town(24, r#"{"name":"Ann","x":3.5,"z":5.5},{"name":"Bob","x":11.5,"z":5.5}"#);
+    w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
+    w.sims[1].needs[..3].copy_from_slice(&[1.0, 1.0, 1.0]);
+    let (mut called, mut heeded) = (false, false);
+    for _ in 0..20 * 30 {
+        w.tick_once();
+        let phase = w.sims[0].current().map(|a| (a.task.kind, phase_name(&a.phase)));
+        called |= matches!(phase, Some((TaskKind::Social { target: 1, .. }, "Calling")));
+        heeded |= w.sims[1].heeding == Some(0);
+        if matches!(phase, Some((_, "Conversing"))) {
+            break;
+        }
+    }
+    assert!(called, "Ann never called Bob");
+    assert!(heeded, "Bob never turned to Ann");
+    assert!(w.sims[1].engaged_with == Some(0), "they never talked");
+    // Both walked, neither all the way.
+    let (ann, bob) = (w.sims[0].pos[0], w.sims[1].pos[0]);
+    eprintln!("They met at {ann:.1} and {bob:.1}");
+    assert!(ann > 4.5 && bob < 10.5, "Ann at {ann:.1}, Bob at {bob:.1}");
+}
+
+#[test]
+fn nobody_chats_with_someone_out_of_earshot() {
+    let mut w = talk_town(48, r#"{"name":"Ann","x":3.5,"z":5.5},{"name":"Bob","x":30.5,"z":5.5}"#);
+    w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
+    w.sims[1].needs[..3].copy_from_slice(&[1.0, 1.0, 1.0]);
+    for _ in 0..20 * 60 {
+        w.tick_once();
+        let social = matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Social { .. }));
+        assert!(!social, "Ann set off across the lot to chat with Bob");
+    }
+}
+
+#[test]
+fn told_to_chat_from_afar_they_walk_until_in_earshot() {
+    let mut w = talk_town(60, r#"{"name":"Ann","x":3.5,"z":5.5},{"name":"Bob","x":40.5,"z":5.5}"#);
+    w.apply(sim_core::Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(sim_core::Command::Social { sim: 0, target: 1, social: 0 }).unwrap();
+    let phase = |w: &World| w.sims[0].current().map(|a| phase_name(&a.phase));
+    for _ in 0..20 * 60 {
+        w.tick_once();
+        if phase(&w) == Some("Calling") {
+            break;
+        }
+    }
+    assert_eq!(phase(&w), Some("Calling"), "Ann never called Bob");
+    let gap = w.sims[1].pos[0] - w.sims[0].pos[0];
+    assert!(gap > 2.0 && w.within_earshot(w.sims[0].pos, w.sims[1].pos), "Ann called from {gap:.1} m");
+    for _ in 0..20 * 60 {
+        w.tick_once();
+        if phase(&w) == Some("Conversing") {
+            break;
+        }
+    }
+    assert_eq!(phase(&w), Some("Conversing"), "they never talked");
+    assert!(w.sims[1].pos[0] < 39.5, "Bob never came to meet Ann");
 }
 
 #[test]
@@ -362,6 +426,7 @@ fn phase_name(p: &Phase) -> &'static str {
     match p {
         Phase::Routing { .. } => "Routing",
         Phase::Using { .. } => "Using",
+        Phase::Calling { .. } => "Calling",
         Phase::Waiting { .. } => "Waiting",
         Phase::Conversing { .. } => "Conversing",
         Phase::Queued { .. } => "Queued",

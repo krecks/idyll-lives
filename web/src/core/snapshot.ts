@@ -59,6 +59,8 @@ export interface SnapshotLayout {
     held?: number;
     /** The recipe they're cooking: index into `recipes` + 1, 0 = none. While cooking, `object` is the station and `action` the step's animation. */
     recipe?: number;
+    /** Calling out someone's name (to talk): their id + 1, 0 = nobody (missing in older layouts). */
+    call?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

@@ -72,6 +72,8 @@ interface SimState {
   interaction: number;
   emotion: number;
   thought: number;
+  /** Calling out someone's name: their id + 1, else 0. */
+  call: number;
   /** When this resident may next say a thought (ms, performance clock). */
   quietUntil: number;
 }
@@ -250,6 +252,7 @@ export class VoiceDirector {
         interaction: k.interaction === undefined ? -1 : curr[o + k.interaction],
         emotion: curr[o + k.emotion],
         thought: k.thought === undefined ? 0 : curr[o + k.thought],
+        call: k.call === undefined ? 0 : curr[o + k.call],
         quietUntil: 0,
       };
       const prev = this.sims.get(id);
@@ -423,6 +426,11 @@ export class VoiceDirector {
       }
       return null;
     }
+    // Calling someone over: their name.
+    if (next.call > 0 && next.call !== prev.call) {
+      const name = game.roster.find((s) => s.id === next.call - 1)?.name.split(' ')[0];
+      return name ? { req: { ...base, partner: next.call - 1, kind: 'call', name }, thought: false } : null;
+    }
     const alone = { ...base, partner: -1 };
     if (now < next.quietUntil) return null;
     if (next.thought > 0 && next.thought !== prev.thought) {
@@ -463,7 +471,8 @@ export class VoiceDirector {
       });
       return;
     }
-    const writer = llmWrites() ? this.llmWriter : null;
+    // (A name called out is said as it is.)
+    const writer = llmWrites() && req.kind !== 'call' ? this.llmWriter : null;
     if (!writer) {
       const line = this.lines ? scripted(this.lines, req) : null;
       if (line) this.say(id, req.row, line, req.partner, thought, now, requested, MAX_WAIT_MS);

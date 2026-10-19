@@ -146,6 +146,8 @@ export class Lines {
         const id = req.thought ? THOUGHTS[req.thought - 1] : undefined;
         return id ? found(of(`thought:${id}`, this.data.thought[id])) : null;
       }
+      case 'call':
+        return null;
     }
   }
 

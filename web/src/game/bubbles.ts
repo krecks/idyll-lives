@@ -1,7 +1,8 @@
 /**
  * Speech bubbles above Sims in a conversation, and thought bubbles (a planned block skipped or
  * kept, wanting somewhere to do it, a goal reached, a room loved or disliked, something broken,
- * an accident), as DOM elements over the canvas. With subtitles, a spoken line shows as text in
+ * an accident), and a name called out (someone calling another over to talk), as DOM elements
+ * over the canvas. With subtitles, a spoken line shows as text in
  * the bubble while it plays (`say`; a bubble of its own if there's no icon).
  * Per frame only `transform` is written (compositor-only), and only when it moved; icons and text
  * change only when a conversation starts, its outcome is revealed or a line starts or ends. No
@@ -12,6 +13,7 @@ import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { Renderer } from '../render/types';
+import { game } from '../ui/state.svelte';
 
 const MAX_SIMS = 64;
 /** Thought kinds (snapshot `thought`) to bubble tones. */
@@ -47,6 +49,8 @@ export class BubbleLayer {
   private readonly screen = { x: 0, y: 0 };
   /** Lines being said, by resident id. */
   private readonly said = new Map<number, Said>();
+  /** The name last called out, and who it belongs to. */
+  private called = { id: -1, text: '' };
 
   constructor(
     container: HTMLElement,
@@ -74,7 +78,9 @@ export class BubbleLayer {
       const o = layout.headerLen + i * layout.simStride;
       const social = curr[o + k.social];
       const thought = social > 0 || k.thought === undefined ? 0 : curr[o + k.thought];
-      const text = this.said.size ? (this.said.get(curr[o + k.id])?.text ?? '') : '';
+      // Calling someone over: their name, shouted (with or without subtitles).
+      const call = k.call === undefined ? 0 : curr[o + k.call];
+      const text = call > 0 ? this.callOut(call - 1) : this.said.size ? (this.said.get(curr[o + k.id])?.text ?? '') : '';
       const key =
         social > 0
           ? this.iconFor(social - 1, curr[o + k.role], curr[o + k.outcome])
@@ -118,6 +124,15 @@ export class BubbleLayer {
 
   dispose(): void {
     this.root.remove();
+  }
+
+  /** What someone calling resident `id` over shouts: their first name (the last one kept). */
+  private callOut(id: number): string {
+    if (this.called.id !== id) {
+      const name = game.roster.find((s) => s.id === id)?.name.split(' ')[0];
+      this.called = { id, text: name ? `${name}!` : '' };
+    }
+    return this.called.text;
   }
 
   /**
