@@ -27,11 +27,12 @@
  * material (about 15 draw calls for a whole house).
  */
 
-import { Color3, type Material, type Mesh, type PBRMaterial, type Scene } from './core';
+import { Color3, Vector3, type Material, type Mesh, type PBRMaterial, type Scene } from './core';
 import type { DoorStyleDef, FloorCoveringDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { LAYER_SHADOW_ONLY } from './layers';
 import { MaterialLibrary } from './materials';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 
@@ -264,7 +265,28 @@ export interface HouseBuild {
   shrubs: [number, number, number, number][];
   trees: [number, number, number, number][];
   surfaces: HouseSurfaces;
+  /** Door leaves that swing shut (front doors, bathroom doors); the rest stand open. */
+  doors: DoorLeaf[];
 }
+
+/**
+ * A door leaf that swings: drawn open (as every other leaf), its meshes turn about the hinge
+ * (their pivot) by up to `close` radians to shut it. Positions are in the storey's metres.
+ */
+export interface DoorLeaf {
+  meshes: Mesh[];
+  /** The middle of its doorway. */
+  centre: [number, number];
+  /** Turn about y that shuts it. */
+  close: number;
+  /** A front door (outdoors on one side): shut unless someone comes through. */
+  front: boolean;
+  /** The bathroom it opens into (0: none): shut while someone is in there. */
+  bath: number;
+}
+
+/** What a doorway needs to know of a leaf that swings, before its meshes exist. */
+type SwingSpec = Omit<DoorLeaf, 'meshes' | 'bath'> & { hinge: [number, number]; rooms: [number, number] };
 
 /**
  * Where coverings lie in the viewed house, for Build mode's previews: each wall face
@@ -299,11 +321,15 @@ export interface SilhouetteSpec {
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
   storeys?: number;
+  /** Someone's home: its windows get a mesh of their own, lit only while someone is up (see `SilhouetteBuild.homes`). */
+  lived?: boolean;
 }
 
 export interface SilhouetteBuild {
   meshes: Mesh[];
   casters: Mesh[];
+  /** The window glass of each lived-in house (also in `meshes`), to light or not (`neighbourGlass`). */
+  homes: { spec: SilhouetteSpec; windows: Mesh }[];
   /** Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz). */
   lamps: [number, number, number, number, number][];
 }
@@ -699,6 +725,15 @@ export class HouseBuilder {
     // Covered faces: one bucket per finish (tinted per covering), and natural-wood door leaves.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
     const doorWood = new Geo();
+    // Front doors and bathroom doors swing (each leaf its own meshes); the others stand open.
+    const swinging: { spec: SwingSpec & { bath: number }; trim: Geo; wood: Geo; glass: Geo }[] = [];
+    const swing = (spec: SwingSpec) => {
+      const bath = spec.rooms.find((r) => r && kinds.get(r) === 'bath') ?? 0;
+      if (storey.preview || (!spec.front && !bath)) return null;
+      const leaf = { spec: { ...spec, bath }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
+      swinging.push(leaf);
+      return leaf;
+    };
     /** Every bucket a wall segment writes to (they share its cutaway data). */
     const wallGeos = [ext, int, wainscot, stone, trim, ao, doorWood, ...covered.values()];
     /** The bucket for a covering (0: none, the automatic look), tinted. */
@@ -851,7 +886,7 @@ export class HouseBuilder {
           const base = axis === 'h' ? x : z;
           const head = doorHead(axis, x, z);
           segment(axis, x, z, head, H, Cut.Hide, run.index > 0 ? base : undefined, run.index < run.len - 1 ? base + 1 : undefined);
-          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass }, lookOf(axis, x, z).style, head, run);
+          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing }, lookOf(axis, x, z).style, head, run);
         }
       }
     }
@@ -1294,6 +1329,16 @@ export class HouseBuilder {
       }
     }
 
+    // ---- a ceiling only the sun's shadow map sees -------------------------------------
+    // Rooms are open at the top (no ceilings, and the roof hides with the walls cut away): this
+    // lid over the indoor tiles keeps the sun out of them but through windows and doorways, in
+    // every wall mode. Just under the wall tops, clear of the floor of a storey above.
+    const lid = new Geo();
+    if (!storey.preview && Number.isFinite(minX)) {
+      const indoor = (x: number, z: number) => (inView(x, z) && (room(x, z) !== 0 || !!diagonal(x, z)?.rooms.some((r) => r !== 0)) ? 1 : 0);
+      for (const r of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) lid.box(r.x0 - T, H - 0.12, r.z0 - T, r.x1 + T, H - 0.04, r.z1 + T);
+    }
+
     // ---- garden: foundation shrubs and a few lot trees --------------------------------
     // The player's own lot gets no automatic border: they plant their garden themselves, and
     // building a room there shouldn't make flowers appear around it.
@@ -1354,12 +1399,13 @@ export class HouseBuilder {
     const meshes: Mesh[] = [];
     const casters: Mesh[] = [];
     const roofs: Mesh[] = [];
-    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean } = {}) => {
+    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean; shadowOnly?: boolean } = {}) => {
       const cut = !storey.preview && (opts.cut ?? true);
       const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
       if (!mesh) return;
       mesh.material = typeof key === 'string' ? this.material(key, cut) : key;
-      mesh.receiveShadows = true;
+      mesh.receiveShadows = !opts.shadowOnly;
+      if (opts.shadowOnly) mesh.layerMask = LAYER_SHADOW_ONLY;
       mesh.isPickable = false;
       meshes.push(mesh);
       if (opts.cast) casters.push(mesh);
@@ -1387,7 +1433,22 @@ export class HouseBuilder {
     add(roof, 'roof', M.roof, { cut: false, cast: true, roof: true });
     add(roofTrim, 'roofTrim', M.trim, { cut: false, cast: true, roof: true });
     add(gables, 'gables', scheme.brick ? M.brick : M.siding, { cut: false, cast: true, roof: true });
-    return { meshes, casters, roofs, rooms: roomTiles, shrubs, trees, surfaces };
+    add(lid, 'ceilingShadow', M.trim, { cut: false, cast: true, shadowOnly: true });
+    const doors: DoorLeaf[] = [];
+    for (const { spec, trim: t, wood: w, glass: g } of swinging) {
+      const { hinge, rooms, ...leaf } = spec;
+      const at = meshes.length;
+      add(t, 'doorLeaf', M.trim, { cast: true });
+      add(w, 'doorLeaf', M.door, { cast: true });
+      add(g, 'doorLeafGlass', this.glassMaterial(rooms[0] || rooms[1], true));
+      const own = meshes.slice(at);
+      for (const mesh of own) {
+        mesh.setPivotPoint(new Vector3(hinge[0], 0, hinge[1]));
+        if (mesh.name === 'doorLeafGlass') mesh.alphaIndex = 10;
+      }
+      doors.push({ ...leaf, meshes: own });
+    }
+    return { meshes, casters, roofs, rooms: roomTiles, shrubs, trees, surfaces, doors };
   }
 
   /**
@@ -1422,9 +1483,12 @@ export class HouseBuilder {
       }
     };
 
+    const homes: { spec: SilhouetteSpec; panes: Geo }[] = [];
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
+      const panes = b.lived ? new Geo() : glass;
+      if (b.lived) homes.push({ spec: b, panes });
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
       walls.color(s.wall);
       const tall = H * (b.storeys ?? 1);
@@ -1454,7 +1518,7 @@ export class HouseBuilder {
         if (o.kind === 'window') {
           const [g0, g1] = [a + WIN_INSET, a + 1 - WIN_INSET];
           const f = 0.07;
-          glass.poly([P(g0, SILL, 0.006), P(g1, SILL, 0.006), P(g1, HEAD, 0.006), P(g0, HEAD, 0.006)], n);
+          panes.poly([P(g0, SILL, 0.006), P(g1, SILL, 0.006), P(g1, HEAD, 0.006), P(g0, HEAD, 0.006)], n);
           // Curtains drawn to the sides with a valance: dark against the glow at night.
           trim.color(curtain);
           board(g0, g0 + 0.17, SILL + 0.04, HEAD, 0.012);
@@ -1516,7 +1580,7 @@ export class HouseBuilder {
         lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
       }
     }
-    const out: SilhouetteBuild = { meshes: [], casters: [], lamps };
+    const out: SilhouetteBuild = { meshes: [], casters: [], homes: [], lamps };
     const M = HOUSE_MATERIALS;
     for (const [geo, name, key, cast] of [
       [siding, 'silhouetteWalls', M.siding, true],
@@ -1534,7 +1598,21 @@ export class HouseBuilder {
       out.meshes.push(mesh);
       if (cast) out.casters.push(mesh);
     }
+    for (const { spec, panes } of homes) {
+      const windows = panes.toMesh('silhouetteWindows', this.scene, { colors: true, cut: true });
+      if (!windows) continue;
+      windows.material = this.neighbourGlass(true);
+      windows.receiveShadows = true;
+      windows.isPickable = false;
+      out.meshes.push(windows);
+      out.homes.push({ spec, windows });
+    }
     return out;
+  }
+
+  /** Neighbours' window glass: glowing at night as the street's (`lit`), or dark (everyone in asleep, or nobody home). */
+  neighbourGlass(lit: boolean): Material {
+    return lit ? this.material(HOUSE_MATERIALS.glass) : this.lib.surface(HOUSE_MATERIALS.glass, { vertexColors: true, cutaway: true, variant: 'dark' });
   }
 
   /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
@@ -1590,7 +1668,7 @@ export class HouseBuilder {
     trim: Geo,
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
-    geos: { wood: Geo; glass: (room: number) => Geo },
+    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
@@ -1617,11 +1695,22 @@ export class HouseBuilder {
     const into = outdoorA ? 1 : -1; // swing towards the indoor side
     // Leaf space: `s` across its thickness from the hinge jamb, `l` from the hinge outwards. The
     // second leaf of a double door hangs on the far jamb.
-    const hinge = run.len > 1 && run.index === run.len - 1 ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
+    const far = run.len > 1 && run.index === run.len - 1;
+    const hinge = far ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
     const at = (l: number) => (axis === 'h' ? z : x) + into * (T + 0.01 + l);
     // The leaf's glass belongs to the room it stands in.
-    const glass = geos.glass(axis === 'h' ? roomP(x + 0.5, z + into * 0.25) : roomP(x + into * 0.25, z + 0.5));
-    this.leaf(style, front, scheme, mask, head, { trim, wood: geos.wood, glass }, {
+    const inside = axis === 'h' ? roomP(x + 0.5, z + into * 0.25) : roomP(x + into * 0.25, z + 0.5);
+    // A leaf that swings shut makes a quarter turn over to the far jamb (the second leaf of a
+    // double door back to its own), ending in the middle of the wall, each face in its own
+    // room's light: about a point by the hinge that carries its hinge edge there.
+    const jamb = far ? hinge + LEAF_T : hinge;
+    const across = far ? -1 : 1;
+    const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
+    const [from, to]: [number, number][] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
+    const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
+    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, front, rooms });
+    const glass = own ? own.glass : geos.glass(inside);
+    this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
         if (axis === 'h') g.box(hinge + s0, y0, p0, hinge + s1, y1, p1);
@@ -1804,11 +1893,22 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
   return axis === 'h' ? [a0, y0, lo, a1, y1, hi] : [lo, y0, a0, hi, y1, a1];
 }
 
+/** The point a turn about y (`turn` radians, as a mesh's `rotation.y`) carries `from` (x, z) to `to` about. */
+function turnAbout(from: [number, number], to: [number, number], turn: number): [number, number] {
+  const [c, s] = [Math.cos(turn), Math.sin(turn)];
+  // to = P + R (from - P), so (I - R) P = to - R from, with R: (x, z) -> (x c + z s, z c - x s).
+  const bx = to[0] - (from[0] * c + from[1] * s);
+  const bz = to[1] - (from[1] * c - from[0] * s);
+  const a = 1 - c;
+  const det = a * a + s * s;
+  return [(a * bx + s * bz) / det, (a * bz - s * bx) / det];
+}
+
 /**
  * Covers the indoor tiles of a bounding box with a few rectangles (greedy, row-major). Leftovers
  * smaller than `minArea` tiles (e.g. a single-tile porch notch) don't get their own roof.
  */
-function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
+export function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
   const w = x1 - x0;
   const covered = new Uint8Array(w * (z1 - z0));
   const indoor = (x: number, z: number) => room(x, z) !== 0;

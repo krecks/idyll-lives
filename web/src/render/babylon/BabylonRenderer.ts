@@ -96,9 +96,9 @@ import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
 import { buildFences } from './fences';
 import { applyShaderFixes } from './shaderFixes';
-import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
+import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, indoorRects, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
-import { MaterialLibrary } from './materials';
+import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
 import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
@@ -169,6 +169,9 @@ const FILL_POWER = 0.35;
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
+/** Seconds a door takes to swing open or shut, and how near (metres) someone walking opens it. */
+const DOOR_SWING = 0.45;
+const DOOR_REACH = 1.3;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -431,9 +434,18 @@ export class BabylonRenderer implements Renderer {
   private roomLightOn: number[] = [];
   /** Per room whose windows are dimmed: 1 glowing, 0 out (its room is dark), eased between; unlisted rooms glow. */
   private readonly windowGlowOn = new Map<number, number>();
-  /** Rooms where everyone is asleep (lights out), and rooms with someone awake (scratch). */
+  /** Rooms where everyone is asleep (lights out), and rooms with someone awake. */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
+  /**
+   * Rooms without windows (as sim-core `lights::windowless`): no daylight, so their lamps are lit
+   * by day as at night, and a fill (no lamp there) only while someone awake is in.
+   */
+  private windowless = new Set<number>();
+  /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
+  private doors: { leaf: DoorLeaf; open: number }[] = [];
+  /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
+  private readonly neighboursUp: boolean[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
   private lampsOff: ReadonlySet<number> | null = null;
   private lampsSettled = true;
@@ -912,6 +924,7 @@ export class BabylonRenderer implements Renderer {
       this.worldMeshes = [];
       this.lotTemplates = new Set([...this.templatesInUse].filter((k) => !before.has(k)));
       for (const mesh of this.lotMeshes) mesh.freezeWorldMatrix();
+      for (const { leaf } of this.doors) for (const mesh of leaf.meshes) mesh.unfreezeWorldMatrix();
     } else {
       for (const key of this.lotTemplates) this.templatesInUse.add(key);
     }
@@ -976,12 +989,14 @@ export class BabylonRenderer implements Renderer {
     const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
-    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0)) {
+    this.swingDoors(frame);
+    this.lightNeighbours(frame);
+    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.windowless.size > 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
     // And their windows (and lamp shades, screens) stop glowing with them.
-    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && this.lampsLevel > 0) {
+    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && (this.lampsLevel > 0 || this.windowless.size > 0)) {
       this.house.setWindowGlow(this.windowGlowOn);
       this.applyGlow();
       this.resetSnapshot();
@@ -2231,6 +2246,7 @@ export class BabylonRenderer implements Renderer {
     this.lotMeshes = [];
     this.lotKey = '';
     this.lotCasters = [];
+    this.doors = [];
     this.lotTemplates.clear();
     this.lotRooms = null;
     this.lotParts = null;
@@ -2480,7 +2496,7 @@ export class BabylonRenderer implements Renderer {
     copyPose(p, cam);
     cam.targetScreenOffset.set(0, 0);
     const map = this.shadows.getShadowMap()!;
-    map.renderList = this.wallMode === 'up' ? [...this.baseCasters, ...this.wallCasters] : this.baseCasters;
+    map.renderList = [...this.baseCasters, ...this.wallCasters];
     this.scene.render();
     cam.layerMask = LAYER_TOWN;
     cam.alpha = w.alpha;
@@ -2567,11 +2583,11 @@ export class BabylonRenderer implements Renderer {
     this.beforeDraw = null;
   }
 
-  /** Shadow casters of what is on screen: the overview, or the game world (its walls only with walls up). */
+  /** Shadow casters of what is on screen: the overview, or the game world (the house in every wall mode). */
   private updateShadowList(): void {
     const map = this.shadows.getShadowMap()!;
     if (this.townMode) map.renderList = [...(this.overview?.casters ?? []), ...((this.quality.landscapeShadows && this.natureIn.town?.casters) || [])];
-    else map.renderList = this.wallMode === 'up' ? [...this.baseCasters, ...this.wallCasters] : this.baseCasters;
+    else map.renderList = [...this.baseCasters, ...this.wallCasters];
     this.sunShadows.moved();
   }
 
@@ -3219,10 +3235,12 @@ export class BabylonRenderer implements Renderer {
           shrubs: builds[0].shrubs,
           trees: builds[0].trees,
           rooms: new Map(builds.flatMap((b) => [...b.rooms])),
+          doors: builds.flatMap((b) => b.doors),
           surfaces: { faces: new Map(builds.flatMap((b) => [...b.surfaces.faces])), floors: new Map(builds.flatMap((b) => [...b.surfaces.floors])) },
         }
       : null;
     if (!built) {
+      this.doors = [];
       // Unknown wall layout: fall back to the simulation's plain meshes.
       this.meshFromArrays('floors', world.meshes.floors, this.lotMaterial('material.floor'));
       const wallMat = this.lotMaterial('material.wall');
@@ -3247,6 +3265,7 @@ export class BabylonRenderer implements Renderer {
     }
     this.lotRooms = built.rooms;
     this.lotSurfaces = built.surfaces;
+    this.doors = built.doors.map((leaf) => ({ leaf, open: -1 }));
     this.refreshLaid();
     return built.casters;
   }
@@ -3300,6 +3319,7 @@ export class BabylonRenderer implements Renderer {
       const row = z - this.rowOf(this.storeyOf(z));
       return !view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d);
     };
+    this.markWindowless(world, view);
     const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     // With few lights to go round, the storey in view gets them first, then the nearest below it
     // (the sort is stable: within a storey, each room's first light still comes before any second);
@@ -3316,7 +3336,58 @@ export class BabylonRenderer implements Renderer {
       else light.position.y = HIDDEN_Y;
       return l ?? null;
     });
-    this.roomLightOn = this.roomLightUse.map((use) => (use?.lamp !== undefined ? (this.lampOn.get(use.lamp) ?? 1) : use && this.darkRooms.has(use.room) ? 0 : 1));
+    this.roomLightOn = this.roomLightUse.map((use) => (use?.lamp !== undefined ? (this.lampOn.get(use.lamp) ?? 1) : use && this.fillOut(use.room) ? 0 : 1));
+  }
+
+  /** A room's fill is out: everyone there is asleep, or nobody awake is in a room without windows. */
+  private fillOut(room: number): boolean {
+    return this.darkRooms.has(room) || (this.windowless.has(room) && !this.awakeRooms.has(room));
+  }
+
+  /**
+   * Finds the rooms without windows (`windowless`), and hands the materials those of the storey
+   * in view as rectangles, kept as dark by day as the basement (see `DigState.rects`).
+   */
+  private markWindowless(world: WorldStructure, view: ViewRect | null): void {
+    const W = world.width;
+    const room = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
+    // A window lets daylight into the rooms on both its sides (sim-core `rooms.rs`).
+    const lit = new Set<number>();
+    for (const o of world.openings ?? []) {
+      if (o.kind !== 'window') continue;
+      lit.add(room(o.x, o.z));
+      lit.add(o.axis === 'h' ? room(o.x, o.z - 1) : room(o.x - 1, o.z));
+    }
+    const halves = new Map<number, [number, number]>();
+    for (const d of world.diagonals ?? []) {
+      halves.set(d.z * W + d.x, d.rooms);
+      if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
+    }
+    const dark = new Set<number>();
+    for (const r of world.rooms) if (r !== 0 && !lit.has(r)) dark.add(r);
+    for (const [a, b] of halves.values()) for (const r of [a, b]) if (r !== 0 && !lit.has(r)) dark.add(r);
+    this.windowless = dark;
+
+    const dig = this.lib.dig;
+    const before = [dig.band.x, dig.band.y, dig.band.z, ...dig.rects];
+    dig.band.set(0, 0, 0, 0);
+    if (view && this.storey >= 0 && dark.size) {
+      const row = this.rowOf(this.storey);
+      // A split tile is dark when every room on it is.
+      const darkAt = (x: number, z: number) => {
+        if (x < view.x || x >= view.x + view.w) return 0;
+        const split = halves.get((z + row) * W + x);
+        const rooms = split ? split.filter((r) => r !== 0) : [room(x, z + row)];
+        return rooms.length && rooms.every((r) => dark.has(r)) ? 1 : 0;
+      };
+      const rects = indoorRects(darkAt, view.x, view.z, view.x + view.w, view.z + view.d, 1)
+        .sort((a, b) => (b.x1 - b.x0) * (b.z1 - b.z0) - (a.x1 - a.x0) * (a.z1 - a.z0))
+        .slice(0, WINDOWLESS_RECTS);
+      rects.forEach((r, i) => dig.rects.set([r.x0, r.z0, r.x1, r.z1], i * 4));
+      // From under the floor of the storey in view to just under the next one's.
+      dig.band.set(this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, rects.length, 0);
+    }
+    if ([dig.band.x, dig.band.y, dig.band.z, ...dig.rects].some((v, i) => v !== before[i])) this.resetSnapshot();
   }
 
   /** The rooms whose occupants are all asleep (at least one, nobody awake, away residents not counted). */
@@ -3351,6 +3422,72 @@ export class BabylonRenderer implements Renderer {
     for (const room of awake) dark.delete(room);
   }
 
+  /**
+   * Front doors stand shut, and a bathroom's door while someone is in there; any of them opens
+   * as someone walks up to it (or through it), and swings back once they've passed.
+   */
+  private swingDoors(frame: FrameState): void {
+    if (!this.doors.length) return;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
+    let moved = false;
+    for (const door of this.doors) {
+      const { leaf } = door;
+      if (leaf.meshes[0]?.isDisposed()) continue;
+      // Someone on the move by it (both in lot rows: the storey is in the row).
+      let passing = false;
+      for (let i = 0; i < count && !passing; i++) {
+        const o = layout.headerLen + i * layout.simStride;
+        if (curr[o + k.away] !== 0 || curr[o + k.moving] === 0) continue;
+        const dx = curr[o + k.x] - leaf.centre[0];
+        const dz = curr[o + k.z] - leaf.centre[1];
+        passing = dx * dx + dz * dz < DOOR_REACH * DOOR_REACH;
+      }
+      const engaged = leaf.bath !== 0 && (this.awakeRooms.has(leaf.bath) || this.darkRooms.has(leaf.bath));
+      const target = passing || !(leaf.front || engaged) ? 1 : 0;
+      const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
+      if (open === door.open) continue;
+      door.open = open;
+      // Eased: quick off the frame, slowing as it meets the jamb or the wall.
+      const turn = leaf.close * (1 - open * open * (3 - 2 * open));
+      for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      moved = true;
+    }
+    if (!moved) return;
+    this.sunShadows.moved();
+    this.resetSnapshot();
+  }
+
+  /**
+   * Neighbours' windows glow at night only while someone is up at home there (not away, not
+   * asleep): after bedtime their houses go dark too.
+   */
+  private lightNeighbours(frame: FrameState): void {
+    const houses = this.townMode ? [] : (this.street?.houses ?? []);
+    if (!houses.length) return;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const sleeping = this.sleepActions?.ids;
+    const up = this.neighboursUp;
+    up.length = houses.length;
+    up.fill(false);
+    // Everyone in town (not only those drawn), as far as the snapshot holds them.
+    const count = Math.min(curr[layout.header.simCount], Math.floor((curr.length - layout.headerLen) / layout.simStride));
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if (curr[o + k.away] !== 0) continue;
+      if (curr[o + k.pose] === Pose.Lie && sleeping?.has(curr[o + k.action] | 0)) continue;
+      const x = curr[o + k.x];
+      // Upstairs is a storey's own rows: back to the ground's.
+      const z = curr[o + k.z] - this.rowOf(this.storeyOf(Math.floor(curr[o + k.z])));
+      const h = houses.findIndex(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
+      if (h >= 0) up[h] = true;
+    }
+    if (this.street?.setUp(up)) this.resetSnapshot();
+  }
+
   /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */
   private fadeRoomLights(dt: number): boolean {
     let changed = false;
@@ -3363,7 +3500,7 @@ export class BabylonRenderer implements Renderer {
         this.roomLightOn[i] = now;
         return;
       }
-      const target = use && this.darkRooms.has(use.room) ? 0 : 1;
+      const target = use && this.fillOut(use.room) ? 0 : 1;
       if (on === target) return;
       this.roomLightOn[i] = target > on ? Math.min(target, on + step) : Math.max(target, on - step);
       changed = true;
@@ -3419,8 +3556,8 @@ export class BabylonRenderer implements Renderer {
     this.wallsLow?.setEnabled(mode !== 'up');
     this.roofShown = this.roofVisible();
     this.showRoofs();
-    // Cut walls would still cast full-height shadows (the shadow pass has no cutaway), so the
-    // house only casts with walls up; stubs and open rooms are then sunlit, as in the classics.
+    // The house casts in every mode, its walls at full height (the shadow pass has no cutaway)
+    // and its shadow-only ceiling over the rooms: the sun comes in through windows and doorways.
     this.updateShadowList();
     this.lib.wallCut.params.x = mode === 'down' ? 1 : 0;
     this.lib.wallCut.params.y = WALL_STUB;
@@ -4004,7 +4141,8 @@ export class BabylonRenderer implements Renderer {
       let lit = false;
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
-        const f = level * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
+        // In a room without windows a lamp's shade glows by day too.
+        const f = (room && this.windowless.has(room) ? 1 : level) * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;
         lit ||= f > 0;
@@ -4069,8 +4207,10 @@ export class BabylonRenderer implements Renderer {
     this.roomLights.forEach((light, i) => {
       // The overview has no interiors: the game house's lamps stay off behind it.
       const use = this.townMode ? null : (this.roomLightUse[i] ?? null);
-      // Down in the basement they're on by day too, as bright as at night (by day the exposure is lower).
-      const lit = (this.storey < 0 ? NIGHT_EXPOSURE / this.exposure : this.lampsLevel) * (this.roomLightOn[i] ?? 1);
+      // Down in the basement and in rooms without windows they're on by day too, as bright as at
+      // night (by day the exposure is lower).
+      const dark = this.storey < 0 || (!!use && this.windowless.has(use.room));
+      const lit = (dark ? NIGHT_EXPOSURE / this.exposure : this.lampsLevel) * (this.roomLightOn[i] ?? 1);
       if (!use) {
         light.intensity = 0;
       } else if (use.kind === 'lamp') {

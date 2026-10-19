@@ -233,6 +233,9 @@ uniform vec4 wallCutParams;
   }
 }
 
+/** Rectangles of windowless rooms the materials test (see `DigState.rects`). */
+export const WINDOWLESS_RECTS = 8;
+
 /**
  * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in
  * metres) of the ground's materials isn't drawn above `below` metres while `on`.
@@ -248,12 +251,20 @@ export class DigState {
    */
   under = false;
   readonly lit = new Vector4(0, 0.1, 0.1, 0);
+  /**
+   * Rooms without windows on the storey in view, as dark as the basement by day: `rects` holds
+   * up to `WINDOWLESS_RECTS` rectangles (x0, z0, x1, z1, in metres), `band` the heights they
+   * reach (y0, y1) and in `band.z` how many there are.
+   */
+  readonly rects = new Float32Array(WINDOWLESS_RECTS * 4);
+  readonly band = new Vector4(0, 0, 0, 0);
 }
 
 /**
- * Keeps daylight out of a basement in view (`DigState.under`): inside the dug-out rectangle the
- * sun and the sky fill (the directional and hemispheric lights) and the environment are scaled
- * down to `DigState.lit`, so only the lamps (point lights) light it, day and night.
+ * Keeps daylight out of a basement in view (`DigState.under`), and out of the rooms without
+ * windows on the storey in view (`DigState.rects`): inside them the sun and the sky fill (the
+ * directional and hemispheric lights) and the environment are scaled down to `DigState.lit`, so
+ * only the lamps (point lights) light them, day and night.
  */
 class UndergroundPlugin extends MaterialPluginBase {
   constructor(
@@ -274,15 +285,17 @@ class UndergroundPlugin extends MaterialPluginBase {
   }
 
   override getUniforms(): { externalUniforms: string[] } {
-    return { externalUniforms: ['undergroundRect', 'undergroundLit'] };
+    return { externalUniforms: ['undergroundRect', 'undergroundLit', 'windowlessBand', 'windowlessRects'] };
   }
 
   override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const effect = subMesh.effect;
     if (!effect) return;
-    const { rect, under, lit } = this.state;
+    const { rect, under, lit, band, rects } = this.state;
     effect.setFloat4('undergroundRect', rect.x, rect.y, rect.z, rect.w);
     effect.setFloat4('undergroundLit', lit.x, lit.y, lit.z, under ? 1 : 0);
+    effect.setFloat4('windowlessBand', band.x, band.y, band.z, 0);
+    effect.setFloatArray4('windowlessRects', rects);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
@@ -290,10 +303,19 @@ class UndergroundPlugin extends MaterialPluginBase {
     const wgsl = shaderLanguage === ShaderLanguage.WGSL;
     const [u, p, v3, v4] = wgsl ? ['uniforms.', 'fragmentInputs.vPositionW', 'vec3f', 'vec4f'] : ['', 'vPositionW', 'vec3', 'vec4'];
     return {
-      CUSTOM_FRAGMENT_DEFINITIONS: wgsl ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};` : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;`,
+      CUSTOM_FRAGMENT_DEFINITIONS: wgsl
+        ? `uniform undergroundRect: ${v4};\nuniform undergroundLit: ${v4};\nuniform windowlessBand: ${v4};\nuniform windowlessRects: array<${v4}, ${WINDOWLESS_RECTS}>;`
+        : `uniform ${v4} undergroundRect;\nuniform ${v4} undergroundLit;\nuniform ${v4} windowlessBand;\nuniform ${v4} windowlessRects[${WINDOWLESS_RECTS}];`,
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
 ${wgsl ? 'var underground' : 'vec3 underground'} = ${v3}(1.0);
 if (${u}undergroundLit.w > 0.5 && ${p}.x > ${u}undergroundRect.x && ${p}.x < ${u}undergroundRect.z && ${p}.z > ${u}undergroundRect.y && ${p}.z < ${u}undergroundRect.w) { underground = ${u}undergroundLit.xyz; }
+if (${p}.y > ${u}windowlessBand.x && ${p}.y < ${u}windowlessBand.y) {
+  for (${wgsl ? 'var i = 0' : 'int i = 0'}; i < ${WINDOWLESS_RECTS}; i++) {
+    if (${wgsl ? 'f32(i)' : 'float(i)'} >= ${u}windowlessBand.z) { break; }
+    ${wgsl ? 'let' : 'vec4'} r = ${u}windowlessRects[i];
+    if (${p}.x > r.x && ${p}.x < r.z && ${p}.z > r.y && ${p}.z < r.w) { underground = ${u}undergroundLit.xyz; }
+  }
+}
 `,
       // Each light's colour as it's read (lamps, the point lights, keep theirs).
       '!#define CUSTOM_LIGHT(\\d+)_COLOR': `

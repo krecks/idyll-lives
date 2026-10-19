@@ -4,13 +4,15 @@
 //! off on its own: the player turns one on or off with a click (`Command::SwitchLamp`). Residents
 //! switch a room's lamps together, as at the switch by the door, on two moments only (so what the
 //! player set stays until someone comes or goes):
-//! - someone awake comes into a room when it's dark (night, or always in the basement) and none of
-//!   its lamps is on: they all go on; the same as night falls on a room with someone awake in it;
+//! - someone awake comes into a room when it's dark (night, or always in the basement and in a
+//!   room without windows) and none of its lamps is on: they all go on; the same as night falls
+//!   on a room with someone awake in it;
 //! - the last one awake leaves a room, or goes to sleep in it: its lamps go off.
 //!
 //! Only at home where the household has free will (and in public places): with it off, the
 //! lights stay as the player left them. Outdoors (the garden's lanterns) is the player's. The
-//! renderer shows a lamp that's off with no light and no glow; by day nothing shows either way.
+//! renderer shows a lamp that's off with no light and no glow; by day only the basement's and
+//! windowless rooms' lamps show.
 //! Room scores count the lamps a room has, on or off (they're how well it can be lit).
 //! A lamp moved (alone, on a top or with its room), undone or redone stays on or off as it was.
 
@@ -102,13 +104,19 @@ pub(crate) fn update(world: &mut World) {
     world.light_watch = watch;
 }
 
-/// Whether `room` is dark: it is night (or the room is in the basement) and none of its lamps is on.
+/// Whether `room` is dark: it is night (or the room is in the basement, or has no windows) and
+/// none of its lamps is on.
 fn room_dark(world: &World, room: u16, night: bool) -> bool {
     let mut lamps = lamps_in(world, room).peekable();
     let Some(&first) = lamps.peek() else { return false };
     let o = &world.objects[first as usize];
     let below = world.stairs.storey(o.z) < 0;
-    (night || below) && lamps.all(|id| world.objects[id as usize].off)
+    (night || below || windowless(world, room)) && lamps.all(|id| world.objects[id as usize].off)
+}
+
+/// Whether `room` has no window (to outdoors or to another room): daylight doesn't reach it.
+pub fn windowless(world: &World, room: u16) -> bool {
+    world.rooms().iter().find(|r| !r.garden && r.id == room).is_some_and(|r| r.windows == 0)
 }
 
 /// The switchable lamps standing in `room`.
