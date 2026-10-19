@@ -78,8 +78,9 @@ export interface ModelTemplate {
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
   /**
    * The files it was built without, as they failed to load: its far version (it's the full model
-   * then), or every one (it's drawn as nothing, or the box asked for). A cache builds it again when
-   * one of them comes (`TemplateCache.invalidate`).
+   * then), or every one (it's drawn as nothing, or the box asked for). It's built again when one of
+   * them comes: by a cache (`TemplateCache.invalidate`), the landscape (`Landscape.rebuild`), the
+   * selection marker.
    */
   failed?: string[];
   /** It's the stand-in box (`BuildOptions.standIn`): its file is missing, or failed to load or to build. */
@@ -203,14 +204,10 @@ export interface BuildOptions {
    * A plain box to draw when the model has no file or its file fails, so the thing stays in view and
    * can be clicked: placed objects ask for one (the lot's, public places' seen from another lot, the
    * town's), buy mode's copy of one in hand, food and dishes, what residents carry, and the catalog's
-   * pictures. The landscape, foliage, kerbside props and the selection marker draw nothing then.
+   * pictures. The landscape, foliage, kerbside props and the selection marker draw nothing then,
+   * until the file comes (`onModelFileArrived`).
    */
   standIn?: StandIn;
-  /**
-   * False: a file that fails isn't tried again in the background for this build, as nothing would
-   * build it again when it comes (the landscape, the selection marker). Default true.
-   */
-  retry?: boolean;
 }
 
 /** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
@@ -253,7 +250,7 @@ export async function buildModel(
     for (const url of far ? [far, entry.url] : [entry.url]) {
       let file: LoadedFile;
       try {
-        file = await loadFile(scene, url, options.retry !== false);
+        file = await loadFile(scene, url);
       } catch (err) {
         // Only a file that didn't load is `failed` (and comes later, `onModelFileArrived`).
         failed.push(url);
@@ -1110,13 +1107,12 @@ export function retellModelFileArrived(scene: Scene, url: string): void {
 
 /**
  * The file at `url` as imported into `scene`, once. A failed import isn't kept, so each build tries
- * it again (none is held back or failed at once because of an earlier failure), and for a build that
- * asks (`retry`) it's tried in the background too (`scheduleRetry`). Only the import counts as the
- * file failing, not a build from it (`buildFromFile`): a file that loads but can't be built isn't
- * fetched again. A background try imports in the slot it was given (`now` false), not as a load
+ * it again (none is held back or failed at once because of an earlier failure), and it's tried in the
+ * background too (`scheduleRetry`). Only the import counts as the file failing, not a build from it
+ * (`buildFromFile`): a file that loads but can't be built isn't fetched again. A background try imports in the slot it was given (`now` false), not as a load
  * someone waits for; a build that wants the file meanwhile shares the download already under way.
  */
-function loadFile(scene: Scene, url: string, retry: boolean, now = true): Promise<LoadedFile> {
+function loadFile(scene: Scene, url: string, now = true): Promise<LoadedFile> {
   const state = filesOf(scene);
   let file = state.files.get(url);
   if (!file) {
@@ -1128,12 +1124,10 @@ function loadFile(scene: Scene, url: string, retry: boolean, now = true): Promis
       () => state.files.get(url) === loading && state.files.delete(url),
     );
   }
-  if (retry) {
-    file.catch(() => {
-      if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
-      scheduleRetry(scene, state, url);
-    });
-  }
+  file.catch(() => {
+    if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
+    scheduleRetry(scene, state, url);
+  });
   return file;
 }
 
@@ -1160,8 +1154,8 @@ function tellArrived(state: SceneFiles, url: string): void {
 function scheduleRetry(scene: Scene, state: SceneFiles, url: string): void {
   const f = state.failed.get(url);
   if (!f || f.timer !== undefined || f.tries >= RETRY_AFTER_MS.length || !state.arrived.size || scene.isDisposed) return;
-  // A load under way (a build's, whichever: one that doesn't ask for tries too) is this try; if it
-  // fails, the next is set from here. Otherwise the try loads the file itself.
+  // A load under way (a build's) is this try; if it fails, the next is set from here. Otherwise the
+  // try loads the file itself.
   const sharedTry = () => {
     const loading = state.files.get(url);
     if (loading) loading.catch(() => scheduleRetry(scene, state, url));
@@ -1175,7 +1169,7 @@ function scheduleRetry(scene: Scene, state: SceneFiles, url: string): void {
     void background(async () => {
       if (scene.isDisposed || !state.failed.has(url) || sharedTry()) return;
       // `loadFile` notes the outcome (and sets the next try); the rejection itself is nobody's to handle.
-      await loadFile(scene, url, true, false).catch(() => {});
+      await loadFile(scene, url, false).catch(() => {});
     }).catch(() => {});
   }, RETRY_AFTER_MS[f.tries]);
 }

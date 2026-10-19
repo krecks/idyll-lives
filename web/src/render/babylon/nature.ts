@@ -168,8 +168,12 @@ export class Landscape {
   private readonly roads: CountryRoads;
   /** Farm fields in town (no lawn on them). */
   private readonly fields: { x: number; z: number; w: number; d: number }[];
-  /** Lawn tufts and flowers, per model, whole and in groups (see `TUFT_CELL`): each instance's original matrix and town tile (-1 outside the town). */
-  private lawn: { meshes: Mesh[]; base: Float32Array; shown: Float32Array; tiles: Int32Array; hidden: Uint8Array }[] = [];
+  /** Lawn tufts and flowers, per model, whole and in groups (see `TUFT_CELL`). */
+  private lawn: LawnLayer[] = [];
+  /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
+  private lawnMask: LawnMask | null = null;
+  /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
+  private batches: Batch[] = [];
 
   /** `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half). */
   constructor(
@@ -282,21 +286,44 @@ export class Landscape {
 
   async build(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<NatureResult> {
     const meshes: Mesh[] = [];
-    const casters: Mesh[] = [];
-    const only = new Map<Mesh, 'game' | 'town'>();
     meshes.push(await perfTimeAsync('nature: terrain', async () => this.terrain(scene, pace)));
     if (this.land.water) meshes.push(await perfTimeAsync('nature: water', async () => this.water(scene)));
     meshes.push(...(await perfTimeAsync('nature: roads', async () => this.roads.build(scene))));
-    const add = ({ shared, whole, cells }: Instanced, casts = false) => {
-      const groups = cells.flatMap((cell) => cell.meshes);
-      meshes.push(...shared, ...whole, ...groups);
-      for (const mesh of whole) only.set(mesh, 'town');
-      for (const mesh of groups) only.set(mesh, 'game');
-      if (casts) casters.push(...shared, ...whole);
+    this.batches = [];
+    await perfTimeAsync('nature: forests', () => this.forests(scene, assets, pace));
+    await perfTimeAsync('nature: lawns', () => this.lawns(scene, assets, world, pace));
+    const plants = gather(this.batches);
+    return { meshes: [...meshes, ...plants.meshes], casters: plants.casters, only: plants.only };
+  }
+
+  /**
+   * Builds again the plants built without the file at `url`, now that it has come: the new meshes
+   * (on no layer yet, `layerMask` 0, like a first build's), the ones they replace, and `commit`,
+   * which puts the new in the old ones' place here (the lawn's hiding goes over to them). The caller
+   * draws the new meshes and disposes the old ones as it commits. Null when none was built without
+   * it. Not while `build` or another `rebuild` runs.
+   */
+  async rebuild(scene: Scene, assets: AssetRegistry, url: string, pace?: () => Promise<void>): Promise<NatureRebuild | null> {
+    const stale = this.batches.filter((b) => b.again && b.built.failed?.includes(url));
+    if (!stale.length) return null;
+    const fresh: Batch[] = [];
+    for (const { again, casts } of stale) {
+      const { key, matrices, lod, fixed, cell } = again!;
+      fresh.push(batch(again!, casts, await instanced(scene, assets, key, matrices, lod, fixed, cell, pace)));
+    }
+    const replaced = gather(stale).meshes;
+    const commit = () => {
+      this.batches = this.batches.map((b) => fresh[stale.indexOf(b)] ?? b);
+      const going = new Set(replaced);
+      this.lawn = this.lawn.filter((layer) => !layer.meshes.some((mesh) => going.has(mesh)));
+      stale.forEach(({ again }, i) => {
+        if (!again!.tiles) return;
+        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles);
+        this.lawn.push(...layers);
+        if (this.lawnMask) this.hideLawn(layers, this.lawnMask);
+      });
     };
-    for (const forest of await perfTimeAsync('nature: forests', () => this.forests(scene, assets, pace))) add(forest, forest.casts);
-    for (const lawn of await perfTimeAsync('nature: lawns', () => this.lawns(scene, assets, world, pace))) add(lawn);
-    return { meshes, casters, only };
+    return { ...gather(fresh), replaced, commit };
   }
 
   private async terrain(scene: Scene, pace?: () => Promise<void>): Promise<Mesh> {
@@ -428,7 +455,7 @@ export class Landscape {
    * near the town are the full models and cast shadows; further ones use the low level of detail
    * (a file's own far version), which don't.
    */
-  private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<(Instanced & { casts: boolean })[]> {
+  private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<void> {
     const rand = mulberry32(this.seed ^ 0x5eed);
     const near = new Map<string, Matrix[]>();
     const far = new Map<string, Matrix[]>();
@@ -480,7 +507,6 @@ export class Landscape {
         bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
       }
     }
-    const out: (Instanced & { casts: boolean })[] = [];
     const [cx, cz] = [this.w / 2, this.d / 2];
     const sector = (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     for (const [bucket, casts] of [
@@ -488,17 +514,17 @@ export class Landscape {
       [far, false],
     ] as const) {
       for (const [key, list] of bucket) {
-        out.push({ ...(await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector, pace)), casts });
+        const lod = casts ? 0 : 1;
+        this.batches.push(batch({ key, matrices: list, lod, fixed: true, cell: sector }, casts, await instanced(scene, assets, key, list, lod, true, sector, pace)));
       }
     }
-    return out;
   }
 
   /**
    * Grass tufts and wildflowers on the town's tiles. Every unpaved tile gets some; the ones
    * indoors or under furniture are hidden by `refreshLawn` (rooms and furniture change in build mode).
    */
-  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<Instanced[]> {
+  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
     const covered = [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...this.fields];
     const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
@@ -545,7 +571,6 @@ export class Landscape {
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     this.lawn = [];
-    const out: Instanced[] = [];
     // About `TUFT_CELL` squares over the town; the tufts scattered round it join the squares at its edge
     // (on their own they would be draws of a few tufts each).
     const [tw, td] = [world.width, groundDepth(world)];
@@ -556,19 +581,11 @@ export class Landscape {
       // (Flowers are sparse: too few triangles for groups to pay.)
       ['model.flowers', thin(flowers), thin(flowerTiles), undefined],
     ] as const) {
-      const lawn = await instanced(scene, assets, key, matrices, 0, false, cell, pace);
-      // Every instance, in the parts drawn whole; then each group's.
-      const groups = [{ meshes: [...lawn.shared, ...lawn.whole], indices: matrices.map((_, k) => k) }, ...lawn.cells];
-      for (const { meshes, indices } of groups) {
-        if (!meshes.length) continue;
-        const base = new Float32Array(indices.length * 16);
-        indices.forEach((k, i) => matrices[k].copyToArray(base, i * 16));
-        this.lawn.push({ meshes, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) });
-      }
-      out.push(lawn);
+      const built = await instanced(scene, assets, key, matrices, 0, false, cell, pace);
+      this.batches.push(batch({ key, matrices, lod: 0, fixed: false, cell, tiles }, false, built));
+      this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);
-    return out;
   }
 
   /**
@@ -589,15 +606,21 @@ export class Landscape {
     for (const o of world.objects) {
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) hidden[z * world.width + x] = 1;
     }
-    for (const layer of this.lawn) {
+    this.lawnMask = { width: world.width, hidden, splitAxis };
+    this.hideLawn(this.lawn, this.lawnMask);
+  }
+
+  /** Hides the tufts and flowers of `layers` on the tiles `mask` hides them on (`refreshLawn`), and shows the rest. */
+  private hideLawn(layers: LawnLayer[], { width, hidden, splitAxis }: LawnMask): void {
+    for (const layer of layers) {
       let changed = false;
       for (let k = 0; k < layer.tiles.length; k++) {
         const t = layer.tiles[k];
         let hide = t >= 0 ? hidden[t] : 0;
         if (hide > 1) {
           // The tuft's position within its tile decides its half.
-          const fx = layer.base[k * 16 + 12] - (t % world.width);
-          const fz = layer.base[k * 16 + 14] - Math.floor(t / world.width);
+          const fx = layer.base[k * 16 + 12] - (t % width);
+          const fz = layer.base[k * 16 + 14] - Math.floor(t / width);
           const axis = splitAxis.get(t) ?? 'dp';
           const half = axis === 'dp' ? (fz < fx ? 0 : 1) : fx + fz < 1 ? 0 : 1;
           // Tufts right at the wall would poke through it.
@@ -635,6 +658,82 @@ interface Instanced {
   shared: Mesh[];
   whole: Mesh[];
   cells: { meshes: Mesh[]; indices: number[] }[];
+  /** The model's files that failed to load (`ModelTemplate.failed`): it's built again when one comes (`Landscape.rebuild`). */
+  failed?: string[];
+}
+
+/** One model's plants, as the landscape keeps them. */
+interface Batch {
+  built: Instanced;
+  /** Its parts drawn whole cast shadows (the woods near the town). */
+  casts: boolean;
+  /** What it was built from, kept only while it's built without a file (`built.failed`), to build it again when that comes (`rebuild`). */
+  again?: BatchSource;
+}
+
+/** `instanced`'s arguments for a model's plants. */
+interface BatchSource {
+  key: string;
+  matrices: Matrix[];
+  lod: 0 | 1;
+  fixed: boolean;
+  cell?: (x: number, z: number) => string;
+  /** The lawn's: each instance's town tile (-1 outside the town), for `refreshLawn`. */
+  tiles?: readonly number[];
+}
+
+/** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
+function batch(source: BatchSource, casts: boolean, built: Instanced): Batch {
+  return { built, casts, ...(built.failed ? { again: source } : {}) };
+}
+
+/** A landscape's plants built again (`Landscape.rebuild`): the new meshes, the ones they replace, and the swap. */
+export interface NatureRebuild extends NatureResult {
+  replaced: Mesh[];
+  commit: () => void;
+}
+
+/** Lawn tufts or flowers drawn by `meshes`: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
+interface LawnLayer {
+  meshes: Mesh[];
+  base: Float32Array;
+  shown: Float32Array;
+  tiles: Int32Array;
+  hidden: Uint8Array;
+}
+
+/** Where the lawn is hidden (`refreshLawn`): per town tile, and the split tiles' diagonals. */
+interface LawnMask {
+  width: number;
+  hidden: Uint8Array;
+  splitAxis: Map<number, 'dp' | 'dn'>;
+}
+
+/** The meshes of `batches`: which cast shadows, and which are drawn only in the game or only in the menus' town (see `NatureResult`). */
+function gather(batches: readonly Batch[]): NatureResult {
+  const meshes: Mesh[] = [];
+  const casters: Mesh[] = [];
+  const only = new Map<Mesh, 'game' | 'town'>();
+  for (const { built, casts } of batches) {
+    const groups = built.cells.flatMap((cell) => cell.meshes);
+    meshes.push(...built.shared, ...built.whole, ...groups);
+    for (const mesh of built.whole) only.set(mesh, 'town');
+    for (const mesh of groups) only.set(mesh, 'game');
+    if (casts) casters.push(...built.shared, ...built.whole);
+  }
+  return { meshes, casters, only };
+}
+
+/** The lawn layers of a model's tufts or flowers: every instance, in the parts drawn whole; then each group's. */
+function lawnLayers(built: Instanced, matrices: readonly Matrix[], tiles: readonly number[]): LawnLayer[] {
+  const layers: LawnLayer[] = [];
+  for (const { meshes, indices } of [{ meshes: [...built.shared, ...built.whole], indices: matrices.map((_, k) => k) }, ...built.cells]) {
+    if (!meshes.length) continue;
+    const base = new Float32Array(indices.length * 16);
+    indices.forEach((k, i) => matrices[k].copyToArray(base, i * 16));
+    layers.push({ meshes, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) });
+  }
+  return layers;
 }
 
 /**
@@ -654,8 +753,10 @@ async function instanced(
 ): Promise<Instanced> {
   if (matrices.length === 0) return { shared: [], whole: [], cells: [] };
   await pace?.();
-  // (The landscape isn't built again when a file that failed comes, so it isn't tried in the background.)
-  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod, retry: false }));
+  // Without its file, nothing, until the file comes (`Landscape.rebuild`).
+  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod }));
+  // On no layer until its owner draws it: built again, it comes in beside what's drawn, unseen until it's whole.
+  for (const mesh of template.meshes) mesh.layerMask = 0;
   await pace?.();
   const groups = new Map<string, number[]>();
   if (cell) {
@@ -676,6 +777,7 @@ async function instanced(
     const part = new Mesh(`${mesh.name}#${c}`, scene);
     mesh.geometry?.copy(`${mesh.geometry.id}#${c}`).applyToMesh(part);
     part.material = mesh.material;
+    part.layerMask = 0;
     // Groups are flat and wide: their boxes fit them far better than the spheres Babylon tests by default.
     part.cullingStrategy = Constants.MESHES_CULLINGSTRATEGY_STANDARD;
     return part;
@@ -697,7 +799,7 @@ async function instanced(
     await pace?.();
   }
   perfEnd(span);
-  return { shared: template.meshes.filter((mesh) => !split.includes(mesh)), whole: split, cells };
+  return { shared: template.meshes.filter((mesh) => !split.includes(mesh)), whole: split, cells, ...(template.failed ? { failed: template.failed } : {}) };
 }
 
 // ---- Garden dressing ------------------------------------------------------------------
