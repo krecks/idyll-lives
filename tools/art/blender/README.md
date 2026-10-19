@@ -378,3 +378,6 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
+| `manifest.py` | plain Python, no bpy: the manifests and content as the gate reads them (`manifests`, `known_keys`, `played`), and centres.json (`read_centres`, `write_centres`) |
+| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file and renders `previews/rt_<name>.png` |
+| `centres.py` | run by `cargo art --centres`: imports every family (no build) and writes centres.json |
