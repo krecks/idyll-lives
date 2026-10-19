@@ -264,7 +264,7 @@ export interface HouseBuild {
   shrubs: [number, number, number, number][];
   trees: [number, number, number, number][];
   surfaces: HouseSurfaces;
-  /** Door leaves that swing shut (front doors, bathroom doors); the rest stand open. */
+  /** Door leaves that swing (front doors, bathroom doors, doors onto a diagonal wall); the rest stand open. */
   doors: DoorLeaf[];
 }
 
@@ -285,8 +285,11 @@ export interface DoorLeaf {
   bath: number;
 }
 
-/** What a doorway needs to know of a leaf that swings, before its meshes exist. */
-type SwingSpec = Omit<DoorLeaf, 'meshes' | 'bath'> & { hinge: [number, number]; rooms: [number, number] };
+/**
+ * What a doorway needs to know of a leaf that swings, before its meshes exist. `slant`: it opens
+ * onto a tile split by a diagonal wall (and so only part way, see `slantClear`).
+ */
+type SwingSpec = Omit<DoorLeaf, 'meshes' | 'bath'> & { hinge: [number, number]; rooms: [number, number]; slant: boolean };
 
 /**
  * Where coverings lie in the viewed house, for Build mode's previews: each wall face
@@ -725,11 +728,13 @@ export class HouseBuilder {
     // Covered faces: one bucket per finish (tinted per covering), and natural-wood door leaves.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
     const doorWood = new Geo();
-    // Front doors and bathroom doors swing (each leaf its own meshes); the others stand open.
+    // Front doors and bathroom doors swing (each leaf its own meshes), and so does a door onto a
+    // tile split by a diagonal wall, to stand open only as far as that wall lets it; the others
+    // stand open.
     const swinging: { spec: SwingSpec & { bath: number }; trim: Geo; wood: Geo; glass: Geo }[] = [];
     const swing = (spec: SwingSpec) => {
       const bath = spec.rooms.find((r) => r && kinds.get(r) === 'bath') ?? 0;
-      if (storey.preview || (!spec.front && !bath)) return null;
+      if (storey.preview || (!spec.front && !bath && !spec.slant)) return null;
       const leaf = { spec: { ...spec, bath }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
       swinging.push(leaf);
       return leaf;
@@ -888,7 +893,9 @@ export class HouseBuilder {
           segment(axis, x, z, head, H, Cut.Hide, run.index > 0 ? base : undefined, run.index < run.len - 1 ? base + 1 : undefined);
           // A wall a tile in front, on the side the door swings to (an open leaf must stay clear of it).
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
-          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing, ahead }, lookOf(axis, x, z).style, head, run);
+          // A diagonal wall across the tile it swings into (the tile on that side of the edge).
+          const slant = (into: number) => (axis === 'h' ? diagonal(x, into > 0 ? z : z - 1) : diagonal(into > 0 ? x : x - 1, z));
+          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing, ahead, slant }, lookOf(axis, x, z).style, head, run);
         }
       }
     }
@@ -1450,7 +1457,7 @@ export class HouseBuilder {
     add(lid, 'ceilingShadow', M.trim, { cut: false, cast: true, shadowOnly: true });
     const doors: DoorLeaf[] = [];
     for (const { spec, trim: t, wood: w, glass: g } of swinging) {
-      const { hinge, rooms, ...leaf } = spec;
+      const { hinge, rooms, slant: _slant, ...leaf } = spec;
       const at = meshes.length;
       add(t, 'doorLeaf', M.trim, { cast: true });
       add(w, 'doorLeaf', M.door, { cast: true });
@@ -1688,7 +1695,13 @@ export class HouseBuilder {
     trim: Geo,
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
-    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null; ahead?: (into: number) => boolean },
+    geos: {
+      wood: Geo;
+      glass: (room: number) => Geo;
+      swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null;
+      ahead?: (into: number) => boolean;
+      slant?: (into: number) => DiagonalWall | undefined;
+    },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
@@ -1713,28 +1726,42 @@ export class HouseBuilder {
     const outdoorB = axis === 'h' ? roomP(x + 0.5, z + 0.25) === 0 : roomP(x + 0.25, z + 0.5) === 0;
     const front = outdoorA !== outdoorB;
     const into = outdoorA ? 1 : -1; // swing towards the indoor side
-    // Leaf space: `s` across its thickness from the hinge jamb, `l` from the hinge outwards. The
-    // second leaf of a double door hangs on the far jamb.
-    const far = run.len > 1 && run.index === run.len - 1;
-    const hinge = far ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
+    // Leaf space: `s` across its thickness from the hinge jamb, `l` from the hinge outwards.
     const at = (l: number) => (axis === 'h' ? z : x) + into * (T + 0.01 + l);
     // The leaf's glass belongs to the room it stands in.
     const inside = axis === 'h' ? roomP(x + 0.5, z + into * 0.25) : roomP(x + into * 0.25, z + 0.5);
-    // A leaf that swings shut makes a quarter turn over to the far jamb (the second leaf of a
-    // double door back to its own), ending in the middle of the wall, each face in its own
-    // room's light: about a point by the hinge that carries its hinge edge there.
-    const jamb = far ? hinge + LEAF_T : hinge;
-    const across = far ? -1 : 1;
-    const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
-    const [from, to]: [number, number][] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
     const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
     // A leaf that shuts fills its opening (a double door's up to the middle). Open, a double
     // door's leaf would reach past a wall a tile in front: then it opens only as far as clears it.
     const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
     // (Open, it reaches from T + 0.01 off its wall line; the wall ahead's face is 1 - T away.)
     const clear = 1 - T - (T + 0.01) - 0.01;
-    const opens = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
-    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms });
+    const ahead = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
+    // A leaf on either jamb (`far`: the far one). One that swings shut makes a quarter turn over
+    // to the other jamb (the second leaf of a double door back to its own), ending in the middle
+    // of the wall, each face in its own room's light: about a point by the hinge that carries its
+    // hinge edge there. A diagonal wall across the tile it swings into stops it short.
+    const slant = geos.slant?.(into);
+    const hang = (far: boolean) => {
+      const hinge = far ? base + 1 - T - 0.02 - LEAF_T : base + T + 0.02;
+      const jamb = far ? hinge + LEAF_T : hinge;
+      const across = far ? -1 : 1;
+      const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
+      const [from, to]: [number, number][] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
+      const pivot = turnAbout(from, to, close);
+      const line = (l: number): P2 => (axis === 'h' ? [hinge + LEAF_T / 2, at(l)] : [at(l), hinge + LEAF_T / 2]);
+      const opens = slant ? Math.min(ahead, slantClear([line(SLANT_SKIP), line(fill)], pivot, close, diagonalEnds(slant.axis, slant.x, slant.z))) : ahead;
+      return { hinge, close, pivot, opens };
+    };
+    // The second leaf of a double door hangs on the far jamb; a single door onto a diagonal wall
+    // hangs on whichever jamb lets it open further (the near one when they're even).
+    let hung = hang(run.len > 1 && run.index === run.len - 1);
+    if (slant && run.len === 1) {
+      const other = hang(true);
+      if (other.opens > hung.opens) hung = other;
+    }
+    const { hinge, close, opens } = hung;
+    const own = geos.swing?.({ hinge: hung.pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slant: !!slant });
     const glass = own ? own.glass : geos.glass(inside);
     // (One that stands open for good keeps the usual width.)
     const width = own ? fill : LEAF_W;
@@ -1920,6 +1947,37 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
   const lo = Math.min(d0, d1);
   const hi = Math.max(d0, d1);
   return axis === 'h' ? [a0, y0, lo, a1, y1, hi] : [lo, y0, a0, hi, y1, a1];
+}
+
+/** How much of a leaf by its hinge `slantClear` leaves out (metres): it stays in the jamb and the corner post. */
+const SLANT_SKIP = 0.2;
+
+/**
+ * How far a door leaf can swing open (a fraction of its quarter turn) before it meets the
+ * diagonal wall `wall` (its centre line's ends) across the tile in front: swept a degree at a
+ * time from shut, it stops 5 degrees short of the first that touches (0: it stays shut). `leaf`:
+ * its centre line drawn open, from `SLANT_SKIP` off the hinge to its edge; it turns about `pivot`,
+ * by `close` radians when shut (as `swingDoors` turns it).
+ */
+function slantClear(leaf: [P2, P2], pivot: P2, close: number, wall: [P2, P2]): number {
+  const reach = T + LEAF_T / 2;
+  const [[ax, az], [bx, bz]] = wall;
+  const [wx, wz] = [bx - ax, bz - az];
+  const length2 = wx * wx + wz * wz;
+  for (let deg = 1; deg <= 90; deg++) {
+    const turn = close * (1 - deg / 90);
+    const [c, s] = [Math.cos(turn), Math.sin(turn)];
+    for (let k = 0; k <= 8; k++) {
+      // A point along the leaf, turned about the pivot (R: (x, z) -> (x c + z s, z c - x s)).
+      const lx = leaf[0][0] + ((leaf[1][0] - leaf[0][0]) * k) / 8 - pivot[0];
+      const lz = leaf[0][1] + ((leaf[1][1] - leaf[0][1]) * k) / 8 - pivot[1];
+      const px = pivot[0] + lx * c + lz * s - ax;
+      const pz = pivot[1] + lz * c - lx * s - az;
+      const t = Math.max(0, Math.min(1, (px * wx + pz * wz) / length2));
+      if (Math.hypot(px - t * wx, pz - t * wz) < reach) return Math.max(0, deg - 5) / 90;
+    }
+  }
+  return 1;
 }
 
 /** The point a turn about y (`turn` radians, as a mesh's `rotation.y`) carries `from` (x, z) to `to` about. */
