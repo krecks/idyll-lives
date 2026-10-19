@@ -22,6 +22,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'assets'))
 PREVIEW = os.path.join(HERE, 'previews')
 CONTENT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'content'))
+# Where each Blender-built model is centred at rest (its Model's `centre`, (0, 0) for most): {key: [x, depth]},
+# for this gate only (the game doesn't read it, so it stays out of the manifests it downloads). A build writes
+# its models' (gamekit/family.py), `build.py --centres` every family's without Blender. A key that isn't in it
+# isn't built here (a third-party file): its centre isn't checked.
+CENTRES = os.path.join(HERE, 'centres.json')
 
 # Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 # primitive parts' median and 90th percentile in each class, so a model costs what the
@@ -40,6 +45,33 @@ WALL = 0.07
 FLOOR_TOP = 0.012
 # A use's clip longer than this (s) reads as slow ("about 1 s"); loops and ambient clips keep their own pace.
 USE_CLIP = 3.0
+# How far (m) a model may reach past its footprint at rest (its parts' boxes: a handle, a knob), and how far a
+# part that goes round may sweep past it (measured from its vertices, so tighter: a fan's blades whose axis
+# stood 3.3 cm off the middle swept 1.97 cm past).
+OVERHANG = 0.02
+SWEEP = 0.01
+# How far (m) a model's middle at rest may be off its `centre` (centres.json).
+OFF_CENTRE = 0.02
+
+
+def read_centres(path=CENTRES):
+    """{key: [x, depth]}: centres.json (empty if there's none yet)."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def write_centres(centres, path=CENTRES, replace=False):
+    """Writes `centres` ({key: (x, depth)}) over centres.json's entries for those keys, keeping the others
+    (`replace`: dropping them): one key a line, sorted, to 0.1 mm."""
+    out = {} if replace else read_centres(path)
+    out.update({key: [round(float(v), 4) + 0.0 for v in c] for key, c in centres.items()})
+    lines = [f'  {json.dumps(key)}: {json.dumps(c)}' for key, c in sorted(out.items())]
+    with open(path, 'w') as f:
+        f.write('{\n' + ',\n'.join(lines) + '\n}\n')
+    return path
 
 
 def manifests(path):
@@ -95,10 +127,11 @@ def apply(m, v):
             m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14]]
 
 
-def node_matrices(gltf, pose=None):
+def node_matrices(gltf, pose=None, worlds=None):
     """(mesh, world matrix (column-major 4x4 list), moving part, node) per mesh node, for the default scene.
     The moving part is the nearest node above it (or itself) that an animation moves, or None. `pose`
-    ({node: {'scale': …}}) puts nodes elsewhere than at rest (a part grown, `grown`)."""
+    ({node: {'scale': …}}) puts nodes elsewhere than at rest (a part grown, `grown`). `worlds`, a dict, gets
+    every node's world matrix."""
     def local(n, i):
         if 'matrix' in n:
             return n['matrix']
@@ -122,6 +155,8 @@ def node_matrices(gltf, pose=None):
 
     def walk(i, parent, part):
         m = mul(parent, local(nodes[i], i))
+        if worlds is not None:
+            worlds[i] = m
         part = i if i in moved else part
         if 'mesh' in nodes[i]:
             out.append((nodes[i]['mesh'], m, part, i))
@@ -230,6 +265,93 @@ def motions_errors(motions):
         elif 'at' in clock and not isinstance(clock['at'], (int, float)):
             errors.append(f'`motions.clock.at` {clock["at"]!r} is no time (minutes past twelve)')
     return errors
+
+
+def qmul(a, b):
+    """The product of two quaternions (x, y, z, w)."""
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+
+
+def turning(gltf, binary, motions):
+    """[(clip, node, axis)]: the parts a clip that goes round (`loops`: a loop, `idle`, a clock's hand) turns one
+    way about one axis all through (G.spin: a fan's blades, a wheel; not G.rock, which turns back), so they
+    sweep a whole circle as it repeats. `axis`: the turn's axis in the node's own frame (unit)."""
+    out = []
+    going = loops(motions)
+    for a in gltf.get('animations', []):
+        if a.get('name', '') not in going:
+            continue
+        for c in a['channels']:
+            node = c['target'].get('node')
+            if c['target'].get('path') != 'rotation' or node is None:
+                continue
+            keys = values(gltf, binary, a['samplers'][c['sampler']]['output'])
+            # Each step from one key to the next, in the part's own frame: a turn about one axis, one way.
+            steps = [qmul((-p[0], -p[1], -p[2], p[3]), q) for p, q in zip(keys, keys[1:])]
+            steps = [st if st[3] >= 0 else tuple(-v for v in st) for st in steps]
+            big = max(steps, key=lambda st: math.hypot(*st[:3]), default=None)
+            if big is None or math.hypot(*big[:3]) < 1e-6:
+                continue
+            n = math.hypot(*big[:3])
+            axis = tuple(v / n for v in big[:3])
+            if all(sum(x * y for x, y in zip(st[:3], axis)) > -1e-6 and math.dist(st[:3], tuple(v * math.hypot(*st[:3]) for v in axis)) < 1e-3
+                   for st in steps):
+                out.append((a.get('name', ''), node, axis))
+    return out
+
+
+def swept(gltf, binary, motions):
+    """[(clip, part name, (x lo, x hi), (depth lo, depth hi), radius)]: the floor-plan box each `turning` part sweeps,
+    a whole circle round its pivot (in game axes), and how far it reaches from its axis."""
+    turns = turning(gltf, binary, motions)
+    if not turns:
+        return []
+    worlds = {}
+    meshes = node_matrices(gltf, worlds=worlds)
+    nodes = gltf.get('nodes', [])
+    out = []
+    for clip, node, axis in turns:
+        below, todo = set(), [node]
+        while todo:
+            i = todo.pop()
+            below.add(i)
+            todo += nodes[i].get('children', [])
+        w = worlds.get(node)
+        if w is None:
+            continue
+        pivot = w[12:15]
+        a = [w[0] * axis[0] + w[4] * axis[1] + w[8] * axis[2], w[1] * axis[0] + w[5] * axis[1] + w[9] * axis[2],
+             w[2] * axis[0] + w[6] * axis[1] + w[10] * axis[2]]
+        n = math.hypot(*a)
+        a = [v / n for v in a]
+        # A circle round the axis reaches r * sqrt(1 - a_k^2) either side of its centre along axis k.
+        spread = [math.sqrt(max(0.0, 1 - a[k] * a[k])) for k in range(3)]
+        lo, hi, radius = [math.inf] * 3, [-math.inf] * 3, 0.0
+        for mesh_index, m, _part, mesh_node in meshes:
+            if mesh_node not in below:
+                continue
+            for prim in gltf['meshes'][mesh_index]['primitives']:
+                index = prim['attributes']['POSITION']
+                pos = accessor(gltf, binary, index)
+                if pos is None:
+                    box = gltf['accessors'][index]
+                    pos = [(x, y, z) for x in (box['min'][0], box['max'][0]) for y in (box['min'][1], box['max'][1])
+                           for z in (box['min'][2], box['max'][2])]
+                for v in pos:
+                    d = [q - p for q, p in zip(apply(m, v), pivot)]
+                    along = sum(x * y for x, y in zip(d, a))
+                    r = math.dist(d, [along * k for k in a])
+                    radius = max(radius, r)
+                    for k in range(3):
+                        centre = pivot[k] + along * a[k]
+                        lo[k], hi[k] = min(lo[k], centre - r * spread[k]), max(hi[k], centre + r * spread[k])
+        if lo[0] <= hi[0]:
+            # glTF x -> game -x
+            out.append((clip, nodes[node].get('name', node), (-hi[0], -lo[0]), (lo[2], hi[2]), radius))
+    return out
 
 
 def check_clips(gltf, binary, entry):
@@ -574,9 +696,17 @@ def content_warnings(facts, lo, slo, shi, sparts, scale, gltf, binary, pose, ent
     if facts and layer in ('floor', 'wall', 'ceiling') and not facts['outside'] and 'vary' not in entry:
         w, d = facts['footprint']
         over = max(-w / 2 - slo[0], shi[0] - w / 2, -d / 2 - slo[2], shi[2] - d / 2)
-        if over > 0.02:
+        if over > OVERHANG:
             warnings.append(f'reaches {over * 100:.1f} cm past its {w} x {d} footprint (x {slo[0]:.2f} to {shi[0]:.2f}, '
                             f'depth {slo[2]:.2f} to {shi[2]:.2f}): it overlaps what stands next to it')
+        # A part that goes round (a fan's blades) sweeps a whole circle about its pivot, not just its rest pose.
+        for clip, name, (xlo, xhi), (zlo, zhi), radius in swept(gltf, binary, entry.get('motions') or {}):
+            xlo, xhi, zlo, zhi, radius = xlo * scale, xhi * scale, zlo * scale, zhi * scale, radius * scale
+            over = max(-w / 2 - xlo, xhi - w / 2, -d / 2 - zlo, zhi - d / 2)
+            if over > SWEEP:
+                warnings.append(f'turning ({clip!r}), {name} sweeps {over * 100:.1f} cm past its {w} x {d} footprint '
+                                f'(x {xlo:.3f} to {xhi:.3f}, depth {zlo:.3f} to {zhi:.3f}; {radius:.3f} m from its axis): '
+                                'it overlaps what stands next to it (keep its axis on the middle, or make it smaller)')
     # On a top: the game keeps the disc of its content `radius` round its origin clear on its host, so the
     # model reaches no farther (a square tray's corners, a model off its origin).
     if facts and layer == 'surface':
@@ -595,10 +725,11 @@ def content_warnings(facts, lo, slo, shi, sparts, scale, gltf, binary, pose, ent
     return warnings
 
 
-def check(entry, finishes, path, far=None, facts=None):
+def check(entry, finishes, path, far=None, facts=None, centre=None):
     """(errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
-    `facts`: those of each content object that draws it (`content_objects`)."""
-    errors, warnings, info = check_file(entry, finishes, path, facts)
+    `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
+    centred (centres.json; None: not built here, not checked)."""
+    errors, warnings, info = check_file(entry, finishes, path, facts, centre)
     summary = f'{info["size"] / 1024:6.1f} KB {info["tris"]:6d} tris {info["draws"]} draws {info["materials"]:2d} materials  ' \
               + ' x '.join(f'{d:.2f}' for d in info['dims']) + ' m'
     if info['clips']:
@@ -606,8 +737,8 @@ def check(entry, finishes, path, far=None, facts=None):
     if far:
         # Its far version (`far`): the same model, still, with far fewer triangles.
         try:
-            # (Without what the full model is checked for: its clips, colours and `centre`.)
-            far_entry = {k: v for k, v in entry.items() if k not in ('motions', 'paint', 'centre')}
+            # (Without what the full model is checked for: its clips, colours and centre.)
+            far_entry = {k: v for k, v in entry.items() if k not in ('motions', 'paint')}
             far_errors, far_warnings, far_info = check_file(far_entry, finishes, far)
         except (OSError, ValueError, KeyError, IndexError) as err:
             far_errors, far_warnings, far_info = [f'cannot read {far}: {err}'], [], None
@@ -629,9 +760,9 @@ def check(entry, finishes, path, far=None, facts=None):
     return errors, warnings, summary
 
 
-def check_file(entry, finishes, path, facts=None):
+def check_file(entry, finishes, path, facts=None, centre=None):
     """(errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
-    that draws it (`content_objects`), each checked."""
+    that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None."""
     errors, warnings = [], []
     gltf, binary, size = read_glb(path)
     required = set(gltf.get('extensionsRequired', []))
@@ -755,16 +886,14 @@ def check_file(entry, finishes, path, facts=None):
             errors.append(f'reaches {-lo[1] * 100:.1f} cm below the floor (origin on the floor, y = 0)')
         elif lo[1] > 0.005:
             warnings.append(f'floats {lo[1] * 100:.1f} cm above its origin (fine only on a wall or ceiling)')
-        # Centred where its `Model` says (`centre`, which the build writes when it isn't the middle: a fridge
-        # against the wall, a wall bed at the back of its tiles), at rest as `G.settle` centres it (grown, the
-        # dartboard's darts and the unrolled yoga mat reach forward). Many models are built in place, off the
-        # middle, and have none: they aren't checked.
-        centre = entry.get('centre')
-        if centre:
+        # Centred where its `Model` says (centres.json, which the build writes: the middle, or its `centre`, a
+        # fridge against the wall, a wall bed at the back of its tiles), at rest as `G.settle` centres it (grown,
+        # the dartboard's darts and the unrolled yoga mat reach forward). A file not built here isn't checked.
+        if centre is not None:
             at = ((lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2)
-            if max(abs(at[0] - centre[0]), abs(at[1] - centre[1])) > 0.02:
-                warnings.append(f'centred on (x {at[0]:.3f}, depth {at[1]:.3f}), its entry\'s `centre` is ({centre[0]:.3f}, {centre[1]:.3f}): '
-                                'rebuild it (the build writes `centre` from its Model)')
+            if max(abs(at[0] - centre[0]), abs(at[1] - centre[1])) > OFF_CENTRE:
+                warnings.append(f'centred on (x {at[0]:.3f}, depth {at[1]:.3f}), its Model\'s `centre` is ({centre[0]:.3f}, {centre[1]:.3f}) '
+                                '(centres.json): rebuild it, or `build.py --centres` if the Model changed')
         # Against what each content object that draws it says of it (two objects may share a model).
         seen = set()
         for fact in facts or [None]:
@@ -835,6 +964,12 @@ def main(argv):
                 finishes[key] = not entry.get('texture') and entry.get('alpha', 1) >= 1
                 if entry.get('alpha', 1) < 1:
                     SEE_THROUGH.add(key)
+    try:
+        centres = read_centres()
+    except (OSError, ValueError) as err:
+        print('FAIL centres.json')
+        print(f'       error: cannot read it: {err}')
+        return 1
     failed = 0
     checked = []
     # What can't be read at all: a model the content draws (or the command line names) that no manifest has,
@@ -867,7 +1002,7 @@ def main(argv):
         path = os.path.normpath(os.path.join(os.path.dirname(manifest), url))
         far = os.path.normpath(os.path.join(os.path.dirname(manifest), entry['far'])) if entry.get('far') else None
         try:
-            errors, warnings, summary = check(entry, finishes, path, far, facts.get(key))
+            errors, warnings, summary = check(entry, finishes, path, far, facts.get(key), centres.get(key))
         except (OSError, ValueError, KeyError, IndexError) as err:
             errors, warnings, summary = [f'cannot read {path}: {err}'], [], ''
         failed += bool(errors)

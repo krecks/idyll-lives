@@ -60,10 +60,6 @@
           "material": "cedar_dark",
           "label": "Posts & rails"
         }
-      ],
-      "centre": [
-        0,
-        0.025
       ]
     },
     "model.natureLover.pottingBench": {
@@ -143,10 +139,6 @@
           "material": "sage",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.13
       ]
     },
     "model.natureLover.birdFeeder": {
@@ -222,10 +214,6 @@
           "material": "roof",
           "label": "Roof"
         }
-      ],
-      "centre": [
-        0.01,
-        -0.05
       ]
     },
     "model.natureLover.gardenHammock": {
@@ -328,10 +316,6 @@
           "material": "copper",
           "label": "Copper"
         }
-      ],
-      "centre": [
-        0,
-        0.011
       ]
     },
     "model.natureLover.mossTerrarium": {
@@ -385,10 +369,6 @@
           "material": "walnut",
           "label": "Wood"
         }
-      ],
-      "centre": [
-        0.03,
-        0.049
       ]
     },
     "model.natureLover.glasshouse": {

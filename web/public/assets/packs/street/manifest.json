@@ -13,10 +13,6 @@
           "finish": "material.finish.wood"
         }
       },
-      "centre": [
-        0,
-        -0.037
-      ],
       "far": "../../models/street/bench.far.glb"
     },
     "model.street.planter": {
@@ -117,10 +113,6 @@
           "finish": "material.finish.metal"
         }
       },
-      "centre": [
-        0,
-        0.0163
-      ],
       "far": "../../models/street/busSign.far.glb"
     },
     "model.street.pot": {

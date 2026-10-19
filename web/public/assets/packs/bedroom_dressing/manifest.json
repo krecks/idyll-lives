@@ -75,10 +75,6 @@
           "material": "table_frame",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.003
       ]
     },
     "model.mirrorWall": {
@@ -104,10 +100,6 @@
           "material": "wall_frame",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.385
       ]
     },
     "model.mirrorFloor": {
@@ -130,10 +122,6 @@
           "material": "stand",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.155
       ]
     }
   }

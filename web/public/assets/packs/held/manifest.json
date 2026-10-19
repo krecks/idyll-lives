@@ -444,11 +444,7 @@
         "stew": {
           "finish": "material.finish.satin"
         }
-      },
-      "centre": [
-        0.0,
-        0.0575
-      ]
+      }
     },
     "tool.grillFood": {
       "type": "model",
@@ -466,11 +462,7 @@
         "sausage_b": {
           "finish": "material.finish.satin"
         }
-      },
-      "centre": [
-        -0.015,
-        -0.005
-      ]
+      }
     }
   }
 }

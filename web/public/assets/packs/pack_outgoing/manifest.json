@@ -96,10 +96,6 @@
           "material": "wood",
           "label": "Back bar"
         }
-      ],
-      "centre": [
-        0,
-        0.008
       ]
     },
     "model.outgoing.conversationSectional": {
@@ -224,10 +220,6 @@
           "material": "speaker",
           "label": "Speakers"
         }
-      ],
-      "centre": [
-        0,
-        0.007
       ]
     },
     "model.outgoing.videoCallNook": {
@@ -289,10 +281,6 @@
           "material": "wood",
           "label": "Wood"
         }
-      ],
-      "centre": [
-        0,
-        0.077
       ]
     },
     "model.outgoing.danceFloor": {
@@ -425,10 +413,6 @@
           "material": "cork",
           "label": "Board"
         }
-      ],
-      "centre": [
-        0,
-        -0.184
       ]
     }
   }

@@ -79,10 +79,6 @@
           "material": "cushion",
           "label": "Cushions"
         }
-      ],
-      "centre": [
-        0,
-        -0.107
       ]
     },
     "model.bookworm.libraryWall": {
@@ -147,10 +143,6 @@
           "material": "honey",
           "label": "Ladder"
         }
-      ],
-      "centre": [
-        0,
-        -0.02
       ]
     },
     "model.bookworm.writingBureau": {
@@ -228,10 +220,6 @@
           "material": "honey",
           "label": "Chair"
         }
-      ],
-      "centre": [
-        0.006,
-        -0.051
       ]
     },
     "model.bookworm.teaTrolley": {
@@ -288,10 +276,6 @@
           "material": "brass",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.184
       ]
     },
     "model.bookworm.firesideLounge": {
@@ -384,10 +368,6 @@
           "material": "rug",
           "label": "Rug"
         }
-      ],
-      "centre": [
-        0,
-        -0.005
       ]
     },
     "model.bookworm.bedsideStack": {
@@ -455,10 +435,6 @@
           "material": "panel",
           "label": "Drawers"
         }
-      ],
-      "centre": [
-        0.023,
-        -0.06
       ]
     }
   }

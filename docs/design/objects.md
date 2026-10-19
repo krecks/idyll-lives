@@ -366,10 +366,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   that animates anything but a node's transform or doesn't start at rest, a `motions` clip the file
   doesn't have, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no
   use plays, over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
-  materials, unused UVs, a floating origin, a model off its entry's `centre` (which the build writes
-  from the `Model`) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the
-  wall, one indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past
-  its footprint, a thing on a top that reaches more than 10 % past its content `radius` from its
+  materials, unused UVs, a floating origin, a Blender-built model off its `Model`'s `centre` (the
+  middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
+  only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
+  indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its
+  footprint at rest, or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
+  over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it; each against every content object that draws the model. No content fact says a thing
   stands against a wall, so one standing off it isn't caught. Plain Python, so CI can run it; inside

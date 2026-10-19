@@ -51,10 +51,6 @@
           "material": "mobile",
           "label": "Mobile"
         }
-      ],
-      "centre": [
-        -0.0175,
-        0.035
       ]
     },
     "model.kidsBed": {
@@ -101,10 +97,6 @@
           "material": "kids_bedding",
           "label": "Bedding"
         }
-      ],
-      "centre": [
-        0.005,
-        0.01
       ]
     },
     "model.kidsBedCar": {
@@ -151,10 +143,6 @@
           "material": "car_bedding",
           "label": "Bedding"
         }
-      ],
-      "centre": [
-        0.0,
-        0.028
       ]
     },
     "model.highChair": {
@@ -180,10 +168,6 @@
           "material": "chair_cushion",
           "label": "Bedding"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0599
       ]
     },
     "model.toyBox": {
@@ -229,10 +213,6 @@
           "material": "toybox_lid",
           "label": "Lid"
         }
-      ],
-      "centre": [
-        0.0,
-        -0.0389
       ]
     },
     "model.toyChest": {
@@ -278,10 +258,6 @@
           "material": "chest_trim",
           "label": "Trim"
         }
-      ],
-      "centre": [
-        0.0,
-        -0.1735
       ]
     },
     "model.dollHouse": {
@@ -339,10 +315,6 @@
           "material": "roof",
           "label": "Roof"
         }
-      ],
-      "centre": [
-        0.0,
-        -0.202
       ]
     },
     "model.rockingHorse": {
@@ -386,10 +358,6 @@
           "material": "saddle",
           "label": "Trim"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0426
       ]
     },
     "model.playTent": {
@@ -480,10 +448,6 @@
           "material": "pit_rim",
           "label": "Rim"
         }
-      ],
-      "centre": [
-        0.0,
-        0.035
       ]
     },
     "model.trainTable": {
@@ -597,10 +561,6 @@
           "material": "mat",
           "label": "Mat"
         }
-      ],
-      "centre": [
-        0.0,
-        0.03
       ]
     },
     "model.teddyBear": {
@@ -634,10 +594,6 @@
           "material": "bow",
           "label": "Bow"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0575
       ]
     },
     "model.beanBagKids": {
@@ -661,10 +617,6 @@
           "material": "bag",
           "label": "Bag"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0187
       ]
     },
     "model.kidsDesk": {
@@ -722,10 +674,6 @@
           "material": "kdesk_chair",
           "label": "Chair"
         }
-      ],
-      "centre": [
-        0.0,
-        0.01
       ]
     },
     "model.kidsTable": {
@@ -770,10 +718,6 @@
           "material": "kchair_seat",
           "label": "Seat"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0386
       ]
     },
     "model.kidsBookshelf": {
@@ -834,10 +778,6 @@
           "material": "kshelf_top",
           "label": "Top"
         }
-      ],
-      "centre": [
-        0.0,
-        -0.23
       ]
     },
     "model.kidsChalkboard": {
@@ -880,10 +820,6 @@
           "material": "slate",
           "label": "Board"
         }
-      ],
-      "centre": [
-        0.0,
-        0.0259
       ]
     },
     "model.kidsEasel": {

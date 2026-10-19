@@ -65,10 +65,6 @@
           "material": "plywood",
           "label": "Panel"
         }
-      ],
-      "centre": [
-        0,
-        0.007
       ]
     },
     "model.energetic.spinBike": {
@@ -121,10 +117,6 @@
           "material": "flywheel",
           "label": "Flywheel"
         }
-      ],
-      "centre": [
-        0,
-        0.1
       ]
     },
     "model.energetic.trampoline": {
@@ -171,10 +163,6 @@
           "material": "tramp_mat",
           "label": "Mat"
         }
-      ],
-      "centre": [
-        0,
-        0.022
       ]
     },
     "model.energetic.streetballHoop": {
@@ -231,10 +219,6 @@
           "material": "hoop_base",
           "label": "Base"
         }
-      ],
-      "centre": [
-        0,
-        0.013
       ]
     },
     "model.energetic.powerBlender": {
@@ -315,10 +299,6 @@
           "material": "motor",
           "label": "Blender"
         }
-      ],
-      "centre": [
-        0,
-        -0.115
       ]
     },
     "model.energetic.contrastShower": {
@@ -380,10 +360,6 @@
           "material": "shower_mat",
           "label": "Mat"
         }
-      ],
-      "centre": [
-        0,
-        0.02
       ]
     },
     "model.energetic.recoveryPod": {

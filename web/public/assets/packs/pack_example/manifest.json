@@ -80,10 +80,6 @@
           "material": "tile",
           "label": "Tiles"
         }
-      ],
-      "centre": [
-        0,
-        -0.099
       ]
     },
     "model.whirlpoolTub": {

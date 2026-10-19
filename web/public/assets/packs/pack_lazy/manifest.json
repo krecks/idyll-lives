@@ -100,10 +100,6 @@
           "material": "hood",
           "label": "Hood"
         }
-      ],
-      "centre": [
-        0,
-        0.024
       ]
     },
     "model.lazy.quiltTable": {
@@ -163,10 +159,6 @@
           "material": "pouf",
           "label": "Poufs"
         }
-      ],
-      "centre": [
-        0,
-        0.016
       ]
     },
     "model.lazy.deliveryLocker": {
@@ -233,10 +225,6 @@
           "material": "accent",
           "label": "Trim"
         }
-      ],
-      "centre": [
-        0,
-        -0.025
       ]
     },
     "model.lazy.vibePlate": {
@@ -286,10 +274,6 @@
           "material": "pad",
           "label": "Deck"
         }
-      ],
-      "centre": [
-        0.02,
-        0.025
       ]
     },
     "model.lazy.smartHub": {
@@ -336,10 +320,6 @@
           "material": "speaker",
           "label": "Speaker"
         }
-      ],
-      "centre": [
-        0,
-        -0.009
       ]
     }
   }

@@ -61,10 +61,6 @@
         }
       },
       "sink": 0.115,
-      "centre": [
-        0.085,
-        0.01
-      ],
       "far": "../../models/ground/rock.far.glb"
     },
     "model.marker": {

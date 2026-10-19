@@ -78,10 +78,6 @@
           "material": "curtain",
           "label": "Curtains"
         }
-      ],
-      "centre": [
-        0,
-        0.025
       ]
     },
     "model.couchPotato.gameConsole": {
@@ -158,10 +154,6 @@
           "material": "mustard",
           "label": "Cushion"
         }
-      ],
-      "centre": [
-        0,
-        0.02
       ]
     },
     "model.couchPotato.recliner": {
@@ -207,10 +199,6 @@
           "material": "throw",
           "label": "Throw"
         }
-      ],
-      "centre": [
-        -0.01,
-        -0.02
       ]
     },
     "model.couchPotato.snackFridge": {
@@ -352,10 +340,6 @@
           "material": "board",
           "label": "Board"
         }
-      ],
-      "centre": [
-        0.032,
-        0.01
       ]
     },
     "model.couchPotato.lavaLamp": {
@@ -403,10 +387,6 @@
           "material": "vessel",
           "label": "Glass"
         }
-      ],
-      "centre": [
-        0.005,
-        0.015
       ]
     }
   }

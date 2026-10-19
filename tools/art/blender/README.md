@@ -9,6 +9,7 @@ The content fields are in [docs/content-packs.md](../../../docs/content-packs.md
 ```
 build.py          the runner (plain python3): runs Blender on a family, then the gate
 check_glb.py      the gate (plain python3): every .glb the manifests use, against its entry
+centres.json      where each model built here is centred at rest, for the gate only (the build writes it)
 gamekit/          the toolkit every family imports as G
 families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
                   bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
@@ -52,7 +53,16 @@ python3 -B tools/art/blender/build.py garden_decor --preview   # previews/<id>.p
 python3 -B tools/art/blender/build.py --all                    # every family (not _template)
 python3 -B tools/art/blender/build.py _template --preview      # the template only previews
 python3 -I -B tools/art/blender/check_glb.py [model.fridge …]  # the gate alone
+python3 -B tools/art/blender/build.py --centres                # centres.json from every family, no Blender
 ```
+
+`centres.json` holds each model's `centre` (key → `[x, depth]`; `[0, 0]`, the middle, for most): where
+`G.settle()` centred it, so the gate can tell a file that is off it (a stale export, a part moved). The
+game doesn't read it, so it stays out of the packs it downloads. A build writes its models' lines.
+`--centres` writes every family's, reading the family scripts with Blender's modules stood in for (no
+Blender, no build): run it after changing a `centre=` without rebuilding (the gate then warns of each
+file off its new centre), or after adding or removing models. A key it doesn't list isn't built here (a
+third-party file), and its centre isn't checked. Commit it with the models.
 
 `build.py` finds Blender in `$BLENDER`, then `/Applications/Blender.app`, then `PATH`. It prints the
 `[gamekit]` lines (sizes, triangles, what was built) and, when a build fails, the Python traceback. It
@@ -323,9 +333,10 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
   and off its content `surface`. Give its `Model` a `centre` (`G.settle()` centres it there), as the kitchen
   families do: the back of a counter or a fridge is 0.43 m in from the middle of its tile. A failed size or
-  centre check prints the measured centre, to copy into `centre=`. No content fact says a thing stands
-  against a wall (a counter and an island have the same top; `fillsWall` only keeps the wall over it
-  clear), so the gate can't tell one standing off it: check by eye.
+  centre check prints the measured centre, to copy into `centre=`. The gate warns of a file over 2 cm off
+  its `centre` (`centres.json`). No content fact says a thing stands against a wall (a counter and an
+  island have the same top; `fillsWall` only keeps the wall over it clear), so the gate can't tell one
+  standing off it: check by eye.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
   reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it
@@ -337,6 +348,11 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Size check.** It counts everything at rest: knobs, handles, a folded bed's foot rail. Set `size` from
   the measured `[gamekit]` line once the model looks right.
 - **Off-centre models.** These need `centre=` on the `Model`. Otherwise the size check fails.
+- **Lopsided turning parts.** `G.settle()` centres the model's box, which moves a part that goes round
+  off the middle when it reaches farther one way (five fan blades: 3.3 cm), and it then sweeps past its
+  tile. Build it with its axis on the middle, `G.settle(centre=False)`, and give the `Model` the box's
+  middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate warns of a part a loop or ambient
+  clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
   is clicked by its whole tiles. The contact shadow follows the footprint.
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.

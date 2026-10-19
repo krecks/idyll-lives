@@ -13,7 +13,7 @@ from .preview import preview, preview_clips
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
 # (export.py, imported above, puts check_glb.py's folder on the path.)
-from check_glb import known_keys, played  # the gate's readings of keys and `motions`, shared
+from check_glb import known_keys, played, write_centres  # the gate's readings of keys and `motions`, shared
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
 FAR_FEET = 0.01
@@ -47,8 +47,8 @@ class Model:
                  middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
                  that stands against a wall (a counter, a fridge) takes (0, -0.43 + depth / 2), so its back is
                  on the wall face (-0.43) and it meets the wall and its neighbours, and its content `surface`
-                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into the entry, for
-                 the gate (check_glb.py: centred there, and against the wall)
+                 stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into centres.json (the
+                 middle too), for the gate only (check_glb.py: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
@@ -133,7 +133,7 @@ class Family:
             if unknown:
                 sys.exit(f'{self.name}: no content object or item names {", ".join(unknown)} and no manifest has it: '
                          'a misspelt key=? (a model the game draws by code takes code=True)')
-        entries = {}
+        entries, centres = {}, {}
         for model in models:
             objs = self.make(model)
             if '--preview' in args:
@@ -159,14 +159,16 @@ class Family:
                 entry['parts'] = model.parts
             if model.sink:
                 entry['sink'] = model.sink
-            if tuple(model.centre) != (0, 0):
-                entry['centre'] = list(model.centre)
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
                 print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry
+            centres[self.key(model)] = model.centre
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
+        if centres:
+            # Where each file is centred, for the gate only: not in the pack the game downloads.
+            write_centres(centres)
         if entries and '--no-pack' not in args:
             path = write_pack(self.pack, entries, self.comment, code={self.key(m) for m in models if m.code}, known=known)
             print(f'[gamekit] wrote {os.path.relpath(path, ASSETS)}')

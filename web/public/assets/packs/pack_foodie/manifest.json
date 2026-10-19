@@ -54,10 +54,6 @@
           "material": "terracotta",
           "label": "Pots"
         }
-      ],
-      "centre": [
-        0,
-        -0.054
       ]
     },
     "model.foodie.deliPantry": {
@@ -142,10 +138,6 @@
           "material": "honey",
           "label": "Shelves"
         }
-      ],
-      "centre": [
-        0,
-        -0.155
       ]
     },
     "model.foodie.espressoBar": {
@@ -221,10 +213,6 @@
           "material": "machine",
           "label": "Machine"
         }
-      ],
-      "centre": [
-        0,
-        -0.18
       ]
     },
     "model.foodie.cookbookLectern": {
@@ -284,10 +272,6 @@
           "material": "cover",
           "label": "Cookbook"
         }
-      ],
-      "centre": [
-        0.022,
-        -0.123
       ]
     },
     "model.foodie.pizzaOven": {
@@ -392,10 +376,6 @@
           "material": "brick",
           "label": "Brick"
         }
-      ],
-      "centre": [
-        0.005,
-        0.018
       ]
     },
     "model.foodie.chefsIsland": {
@@ -488,10 +468,6 @@
           "material": "oak",
           "label": "Stools"
         }
-      ],
-      "centre": [
-        0,
-        0.073
       ]
     }
   }

@@ -221,10 +221,6 @@
           "material": "shade",
           "label": "Shade"
         }
-      ],
-      "centre": [
-        0,
-        -0.295
       ]
     },
     "model.wallLampArm": {
@@ -258,10 +254,6 @@
           "material": "shade_metal",
           "label": "Shade"
         }
-      ],
-      "centre": [
-        0,
-        -0.218
       ]
     },
     "model.wallLightOutdoor": {
@@ -289,10 +281,6 @@
           "material": "lens",
           "label": "Shade"
         }
-      ],
-      "centre": [
-        0,
-        -0.375
       ]
     },
     "model.lamp": {
@@ -394,10 +382,6 @@
           "material": "marble",
           "label": "Base"
         }
-      ],
-      "centre": [
-        0,
-        -0.025
       ]
     },
     "model.lampFloorTripod": {

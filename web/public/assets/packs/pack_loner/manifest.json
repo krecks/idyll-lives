@@ -47,10 +47,6 @@
           "material": "cushion",
           "label": "Cushions"
         }
-      ],
-      "centre": [
-        0,
-        -0.0455
       ]
     },
     "model.loner.shortwaveRadio": {
@@ -116,10 +112,6 @@
           "material": "seatpad",
           "label": "Seat"
         }
-      ],
-      "centre": [
-        0,
-        0.113
       ]
     },
     "model.loner.puzzleTable": {
@@ -190,10 +182,6 @@
           "material": "wood",
           "label": "Wood"
         }
-      ],
-      "centre": [
-        0.003,
-        0.091
       ]
     },
     "model.loner.bonsaiBench": {
@@ -255,10 +243,6 @@
           "material": "glaze",
           "label": "Pot"
         }
-      ],
-      "centre": [
-        0,
-        -0.055
       ]
     },
     "model.loner.soloSauna": {
@@ -310,10 +294,6 @@
           "material": "cedar_dark",
           "label": "Trim"
         }
-      ],
-      "centre": [
-        0,
-        -0.222
       ]
     },
     "model.loner.deliveryHatch": {
@@ -382,10 +362,6 @@
           "material": "wood",
           "label": "Wood"
         }
-      ],
-      "centre": [
-        0,
-        -0.01
       ]
     }
   }

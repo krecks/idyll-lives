@@ -54,10 +54,6 @@
           "material": "pads",
           "label": "Pads"
         }
-      ],
-      "centre": [
-        0.032,
-        -0.005
       ]
     },
     "model.weightBench": {
@@ -100,10 +96,6 @@
           "material": "pads",
           "label": "Pads"
         }
-      ],
-      "centre": [
-        0,
-        -0.006
       ]
     },
     "model.exerciseBike": {
@@ -140,10 +132,6 @@
           "material": "pads",
           "label": "Pads"
         }
-      ],
-      "centre": [
-        0,
-        0.02
       ]
     },
     "model.yogaMat": {
@@ -173,10 +161,6 @@
           "material": "mat",
           "label": "Mat"
         }
-      ],
-      "centre": [
-        0.025,
-        -0.295
       ]
     },
     "model.dumbbells": {
@@ -210,10 +194,6 @@
           "material": "plate",
           "label": "Weights"
         }
-      ],
-      "centre": [
-        0,
-        0.025
       ]
     }
   }

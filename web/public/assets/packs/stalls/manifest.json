@@ -60,10 +60,6 @@
           "label": "Bands"
         }
       ],
-      "centre": [
-        -0.0235,
-        0.0023
-      ],
       "far": "../../models/stalls/iceCreamCart.far.glb"
     },
     "model.hotDogStand": {
@@ -118,10 +114,6 @@
           "material": "awning",
           "label": "Awning"
         }
-      ],
-      "centre": [
-        -0.0915,
-        0.0033
       ],
       "far": "../../models/stalls/hotDogStand.far.glb"
     },
@@ -190,10 +182,6 @@
           "label": "Body"
         }
       ],
-      "centre": [
-        0,
-        -0.056
-      ],
       "far": "../../models/stalls/vendingSnack.far.glb"
     },
     "model.vendingDrink": {
@@ -250,10 +238,6 @@
           "label": "Body"
         }
       ],
-      "centre": [
-        0,
-        -0.0375
-      ],
       "far": "../../models/stalls/vendingDrink.far.glb"
     },
     "model.marketStall": {
@@ -303,10 +287,6 @@
           "material": "awning_green",
           "label": "Awning"
         }
-      ],
-      "centre": [
-        0.0005,
-        0.02
       ],
       "far": "../../models/stalls/marketStall.far.glb"
     }

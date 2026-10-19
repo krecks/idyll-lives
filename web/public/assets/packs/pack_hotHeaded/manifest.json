@@ -95,10 +95,6 @@
           "material": "crate",
           "label": "Body"
         }
-      ],
-      "centre": [
-        0.003,
-        0.008
       ]
     },
     "model.hotHeaded.thunderDrums": {
@@ -149,10 +145,6 @@
           "material": "shell",
           "label": "Body"
         }
-      ],
-      "centre": [
-        0.005,
-        0.02
       ]
     },
     "model.hotHeaded.coolDownCushion": {
@@ -207,10 +199,6 @@
           "material": "zafu",
           "label": "Body"
         }
-      ],
-      "centre": [
-        0,
-        0.02
       ]
     },
     "model.hotHeaded.grudgeJournal": {
@@ -261,10 +249,6 @@
           "material": "body",
           "label": "Body"
         }
-      ],
-      "centre": [
-        0,
-        0.111
       ]
     },
     "model.hotHeaded.coldPlunge": {
@@ -321,10 +305,6 @@
           "material": "cedar",
           "label": "Body"
         }
-      ],
-      "centre": [
-        0,
-        -0.23
       ]
     }
   }

@@ -63,10 +63,6 @@
           "material": "amber",
           "label": "Trim"
         }
-      ],
-      "centre": [
-        0,
-        -0.183
       ]
     },
     "model.cheerful.karaokeMachine": {
@@ -131,10 +127,6 @@
           "material": "stage",
           "label": "Rug"
         }
-      ],
-      "centre": [
-        -0.06,
-        -0.005
       ]
     },
     "model.cheerful.mocktailCart": {
@@ -220,10 +212,6 @@
           "material": "brass",
           "label": "Frame"
         }
-      ],
-      "centre": [
-        0,
-        -0.045
       ]
     },
     "model.cheerful.rainbowHammock": {
@@ -334,10 +322,6 @@
           "material": "yoga",
           "label": "Mat"
         }
-      ],
-      "centre": [
-        0,
-        0.005
       ]
     },
     "model.cheerful.partyBooth": {
@@ -421,10 +405,6 @@
           "material": "curtain",
           "label": "Curtain"
         }
-      ],
-      "centre": [
-        0,
-        -0.015
       ]
     }
   }

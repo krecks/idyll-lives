@@ -86,10 +86,6 @@
           "label": "Trim"
         }
       ],
-      "centre": [
-        0,
-        -0.04
-      ],
       "far": "../../models/shops/shopCounter.far.glb"
     },
     "model.bakeryCase": {
@@ -217,10 +213,6 @@
           "label": "Trim"
         }
       ],
-      "centre": [
-        0,
-        -0.19
-      ],
       "far": "../../models/shops/groceryShelf.far.glb"
     },
     "model.cafeTable": {
@@ -266,10 +258,6 @@
           "material": "cane",
           "label": "Seat"
         }
-      ],
-      "centre": [
-        0,
-        -0.008
       ],
       "far": "../../models/shops/cafeChair.far.glb"
     }
