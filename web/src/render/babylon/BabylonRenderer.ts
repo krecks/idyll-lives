@@ -347,6 +347,10 @@ export class BabylonRenderer implements Renderer {
   /** World/overview builds in progress; snapshot recording waits until there are none. */
   private builds = 0;
   private snapshotGeneration = 0;
+  /** A snapshot recording to start, or to make again, before the next frame draws (see `applySnapshotDue`). */
+  private snapshotDue: 'record' | 'reset' | null = null;
+  /** Drawing to do in the next frame, before the scene is drawn (see `warmGame`). */
+  private beforeDraw: (() => void) | null = null;
   private readonly warmPose = { alpha: 0, beta: 0, radius: 0, x: 0, y: 0, z: 0, ox: 0, oy: 0 };
   /** Lot being shown; null = everything. */
   private view: ViewRect | null = null;
@@ -2426,6 +2430,7 @@ export class BabylonRenderer implements Renderer {
     this.updateCutaway();
     // The game draws live (see `scheduleSnapshot`).
     this.snapshotGeneration++;
+    this.snapshotDue = null;
     if (this.webgpu) this.webgpu.snapshotRendering = false;
   }
 
@@ -2527,34 +2532,39 @@ export class BabylonRenderer implements Renderer {
     });
     const gameMinute = this.lastMinute;
     town();
-    // Then draw the world once with that look, in the next frame (a whole render is a slice of its own).
-    await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-    if (!this.townMode) return;
-    this.townMode = false;
-    try {
-      copyPose(this.parked, cam);
-      // (The game's pose is the one the reflections are culled against, so they are ranked again here.)
-      this.mirrors.update(this.camera, null);
-      if (!this.mirrorWarmed) {
-        this.mirrorWarmed = true;
-        cam.layerMask = LAYER_WORLD;
-        this.scene.updateTransformMatrix();
-        // At its real size: the first live reflection at 512 would otherwise pay the same compile again.
-        this.mirrors.warm(0)();
+    // Then draw the world once with that look, in the next frame (a whole render is a slice of its
+    // own). Inside the render loop: a WebGPU draw outside a frame targets the canvas texture of the
+    // frame before, which is gone by the next submit, and that whole submit is then refused.
+    this.beforeDraw = () => {
+      if (!this.townMode) return;
+      this.townMode = false;
+      try {
+        copyPose(this.parked, cam);
+        // (The game's pose is the one the reflections are culled against, so they are ranked again here.)
+        this.mirrors.update(this.camera, null);
+        if (!this.mirrorWarmed) {
+          this.mirrorWarmed = true;
+          cam.layerMask = LAYER_WORLD;
+          this.scene.updateTransformMatrix();
+          // At its real size: the first live reflection at 512 would otherwise pay the same compile again.
+          this.mirrors.warm(0)();
+        }
+        perfTime('render: warm game draw', () => {
+          this.lastMinute = gameMinute;
+          this.applyLighting(gameMinute);
+          this.applyDig();
+          this.updateCutaway();
+          this.sunShadows.setOverview(false);
+          this.updateShadowList();
+          this.warmFrames = Math.max(1, this.warmFrames);
+          this.warmWorld();
+        });
+      } finally {
+        town();
       }
-      perfTime('render: warm game draw', () => {
-        this.lastMinute = gameMinute;
-        this.applyLighting(gameMinute);
-        this.applyDig();
-        this.updateCutaway();
-        this.sunShadows.setOverview(false);
-        this.updateShadowList();
-        this.warmFrames = Math.max(1, this.warmFrames);
-        this.warmWorld();
-      });
-    } finally {
-      town();
-    }
+    };
+    await this.framesRendered(1);
+    this.beforeDraw = null;
   }
 
   /** Shadow casters of what is on screen: the overview, or the game world (its walls only with walls up). */
@@ -2671,6 +2681,10 @@ export class BabylonRenderer implements Renderer {
         this.townFrame(dt);
         if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
       }
+      const before = this.beforeDraw;
+      this.beforeDraw = null;
+      before?.();
+      this.applySnapshotDue();
       const tScene = performance.now();
       this.scene.render();
       const sceneMs = performance.now() - tScene;
@@ -4154,14 +4168,30 @@ export class BabylonRenderer implements Renderer {
 
   /** Something on screen changed: a WebGPU recording is made again, and held reflections are drawn again. */
   private resetSnapshot(): void {
-    if (this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
+    if (this.webgpu?.snapshotRendering) this.snapshotDue ??= 'reset';
     this.mirrors?.changed();
+  }
+
+  /**
+   * Starts or restarts a snapshot recording, right before a frame draws. Babylon records from the
+   * render pass after the call: one made while a frame draws (the materials' refreeze and the
+   * recording's own start run after the scene's render targets) records only the canvas pass, and
+   * the replays then draw nothing but the clear colour until the next reset.
+   */
+  private applySnapshotDue(): void {
+    const due = this.snapshotDue;
+    const engine = this.webgpu;
+    this.snapshotDue = null;
+    if (!engine || !due) return;
+    if (due === 'record') engine.snapshotRendering = true;
+    else if (engine.snapshotRendering) engine.snapshotRenderingReset();
   }
 
   /** A world or overview build starts: no snapshot recording until every build is done. */
   private beginBuild(): void {
     this.builds++;
     this.snapshotGeneration++;
+    this.snapshotDue = null;
     if (this.webgpu) this.webgpu.snapshotRendering = false;
   }
 
@@ -4173,6 +4203,7 @@ export class BabylonRenderer implements Renderer {
   /** Stops replaying (the scene changed a lot) and records again once it has settled. */
   private pauseSnapshot(): void {
     this.snapshotGeneration++;
+    this.snapshotDue = null;
     if (this.webgpu) this.webgpu.snapshotRendering = false;
     if (this.builds === 0) this.scheduleSnapshot();
   }
@@ -4196,7 +4227,8 @@ export class BabylonRenderer implements Renderer {
         this.scene.onAfterRenderObservable.remove(observer);
         if (!current()) return;
         engine.snapshotRenderingMode = Constants.SNAPSHOTRENDERING_STANDARD;
-        engine.snapshotRendering = true;
+        // (This runs as the frame ends: the recording starts with the next one.)
+        this.snapshotDue = 'record';
         // Record once more after the first replays: the first recording can capture one-off
         // start-up state (late material freezes) and then stop following the camera.
         let again = 15;
