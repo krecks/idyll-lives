@@ -54,6 +54,7 @@ import {
   WebGPUEngine,
   WebGPUPerfCounter,
   type AbstractEngine,
+  type AbstractMesh,
   type PerformanceMonitor,
   type RenderTargetTexture,
   type RenderTargetWrapper,
@@ -526,7 +527,7 @@ export class BabylonRenderer implements Renderer {
   private readonly mOut = new Matrix();
   private simCount = 0;
   private readonly simInView = (x: number, z: number) => this.inView(x, z, SIM_VIEW_MARGIN);
-  private readonly residentRows = (mesh: object) => this.characters.rowsOf(mesh);
+  private readonly residentRows = (mesh: AbstractMesh) => this.characters.rowsOf(mesh);
   private readonly vTmp = new Vector3();
   private readonly vScale = new Vector3();
   private readonly qTmp = new Quaternion();
@@ -586,8 +587,10 @@ export class BabylonRenderer implements Renderer {
     // mirror pass compiles a clip-plane variant of every material it reflects, and those are the
     // expensive ones to lose when a household's world is torn down. Keep them alive: the cache
     // entry is still there, so the next world's first reflection reuses it instead of recompiling.
-    if (!(Effect.prototype as unknown as { keepsClipPlanes?: boolean }).keepsClipPlanes) {
-      (Effect.prototype as unknown as { keepsClipPlanes?: boolean }).keepsClipPlanes = true;
+    // SAFETY: `keepsClipPlanes` is our own marker on Babylon's runtime Effect class; its typings do not know it.
+    const effectProto = Effect.prototype as unknown as { keepsClipPlanes?: boolean };
+    if (!effectProto.keepsClipPlanes) {
+      effectProto.keepsClipPlanes = true;
       const dispose = Effect.prototype.dispose;
       Effect.prototype.dispose = function (this: Effect, ...args: Parameters<typeof dispose>) {
         if (/^#define CLIPPLANE\d*\b/m.test(this.defines)) return;
@@ -627,6 +630,7 @@ export class BabylonRenderer implements Renderer {
         } finally {
           const ms = performance.now() - start;
           if (ms > 20) {
+            // SAFETY: Babylon stores the compiled effect's cache key in the private `_key` field, set before this hook runs.
             const key = (this as unknown as { _key: string })._key ?? '';
             console.log(`[shader] ${ms.toFixed(0)} ms at ${start.toFixed(0)} ${this.name} mat ${material} defs ${this.defines.length} key ${key.slice(0, 140)}`);
             const name = String(this.name);
@@ -645,6 +649,7 @@ export class BabylonRenderer implements Renderer {
     }
     if (this.webgpu && new URLSearchParams(location.search).has('profile')) {
       // WebGPU builds a pipeline synchronously on first use: a slow one is a dropped frame, so name it.
+      // SAFETY: WebGPUEngine keeps its GPUDevice in the private `_device`; only read under `?profile`.
       const device = (this.webgpu as unknown as { _device?: { createRenderPipeline: (desc: { label?: string }) => unknown } })._device;
       if (device) {
         const create = device.createRenderPipeline.bind(device);
@@ -1267,8 +1272,9 @@ export class BabylonRenderer implements Renderer {
 
   setPlacementGhost(ghost: PlacementGhost | null): void {
     // Something for a wall in hand: the things on walls show, so what's in its way does.
-    if (!!ghost?.wall !== this.ghostOnWall) {
-      this.ghostOnWall = !!ghost?.wall;
+    const onWall = !!ghost?.wall;
+    if (onWall !== this.ghostOnWall) {
+      this.ghostOnWall = onWall;
       this.cutWallItems(Math.max(this.cutLook, 0));
       this.resetSnapshot();
     }
@@ -1969,15 +1975,18 @@ export class BabylonRenderer implements Renderer {
     } else if (want !== this.glTimer) {
       // WebGL2: EXT_disjoint_timer_query_webgl2 where the browser offers it (the query code loads on first use).
       this.glTimer = want;
-      void Promise.all([import('@babylonjs/core/Engines/AbstractEngine/abstractEngine.timeQuery'), import('@babylonjs/core/Engines/Extensions/engine.query')]).then(() =>
-        (this.engine as unknown as { captureGPUFrameTime(on: boolean): void }).captureGPUFrameTime(this.glTimer),
-      );
+      void Promise.all([import('@babylonjs/core/Engines/AbstractEngine/abstractEngine.timeQuery'), import('@babylonjs/core/Engines/Extensions/engine.query')]).then(() => {
+        // SAFETY: the WebGL2 query extension adds `captureGPUFrameTime` to the engine at runtime.
+        const engine = this.engine as unknown as { captureGPUFrameTime(on: boolean): void };
+        engine.captureGPUFrameTime(this.glTimer);
+      });
     }
   }
 
   /** GPU time of the whole frame, about the last second's average (ms), while measured. */
   private gpuMs(): number | null {
     if (this.webgpu) return this.gpuRecent.length ? this.gpuRecent.reduce((a, x) => a + x, 0) / this.gpuRecent.length : null;
+    // SAFETY: Babylon's WebGL2 timer keeps its running counter in the private `_gpuFrameTime`.
     const counter = this.glTimer ? (this.engine as unknown as { _gpuFrameTime?: { count: number; lastSecAverage: number } })._gpuFrameTime : undefined;
     return counter && counter.count > 0 ? counter.lastSecAverage / 1e6 : null;
   }
@@ -1991,6 +2000,7 @@ export class BabylonRenderer implements Renderer {
   private spanPasses(): void {
     type QuerySet = { readTwoValuesAndSubtract(first: number): Promise<number | null>; _getBuffer(first: number, count: number): GPUBuffer | null; _dstBuffers: GPUBuffer[]; spans?: true };
     const engine = this.webgpu!;
+    // SAFETY: WebGPUEngine's timestamp-query state is private (`_timestampQuery`); its shape is stable in 9.x.
     const current = () => (engine as unknown as { _timestampQuery: { _enabled: boolean; _measureDuration?: { _querySet?: QuerySet } } })._timestampQuery;
     const set = current()._measureDuration?._querySet;
     if (!set || set.spans || typeof set._getBuffer !== 'function') return;
@@ -2043,9 +2053,15 @@ export class BabylonRenderer implements Renderer {
     }
   }
 
+  /** Every render target Babylon has made for this engine (its private wrapper cache). */
+  private targetWrappers(engine: AbstractEngine): RenderTargetWrapper[] {
+    // SAFETY: Babylon keeps every render-target wrapper in the engine's private `_renderTargetWrapperCache`.
+    return (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache;
+  }
+
   /** WebGPU: a GPU timer on every render target (Babylon gives one only to targets made while timing is on). */
   private timePasses(reset = false): void {
-    for (const target of (this.engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache) {
+    for (const target of this.targetWrappers(this.engine)) {
       const timed = target as RenderTargetWrapper & { gpuTimeInFrame?: WebGPUPerfCounter };
       if (reset || !timed.gpuTimeInFrame) timed.gpuTimeInFrame = new WebGPUPerfCounter();
     }
@@ -2061,7 +2077,7 @@ export class BabylonRenderer implements Renderer {
       if (c && c.count > 0) out.push({ name, ms: c.average / 1e6, frames: c.count });
     };
     add('canvas', engine.gpuTimeInFrameForMainPass);
-    for (const target of (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache) {
+    for (const target of this.targetWrappers(engine)) {
       add(target.label ?? '?', (target as RenderTargetWrapper & { gpuTimeInFrame?: WebGPUPerfCounter }).gpuTimeInFrame);
     }
     this.timePasses(reset);
@@ -2091,6 +2107,7 @@ export class BabylonRenderer implements Renderer {
     const triangles = (m: Mesh) => (m.getTotalIndices() / 3) * (m.hasThinInstances ? m.thinInstanceCount : 1);
     const nature = (this.natureIn.world?.meshes ?? []).filter((m) => m.layerMask & LAYER_WORLD);
     // (GPUAdapterInfo's fields are getters: copied one by one.)
+    // SAFETY: WebGPUEngine keeps the adapter's info in the private `_adapterInfo`; its fields are getters.
     const adapter = (this.webgpu as unknown as { _adapterInfo?: Record<string, string> } | null)?._adapterInfo;
     return {
       backend: this.webgpu ? 'WebGPU' : 'WebGL2',
@@ -2100,7 +2117,7 @@ export class BabylonRenderer implements Renderer {
       quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: !!this.lampCluster, postSamples: this.post?.samples ?? 1, fxaa: this.post?.fxaaEnabled ?? false },
       diag: [...this.diag],
       passes,
-      targets: (engine as unknown as { _renderTargetWrapperCache: RenderTargetWrapper[] })._renderTargetWrapperCache.map((t) => target(t.label ?? '?', t)),
+      targets: this.targetWrappers(engine).map((t) => target(t.label ?? '?', t)),
       scene: {
         meshes: scene.meshes.length,
         enabledMeshes: scene.meshes.filter((m) => m.isEnabled()).length,
@@ -2672,6 +2689,7 @@ export class BabylonRenderer implements Renderer {
       this.counts.drawCalls = this.instrumentation.drawCallsCounter.current;
       this.counts.triangles = this.scene.getActiveIndices() / 3;
       if (!this.webgpu) {
+        // SAFETY: Babylon's WebGL2 timer keeps its running counter in the private `_gpuFrameTime`.
         const gpu = this.glTimer ? (this.engine as unknown as { _gpuFrameTime?: { count: number; current: number } })._gpuFrameTime : undefined;
         this.counts.gpuFrames = gpu?.count ?? 0;
         this.counts.gpuMs = gpu ? gpu.current / 1e6 : 0;
@@ -3818,6 +3836,7 @@ export class BabylonRenderer implements Renderer {
         mesh.parent = this.ghostRoot;
         mesh.isPickable = false;
         mesh.renderingGroupId = 1;
+        // SAFETY: `Matrix.asArray()` with no destination returns a Float32Array; its typings widen it to the array union.
         mesh.thinInstanceSetBuffer('matrix', Matrix.Identity().asArray() as unknown as Float32Array, 16, true);
         mesh.alwaysSelectAsActiveMesh = true;
       }
@@ -4199,6 +4218,7 @@ export class BabylonRenderer implements Renderer {
    * fades) is then whole refreshes, as the frames show.
    */
   private timeFramesByRefresh(): void {
+    // SAFETY: Babylon's private frame timer lives on the engine as `_measureFps`, `_performanceMonitor`, `_fps` and `_deltaTime`.
     const engine = this.engine as unknown as { _measureFps?: () => void; _performanceMonitor?: PerformanceMonitor; _fps: number; _deltaTime: number };
     const monitor = engine._performanceMonitor;
     if (typeof engine._measureFps !== 'function' || !monitor) return;
@@ -4247,6 +4267,7 @@ export class BabylonRenderer implements Renderer {
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
+  // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
   if (typeof fields._exposure === 'number' && (fields._exposure === 1) === (value === 1)) fields._exposure = value;
   else config.exposure = value;

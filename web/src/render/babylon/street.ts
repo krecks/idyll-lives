@@ -259,6 +259,7 @@ function car(p: Painter, body: CarBody, paint: string): void {
       const b = [0, 1, 2].map((k) => q[0][k] + (q[1][k] - q[0][k]) * u);
       const t = [0, 1, 2].map((k) => q[3][k] + (q[2][k] - q[3][k]) * u);
       const len = Math.hypot(...out) || 1;
+      // SAFETY: the map runs over exactly the three coordinates of a V3.
       return [0, 1, 2].map((k) => b[k] + (t[k] - b[k]) * v + (out[k] / len) * 0.006) as unknown as V3;
     };
     p.paint('#1C252D', 0.06, 0).poly([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], out);

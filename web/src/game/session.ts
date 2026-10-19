@@ -716,7 +716,12 @@ export async function startSession(
     },
     buildBlueprint(id) {
       const saved = blueprints.list.find((b) => b.id === id);
-      if (saved) bridge.send({ type: 'buildBlueprint', household: game.home, blueprint: JSON.parse(saved.data) });
+      if (!saved) return;
+      try {
+        bridge.send({ type: 'buildBlueprint', household: game.home, blueprint: JSON.parse(saved.data) });
+      } catch (err) {
+        toast(err instanceof Error ? err.message : String(err));
+      }
     },
     setBuildTool(tool) {
       const wasBuilding = game.mode === 'build';

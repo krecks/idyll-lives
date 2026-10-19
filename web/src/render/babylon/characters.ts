@@ -57,6 +57,7 @@ import {
   Quaternion,
   Vector3,
   VertexData,
+  type AbstractMesh,
   type Engine,
   type Scene,
   type WebGPUEngine,
@@ -1335,11 +1336,11 @@ export class Characters {
     // first time a Sim needs them.
     await Promise.all(
       world.sims.map(async (s) => {
-        if (s.gone || s.id >= MAX_CHARACTERS) return;
+        if (s.gone || s.id >= MAX_CHARACTERS) return null;
         const base = this.baseBody(s.gender);
         const stage = s.appearance?.stage;
         if (stage && stage !== base.stage) {
-          const b = await loadStage(set, base, stage).catch((err) => (console.warn(`[render] ${base.name}.${stage} unavailable`, err), null));
+          const b = await loadStage(set, base, stage).catch((err) => (console.warn('[render] life stage unavailable', base.name, stage, err), null));
           if (b && !this.sitPelvis.has(b.name)) {
             this.sitPelvis.set(b.name, this.measureSit(b));
             this.legFits.set(b.name, this.measureLegs(b));
@@ -4185,7 +4186,7 @@ export class Characters {
    * The Sim rows a part mesh draws now: one each four numbers of `rows`, `count` of them (its
    * thin instances); null for any other mesh. (The mirrors draw only the residents they show.)
    */
-  rowsOf(mesh: object): { rows: Float32Array; count: number } | null {
+  rowsOf(mesh: AbstractMesh): { rows: Float32Array; count: number } | null {
     const pm = this.parts.get(mesh);
     return pm ? { rows: pm.settings, count: pm.mesh.thinInstanceCount } : null;
   }
