@@ -96,7 +96,7 @@ import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
 import { buildFences } from './fences';
 import { applyShaderFixes } from './shaderFixes';
-import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, indoorRects, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
+import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, indoorRects, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
@@ -169,6 +169,9 @@ const FILL_POWER = 0.35;
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
+/** Seconds a door takes to swing open or shut, and how near (metres) someone walking opens it. */
+const DOOR_SWING = 0.45;
+const DOOR_REACH = 1.3;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -439,6 +442,8 @@ export class BabylonRenderer implements Renderer {
    * by day as at night, and a fill (no lamp there) only while someone awake is in.
    */
   private windowless = new Set<number>();
+  /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
+  private doors: { leaf: DoorLeaf; open: number }[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
   private lampsOff: ReadonlySet<number> | null = null;
   private lampsSettled = true;
@@ -917,6 +922,7 @@ export class BabylonRenderer implements Renderer {
       this.worldMeshes = [];
       this.lotTemplates = new Set([...this.templatesInUse].filter((k) => !before.has(k)));
       for (const mesh of this.lotMeshes) mesh.freezeWorldMatrix();
+      for (const { leaf } of this.doors) for (const mesh of leaf.meshes) mesh.unfreezeWorldMatrix();
     } else {
       for (const key of this.lotTemplates) this.templatesInUse.add(key);
     }
@@ -981,6 +987,7 @@ export class BabylonRenderer implements Renderer {
     const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
+    this.swingDoors(frame);
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.windowless.size > 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
@@ -2236,6 +2243,7 @@ export class BabylonRenderer implements Renderer {
     this.lotMeshes = [];
     this.lotKey = '';
     this.lotCasters = [];
+    this.doors = [];
     this.lotTemplates.clear();
     this.lotRooms = null;
     this.lotParts = null;
@@ -3224,10 +3232,12 @@ export class BabylonRenderer implements Renderer {
           shrubs: builds[0].shrubs,
           trees: builds[0].trees,
           rooms: new Map(builds.flatMap((b) => [...b.rooms])),
+          doors: builds.flatMap((b) => b.doors),
           surfaces: { faces: new Map(builds.flatMap((b) => [...b.surfaces.faces])), floors: new Map(builds.flatMap((b) => [...b.surfaces.floors])) },
         }
       : null;
     if (!built) {
+      this.doors = [];
       // Unknown wall layout: fall back to the simulation's plain meshes.
       this.meshFromArrays('floors', world.meshes.floors, this.lotMaterial('material.floor'));
       const wallMat = this.lotMaterial('material.wall');
@@ -3252,6 +3262,7 @@ export class BabylonRenderer implements Renderer {
     }
     this.lotRooms = built.rooms;
     this.lotSurfaces = built.surfaces;
+    this.doors = built.doors.map((leaf) => ({ leaf, open: -1 }));
     this.refreshLaid();
     return built.casters;
   }
@@ -3406,6 +3417,44 @@ export class BabylonRenderer implements Renderer {
       (asleep ? dark : awake).add(room);
     }
     for (const room of awake) dark.delete(room);
+  }
+
+  /**
+   * Front doors stand shut, and a bathroom's door while someone is in there; any of them opens
+   * as someone walks up to it (or through it), and swings back once they've passed.
+   */
+  private swingDoors(frame: FrameState): void {
+    if (!this.doors.length) return;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
+    let moved = false;
+    for (const door of this.doors) {
+      const { leaf } = door;
+      if (leaf.meshes[0]?.isDisposed()) continue;
+      // Someone on the move by it (both in lot rows: the storey is in the row).
+      let passing = false;
+      for (let i = 0; i < count && !passing; i++) {
+        const o = layout.headerLen + i * layout.simStride;
+        if (curr[o + k.away] !== 0 || curr[o + k.moving] === 0) continue;
+        const dx = curr[o + k.x] - leaf.centre[0];
+        const dz = curr[o + k.z] - leaf.centre[1];
+        passing = dx * dx + dz * dz < DOOR_REACH * DOOR_REACH;
+      }
+      const engaged = leaf.bath !== 0 && (this.awakeRooms.has(leaf.bath) || this.darkRooms.has(leaf.bath));
+      const target = passing || !(leaf.front || engaged) ? 1 : 0;
+      const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
+      if (open === door.open) continue;
+      door.open = open;
+      // Eased: quick off the frame, slowing as it meets the jamb or the wall.
+      const turn = leaf.close * (1 - open * open * (3 - 2 * open));
+      for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      moved = true;
+    }
+    if (!moved) return;
+    this.sunShadows.moved();
+    this.resetSnapshot();
   }
 
   /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */
