@@ -296,8 +296,6 @@ export interface DoorLeaf {
   bath: number;
   /** A leaf that slides into the wall instead (it could swing only a little way open): how far, open. */
   slide?: [number, number];
-  /** One that can hardly open at all and can't slide: shut, and hidden while open. */
-  hide?: boolean;
 }
 
 /** What a doorway needs to know of a leaf that swings, before its meshes exist. */
@@ -587,14 +585,15 @@ export class HouseBuilder {
     // A preview's straight walls and openings standing round it, like its diagonals: in every
     // lookup (runs and pairs, heights, posts, where leaves stand, shutters) as in the house, but
     // drawn only where its own walls are (`drawn`).
-    const own = storey.standing && new Set([...world.walls, ...world.openings].map((e) => `${e.axis}:${e.x}:${e.z}`));
-    const standing = <E extends { axis: 'h' | 'v'; x: number; z: number }>(list: readonly E[] | undefined): E[] => (own ? (list ?? []).filter((e) => edgeInView(e) && !own.has(`${e.axis}:${e.x}:${e.z}`)) : []);
+    const own = storey.standing ? new Edges(W + 8) : undefined;
+    if (own) for (const e of [...world.walls, ...world.openings]) own.set(e.axis, e.x, e.z, 'wall');
+    const standing = <E extends { axis: 'h' | 'v'; x: number; z: number }>(list: readonly E[] | undefined): E[] => (own ? (list ?? []).filter((e) => edgeInView(e) && !own.get(e.axis, e.x, e.z)) : []);
     const standingWalls = standing(storey.standing?.walls);
     const standingOpenings = standing(storey.standing?.openings);
     for (const e of standingWalls) edges.set(e.axis, e.x, e.z, 'wall');
     for (const o of standingOpenings) edges.set(o.axis, o.x, o.z, o.kind);
     /** Whether a wall stands on an edge and is drawn here (a preview's own, not one standing round it). */
-    const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!edges.get(axis, x, z) && (!own || own.has(`${axis}:${x}:${z}`));
+    const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!(own ?? edges).get(axis, x, z) && !!edges.get(axis, x, z);
     // Looks: face coverings and form from the wall list, the style from the opening.
     const looks = new Map<string, Look>();
     for (const e of [...standingWalls, ...world.walls]) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
@@ -932,14 +931,18 @@ export class HouseBuilder {
     /** The tile in front of door edge (axis, x, z) on the side `into`. */
     const tileInFront = (axis: 'h' | 'v', x: number, z: number, into: number): [number, number] => (axis === 'h' ? [x, into > 0 ? z : z - 1] : [into > 0 ? x : x - 1, z]);
     /**
-     * Whether a leaf of a door's run can slide open into the wall past the run's end `end` (-1:
-     * its first; see `doorway`): a plain full-height wall goes on there. (Inside the wall, it
-     * keeps clear of whatever stands or hangs by it, and of diagonals meeting it.)
+     * The wall a leaf of a door's run can slide open into past the run's end `end` (-1: its first;
+     * see `doorway`), as its cutaway mask; undefined if none: a plain full-height wall goes on
+     * there. A wall with a door at its other end too is the pocket of the door before it (a leaf
+     * each would overlap), whatever either needs, so the house and its previews agree. (Inside the
+     * wall, a leaf keeps clear of whatever stands or hangs by it, and of diagonals meeting it.)
      */
-    const pocket = (axis: 'h' | 'v', x: number, z: number, run: Run, end: -1 | 1): boolean => {
+    const pocket = (axis: 'h' | 'v', x: number, z: number, run: Run, end: -1 | 1): number | undefined => {
       const next = end < 0 ? run.start - 1 : run.start + run.len;
       const [bx, bz] = axis === 'h' ? [next, z] : [x, next];
-      return edges.get(axis, bx, bz) === 'wall' && heightOf(axis, bx, bz) === H;
+      if (edges.get(axis, bx, bz) !== 'wall' || heightOf(axis, bx, bz) < H) return undefined;
+      if (end < 0 && edges.get(axis, axis === 'h' ? bx - 1 : bx, axis === 'h' ? bz : bz - 1) === 'door') return undefined;
+      return edgeMask(axis, bx, bz);
     };
     /**
      * Whether a door (its whole run) swings the other way from usual (see `doorway`): when
@@ -984,8 +987,7 @@ export class HouseBuilder {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const pockets = (end: -1 | 1) => pocket(axis, x, z, run, end);
-          const geos = { wood: doorWood, glass, moves, swing: storey.preview ? undefined : swing, ahead, slant, pockets, flip: flipped(axis, x, z, run) };
+          const geos = { wood: doorWood, glass, moves, swing: storey.preview ? undefined : swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -1797,7 +1799,7 @@ export class HouseBuilder {
       swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo };
       ahead?: (into: number) => boolean;
       slant?: (into: number) => readonly Obstacle[] | undefined;
-      pockets?: (end: -1 | 1) => boolean;
+      pocket?: (end: -1 | 1) => number | undefined;
       flip?: boolean;
     },
     style: number | undefined,
@@ -1870,40 +1872,45 @@ export class HouseBuilder {
       const other = hang(!usualFar, into);
       return other.room > hung.room ? other : hung;
     };
-    let hung = best(geos.flip ? -usual : usual);
-    // One that can't open at all tries the other way.
-    if (hung.room === 0) {
-      const other = best(-hung.into);
-      if (other.room > 0) hung = other;
-    }
+    // How far each way lets it open (`ahead` matters only to a leaf as wide as the opening).
+    const reach = (h: ReturnType<typeof hang>) => (moves ? Math.min(h.ahead, h.room) : h.room);
+    const sides = [best(geos.flip ? -usual : usual), best(geos.flip ? usual : -usual)];
+    const [a, b] = sides.map(reach);
+    // The way it opens furthest (the usual one when even). Short of `SLIDE_BELOW` either way (it
+    // would stand across the way through), it slides into the wall instead, a pocket door, where
+    // a plain wall goes on past an end of the run (`geos.pocket`): shut in the doorway as ever,
+    // open with its edge just showing at the jamb. Past its hinge's end if it can (a double door's
+    // leaves each past their own end). Short of that it swings part way after all, or has no leaf
+    // if it can't even open `MIN_SWING` (rather than one in the way).
+    const hung = b > a ? sides[1] : sides[0];
+    const opens = Math.max(a, b);
     const { far, into, at, hinge, lo, hi, close, pivot } = hung;
-    // One that would open less than `SLIDE_BELOW` (and stand across the way through) slides into
-    // the wall instead, a pocket door, where a plain wall goes on past an end of the run
-    // (`geos.pockets`): shut in the doorway as ever, open with its edge just showing at the jamb.
-    // Past its hinge's end if it can (a double door's leaves each past their own end). Short of
-    // that it swings part way after all; one that moves and can't even open `MIN_SWING` stays
-    // shut and is hidden while open (rather than drawn through the wall).
     let slide: [number, number] | undefined;
-    if (hung.room < SLIDE_BELOW) {
+    let leafMask = mask;
+    if (opens < SLIDE_BELOW) {
       const ends: (-1 | 1)[] = run.len > 1 ? [first ? -1 : 1] : far ? [1, -1] : [-1, 1];
-      const end = ends.find((e) => geos.pockets?.(e));
-      const by = end === undefined ? 0 : end < 0 ? run.start + T - hi + POCKET_SHOW : run.start + run.len - T - lo - POCKET_SHOW;
-      if (end !== undefined) slide = axis === 'h' ? [by, 0] : [0, by];
+      for (const end of ends) {
+        const wall = geos.pocket?.(end);
+        if (wall === undefined) continue;
+        const by = end < 0 ? run.start + T - hi + POCKET_SHOW : run.start + run.len - T - lo - POCKET_SHOW;
+        slide = axis === 'h' ? [by, 0] : [0, by];
+        // Hidden whenever the doorway's wall or the one it slides into is cut away.
+        leafMask = mask | wall;
+        break;
+      }
     }
-    const opens = moves ? Math.min(hung.ahead, hung.room) : hung.room;
-    const hide = moves && !slide && opens < MIN_SWING;
-    if (!moves && !slide && opens === 0) return;
+    if (!slide && opens < MIN_SWING) return;
     // The leaf's glass belongs to the room it stands in (opening outdoors, the one it shuts).
     const roomOn = (side: number) => (axis === 'h' ? roomP(x + 0.5, z + side * 0.25) : roomP(x + side * 0.25, z + 0.5));
     const inside = roomOn(into) || roomOn(-into);
-    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slide, hide }) : undefined;
+    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slide }) : undefined;
     const glass = own ? own.glass : geos.glass(inside);
     // One that moves is drawn open and turned (and slid) by `swingDoors`. One that doesn't (or
     // any in a preview) is drawn at rest, as `swingDoors` would leave it: turned about the pivot
     // in a frame across the leaf (`a`: its thickness from the hinge, `d`: out from the wall), as a
-    // diagonal door's leaf is. At rest a front door is shut (and a hidden one drawn shut), the
-    // others open: slid into the wall, or as far open as they go.
-    const shut = moves && (front || hide);
+    // diagonal door's leaf is. At rest a front door is shut, the others open: slid into the wall,
+    // or as far open as they go.
+    const shut = moves && front;
     const turn = own ? 0 : shut || slide ? close : close * (1 - opens);
     const [sx, sz] = slide && !own && !shut ? slide : [0, 0];
     const [tx, tz] = turnY(axis === 'h' ? [hinge, z] : [x, hinge], pivot, turn);
@@ -1911,7 +1918,7 @@ export class HouseBuilder {
     const [ux, uz] = turnY(axis === 'h' ? [1, 0] : [0, 1], [0, 0], turn);
     const f = new WallFrame(ox, oz, ox + ux, oz + uz);
     const out = (l: number) => (axis === 'h' ? into : -into) * (T + 0.01 + l);
-    this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
+    this.leaf(style, front, scheme, leafMask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         if (turn !== 0) return f.box(g, s0, s1, y0, y1, Math.min(out(l0), out(l1)), Math.max(out(l0), out(l1)));
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
@@ -2098,7 +2105,7 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
 const SLANT_SKIP = 0.2;
 /**
  * Least a double door's leaf by a diagonal opens before it tries its other jamb (a fraction of its
- * quarter turn); a front or bathroom door that can't open this far, nor slide, is hidden while open.
+ * quarter turn); a leaf that can't open this far, nor slide, isn't drawn.
  */
 const MIN_SWING = 10 / 90;
 

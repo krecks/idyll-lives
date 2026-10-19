@@ -106,7 +106,6 @@ import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placem
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
-import { smooth } from './characters/clips/ik';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
@@ -482,7 +481,8 @@ export class BabylonRenderer implements Renderer {
   /** Their tiles, as `DigState` gets them while the game world is shown (null: none in view). */
   private dimming: DarkTiles | null = null;
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
-  private doors: { leaf: DoorLeaf; open: number }[] = [];
+  /** `base`: where the leaf's meshes stand (lifted to their storey), before any slide. */
+  private doors: { leaf: DoorLeaf; open: number; base: Vector3 }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
@@ -3485,7 +3485,7 @@ export class BabylonRenderer implements Renderer {
     }
     this.lotRooms = built.rooms;
     this.lotSurfaces = built.surfaces;
-    this.doors = built.doors.map((leaf) => ({ leaf, open: -1 }));
+    this.doors = built.doors.map((leaf) => ({ leaf, open: -1, base: leaf.meshes[0]?.position.clone() ?? Vector3.Zero() }));
     this.refreshLaid();
     return built.casters;
   }
@@ -3734,14 +3734,12 @@ export class BabylonRenderer implements Renderer {
       if (open === door.open) continue;
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
-      // turned shut and slides into the wall; one that can't open is hidden while open (not
-      // `setEnabled`: that's the storeys').
-      const eased = smooth(open);
+      // turned shut and slides into the wall (from where its storey has it).
+      const k = ease(open);
       const { slide } = leaf;
       for (const mesh of leaf.meshes) {
-        if (slide) mesh.position.set(slide[0] * eased, 0, slide[1] * eased);
-        if (leaf.hide) mesh.isVisible = open < 0.5;
-        mesh.rotation.y = slide || leaf.hide ? leaf.close : leaf.close * (1 - leaf.opens * eased);
+        if (slide) mesh.position.set(door.base.x + slide[0] * k, door.base.y, door.base.z + slide[1] * k);
+        mesh.rotation.y = slide ? leaf.close : leaf.close * (1 - leaf.opens * k);
       }
       moved = true;
     }
@@ -4766,6 +4764,11 @@ export class BabylonRenderer implements Renderer {
  * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
+/** Smoothstep: eases 0..1 in and out. */
+function ease(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
