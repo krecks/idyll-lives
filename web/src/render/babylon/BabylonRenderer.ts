@@ -1002,9 +1002,6 @@ export class BabylonRenderer implements Renderer {
     const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep (and neighbours' windows where they all are).
     this.findDarkRooms(frame);
-    // (The game is warmed up behind the menus' town, with no windowless rooms dark there: a
-    // check, the materials only get anything when that or the rooms changed.)
-    this.applyDimming();
     this.swingDoors();
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.dimmed.size > 0)) {
       this.applyRoomLights();
@@ -3373,8 +3370,6 @@ export class BabylonRenderer implements Renderer {
   private markWindowless(world: WorldStructure, view: ViewRect | null): void {
     const W = world.width;
     const room = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-    const halves = new Map<number, [number, number]>();
-    for (const d of world.diagonals ?? []) halves.set(d.z * W + d.x, d.rooms);
     // Which rooms have none only changes with the walls (new `rooms` and `openings` arrays).
     const of = [world.rooms, world.openings, world.diagonals];
     if (of.some((a, i) => a !== this.windowless.of[i])) {
@@ -3388,13 +3383,14 @@ export class BabylonRenderer implements Renderer {
       for (const d of world.diagonals ?? []) if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
       const rooms = new Set<number>();
       for (const r of world.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
-      for (const [a, b] of halves.values()) for (const r of [a, b]) if (r !== 0 && !lit.has(r)) rooms.add(r);
+      for (const d of world.diagonals ?? []) for (const r of d.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
       this.windowless = { rooms, of };
     }
     const dark = this.windowless.rooms;
 
     const dimmed = new Set<number>();
     const { band, bounds, rects } = this.dimming;
+    const before = [...band, ...bounds, ...rects];
     band.fill(0);
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
@@ -3427,15 +3423,6 @@ export class BabylonRenderer implements Renderer {
       whole.forEach((r, i) => r && grow(r, (i % vw) + view.x, Math.floor(i / vw) + view.z, 1, 0));
       for (const [x, z, , r] of parts) grow(r, x, z, 0.5, 1);
       const at = (x: number, z: number) => whole[(z - view.z) * vw + x - view.x];
-      // Biggest rooms first, each whole or not at all.
-      let budget = WINDOWLESS_RECTS;
-      for (const [r, b] of [...share].sort((p, q) => q[1].n - p[1].n)) {
-        const need = indoorRects((x, z) => (at(x, z) === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1).length + b.halves;
-        if (need > budget) continue;
-        budget -= need;
-        dimmed.add(r);
-      }
-      // Then their tiles together (rooms side by side share rectangles) and their halves.
       let count = 0;
       const add = (r: readonly [number, number, number, number], x0: number, z0: number, x1: number, z1: number) => {
         rects.set(r, count * 4);
@@ -3443,15 +3430,19 @@ export class BabylonRenderer implements Renderer {
         else bounds.splice(0, 4, Math.min(bounds[0], x0), Math.min(bounds[1], z0), Math.max(bounds[2], x1), Math.max(bounds[3], z1));
         count++;
       };
-      if (dimmed.size) {
-        for (const q of indoorRects((x, z) => (dimmed.has(at(x, z)) ? 1 : 0), view.x, view.z, view.x + vw, view.z + vd, 1)) add([q.x0, q.z0, q.x1, q.z1], q.x0, q.z0, q.x1, q.z1);
-        for (const [x, z, half, r] of parts) if (dimmed.has(r)) add([x, z, -1 - half, 0], x, z, x + 1, z + 1);
+      // Biggest rooms first, each whole (its tiles' rectangles and its halves) or not at all.
+      for (const [r, b] of [...share].sort((p, q) => q[1].n - p[1].n)) {
+        const own = indoorRects((x, z) => (at(x, z) === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
+        if (count + own.length + b.halves > WINDOWLESS_RECTS) continue;
+        for (const q of own) add([q.x0, q.z0, q.x1, q.z1], q.x0, q.z0, q.x1, q.z1);
+        for (const [x, z, half, h] of parts) if (h === r) add([x, z, -1 - half, 0], x, z, x + 1, z + 1);
+        dimmed.add(r);
       }
       // From under the floor of the storey in view to just under the next one's.
       if (count) band.splice(0, 3, this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, count);
     }
     this.dimmed = dimmed;
-    this.dimmingVersion++;
+    if ([...band, ...bounds, ...rects].some((v, i) => v !== before[i])) this.dimmingVersion++;
     this.applyDimming();
   }
 
@@ -3505,6 +3496,7 @@ export class BabylonRenderer implements Renderer {
     const up = this.neighboursUp;
     up.length = houses.length;
     up.fill(false);
+    const babies = this.babyStages();
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
@@ -3513,7 +3505,7 @@ export class BabylonRenderer implements Renderer {
       const pz = curr[o + k.z];
       if (curr[o + k.moving] !== 0) movers.push(px, pz);
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
-      const baby = this.babyStages().has(world.sims[i]?.stage ?? '');
+      const baby = babies.has(world.sims[i]?.stage ?? '');
       // `z` is in lot rows: upper storeys have rooms of their own there.
       const x = Math.floor(px);
       const z = Math.floor(pz);

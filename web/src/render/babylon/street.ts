@@ -456,6 +456,9 @@ interface PlotLayout {
   drive: Rect | null;
 }
 
+/** How often (ms) at most the neighbours' window glass is redrawn as they go to bed or get up. */
+const WINDOWS_EVERY_MS = 1000;
+
 export class Street {
   private readonly lib: MaterialLibrary;
   private key = '';
@@ -473,8 +476,10 @@ export class Street {
   /** Neighbours' houses (wall box, grid lines) and their window glass, lit while someone is `up` in there. */
   private homes: { box: [number, number, number, number]; panes: Geo; up: boolean }[] = [];
   private boxes: (readonly [number, number, number, number])[] = [];
-  /** Their glass as drawn: one mesh lit, one dark (see `drawWindows`). */
+  /** Their glass as drawn: one mesh lit, one dark (see `drawWindows`); when, and whether someone has gone to bed or got up since. */
   private windowMeshes: Mesh[] = [];
+  private windowsDrawn = 0;
+  private windowsDue = false;
   private readonly tmpQ = new Quaternion();
   private readonly tmpM = new Matrix();
   private readonly tmpS = new Vector3();
@@ -977,23 +982,28 @@ export class Street {
     return this.boxes;
   }
 
-  /** Which neighbours' houses have someone up in them (as `houses`): only theirs glow at night. True if any changed. */
+  /**
+   * Which neighbours' houses have someone up in them (as `houses`): only theirs glow at night.
+   * Redrawn at most once a second (a street going to bed is many changes); true when it was.
+   */
   setUp(up: readonly boolean[]): boolean {
-    let changed = false;
     this.homes.forEach((h, i) => {
       const now = up[i] ?? true;
       if (h.up === now) return;
       h.up = now;
-      changed = true;
+      this.windowsDue = true;
     });
-    if (changed) this.drawWindows();
-    return changed;
+    if (!this.windowsDue || performance.now() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
+    this.drawWindows();
+    return true;
   }
 
   /** The neighbours' glass again: those with someone up in one mesh, glowing; the rest in another, dark. */
   private drawWindows(): void {
     for (const mesh of this.windowMeshes) mesh.dispose(false, false);
     this.windowMeshes = [];
+    this.windowsDrawn = performance.now();
+    this.windowsDue = false;
     for (const lit of [true, false]) {
       const mesh = this.house.neighbourWindows(this.homes.filter((h) => h.up === lit).map((h) => h.panes), lit);
       if (!mesh) continue;

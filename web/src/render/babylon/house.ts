@@ -1732,7 +1732,8 @@ export class HouseBuilder {
     // A leaf that shuts fills its opening (a double door's up to the middle). Open, a double
     // door's leaf would reach past a wall a tile in front: then it opens only as far as clears it.
     const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
-    const clear = 1 - 2 * T - 0.03;
+    // (Open, it reaches from T + 0.01 off its wall line; the wall ahead's face is 1 - T away.)
+    const clear = 1 - T - (T + 0.01) - 0.01;
     const opens = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
     const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms });
     const glass = own ? own.glass : geos.glass(inside);
