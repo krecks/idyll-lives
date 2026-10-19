@@ -96,7 +96,7 @@
     app.start(request);
   }
 
-  /** A closer look at a household before playing it: who they are, their home and neighbours. */
+  /** A closer look at a household before playing it (a click on its card): who they are, their home and neighbours. */
   function meet(slot: number) {
     if (!town) return;
     keep();
@@ -198,7 +198,6 @@
           <button class="btn" onclick={() => (focus = null)}><Icon name="icon.ui.town" size={16} /> Whole town</button>
           {#if focused}
             {#key focused.slot}
-              <button class="btn" onclick={() => meet(focused.slot)}>Meet the {focused.household.name}s</button>
               <button class="btn primary play-lot" onclick={() => play(focused.slot)}>Play the {focused.household.name}s →</button>
             {/key}
           {/if}
@@ -221,7 +220,7 @@
               onmouseenter={() => (hover = h.slot)}
               onmouseleave={() => (hover = null)}
             >
-              <button class="pick" aria-label="Show the {h.household.name}s' home" onclick={() => select(h.slot)}>
+              <button class="pick" aria-label="Meet the {h.household.name}s" onclick={() => meet(h.slot)}>
                 <span class="faces">
                   {#each h.household.members as m (m.uid)}
                     <span class="face" title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={42} /></span>
