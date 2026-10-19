@@ -2256,9 +2256,11 @@ export class Characters {
       rig.floorY = th * WALL_HEIGHT;
       const pose = curr[o + k.pose];
       const moving = curr[o + k.moving] > 0;
-      const social = curr[o + k.anim] | 0;
+      // Calling someone over (sim-core's `call`): a wave, looking at them.
+      const call = k.call === undefined ? 0 : curr[o + k.call] | 0;
+      const social = (curr[o + k.anim] | 0) || (call > 0 ? Anim.Wave : 0);
       const role = curr[o + k.role] | 0;
-      const partner = curr[o + k.partner] | 0;
+      const partner = call > 0 ? call - 1 : curr[o + k.partner] | 0;
       const outcome = curr[o + k.outcome] | 0;
       rig.emotion = curr[o + k.emotion] | 0;
       const mood = k.mood !== undefined ? curr[o + k.mood] : 1;

@@ -160,6 +160,9 @@ function eventOf({ content }: TalkSources, req: LineRequest, frame: FrameState, 
       const id = req.thought ? thoughtId(req.thought) : undefined;
       return id ? { kind: 'thought', thought: id, subject: thoughtSubject(content, req.thought!, req.thoughtSubject ?? 0) } : null;
     }
+    // (A name called out is said as it is.)
+    case 'call':
+      return null;
   }
 }
 

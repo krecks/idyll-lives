@@ -1115,7 +1115,24 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             active: true,
         });
     }
-    actions.extend(s.current().map(|a| task_view(world, &a.task, Some(&a.phase), s.held)));
+    // Called over: on their way to the one who called (or waiting there) for what they called
+    // them for, not a walk of their own.
+    let called = s.heeding.and_then(|a| match world.sims[a as usize].current().map(|c| c.task.kind) {
+        Some(TaskKind::Social { target, social }) if target == s.id => Some((a, social)),
+        _ => None,
+    });
+    if let Some((a, social)) = called {
+        actions.push(ActionView {
+            label: content.socials[social].label.clone(),
+            object: None,
+            target: Some(a),
+            progress: 0.0,
+            directed: false,
+            active: true,
+        });
+    } else {
+        actions.extend(s.current().map(|a| task_view(world, &a.task, Some(&a.phase), s.held)));
+    }
     actions.extend(s.queue().map(|t| task_view(world, t, None, None)));
     actions
 }

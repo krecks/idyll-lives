@@ -12,7 +12,7 @@ export interface LineRequest {
   speaker: number;
   row: number;
   partner: number;
-  kind: 'social' | 'use' | 'emotion' | 'thought';
+  kind: 'social' | 'use' | 'emotion' | 'thought' | 'call';
   /** Conversations: the social interaction, and the opener or the answer once it went well or badly. */
   social?: string;
   phase?: 'start' | 'good' | 'bad';
@@ -24,6 +24,8 @@ export interface LineRequest {
   /** Planner thought kind (snapshot `thought`, 1..) and its subject. */
   thought?: number;
   thoughtSubject?: number;
+  /** Calling out: the name called (always said as it is, never written by the language model). */
+  name?: string;
   /** Variation: picks among lines, seeds sampling. */
   seed: number;
 }
@@ -40,5 +42,7 @@ export function scripted(lines: Lines, req: LineRequest): Line | null {
       return req.emotion ? lines.emotion(who, req.emotion, seed) : null;
     case 'thought':
       return req.thought ? lines.thought(who, req.thought, seed) : null;
+    case 'call':
+      return req.name ? { text: `${req.name}!`, key: 'call' } : null;
   }
 }

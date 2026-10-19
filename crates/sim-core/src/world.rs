@@ -24,8 +24,6 @@ pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
 const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
-/// Sims further apart than this don't start socials on their own.
-const SOCIAL_RANGE: f32 = 45.0;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
 const BABY_CRIES_BELOW: f32 = 0.3;
 pub const TICKS_PER_DAY: u64 = crate::clock::TICKS_PER_DAY;
@@ -529,6 +527,11 @@ pub enum Phase {
     Using {
         elapsed: f32,
     },
+    /// Calling out the social target's name from where they stand (they're within earshot); the
+    /// two then walk to meet halfway (see `conversation::update`).
+    Calling {
+        ticks: u32,
+    },
     /// Next to the social target, waiting for them to be free.
     Waiting {
         ticks: u32,
@@ -588,6 +591,9 @@ pub struct Sim {
     pub feelings: Vec<ActiveFeeling>,
     /// Set while another Sim is talking to this one.
     pub engaged_with: Option<u32>,
+    /// Someone called out their name: they turned to them and are on their way to meet them, or
+    /// wait for them where they met (see `conversation::update`). Not saved.
+    pub heeding: Option<u32>,
     pub(crate) gender_ix: Option<usize>,
     pub(crate) attraction: u32,
     pub(crate) queue: VecDeque<Task>,
@@ -605,6 +611,8 @@ pub struct Sim {
     /// Ticks the social they're on has spent waiting for its target, and following them since
     /// it first got there (see `conversation::update`). Not saved.
     pub(crate) social_waited: u32,
+    /// They called out to the target of the social they're on already (once per social). Not saved.
+    pub(crate) called: bool,
     /// The `World::nav_version` their route was last checked against (see `step_sim`): a
     /// resident nobody watches takes a turn only every so often, and a change between two of
     /// them still catches up with them. Not saved (after a load, a walker routes again once).
@@ -717,6 +725,7 @@ impl Sim {
         self.queue.clear();
         self.follow_up = None;
         self.engaged_with = None;
+        self.heeding = None;
         self.transition = None;
         self.visiting = None;
         self.pose = Pose::Stand;
@@ -797,7 +806,7 @@ impl Sim {
 
     /// Whether another Sim can pull this one into a conversation right now.
     pub fn available_for_social(&self, content: &Content) -> bool {
-        if self.engaged_with.is_some() || self.pose == Pose::Lie || self.away_until.is_some() || self.pressed(content) {
+        if self.engaged_with.is_some() || self.heeding.is_some() || self.pose == Pose::Lie || self.away_until.is_some() || self.pressed(content) {
             return false;
         }
         // Busy with a planned block (unless it's for socialising).
@@ -1395,6 +1404,12 @@ impl World {
         &self.blocked
     }
 
+    /// Whether someone at `b` hears someone at `a` call their name (see
+    /// `conversation::within_earshot`).
+    pub fn within_earshot(&self, a: [f32; 2], b: [f32; 2]) -> bool {
+        conversation::within_earshot(&self.nav(), a, b)
+    }
+
     /// The plot a tile is on (on any storey).
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let z = self.ground_z(z);
@@ -1756,6 +1771,7 @@ impl World {
             needs,
             feelings: Vec::new(),
             engaged_with: None,
+            heeding: None,
             gender_ix,
             attraction,
             queue: VecDeque::new(),
@@ -1764,6 +1780,7 @@ impl World {
             follow_up: None,
             unreachable: [None; UNREACHABLE],
             social_waited: 0,
+            called: false,
             nav_seen: 0,
             household: spawn.household,
             job,
@@ -1873,6 +1890,9 @@ impl World {
         for other in sims.iter_mut() {
             if other.engaged_with == Some(id) {
                 other.engaged_with = None;
+            }
+            if other.heeding == Some(id) {
+                other.heeding = None;
             }
             other.queue.retain(|t| !with_them(t));
             if other.current.as_ref().is_some_and(|a| with_them(&a.task)) {
@@ -3020,8 +3040,10 @@ impl World {
                 let s = sims
                     .get_mut(sim as usize)
                     .ok_or_else(|| Error::new(format!("unknown resident {sim}")))?;
-                let offset = (s.current.is_some() || s.engaged_with.is_some()) as usize;
+                let offset = (s.current.is_some() || s.engaged_with.is_some() || s.heeding.is_some()) as usize;
                 if index < offset {
+                    // (Called over: they don't go after all.)
+                    s.heeding = None;
                     if s.current.is_some() {
                         end_activity(s, content, objects);
                     } else {
@@ -3325,6 +3347,15 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         if sim.queue.front().is_some_and(|t| t.directed) {
             sim.engaged_with = None;
         } else {
+            return;
+        }
+    }
+    // Someone called them: on their way to meet them, or waiting there (unless the player gives
+    // an order).
+    if sim.heeding.is_some() {
+        if sim.queue.front().is_some_and(|t| t.directed) {
+            sim.heeding = None;
+        } else if sim.current.is_none() {
             return;
         }
     }
@@ -3687,14 +3718,12 @@ fn pick_autonomous(
         if j == me || !other.available || pressed {
             continue;
         }
-        // Chat with people on the same lot (or nearby on the street); crossing town is a visit.
+        // Chat with people within earshot (they call out to them); nobody crosses the house or
+        // the lot for a chat, and crossing town is a visit.
         let distance = ctx.nav.stairs.distance(other.pos, sim.pos);
-        let same_place = match (here, other.plot) {
-            (Some(a), Some(b)) => a == b,
-            _ => distance <= SOCIAL_RANGE,
-        };
+        let heard = conversation::within_earshot(&ctx.nav, sim.pos, other.pos);
         // Nor out on the street, minding the baby.
-        if !same_place || (minding && other.plot != own) {
+        if !heard || (minding && other.plot != own) {
             continue;
         }
         // Not over the fence into someone else's garden to chat (a guest is welcome at the host's).
@@ -3759,12 +3788,10 @@ fn pick_autonomous(
         if !s.joinable || !leader.here || leader.away || pressed {
             continue;
         }
+        // (Only where they can hear them talking.)
         let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
-        let same_place = match (here, leader.plot) {
-            (Some(a), Some(b)) => a == b,
-            _ => distance <= SOCIAL_RANGE,
-        };
-        if !same_place || (minding && leader.plot != own) {
+        let heard = conversation::within_earshot(&ctx.nav, sim.pos, leader.pos);
+        if !heard || (minding && leader.plot != own) {
             continue;
         }
         if let Some(b) = leader.plot
@@ -4103,10 +4130,19 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if target == sim.id {
                 return;
             }
+            sim.social_waited = 0;
+            // Within earshot: they call out to them, and the two meet halfway (see
+            // `conversation::update`); otherwise over to them until they are (or right there).
+            sim.called = other.available && conversation::calls_out(nav, &content.socials[social], sim.pos, other.pos);
+            if sim.called {
+                sim.pose = Pose::Stand;
+                let tags = content.socials[social].tags;
+                sim.current = Some(Activity { task, phase: Phase::Calling { ticks: 0 }, tags });
+                return;
+            }
             let Some(goal) = conversation::approach_tile(nav, other.pos, sim.pos) else {
                 return;
             };
-            sim.social_waited = 0;
             (
                 [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5],
                 goal,
@@ -4358,7 +4394,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             }
         }
         // Conversations are driven by `conversation::update`, which sees both Sims.
-        Phase::Waiting { .. } | Phase::Conversing { .. } => false,
+        Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Conversing { .. } => false,
     };
     if finished {
         // A recipe's step, eating, washing up: on to what comes next.

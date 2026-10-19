@@ -430,7 +430,7 @@ fn state(w: &World, s: &Sim) -> State {
         }
         Phase::Conversing { .. } => State::Busy(d),
         Phase::Routing { .. } => State::Routing(d),
-        Phase::Waiting { .. } | Phase::Queued { .. } | Phase::Knocking { .. } => State::Waiting(d),
+        Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Queued { .. } | Phase::Knocking { .. } => State::Waiting(d),
     }
 }
 
