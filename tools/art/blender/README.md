@@ -118,6 +118,10 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `size` is asserted after the build, within 2 % (`tolerance`). It's the real size, never stretched.
      Take it from the content, or from the `[gamekit]` line once the model is right.
    - `key` is only needed when it isn't `model.<family>.<id>`; an object's content names its `model`.
+     Before it builds anything, the build refuses a key that no content object or item names and no
+     manifest has (a misspelt `key=`). A model the game draws by code, not for a content object or
+     item (a held `tool.*`, a `model.street.*` prop, the woods' rock), takes `code=True` so its first
+     build isn't refused; once its pack has it, it builds either way.
    - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
      to a quarter of the triangles (all but what stands within 1 cm of the floor, so it keeps its
      feet), drawn where it's only seen from afar (the town overview, the far woods). For what is placed
@@ -150,8 +154,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - `BEDS`: mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
-  - `cargo test -p sim-core --test shipped_content` checks every object's model is in the manifests,
-    every interaction has an animation, and the categories and groups exist.
+  - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file
+    (and its `far` file) once the manifests are stacked (a pack left out of `packs` fails it), every
+    interaction has an animation, and the categories and groups exist.
   - Changed the sim? Run `cargo test -p sim-core`, then `npm run wasm` in `web/` before testing in the
     browser.
 
@@ -318,7 +323,9 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
   and off its content `surface`. Give its `Model` a `centre` (`G.settle()` centres it there), as the kitchen
   families do: the back of a counter or a fridge is 0.43 m in from the middle of its tile. A failed size or
-  centre check prints the measured centre, to copy into `centre=`.
+  centre check prints the measured centre, to copy into `centre=`. No content fact says a thing stands
+  against a wall (a counter and an island have the same top; `fillsWall` only keeps the wall over it
+  clear), so the gate can't tell one standing off it: check by eye.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
   reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it

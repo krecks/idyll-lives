@@ -44,10 +44,10 @@ use: `uses: {yoga: unroll}`, back when the yoga ends) moves two parts together:
 - **The roll** (`roll`), its origin on the floor under its axis: it rolls forward with the mat's edge (`G.slide`)
   and shrinks onto the floor (`G.squash` to 0.12), leaving a curled front edge.
 
-The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. `check_glb.py` warns that
-it is off centre and shallower than its footprint: picking follows the rolled mat as drawn, and the shadow the
-tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
-cross-legged on the unrolled mat.
+The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. Rolled at rest, it
+stands off the middle of its footprint (its `Model`'s `centre`, which the gate checks it is centred on) and is
+shallower than it: picking follows the rolled mat as drawn, and the shadow the tile. Yoga is done sitting
+(`pose: sit`, content `seat` 0.03 m), so the resident sits cross-legged on the unrolled mat.
 
 ## The weights
 
