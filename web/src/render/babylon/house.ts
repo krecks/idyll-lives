@@ -2103,7 +2103,7 @@ function turnAbout(from: P2, to: P2, turn: number): [number, number] {
  * Covers the indoor tiles of a bounding box with a few rectangles (greedy, row-major). Leftovers
  * smaller than `minArea` tiles (e.g. a single-tile porch notch) don't get their own roof.
  */
-export function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
+function indoorRects(room: (x: number, z: number) => number, x0: number, z0: number, x1: number, z1: number, minArea = 4): { x0: number; z0: number; x1: number; z1: number }[] {
   const w = x1 - x0;
   const covered = new Uint8Array(w * (z1 - z0));
   const indoor = (x: number, z: number) => room(x, z) !== 0;
