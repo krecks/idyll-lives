@@ -234,7 +234,7 @@ uniform vec4 wallCutParams;
 }
 
 /** Rectangles of windowless rooms the materials test (see `DigState.rects`). */
-export const WINDOWLESS_RECTS = 12;
+export const WINDOWLESS_RECTS = 32;
 
 /**
  * The ground dug away over the lot while its basement is in view: `rect` (x0, z0, x1, z1, in

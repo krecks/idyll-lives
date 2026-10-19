@@ -452,6 +452,9 @@ export class BabylonRenderer implements Renderer {
   private dimmed = new Set<number>();
   /** What `DigState` gets for them (heights, count, bounds, rectangles) while the game world is shown. */
   private dimming = { band: [0, 0, 0], bounds: [0, 0, 0, 0], rects: new Float32Array(WINDOWLESS_RECTS * 4) };
+  /** Bumped as `dimming` changes; what the materials were last given (and whether the game was shown then). */
+  private dimmingVersion = 0;
+  private dimmingApplied = { version: -1, on: false };
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: DoorLeaf; open: number }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
@@ -999,7 +1002,8 @@ export class BabylonRenderer implements Renderer {
     const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep (and neighbours' windows where they all are).
     this.findDarkRooms(frame);
-    // (The game is warmed up behind the menus' town, with no windowless rooms dark there.)
+    // (The game is warmed up behind the menus' town, with no windowless rooms dark there: a
+    // check, the materials only get anything when that or the rooms changed.)
     this.applyDimming();
     this.swingDoors();
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.dimmed.size > 0)) {
@@ -2259,7 +2263,9 @@ export class BabylonRenderer implements Renderer {
     this.lotCasters = [];
     this.doors = [];
     this.dimmed = new Set();
+    this.windowless = { rooms: new Set(), of: [] };
     this.dimming.band.fill(0);
+    this.dimmingVersion++;
     this.applyDimming();
     this.lotTemplates.clear();
     this.lotRooms = null;
@@ -3392,55 +3398,65 @@ export class BabylonRenderer implements Renderer {
     band.fill(0);
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
-      // The rooms on a tile: both halves of a split one (it's dark when all of them are).
-      const roomsAt = (x: number, z: number): number[] => {
-        const split = halves.get((z + row) * W + x);
-        return split ? split.filter((r) => r !== 0) : [room(x, z + row)].filter((r) => r !== 0);
-      };
-      const spans = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number }>();
-      for (let z = view.z; z < view.z + view.d; z++) {
-        for (let x = view.x; x < view.x + view.w; x++) {
-          const here = roomsAt(x, z);
-          if (!here.length || !here.every((r) => dark.has(r))) continue;
-          for (const r of here) {
-            const b = spans.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1 };
-            b.n++;
-            [b.x0, b.z0, b.x1, b.z1] = [Math.min(b.x0, x), Math.min(b.z0, z), Math.max(b.x1, x + 1), Math.max(b.z1, z + 1)];
-            spans.set(r, b);
-          }
+      const [vw, vd] = [view.w, view.d];
+      // The view's tiles: the windowless room on a whole one (0: none), and the tiles split by a
+      // diagonal wall with a windowless room on both halves.
+      const whole = new Int32Array(vw * vd);
+      const split: [number, number, number, number][] = [];
+      for (let z = 0; z < vd; z++) {
+        for (let x = 0; x < vw; x++) {
+          const i = (z + view.z + row) * W + x + view.x;
+          const h = halves.get(i);
+          if (h) {
+            if (dark.has(h[0]) && dark.has(h[1])) split.push([x + view.x, z + view.z, h[0], h[1]]);
+          } else if (dark.has(world.rooms[i])) whole[z * vw + x] = world.rooms[i];
         }
       }
-      // Biggest rooms first.
+      const spans = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number }>();
+      whole.forEach((r, i) => {
+        if (!r) return;
+        const [x, z] = [(i % vw) + view.x, Math.floor(i / vw) + view.z];
+        const b = spans.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1 };
+        b.n++;
+        [b.x0, b.z0, b.x1, b.z1] = [Math.min(b.x0, x), Math.min(b.z0, z), Math.max(b.x1, x + 1), Math.max(b.z1, z + 1)];
+        spans.set(r, b);
+      });
       let count = 0;
+      const add = (x0: number, z0: number, x1: number, z1: number) => {
+        rects.set([x0, z0, x1, z1], count * 4);
+        if (count === 0) bounds.splice(0, 4, x0, z0, x1, z1);
+        else bounds.splice(0, 4, Math.min(bounds[0], x0), Math.min(bounds[1], z0), Math.max(bounds[2], x1), Math.max(bounds[3], z1));
+        count++;
+      };
+      // Biggest rooms first, each whole or not at all.
       for (const [r, b] of [...spans].sort((p, q) => q[1].n - p[1].n)) {
-        const own = indoorRects((x, z) => (roomsAt(x, z).includes(r) && roomsAt(x, z).every((o) => dark.has(o)) ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
+        const own = indoorRects((x, z) => (whole[(z - view.z) * vw + x - view.x] === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
         if (count + own.length > WINDOWLESS_RECTS) continue;
-        for (const q of own) {
-          rects.set([q.x0, q.z0, q.x1, q.z1], count * 4);
-          if (count === 0) bounds.splice(0, 4, q.x0, q.z0, q.x1, q.z1);
-          else bounds.splice(0, 4, Math.min(bounds[0], q.x0), Math.min(bounds[1], q.z0), Math.max(bounds[2], q.x1), Math.max(bounds[3], q.z1));
-          count++;
-        }
+        for (const q of own) add(q.x0, q.z0, q.x1, q.z1);
         dimmed.add(r);
       }
+      // A split tile where both rooms are kept dark is too, as far as there's room for it (a
+      // half with outdoors or a lit room keeps its daylight).
+      for (const [x, z, a, c] of split) if (count < WINDOWLESS_RECTS && dimmed.has(a) && dimmed.has(c)) add(x, z, x + 1, z + 1);
       // From under the floor of the storey in view to just under the next one's.
       if (count) band.splice(0, 3, this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, count);
     }
     this.dimmed = dimmed;
+    this.dimmingVersion++;
     this.applyDimming();
   }
 
   /** The windowless rooms' darkness on the materials (`dimming`): none while the menus' town is shown. */
   private applyDimming(): void {
+    const on = !this.townMode;
+    if (this.dimmingApplied.version === this.dimmingVersion && this.dimmingApplied.on === on) return;
+    this.dimmingApplied = { version: this.dimmingVersion, on };
     const dig = this.lib.dig;
     const { band, bounds, rects } = this.dimming;
-    const on = !this.townMode;
-    const before = [dig.band.x, dig.band.y, dig.band.z, dig.bounds.x, dig.bounds.y, dig.bounds.z, dig.bounds.w, ...dig.rects];
     dig.band.set(band[0], band[1], on ? band[2] : 0, 0);
     dig.bounds.set(bounds[0], bounds[1], bounds[2], bounds[3]);
     dig.rects.set(rects);
-    const after = [dig.band.x, dig.band.y, dig.band.z, dig.bounds.x, dig.bounds.y, dig.bounds.z, dig.bounds.w, ...dig.rects];
-    if (after.some((v, i) => v !== before[i])) this.resetSnapshot();
+    this.resetSnapshot();
   }
 
   /**

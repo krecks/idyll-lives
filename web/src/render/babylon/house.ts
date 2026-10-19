@@ -886,7 +886,9 @@ export class HouseBuilder {
           const base = axis === 'h' ? x : z;
           const head = doorHead(axis, x, z);
           segment(axis, x, z, head, H, Cut.Hide, run.index > 0 ? base : undefined, run.index < run.len - 1 ? base + 1 : undefined);
-          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing }, lookOf(axis, x, z).style, head, run);
+          // A wall a tile in front, on the side the door swings to (an open leaf must stay clear of it).
+          const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
+          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing, ahead }, lookOf(axis, x, z).style, head, run);
         }
       }
     }
@@ -1624,10 +1626,15 @@ export class HouseBuilder {
     for (const p of panes) geo.append(p);
     const mesh = geo.toMesh(lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', this.scene, { colors: true, cut: true });
     if (!mesh) return null;
-    mesh.material = lit ? this.material(HOUSE_MATERIALS.glass) : this.lib.surface(HOUSE_MATERIALS.glass, { vertexColors: true, cutaway: true, variant: 'dark' });
+    mesh.material = this.neighbourGlass(lit);
     mesh.receiveShadows = true;
     mesh.isPickable = false;
     return mesh;
+  }
+
+  /** Neighbours' window glass: the street's, glowing at night (`lit`), or a variant that doesn't. */
+  neighbourGlass(lit: boolean): Material {
+    return lit ? this.material(HOUSE_MATERIALS.glass) : this.lib.surface(HOUSE_MATERIALS.glass, { vertexColors: true, cutaway: true, variant: 'dark' });
   }
 
   /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
@@ -1683,7 +1690,7 @@ export class HouseBuilder {
     trim: Geo,
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
-    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null },
+    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null; ahead?: (into: number) => boolean },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
@@ -1725,9 +1732,9 @@ export class HouseBuilder {
     const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
     const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, front, rooms });
     const glass = own ? own.glass : geos.glass(inside);
-    // A leaf that shuts fills its opening (a double door's up to the middle); one that stands open
-    // for good keeps the usual width.
-    const width = own ? (run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03) : LEAF_W;
+    // A leaf that shuts fills its opening (a double door's up to the middle, unless a wall a tile
+    // in front leaves it less room when open); one that stands open for good keeps the usual width.
+    const width = !own ? LEAF_W : run.len > 1 && !geos.ahead?.(into) ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
     this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];

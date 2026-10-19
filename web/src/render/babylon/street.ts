@@ -575,8 +575,8 @@ export class Street {
       // The player's house is the game's own on its lot; seen from the menus' town it is a shell dressed like it.
       const home = L.kind === 'home' && !view;
       if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
-      // (Only the game follows who's up: the menus' town keeps every window lit.)
-      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && !!view });
+      // (Only the game's street follows who's up: the menus' town keeps every window lit.)
+      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && this.layerMask === undefined });
     }
     const sil = perfTime('street: silhouettes', () => this.house.silhouettes(specs, world.openings ?? [], world));
     await pace?.();
@@ -587,6 +587,9 @@ export class Street {
     this.homes = sil.homes.map(({ spec, panes }) => ({ box: [spec.x0, spec.z0, spec.x1, spec.z1], panes, up: wasUp.get(`${spec.x0},${spec.z0}`) ?? true }));
     this.boxes = this.homes.map((h) => h.box);
     this.drawWindows();
+    // The dark glass is first drawn when someone goes to bed: compiled now, not then.
+    const lit = this.windowMeshes.find((m) => m.name === 'silhouetteWindowsLit');
+    if (lit) void this.house.neighbourGlass(false).forceCompilationAsync(lit).catch(() => {});
     for (const s of specs) if (s.garage) blocked.push({ x: s.garage.x0 - T, z: s.garage.z0 - T, w: s.garage.x1 - s.garage.x0 + 2 * T, d: s.garage.z1 - s.garage.z0 + 2 * T });
     for (const [x, y, z, nx, nz] of sil.lamps) {
       glow.at(x, z).box(-0.06 + nx * 0.02, y - 0.12, -0.06 + nz * 0.02, 0.06 + nx * 0.02, y + 0.08, 0.06 + nz * 0.02);
