@@ -24,7 +24,7 @@
  * - Blender-built models only (no downloads), plus a CC0 concrete texture for the sidewalks.
  */
 
-import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
+import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Light, type Material, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
@@ -456,6 +456,9 @@ interface PlotLayout {
   drive: Rect | null;
 }
 
+/** How often (ms) at most the neighbours' window glass is redrawn as they go to bed or get up. */
+const WINDOWS_EVERY_MS = 1000;
+
 export class Street {
   private readonly lib: MaterialLibrary;
   private key = '';
@@ -471,7 +474,12 @@ export class Street {
   private glows: { mesh: Mesh; colors: Float32Array }[] = [];
   private lamps = -1;
   /** Neighbours' houses (wall box, grid lines) and their window glass, lit while someone is `up` in there. */
-  private homes: { box: [number, number, number, number]; windows: Mesh; up: boolean }[] = [];
+  private homes: { box: [number, number, number, number]; panes: Geo; up: boolean }[] = [];
+  private boxes: (readonly [number, number, number, number])[] = [];
+  /** Their glass as drawn: one mesh lit, one dark (see `drawWindows`); when, and whether someone has gone to bed or got up since. */
+  private windowMeshes: Mesh[] = [];
+  private windowsDrawn = 0;
+  private windowsDue = false;
   private readonly tmpQ = new Quaternion();
   private readonly tmpM = new Matrix();
   private readonly tmpS = new Vector3();
@@ -483,6 +491,8 @@ export class Street {
     private readonly house: HouseBuilder,
     /** Camera layer of everything this street draws (see layers.ts); default: the game world. */
     private readonly layerMask?: number,
+    /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
+    private readonly lived = false,
     /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
     private readonly look?: ObjectLook,
   ) {
@@ -539,6 +549,8 @@ export class Street {
     this.meshes = [];
     this.casters = [];
     this.key = key;
+    const wasUp = new Map(this.homes.map((h) => [`${h.box[0]},${h.box[1]}`, h.up]));
+    this.dropWindows();
 
     const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
     const paths = world.meta?.paths ?? [];
@@ -570,14 +582,21 @@ export class Street {
       // The player's house is the game's own on its lot; seen from the menus' town it is a shell dressed like it.
       const home = L.kind === 'home' && !view;
       if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
-      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' });
+      // (Only the game's street follows who's up: the menus' town keeps every window lit.)
+      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && this.lived });
     }
     const sil = perfTime('street: silhouettes', () => this.house.silhouettes(specs, world.openings ?? [], world));
     await pace?.();
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
     this.meshes.push(...sil.meshes);
     this.casters.push(...sil.casters);
-    this.homes = sil.homes.map(({ spec, windows }) => ({ box: [spec.x0, spec.z0, spec.x1, spec.z1], windows, up: true }));
+    // Who was up stays so through a rebuild (the lights don't flick on for a frame).
+    this.homes = sil.homes.map(({ spec, panes }) => ({ box: [spec.x0, spec.z0, spec.x1, spec.z1], panes, up: wasUp.get(`${spec.x0},${spec.z0}`) ?? true }));
+    this.boxes = this.homes.map((h) => h.box);
+    this.drawWindows();
+    // The dark glass is first drawn when someone goes to bed: compiled now, not then.
+    const lit = this.windowMeshes.find((m) => m.name === 'silhouetteWindowsLit');
+    if (lit) void this.house.neighbourGlass(false).forceCompilationAsync(lit).catch(() => {});
     for (const s of specs) if (s.garage) blocked.push({ x: s.garage.x0 - T, z: s.garage.z0 - T, w: s.garage.x1 - s.garage.x0 + 2 * T, d: s.garage.z1 - s.garage.z0 + 2 * T });
     for (const [x, y, z, nx, nz] of sil.lamps) {
       glow.at(x, z).box(-0.06 + nx * 0.02, y - 0.12, -0.06 + nz * 0.02, 0.06 + nx * 0.02, y + 0.08, 0.06 + nz * 0.02);
@@ -903,9 +922,9 @@ export class Street {
       this.meshes.push(poolMesh);
     }
     add(shadows, 'streetShadows', this.lib.contactShadow());
-    // Interior lamps of the viewed house never reach the street (keeps its shaders simple): the
-    // room lights, or the clustered container holding them. Left out as soon as the meshes exist.
-    const interior = this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
+    // Interior lamps of the viewed house never reach the street (keeps its shaders simple), left
+    // out as soon as the meshes exist.
+    const interior = this.interiorLights();
     this.lib.excludeFromLights(interior, new Set(this.meshes));
     perfEnd(meshesSpan);
     await pace?.();
@@ -927,7 +946,7 @@ export class Street {
     }
     perfEnd(batchesSpan);
     for (const mesh of this.meshes) mesh.freezeWorldMatrix();
-    this.drawn = [...this.meshes, ...foliage];
+    this.drawn = [...this.meshes, ...this.windowMeshes, ...foliage];
     const lamps = this.lamps;
     this.lamps = -1;
     if (lamps >= 0) this.setNight(lamps, this.glow);
@@ -950,7 +969,7 @@ export class Street {
     this.drawn = [];
     this.key = '';
     this.glows = [];
-    this.homes = [];
+    this.dropWindows();
     for (const template of this.templates.values()) {
       void template.then((t) => {
         if (this.key === '') for (const mesh of withGlows(t)) mesh.setEnabled(false);
@@ -960,20 +979,54 @@ export class Street {
 
   /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
   get houses(): readonly (readonly [number, number, number, number])[] {
-    return this.homes.map((h) => h.box);
+    return this.boxes;
   }
 
-  /** Which neighbours' houses have someone up in them (as `houses`): only theirs glow at night. True if any changed. */
+  /**
+   * Which neighbours' houses have someone up in them (as `houses`): only theirs glow at night.
+   * Redrawn at most once a second (a street going to bed is many changes); true when it was.
+   */
   setUp(up: readonly boolean[]): boolean {
-    let changed = false;
     this.homes.forEach((h, i) => {
       const now = up[i] ?? true;
       if (h.up === now) return;
       h.up = now;
-      h.windows.material = this.house.neighbourGlass(now);
-      changed = true;
+      this.windowsDue = true;
     });
-    return changed;
+    if (!this.windowsDue || performance.now() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
+    this.drawWindows();
+    return true;
+  }
+
+  /** The neighbours' glass again: those with someone up in one mesh, glowing; the rest in another, dark. */
+  private drawWindows(): void {
+    for (const mesh of this.windowMeshes) mesh.dispose(false, false);
+    this.windowMeshes = [];
+    this.windowsDrawn = performance.now();
+    this.windowsDue = false;
+    for (const lit of [true, false]) {
+      const mesh = this.house.neighbourWindows(this.homes.filter((h) => h.up === lit).map((h) => h.panes), lit);
+      if (!mesh) continue;
+      if (this.layerMask !== undefined) mesh.layerMask = this.layerMask;
+      mesh.freezeWorldMatrix();
+      this.windowMeshes.push(mesh);
+    }
+    // Kept out of the viewed house's interior lights, as the rest of the street.
+    this.lib.excludeFromLights(this.interiorLights(), new Set(this.windowMeshes));
+    if (this.drawn.length) this.drawn = [...this.drawn.filter((m) => !m.isDisposed()), ...this.windowMeshes];
+  }
+
+  /** The viewed house's interior lights (the room lights, or the clustered container holding them), which never reach the street. */
+  private interiorLights(): Light[] {
+    return this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
+  }
+
+  /** Forgets the neighbours' houses and their glass. */
+  private dropWindows(): void {
+    for (const mesh of this.windowMeshes) mesh.dispose(false, false);
+    this.windowMeshes = [];
+    this.homes = [];
+    this.boxes = [];
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level. */

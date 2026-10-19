@@ -277,8 +277,9 @@ export interface DoorLeaf {
   meshes: Mesh[];
   /** The middle of its doorway. */
   centre: [number, number];
-  /** Turn about y that shuts it. */
+  /** Turn about y that shuts it, and how much of it back it swings open (1: all the way, against the wall). */
   close: number;
+  opens: number;
   /** A front door (outdoors on one side): shut unless someone comes through. */
   front: boolean;
   /** The bathroom it opens into (0: none): shut while someone is in there. */
@@ -321,15 +322,15 @@ export interface SilhouetteSpec {
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
   storeys?: number;
-  /** Someone's home: its windows get a mesh of their own, lit only while someone is up (see `SilhouetteBuild.homes`). */
+  /** Someone's home: its window glass is kept apart, lit only while someone is up (see `SilhouetteBuild.homes`). */
   lived?: boolean;
 }
 
 export interface SilhouetteBuild {
   meshes: Mesh[];
   casters: Mesh[];
-  /** The window glass of each lived-in house (also in `meshes`), to light or not (`neighbourGlass`). */
-  homes: { spec: SilhouetteSpec; windows: Mesh }[];
+  /** The window glass of each lived-in house (not in `meshes`): drawn lit or dark by `neighbourWindows`. */
+  homes: { spec: SilhouetteSpec; panes: Geo }[];
   /** Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz). */
   lamps: [number, number, number, number, number][];
 }
@@ -886,7 +887,9 @@ export class HouseBuilder {
           const base = axis === 'h' ? x : z;
           const head = doorHead(axis, x, z);
           segment(axis, x, z, head, H, Cut.Hide, run.index > 0 ? base : undefined, run.index < run.len - 1 ? base + 1 : undefined);
-          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing }, lookOf(axis, x, z).style, head, run);
+          // A wall a tile in front, on the side the door swings to (an open leaf must stay clear of it).
+          const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
+          this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, { wood: doorWood, glass, swing, ahead }, lookOf(axis, x, z).style, head, run);
         }
       }
     }
@@ -1335,8 +1338,20 @@ export class HouseBuilder {
     // every wall mode. Just under the wall tops, clear of the floor of a storey above.
     const lid = new Geo();
     if (!storey.preview && Number.isFinite(minX)) {
-      const indoor = (x: number, z: number) => (inView(x, z) && (room(x, z) !== 0 || !!diagonal(x, z)?.rooms.some((r) => r !== 0)) ? 1 : 0);
-      for (const r of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) lid.box(r.x0 - T, H - 0.12, r.z0 - T, r.x1 + T, H - 0.04, r.z1 + T);
+      // Whole tiles in rectangles; a tile split by a diagonal wall with outdoors on one side gets
+      // its indoor half only (the outdoor one stays in the sun).
+      const whole = (x: number, z: number) => {
+        const d = diagonal(x, z);
+        return inView(x, z) && (d ? d.rooms[0] !== 0 && d.rooms[1] !== 0 : room(x, z) !== 0) ? 1 : 0;
+      };
+      for (const r of indoorRects(whole, minX, minZ, maxX, maxZ, 1)) lid.box(r.x0 - T, H - 0.12, r.z0 - T, r.x1 + T, H - 0.04, r.z1 + T);
+      for (const d of world.diagonals ?? []) {
+        if (!inView(d.x, d.z) || (d.rooms[0] !== 0) === (d.rooms[1] !== 0)) continue;
+        const corners = halfTriangle(d.axis, d.rooms[0] !== 0 ? 0 : 1);
+        const at = (y: number) => corners.map(([fx, fz]): V3 => [d.x + fx, y, d.z + fz]);
+        lid.poly(at(H - 0.04), [0, 1, 0]);
+        lid.poly(at(H - 0.12).reverse(), [0, -1, 0]);
+      }
     }
 
     // ---- garden: foundation shrubs and a few lot trees --------------------------------
@@ -1580,7 +1595,7 @@ export class HouseBuilder {
         lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
       }
     }
-    const out: SilhouetteBuild = { meshes: [], casters: [], homes: [], lamps };
+    const out: SilhouetteBuild = { meshes: [], casters: [], homes, lamps };
     const M = HOUSE_MATERIALS;
     for (const [geo, name, key, cast] of [
       [siding, 'silhouetteWalls', M.siding, true],
@@ -1598,19 +1613,25 @@ export class HouseBuilder {
       out.meshes.push(mesh);
       if (cast) out.casters.push(mesh);
     }
-    for (const { spec, panes } of homes) {
-      const windows = panes.toMesh('silhouetteWindows', this.scene, { colors: true, cut: true });
-      if (!windows) continue;
-      windows.material = this.neighbourGlass(true);
-      windows.receiveShadows = true;
-      windows.isPickable = false;
-      out.meshes.push(windows);
-      out.homes.push({ spec, windows });
-    }
     return out;
   }
 
-  /** Neighbours' window glass: glowing at night as the street's (`lit`), or dark (everyone in asleep, or nobody home). */
+  /**
+   * Neighbours' window glass (`SilhouetteBuild.homes`' panes) as one mesh: glowing at night as the
+   * street's (`lit`), or dark (everyone in asleep, or nobody home). Null when there's none.
+   */
+  neighbourWindows(panes: readonly Geo[], lit: boolean): Mesh | null {
+    const geo = new Geo();
+    for (const p of panes) geo.append(p);
+    const mesh = geo.toMesh(lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', this.scene, { colors: true, cut: true });
+    if (!mesh) return null;
+    mesh.material = this.neighbourGlass(lit);
+    mesh.receiveShadows = true;
+    mesh.isPickable = false;
+    return mesh;
+  }
+
+  /** Neighbours' window glass: the street's, glowing at night (`lit`), or a variant that doesn't. */
   neighbourGlass(lit: boolean): Material {
     return lit ? this.material(HOUSE_MATERIALS.glass) : this.lib.surface(HOUSE_MATERIALS.glass, { vertexColors: true, cutaway: true, variant: 'dark' });
   }
@@ -1668,7 +1689,7 @@ export class HouseBuilder {
     trim: Geo,
     roomP: (px: number, pz: number) => number,
     scheme: HouseScheme,
-    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null },
+    geos: { wood: Geo; glass: (room: number) => Geo; swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo } | null; ahead?: (into: number) => boolean },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
@@ -1708,8 +1729,16 @@ export class HouseBuilder {
     const close = ((axis === 'h' ? 1 : -1) * across * into * Math.PI) / 2;
     const [from, to]: [number, number][] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
     const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
-    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, front, rooms });
+    // A leaf that shuts fills its opening (a double door's up to the middle). Open, a double
+    // door's leaf would reach past a wall a tile in front: then it opens only as far as clears it.
+    const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
+    // (Open, it reaches from T + 0.01 off its wall line; the wall ahead's face is 1 - T away.)
+    const clear = 1 - T - (T + 0.01) - 0.01;
+    const opens = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
+    const own = geos.swing?.({ hinge: turnAbout(from, to, close), centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms });
     const glass = own ? own.glass : geos.glass(inside);
+    // (One that stands open for good keeps the usual width.)
+    const width = own ? fill : LEAF_W;
     this.leaf(style, front, scheme, mask, head, own ? { trim: own.trim, wood: own.wood, glass } : { trim, wood: geos.wood, glass }, {
       box: (g, s0, s1, y0, y1, l0, l1) => {
         const [p0, p1] = [Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))];
@@ -1724,14 +1753,14 @@ export class HouseBuilder {
         glass.poly(pts, n);
         glass.poly([...pts].reverse(), [-n[0], 0, -n[2]]);
       },
-    });
+    }, width);
   }
 
   /**
    * A door leaf, open against its jamb, in a style: `panel` (painted: the style's colour, else the
    * house accent on front doors and off-white inside), `oak` (natural wood), `halfGlass` (solid
-   * below, glazed above) or `glass` (a glazed frame). `put.box` draws in leaf space (`s` across
-   * its thickness, `y` up, `l` from the hinge outwards); `put.pane` a glass pane through it.
+   * below, glazed above) or `glass` (a glazed frame), `width` wide. `put.box` draws in leaf space
+   * (`s` across its thickness, `y` up, `l` from the hinge outwards); `put.pane` a glass pane through it.
    */
   private leaf(
     style: number | undefined,
@@ -1741,6 +1770,7 @@ export class HouseBuilder {
     head: number,
     geos: { trim: Geo; wood: Geo; glass: Geo },
     put: { box: (g: Geo, s0: number, s1: number, y0: number, y1: number, l0: number, l1: number) => void; pane: (y0: number, y1: number, l0: number, l1: number) => void },
+    width = LEAF_W,
   ): void {
     const def = this.looks.doors[style ?? 0] ?? PANEL_DOOR;
     const { trim, wood, glass } = geos;
@@ -1748,23 +1778,23 @@ export class HouseBuilder {
     const paint = def.color ?? (front ? scheme.accent : '#EDEAE2');
     const top = head - 0.03;
     const box = (g: Geo, y0: number, y1: number, l0: number, l1: number) => put.box(g, 0, LEAF_T, y0, y1, l0, l1);
-    if (def.leaf === 'oak') box(wood.color('#FFFFFF'), 0.01, top, 0, LEAF_W);
-    else if (def.leaf === 'panel') box(trim.color(paint), 0.01, top, 0, LEAF_W);
+    if (def.leaf === 'oak') box(wood.color('#FFFFFF'), 0.01, top, 0, width);
+    else if (def.leaf === 'panel') box(trim.color(paint), 0.01, top, 0, width);
     else {
       // A frame of stiles and rails around glass (half-glazed: a solid panel below).
       const glassFrom = def.leaf === 'halfGlass' ? 1.05 : 0.22;
       const stile = def.leaf === 'halfGlass' ? 0.1 : 0.08;
       trim.color(paint);
-      box(trim, 0.01, glassFrom, 0, LEAF_W);
+      box(trim, 0.01, glassFrom, 0, width);
       box(trim, glassFrom, top, 0, stile);
-      box(trim, glassFrom, top, LEAF_W - stile, LEAF_W);
-      box(trim, top - 0.1, top, stile, LEAF_W - stile);
-      if (def.leaf === 'glass') box(trim, 1.08, 1.12, stile, LEAF_W - stile);
-      put.pane(glassFrom, top - 0.1, stile, LEAF_W - stile);
+      box(trim, glassFrom, top, width - stile, width);
+      box(trim, top - 0.1, top, stile, width - stile);
+      if (def.leaf === 'glass') box(trim, 1.08, 1.12, stile, width - stile);
+      put.pane(glassFrom, top - 0.1, stile, width - stile);
     }
     // A brass handle on both faces.
     trim.color('#B39A62');
-    put.box(trim, -0.035, LEAF_T + 0.035, 1.0, 1.05, LEAF_W - 0.12, LEAF_W - 0.07);
+    put.box(trim, -0.035, LEAF_T + 0.035, 1.0, 1.05, width - 0.12, width - 0.07);
     trim.color(TRIM);
   }
 

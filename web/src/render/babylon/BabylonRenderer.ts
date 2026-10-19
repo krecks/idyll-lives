@@ -434,14 +434,27 @@ export class BabylonRenderer implements Renderer {
   private roomLightOn: number[] = [];
   /** Per room whose windows are dimmed: 1 glowing, 0 out (its room is dark), eased between; unlisted rooms glow. */
   private readonly windowGlowOn = new Map<number, number>();
-  /** Rooms where everyone is asleep (lights out), and rooms with someone awake. */
+  /**
+   * Rooms where everyone is asleep (lights out), rooms with someone awake (babies don't count, as
+   * in sim-core `lights`), and rooms with anyone in them; where residents on the move are (x, z
+   * pairs, in lot rows); all as of this frame (`findDarkRooms`).
+   */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
+  private readonly occupiedRooms = new Set<number>();
+  private readonly movers: number[] = [];
+  /** Rooms without windows in the whole town (as sim-core `lights::windowless`), for the lot it was found for. */
+  private windowless: { rooms: ReadonlySet<number>; of: readonly unknown[] } = { rooms: new Set(), of: [] };
   /**
-   * Rooms without windows (as sim-core `lights::windowless`): no daylight, so their lamps are lit
-   * by day as at night, and a fill (no lamp there) only while someone awake is in.
+   * The windowless rooms of the storey in view kept out of daylight (`DigState.rects`): their
+   * lamps are lit by day as at night, and a fill (no lamp there) only while someone awake is in.
    */
-  private windowless = new Set<number>();
+  private dimmed = new Set<number>();
+  /** What `DigState` gets for them (heights, count, bounds, rectangles) while the game world is shown. */
+  private dimming = { band: [0, 0, 0], bounds: [0, 0, 0, 0], rects: new Float32Array(WINDOWLESS_RECTS * 4) };
+  /** Bumped as `dimming` changes; what the materials were last given (and whether the game was shown then). */
+  private dimmingVersion = 0;
+  private dimmingApplied = { version: -1, on: false };
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: DoorLeaf; open: number }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
@@ -736,7 +749,7 @@ export class BabylonRenderer implements Renderer {
       roofColors: c.roofColors,
     });
     // Public places seen from another lot show their things in the open (as the overview does).
-    this.street = new Street(scene, this.deps.assets, this.house, undefined, (def) => {
+    this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
       const d = this.deps.content.object(def);
       return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1] };
     });
@@ -942,7 +955,7 @@ export class BabylonRenderer implements Renderer {
     this.retireTemplates(new Set(this.templatesInUse));
     const templates = await perfTimeAsync('render: templates', () => this.templateMeshes());
 
-    const notCasting = new Set(['floors', 'floorsTiled', 'floorsCarpet', 'floorsStone', 'streets', 'paths', 'fields', 'furrows', 'contactShadows', 'objectShadows', 'windows', 'windowsInner', 'plinth', 'wallsTiled']);
+    const notCasting = new Set(['floors', 'floorsTiled', 'floorsCarpet', 'floorsStone', 'streets', 'paths', 'fields', 'furrows', 'contactShadows', 'objectShadows', 'windows', 'doorLeafGlass', 'windowsInner', 'plinth', 'wallsTiled']);
     this.baseCasters = [
       ...new Set([
         ...[...this.lotMeshes, ...this.worldMeshes].filter((m) => !notCasting.has(m.name) && !m.name.startsWith('silhouette') && !houseCasters.includes(m)),
@@ -987,16 +1000,15 @@ export class BabylonRenderer implements Renderer {
     }
     // Lamps switched off or on fade out or in.
     const switched = this.fadeLamps(this.frameDt / 1000);
-    // Lights go out in rooms where everyone is asleep.
+    // Lights go out in rooms where everyone is asleep (and neighbours' windows where they all are).
     this.findDarkRooms(frame);
-    this.swingDoors(frame);
-    this.lightNeighbours(frame);
-    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.windowless.size > 0)) {
+    this.swingDoors();
+    if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.dimmed.size > 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
     }
     // And their windows (and lamp shades, screens) stop glowing with them.
-    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && (this.lampsLevel > 0 || this.windowless.size > 0)) {
+    if ((this.fadeWindowGlow(this.frameDt / 1000) || switched) && (this.lampsLevel > 0 || this.dimmed.size > 0)) {
       this.house.setWindowGlow(this.windowGlowOn);
       this.applyGlow();
       this.resetSnapshot();
@@ -2247,6 +2259,11 @@ export class BabylonRenderer implements Renderer {
     this.lotKey = '';
     this.lotCasters = [];
     this.doors = [];
+    this.dimmed = new Set();
+    this.windowless = { rooms: new Set(), of: [] };
+    this.dimming.band.fill(0);
+    this.dimmingVersion++;
+    this.applyDimming();
     this.lotTemplates.clear();
     this.lotRooms = null;
     this.lotParts = null;
@@ -3294,6 +3311,7 @@ export class BabylonRenderer implements Renderer {
 
   /** In the basement, the ground over the viewed lot is dug away (terrain and lawn; see `DigState`). */
   private applyDig(): void {
+    this.applyDimming();
     const dig = this.lib.dig;
     const v = this.view;
     // From the ground up, only over the stairs down (the floors round them cover the rest).
@@ -3341,62 +3359,128 @@ export class BabylonRenderer implements Renderer {
 
   /** A room's fill is out: everyone there is asleep, or nobody awake is in a room without windows. */
   private fillOut(room: number): boolean {
-    return this.darkRooms.has(room) || (this.windowless.has(room) && !this.awakeRooms.has(room));
+    return this.darkRooms.has(room) || (this.dimmed.has(room) && !this.awakeRooms.has(room));
   }
 
   /**
-   * Finds the rooms without windows (`windowless`), and hands the materials those of the storey
-   * in view as rectangles, kept as dark by day as the basement (see `DigState.rects`).
+   * Finds the rooms without windows (`windowless`), and keeps those of the storey in view out of
+   * daylight as the basement is (`dimmed`): each as rectangles for the materials, a room whole or
+   * not at all (with too many rectangles the smallest rooms keep their daylight, lamps as usual).
    */
   private markWindowless(world: WorldStructure, view: ViewRect | null): void {
     const W = world.width;
     const room = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-    // A window lets daylight into the rooms on both its sides (sim-core `rooms.rs`).
-    const lit = new Set<number>();
-    for (const o of world.openings ?? []) {
-      if (o.kind !== 'window') continue;
-      lit.add(room(o.x, o.z));
-      lit.add(o.axis === 'h' ? room(o.x, o.z - 1) : room(o.x - 1, o.z));
+    // Which rooms have none only changes with the walls (new `rooms` and `openings` arrays).
+    const of = [world.rooms, world.openings, world.diagonals];
+    if (of.some((a, i) => a !== this.windowless.of[i])) {
+      // A window lets daylight into the rooms on both its sides (sim-core `rooms.rs`).
+      const lit = new Set<number>();
+      for (const o of world.openings ?? []) {
+        if (o.kind !== 'window') continue;
+        lit.add(room(o.x, o.z));
+        lit.add(o.axis === 'h' ? room(o.x, o.z - 1) : room(o.x - 1, o.z));
+      }
+      for (const d of world.diagonals ?? []) if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
+      const rooms = new Set<number>();
+      for (const r of world.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
+      for (const d of world.diagonals ?? []) for (const r of d.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
+      this.windowless = { rooms, of };
     }
-    const halves = new Map<number, [number, number]>();
-    for (const d of world.diagonals ?? []) {
-      halves.set(d.z * W + d.x, d.rooms);
-      if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
-    }
-    const dark = new Set<number>();
-    for (const r of world.rooms) if (r !== 0 && !lit.has(r)) dark.add(r);
-    for (const [a, b] of halves.values()) for (const r of [a, b]) if (r !== 0 && !lit.has(r)) dark.add(r);
-    this.windowless = dark;
+    const dark = this.windowless.rooms;
 
-    const dig = this.lib.dig;
-    const before = [dig.band.x, dig.band.y, dig.band.z, ...dig.rects];
-    dig.band.set(0, 0, 0, 0);
+    const dimmed = new Set<number>();
+    const { band, bounds, rects } = this.dimming;
+    const before = [...band, ...bounds, ...rects];
+    band.fill(0);
     if (view && this.storey >= 0 && dark.size) {
       const row = this.rowOf(this.storey);
-      // A split tile is dark when every room on it is.
-      const darkAt = (x: number, z: number) => {
-        if (x < view.x || x >= view.x + view.w) return 0;
-        const split = halves.get((z + row) * W + x);
-        const rooms = split ? split.filter((r) => r !== 0) : [room(x, z + row)];
-        return rooms.length && rooms.every((r) => dark.has(r)) ? 1 : 0;
+      const [vw, vd] = [view.w, view.d];
+      // The view's tiles: the windowless room on a whole one (0: none), and the halves of tiles
+      // split by a diagonal wall that belong to one (x, z, which half, room).
+      const whole = new Int32Array(vw * vd);
+      const parts: [number, number, number, number][] = [];
+      const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
+      for (let z = 0; z < vd; z++) {
+        for (let x = 0; x < vw; x++) {
+          const i = (z + view.z + row) * W + x + view.x;
+          const d = diagonals.get(i);
+          if (!d) {
+            if (dark.has(world.rooms[i])) whole[z * vw + x] = world.rooms[i];
+            continue;
+          }
+          d.rooms.forEach((r, h) => dark.has(r) && parts.push([x + view.x, z + view.z, (d.axis === 'dp' ? 0 : 2) + h, r]));
+        }
+      }
+      // Each room's share: its tiles (halves count half) and what its rectangles would take.
+      const share = new Map<number, { n: number; x0: number; z0: number; x1: number; z1: number; halves: number }>();
+      const grow = (r: number, x: number, z: number, n: number, half: number) => {
+        const b = share.get(r) ?? { n: 0, x0: x, z0: z, x1: x + 1, z1: z + 1, halves: 0 };
+        b.n += n;
+        b.halves += half;
+        [b.x0, b.z0, b.x1, b.z1] = [Math.min(b.x0, x), Math.min(b.z0, z), Math.max(b.x1, x + 1), Math.max(b.z1, z + 1)];
+        share.set(r, b);
       };
-      const rects = indoorRects(darkAt, view.x, view.z, view.x + view.w, view.z + view.d, 1)
-        .sort((a, b) => (b.x1 - b.x0) * (b.z1 - b.z0) - (a.x1 - a.x0) * (a.z1 - a.z0))
-        .slice(0, WINDOWLESS_RECTS);
-      rects.forEach((r, i) => dig.rects.set([r.x0, r.z0, r.x1, r.z1], i * 4));
+      whole.forEach((r, i) => r && grow(r, (i % vw) + view.x, Math.floor(i / vw) + view.z, 1, 0));
+      for (const [x, z, , r] of parts) grow(r, x, z, 0.5, 1);
+      const at = (x: number, z: number) => whole[(z - view.z) * vw + x - view.x];
+      let count = 0;
+      const add = (r: readonly [number, number, number, number], x0: number, z0: number, x1: number, z1: number) => {
+        rects.set(r, count * 4);
+        if (count === 0) bounds.splice(0, 4, x0, z0, x1, z1);
+        else bounds.splice(0, 4, Math.min(bounds[0], x0), Math.min(bounds[1], z0), Math.max(bounds[2], x1), Math.max(bounds[3], z1));
+        count++;
+      };
+      // Biggest rooms first, each whole (its tiles' rectangles and its halves) or not at all.
+      for (const [r, b] of [...share].sort((p, q) => q[1].n - p[1].n)) {
+        const own = indoorRects((x, z) => (at(x, z) === r ? 1 : 0), b.x0, b.z0, b.x1, b.z1, 1);
+        if (count + own.length + b.halves > WINDOWLESS_RECTS) continue;
+        for (const q of own) add([q.x0, q.z0, q.x1, q.z1], q.x0, q.z0, q.x1, q.z1);
+        for (const [x, z, half, h] of parts) if (h === r) add([x, z, -1 - half, 0], x, z, x + 1, z + 1);
+        dimmed.add(r);
+      }
       // From under the floor of the storey in view to just under the next one's.
-      dig.band.set(this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, rects.length, 0);
+      if (count) band.splice(0, 3, this.storey * WALL_HEIGHT - 0.5, (this.storey + 1) * WALL_HEIGHT - 0.02, count);
     }
-    if ([dig.band.x, dig.band.y, dig.band.z, ...dig.rects].some((v, i) => v !== before[i])) this.resetSnapshot();
+    this.dimmed = dimmed;
+    if ([...band, ...bounds, ...rects].some((v, i) => v !== before[i])) this.dimmingVersion++;
+    this.applyDimming();
   }
 
-  /** The rooms whose occupants are all asleep (at least one, nobody awake, away residents not counted). */
+  /** Life stage ids of babies (content `baby`: they don't count as someone up, as in sim-core). */
+  private babyStages(): ReadonlySet<string> {
+    const stages = this.deps.content.lifeStages;
+    if (this.babies?.of !== stages) this.babies = { of: stages, ids: new Set(stages.filter((s) => s.baby).map((s) => s.id)) };
+    return this.babies.ids;
+  }
+  private babies: { of: readonly unknown[]; ids: ReadonlySet<string> } | null = null;
+
+  /** The windowless rooms' darkness on the materials (`dimming`): none while the menus' town is shown. */
+  private applyDimming(): void {
+    const on = !this.townMode;
+    if (this.dimmingApplied.version === this.dimmingVersion && this.dimmingApplied.on === on) return;
+    this.dimmingApplied = { version: this.dimmingVersion, on };
+    const dig = this.lib.dig;
+    const { band, bounds, rects } = this.dimming;
+    dig.band.set(band[0], band[1], on ? band[2] : 0, 0);
+    dig.bounds.set(bounds[0], bounds[1], bounds[2], bounds[3]);
+    dig.rects.set(rects);
+    this.resetSnapshot();
+  }
+
+  /**
+   * Where residents are this frame (`darkRooms`, `awakeRooms`, `occupiedRooms`, `movers`; away
+   * residents not counted), and which neighbours' houses have someone up in them (`neighboursUp`).
+   */
   private findDarkRooms(frame: FrameState): void {
     const { curr, layout } = frame;
     const dark = this.darkRooms;
     const awake = this.awakeRooms;
+    const occupied = this.occupiedRooms;
+    const movers = this.movers;
     dark.clear();
     awake.clear();
+    occupied.clear();
+    movers.length = 0;
     const world = this.lastWorld;
     if (!world) return;
     if (this.sleepActions?.tags !== layout.actions) {
@@ -3407,30 +3491,47 @@ export class BabylonRenderer implements Renderer {
     const sleeping = this.sleepActions.ids;
     const k = layout.sim;
     const W = world.width;
+    // Neighbours' houses only matter once their windows can glow.
+    const houses = this.townMode || this.lampsLevel <= 0 ? [] : (this.street?.houses ?? []);
+    const up = this.neighboursUp;
+    up.length = houses.length;
+    up.fill(false);
+    const babies = this.babyStages();
     const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
       if (curr[o + k.away] !== 0) continue;
-      // `z` is in lot rows: upper storeys have rooms of their own there.
-      const x = Math.floor(curr[o + k.x]);
-      const z = Math.floor(curr[o + k.z]);
-      const room = x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0;
-      if (!room) continue;
+      const px = curr[o + k.x];
+      const pz = curr[o + k.z];
+      if (curr[o + k.moving] !== 0) movers.push(px, pz);
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
-      (asleep ? dark : awake).add(room);
+      const baby = babies.has(world.sims[i]?.stage ?? '');
+      // `z` is in lot rows: upper storeys have rooms of their own there.
+      const x = Math.floor(px);
+      const z = Math.floor(pz);
+      const room = x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0;
+      if (room) {
+        occupied.add(room);
+        if (asleep) dark.add(room);
+        else if (!baby) awake.add(room);
+      }
+      if (asleep || baby || !houses.length) continue;
+      // Upstairs is a storey's own rows: back to the ground's.
+      const gz = pz - this.rowOf(this.storeyOf(z));
+      const h = houses.findIndex(([x0, z0, x1, z1]) => px >= x0 && px <= x1 && gz >= z0 && gz <= z1);
+      if (h >= 0) up[h] = true;
     }
     for (const room of awake) dark.delete(room);
+    if (houses.length && this.street?.setUp(up)) this.resetSnapshot();
   }
 
   /**
    * Front doors stand shut, and a bathroom's door while someone is in there; any of them opens
    * as someone walks up to it (or through it), and swings back once they've passed.
    */
-  private swingDoors(frame: FrameState): void {
+  private swingDoors(): void {
     if (!this.doors.length) return;
-    const { curr, layout } = frame;
-    const k = layout.sim;
-    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    const movers = this.movers;
     const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
     let moved = false;
     for (const door of this.doors) {
@@ -3438,54 +3539,24 @@ export class BabylonRenderer implements Renderer {
       if (leaf.meshes[0]?.isDisposed()) continue;
       // Someone on the move by it (both in lot rows: the storey is in the row).
       let passing = false;
-      for (let i = 0; i < count && !passing; i++) {
-        const o = layout.headerLen + i * layout.simStride;
-        if (curr[o + k.away] !== 0 || curr[o + k.moving] === 0) continue;
-        const dx = curr[o + k.x] - leaf.centre[0];
-        const dz = curr[o + k.z] - leaf.centre[1];
+      for (let i = 0; i < movers.length && !passing; i += 2) {
+        const dx = movers[i] - leaf.centre[0];
+        const dz = movers[i + 1] - leaf.centre[1];
         passing = dx * dx + dz * dz < DOOR_REACH * DOOR_REACH;
       }
-      const engaged = leaf.bath !== 0 && (this.awakeRooms.has(leaf.bath) || this.darkRooms.has(leaf.bath));
+      const engaged = leaf.bath !== 0 && this.occupiedRooms.has(leaf.bath);
       const target = passing || !(leaf.front || engaged) ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall.
-      const turn = leaf.close * (1 - open * open * (3 - 2 * open));
+      const turn = leaf.close * (1 - leaf.opens * open * open * (3 - 2 * open));
       for (const mesh of leaf.meshes) mesh.rotation.y = turn;
       moved = true;
     }
     if (!moved) return;
     this.sunShadows.moved();
     this.resetSnapshot();
-  }
-
-  /**
-   * Neighbours' windows glow at night only while someone is up at home there (not away, not
-   * asleep): after bedtime their houses go dark too.
-   */
-  private lightNeighbours(frame: FrameState): void {
-    const houses = this.townMode ? [] : (this.street?.houses ?? []);
-    if (!houses.length) return;
-    const { curr, layout } = frame;
-    const k = layout.sim;
-    const sleeping = this.sleepActions?.ids;
-    const up = this.neighboursUp;
-    up.length = houses.length;
-    up.fill(false);
-    // Everyone in town (not only those drawn), as far as the snapshot holds them.
-    const count = Math.min(curr[layout.header.simCount], Math.floor((curr.length - layout.headerLen) / layout.simStride));
-    for (let i = 0; i < count; i++) {
-      const o = layout.headerLen + i * layout.simStride;
-      if (curr[o + k.away] !== 0) continue;
-      if (curr[o + k.pose] === Pose.Lie && sleeping?.has(curr[o + k.action] | 0)) continue;
-      const x = curr[o + k.x];
-      // Upstairs is a storey's own rows: back to the ground's.
-      const z = curr[o + k.z] - this.rowOf(this.storeyOf(Math.floor(curr[o + k.z])));
-      const h = houses.findIndex(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
-      if (h >= 0) up[h] = true;
-    }
-    if (this.street?.setUp(up)) this.resetSnapshot();
   }
 
   /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */
@@ -4141,7 +4212,7 @@ export class BabylonRenderer implements Renderer {
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
         // In a room without windows a lamp's shade glows by day too.
-        const f = (room && this.windowless.has(room) ? 1 : level) * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
+        const f = (room && this.dimmed.has(room) ? 1 : level) * (lamp >= 0 ? (this.lampOn.get(lamp) ?? 1) : room ? (this.windowGlowOn.get(room) ?? 1) : 1);
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;
         lit ||= f > 0;
@@ -4208,7 +4279,7 @@ export class BabylonRenderer implements Renderer {
       const use = this.townMode ? null : (this.roomLightUse[i] ?? null);
       // Down in the basement and in rooms without windows they're on by day too, as bright as at
       // night (by day the exposure is lower).
-      const dark = this.storey < 0 || (!!use && this.windowless.has(use.room));
+      const dark = this.storey < 0 || (!!use && this.dimmed.has(use.room));
       const lit = (dark ? NIGHT_EXPOSURE / this.exposure : this.lampsLevel) * (this.roomLightOn[i] ?? 1);
       if (!use) {
         light.intensity = 0;
