@@ -2,16 +2,12 @@
 # ("Optimisation and registration").
 import json
 import os
-import sys
 
 import bpy
 
+# The manifests as the game stacks them, and which keys the game draws (read as the gate reads them).
+from .manifest import known_keys, manifests
 from .scene import ASSETS, meshes
-
-# The gate's readings, shared: the manifests as the game stacks them, and which keys the game draws.
-# (gamekit/__init__ imports this module first, so this puts check_glb.py's folder on the path for family.py too.)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from check_glb import known_keys, manifests  # noqa: E402
 
 
 def export_glb(path, objects=None, texcoords=False, clips=False):
@@ -60,7 +56,7 @@ def write_pack(pack, entries, comment, code=(), known=None):
     A new key must be one the game draws: a content object's or item's model, one a manifest has, or
     one of `code` (keys the game draws by code: `Model(code=True)`). Anything else is a misspelt `key=`,
     which would write an entry nothing draws (the object a box). `Family.run` refuses those before it
-    builds anything and passes the keys it knows (`known`, check_glb `known_keys`); this is the backstop.
+    builds anything and passes the keys it knows (`known`, manifest.py `known_keys`); this is the backstop.
     """
     path = os.path.join(ASSETS, 'packs', pack, 'manifest.json')
     rel = os.path.relpath(path, ASSETS)

@@ -370,9 +370,9 @@ function resizeData(data: VertexData, maps: ((v: number) => number)[], slopes: (
 
 /**
  * A part's exact bounds in model space (`lo`, `hi`: along x, y, z), turned as `partMesh` turns it:
- * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent
- * (check_glb.py `part_box` measures the same). And which of its own axes lies along each model axis
- * (-1: none; it's turned off the axes).
+ * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent (the
+ * gate, crates/tools/src/checkglb.rs `bounds`, measures a file's boxes by their corners, turned the same
+ * way). And which of its own axes lies along each model axis (-1: none; it's turned off the axes).
  */
 function partBox(p: PrimitivePart): { lo: number[]; hi: number[]; along: number[] } {
   const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);

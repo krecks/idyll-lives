@@ -7,8 +7,11 @@
 #   python3 -I -B tools/art/blender/check_glb.py model.garden.gnome …  only these keys (model., item., tool.)
 #
 # Plain Python, no Blender needed. Run inside Blender with `-- --preview`, it also re-imports each
-# file and renders it to tools/art/blender/previews/rt_<name>.png, so export problems show:
+# file and renders it to tools/art/blender/previews/rt_<name>.png, so export problems show (gamekit/review.py):
 #   Blender --background --python tools/art/blender/check_glb.py -- --preview
+#
+# Ported to Rust as `cargo check-glb` (crates/tools/src/checkglb.rs), which prints the same; this stays until
+# the two are compared. The manifests, the content and centres.json are read by gamekit/manifest.py.
 #
 # Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 import json
@@ -19,14 +22,10 @@ import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASSETS = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'assets'))
-PREVIEW = os.path.join(HERE, 'previews')
-CONTENT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'content'))
-# Where each Blender-built model is centred at rest (its Model's `centre`, (0, 0) for most): {key: [x, depth]},
-# for this gate only (the game doesn't read it, so it stays out of the manifests it downloads). A build writes
-# its models' (gamekit/family.py), `build.py --centres` every family's without Blender. A key that isn't in it
-# isn't built here (a third-party file): its centre isn't checked.
-CENTRES = os.path.join(HERE, 'centres.json')
+# (gamekit/manifest.py is plain Python; `import gamekit` would need Blender.)
+sys.path.insert(0, os.path.join(HERE, 'gamekit'))
+from manifest import (ASSETS, CENTRES, CONTENT, content, content_keys, known_keys, manifests, model_key,  # noqa: E402,F401
+                      played, read_centres, uses, write_centres)
 
 # Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 # primitive parts' median and 90th percentile in each class, so a model costs what the
@@ -52,40 +51,6 @@ OVERHANG = 0.02
 SWEEP = 0.01
 # How far (m) a model's middle at rest may be off its `centre` (centres.json).
 OFF_CENTRE = 0.02
-
-
-def read_centres(path=CENTRES):
-    """{key: [x, depth]}: centres.json (empty if there's none yet)."""
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-
-def write_centres(centres, path=CENTRES, replace=False):
-    """Writes `centres` ({key: (x, depth)}) over centres.json's entries for those keys, keeping the others
-    (`replace`: dropping them): one key a line, sorted, to 0.1 mm."""
-    out = {} if replace else read_centres(path)
-    out.update({key: [round(float(v), 4) + 0.0 for v in c] for key, c in centres.items()})
-    lines = [f'  {json.dumps(key)}: {json.dumps(c)}' for key, c in sorted(out.items())]
-    with open(path, 'w') as f:
-        f.write('{\n' + ',\n'.join(lines) + '\n}\n')
-    return path
-
-
-def manifests(path):
-    """[(path, manifest)] for a manifest and the packs it lists, depth first, in order. A manifest that can't
-    be read raises ValueError naming it."""
-    try:
-        with open(path) as f:
-            m = json.load(f)
-    except (OSError, ValueError) as err:
-        raise ValueError(f'{os.path.relpath(path, os.path.dirname(ASSETS))}: {err}') from None
-    out = [(path, m)]
-    for pack in m.get('packs', []):
-        out += manifests(os.path.normpath(os.path.join(os.path.dirname(path), pack)))
-    return out
 
 
 def read_glb(path):
@@ -208,30 +173,6 @@ def named_finish(name):
     `namedFinish`; a tint slot `#body`, `#skin` or `#hair` in the name aside)."""
     head, at, tail = re.sub(r'#(body|skin|hair)(?=@|$)', '', name).rpartition('@')
     return {'finish': f'material.finish.{tail}'} if head and at and tail.isalpha() and tail.islower() else None
-
-
-def uses(motions):
-    """[(use, {clip, hold, delay, every, slot, out})] for each clip an entry's `motions.uses` plays (a clip,
-    {clip, ...} or a list of them)."""
-    return [(use, u if isinstance(u, dict) else {'clip': u})
-            for use, value in (motions.get('uses') or {}).items() for u in (value if isinstance(value, list) else [value])]
-
-
-def played(motions):
-    """{clip: what plays it} for an entry's `motions`: `uses`, `loops`, `open`, `idle`, `night`, `growth`,
-    `ride` (the clip whose part carries its users) and `clock` (`hour`, `minute`: hands set by the time)."""
-    out = {}
-    for use, u in uses(motions):
-        out.setdefault(u['clip'], f'use {use!r}')
-    for use, clip in (motions.get('loops') or {}).items():
-        out.setdefault(clip, f'loop {use!r}')
-    for kind in ('open', 'idle', 'night', 'growth', 'ride'):
-        if motions.get(kind):
-            out.setdefault(motions[kind], kind)
-    for hand in ('hour', 'minute'):
-        if (motions.get('clock') or {}).get(hand):
-            out.setdefault(motions['clock'][hand], f'clock {hand}')
-    return out
 
 
 def loops(motions):
@@ -419,54 +360,6 @@ def check_clips(gltf, binary, entry):
                 continue
             errors.append(f'loop {a["name"]!r} ends {node} away from where it starts ({c["target"]["path"]}): a loop goes from rest to rest (G.spin, G.rock, G.scroll)')
     return errors, warnings
-
-
-def content():
-    """(objects, items, buyCategories) of the game's content: base.json and the files its `include` lists,
-    merged as the game merges them (sim_core::merge_content: each file's lists after the ones before).
-    A file that can't be read raises ValueError naming it."""
-    def read(name):
-        try:
-            with open(os.path.join(CONTENT, name)) as f:
-                data = json.load(f)
-        except (OSError, ValueError) as err:
-            raise ValueError(f'web/public/content/{name}: {err}') from None
-        if not isinstance(data, dict):
-            raise ValueError(f'web/public/content/{name}: a content file is a JSON object')
-        return data
-    base = read('base.json')
-    files = [base] + [read(name) for name in base.get('include', [])]
-    return tuple([d for f in files for d in f.get(k) or []] for k in ('objects', 'items', 'buyCategories'))
-
-
-def model_key(d, prefix):
-    """The model a content object (`prefix` model) or item (item) draws, as the renderer picks it
-    (`def.model ?? `model.${id}``): its `model`, or `<prefix>.<id>`. An empty `model` stays empty (an error)."""
-    return d['model'] if d.get('model') is not None else f'{prefix}.{d["id"]}'
-
-
-def content_keys(defs=None):
-    """{model key: what draws it ('object fridge')}: the model each content object and item draws
-    (`model_key`). The game's own models (the rock, the marker, the street's) are drawn by code and aren't here."""
-    objects, items, _ = defs or content()
-    keys = {}
-    for kind, prefix, found in (('object', 'model', objects), ('item', 'item', items)):
-        for d in found:
-            keys.setdefault(model_key(d, prefix), f'{kind} {d["id"]}')
-    return keys
-
-
-def known_keys(assets=ASSETS, pack=None):
-    """The model keys a build may write: every content object's and item's model, and every model entry of the
-    manifests (`assets`/manifest.json and its packs) and of `pack` (a pack's manifest.json, whether `packs` lists
-    it or not). Any other key is a misspelt `key=`, refused (gamekit `Family.run`, `write_pack`) unless its
-    `Model` says the game draws it by code (`code=True`). Raises ValueError on content it can't read."""
-    known = set(content_keys()) - {''}
-    stack = manifests(os.path.join(assets, 'manifest.json'))
-    if pack and os.path.exists(pack) and os.path.normpath(pack) not in {os.path.normpath(p) for p, _m in stack}:
-        stack += manifests(pack)
-    known |= {k for _path, m in stack for k, e in (m.get('entries') or {}).items() if e.get('type') == 'model'}
-    return known
 
 
 def content_objects(defs=None):
@@ -893,7 +786,7 @@ def check_file(entry, finishes, path, facts=None, centre=None):
             at = ((lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2)
             if max(abs(at[0] - centre[0]), abs(at[1] - centre[1])) > OFF_CENTRE:
                 warnings.append(f'centred on (x {at[0]:.3f}, depth {at[1]:.3f}), its Model\'s `centre` is ({centre[0]:.3f}, {centre[1]:.3f}) '
-                                '(centres.json): rebuild it, or `build.py --centres` if the Model changed')
+                                '(centres.json): rebuild it, or `cargo art --centres` if the Model changed')
         # Against what each content object that draws it says of it (two objects may share a model).
         seen = set()
         for fact in facts or [None]:
@@ -1019,18 +912,15 @@ def main(argv):
 
 
 def preview(paths):
-    """Inside Blender: re-imports each file and renders it next to the build's previews."""
+    """Inside Blender: re-imports each file and renders it next to the build's previews (gamekit/review.py)."""
     try:
-        import bpy
+        import bpy  # noqa: F401
     except ImportError:
         print('--preview needs Blender: Blender --background --python check_glb.py -- --preview')
         return
     sys.path.insert(0, HERE)
-    import gamekit as G
-    for path in paths:
-        G.reset()
-        bpy.ops.import_scene.gltf(filepath=path)
-        G.preview(os.path.join(PREVIEW, 'rt_' + os.path.splitext(os.path.basename(path))[0] + '.png'))
+    from gamekit.review import review
+    review(paths)
 
 
 if __name__ == '__main__':
