@@ -75,6 +75,14 @@ pub struct Interaction {
     pub total_gain: [f32; MAX_NEEDS],
     pub gain_per_minute: [f32; MAX_NEEDS],
     pub pose: Pose,
+    /// Sit on a free seat within this many metres of the object, if there is one (content
+    /// `seatNear`: watching TV from the sofa). 0: use it standing, as `pose` says.
+    pub seat_near: f32,
+    /// Share (0..1) of this use's need gains that nearby residents get too (content
+    /// `broadcast`: hearing the TV while eating). 0: nobody else.
+    pub broadcast: f32,
+    /// How far (m) `broadcast` carries when it isn't in the same room (content `broadcastRange`).
+    pub broadcast_range: f32,
     /// Used standing on the object rather than in front of it (content `inside`: a shower):
     /// the resident steps onto its centre, facing out, and back off where they came from.
     pub inside: bool,
@@ -2102,6 +2110,15 @@ struct InteractionRaw {
     effects: HashMap<String, f32>,
     #[serde(default)]
     pose: Pose,
+    /// Sit on a free seat within this many metres of the object (see `Interaction::seat_near`).
+    #[serde(default)]
+    seat_near: f32,
+    /// Share of the gains nearby residents get too (see `Interaction::broadcast`).
+    #[serde(default)]
+    broadcast: f32,
+    /// How far that carries when not in the same room (see `Interaction::broadcast_range`).
+    #[serde(default)]
+    broadcast_range: Option<f32>,
     /// Used standing on the object (see `Interaction::inside`).
     #[serde(default)]
     inside: bool,
@@ -2570,6 +2587,15 @@ impl Content {
                 if it.cost < 0 {
                     return Err(Error::new(format!("{ctx}: negative cost")));
                 }
+                if it.seat_near < 0.0 {
+                    return Err(Error::new(format!("{ctx}: negative seatNear")));
+                }
+                if !(0.0..=1.0).contains(&it.broadcast) {
+                    return Err(Error::new(format!("{ctx}: broadcast must be 0..=1")));
+                }
+                if it.broadcast_range.is_some_and(|r| r < 0.0) {
+                    return Err(Error::new(format!("{ctx}: negative broadcastRange")));
+                }
                 let skill = it
                     .skill
                     .as_deref()
@@ -2605,6 +2631,9 @@ impl Content {
                     total_gain,
                     gain_per_minute: own_gain.map(|g| g / minutes),
                     pose: it.pose,
+                    seat_near: it.seat_near,
+                    broadcast: it.broadcast,
+                    broadcast_range: it.broadcast_range.unwrap_or(6.0),
                     inside: it.inside,
                     autonomous: it.autonomous,
                     tags: mask,
@@ -2644,7 +2673,9 @@ impl Content {
                     && (it.leaves != Some(OpenState::Open)
                         || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
                 {
-                    return Err(Error::new(format!("{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed"
+                    )));
                 }
                 if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
                     return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
@@ -3743,7 +3774,9 @@ mod tests {
         assert_eq!(c.object_index("fridge"), Some(0));
         assert_eq!(
             c.tags,
-            ["food", "screen", "fun", "social", "friendly", "visit", "chores", "cleaning"]
+            [
+                "food", "screen", "fun", "social", "friendly", "visit", "chores", "cleaning"
+            ]
         );
         assert_eq!(c.objects[1].interactions[0].tags, 0b110);
         assert_eq!(c.socials[0].success.feeling, Some(0));

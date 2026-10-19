@@ -148,9 +148,12 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `anim` | What the resident is shown doing while using it: one tag from the content's `animations` list (see [Animations](#animations)), e.g. `eat` for a snack, `cook` for a meal, `wash` at a sink, `type` at a computer. An unknown tag is an error. Optional, but give every interaction one; without it the game guesses from `tags`, `pose` and `effects`. |
 | `minutes` | Game minutes for the whole interaction (> 0). Residents stop early when every need it raises is full. |
 | `effects` | Need id → total change over the full duration (0..1 scale; negative = a cost, e.g. a workout makes you sweaty). Gains are spread evenly over the minutes. |
+| `broadcast` | Share (0..1) of this interaction's positive need gains that other residents nearby get too, as if they heard or saw it (watching TV from the sofa while someone eats at the table). Same room or within `broadcastRange`, not asleep, and not the resident using it. Default 0 (nobody else). |
+| `broadcastRange` | How far (m) `broadcast` carries outside the same room. Default 6. |
 | `tags` | Tag ids (see [Tags](#tags)): drive trait/emotion/schedule preferences, "busy" (can't be interrupted by a chat) and what counts as sleep. |
 | `skills` | Skill id → levels gained per hour of use (before the per-level slowdown). |
 | `pose` | `stand` (default), `sit` or `lie`. |
+| `seatNear` | Sit on a free seat within this many metres of the object before using it, if there is one (watching TV from the sofa). The resident walks to the seat, sits facing the way it faces, and uses the object from there; the seat is reserved while they do. Seats are sitting interactions with a `cooking.seatTags` tag and no `seatAvoid` tag. Default 0 (use the object standing in front of it). |
 | `inside` | Used standing on the object rather than in front of it: the resident steps in onto its centre (or its slot), facing the way it faces, and steps back out where they came from when done (the same as sitting down and getting up). Every shower has it. Default `false`. |
 | `autonomous` | `false` = only when the player asks. Default `true`. |
 | `needsTable` | Only offered while the seat faces a table it tucks under (its `seatAt`): dining at a table. A chair alone offers only its other interactions; the player's order fails with "needs a table". Needs a `seatAt`. Default `false`. |

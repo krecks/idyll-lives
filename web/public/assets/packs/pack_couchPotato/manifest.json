@@ -28,10 +28,14 @@
           "finish": "material.finish.satin"
         },
         "picture": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#3BA3E0",
+          "screen": true
         },
         "picture_b": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#D6A64A",
+          "screen": true
         },
         "popcorn": {
           "finish": "material.finish.matte"
@@ -111,10 +115,14 @@
           "finish": "material.finish.satin"
         },
         "picture": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#3BA3E0",
+          "screen": true
         },
         "picture_b": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#D6A64A",
+          "screen": true
         },
         "screen_back": {
           "finish": "material.finish.satin"
@@ -283,7 +291,9 @@
           "finish": "material.finish.satin"
         },
         "picture_b": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#D6A64A",
+          "screen": true
         },
         "soda": {
           "finish": "material.finish.gloss"
@@ -301,7 +311,9 @@
           "finish": "material.finish.gloss"
         },
         "tv_screen": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#4FC3A1",
+          "screen": true
         },
         "tv_white": {
           "finish": "material.finish.gloss"

@@ -432,6 +432,9 @@ export class BabylonRenderer implements Renderer {
   private sleepActions: { tags: readonly string[]; ids: Set<number> } | null = null;
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`). */
   private lampsLevel = 0;
+  /** Objects whose screen is on this frame (a resident is using them), and when it was last set. */
+  private screenOn = new Set<number>();
+  private screenTime = 0;
   /** The camera's exposure at the last lighting update (without the look's overall scale). */
   private exposure = 1;
   private readonly lampColor = new Color3();
@@ -487,8 +490,8 @@ export class BabylonRenderer implements Renderer {
   private fx!: BuildEffects;
   /** Placed objects' moving parts, played while residents use them. */
   private readonly motion = new ObjectMotion();
-  /** What glows at night (lamp shades, screens: a template's `glow`), per model: its instances' strengths and rooms. */
-  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[]; lamps: number[] }[] = [];
+  /** What glows (lamp shades at night, screens while used: a template's `glow`), per model: its instances' strengths, rooms and object ids. */
+  private glows: { mesh: Mesh; colors: Float32Array; rooms: number[]; lamps: number[]; ids: number[]; screen: boolean }[] = [];
   private previewMeshes!: Record<'wall' | 'door' | 'window' | 'open', Mesh>;
   private previewBuffers!: Record<'wall' | 'door' | 'window' | 'open', Float32Array>;
   private previewValid = true;
@@ -871,6 +874,7 @@ export class BabylonRenderer implements Renderer {
     if (motion.moved) this.resetSnapshot();
     // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
     else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
+    this.animateScreens(frame);
     // Sims: pose every visible Sim into the shared pose texture (characters.ts).
     // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
@@ -3362,7 +3366,7 @@ export class BabylonRenderer implements Renderer {
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
       });
-      for (const { mesh, part } of template.glows ?? []) {
+      for (const { mesh, part, screen } of template.glows ?? []) {
         // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
         const colors = new Float32Array(list.length * 4);
         const still = part < 0 || !parts[part];
@@ -3374,7 +3378,7 @@ export class BabylonRenderer implements Renderer {
         // A lamp's shade glows with the lamp (switched on or off), anything else's with its room's lights.
         const light = this.deps.content.object(list[0].def)?.light;
         const lamps = list.map((o) => (light && light.switch !== false ? o.id : -1));
-        glows.push({ mesh, colors, rooms: list.map(roomOf), lamps });
+        glows.push({ mesh, colors, rooms: list.map(roomOf), lamps, ids: list.map((o) => o.id), screen: !!screen });
       }
     });
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
@@ -3700,13 +3704,17 @@ export class BabylonRenderer implements Renderer {
   }
 
   /**
-   * Lamp shades and screens glow as the windows do: from dusk, as the lamps come up, and out with
-   * their room's lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp
-   * (`lampOn`: off, no glow). By day nothing is drawn.
+   * Lamp shades glow as the windows do: from dusk, as the lamps come up, and out with their room's
+   * lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp (`lampOn`: off,
+   * no glow). Screens are lit by use instead (see `writeScreenGlow`).
    */
   private applyGlow(): void {
     const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
     for (const g of this.glows) {
+      if (g.screen) {
+        this.writeScreenGlow(g);
+        continue;
+      }
       let lit = false;
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
@@ -3719,6 +3727,50 @@ export class BabylonRenderer implements Renderer {
       g.mesh.thinInstanceBufferUpdated('color');
       g.mesh.setEnabled(lit);
     }
+  }
+
+  /**
+   * Screens (a TV, a monitor) are lit only while a resident uses them, and flicker a little while
+   * they run; the glow mesh's vertex colour is the screen's, its instance colour the brightness.
+   */
+  private writeScreenGlow(g: { mesh: Mesh; colors: Float32Array; ids: number[] }): void {
+    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    const t = this.screenTime / 1000;
+    g.ids.forEach((id, i) => {
+      let f = 0;
+      if (!this.townMode && this.screenOn.has(id)) {
+        const flicker = this.reducedMotion
+          ? 1
+          : 0.9 + 0.1 * (0.5 + 0.5 * Math.sin(t * 17.3 + id * 1.7)) * (0.6 + 0.4 * Math.sin(t * 41.1 + id * 2.3));
+        f = (0.55 + 0.45 * level) * flicker;
+      }
+      g.colors.fill(f, i * 4, i * 4 + 3);
+      g.colors[i * 4 + 3] = 1;
+    });
+    if (g.mesh.isDisposed()) return;
+    g.mesh.thinInstanceBufferUpdated('color');
+    // Off (nobody watching) it needn't draw at all; toggled only when that changes, so a still
+    // picture isn't re-recorded every frame.
+    const on = g.ids.some((id) => this.screenOn.has(id));
+    if (g.mesh.isEnabled() !== on) g.mesh.setEnabled(on);
+  }
+
+  /** Which screens are on this frame: the objects residents are using (not just walking to). */
+  private animateScreens(frame: FrameState): void {
+    if (!this.glows.some((g) => g.screen)) return;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const on = new Set<number>();
+    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if ((curr[o + k.action] | 0) < 0) continue;
+      const id = curr[o + k.object] | 0;
+      if (id >= 0) on.add(id);
+    }
+    this.screenOn = on;
+    this.screenTime = frame.now;
+    for (const g of this.glows) if (g.screen) this.writeScreenGlow(g);
   }
 
   /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */

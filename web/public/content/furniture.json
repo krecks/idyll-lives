@@ -1548,6 +1548,9 @@
           "label": "Watch TV",
           "anim": "watch",
           "minutes": 60,
+          "seatNear": 4,
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "effects": {
             "fun": 0.8
           },
@@ -1576,6 +1579,9 @@
           "label": "Watch TV",
           "anim": "watch",
           "minutes": 60,
+          "seatNear": 4,
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "effects": {
             "fun": 0.6
           },
@@ -1605,6 +1611,9 @@
           "label": "Watch TV",
           "anim": "watch",
           "minutes": 60,
+          "seatNear": 4,
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "effects": {
             "fun": 0.9
           },
@@ -1618,6 +1627,9 @@
           "label": "Watch a film",
           "anim": "watch",
           "minutes": 120,
+          "seatNear": 4,
+          "broadcast": 0.35,
+          "broadcastRange": 6,
           "effects": {
             "fun": 1.0,
             "comfort": 0.1

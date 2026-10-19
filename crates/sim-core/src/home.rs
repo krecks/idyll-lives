@@ -1262,6 +1262,19 @@ impl World {
                 shift_objects(&mut t.kind, id);
             }
             sim.remap_unreachable(|o| if o == id { None } else { Some(if o > id { o - 1 } else { o }) });
+            // A seat taken to use something else (content `seatNear`): ids shift down too, and
+            // if the seat itself goes they stand up but may carry on with what they were using.
+            match sim.use_seat {
+                Some(seat) if seat == id => {
+                    sim.use_seat = None;
+                    if sim.pose == crate::content::Pose::Sit {
+                        sim.seated_from = None;
+                        sim.pose = crate::content::Pose::Stand;
+                    }
+                }
+                Some(seat) if seat > id => sim.use_seat = Some(seat - 1),
+                _ => {}
+            }
         }
         let obj = self.objects.remove(id as usize);
         self.object_plot.remove(id as usize);

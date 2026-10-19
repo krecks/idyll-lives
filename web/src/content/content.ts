@@ -26,6 +26,12 @@ export interface InteractionDef {
   /** Needs it fills for the baby lying in the object (cribs). */
   care?: Record<string, number>;
   pose?: 'stand' | 'sit' | 'lie';
+  /** Sit on a free seat within this many metres of the object, if there is one (watching TV from the sofa). */
+  seatNear?: number;
+  /** Share (0..1) of the use's need gains that nearby residents get too (hearing the TV while eating). */
+  broadcast?: number;
+  /** How far (m) that carries outside the same room. */
+  broadcastRange?: number;
   /** Used standing on the object, not in front of it (a shower): in on its centre, facing out. */
   inside?: boolean;
   autonomous?: boolean;
