@@ -4,10 +4,9 @@
 in `packs/playground/manifest.json`: the slide (`model.slide`), the climbing frame (`model.climbingFrame`), the seesaw
 (`model.seesaw`), the spring rider (`model.springRider`), the merry-go-round (`model.merryGoRound`), the basketball
 hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and the park chess table
-(`model.parkChessTable`). They replace the primitive-part placeholders of `tools/art/community.py`, which stay as the
-fallback. Built 2026-10-14; they sit in Validate › Playground until checked in play.
+(`model.parkChessTable`). Built 2026-10-14; they sit in Validate › Playground until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes) and stood on the floor without moving it across
+Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
 (`G.settle(centre=False)`, `centre=` on its `Model`), so the seats stay where `community.json` seats the riders. Town
 things, seen from far: every model has a far version (`far=0.25`; the chess table's by hand, below).
 
@@ -66,8 +65,8 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 | `model.pingPongTable` | 1.90 × 0.95 × 0.99 m | 1,148 (276) | 1 | Table, Legs |
 | `model.parkChessTable` | 0.80 × 0.85 × 0.88 m | 3,468 (1,216) | 2 | Table, Stools |
 
-`check_glb.py`: 8 models, 0 failed, no warnings (the seesaw's placeholder, built for 2 × 1 tiles, was widened to the
-content's 3 × 1 with its seats at ±0.75 m, so the fallback, picking and shadow match the model). Khronos
+`check_glb.py`: 8 models, 0 failed, no warnings (the seesaw, built for 2 × 1 tiles, was widened to the content's
+3 × 1 with its seats at ±0.75 m, so picking and the shadow match the model). Khronos
 validator: 0 errors, 0 warnings on all 16 files.
 
 ## Rebuild

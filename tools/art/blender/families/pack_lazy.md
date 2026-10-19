@@ -1,11 +1,10 @@
 # Lazy pack — notes
 
 `pack_lazy.py` builds the six P10 lazy models into `web/public/assets/models/pack_lazy/` and their entries in
-`packs/pack_lazy/manifest.json`, an override pack listed after `packs/lazy/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_lazy.py`, in `packs/lazy`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_lazy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Lazy until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 What the renderer fixes is kept: the bed's mattress top at 0.49 (`BEDS` default 0.5; it is in `BLANKET_BEDS`, so no
 duvet is modelled, only a throw folded at the foot), the pod's and the poufs' seats at 0.45, the vibration plate's
 deck at 0.125 (content `stand.height` 0.12, where the resident stands).
@@ -28,9 +27,9 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 - `shake` is 0.25 s long, not about 1 s: one slow rock a second reads as tilting, not vibrating.
 - The nap pod keeps inside its 1x1 footprint (0.88 × 0.91 m), its hood's back on the wall face (centred on its
   `Model` `centre`; its rug 3 cm further in than first built, so it stays on the tile). The egg is 1.42 m tall with
-  its hood, so a sitter's head (about 1.3 m) is inside it. Its placeholder draws the egg, the hood folded back on
+  its hood, so a sitter's head (about 1.3 m) is inside it. Its old part drew the egg, the hood folded back on
   top and the rug as the model has them (it overhung the tile at 1.15 m deep, and stood 3 cm into the wall).
-- The quilt table stands on the wall face too (`centre`), as do their placeholders (`pack_shapes.to_wall`).
+- The quilt table stands on the wall face too (`centre`), as its old part stood.
 - Colour parts: the plan's "Body, Upholstery" fit the bed, the pod and the quilt table. The locker, the plate and the
   hub have no upholstery: they offer Body with Doors and Trim, Trim and Deck, and Speaker.
 

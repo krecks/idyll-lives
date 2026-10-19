@@ -3,11 +3,10 @@
 `stalls.py` builds the five CM3 models into `web/public/assets/models/stalls/` and their entries in
 `packs/stalls/manifest.json`: the ice cream cart (`model.iceCreamCart`), the hot dog stand (`model.hotDogStand`),
 the snack machine (`model.vendingSnack`), the drinks machine (`model.vendingDrink`) and the market stall
-(`model.marketStall`). They replace the primitive-part placeholders of `tools/art/community.py` ("Carts and
-machines"), which stay as the fallback. Built 2026-10-14; they sit in Validate › Stalls until checked in play
+(`model.marketStall`). Built 2026-10-14; they sit in Validate › Stalls until checked in play
 (back to community / food).
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`):
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`):
 the carts and the stall across their 2 × 1 tiles, the machines with their backs on the wall face (depth −0.43) of
 their 1 × 1 tile. They are placed on town lots and seen from far, so each has a far version (`far=0.25`: the model
 at rest, joined, a quarter of the triangles).
@@ -21,7 +20,7 @@ at rest, joined, a quarter of the triangles).
   - **The parasol** stands in a socket at the back of the top, behind the lid's rails, and leans 11° forward so
     its canopy sits over the middle of the cart and inside the footprint's depth. A centred upright pole would
     pass through the sliding lid. The canopy is 16 gores, pink and white (`parasol`, `parasol_white`, one cone
-    with alternating face materials), 1.5 × as wide as deep, as the placeholder's is (0.94 m deep).
+    with alternating face materials), 1.5 × as wide as deep, as the old part was (0.94 m deep).
 - **Hot dog stand.** A red gloss cart with a steel top, a sign with a hot dog on its front, sauces and napkins, four
   posts and a striped awning (six slats, red and white, with a valance) leaning down to the front. The hot plate
   (a steel tray, a dark plate, five sausages and two buns) has a hinged steel lid (`lid`) on its back edge:

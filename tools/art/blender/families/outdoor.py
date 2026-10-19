@@ -1,5 +1,4 @@
-# The outdoor things, over their primitive-part placeholders (`catalog.py`, `catalog2.py`, `furniture.py`), which
-# stay the fallback. Notes: outdoor.md.
+# The outdoor things. Notes: outdoor.md.
 #
 # OU1, patio seating and tables: the park bench (`model.bench`), the folding bistro set (`model.patioSet`), the
 # picnic table (`model.picnicTable`), the garden chair (`model.gardenChair`), the round mosaic table
@@ -10,8 +9,8 @@
 # OU3, grills and fire: the charcoal grill (`model.grill`, its lid swings up while cooking), the gas grill station
 # (`model.grillStation`, its hood swings up) and the fire pit (`model.firePit`, its flames grow while warmed by).
 #
-# Each is built in place where its placeholder stands (`F`, game axes), so the seat heights (`catalog2.py`
-# `SEATS`) and the tops things stand on (content `surface`) stay where the game has them.
+# Each is built in place where the game placed it (`F`, game axes), so the seat heights (content `seat`)
+# and the tops things stand on (content `surface`) stay where the game has them.
 #
 # Run:  python3 -B tools/art/blender/build.py outdoor [--only bench] [--preview]
 import math
@@ -625,7 +624,7 @@ def _embers(prefix, r, y, n, seed, material):
                  scale=(1, 1, 0.6), segments=6, rings=4)
 
 
-KETTLE_R, KETTLE_RIM = 0.3, 0.99     # the charcoal grill's bowl: its radius and its rim's height (placeholder)
+KETTLE_R, KETTLE_RIM = 0.3, 0.99     # the charcoal grill's bowl: its radius and its rim's height (old part)
 
 
 # The charcoal grill: a kettle on three legs, wheels on the back two, an ash catcher under the bowl; inside, a bed of
@@ -825,11 +824,11 @@ FAMILY = G.Family(
              motions={'uses': {'cook': 'hood_up', 'feast': 'hood_up'}}, paint=[('cart', 'Cart'), ('hood', 'Hood')]),
      G.Model('firePit', firePit, size=(0.927, 0.619, 0.91), centre=(-0.001, -0.009), key='model.firePit', motions={'uses': {'relax': 'flames'}},
              paint=[('pit', 'Bowl'), ('pit_stones', 'Stones')])],
-    comment='Blender-built outdoor things (tools/art/blender/families/outdoor.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The parasol\'s canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the '
-            'swings sway with whoever is on them, and the hot tub\'s cover folds back for a soak.',
+    comment='Blender-built outdoor things (tools/art/blender/families/outdoor.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. The parasol\'s canopy stirs in the wind (`stir`, ambient); the lounger '
+            'reclines, the hammock and the swings sway with whoever is on them, and the hot tub\'s cover '
+            'folds back for a soak.',
 )
 
 if __name__ == '__main__':

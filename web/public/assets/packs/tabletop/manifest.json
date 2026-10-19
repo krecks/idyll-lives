@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built tabletop things (tools/art/blender/families/tabletop.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes, so each costs one draw call (the see-through ones and the parts kept for a use to come one more, the alarm clock's two hands two more).",
+  "$comment": "Blender-built tabletop things (tools/art/blender/families/tabletop.py). Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the see-through ones and the parts kept for a use to come one more, the alarm clock's two hands two more).",
   "version": 1,
   "entries": {
     "model.kettle": {

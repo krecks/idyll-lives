@@ -5,12 +5,11 @@
 lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the drinking fountain (`model.drinkingFountain`),
 the litter bin (`model.litterBin`), the bus shelter (`model.busStop`), the post box (`model.postBox`), the notice board
 (`model.noticeBoard`), the phone box (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's
-statue (`model.townStatue`). They replace the primitive-part placeholders of `tools/art/community.py` ("Street and
-square"), which stay as the fallback. The street dressing props (`model.street.*`) are not part of it. Built
+statue (`model.townStatue`). The street dressing props (`model.street.*`) are not part of it. Built
 2026-10-14; they sit in Validate › Street until checked in play.
 
 They stand on the town's park lots (`web/public/content/houses.json` `parks`) and can be bought for a garden. Each is
-built in the game's axes (`F`) where its placeholder stands, at the content's heights:
+built in the game's axes (`F`) where the game places it, at the content's heights:
 
 - the bench's seat top at 0.45 m, centred on depth 0 (`seat`: 0.45, forward 0);
 - the shelter's bench top at 0.46 m, centred at depth −0.16 (`seat`: 0.46, forward −0.16);
@@ -18,7 +17,7 @@ built in the game's axes (`F`) where its placeholder stands, at the content's he
 - the lamp's lantern from 3.46 to 3.88 m round the content's `light.height` 3.5.
 
 The bench, the litter bin and the notice board stand a few centimetres back of their tile's middle, as their
-placeholders do (`G.settle(centre=False)` and `centre=` on the `Model`); the rest are centred by `G.settle`.
+old parts do (`G.settle(centre=False)` and `centre=` on the `Model`); the rest are centred by `G.settle`.
 
 ## One palette per model
 
@@ -108,9 +107,9 @@ fountain (body, jet, splashes). The lamp and the phone box take one more at nigh
   glazing. The plan's folding door would be two moving leaves, each with its own glass: 6 draws, over the limit, so
   the door is one leaf, as on the real red kiosk. Opaque panes would save one, but then the kiosk and its phone could
   not be seen through.
-- **Street lamp: depth 0.47 m against the placeholder's 0.65 m**: the placeholder's pyramid cap is measured across
+- **Street lamp: depth 0.47 m against the old part's 0.65 m**: the old part's pyramid cap is measured across
   its corners; the real lantern is 0.47 m a side, and the ladder bar makes it 0.66 m wide. Picking and the contact
-  shadow follow the placeholder.
+  shadow follow the old part.
 
 Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its far version).
 

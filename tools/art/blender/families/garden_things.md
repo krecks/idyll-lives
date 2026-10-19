@@ -1,8 +1,6 @@
 # Garden things (`families/garden_things.py`)
 
-OU5 of `docs/objects/outdoor.md`: the pond, the small garden things and the garden lights, built over their primitive-part
-placeholders (`nature.py` for the pond, `catalog2.py` for the planter box, birdhouse, feeders, dog house, sundial and
-stepping stones, `catalog.py` for the lamp post and the string lights), which stay the fallback. One pack,
+OU5 of `docs/objects/outdoor.md`: the pond, the small garden things and the garden lights. One pack,
 `packs/garden_things/manifest.json`. Built 2026-10-16; in Validate › Garden Things until signed off (back to Outdoor ›
 Decor, the two lights to Outdoor › Lights).
 
@@ -21,7 +19,7 @@ red kennel, iron), so each build makes its own palette (`_own`), as `street_furn
     resident watches the fish (`fish`, `every`), so a 20-minute watch isn't one koi parked at the top.
 - **Planter box** (`planterBox`): a plank trough on corner legs, capped with a rim (`body` "Box", wood), soil, twelve
   leafy clumps on `foliage` (the nature shader's sway and tint) with five-petal flowers sat on them, a few leaves
-  over the front rim. Centred 9 cm back, as the placeholder's trough. Far version: the same build at low detail
+  over the front rim. Centred 9 cm back, as the old part's trough. Far version: the same build at low detail
   (`far_of`, 1,272 triangles).
 - **Birdhouse** (`birdhouse`): a gabled cream house (`body` "House") with a red roof and ridge ("Roof"), an entry hole
   with a ring, a perch and corner trim, on a 1.5 m wooden post with a bracket.
@@ -34,7 +32,7 @@ red kennel, iron), so each build makes its own palette (`_own`), as `street_furn
   Letters are mirrored in the build: game x runs to the viewer's left in Blender's front view.
 - **Sundial** (`sundial`): a turned stone baluster on a square step (`body` "Plinth"), a copper dial with a rim,
   twelve hour marks and a boss ("Dial"), and the gnomon along the noon line.
-- **Stepping stones** (`steppingStones`, 1x3, rug layer): four slabs where the placeholder's are, 4 cm high with
+- **Stepping stones** (`steppingStones`, 1x3, rug layer): four slabs where the old ones are, 4 cm high with
   rounded edges (`body` "Stones"); on the lawn they show above the grass.
 - **Garden lamp post** (`lampPost`): a turned iron base, post, collar and cup (`body` "Post"), four brackets, a lantern
   of four frosted panes in a frame under a pyramid roof and finial ("Lantern"). The panes are the content's light
@@ -59,7 +57,7 @@ red kennel, iron), so each build makes its own palette (`_own`), as `street_furn
 
 `check_glb.py`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on each file and far version.
 
-**In the game** (2026-10-16, headless, WebGPU and WebGL2): the gallery next to the placeholders; the clips bench
+**In the game** (2026-10-16, headless, WebGPU and WebGL2): the gallery next to the old parts; the clips bench
 (`fish`, `surface`, `ripple`, `bird`, `sway`); in play, all nine bought in House 0's garden (`bathroom-check`), the
 dog house at all four facings, the planter box and the string lights recoloured, a resident feeding the fish (koi up),
 watching the fish (`surface` repeating, ripples ambient) and watching the birds (the blue tit on its perch), by day

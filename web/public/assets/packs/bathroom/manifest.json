@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
+  "$comment": "Blender-built bathroom models (tools/art/blender/families/bathroom.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
   "version": 1,
   "entries": {
     "model.sink": {

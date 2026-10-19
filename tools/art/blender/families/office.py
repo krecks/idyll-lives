@@ -1,13 +1,11 @@
 # The office: the desks (O1: the simple, corner, standing and executive desks, the computer, writing and
 # laptop desks and the gaming PC), the desk chairs (O2: the executive, desk and office chairs) and the storage
-# and boards (O3: the filing cabinet, the whiteboard and the corkboard). Each replaces the primitive-part
-# placeholder of `catalog.py` / `catalog2.py` / `furniture.py`, which stays the fallback if the file fails to
-# load. Notes: office.md.
+# and boards (O3: the filing cabinet, the whiteboard and the corkboard). Notes: office.md.
 #
-# The parts are placed in game axes (`F`, no shift), where each placeholder stands; a desk's top is the
-# content's `surface` height (`DT`, 0.75 for the furniture.py desks, 1.05 standing). Backs against the wall
+# The parts are placed in game axes (`F`, no shift), where the game places it; a desk's top is the
+# content's `surface` height (`DT`, 0.75 for the plain desks, 1.05 standing). Backs against the wall
 # stop at its face (game depth -0.43, -0.93 two tiles deep). The computer, writing, laptop and gaming desks
-# keep their placeholder's chair in the back half (`characters.ts` SEATS: seat 0.44, 17 cm back), facing the
+# keep the old part's chair in the back half (`characters.ts` SEATS: seat 0.44, 17 cm back), facing the
 # desk, as residents sit there. Moving parts:
 # - the standing and computer desks' keyboard shelf slides out to the resident while they type (`tray_out`);
 # - the writing desk's drawer slides out as they sit down to write (`drawer_open`, shut after 2.5 s);
@@ -98,8 +96,8 @@ M = G.Palette(
 
 F = G.GameFrame()
 WALL = -0.43          # the wall's face, game depth (one tile deep)
-DT = 0.74             # the catalog2 desks' top (catalog2.py DT)
-FT = 0.7525           # the furniture.py desks' top (content surface 0.75)
+DT = 0.74             # the second catalogue's desk top
+FT = 0.7525           # the plain desks' top (content surface 0.75)
 CHAIR_Z = -0.17       # where a desk's own chair stands (characters.ts SEATS fwd)
 
 
@@ -229,7 +227,7 @@ def officeChair():
     return _chair(0.47, 0.62, 0.0, M.upholstery)
 
 
-# --- the furniture.py desks: a top at the front of the tile, a frame, the chair behind -----------------------
+# --- the plain desks: a top at the front of the tile, a frame, the chair behind -------------------------------
 def _desk_frame(w, legs=None, gap=None, apron=None):
     """Four square legs, side and back aprons, and a front (resident's side) apron with a drawer gap
     (x0, x1) left open."""
@@ -688,13 +686,12 @@ FAMILY = G.Family(
              paint=[('board', 'Board'), ('aluminium', 'Frame')]),
      G.Model('corkboard', corkboard, size=(0.74, 0.52, 0.033), key='model.corkboard', centre=(0, -0.4135),
              floor=False, paint=[('cork', 'Board'), ('cork_frame', 'Frame')])],
-    comment='Blender-built office models (tools/art/blender/families/office.py): the desks, the desk chairs, the '
-            'filing cabinet and the boards. Replaces the primitive-part placeholders by key; listed in the base '
-            'manifest\'s packs. The placeholder is kept as a fallback if a file fails to load, and the materials map '
-            'onto the game\'s finishes so a model costs one draw call per finish group. The keyboard shelves slide '
-            'out (`tray_out`), the writing desk\'s drawer opens (`drawer_open`), the laptop opens (`lid_open`), the '
-            'gaming PC\'s fans spin (`fans`), the chairs swivel (`swivel`) and the whiteboard fills with a plan '
-            '(`scribble`) while residents use them.',
+    comment='Blender-built office models (tools/art/blender/families/office.py): the desks, the desk '
+            'chairs, the filing cabinet and the boards. Listed in the base manifest\'s packs. The '
+            'materials map onto the game\'s finishes so a model costs one draw call per finish group. The '
+            'keyboard shelves slide out (`tray_out`), the writing desk\'s drawer opens (`drawer_open`), '
+            'the laptop opens (`lid_open`), the gaming PC\'s fans spin (`fans`), the chairs swivel '
+            '(`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.',
 )
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built gloomy pack models (tools/art/blender/families/pack_gloomy.py). Replaces the primitive-part placeholders of packs/gloomy by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The cabinet's lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp, the window seat's cushion sinks and the tub fills.",
+  "$comment": "Blender-built gloomy pack models (tools/art/blender/families/pack_gloomy.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The cabinet's lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp, the window seat's cushion sinks and the tub fills.",
   "version": 1,
   "entries": {
     "model.gloomy.recordCabinet": {

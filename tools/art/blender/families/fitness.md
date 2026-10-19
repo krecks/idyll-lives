@@ -3,10 +3,9 @@
 `fitness.py` builds the five F1 home gym models into `web/public/assets/models/fitness/` and their entries in
 `packs/fitness/manifest.json`: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the
 exercise bike (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`).
-They replace the primitive-part placeholders of `objects_extra.py` / `furniture.py` (the base manifest) and
-`catalog.py`, which stay as the fallback. Built 2026-10-14; they sit in Validate › Fitness until checked in play.
+Built 2026-10-14; they sit in Validate › Fitness until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`,
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`,
 except the bike, which is centred).
 
 ## The treadmill
@@ -26,7 +25,7 @@ top (content `stand.height`, 0.156 m), as it does for the trampoline.
 ## The exercise bike
 
 (The bike and the yoga mat stand with their backs on the wall face, -0.43, on their `Model` `centre`; they and
-their placeholders (`catalog.py`) reached 2 cm into the wall.)
+their old parts reached 2 cm into the wall.)
 
 An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (content `seat`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
@@ -46,8 +45,8 @@ use: `uses: {yoga: unroll}`, back when the yoga ends) moves two parts together:
   and shrinks onto the floor (`G.squash` to 0.12), leaving a curled front edge.
 
 The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. `check_glb.py` warns that
-it is off centre and shallower than its placeholder (the flat mat with a roll): only the fallback follows the
-placeholder; picking follows the rolled mat as drawn, and the shadow the tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
+it is off centre and shallower than its footprint: picking follows the rolled mat as drawn, and the shadow the
+tile. Yoga is done sitting (`pose: sit`, content `seat` 0.03 m), so the resident sits
 cross-legged on the unrolled mat.
 
 ## The weights
@@ -57,7 +56,7 @@ down, and curls a pair of dumbbells standing at the rack. The weight is a part o
 the hands (squashed to 0.001 in 0.2 s, `uses: {lift: …}`), and the game draws that part in the hands, so there
 is never two of it.
 
-- **Weight bench**: 2 cm forward of where its placeholder stood (both now stop at the wall's face), a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
+- **Weight bench**: 2 cm forward of where the game placed it (both now stop at the wall's face), a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
   lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet. The bar with its plates
   is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`),
   `BAR_DELAY` (0.8 s) into the lift: the game draws the bar in the hands only once the lifter has sat down and

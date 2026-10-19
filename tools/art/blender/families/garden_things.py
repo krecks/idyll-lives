@@ -1,10 +1,9 @@
 # OU5, the pond, the small garden things and the garden lights: the garden pond (`model.garden.pond`), the planter
 # box (`model.planterBox`), the birdhouse (`model.birdhouse`), the bird feeders (`model.birdFeederPole`), the dog
 # house (`model.dogHouse`), the sundial (`model.sundial`), the stepping stones (`model.steppingStones`), the garden
-# lamp post (`model.lampPost`) and the string lights (`model.stringLights`), over their primitive-part placeholders
-# (`catalog.py`, `catalog2.py`, `nature.py`), which stay the fallback. Notes: garden_things.md.
+# lamp post (`model.lampPost`) and the string lights (`model.stringLights`). Notes: garden_things.md.
 #
-# Each is built in game axes (`F`) where its placeholder stands. The pond's water is opaque `gloss`, as the
+# Each is built in game axes (`F`) where the game places it. The pond's water is opaque `gloss`, as the
 # fountains'; its ripples spread all the time near the camera (`ripple`, ambient) and a koi comes up out of it to
 # be fed or watched (`fish`, `surface`). A bird lands on the feeders while a resident watches (`bird`). The planter
 # box's leaves are on `foliage`, which the nature shader sways and tints. The lamp post's panes and the string
@@ -30,7 +29,7 @@ from gamekit.motion import _clip, last_frame  # noqa: E402
 
 SPEC = dict(
     # the pond
-    water=('#4F8CA6', 'gloss'),          # opaque, as the fountains' and the placeholder's
+    water=('#4F8CA6', 'gloss'),          # opaque, as the fountains' and the old part's
     water_deep=('#3E7890', 'gloss'),
     ripple=('#A8D2DE', 'gloss'),
     pebble=('#8F887C', 'matte'),
@@ -296,13 +295,13 @@ def _pad(name, r, at, yaw, material, n=14):
 
 
 # --- the planter box (1x1): a plank trough on feet, full of leaves and flowers ---------------------------------
-PLANTER_C = -0.09      # the depth it is centred on: the trough 10 cm back (as the placeholder's), leaves over its front
+PLANTER_C = -0.09      # the depth it is centred on: the trough 10 cm back (as the old part's), leaves over its front
 
 
 def planterBox():
     _own('planterBox')
     rng = random.Random(58)
-    z0 = -0.1                          # the placeholder's trough stands 10 cm back on its tile
+    z0 = -0.1                          # the old part's trough stands 10 cm back on its tile
     w, d, h = 0.9, 0.42, 0.44
     for s in (-1, 1):
         for e in (-1, 1):
@@ -377,7 +376,7 @@ def birdhouse():
 
 
 # --- the bird feeders (1x1): two seed tubes on a shepherd's hook; a robin on one, a blue tit lands for watching -
-FEED_Z = -0.2      # the hook's plane (the placeholder's)
+FEED_Z = -0.2      # the hook's plane (the old part's)
 
 
 def _feeder(x):
@@ -442,7 +441,7 @@ def _letter(ch, x, y, z, size, material):
 
 def dogHouse():
     _own('dogHouse')
-    zc, d = -0.03, 0.84                # the placeholder's body: 0.8 wide, centred 3-4 cm back
+    zc, d = -0.03, 0.84                # the old part's body: 0.8 wide, centred 3-4 cm back
     front = zc + d / 2
     with G.new_parts():
         F.box('base', 0.84, 0.04, 0.9, (0, 0.02, zc), M.plinth, bevel=0.008)
@@ -639,15 +638,15 @@ FAMILY = G.Family(
      G.Model('stringLights', stringLights, size=(1.97, 2.37, 0.246), key='model.stringLights',
              motions={'idle': 'sway'}, paint=[('body', 'Posts'), ('bulb', 'Bulbs')])],
     pack='garden_things',
-    comment='Blender-built garden things and lights (tools/art/blender/families/garden_things.py): the garden pond, '
-            'the planter box, the birdhouse, the bird feeders, the dog house, the sundial, the stepping stones, '
-            'the garden lamp post and the string lights. Replaces the primitive-part placeholders by key; listed '
-            'in the base manifest\'s packs. The placeholder is kept as a fallback if a file fails to load, and the '
-            'materials map onto the game\'s finishes so a model costs one draw call per finish group. The pond\'s '
-            'ripples spread near the camera (`ripple`, ambient) and a koi comes up for `feedFish` (`fish`) and '
-            'now and then while watched (`surface`); a blue tit lands on the feeders for `birdwatch` (`bird`); '
-            'the lamp\'s panes and the bulbs glow at night, and the string sways near the camera (`sway`, '
-            'ambient). The planter box and the lamp post have far versions.',
+    comment='Blender-built garden things and lights (tools/art/blender/families/garden_things.py): the '
+            'garden pond, the planter box, the birdhouse, the bird feeders, the dog house, the sundial, '
+            'the stepping stones, the garden lamp post and the string lights. Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. The pond\'s ripples spread near the camera (`ripple`, ambient) and a koi '
+            'comes up for `feedFish` (`fish`) and now and then while watched (`surface`); a blue tit '
+            'lands on the feeders for `birdwatch` (`bird`); the lamp\'s panes and the bulbs glow at night, '
+            'and the string sways near the camera (`sway`, ambient). The planter box and the lamp post '
+            'have far versions.',
 )
 
 if __name__ == '__main__':

@@ -1,9 +1,8 @@
 # The slob pack (P16): the late-night microwave cart, the crumb-proof beanbag, the snack-stash nightstand, the
-# spritz & go station, the pixel-blaster arcade cabinet and the command-couch gaming recliner, over their
-# primitive-part placeholders (`tools/art/pack_slob.py`, `packs/slob/manifest.json`), which stay the fallback.
+# spritz & go station, the pixel-blaster arcade cabinet and the command-couch gaming recliner.
 # Notes: pack_slob.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), with its moving parts: the microwave's door opens and shuts (`door_open`), the beanbag squashes under
 # its sitter (`squash`), the nightstand's side drawer of snacks slides out (`drawer_open`), the spray bottle tips
 # (`spritz`), the arcade joystick waggles (`joystick`, a loop), and the recliner's back reclines (`recline`) and
@@ -390,11 +389,11 @@ FAMILY = G.Family(
      G.Model('gamingRecliner', gamingRecliner, size=(1.77, 1.103, 0.874), key='model.slob.gamingRecliner',
              centre=(0.005, 0.01), motions={'uses': {'marathon': 'recline', 'armrestSoda': 'cup_out'}, 'ride': 'recline'},
              paint=[('seat', 'Body'), ('stripe', 'Stripes')])],
-    comment='Blender-built slob pack models (tools/art/blender/families/pack_slob.py). Replaces the primitive-part '
-            'placeholders of packs/slob by key; the placeholder is kept as a fallback if a file fails to load, and the '
-            'materials map onto the game\'s finishes so a model costs one draw call per finish group. Each moves while '
-            'it is used: the microwave\'s door opens, the beanbag squashes, the snack drawer slides out, the spray '
-            'tips, the joystick waggles, and the recliner reclines and swings its cup holder out.',
+    comment='Blender-built slob pack models (tools/art/blender/families/pack_slob.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each moves while it is used: the microwave\'s door opens, the beanbag '
+            'squashes, the snack drawer slides out, the spray tips, the joystick waggles, and the '
+            'recliner reclines and swings its cup holder out.',
 )
 
 if __name__ == '__main__':

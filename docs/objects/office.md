@@ -14,7 +14,6 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 ## O1. Desks (8)
 
 - **Family:** `tools/art/blender/families/office.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -48,7 +47,6 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 ## O2. Desk chairs (3)
 
 - **Family:** `tools/art/blender/families/office.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -72,7 +70,6 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 ## O3. Storage and boards (3)
 
 - **Family:** `tools/art/blender/families/office.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

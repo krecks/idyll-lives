@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and science. Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The piano lifts its fallboard, the drums' cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
+  "$comment": "Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and science. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The piano lifts its fallboard, the drums' cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
   "version": 1,
   "entries": {
     "model.piano": {

@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built outdoor things (tools/art/blender/families/outdoor.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The parasol's canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a soak.",
+  "$comment": "Blender-built outdoor things (tools/art/blender/families/outdoor.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The parasol's canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a soak.",
   "version": 1,
   "entries": {
     "model.bench": {

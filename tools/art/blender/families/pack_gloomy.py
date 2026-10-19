@@ -1,8 +1,7 @@
 # The gloomy pack (P7): the midnight record cabinet, the nocturne cello, the candlelit writing desk, the rainfall
-# lamp, the brooding window seat and the moonstone soaking tub, over their primitive-part placeholders
-# (`tools/art/pack_gloomy.py`, `packs/gloomy/manifest.json`), which stay the fallback. Notes: pack_gloomy.md.
+# lamp, the brooding window seat and the moonstone soaking tub. Notes: pack_gloomy.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`). The cabinet's lid lifts (`lid_open`) and its platter turns while the record plays (`platter_spin`, a
 # loop); the cello comes off its stand into the player's arms (`off_stand`); a candle is lit on the desk
 # (`candle`); the rain runs down the lamp's lines (`rain`) over a pool that ripples all the time (`ripple`,
@@ -418,7 +417,7 @@ TZ = 0.05            # the tub's middle (depth)
 def soakingTub():
     F = G.GameFrame()
     with G.new_parts() as still:
-        # the tub: up the outside, over the rim and down the inside to its floor (the placeholder's TUB profile)
+        # the tub: up the outside, over the rim and down the inside to its floor (the old part's TUB profile)
         G.revolve('tub', [(0, 0), (0.66, 0), (0.735, 0.132), (0.75, 0.6), (0.735, 0.645), (0.7, 0.66), (0.655, 0.655),
                           (0.635, 0.62), (0.57, 0.13), (0.5, 0.1), (0, 0.095)],
                   at=F.at(0, 0, TZ), material=M.stone, segments=56)
@@ -477,11 +476,11 @@ FAMILY = G.Family(
      G.Model('soakingTub', soakingTub, size=(1.86, 0.922, 1.85), key='model.gloomy.soakingTub', centre=(0, -0.005),
              motions={'uses': {'soak': 'fill'}},
              paint=[('stone', 'Body'), ('ledge', 'Trim')])],
-    comment='Blender-built gloomy pack models (tools/art/blender/families/pack_gloomy.py). Replaces the '
-            'primitive-part placeholders of packs/gloomy by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The cabinet\'s lid lifts and its record turns, the cello comes off its stand, a candle '
-            'is lit, the rain runs down the lamp, the window seat\'s cushion sinks and the tub fills.',
+    comment='Blender-built gloomy pack models (tools/art/blender/families/pack_gloomy.py). Listed in the '
+            'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
+            'call per finish group. The cabinet\'s lid lifts and its record turns, the cello comes off its '
+            'stand, a candle is lit, the rain runs down the lamp, the window seat\'s cushion sinks and the '
+            'tub fills.',
 )
 
 if __name__ == '__main__':

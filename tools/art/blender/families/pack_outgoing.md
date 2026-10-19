@@ -1,12 +1,11 @@
 # Outgoing pack — notes
 
 `pack_outgoing.py` builds the six P14 outgoing models into `web/public/assets/models/pack_outgoing/` and their
-entries in `packs/pack_outgoing/manifest.json`, an override pack listed after `packs/outgoing/manifest.json`. Their
-primitive-part placeholders (`tools/art/pack_outgoing.py`, in `packs/outgoing`) stay as the fallback. Built
+entries in `packs/pack_outgoing/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sit in Validate › Outgoing until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
-backs on the wall's face (depth −0.43; the placeholders' backs were 2 cm into the wall).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+backs on the wall's face (depth −0.43; the old parts' backs were 2 cm into the wall).
 
 | Model | Moving part and clip | Played by |
 |---|---|---|

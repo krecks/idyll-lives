@@ -1,8 +1,7 @@
 # The foodie pack (P6): the windowsill herb garden, the deli pantry, the espresso bar, the cookbook lectern, the
-# wood-fired pizza oven and the chef's island, over their primitive-part placeholders (`tools/art/pack_foodie.py`,
-# `packs/foodie/manifest.json`), which stay the fallback. Notes: pack_foodie.md.
+# wood-fired pizza oven and the chef's island. Notes: pack_foodie.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`). A fresh sprig grows in a pot (`sprig`), the pantry's doors swing open (`doors_open`), the coffee runs
 # and the steam wand swings out (`brew`), a page of the cookbook turns over (`page`), the oven door lifts aside
 # and the peel slides in (`door_off`) as the fire grows (`flames`), and the island's drawer pulls out
@@ -674,11 +673,10 @@ FAMILY = G.Family(
      G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.774), key='model.foodie.chefsIsland', centre=(0, 0.073),
              motions={'uses': {'tastingMenu': 'drawer_open'}, 'hold': 2.5},
              paint=[('cabinet', 'Body'), ('marble', 'Worktop'), ('oak', 'Stools')])],
-    comment='Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Replaces the '
-            'primitive-part placeholders of packs/foodie by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts '
-            'aside for the peel as the fire grows, and the island\'s drawer pulls out.',
+    comment='Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Listed in the '
+            'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
+            'call per finish group. A sprig grows, the pantry doors swing, the coffee runs, a page turns, '
+            'the oven door lifts aside for the peel as the fire grows, and the island\'s drawer pulls out.',
 )
 
 if __name__ == '__main__':

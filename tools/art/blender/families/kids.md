@@ -1,15 +1,14 @@
 # Kids — notes
 
 `kids.py` builds the twenty kids' things of docs/objects/kids.md into `web/public/assets/models/kids/` and their entries
-in `packs/kids/manifest.json`, over the primitive-part placeholders of the base manifest (the crib), `catalog.py`
-and `catalog2.py`, which stay the fallback. Built 2026-10-14; they sit in Validate › Baby And Beds, Toys and Kids
+in `packs/kids/manifest.json`. Built 2026-10-14; they sit in Validate › Baby And Beds, Toys and Kids
 Study until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 so the baby, the sleepers and the sitters land where the game puts them: the crib's mattress at 0.56 m
 (`BEDS.crib`), the kids' bed's at 0.44 (`BEDS.kidsBed`), the car bed's at the default 0.5, the rocking horse's
 saddle at 0.56 (`SEATS.rockingHorse`), the desk chair's seat at 0.365 (`SEATS.kidsDesk`), the kids' chair's at 0.31
-and the bean bag's at 0.24 (catalog2.py `SEATS`), the kids' table's top at 0.5 (`TOPS`).
+and the bean bag's at 0.24 (content `seat`), the kids' table's top at 0.5 (`TOPS`).
 
 Flat things on a slope (the tent's door and flap, the bunting, the chalk drawing, the painting, the picture books)
 are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetres thick. The rockers are a swept
@@ -45,11 +44,11 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
 | Giant teddy bear | `squish`: the bear squashes 10 % and bulges 6 % | `uses.hug` |
 | Kids' bean bag | `squash`: the bag flattens 15 % | `uses.flop` |
 
-The train table's track is a circle (the placeholder's is an oval), so the train can `spin` round its middle.
+The train table's track is a circle (the old part's is an oval), so the train can `spin` round its middle.
 
 ## KD3: the kids' study and art
 
-- **Kids' desk**: the desk and its chair (one model, as the placeholder). A pencil drawer under the top slides out
+- **Kids' desk**: the desk and its chair (one model, as the old part). A pencil drawer under the top slides out
   toward the child (`drawer_open`, `hold` 2 s) for homework and drawing: they take a pencil out and shut it (left
   open for a 45-minute use, it would read as forgotten). The toy box's and chest's lids, by contrast, stay open
   while the child plays, the toys being out.
@@ -86,15 +85,13 @@ The train table's track is a circle (the placeholder's is an oval), so the train
 | `model.kidsChalkboard` | 0.66 × 0.96 × 0.53 m | 916 | 3 | Frame, Board |
 | `model.kidsEasel` | 0.66 × 1.21 × 0.63 m | 1,528 | 3 | Easel |
 
-`check_glb.py`: 20 models, 0 failed. The toy box's and the chest's placeholders drew the lid open; they're shut
+`check_glb.py`: 20 models, 0 failed, no warnings. The toy box and the chest had the lid drawn open; they're shut
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
-into it, placeholders too; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat
-reached 3–7 cm into the wall, placeholders too; their backs are on the face now (2026-10-15). The crib, the pit
+into it; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat reached 3–7 cm into
+the wall; their backs are on the face now (2026-10-15). The crib, the pit
 and the mat stand 3–3.5 cm forward of the middle (`_place(forward=)`; the crib's post caps and the pit's rim 1 cm
 smaller, so their fronts stay on the tile). The beds' mattresses stay where the game lays children: the kids'
-bed's headboard is 4 cm thick (was 6), the car's tail and spoiler are shorter from the back. The play tent's placeholder is centred, as the model (it stands free). The remaining warnings are expected: the high chair's
-and the tent's placeholder boxes count their splayed legs and poles unturned. Khronos validator: 0 errors,
-0 warnings each.
+bed's headboard is 4 cm thick (was 6), the car's tail and spoiler are shorter from the back. The play tent stands free, centred. Khronos validator: 0 errors, 0 warnings each.
 
 The ball pit's colour parts are Pit and Rim, not "Balls": the balls are five colours, and one slot would recolour a
 fifth of them.

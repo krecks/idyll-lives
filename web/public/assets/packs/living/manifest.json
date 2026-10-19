@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built living room models (tools/art/blender/families/living.py). New objects with a Blender model; the placeholder is drawn if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group.",
+  "$comment": "Blender-built living room models (tools/art/blender/families/living.py). The materials map onto the game's finishes so a model costs one draw call per finish group.",
   "version": 1,
   "entries": {
     "model.wallBed": {
@@ -76,98 +76,6 @@
         {
           "material": "metal",
           "label": "Handle"
-        }
-      ],
-      "placeholder": [
-        {
-          "shape": "box",
-          "size": [
-            1.66,
-            2.17,
-            0.49
-          ],
-          "at": [
-            0,
-            1.085,
-            -1.185
-          ],
-          "color": "#E9E4DA",
-          "material": "material.finish.satin"
-        },
-        {
-          "shape": "box",
-          "size": [
-            1.98,
-            0.05,
-            0.52
-          ],
-          "at": [
-            0,
-            2.195,
-            -1.1700000000000002
-          ],
-          "color": "#E9E4DA",
-          "material": "material.finish.satin"
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.15,
-            2.17,
-            0.49
-          ],
-          "at": [
-            -0.905,
-            1.085,
-            -1.185
-          ],
-          "color": "#D8D1C4",
-          "material": "material.finish.matte"
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.15,
-            2.17,
-            0.49
-          ],
-          "at": [
-            0.905,
-            1.085,
-            -1.185
-          ],
-          "color": "#D8D1C4",
-          "material": "material.finish.matte"
-        },
-        {
-          "shape": "box",
-          "size": [
-            1.36,
-            0.12,
-            0.12
-          ],
-          "at": [
-            0,
-            2.0,
-            -0.8999999999999999
-          ],
-          "color": "#E9E4DA",
-          "material": "material.finish.satin"
-        },
-        {
-          "shape": "box",
-          "size": [
-            0.5,
-            0.03,
-            0.04
-          ],
-          "at": [
-            0,
-            1.45,
-            -0.8999999999999999
-          ],
-          "color": "#8D8F92",
-          "material": "material.finish.metal"
         }
       ]
     },

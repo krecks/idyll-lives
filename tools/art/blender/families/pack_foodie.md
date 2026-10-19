@@ -1,13 +1,12 @@
 # Foodie pack — notes
 
 `pack_foodie.py` builds the six P6 foodie models into `web/public/assets/models/pack_foodie/` and their entries in
-`packs/pack_foodie/manifest.json`, an override pack listed after `packs/foodie/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_foodie.py`, in `packs/foodie`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_foodie/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Foodie until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 backs on the wall's face (depth −0.43). The island's top is at 0.9, the content's `surface.height` (the
-placeholder's was 0.83), so what is put on it sits on it; its stools keep the default seat (0.45, the sitters at
+old part's was 0.83), so what is put on it sits on it; its stools keep the default seat (0.45, the sitters at
 x ±0.5 in the middle, facing the top), with their legroom open right through under the drawer bank.
 
 | Model | Moving part and clip | Played by |
@@ -44,10 +43,10 @@ comes off a burning oven (the plan names `flames` for `warmUp` only).
 | `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 5,056 | 4 | Body, Worktop, Brick |
 | `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.77 m | 6,288 | 3 | Body, Worktop, Stools |
 
-The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the placeholder's.
+The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the old part's.
 
 `check_glb.py`: 6 models, 0 failed; the pizza oven's 4-draw warning above. Khronos validator: 0 errors, 0 warnings
-each. Gallery next to the placeholders; clips bench at rest and open on WebGPU and WebGL, coloured (pantry, oven).
+each. Gallery next to the old parts; clips bench at rest and open on WebGPU and WebGL, coloured (pantry, oven).
 In play (`wants-asking`, WebGPU): the pizza oven baked in the yard (door down, peel in, fire, all back after),
 the island sat at for a bite, the pantry opened for a snack, the herbs tended, the cookbook read (the page over),
 the espresso bar used (the resident hides the stream from the camera; seen on the bench). At night

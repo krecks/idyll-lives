@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kind pack models (tools/art/blender/families/pack_kind.py). Replaces the primitive-part placeholders of packs/kind by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours, the feeder's roof lifts and songbirds fly out, and the settee's cushions sink.",
+  "$comment": "Blender-built kind pack models (tools/art/blender/families/pack_kind.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours, the feeder's roof lifts and songbirds fly out, and the settee's cushions sink.",
   "version": 1,
   "entries": {
     "model.kind.neighbourlyOven": {

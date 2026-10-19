@@ -1,11 +1,10 @@
 # The street furniture (CM2): the street lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the
 # drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the bus shelter
 # (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
-# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`),
-# over the primitive-part placeholders of `tools/art/community.py`, which stay the fallback. Notes:
+# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`). Notes:
 # street_furniture.md.
 #
-# Each is built in game axes (`F`) where its placeholder stands, at the content's heights (the bench's and the
+# Each is built in game axes (`F`) where the game places it, at the content's heights (the bench's and the
 # shelter's seats, the fountain's rim, the lamp's light), and each has a far version (`far=0.25`): they stand on
 # the town's lots and are seen from afar. The lamp's lantern glows at night; the drinking fountain's arc of water
 # grows while someone drinks (`water_on`); the post box's flap swings in for a card (`flap`); the phone box's
@@ -29,7 +28,7 @@ SHARED = dict(
     iron=('#2B302E', 'metal'),        # cast iron: posts, frames, the lamp's lantern frame
     stone=('#C9C2B4', 'matte'),       # pale stone
     granite=('#8E8C88', 'matte'),     # plinths and slabs
-    water=('#6FA8C0', 'gloss'),       # standing water: opaque, as the placeholders'
+    water=('#6FA8C0', 'gloss'),       # standing water: opaque, as the old parts'
     spray=('#BFDDE8', 'gloss'),       # running water: jets, streams and arcs (gloss, never emissive)
     chrome=('#C8CCD0', 'chrome'),     # taps, handles, the pedal
     dark=('#1E2120', 'matte'),        # openings, slots, the phone
@@ -529,15 +528,15 @@ FAMILY = G.Family(
      G.Model('townStatue', townStatue, size=(1.8, 3.39, 1.8), key='model.townStatue', far=_far(townStatue),
              paint=[('body', 'Statue')])],
     pack='street_furniture',
-    comment='Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street lamp, the '
-            'park bench, the drinking fountain, the litter bin, the bus shelter, the post box, the notice board, the '
-            'phone box, the town fountain and the founder\'s statue. Replaces the primitive-part placeholders of '
-            'tools/art/community.py by key; listed in the base manifest\'s packs. The placeholder is kept as a '
-            'fallback if a file fails to load, and the materials map onto the game\'s finishes so a model costs one '
-            'draw call per finish group. Each has a far version for the town overview. The lamp\'s lantern and the '
-            'phone box\'s signs glow at night; the drinking fountain\'s water arcs for `drink` (`water_on`), the post '
-            'box\'s flap swings in for `post` (`flap`), the phone box\'s door opens for `call` (`door_open`) and the '
-            'town fountain\'s water runs near the camera (`water_run`, ambient).',
+    comment='Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street '
+            'lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, '
+            'the notice board, the phone box, the town fountain and the founder\'s statue. Listed in the '
+            'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
+            'call per finish group. Each has a far version for the town overview. The lamp\'s lantern and '
+            'the phone box\'s signs glow at night; the drinking fountain\'s water arcs for `drink` '
+            '(`water_on`), the post box\'s flap swings in for `post` (`flap`), the phone box\'s door opens '
+            'for `call` (`door_open`) and the town fountain\'s water runs near the camera (`water_run`, '
+            'ambient).',
 )
 
 if __name__ == '__main__':

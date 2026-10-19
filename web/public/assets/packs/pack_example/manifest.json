@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built example pack models (tools/art/blender/families/pack_example.py). Replaces the primitive-part placeholders of the chef's stove and the whirlpool tub (base manifest) by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The stove's oven door drops and its front burner lights; the tub fills and bubbles while residents soak.",
+  "$comment": "Blender-built example pack models (tools/art/blender/families/pack_example.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The stove's oven door drops and its front burner lights; the tub fills and bubbles while residents soak.",
   "version": 1,
   "entries": {
     "model.chefStove": {

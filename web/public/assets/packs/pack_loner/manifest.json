@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built loner pack models (tools/art/blender/families/pack_loner.py). Replaces the primitive-part placeholders of packs/loner by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves a part while it is used: the pod's hood, the radio's dial and antenna, a patch of the puzzle, a twig of the bonsai, the sauna's door and the delivery hatch.",
+  "$comment": "Blender-built loner pack models (tools/art/blender/families/pack_loner.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves a part while it is used: the pod's hood, the radio's dial and antenna, a patch of the puzzle, a twig of the bonsai, the sauna's door and the delivery hatch.",
   "version": 1,
   "entries": {
     "model.loner.quietPod": {

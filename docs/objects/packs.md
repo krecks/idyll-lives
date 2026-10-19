@@ -1,15 +1,14 @@
 # Personality packs
 
-The traits' own things: content in `web/public/content/packs/<trait>.json`, placeholders from
-`tools/art/pack_<trait>.py`. One Blender family per pack, `tools/art/blender/families/pack_<trait>.py`, with its
-notes in `pack_<trait>.md` (`pack_bookworm.py` and `.md` are the pattern). Each family writes its own override
-pack, `web/public/assets/packs/pack_<trait>/manifest.json`, keyed `model.<trait>.<id>` and listed after the trait's
-own pack, so the placeholders stay as the fallback if a file fails to load. The example pack's two models keep the
-base keys `model.chefStove` and `model.whirlpoolTub`.
+The traits' own things: content in `web/public/content/packs/<trait>.json`. One Blender family per pack,
+`tools/art/blender/families/pack_<trait>.py`, with its notes in `pack_<trait>.md` (`pack_bookworm.py` and `.md` are
+the pattern). Each family writes its own override pack, `web/public/assets/packs/pack_<trait>/manifest.json`,
+keyed `model.<trait>.<id>`. The example pack's two models keep the base keys `model.chefStove` and
+`model.whirlpoolTub`.
 
 Pack things are the residents' favourites and used often, so every one but the bouldering wall has a clip. Each is
-built where its placeholder stands, backs on the wall face (depth −0.43) where it stands against one, seats at the
-height the renderer puts residents (`SEATS`, `BEDS`, content `seat` / `stand`). Most take 3 draw calls; the jukebox,
+built with its back on the wall face (depth −0.43) where it stands against one, and its seat at the height the
+renderer puts residents (content `seat` / `stand`). Most take 3 draw calls; the jukebox,
 chef's stove, whirlpool tub, pizza oven, record cabinet, lava lamp, sauna, glasshouse, veggie bed and potting bench
 take 4. Back home, a pack thing has no group (`<category> / —`), except the veggie bed (garden / edibles). Seats
 that face a screen or desk at the back of their own footprint carry content `seat.facing: "back"` (the writer's
@@ -20,7 +19,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P1. Bookworm (6)
 
 - **Family:** `tools/art/blender/families/pack_bookworm.py`
-- **Placeholders:** `tools/art/pack_bookworm.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -34,16 +32,13 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the nook's cushion, the library ladder, the bureau's flap, the teapot, the fire for
   both readings, the bedside book.
-- The fireside lounge's hood hangs on a flue that rises to the 2.8 m ceiling, with a collar there (its placeholder
-  stays 1.96 m tall, only the fallback).
-- The bureau is built turned round (`_turn_round`), back on the wall and chair in front; its placeholder is turned
-  the same.
+- The fireside lounge's hood hangs on a flue that rises to the 2.8 m ceiling, with a collar there.
+- The bureau is built turned round (`_turn_round`), back on the wall and chair in front.
 - The library wall has no fabric to colour; its second colour part is the ladder.
 
 ## P2. Cheerful (6)
 
 - **Family:** `tools/art/blender/families/pack_cheerful.py`
-- **Placeholders:** `tools/art/pack_cheerful.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -56,14 +51,13 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts; nothing needed fixing.
-- The hammock is lain across its 2x1 sling, as on the placeholder; the hammock's throw is left out.
+- The hammock is lain across its 2x1 sling; the hammock's throw is left out.
 - The jukebox takes 4 draws (the spinning label is a part inside the record, so it swings up with it).
 - The booth's curtain is gathered along its rail, not hinged: swung, it would sweep through the backrest.
 
 ## P3. Couch potato (6)
 
 - **Family:** `tools/art/blender/families/pack_couchPotato.py`
-- **Placeholders:** `tools/art/pack_couchPotato.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -79,7 +73,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   door, the board, the wax over its ambient `drift`.
 - The cinema wall and the console are built turned round (`_turn_round`), the screen on the wall face and the seats
   in front (content `seat` `forward` 0.05 for the cinema, 0.12 for the console, so the knees stay under the
-  console's shelf). Two sitters face the picture in all four facings; the placeholders are turned the same.
+  console's shelf). Two sitters face the picture in all four facings.
 - Both cinema uses broadcast 35% of their fun to residents in the room (or within 6 m): someone at the snack fridge
   hears the film while they eat.
 - The cinema's and the console's screens (the `picture`/`picture_b` materials) and the workout game's TV (`tv_screen`)
@@ -89,7 +83,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P4. Energetic (7)
 
 - **Family:** `tools/art/blender/families/pack_energetic.py`
-- **Placeholders:** `tools/art/pack_energetic.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -111,7 +104,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P5. Example pack (2)
 
 - **Family:** `tools/art/blender/families/pack_example.py`
-- **Placeholders:** base manifest (`tools/art/furniture.py` `chef_stove`, `whirlpool`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -128,7 +120,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P6. Foodie (6)
 
 - **Family:** `tools/art/blender/families/pack_foodie.py`
-- **Placeholders:** `tools/art/pack_foodie.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -150,7 +141,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P7. Gloomy (6)
 
 - **Family:** `tools/art/blender/families/pack_gloomy.py`
-- **Placeholders:** `tools/art/pack_gloomy.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -176,7 +166,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P8. Hot-headed (6)
 
 - **Family:** `tools/art/blender/families/pack_hotHeaded.py`
-- **Placeholders:** `tools/art/pack_hotHeaded.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -197,7 +186,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P9. Kind (6)
 
 - **Family:** `tools/art/blender/families/pack_kind.py`
-- **Placeholders:** `tools/art/pack_kind.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -219,7 +207,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P10. Lazy (6)
 
 - **Family:** `tools/art/blender/families/pack_lazy.py`
-- **Placeholders:** `tools/art/pack_lazy.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -242,7 +229,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P11. Loner (6)
 
 - **Family:** `tools/art/blender/families/pack_loner.py`
-- **Placeholders:** `tools/art/pack_loner.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -263,7 +249,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P12. Nature lover (7)
 
 - **Family:** `tools/art/blender/families/pack_natureLover.py`
-- **Placeholders:** `tools/art/pack_natureLover.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -287,7 +272,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P13. Neat (6)
 
 - **Family:** `tools/art/blender/families/pack_neat.py`
-- **Placeholders:** `tools/art/pack_neat.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -308,7 +292,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P14. Outgoing (6)
 
 - **Family:** `tools/art/blender/families/pack_outgoing.py`
-- **Placeholders:** `tools/art/pack_outgoing.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -329,7 +312,6 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 ## P15. Romantic (6)
 
 - **Family:** `tools/art/blender/families/pack_romantic.py`
-- **Placeholders:** `tools/art/pack_romantic.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -345,12 +327,11 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   drawer, the arm and platter for listen and waltz, the swing with its sitter and the bloom. Nothing needed fixing.
 - At the letter bureau the hands rest on the top (`sitHandsNear`).
 - Known: seated bathers in the heart tub put their shins through the front of the shell where the heart narrows
-  (the 0.35 m seat pose, as on the placeholder).
+  (the 0.35 m seat pose).
 
 ## P16. Slob (6)
 
 - **Family:** `tools/art/blender/families/pack_slob.py`
-- **Placeholders:** `tools/art/pack_slob.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

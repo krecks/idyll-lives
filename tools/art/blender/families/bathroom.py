@@ -1,7 +1,6 @@
 # The bathroom sinks: the base sink (`model.sink`), the pedestal (`model.sinkPedestal`), the double
 # vanity (`model.vanityDouble`), the vessel sink (`model.sinkVessel`) and the console sink
-# (`model.sinkConsole`), over their primitive-part placeholders (`catalog.py`, `furniture_prims.py`),
-# which stay the fallback; and the five toilets (`model.toilet`, `model.toiletCompact`, `model.toiletSmart`,
+# (`model.sinkConsole`); and the five toilets (`model.toilet`, `model.toiletCompact`, `model.toiletSmart`,
 # `model.toiletClassic`, `model.toiletWallHung`) and the four showers (`model.shower`, `model.showerStall`,
 # `model.showerWalkIn`, `model.showerRain`) and the three baths (`model.bathtub`, `model.bathtubClawfoot`,
 # `model.bathtubFreestanding`). Notes: bathroom.md.
@@ -11,7 +10,7 @@
 # Each toilet is one still body plus its lid, which lifts while a resident uses it; each shower one still
 # body plus its rain, which grows down from the head while a resident showers; each bath one still body plus
 # its tap's stream and its water, which fills while a resident bathes.
-# Built to the placeholder's size, in its numbers: the parts are placed in game axes (`F`).
+# Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py bathroom [--preview]
 import math
@@ -295,7 +294,7 @@ def sinkConsole():
 
 
 # --- the toilets: a bowl, a seat and a cistern; the lid lifts while a resident uses it ----------------------
-# Built where the placeholder stands, the cistern against the wall face (game depth -0.43), not centred:
+# Built where the game places it, the cistern against the wall face (game depth -0.43), not centred:
 # the game sits the resident at the footprint's middle (characters.ts SEATS, the content's `seat`), so the
 # bowl must stay where the seat is. The seat's top is the seat height. The lid is the moving part, hinged
 # at its back edge; `lid_up` lifts it 100° to lean on the cistern (or over the smart seat's housing).
@@ -483,7 +482,7 @@ def toiletWallHung():
 
 
 # --- the showers: a tray, walls, a screen or curtain, and a head that rains while a resident showers ------
-# Each fills its tile, as its placeholder does (the resident stands inside, at the middle). The rain is
+# Each fills its tile, as its old part does (the resident stands inside, at the middle). The rain is
 # the moving part: thin streams built full length below the head, joined with the origin on the head and
 # scaled to nothing along their length, so they are hidden at rest; `water_on` grows them down for the
 # whole use (the sinks' `water_on` way). Glass is its own draw call: tray, walls and metal (1), glass (1),
@@ -890,10 +889,10 @@ def bathtubFreestanding():
 
 
 # --- bathroom storage and mirrors -------------------------------------------------------------------------
-# Built where the placeholders stand. The two wall things hang at their real height, their backs on the wall
+# Built where the game places them. The two wall things hang at their real height, their backs on the wall
 # face (`G.settle(centre=False, floor=False)`, `floor=False` on the Model). Mirror glass is a flat piece of
 # the `mirror` material (`gloss`, `'front'`): the game reflects the room in it where the preset has live mirrors
-# (High) and draws it pale gloss elsewhere, as the placeholders' mirrors. The cabinets' doors are parts of
+# (High) and draws it pale gloss elsewhere, as the old parts' mirrors. The cabinets' doors are parts of
 # their own, hinged on their left edge. The mirror cabinet's swings open (`door_open`, the mirror with it)
 # while a resident brushes their teeth; the tall cabinet's upper door onto its towels while one takes a
 # fresh towel.
@@ -1057,11 +1056,10 @@ FAMILY = G.Family(
      G.Model('bathCabinetTall', bathCabinetTall, size=(0.42, 1.82, 0.38), key='model.bathCabinetTall',
              centre=(0, -0.24), motions={'uses': {'takeTowel': 'door_open'}, 'hold': 1.5},
              paint=[('cab', 'Cabinet'), ('cab_door', 'Doors'), ('towel_blue', 'Towels')])],
-    comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Replaces the '
-            'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
-            'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so '
-            'a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from '
-            'the tap) played while a resident washes.',
+    comment='Blender-built bathroom models (tools/art/blender/families/bathroom.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a '
+            'resident washes.',
 )
 
 if __name__ == '__main__':

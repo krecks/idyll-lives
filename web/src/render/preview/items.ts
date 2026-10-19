@@ -1,6 +1,6 @@
 /**
  * Catalog pictures of furniture: a small WebGL engine of its own that builds each model with the
- * game's own pipeline (`buildModel`: the same files, finishes and placeholder parts as in play),
+ * game's own pipeline (`buildModel`: the same files and finishes as in play),
  * lights it like a product shot and reads the picture back into a cached image URL.
  *
  * Requests are queued and drawn one model at a time: what's on screen first, in order (cards ask

@@ -1,11 +1,11 @@
 /**
  * Physically based materials and image-based lighting.
  *
- * - Lot surfaces (walls, floors, roads, terrain) and placeholder "finishes" (fabric, wood,
+ * - Lot surfaces (walls, floors, roads, terrain) and the "finishes" of primitive parts (fabric, wood,
  *   ceramic, metal, ...) are `PBRMaterial`s built from manifest `material` entries: albedo,
  *   normal and packed AO/roughness/metal maps tiled in metres.
  * - Manifest colours are sRGB; PBR shades in linear space. Vertex and per-instance colours
- *   (placeholder parts, Sim tints) are converted on the GPU by `VertexTweaksPlugin`.
+ *   (primitive parts, Sim tints) are converted on the GPU by `VertexTweaksPlugin`.
  * - The environment (`.env`, prefiltered offline from a CC0 HDRI) lights everything with sky
  *   ambient and reflections; its intensity follows the time of day.
  *
@@ -47,7 +47,7 @@ import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
 import { applySoftLook } from './softLook';
 
-/** Default finish for placeholder parts without a `material`. */
+/** Default finish for primitive parts without a `material`. */
 export const DEFAULT_FINISH = 'material.finish.matte';
 
 const FALLBACK_FINISH: MaterialEntry = { type: 'material', color: '#FFFFFF', roughness: 0.75 };
@@ -385,7 +385,7 @@ const SKY_FOR_GROUND = '0.3';
 /**
  * One material for every untextured opaque finish (matte, satin, gloss, metal, chrome, skin,
  * hair): metalness and roughness come from the vertex colour's alpha (see `encodeFinish`), so a
- * placeholder model with five finishes is one draw call instead of five. The alpha goes to the
+ * model with five finishes is one draw call instead of five. The alpha goes to the
  * fragment in a varying of its own: Babylon's `vColor.a` is 1 unless the mesh has vertex alpha,
  * and vertex alpha would make the material blend (which put every plain finish at rough metal).
  *
@@ -539,7 +539,7 @@ export class MaterialLibrary {
     return mat;
   }
 
-  /** A vertex-coloured finish for placeholder parts (`material.finish.*`). */
+  /** A vertex-coloured finish for primitive parts (`material.finish.*`). */
   finish(key: string = DEFAULT_FINISH): PBRMaterial {
     const id = `finish|${key}`;
     let mat = this.cache.get(id);

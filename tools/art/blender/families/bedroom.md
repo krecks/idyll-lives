@@ -2,20 +2,18 @@
 
 `bedroom.py` builds the nine beds of BR1 into `web/public/assets/models/bedroom/` and their entries in
 `packs/bedroom/manifest.json`: `model.bed`, `model.bedSingle`, `model.bedBunk`, `model.bedFuton`, `model.bedKing`,
-`model.bedDouble`, `model.bedQueenUpholstered`, `model.bedCanopy` and `model.bedDaybed`. They replace the
-primitive-part placeholders in the base manifest (`furniture.py`), `catalog.py` and `catalog2.py`, which stay as
-the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in play (back to Bedroom › Beds).
+`model.bedDouble`, `model.bedQueenUpholstered`, `model.bedCanopy` and `model.bedDaybed`. Built 2026-10-14; they sit in Validate › Beds until checked in play (back to Bedroom › Beds).
 
 ## Shared
 
 - **Mattresses centred, at the renderer's mattress heights.** The game lays sleepers centred on the footprint (head about
   0.84 m behind the middle, feet 0.86 m in front) at characters.ts `BEDS` (`BUNKS` for the bunk's two). Each
   mattress top is that height: `bed` 0.58, `bedSingle` 0.5, `bedBunk` 0.44 and 1.38, `bedFuton` 0.4, `bedKing`
-  0.59. The oak double, the queen and the four-poster are 0.52 and the daybed 0.51, as their placeholders: they
+  0.59. The oak double, the queen and the four-poster are 0.52 and the daybed 0.51, as the old parts were: they
   got `BEDS` entries with those tops. Headboard faces stay behind depth -0.87, so heads don't go into them.
 - **The head end stands on the wall's face** (depth -0.93): headboards, posts, rails and the canopy's head end
   stop there, not the mattress, so the sleepers keep their places. Each bed's bounds therefore stand 1–2.5 cm
-  forward of the middle (the Model's `centre`, printed by `_settle`); the placeholders were cut back the same way
+  forward of the middle (the Model's `centre`, printed by `_settle`); the old parts were cut back the same way
   (`to_wall`, the posted beds' head ends moved forward).
 - **The duvet turns down (`turn_down`).** The game lays its own quilt over each sleeper on `BLANKET_BEDS` (now
   also `bedDouble`, `bedQueenUpholstered`, `bedCanopy`), so the bed's duvet isn't a second cover over them. It is
@@ -53,11 +51,12 @@ the fallback. Built 2026-10-14; they sit in Validate › Beds until checked in p
 | `model.bedCanopy` | 1.73 × 2.135 × 1.90 m | 4,960 | 3 | `turn_down` | walnut posts with finials, panelled headboard, linen valance and four tied curtains (still) |
 | `model.bedDaybed` | 0.96 × 0.84 × 1.91 m | 4,720 | 2 | — | white spindle back and arms, sage fitted cover, rose cushions (static) |
 
-`check_glb.py`: 0 failed. The futon's placeholder (`catalog.py` `futon`) was the futon lying flat (0.66 m); it
-is the folded sofa now, as the model rests (2026-10-14). Khronos validator: 0 errors, 0 warnings each.
+`check_glb.py`: 0 failed; its one warning is the bunk's 4 draw calls. The old `futon` was the futon lying flat
+(0.66 m); it is the folded sofa now, as the model rests (2026-10-14). Khronos validator: 0 errors, 0 warnings
+each.
 
 The beds fill their 2-deep tiles, and their headboards reached 1–5 cm past the wall face (−0.93), as their
-placeholders did; moving them forward would have pushed their feet past the tiles or their headboards onto the
+old parts did; moving them forward would have pushed their feet past the tiles or their headboards onto the
 sleepers. Since 2026-10-15 the head ends are tucked instead (above): the padded headboards are 3.5–4 cm thick
 (were 5–6), the posted ones' head ends (single, bunk, oak double, four-poster, daybed, futon frame) stand
 2.5–5 cm further forward, the king's wings 3.7 cm. Mattresses, pillows and feet are where they were, but for the
@@ -73,7 +72,7 @@ sleep, nap and Unfold, `when`/`leaves` on Fold away). Behind the back, at rest, 
 
 ## The four-poster's top is open
 
-Its placeholder has a solid linen roof; the model has a valance round the top rails and curtains at the posts, so
+Its old part had a solid linen roof; the model has a valance round the top rails and curtains at the posts, so
 residents asleep in it stay in view from above.
 
 ## Rebuild

@@ -15,7 +15,6 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 ## BR1. Beds (9)
 
 - **Family:** `tools/art/blender/families/bedroom.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -48,7 +47,6 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 ## BR2. Nightstands and small storage (8)
 
 - **Family:** `tools/art/blender/families/bedroom_storage.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -72,7 +70,6 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 ## BR3. Wardrobes and drawers (6)
 
 - **Family:** `tools/art/blender/families/bedroom_storage.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -92,7 +89,6 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 ## BR4. Dressing and mirrors (4)
 
 - **Family:** `tools/art/blender/families/bedroom_dressing.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

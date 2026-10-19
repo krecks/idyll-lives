@@ -41,8 +41,8 @@ a single object does is on its category page ([README.md](README.md)); this page
   cabinet), "Take out a blanket" (cedar chest), "File papers" (filing cabinet), "Take a fresh towel" (tall bathroom
   cabinet), "Sort the washing" (hamper), "Sort the recycling", "Pick an outfit" (three-drawer nightstand).
 - **The gate** warns of a use clip over 3 s (loops, `idle`, `night`, `open`, growth are left alone); it skips the
-  `outside` groups by design, and the wall-face check for `stairs: true`; a model may reach below the floor as far
-  as its placeholder does.
+  `outside` groups by design, and the wall-face check for `stairs: true`; a model may reach below the floor only where the
+  thing it stands for does (a rock sunk in the ground, the selection marker).
 
 ### Residents with objects
 - **Held things** are drawn in the object's colours; the weight bench's bar leaves its hooks 0.8 s in.
@@ -90,7 +90,7 @@ a single object does is on its category page ([README.md](README.md)); this page
   `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`.
 - **Kept as they are:** pictures as flat shapes (a texture would double their draws); one sitter sinking every sofa
   cushion; pillows not following; the foosball's two rods; the curtains stretching to close; standing mirrors
-  upright; the base shower's sliding door shut; the `@modern`/`@cozy`/`@minimal` style code in `catalog.py`.
+  upright; the base shower's sliding door shut; the retired `@modern`/`@cozy`/`@minimal` style variants.
 - **Colour parts:** the wardrobe has three (Body, Doors, Handles); the sewing table's legs, apron and drawer have
   their own (Legs); the acoustic guitar and ukulele have a "Top"; the books and bookends list Book 1–5; the garden
   decor has colour parts; flowers are colourable only where their petals are one colour.

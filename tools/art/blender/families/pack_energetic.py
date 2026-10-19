@@ -1,9 +1,7 @@
 # The energetic pack (P4): the home bouldering wall, the interactive spin bike, the rebound trampoline, the
-# streetball hoop, the power blender station, the contrast rain shower and the recovery pod, over their
-# primitive-part placeholders (`tools/art/pack_energetic.py`, `packs/energetic/manifest.json`), which stay the
-# fallback. Notes: pack_energetic.md.
+# streetball hoop, the power blender station, the contrast rain shower and the recovery pod. Notes: pack_energetic.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`). The bouldering wall is still (its holds are the shape); the bike's cranks go round while it is
 # ridden (`pedals`, a loop the rider rides), the trampoline's mat dips with each bounce (`bounce`, a loop), the
 # hoop's net sways (`swish`), the blender's lid lifts and settles (`lid`), the shower's rain grows (`water_on`)
@@ -537,11 +535,11 @@ FAMILY = G.Family(
      G.Model('recoveryPod', recoveryPod, size=(0.859, 1.175, 1.86), key='model.energetic.recoveryPod',
              centre=(0, 0), motions={'uses': {'recover': 'canopy'}},
              paint=[('pod_shell', 'Frame'), ('pod_pad', 'Pads'), ('pod_boots', 'Boots')])],
-    comment='Blender-built energetic pack models (tools/art/blender/families/pack_energetic.py). Replaces the '
-            'primitive-part placeholders of packs/energetic by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The bike\'s cranks turn and the trampoline\'s mat dips while used (loops), the net sways, '
-            'the blender\'s lid lifts, the rain grows and the pod\'s canopy lowers; the bouldering wall is still.',
+    comment='Blender-built energetic pack models (tools/art/blender/families/pack_energetic.py). Listed '
+            'in the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs '
+            'one draw call per finish group. The bike\'s cranks turn and the trampoline\'s mat dips while '
+            'used (loops), the net sways, the blender\'s lid lifts, the rain grows and the pod\'s canopy '
+            'lowers; the bouldering wall is still.',
 )
 
 if __name__ == '__main__':

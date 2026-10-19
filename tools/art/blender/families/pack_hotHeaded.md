@@ -1,11 +1,10 @@
 # Hot-headed pack — notes
 
 `pack_hotHeaded.py` builds the six P8 hot-headed models into `web/public/assets/models/pack_hotHeaded/` and their
-entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed after `packs/hotHeaded/manifest.json`. Their
-primitive-part placeholders (`tools/art/pack_hotHeaded.py`, in `packs/hotHeaded`) stay as the fallback. Built
+entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sit in Validate › Hot Headed until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats stay where the renderer puts residents: the drum throne's top at 0.47 (default seat), the zafu pressed to 0.40
 (`SEATS` `hotHeaded.coolDownCushion`), the plunge's bather at 0.35 in the middle of its tub (`SEATS`), the desk chair
 at 0.45 in the middle of its tile.
@@ -25,12 +24,12 @@ Where the plan's table says "Loop (E1) … Until then U / static" (the bag, the 
 - `cover_off`: the cover is a roll-up slatted cover that retracts into a housing on the tub's back rim (a squash
   along its depth), rather than a lid sliding off sideways: sliding it off whole would take it out of the footprint
   or through the chiller behind the tub.
-- The crate in the placeholder is open-topped; it gets a board lid for `lid_open`.
+- The crate in the old part was open-topped; it gets a board lid for `lid_open`.
 - The drums' cymbals are two moving parts on one clip (each rocks on its own stand), the hi-hat stays still.
 
 **Draw calls: 3 each (the bag 2).** The still body takes its plain finishes and at most one textured finish, the
 moving part one more. So that it stays at 3:
-- the floor mats and the drum rug are plain satin (the placeholders' were `fabric`);
+- the floor mats and the drum rug are plain satin (the old parts' were `fabric`);
 - the drum kit's still body is all plain (shells gloss, hoops and stands chrome, heads satin, sticks satin), so its
   two cymbals take the other two draws;
 - the cushion's plant is satin leaves (no `foliage`), its candle glass is left out;
@@ -46,7 +45,7 @@ moving part one more. So that it stays at 3:
 | `model.hotHeaded.grudgeJournal` | 0.84 × 1.02 × 0.68 m | 2,844 | 3 | Body (the desk's wood) |
 | `model.hotHeaded.coldPlunge` | 0.86 × 0.86 × 1.39 m | 7,140 | 3 | Body (the cedar cladding) |
 
-The desk's lamp is a little lower than the placeholder's (1.02 m against 1.11 m), the only size that differs by more
+The desk's lamp is a little lower than the old part's (1.02 m against 1.11 m), the only size that differs by more
 than 2 %.
 
 `check_glb.py`: 6 models, 0 failed, no warnings (the crate's slats are unbevelled to keep it under 4,000 triangles).

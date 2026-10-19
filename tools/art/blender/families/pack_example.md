@@ -2,13 +2,12 @@
 
 `pack_example.py` builds the two P5 example-pack models (`content/packs/example.json`) into
 `web/public/assets/models/pack_example/` and their entries in `packs/pack_example/manifest.json`, an override pack
-listed after the base manifest's own. Their keys are the existing `model.chefStove` and `model.whirlpoolTub`, whose
-primitive-part placeholders (`tools/art/furniture.py` `chef_stove`, `whirlpool`, in the base manifest) stay as the
-fallback. Built 2026-10-14; they sit in Validate › Example until checked in play (back to Kitchen and Wellness).
+listed after the base manifest's own. Their keys are the existing `model.chefStove` and `model.whirlpoolTub`.
+Built 2026-10-14; they sit in Validate › Example until checked in play (back to Kitchen and Wellness).
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-The stove's back is on the wall's face (depth −0.43; the placeholder's sat 2.5 cm into the wall). The tub keeps the
-placeholder's 1.86 m square and its bench under the two bathers (seat 0.45, the default; they sit at x ±0.5 in the
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+The stove's back is on the wall's face (depth −0.43; the old part's sat 2.5 cm into the wall). The tub keeps the
+old part's 1.86 m square and its bench under the two bathers (seat 0.45, the default; they sit at x ±0.5 in the
 middle, facing the front), with the water up to 0.65.
 
 | Model | Moving part and clip | Played by |
@@ -28,8 +27,8 @@ origin, so on the first round they ride up on the rising water instead of floati
 - the tub: its body (plain, plus the surround's `wood`) plus the water and the bubbles — the plan's extra loop (E1).
   Making the cedar surround plain satin would bring it to 3.
 
-The placeholder's glass water surface, fabric towels and foliage plant are gloss, satin and satin here (no glass).
-The placeholder's step was buried in the tub's surround; there is none.
+The old part's glass water surface, fabric towels and foliage plant are gloss, satin and satin here (no glass).
+The old part's step was buried in the tub's surround; there is none.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

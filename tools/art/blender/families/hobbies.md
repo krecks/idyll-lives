@@ -1,20 +1,19 @@
 # Hobbies — notes
 
 `hobbies.py` builds the nineteen hobby models (docs/objects/hobbies.md, H1–H3) into `web/public/assets/models/hobbies/`
-and their entries in `packs/hobbies/manifest.json`. They replace the primitive-part placeholders of
-`furniture.py` (the base manifest), `catalog.py` and `catalog2.py`, which stay as the fallback. Built 2026-10-14;
+and their entries in `packs/hobbies/manifest.json`. Built 2026-10-14;
 they sit in Validate › Music, Games and Crafts until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 `Model`), so seats and stools stay where the game seats residents. The dartboard hangs at its real height
 (`floor=False`).
 
 ## Music (H1)
 
 - **Piano**: an upright with its back on the wall's face and its bench in front; the pianist faces the case
-  (content `"seat": {"height": 0.47, "forward": 0.227, "facing": "back"}`). It is built as the old placeholder
-  stood (keys to the back) and turned round (`_turn_round`), so its clips open the other way; the placeholder
-  (`furniture.py`, `turned`) is turned the same. Two
+  (content `"seat": {"height": 0.47, "forward": 0.227, "facing": "back"}`). It is built as the old part
+  stood (keys to the back) and turned round (`_turn_round`), so its clips open the other way; the old part
+  was turned the same. Two
   parts share one clip, `fallboard`, played by `play` until the use ends: the fallboard lifts 90° off the keys
   to stand against the case, and the music desk, hinged at its top, swings its foot out 18° so the sheet leans
   back.
@@ -35,12 +34,12 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 - **Chess table**: a black pawn is its own part and slides one square (`move`) for `chess`. Its chair is coloured on
   its own ("Chair"); the board's rim is the table's wood.
 - **Pool table**: the triangle lifts 25 cm off the fifteen racked balls (`rack_off`) for `pool` and
-  `trickShots`. The cue lies on the cloth, as the placeholder's now does (it stuck out to 1.69 m).
+  `trickShots`. The cue lies on the cloth, as it now does (it stuck out to 1.69 m).
 - **Foosball**: four rods; the two outer ones (one each side, by where the players stand) kick ±55° in a loop,
   `rods`. Four turning rods would be six draw calls.
 - **Dartboard**: twenty segments and the rings are one flat mesh (`_dart_face`). Three darts, one part, grow
   out of the board (`darts`). Hidden at rest, they leave the model 7 cm deep and centred on the board, where
-  the placeholder (darts in) is 19 cm: `check_glb.py` warns of the depth and the centre.
+  the old part (darts in) was 19 cm.
   Their origin is 2 cm inside the board, so at rest they flatten out of sight (on the face, the flights showed
   as crosses).
 - **Arcade cabinet**: the sides are prisms cut to the classic profile (`_prism`). The screen and the marquee
@@ -51,7 +50,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 
 - **Easel**: the canvas is blank at rest; the painting (sky, grass, trees, a stream, the sun) grows across it
   from its left edge (`painting`).
-- **Workbench**: its back on the wall face (the placeholder's went 2.5 cm into the wall). A bench vice holds a
+- **Workbench**: its back on the wall face (the old part's went 2.5 cm into the wall). A bench vice holds a
   plank on edge; its front jaw, screw and handle slide 4 cm shut (`vice`).
 - **Telescope**: the tube, with dew shield, finder and eyepiece, tilts up 35° more about the mount's axle
   (`aim`), and back down when the use ends.
@@ -60,7 +59,7 @@ Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=Fal
 - **Chemistry bench**: glass flasks and test tubes (one see-through draw call). The middle flask's liquid
   rises from its floor (`bubble`). Its origin is 1 cm inside the bench top, so at rest it flattens out of sight.
 - **Pottery wheel**: the pot rises from a squat lump, 30 % of its height (`clay`), and the wheel head turns in
-  a loop (`wheel`) for `throw`. At rest it is lower than the placeholder's full pot: `check_glb.py` warns of it.
+  a loop (`wheel`) for `throw`. At rest it is lower than the old part's full pot.
 - **Craft table**: the scrapbook's cover swings 176° open over its spine (`book_open`), onto the photos of its
   first page.
 

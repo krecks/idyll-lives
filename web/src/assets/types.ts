@@ -1,7 +1,7 @@
 /**
  * Asset manifest schema. Code and content refer to assets only by key
- * (e.g. `model.fridge`, `icon.need.hunger`); the manifest maps keys to files
- * or placeholders. Swapping art = editing the manifest or adding a pack.
+ * (e.g. `model.fridge`, `icon.need.hunger`); the manifest maps keys to files.
+ * Swapping art = editing the manifest or adding a pack.
  */
 
 export type Vec3 = [number, number, number];
@@ -12,7 +12,8 @@ export interface PaintSlot {
   label: string;
 }
 
-export interface PlaceholderPart {
+/** A primitive part drawn in code: a character's limbs, or the few parts a file can't carry. */
+export interface PrimitivePart {
   /** `blob` is a lumpy sphere for foliage and rocks. */
   shape: 'box' | 'cylinder' | 'cone' | 'sphere' | 'capsule' | 'blob';
   size: Vec3;
@@ -52,7 +53,7 @@ export interface PlaceholderPart {
 
 export interface ModelEntry {
   type: 'model';
-  /** glTF/GLB file. When missing or failing to load, `placeholder` is used. */
+  /** glTF/GLB file. A key without one, or a file that fails to load, draws nothing. */
   url?: string;
   /**
    * Its far version (`<id>.far.glb`, about a quarter of the triangles, no moving parts), drawn
@@ -63,7 +64,6 @@ export interface ModelEntry {
   /** Degrees. */
   rotationY?: number;
   offset?: Vec3;
-  placeholder?: PlaceholderPart[];
   /**
    * Natural variation for placed objects (plants): each one gets its own turn and a size up to
    * ±`vary` (0.1 = 10%) larger or smaller, fixed by where it stands.

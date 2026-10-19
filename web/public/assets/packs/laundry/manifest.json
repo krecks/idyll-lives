@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) and turn their drum (`drum_spin`) while a resident does the laundry.",
+  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) and turn their drum (`drum_spin`) while a resident does the laundry.",
   "version": 1,
   "entries": {
     "model.laundryWasher": {

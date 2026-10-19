@@ -151,7 +151,7 @@ export interface BuildEffect {
   y?: number;
 }
 
-/** An object the player resized (see `render/babylon/models.ts` `resizeParts`): its kind's footprint (tiles) and its own size (m), across and deep before turning, and centimetres taller. */
+/** An object the player resized (see `render/babylon/models.ts` `resizeMaps`): its kind's footprint (tiles) and its own size (m), across and deep before turning, and centimetres taller. */
 export interface ObjectResize {
   from: [number, number];
   size: [number, number];

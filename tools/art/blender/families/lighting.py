@@ -2,8 +2,7 @@
 # `ceilingFan`, `trackLights`, `paperLantern`), the wall lights (LT2: `wallSconce`, `wallLampArm`,
 # `wallLightOutdoor`), the floor lamps (LT3: `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`,
 # `lampTorchiere`) and the table lamps (LT4: `tableLamp`, `lampTableRound`, `lampTableSquare`, `lampBanker`,
-# `lampMushroom`, `lampLantern`), over their primitive-part placeholders (`catalog.py`, `catalog2.py`, the base
-# manifest), which stay the fallback. Notes: lighting.md.
+# `lampMushroom`, `lampLantern`). Notes: lighting.md.
 #
 # The light itself is the content's `light`; each lamp's bulb is placed near its `light.height` (asserted
 # against the content JSON). The shades, diffusers and bulbs glow at night (`glow`, E8); nothing glows by
@@ -99,7 +98,7 @@ def _bulb(F, id, r, at, material=None, scale=(1, 1, 1), segments=14, rings=8):
 
 
 def _lathe(F, name, w, h, at, profile, material, segments=24, rot=(0, 0, 0), top=False, liner=None):
-    """A placeholder's lathe: `profile` in fractions of `w` across and `h` high (-0.5 … 0.5), centred on game
+    """An old part's lathe: `profile` in fractions of `w` across and `h` high (-0.5 … 0.5), centred on game
     `at`, closed if it doesn't end on the axis or where it starts. `top`: `at` is its top middle instead, its
     origin (to tilt it about where it hangs). `liner` (a material): a thin shell of it just inside the profile's inner
     face, the points after the axis (a metal shade's white inside)."""
@@ -622,11 +621,10 @@ FAMILY = G.Family(
      _m('lampBanker', lampBanker, (0.3, 0.39, 0.16), [('brass', 'Base'), ('banker', 'Shade')]),
      _m('lampMushroom', lampMushroom, (0.3, 0.36, 0.3), [('porcelain', 'Base'), ('cap', 'Shade')]),
      _m('lampLantern', lampLantern, (0.16, 0.373, 0.16), [('iron', 'Base'), ('glass', 'Glass')])],
-    comment='Blender-built lamps (tools/art/blender/families/lighting.py). Replaces the primitive-part placeholders '
-            'by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a file fails '
-            'to load, and the materials map onto the game\'s finishes so a model costs one draw call per finish '
-            'group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan\'s blades turn and the '
-            'paper lantern sways all the time near the camera (`idle`).',
+    comment='Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest\'s '
+            'packs. The materials map onto the game\'s finishes so a model costs one draw call per finish '
+            'group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan\'s blades turn and '
+            'the paper lantern sways all the time near the camera (`idle`).',
 )
 
 if __name__ == '__main__':

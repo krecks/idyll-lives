@@ -1,8 +1,7 @@
 # Tabletop — notes
 
 `tabletop.py` builds the 39 tabletop things (docs/objects/tabletop.md, TT1–TT5) into `web/public/assets/models/tabletop/`
-and their entries in `packs/tabletop/manifest.json`, over the primitive-part placeholders of `catalog2.py`, which stay
-the fallback. Built 2026-10-14; they sit in Validate (Kitchenware, Tableware, Books And Pots, Small Ornaments, Desk And
+and their entries in `packs/tabletop/manifest.json`. Built 2026-10-14; they sit in Validate (Kitchenware, Tableware, Books And Pots, Small Ornaments, Desk And
 Bath Bits) until checked in play, then go back to `tabletop` and their old group (`kitchenware`, `tableware`, `books`,
 `plants`, `ornaments`, `bath`, `desk`, `toys`).
 
@@ -10,8 +9,8 @@ Bath Bits) until checked in play, then go back to `tabletop` and their old group
 
 - **Origin at the base, centred** (the `surface` layer: the renderer lifts them to their host's top). `G.settle` puts
   them there.
-- **Size** within 10 % of the placeholder on every axis, so the content's `radius` (the disc a thing takes on a top,
-  from the placeholder) still holds and `check_glb.py` has nothing to warn of. The four widest (`plateSet`,
+- **Size** within 10 % of the content's `radius` on every axis (the disc a thing takes on a top). The four widest
+  (`plateSet`,
   `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit on a counter's top with its edge margin,
   as before: they go on tables and desks.
 - **One draw call** where it can: every finish is a plain one. Wood is `satin` brown, towels and the teddy `matte`,

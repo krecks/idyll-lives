@@ -1,5 +1,5 @@
 {
-  "$comment": "Town things: street furniture, playground, food carts and machines, and shop fittings for the public places in houses.json (parks, the market, the café and the shops), all in the `community` buy category. Models are in assets/community/manifest.json (tools/art/community.py). Per-use `cost` is what a passer-by pays at a cart, a machine or a counter. Feelings are prefixed `community.`.",
+  "$comment": "Town things: street furniture, playground, food carts and machines, and shop fittings for the public places in houses.json (parks, the market, the café and the shops), all in the `community` buy category. Models are in assets/manifest.json and the packs it lists (tools/art/blender/families/). Per-use `cost` is what a passer-by pays at a cart, a machine or a counter. Feelings are prefixed `community.`.",
   "feelings": [
     {
       "id": "community.iceCream",

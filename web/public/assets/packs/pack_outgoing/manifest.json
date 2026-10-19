@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built outgoing pack models (tools/art/blender/families/pack_outgoing.py). Replaces the primitive-part placeholders of packs/outgoing by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light swings up, the dance floor's tiles pulse and a new photo grows.",
+  "$comment": "Blender-built outgoing pack models (tools/art/blender/families/pack_outgoing.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light swings up, the dance floor's tiles pulse and a new photo grows.",
   "version": 1,
   "entries": {
     "model.outgoing.partyBar": {

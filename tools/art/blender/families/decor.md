@@ -1,11 +1,10 @@
 # Decor — notes
 
 `decor.py` builds the 22 decor models into `web/public/assets/models/decor/` and their entries in
-`packs/decor/manifest.json`: wall art and clocks (D1), ornaments (D2) and textiles (D3). They replace the
-primitive-part placeholders of `catalog.py`, which stay as the fallback. Built 2026-10-14; they sit in Validate ›
+`packs/decor/manifest.json`: wall art and clocks (D1), ornaments (D2) and textiles (D3). Built 2026-10-14; they sit in Validate ›
 Wall Decor, Ornaments and Textiles until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes):
+Each is built where the game places it (`F`, game axes):
 - **Wall things** (the pictures, the clocks, the shelf, the curtains) hang at their real height with their back on the
   wall face: `G.settle(centre=False, floor=False)`, `floor=False` and `centre=` on the `Model`. `check_glb.py` warns
   that they float (right on a wall).
@@ -13,9 +12,9 @@ Each is built where its placeholder stands (`F`, game axes):
 - **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
   sit on the bench, the fire behind them (content `seat`: height 0.42, forward 0.02; the fire's `light.height` 0.7).
 - **Against the wall**, the grandfather clock and the fireplace have their backs on the wall face, and so do their
-  placeholders (moved forward 4 and 5 cm, 2026-10-14), and the curtains' (moved back 5 cm onto it, where the
-  models' rail brackets reach). The fireplace's placeholder is redrawn as the model: the chimney breast round a
-  dark firebox over the raised hearth bench, so a resident warming up sits on it if the file fails to load.
+  old parts (moved forward 4 and 5 cm, 2026-10-14), and the curtains' (moved back 5 cm onto it, where the
+  models' rail brackets reach). The fireplace's old part is redrawn as the model: the chimney breast round a
+  dark firebox over the raised hearth bench, so a resident warming up sits on it.
 - **The rest** stand centred on their tile, or lie flat (the rugs).
 - **Details** (2026-10-14): the ginger jar's blue sprigs are painted-on blossom sprigs (a curving stem, three leaves,
   a five-petalled flower; `_sprig`), not V-shaped pairs that read as crosses; the cat sits on its rump with a thigh

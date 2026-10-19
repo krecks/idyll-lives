@@ -6,8 +6,7 @@
  *
  *   node tools/bench/check.mjs <what> --port 5227 [options]
  *
- *   gallery   the gallery (`/gallery.html`), and with `--placeholder` the same with every .glb
- *             answered 404 (the fallback the game draws), side by side in one picture
+ *   gallery   the gallery (`/gallery.html`)
  *               --keys model.sofa,model.lamp   which models (required)
  *               --cols 4  --alpha 0.97 --beta 1.15 --radius 4 --target 1.4   the gallery's camera
  *   clips     the clips bench (`/clips.html`) held at set times, one picture per time
@@ -35,7 +34,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createConnection } from 'node:net';
 import { join } from 'node:path';
@@ -144,17 +143,6 @@ async function shot(page, name, extra = {}) {
   return file;
 }
 
-/** Two pictures side by side in one (left, right), with their captions. */
-async function sideBySide(left, right, name, captions) {
-  const page = await newPage();
-  const img = (f) => `data:image/png;base64,${readFileSync(f).toString('base64')}`;
-  const [a, b] = [img(left), img(right)];
-  await page.setViewportSize({ width: width * 2, height });
-  await page.setContent(`<body style="margin:0;display:flex;font:14px system-ui"><figure style="margin:0;position:relative"><img src="${a}"><figcaption style="position:absolute;left:8px;top:8px;background:#000a;color:#fff;padding:2px 6px">${captions[0]}</figcaption></figure><figure style="margin:0;position:relative"><img src="${b}"><figcaption style="position:absolute;left:8px;top:8px;background:#000a;color:#fff;padding:2px 6px">${captions[1]}</figcaption></figure></body>`);
-  await shot(page, name);
-  await page.context().close();
-}
-
 const settle = (page, ms) => page.waitForTimeout(ms);
 const camera = () => ({ alpha: flag('alpha'), beta: flag('beta'), radius: flag('radius'), target: flag('target') });
 
@@ -166,16 +154,7 @@ if (what === 'gallery') {
   await page.goto(pageUrl('/gallery.html', params));
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
   await settle(page, 1500);
-  const model = await shot(page, name, { kind: 'model' });
-  if (has('placeholder')) {
-    const fallback = await newPage();
-    await fallback.route(/\.glb(\?|$)/, (route) => route.fulfill({ status: 404, body: '' }));
-    await fallback.goto(pageUrl('/gallery.html', params));
-    await fallback.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
-    await settle(fallback, 1500);
-    const placeholder = await shot(fallback, `${name}-placeholder`, { kind: 'placeholder' });
-    await sideBySide(model, placeholder, `${name}-side`, ['model', 'placeholder']);
-  }
+  await shot(page, name, { kind: 'model' });
 }
 
 if (what === 'clips') {

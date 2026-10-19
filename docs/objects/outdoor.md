@@ -4,8 +4,8 @@ The outdoor things are built in four families. `families/outdoor.py` builds the 
 OU2 loungers and swings and the three OU3 grills (notes: `outdoor.md`); `families/yard.py` the nine OU4 play and yard
 things (notes: `yard.md`); `families/garden_things.py` the nine OU5 pond, small garden things and lights (notes:
 `garden_things.md`); `families/garden_decor.py` the six garden decor models (gnome, bird bath, fountain, lantern,
-wheelbarrow, boulders). Each model is built where its placeholder stands, so seat heights (`catalog2.py` `SEATS`,
-content `seat`) and table tops (content `surface`) stay where the game has them. Every item is `outdoors`: it can only
+wheelbarrow, boulders). Each model is built to the content's seat heights (`seat`) and table tops
+(`surface`), where the game has them. Every item is `outdoors`: it can only
 be bought outside.
 
 Moving parts: the parasol and the string lights stir in the wind and the pond ripples (ambient, E2, off on Low); the
@@ -18,7 +18,6 @@ none.
 ## OU1. Patio seating and tables (11)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -51,7 +50,6 @@ none.
 ## OU2. Loungers, swings and the hot tub (5)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -74,7 +72,6 @@ none.
 ## OU3. Grills and fire (3)
 
 - **Family:** `tools/art/blender/families/outdoor.py`
-- **Placeholders:** `tools/art/catalog.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -92,7 +89,6 @@ none.
 
 - **Family:** `tools/art/blender/families/yard.py` (notes: `yard.md`; a family of its own rather than `outdoor.py`,
   so that OU3–OU5 were built without all editing one script and pack)
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -120,7 +116,6 @@ none.
 
 - **Family:** `tools/art/blender/families/garden_things.py` (notes: `garden_things.md`; its own family so OU3 and OU4
   could be built alongside)
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -147,7 +142,6 @@ none.
 These six have no group code of their own.
 
 - **Family:** `tools/art/blender/families/garden_decor.py`
-- **Placeholders:** base manifest (`tools/art/nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

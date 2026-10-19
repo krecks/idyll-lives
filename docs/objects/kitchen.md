@@ -8,7 +8,7 @@ stools and the K9 dining storage (`dining.md`).
 
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut while
 the resident is still busy. Water grows from the tap (`water_on`) for the whole use. Counter and table tops keep
-their heights (`tools/art/catalog2.py` `TOPS`, the content's `surface`; every kitchen worktop is 0.95 m); chairs and
+their heights (the content's `surface`; every kitchen worktop is 0.95 m); chairs and
 stools keep their seat height (`SEATS` in `web/src/render/babylon/characters.ts`). Clean things are put away in the
 nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wall cabinets and the dining storage are
 `cupboard` stations and open a door while it happens, the drawer counter its top drawer.
@@ -16,7 +16,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## Kitchen sinks (2)
 
 - **Family:** `tools/art/blender/families/kitchen.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -33,7 +32,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K1. Fridges (7)
 
 - **Family:** `tools/art/blender/families/kitchen.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -56,7 +54,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K2. Cookers (6)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -80,7 +77,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K3. Small appliances and dishwashers (4)
 
 - **Family:** `tools/art/blender/families/kitchen_cooking.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -100,7 +96,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K4. Base counters (8)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -123,7 +118,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K5. Tall and wall storage (11)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -150,7 +144,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K6. Islands and bars (5)
 
 - **Family:** `tools/art/blender/families/kitchen_counters.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -171,7 +164,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K7. Dining tables (13)
 
 - **Family:** `tools/art/blender/families/dining.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -205,7 +197,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K8. Chairs and stools (12)
 
 - **Family:** `tools/art/blender/families/dining.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -241,7 +232,6 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 ## K9. Dining storage (4)
 
 - **Family:** `tools/art/blender/families/dining.py`
-- **Placeholders:** `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

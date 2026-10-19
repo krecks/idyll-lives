@@ -4,18 +4,16 @@
 `web/public/assets/models/dining/` and their entries in `packs/dining/manifest.json` (listed in the base
 manifest's `packs`, after `catalog` and `catalog2`, whose entries it overrides).
 
-K7 (2026-10-14): the dining table with its two chairs (`model.diningTable`, base manifest, `furniture.py`), the
-bistro set (`model.bistroSet`), the glass and farmhouse dining sets (`model.diningGlass`, `model.diningOak`,
-`catalog.py`), and catalog2's chair-less tables: `tableSquare2`, `tableBistroRound`, `tableDining4`, `tableDining6`,
+K7 (2026-10-14): the dining table with its two chairs (`model.diningTable`, base manifest), the bistro set
+(`model.bistroSet`), the glass and farmhouse dining sets (`model.diningGlass`, `model.diningOak`) and the second
+catalogue's chair-less tables: `tableSquare2`, `tableBistroRound`, `tableDining4`, `tableDining6`,
 `tableBanquet8`, `tableRound4`, `tableSquare8`, `tableFarmhouse6`, `tableBarHigh`.
 
-K8 (2026-10-14): the bar stool (`model.barStool`) and dining chair (`model.diningChair`) of `catalog.py`, and
-catalog2's `stoolCounter`, `stoolBarHigh`, `chairWood`, `chairUpholstered`, `chairModern`, `chairWindsor`,
+K8 (2026-10-14): the bar stool (`model.barStool`) and dining chair (`model.diningChair`), and the second
+catalogue's `stoolCounter`, `stoolBarHigh`, `chairWood`, `chairUpholstered`, `chairModern`, `chairWindsor`,
 `chairBentwood`, `chairFolding`, `chairArm` and `benchDining`.
 
 K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
-
-They replace the primitive-part placeholders, which stay as the fallback.
 
 ## Facts kept
 
@@ -24,12 +22,12 @@ They replace the primitive-part placeholders, which stay as the fallback.
   things bought onto `tableDining4` stand on its top (seen in play). The plank joints on the banquet and farmhouse
   tops are flush (0.5 mm proud), so nothing sinks.
 - **Seats** at `characters.ts` SEATS or the content's `seat`: the seat's (hard) top at that height, the pad or
-  cushion a little above, as the placeholders: the sets' chairs 0.46 (behind the table, `fwd` −0.19 / −0.22 /
+  cushion a little above, as the old parts: the sets' chairs 0.46 (behind the table, `fwd` −0.19 / −0.22 /
   −0.24), the bar stool 0.74 (sitters at 0.72), the counter stool 0.685 (0.68), the high stool 0.805 (0.8), the
   chairs 0.46–0.48, the carver chair's board 0.465 under a cushion to 0.52 (0.5), the bench 0.465 (0.47, two
-  slots). catalog2's seats are centred 5 cm forward (`SZ`), as their placeholders.
-- **The sets' chairs** are part of the table (as the placeholders draw them): residents sit on them.
-- **Storage** stands where its placeholder stands against the wall (`centre=` its placeholder's middle, then
+  slots). catalog2's seats are centred 5 cm forward (`SZ`), as the old parts.
+- **The sets' chairs** are part of the table (as the old parts drew them): residents sit on them.
+- **Storage** stands where the game places it against the wall (`centre=` the old part's middle, then
   `G.settle()`), so the sideboard's and buffet's tops (0.8, 0.9) are where the content's `surface` is.
 
 ## Materials
@@ -103,9 +101,8 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 | `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 5,608 | 4 | `door_open` (putting clean things away, `fetch`) |
 | `model.barCart` | 0.77 × 1.09 × 0.45 m | 4,468 | 3 | `shake` 0.6 s (mix, `hold` 1.5 s) |
 
-`check_glb.py`: 29 models, 0 failed; one warning, that the dining chair's placeholder in `catalog/manifest.json`
-differs from the base manifest's (it did before the model; the model copies the catalog one). Khronos validator:
-0 errors, 0 warnings each. Seen in the gallery next to the placeholders (WebGPU), the clips bench (WebGPU and
+`check_glb.py`: 29 models, 0 failed; two warnings, the sideboard's and the china cabinet's 4 draw calls. Khronos
+validator: 0 errors, 0 warnings each. Seen in the gallery next to their files (WebGPU), the clips bench (WebGPU and
 WebGL2), the pose bench (`/poses.html?seats=…`: a man and a woman on every chair, stool, bench and set) and in play
 (stools sat on with the swivel playing, WebGPU and WebGL2; the bar cart's shake; the oak and bistro sets sat at;
 the storage against the wall). All 29 sit in Validate › Tables, Chairs and Dining Storage until signed off.

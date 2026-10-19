@@ -1,7 +1,6 @@
 # Held (`families/held.py`)
 
-The 20 things residents carry and cook with, built over the primitive-part placeholders of `tools/art/items.py`
-(`web/public/assets/items/manifest.json`), which stay the fallback. One pack, `packs/held/manifest.json`, models in
+The 20 things residents carry and cook with. One pack, `packs/held/manifest.json`, models in
 `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group, no paint.
 
 - **Items** (`item.*`, content `items[].model`): drawn on the palms while carried (characters.ts `writeCarried`:
@@ -11,8 +10,8 @@ The 20 things residents carry and cook with, built over the primitive-part place
   the grill (`flip`), on the station's top while a resident works there, 15 cm towards the cook, turned to face the
   way they face.
 
-So each keeps its placeholder's frame: origin at the middle of its base, front +depth (away from the one holding it).
-Each is built in place in the game's axes (`F`, as the placeholder's parts are), stood on the floor without moving it
+So each keeps the old part's frame: origin at the middle of its base, front +depth (away from the one holding it).
+Each is built in place in the game's axes (`F`, as its parts were), stood on the floor without moving it
 sideways; the pan and the grill food, which stand off their middle, take their measured `centre`.
 
 | Key | What it shows | Draws | Tris |
@@ -39,14 +38,14 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.grillFood` | two sausages with grill marks and a marked burger | 1 | 400 |
 
 - **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
-  The wooden boards (chopping, tasting, pizza) take `wood` as their placeholders did: their second draw call.
+  The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.
 - **The plate** (`plate()`) is shared: a foot, a rim up to 1.7 cm and a paler well at 0.9 cm (`WELL`), where the food
   stands. The platter is the same, oval.
 - **Shapes.** Round things are `lathe`s (a profile turned about the up axis, one pole at each end, a material per
   band, edges over 40° kept sharp): the plate, bowl, pots, pan, pizza, rolls, the cupcake, and the sausages (laid
   down, their grill marks as bands). Wedges and the sandwich halves are `prism`s over their outline. Lumpy food is
   `G.boulder` at one or two subdivisions.
-- **Sizes** within 10 % of the placeholder on every axis (the gate's warning). The pan's handle runs to the back as the
-  placeholder's (whose crossbar was across, likely by mistake), 2 cm longer.
-- **The placeholder of `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a
-  flat wedge on the plate (`items.py`).
+- **Sizes** within 10 % of the old part on every axis (the gate's warning). The pan's handle runs to the back as the
+  old part's (whose crossbar was across, likely by mistake), 2 cm longer.
+- **The old `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a flat wedge
+  on the plate.

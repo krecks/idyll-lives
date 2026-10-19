@@ -1,9 +1,8 @@
 # The bookworm pack (P1): the window-seat reading nook, the rare-books library wall, the writer's bureau, the
-# book-club tea trolley, the fireside reading lounge and the bedside book stack, over their primitive-part
-# placeholders (`tools/art/pack_bookworm.py`, `packs/bookworm/manifest.json`), which stay the fallback.
+# book-club tea trolley, the fireside reading lounge and the bedside book stack.
 # Notes: pack_bookworm.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), one moving part each: the nook's seat cushion sinks (`sink_in`), the library ladder rolls along
 # its rail (`ladder`), the bureau's writing flap drops (`fall_front`), the teapot pours (`pour`), the fire
 # grows in the grate (`flames`) and the top book of the bedside stack opens (`book_up`).
@@ -244,7 +243,7 @@ def _turn_round(objs):
 
 
 # --- the writer's bureau (1x1): its back on the wall, the chair in front; the writer faces the bureau ------
-# (content `seat.facing: "back"`). Built as the placeholder first stood, the chair at the back, then turned round.
+# (content `seat.facing: "back"`). Built as the old part first stood, the chair at the back, then turned round.
 def writingBureau():
     F = G.GameFrame()
     rnd = random.Random(5)
@@ -503,11 +502,11 @@ FAMILY = G.Family(
      G.Model('bedsideStack', bedsideStack, size=(0.846, 0.931, 0.74), key='model.bookworm.bedsideStack',
              centre=(0.023, -0.06), motions={'uses': {'chapter': 'book_up'}},
              paint=[('body', 'Wood'), ('shade', 'Fabric'), ('panel', 'Drawers')])],
-    comment='Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Replaces the '
-            'primitive-part placeholders of packs/bookworm by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each has one moving part its use plays: the nook\'s cushion sinks, the ladder rolls, '
-            'the bureau\'s flap drops, the teapot pours, the fire grows and the top book opens.',
+    comment='Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Listed in '
+            'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
+            'draw call per finish group. Each has one moving part its use plays: the nook\'s cushion '
+            'sinks, the ladder rolls, the bureau\'s flap drops, the teapot pours, the fire grows and the '
+            'top book opens.',
 )
 
 if __name__ == '__main__':

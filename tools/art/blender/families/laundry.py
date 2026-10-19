@@ -1,9 +1,8 @@
 # The laundry: the washing machine (`model.laundryWasher`), the tumble dryer (`model.laundryDryer`), the towel
 # rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry basket (`model.laundryBasket`)
-# and the bath mat (`model.bathMat`), over their primitive-part placeholders (`catalog.py`, `catalog2.py`),
-# which stay the fallback. Notes: laundry.md.
+# and the bath mat (`model.bathMat`). Notes: laundry.md.
 #
-# The washer and the dryer stand against the wall where their placeholders do, built in place (`F`, game
+# The washer and the dryer stand against the wall where the game places them, built in place (`F`, game
 # axes). Each has two moving parts: the round door, hinged on its left, which swings open while a resident
 # loads it (`door_open`, held 2.5 s), and the drum's face behind the glass, which turns for the whole use
 # (`drum_spin`, a loop). The rail hangs on the wall at its real height; the rest are still.
@@ -99,7 +98,7 @@ def _drum(F, washing):
 
 
 def _machine(dryer):
-    F = G.GameFrame(shift=0.03)      # built 3 cm into the wall (as the placeholder was); moved onto its face
+    F = G.GameFrame(shift=0.03)      # built 3 cm into the wall (as the old part was); moved onto its face
     led, ring = (M.led_dryer, M.door_dryer) if dryer else (M.led, M.door)
     with G.new_parts() as still:
         _cabinet(F, led, dryer)
@@ -240,11 +239,10 @@ FAMILY = G.Family(
              paint=[('wicker', 'Basket'), ('wicker_rim', 'Rim & weave')]),
      G.Model('bathMat', bathMat, size=(0.76, 0.025, 0.5), key='model.bathMat',
              paint=[('mat', 'Mat'), ('mat_pile', 'Pile')])],
-    comment='Blender-built laundry models (tools/art/blender/families/laundry.py). Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The washer and the dryer open their door (`door_open`) and turn their drum (`drum_spin`) '
-            'while a resident does the laundry.',
+    comment='Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
+            'per finish group. The washer and the dryer open their door (`door_open`) and turn their drum '
+            '(`drum_spin`) while a resident does the laundry.',
 )
 
 if __name__ == '__main__':

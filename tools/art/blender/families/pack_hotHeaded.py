@@ -1,9 +1,7 @@
 # The hot-headed pack (P8): the heavy punching bag, the plate-smash bin, the thunder drum kit, the cool-down
-# meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub, over their
-# primitive-part placeholders (`tools/art/pack_hotHeaded.py`, `packs/hotHeaded/manifest.json`), which stay the
-# fallback. Notes: pack_hotHeaded.md.
+# meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub. Notes: pack_hotHeaded.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the bag swings on its chains while it is pounded (`swing`, a loop), the crate's lid flips up
 # (`lid_open`), the crash and ride cymbals rock while the kit is played (`cymbals`, a loop), the zafu sinks
 # (`sink_in`), the desk's drawer slides out (`drawer_open`) and the plunge tub's slatted cover rolls back into
@@ -463,12 +461,11 @@ FAMILY = G.Family(
      G.Model('coldPlunge', coldPlunge, size=(0.86, 0.86, 1.39), key='model.hotHeaded.coldPlunge', centre=(0, -0.23),
              motions={'uses': {'plunge': 'cover_off'}},
              paint=[('cedar', 'Body')])],
-    comment='Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Replaces the '
-            'primitive-part placeholders of packs/hotHeaded by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each has its moving part: the bag swings while pounded, the crate\'s lid flips up, the '
-            'cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge '
-            'cover rolls back.',
+    comment='Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Listed '
+            'in the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs '
+            'one draw call per finish group. Each has its moving part: the bag swings while pounded, the '
+            'crate\'s lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk '
+            'drawer slides out and the plunge cover rolls back.',
 )
 
 if __name__ == '__main__':

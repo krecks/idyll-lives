@@ -1,7 +1,6 @@
 # Yard (`families/yard.py`)
 
-The OU4 play and yard things (docs/objects/outdoor.md), built over their primitive-part placeholders (`catalog.py`:
-the sandpit and the bike rack; `catalog2.py`: the rest), which stay the fallback. One pack, `packs/yard/manifest.json`,
+The OU4 play and yard things (docs/objects/outdoor.md). One pack, `packs/yard/manifest.json`,
 models in `models/yard/`. Built 2026-10-16; they sit in Validate › Yard until signed off (the sandpit and the bike
 rack back to Outdoor › Play, the rest to Outdoor › Yard).
 
@@ -9,7 +8,7 @@ The plan names `outdoor.py` as the family; these nine are a family of their own 
 building at once don't all edit one script, palette and pack. Moving them into `outdoor.py` later changes only the
 files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 
-Each is built in place where its placeholder stands (`F`, game axes), with `G.settle(centre=False)` and its
+Each is built in place where the game places it (`F`, game axes), with `G.settle(centre=False)` and its
 `Model`'s `centre` where it stands off the footprint's middle. Outdoor things are drawn in the town overview, so
 each has a far version (`far=`): the model's own build at low detail (`G.far_of`), at rest, all one part, without
 the castle and the washing; the log store's is decimated (`far=0.25`).
@@ -31,7 +30,7 @@ The rain barrel and the log store are still.
 - **The bike rack**: four galvanised hoops on a rail (each one bent tube, `_tube`, so no seams show where rods met),
   a blue bike in front of them (frame, mudguards, spoked wheels, chain ring, cranks, chain, saddle, bars and bell),
   and a repair stand either side of the back wheel. The bars are 0.44 m wide and the bike stands on the tile's
-  middle line, so the model keeps within 10 % of the placeholder's depth.
+  middle line, so the model keeps within 10 % of the old part's depth.
 - **The raised bed**: two boards high on each side, corner posts, soil 2 cm below the rim, a white plant label;
   six lettuces at the back, six carrots in the middle, three tomato bushes at the front. It is plain satin cedar so
   the leaves take the one textured draw (as the nature lover's veggie bed). The plants are one part, so they don't
@@ -49,7 +48,7 @@ The rain barrel and the log store are still.
 - **The rain barrel**: a ribbed green barrel with two hoops and a lid, a brass tap and lever, the downpipe behind
   with clips, its shoe turned into the lid.
 - **The washing line**: two galvanised T-posts with braces and the three lines; a wicker basket of folded washing.
-- **The log store**: the black iron rack (the placeholder's) under a pent roof of iron sheet (the "Shelter"),
+- **The log store**: the black iron rack (the old part's) under a pent roof of iron sheet (the "Shelter"),
   stacked with logs in brick bond, their pale ends to the front.
 
 **Draw calls: 3 each but the greenhouse (4), the log store (2) and the rain barrel (1).**
@@ -64,8 +63,8 @@ The rain barrel and the log store are still.
 line at rest, it is inside the line and doesn't show (`check_glb.py` warned when it was 12 mm against a 1 cm line).
 The castle is flattened 2 cm down in the sand.
 
-**Left out from the placeholders**: the watering can by the barrel and the log store's chopping block (both first
-built, then dropped: the gate warned the models stood 7 cm off their placeholders' centres and 20–140 % deeper).
+**Left out from the old parts**: the watering can by the barrel and the log store's chopping block (both first
+built, then dropped: the gate warned the models stood 7 cm off the old parts' centres and 20–140 % deeper).
 
 | Model | Size (w × h × d) | Triangles | Far | Draws | Colour parts |
 |---|---|---|---|---|---|
@@ -82,7 +81,7 @@ built, then dropped: the gate warned the models stood 7 cm off their placeholder
 `check_glb.py`: 0 failed; one warning, the greenhouse's 4 draws. Khronos validator: 0 errors, 0 warnings on every
 file and far file.
 
-**In the game** (2026-10-16, headless, WebGPU and WebGL2, by day and at 22:00): the gallery next to the placeholders;
+**In the game** (2026-10-16, headless, WebGPU and WebGL2, by day and at 22:00): the gallery next to the old parts;
 the clips bench; all nine bought in the garden of `bathroom-check` (the compost bin, the barrel and the log store at
 rot 1, 2 and 3), and a resident tending in the greenhouse, pottering in the shed, building a sand castle, hanging out
 the washing (still out after), turning the compost, tuning up the bike, and harvesting a ripe raised bed (a state

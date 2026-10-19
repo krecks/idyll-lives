@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Replaces the primitive-part placeholders by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load. Each cooker is a box on the floor with a hob on top and an oven below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave swings its door (`door_open`) and turns its turntable (`turntable`).",
+  "$comment": "Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Listed in the base manifest's packs. Each cooker is a box on the floor with a hob on top and an oven below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave swings its door (`door_open`) and turns its turntable (`turntable`).",
   "version": 1,
   "entries": {
     "model.stoveElectric": {

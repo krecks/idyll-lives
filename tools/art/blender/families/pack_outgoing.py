@@ -1,9 +1,8 @@
 # The outgoing pack (P14): the home party bar, the conversation sectional, the karaoke stage, the video-call
-# corner, the light-up dance floor and the party photo wall, over their primitive-part placeholders
-# (`tools/art/pack_outgoing.py`, `packs/outgoing/manifest.json`), which stay the fallback.
+# corner, the light-up dance floor and the party photo wall.
 # Notes: pack_outgoing.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), with its moving parts: the bar's beer-tap lever pulls (`tap`), the sectional's seat cushions sink
 # (`sink_in`), the karaoke mics rise on their stands (`mic_up`), the ring light swings up to face the caller
 # (`ring_light`), the dance floor's tiles pulse up and down in a checkerboard (`tiles`, a loop) and a new
@@ -487,11 +486,11 @@ FAMILY = G.Family(
      G.Model('photoWall', photoWall, size=(0.9, 2.16, 0.492), key='model.outgoing.photoWall',
              centre=(0, -0.184), motions={'uses': {'reminisce': 'photo'}},
              paint=[('wood', 'Body'), ('cork', 'Board')])],
-    comment='Blender-built outgoing pack models (tools/art/blender/families/pack_outgoing.py). Replaces the '
-            'primitive-part placeholders of packs/outgoing by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each moves while it is used: the bar\'s tap lever pulls, the sectional\'s cushions sink, '
-            'the mics rise, the ring light swings up, the dance floor\'s tiles pulse and a new photo grows.',
+    comment='Blender-built outgoing pack models (tools/art/blender/families/pack_outgoing.py). Listed in '
+            'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
+            'draw call per finish group. Each moves while it is used: the bar\'s tap lever pulls, the '
+            'sectional\'s cushions sink, the mics rise, the ring light swings up, the dance floor\'s tiles '
+            'pulse and a new photo grows.',
 )
 
 if __name__ == '__main__':

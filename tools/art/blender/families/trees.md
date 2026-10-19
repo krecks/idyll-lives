@@ -3,8 +3,7 @@
 `trees.py` builds the G5 trees into `web/public/assets/models/trees/` and their entries in
 `packs/trees/manifest.json`: the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`, `model.spruce`,
-`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). They replace the primitive-part placeholders of
-`nature.py`, which stay as the fallback. Built 2026-10-14; they sit in Validate › Trees until checked in play. The
+`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sit in Validate › Trees until checked in play. The
 shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plants.py`.
 
 ## How a tree is made
@@ -22,9 +21,9 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 
 Each tree has a far version (`far_of`): every third clump of each crown, round a smooth core spanning all the full
 crown's clumps (their random numbers drawn as in the full build, so the core is measured, not guessed); conifers
-pointed cones of eight sides. It keeps the tree's size within 5 % at 18–40 % of its triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` placeholder keys whatever the model; they
-now draw a file's own far version, so the woods match the town, and those keys are gone from `nature.py` (a tree
-whose file fails to load falls back to its placeholder at the low level of detail). The town overview draws them too.
+pointed cones of eight sides. It keeps the tree's size within 5 % at 18–40 % of its triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` old part keys whatever the model; they
+now draw a file's own far version, so the woods match the town, and those keys are gone (2026-10-18, with the
+primitive parts). The town overview draws them too.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
@@ -41,11 +40,10 @@ whose file fails to load falls back to its placeholder at the low level of detai
 | `model.cypress` | 2.12 × 7.95 × 2.05 m | 1,496 | 370 | 2 |
 | `model.garden.lemonTree` | 1.29 × 2.37 × 1.34 m | 1,736 | 698 | 4 |
 
-`check_glb.py`: 12 models, 0 failed. Warnings: four draw calls (apple, lemon tree); sizes under the placeholders'
-bounds for the oak, maple, pine, spruce and cypress (those bounds count each turned blob's or cone's whole box: the
-spruce's read 7.8 m for cones 5.4 m across). Since the gate measures turned parts exactly, only the oak's and maple's were still over
-10 % off; their placeholders' main crowns were drawn in a little (`spread` 0.75 to 0.71 and 0.78 to 0.74, 2026-10-15),
-the models being what the game draws. Khronos validator: 0 errors, 0 warnings on all 24 files.
+`check_glb.py`: 12 models, 0 failed; its one warning is the lemon tree's 4 draw calls. The sizes were held to the
+old parts' bounds as they were built (those bounds counted each turned blob's or cone's whole box: the
+spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were drawn in a little to match (`spread`
+0.75 to 0.71 and 0.78 to 0.74, 2026-10-15). Khronos validator: 0 errors, 0 warnings on all 24 files.
 
 ## Rebuild
 

@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Kids' furniture and toys, with a low table and little chairs that pull up to it. Separate pieces only. Models: assets/catalog2/manifest.json (tools/art/catalog2.py).",
+  "$comment": "Catalogue 2: Kids' furniture and toys, with a low table and little chairs that pull up to it. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
   "objects": [
     {
       "id": "kidsTable",

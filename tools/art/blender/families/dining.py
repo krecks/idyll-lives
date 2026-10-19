@@ -1,5 +1,4 @@
-# The kitchen's dining things, over their primitive-part placeholders (`catalog.py`, `catalog2.py`, `furniture.py`),
-# which stay the fallback if a file fails to load. Notes: dining.md.
+# The kitchen's dining things. Notes: dining.md.
 #
 # K7, dining tables: the dining table with its two chairs (`model.diningTable`, base manifest), the bistro table
 # and chair (`model.bistroSet`), the glass and farmhouse dining sets (`model.diningGlass`, `model.diningOak`), and
@@ -11,11 +10,11 @@
 # K9, dining storage: the walnut sideboard, the painted buffet, the china cabinet and the bar cart, whose cocktail
 # shaker lifts 10 cm and tips 30 degrees while a resident mixes a drink (`shake`).
 #
-# Each is built in place where its placeholder stands (`F`, game axes): table tops at the content's `surface`
-# heights (catalog2.py `TT` 0.75, `BT` 1.06; 0.75-0.765 for the catalog sets), seats where the game seats residents
+# Each is built in place where the game places it (`F`, game axes): table tops at the content's `surface`
+# heights (`TT` 0.75, `BT` 1.06; 0.75-0.765 for the catalog sets), seats where the game seats residents
 # (`characters.ts` SEATS, content `seat`: the seat's top at that height, its middle 5 cm forward for catalog2's
-# chairs). The sets' chairs are part of the table, as the placeholders draw them, since residents sit on them. The
-# storage stands against the wall where its placeholder stands (`centre=`, the placeholder's middle: its back about
+# chairs). The sets' chairs are part of the table, as the old parts drew them, since residents sit on them. The
+# storage stands against the wall where the game places it (`centre=`, the old part's middle: its back about
 # 5 cm behind the tile's wall face, where the content's `surface` is). The sideboard's, buffet's and china cabinet's
 # doors are parts of their own, hinged; one of each (the china cabinet's left glazed door) swings open while a
 # resident puts clean things away there (they are `cupboard` stations), the others are still.
@@ -59,7 +58,7 @@ M = G.Palette(
     runner=('#E8DCC0', 'fabric'),         # a table runner
     porcelain=('#F5F3EE', 'gloss'),       # plates, a cup
     food=('#E7D9BF', 'gloss'),
-    tumbler=('#DCE6EA', 'gloss'),         # drinking glasses (gloss, as the placeholders')
+    tumbler=('#DCE6EA', 'gloss'),         # drinking glasses (gloss, as the old parts')
     cutlery=('#B9BDC1', 'satin'),
     vase=('#D8D2C4', 'gloss'),
     stem=('#7E9A62', 'satin'),
@@ -107,8 +106,8 @@ M = G.Palette(
 )
 
 F = G.GameFrame()
-TT = 0.75     # a dining table's top (catalog2.py TT, content surface)
-BT = 1.06     # a bar table's top (catalog2.py BT)
+TT = 0.75     # a dining table's top (content surface)
+BT = 1.06     # a bar table's top (the old `BT`)
 SZ = 0.05     # catalog2's chairs: the seat's middle sits 5 cm forward, towards the table
 
 
@@ -304,7 +303,7 @@ def bistroSet():
     G.torus('cup_handle', 0.02, 0.005, at=F.at(0.175, y + 0.05, 0.24), material=M.porcelain, rot=(90, 0, 0),
             major_segments=10, minor_segments=5)
     _flowers('', -0.15, 0.1, y, h=0.12)
-    _cafe_chair('c', 0, -0.19, M.legs_black, M.seat_sage)        # its back on the wall face, as the placeholder's
+    _cafe_chair('c', 0, -0.19, M.legs_black, M.seat_sage)        # its back on the wall face, as the old part's
     return _finish('bistroSet')
 
 
@@ -707,7 +706,7 @@ def benchDining():
 
 
 # === K9: dining storage ===============================================================================================
-WALL = -0.43   # where the storage is built from (game depth); `settle()` then moves it to its placeholder's centre
+WALL = -0.43   # where the storage is built from (game depth); `settle()` then moves it to the old part's centre
 LEG_H = 0.16   # a sideboard's legs
 DOOR_SECONDS = 0.9   # a storage door swings open in this long, while clean things are put away (a `cupboard`)
 PUT_AWAY = {'uses': {'fetch': 'door_open'}, 'hold': 1.5}
@@ -804,7 +803,7 @@ def sideboard():
                      segments=10, rings=6)
             flutes(a, b, c, e, zf)
         doors.append(_door(f'door{i}', x0, x1, y0, y1, zf, M.body_walnut, left, knob))
-    G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the second door (hinged on its right) swings open while clean things are put away; one door only, as
     # each costs draws of its own
     G.swing(doors[1], 'door_open', -100, seconds=DOOR_SECONDS)
@@ -838,7 +837,7 @@ def buffet():
     parts = [_door(f'door{i}', x0, x1, y0, y1, zf, M.body_sage, left,
                    lambda a, b, c, e, z, left=left: panel(a, b, c, e, z, left))
              for i, (x0, x1, left) in enumerate(doors)]
-    G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the wide middle door (hinged on its left) swings open while clean things are put away
     G.swing(parts[2], 'door_open', 100, seconds=DOOR_SECONDS)
     return G.meshes()
@@ -885,7 +884,7 @@ def chinaCabinet():
             glazing(a, b, c, e, z)
             F.sphere(f'knob_g{s}', 0.014, (s * 0.04, 1.45, z + 0.01), M.brass, segments=10, rings=6)
         glazed_doors.append(_door(f'glass_door{s}', x0, x1, 0.93, 2.0, zf, M.body_china, s < 0, glazed, frame=0.045))
-    G.settle()                       # where its placeholder stands, against the wall (its Model's centre)
+    G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the left glazed door (hinged on its left) swings open onto the plates while clean things are put away
     G.swing(glazed_doors[0], 'door_open', 100, seconds=DOOR_SECONDS)
     return G.meshes()
@@ -1011,12 +1010,12 @@ FAMILY = G.Family(
      G.Model('barCart', barCart, size=(0.769, 1.09, 0.45), centre=(-0.017, 0), key='model.barCart',
              motions={'uses': {'mix': 'shake'}, 'hold': 1.5},
              paint=[('frame_brass', 'Frame'), ('tray', 'Trays')])],
-    comment='Blender-built dining tables, chairs, stools and storage (tools/art/blender/families/dining.py). Replaces '
-            'the primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a '
-            'fallback if a file fails to load, and the materials map onto the game\'s finishes so a model costs one '
-            'draw call per finish group. Table tops stand at the content\'s surface heights and seats where the game '
-            'seats residents; the stools\' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and '
-            'the bar cart\'s cocktail shaker lifts and tips while a drink is mixed (`shake`).',
+    comment='Blender-built dining tables, chairs, stools and storage '
+            '(tools/art/blender/families/dining.py). Listed in the base manifest\'s packs. The materials '
+            'map onto the game\'s finishes so a model costs one draw call per finish group. Table tops '
+            'stand at the content\'s surface heights and seats where the game seats residents; the stools\' '
+            'seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart\'s '
+            'cocktail shaker lifts and tips while a drink is mixed (`shake`).',
 )
 
 if __name__ == '__main__':

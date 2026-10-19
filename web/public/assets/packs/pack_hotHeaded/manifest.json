@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Replaces the primitive-part placeholders of packs/hotHeaded by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge cover rolls back.",
+  "$comment": "Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge cover rolls back.",
   "version": 1,
   "entries": {
     "model.hotHeaded.heavyBag": {

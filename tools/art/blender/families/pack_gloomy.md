@@ -1,11 +1,10 @@
 # Gloomy pack — notes
 
 `pack_gloomy.py` builds the six P7 gloomy models into `web/public/assets/models/pack_gloomy/` and their entries in
-`packs/pack_gloomy/manifest.json`, an override pack listed after `packs/gloomy/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_gloomy.py`, in `packs/gloomy`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_gloomy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Gloomy until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 backs on the wall's face (−0.43; the tub's ledge −0.93). Seats keep the default 0.45 (the cello's stool, the desk's
 chair, the window seat's cushion top); the tub keeps `SEATS`/`BEDS` 0.25 (its inside floor is at 0.095).
 
@@ -21,8 +20,8 @@ chair, the window seat's cushion top); the tub keeps `SEATS`/`BEDS` 0.25 (its in
 | `soakingTub` | the water up to 0.52 with a little foam, origin under the tub's floor, flat there at rest: `fill` raises it (1.5 s) | `soak` |
 
 The music animation poses the player round the model's own cello (characters.ts, `def.includes('cello')`), so the
-cello is a part of the model and `off_stand` brings it to where the pose expects it (the placeholder's spot, end pin
-at depth 0.3). The music stand of the placeholder is gone (it stood where the cello is played); an open book of music
+cello is a part of the model and `off_stand` brings it to where the pose expects it (the old part's spot, end pin
+at depth 0.3). The old part's music stand is gone (it stood where the cello is played); an open book of music
 lies on the floor and the bow hangs on the cello's stand.
 
 The rain lamp is an open frame (a canopy on three posts over a pool, a little figure under an umbrella on a rock),
@@ -47,10 +46,10 @@ satin book); the tub's ledge `wood`, the rest plain.
 | `model.gloomy.windowSeat` | 1.84 × 1.97 × 0.71 m | 3,668 | 3 | Body, Cushion, Trim |
 | `model.gloomy.soakingTub` | 1.86 × 0.92 × 1.85 m | 4,120 | 3 | Body, Trim |
 
-The desk's apron runs only along its far edge and its ends (the placeholder's deep apron took the writer's hands).
+The desk's apron runs only along its far edge and its ends (the old part's deep apron took the writer's hands).
 
 `check_glb.py`: 6 models, 0 failed; the record cabinet's 4-draw warning above. Khronos validator: 0 errors, 0
-warnings each. Gallery next to the placeholders; clips bench at rest, open and mid-loop on WebGPU and WebGL,
+warnings each. Gallery next to the old parts; clips bench at rest, open and mid-loop on WebGPU and WebGL,
 coloured (cabinet, window seat). In play (`wants-asking`, WebGPU): the cello played (in the player's arms), the
 record played (lid up, record turning), brooding on the window seat, writing at the desk by the lit candle, watching
 the rain, soaking in the tub. At night (`office-night`, WebGL): the window seat in four facings, the tub, the

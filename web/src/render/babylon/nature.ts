@@ -3,10 +3,9 @@
  * dome. Everything is static and instanced (a draw call per model type, and in the game per area,
  * see `FOREST_SECTORS`), generated deterministically from the town's seed so a loaded game looks the same.
  *
- * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are primitive-part models
- * (tools/art/nature.py): crowns of lumpy blobs on the leafy `foliage` finish over `bark` limbs,
- * ~1-1.5k triangles per tree, drawn over by Blender-built files (each tree and shrub with a far
- * version for the distant woods: tools/art/blender/families/plants.py, trees.py).
+ * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are Blender-built files
+ * (tools/art/blender/families/plants.py, trees.py): crowns on the leafy `foliage` finish over `bark`
+ * limbs, each tree and shrub with a far version for the distant woods.
  * `installNature` adds vertex-shader wind and per-instance tint variation to those two finishes;
  * `natureDecor` turns the house builder's garden dressing into species (hedges or mixed borders,
  * mixed lot trees kept clear of the street and paths).
@@ -427,7 +426,7 @@ export class Landscape {
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
    * near the town are the full models and cast shadows; further ones use the low level of detail
-   * (a file's own far version; a placeholder built coarser), which don't.
+   * (a file's own far version), which don't.
    */
   private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -811,7 +810,7 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
 const windState = new WeakMap<Scene, { time: number; strength: number }>();
 
 /**
- * Per finish (placeholder parts' `material`): x bend (per m^2 of height), y flutter amplitude (m),
+ * Per finish (primitive parts' `material`): x bend (per m^2 of height), y flutter amplitude (m),
  * z flutter speed, w flutter ramp (1/m).
  */
 const WIND_KIND: Record<string, [number, number, number, number]> = {

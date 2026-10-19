@@ -1,8 +1,7 @@
 # Outdoor (`families/outdoor.py`)
 
-The outdoor things, built over their primitive-part placeholders (`catalog.py`, `catalog2.py`, `furniture.py`),
-which stay the fallback. One pack, `packs/outdoor/manifest.json`. Each model is built in place where its
-placeholder stands (`F`, game axes), so seat heights (`catalog2.py` `SEATS`) and table tops (content `surface`)
+The outdoor things. One pack, `packs/outdoor/manifest.json`. Each model is built in place where the
+old part stood (`F`, game axes), so seat heights (content `seat`) and table tops (content `surface`)
 stay where the game has them; models that stand off the middle of their footprint say so with `centre=`.
 
 ## OU1. Patio seating and tables (Validate › Patio)
@@ -20,9 +19,8 @@ Built 2026-10-14; they sit in Validate › Patio until signed off (back to Outdo
   and a cup on its arm, the Adirondack green with a fanned, arched back.
 - **Round patio table** (`patioTableRound`): a teal top with a ring of yellow and cream tiles, an iron rim, a
   pedestal and a domed foot. It is coloured as Frame, Top and Tiles (not "Slats": it has none).
-- **Teak patio table** (`patioTable4`): five planks at 0.74 m on aprons, square legs and a low stretcher.
-  `check_glb.py` warns it is 4 cm off centre: it follows the content's top (−0.43 to 0.35 deep); the
-  placeholder's legs stood out past the front of it.
+- **Teak patio table** (`patioTable4`): five planks at 0.74 m on aprons, square legs and a low stretcher,
+  centred on the content's top (−0.43 to 0.35 deep).
 - **Patio chair** (`patioChair`): a bent green-iron frame, three back slats and a seat cushion (Frame, Cushion).
 - **Garden bench** (`benchGarden3`): three seat and three back slats on three iron frames, arms at the ends.
 - **Outdoor bar** (`outdoorBar`): a teak body with twenty front slats, a lighter counter at 1.06 m (the content's
@@ -48,7 +46,7 @@ Built 2026-10-14; they sit in Validate › Patio until signed off (back to Outdo
 
 `check_glb.py`: 0 failed (the one warning above). Khronos validator: 0 errors, 0 warnings each.
 
-**In the game** (2026-10-14, headless, WebGPU and WebGL2): the gallery next to the placeholders; the clips bench
+**In the game** (2026-10-14, headless, WebGPU and WebGL2): the gallery next to the old parts; the clips bench
 (`stir`); in play, all eleven bought in a garden (one chair at each of the four facings, three recoloured), a
 resident relaxing in the Adirondack chair, sitting on both benches, the bistro set and the patio chair (at the
 round table), and having a picnic at the picnic table, by day and on into the night.

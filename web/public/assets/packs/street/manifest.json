@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, the door pot, the garden path light, the street hedge and the flower clump that render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Replaces the primitive-part placeholders of tools/art/community.py and street/manifest.json by key; listed in the base manifest's packs after them. The placeholder is kept as a fallback if a file fails to load. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
+  "$comment": "Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, the door pot, the garden path light, the street hedge and the flower clump that render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Listed in the base manifest's packs. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
   "version": 1,
   "entries": {
     "model.street.bench": {

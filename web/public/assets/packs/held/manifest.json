@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the models of content `items` and the props drawn on a station while cooking. Replaces the primitive-part placeholders of tools/art/items.py by key; listed in the base manifest's packs. The placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes, so each costs one draw call (the wooden boards two).",
+  "$comment": "Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the models of content `items` and the props drawn on a station while cooking. Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the wooden boards two).",
   "version": 1,
   "entries": {
     "item.ingredients": {

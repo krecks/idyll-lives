@@ -12,7 +12,6 @@ the object's colours, so there are never two.
 ## F1. Home gym (5)
 
 - **Family:** `tools/art/blender/families/fitness.py`
-- **Placeholders:** `tools/art/catalog.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

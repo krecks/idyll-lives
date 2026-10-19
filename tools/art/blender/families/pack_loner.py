@@ -1,9 +1,8 @@
 # The loner pack (P11): the hush-shell reading pod, the shortwave radio desk, the jigsaw puzzle table, the
-# bonsai potting bench, the cedar sauna for one and the no-knock delivery hatch, over their primitive-part
-# placeholders (`tools/art/pack_loner.py`, `packs/loner/manifest.json`), which stay the fallback.
+# bonsai potting bench, the cedar sauna for one and the no-knock delivery hatch.
 # Notes: pack_loner.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the pod's hood swings half closed (`shell`), the radio's tuning dial turns (`dial`) and its
 # antenna extends (`antenna`), a patch of the puzzle grows (`pieces`), a twig of the bonsai shrinks away
 # (`trim`), the sauna's glass door opens and shuts (`door_open`) and the delivery hatch opens (`hatch`).
@@ -479,11 +478,11 @@ FAMILY = G.Family(
              centre=(0, -0.01),
              motions={'uses': {'order': 'hatch', 'treat': 'hatch'}, 'hold': 2},
              paint=[('slate', 'Body'), ('wood', 'Wood')])],
-    comment='Blender-built loner pack models (tools/art/blender/families/pack_loner.py). Replaces the '
-            'primitive-part placeholders of packs/loner by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. Each moves a part while it is used: the pod\'s hood, the radio\'s dial and antenna, '
-            'a patch of the puzzle, a twig of the bonsai, the sauna\'s door and the delivery hatch.',
+    comment='Blender-built loner pack models (tools/art/blender/families/pack_loner.py). Listed in the '
+            'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
+            'call per finish group. Each moves a part while it is used: the pod\'s hood, the radio\'s dial '
+            'and antenna, a patch of the puzzle, a twig of the bonsai, the sauna\'s door and the delivery '
+            'hatch.',
 )
 
 if __name__ == '__main__':

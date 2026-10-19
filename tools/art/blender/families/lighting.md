@@ -1,8 +1,7 @@
 # Lighting — notes
 
 `lighting.py` builds the 21 lamps of docs/objects/lighting.md into `web/public/assets/models/lighting/` and their
-entries in `packs/lighting/manifest.json`, over the primitive-part placeholders of `catalog.py`, `catalog2.py`
-and the base manifest (`model.lamp`), which stay as the fallback. Built 2026-10-14; they sit in Validate ›
+entries in `packs/lighting/manifest.json`. Built 2026-10-14; they sit in Validate ›
 Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 - **LT1, ceiling:** `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`,
@@ -11,11 +10,11 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 - **LT2, wall:** `wallSconce`, `wallLampArm`, `wallLightOutdoor`. Their back is on the wall face (−0.43), at
   their real height (`G.settle(centre=False, floor=False)`, `centre=` on the `Model`).
 - **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp's
-  base stands in the back corner, its back on the wall face (`centre=`), as its placeholder now does.
+  base stands in the back corner, its back on the wall face (`centre=`), as its old part now does.
 - **LT4, table:** `tableLamp` (a lamp on its own oak side table, a floor object), and the surface lamps
   `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern`. Their content `radius` (the room
   they take on a top) follows the drawn model: the round, square, mushroom and lantern lamps' were taken from their
-  placeholders' boxes (0.18–0.29 m), too wide for a side table's or nightstand's top, which refused them; they are
+  old parts' boxes (0.18–0.29 m), too wide for a side table's or nightstand's top, which refused them; they are
   0.12–0.17 m now (2026-10-14), and all five stand on a side table in play.
 
 ## The light
@@ -23,9 +22,9 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 The light is the content's `light`; the model only shows where it comes from. `_bulb` (and `_near_light`)
 asserts each bulb within 25 cm of the content's `light.height`, read from `base.json`, `furniture.json` and
 `catalog2/lighting.json`, so a remodel can't drift away from it. Most are within 8 cm. The pendant's light was
-at the top of its dome (2.1 m, as the placeholder had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
+at the top of its dome (2.1 m, as the old part had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
 2026-10-14), a little brighter on the floor and a little darker on the ceiling. Across, the light is at the
-footprint's middle unless the content's `light.at` moves it (in the game's frame, the placeholder's: the GLB's x
+footprint's middle unless the content's `light.at` moves it (in the game's frame, the old part's: the GLB's x
 mirrored, as the glTF loader turns it): the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0) put it at
 their bulbs, the nightstand lamp's (0, −0.26) at its bulb near the wall (2026-10-17; `_bulb` checks only the
 height). The wall lights keep theirs at the middle, 13–38 cm out from the bulb: tried at the bulb, the sconce and
@@ -44,11 +43,11 @@ banker's lamp) glow only on their white `liner`, a thin shell just inside the sh
 - **Paper lantern** (`lantern`): the cord, the paper globe and its ribs, origin on the canopy; `sway` rocks
   them 2.5° in 2 s (`G.rock`), about a pendulum's period for its length.
 
-Not on Low (E2); at rest they look as the placeholder.
+Not on Low (E2); at rest they look as the old part.
 
 ## Shapes
 
-- `_lathe` turns a placeholder's `lathe` (profile in fractions of its size) into a `G.revolve`, closing the
+- `_lathe` turns an old part's `lathe` (profile in fractions of its size) into a `G.revolve`, closing the
   profile and optionally adding the liner. `top=True` puts the origin at the top, to tilt the swing-arm
   shade about where it hangs.
 - `_drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
@@ -59,14 +58,14 @@ Not on Low (E2); at rest they look as the placeholder.
 `check_glb.py`: 21 ok, 0 failed. Its warnings, all expected:
 
 - the ceiling and wall lights float above their origin (they hang);
-- `floorLampSimple`, `lampTableSquare` and `lampLantern` are about half their placeholder's width: the gate
-  measures the placeholder's 4-sided shade or roof (a cylinder of 4 segments turned 45°) by its unturned box;
+- `floorLampSimple`, `lampTableSquare` and `lampLantern` are about half the old part's width: the gate
+  measures the old part's 4-sided shade or roof (a cylinder of 4 segments turned 45°) by its unturned box;
   the drawn sizes match;
-- `wallLampArm` is 5 cm lower than the gate's estimate of the tilted placeholder shade; the drawn shades agree
-  (checked side by side in the gallery), so the placeholder is kept. Fixed 2026-10-14: the track lights'
-  placeholder aims its heads as the model's (it was 3 cm shallower), and the outdoor light's lens no longer reaches
+- `wallLampArm` is 5 cm lower than the gate's estimate of the tilted old shade; the drawn shades agree
+  (checked side by side in the gallery), so the shade is kept. Fixed 2026-10-14: the track lights'
+  old part aims its heads as the model's (it was 3 cm shallower), and the outdoor light's lens no longer reaches
   3 cm into the wall behind its plate (its hidden back half is flattened onto the wall face), so it is 0.11 m deep,
-  as its placeholder.
+  as the model does.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

@@ -1,9 +1,9 @@
 # The living room's media (L4, notes: media.md): the television on its media unit, the flat-screen TV on the
 # wall, the portable TV, the low TV bench with a TV lift, the home cinema, the stereo, the boombox and the
-# electric fireplace, over their primitive-part placeholders (furniture.py `tv_set`, catalog.py, catalog2.py).
+# electric fireplace.
 #
-# Each is built where its placeholder stands (`F`, game axes: x, height, depth; front +depth), its back on the
-# wall face (-0.43) where the placeholder's reached past it, then stood on the floor (`G.settle(centre=False)`,
+# Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), its back on the
+# wall face (-0.43) where the old part's reached past it, then stood on the floor (`G.settle(centre=False)`,
 # its `centre=` on the Model). Every screen faces the front (+depth), where the game stands its watchers, and
 # glows at night (`glow`); the home cinema's projector screen is rolled away at rest, so it glows only while it
 # is down, while watched.
@@ -33,7 +33,7 @@ M = G.Palette(
     steel=('#C3C7CB', 'metal'),                          # knobs, tonearm, ears
     grille=('#2E3034', 'matte'),                         # speaker cloth
     led=('#5EC28B', 'gloss'),
-    # the television on its media unit (furniture.py tv_set)
+    # the television on its media unit (the old `tv_set`)
     tv_cabinet=('#B08E66', 'wood'),     # the unit; Body
     tv_oak=('#CDB08A', 'wood'),         # its top board and doors; Trim
     tv_frame=('#2A2C30', 'satin'),      # the set's casing and stand
@@ -113,7 +113,7 @@ def _rod(name, a, b, r, mat, verts=8):
     return G.rod(name, F.at(*a), F.at(*b), r, material=mat, verts=verts)
 
 
-# --- the television (1x1): a flat set on its stand on a low oak media unit (furniture.py tv_set) -------------
+# --- the television (1x1): a flat set on its stand on a low oak media unit (the old `tv_set`) -------------
 def tv():
     F.box('unit', 0.9, 0.4, 0.42, (0, 0.24, -0.22), M.tv_cabinet, bevel=0.012)
     F.box('top', 0.91, 0.03, 0.43, (0, 0.455, -0.215), M.tv_oak, bevel=0.008)
@@ -139,7 +139,7 @@ def tv():
     G.settle(centre=False)
 
 
-# --- the flat-screen TV (2x1, wall): a thin panel on a bracket, a soundbar under it (catalog.py tv_wall) ------
+# --- the flat-screen TV (2x1, wall): a thin panel on a bracket, a soundbar under it (the old tv_wall) ------
 def tv_wall():
     y = 1.28
     F.box('bracket', 0.3, 0.2, 0.008, (0, y - 0.02, WALL + 0.004), M.black_metal, bevel=0.002)
@@ -506,9 +506,9 @@ FAMILY = G.Family(
      G.Model('fireplaceElectric', fireplace_electric, key='model.fireplaceElectric', size=(1.76, 1.31, 0.92),
              centre=(0, 0.03), motions={'uses': {'relax': 'flames'}},
              paint=[('surround', 'Surround'), ('firebox', 'Firebox')])],
-    comment='Blender-built living room media (tools/art/blender/families/media.py): the TVs, the home cinema, '
-            'the stereo, the boombox and the electric fireplace. The placeholder is drawn if a file fails to load, '
-            'and the materials map onto the game\'s finishes so a model costs one draw call per finish group.',
+    comment='Blender-built living room media (tools/art/blender/families/media.py): the TVs, the home '
+            'cinema, the stereo, the boombox and the electric fireplace. The materials map onto the '
+            'game\'s finishes so a model costs one draw call per finish group.',
 )
 
 if __name__ == '__main__':

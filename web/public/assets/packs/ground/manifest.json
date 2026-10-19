@@ -1,5 +1,5 @@
 {
-  "$comment": "The lawn's grass tuft and wildflowers, the woods' rocks and the selection marker, built in Blender (tools/art/blender/families/ground.py) over the primitive-part placeholders of nature.py and models.py.",
+  "$comment": "The lawn's grass tuft and wildflowers, the woods' rocks and the selection marker, built in Blender (tools/art/blender/families/ground.py).",
   "version": 1,
   "entries": {
     "model.grassTuft": {
@@ -60,6 +60,7 @@
           "finish": "material.finish.matte"
         }
       },
+      "sink": 0.115,
       "far": "../../models/ground/rock.far.glb"
     },
     "model.marker": {
@@ -69,7 +70,8 @@
         "star": {
           "finish": "material.finish.satin"
         }
-      }
+      },
+      "sink": 0.17
     }
   }
 }

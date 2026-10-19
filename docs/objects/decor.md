@@ -1,7 +1,7 @@
 # Decor
 
 Mostly still things. All 22 are built by `tools/art/blender/families/decor.py` (notes: `families/decor.md`), each
-where its placeholder stands: the wall things (pictures, clocks, shelf, curtains) at their real height with their
+in its place: the wall things (pictures, clocks, shelf, curtains) at their real height with their
 back on the wall face, the hanging plant from the 2.8 m ceiling, the grandfather clock and the fireplace with their
 backs on the wall face, the rest centred on their tile or flat on the floor (the rugs). The pictures are flat colour
 shapes (matte, one draw call with the frame), not textures.
@@ -20,7 +20,6 @@ cutaway drops it, from either side.
 ## D1. Wall art and clocks (6)
 
 - **Family:** `tools/art/blender/families/decor.py`
-- **Placeholders:** `tools/art/catalog.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -45,7 +44,6 @@ cutaway drops it, from either side.
 ## D2. Ornaments (10)
 
 - **Family:** `tools/art/blender/families/decor.py`
-- **Placeholders:** `tools/art/catalog.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -68,13 +66,11 @@ cutaway drops it, from either side.
 - The fireplace has a raised hearth bench (content `seat`: height 0.42, forward 0.02): a resident warming up sits on
   it with the flames growing behind her and dying down when she gets up. Its `light` (height 0.7, `switch: false`:
   residents don't switch it) lights the room at night.
-- The horse statue is a bronze horse standing on an oak plinth (model, placeholder and its name and description
-  agree); the pedestal vase is blue.
+- The horse statue is a bronze horse standing on an oak plinth (model and its name and description agree); the pedestal vase is blue.
 
 ## D3. Textiles (6)
 
 - **Family:** `tools/art/blender/families/decor.py`
-- **Placeholders:** `tools/art/catalog.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

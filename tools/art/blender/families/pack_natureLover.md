@@ -2,11 +2,10 @@
 
 `pack_natureLover.py` builds the seven P12 nature lover models into `web/public/assets/models/pack_natureLover/`
 and their entries in `packs/pack_natureLover/manifest.json`, an override pack listed after
-`packs/natureLover/manifest.json`. Their primitive-part placeholders (`tools/art/pack_natureLover.py`, in
-`packs/natureLover`) stay as the fallback. Built 2026-10-14; they sit in Validate › Nature Lover until checked in
+`packs/natureLover/manifest.json`. Built 2026-10-14; they sit in Validate › Nature Lover until checked in
 play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 keeping its footprint, its wall side (the potting bench and the shower against the wall face at depth −0.43), the
 hammock's sling low point at 0.5 m (no `BEDS` entry: the default mattress height) and the glasshouse bench's seats
 at 0.45 m.
@@ -41,7 +40,7 @@ seedlings sway by their own height and keep their size. No new part: still 4 dra
   Its plants are plain satin (ferns, palms, orchids, baskets): the glass is the point, and a foliage draw would make
   5. The door is frameless glass (a frame would be a second draw on it).
 - The hammock: the still stand is one draw (wood); the sling part takes its fabric (canvas, stripes, ropes, pillow)
-  and the spreader bars' wood. The placeholder's grass tuft is left out.
+  and the spreader bars' wood. The old grass tuft is left out.
 - The shower's potted plant, the feeder's tube (plain gloss, no glass) and the bench's seedling are plain.
 
 **Found in the game:** a part in a textured finish (`foliage`) that is grown from nothing (`G.grow` from 0.001) never
@@ -70,13 +69,13 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 draw calls (above).
 Khronos validator: 0 errors, 0 warnings each.
 On the clips bench (WebGPU and WebGL): every clip at rest and open (the veggie bed's `harvest` alone, `&clip=`), the
-glasshouse's vent from above, the hammock from its end. Gallery: each next to its placeholder. In play
+glasshouse's vent from above, the hammock from its end. Gallery: each next to its old part. In play
 (`wants-asking`, WebGPU, the yard): the hammock (`swing`: the resident lies in it and rides the sway), the
 glasshouse (`unwind`: seated on the bench, the door and vent open), the shower (`rinse`: the rain runs over the
 resident), the feeder (`birdwatch`: the bird lands) used; the veggie bed seen ripe and then picked (the fruit gone,
 the plants kept). At night (`office-night`, WebGL): the glasshouse at all four facings, the hammock, veggie bed,
 feeder and potting bench coloured. Not seen used in play: the potting bench, the terrarium and `pickSnack`
-(clips bench only). Residents lie along the depth, across the 2 × 1 hammock's sling, as on the placeholder: the
+(clips bench only). Residents lie along the depth, across the 2 × 1 hammock's sling, as on the old part: the
 lying direction is the engine's, not the model's.
 
 ## Rebuild

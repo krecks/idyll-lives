@@ -1,11 +1,10 @@
 # Kind pack — notes
 
 `pack_kind.py` builds the six P9 kind models into `web/public/assets/models/pack_kind/` and their entries in
-`packs/pack_kind/manifest.json`, an override pack listed after `packs/kind/manifest.json`. Their primitive-part
-placeholders (`tools/art/pack_kind.py`, in `packs/kind`) stay as the fallback. Built 2026-10-14; they sit in
+`packs/pack_kind/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
 Validate › Kind until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats stay where the renderer puts residents: the rocker's cushion and the poufs at 0.45–0.49 (default seat), the
 settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height.
 
@@ -26,7 +25,7 @@ Where the plan's table says "Loop (E1) … Until then static" (the rocker), the 
 - `coin`: with no `hold`, the coin stays in the jar while the resident is at it and comes back up into the slot (the
   next coin ready) when the use ends.
 - The tea table's two poufs are two materials (sage `pouf` "Fabric", rose `pouf_rose` "Second pouf"), as in the
-  placeholder; the settee's cushions take its `body` colour with the frame.
+  old part; the settee's cushions take its `body` colour with the frame.
 
 **Draw calls: 3 each.** The still body takes its plain finishes and at most one textured or glass finish, the moving
 parts the rest. So that it stays at 3:
@@ -50,7 +49,7 @@ parts the rest. So that it stays at 3:
 | `model.kind.songbirdFeeder` | 0.90 × 1.70 × 0.88 m | 5,004 | 3 | Body (the feeder house), Fabric (the seed sack), Roof |
 | `model.kind.hearthSettee` | 1.90 × 0.95 × 0.83 m | 3,188 | 3 | Body (the velvet), Fabric (the quilt) |
 
-The range sits on the wall's face (−0.43), 2.5 cm forward of the placeholder's; the jar is 3.5 cm taller with the
+The range sits on the wall's face (−0.43), 2.5 cm forward of the old part's; the jar is 3.5 cm taller with the
 coin standing in its slot; the rocker's yarn basket stands 2 cm further out.
 
 `check_glb.py`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every clip

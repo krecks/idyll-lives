@@ -2,10 +2,9 @@
 # `model.drumKit`, `model.guitarAcoustic`), games (H2: `model.chessTable`, `model.poolTable`, `model.foosball`,
 # `model.dartboard`, `model.arcadeCabinet`, `model.puzzleTable`) and crafts and science (H3: `model.easel`,
 # `model.workbench`, `model.telescope`, `model.sewingTable`, `model.chemistrySet`, `model.potteryWheel`,
-# `model.craftTable`), over their primitive-part placeholders (`furniture.py`, `catalog.py`, `catalog2.py`),
-# which stay the fallback. Notes: hobbies.md.
+# `model.craftTable`). Notes: hobbies.md.
 #
-# Each is built where its placeholder stands, in the game's axes (`F`), and stood on the floor with
+# Each is built where the game places it, in the game's axes (`F`), and stood on the floor with
 # `G.settle(centre=False)`, so a seat stays where the game seats residents. The moving parts and their clips:
 #   piano          the fallboard lifts off the keys and the music desk swings out (`fallboard`)
 #   drumKit        the crash and ride cymbals wobble while drummed (`cymbals`, a loop)
@@ -191,8 +190,8 @@ M = G.Palette(
 
 # --- helpers ----------------------------------------------------------------------------------------------
 def _axis(rx, ry, rz=0.0):
-    """The game direction of a placeholder part's long axis (its local y) under its `rotate`: Babylon's
-    Euler degrees (yaw y, pitch x, roll z), read as check_glb.placeholder_box reads them."""
+    """The game direction of an old part's long axis (its local y) under its `rotate`: Babylon's
+    Euler degrees (yaw y, pitch x, roll z), read as Babylon reads them."""
     rx, ry, rz = (math.radians(a) for a in (rx, ry, rz))
     cy, sy, cp, sp, cr, sr = (math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2),
                               math.cos(rz / 2), math.sin(rz / 2))
@@ -204,7 +203,7 @@ def _axis(rx, ry, rz=0.0):
 
 
 def _rod(F, name, at, length, rotate, r, material, verts=10):
-    """A placeholder's turned cylinder (centre `at`, `length` long, `rotate`) as a rod between its ends."""
+    """An old part's turned cylinder (centre `at`, `length` long, `rotate`) as a rod between its ends."""
     d = _axis(*rotate)
     a = [at[i] - d[i] * length / 2 for i in range(3)]
     b = [at[i] + d[i] * length / 2 for i in range(3)]
@@ -517,7 +516,7 @@ def _acoustic(F):
 
 
 def guitarAcoustic():
-    F = G.GameFrame(shift=0.07)   # a little forward, where its placeholder stands
+    F = G.GameFrame(shift=0.07)   # a little forward, where the game places it
     with G.new_parts() as still:
         _guitar_stand(F, -0.01, 0.19, 1.0, -0.075, reach=0.1, back=0.27)
     G.join(still, 'stand', origin=(0, 0, 0))
@@ -1493,12 +1492,11 @@ FAMILY = G.Family(
              paint=[('wheel_body', 'Wheel'), ('stool', 'Stool')]),
      G.Model('craftTable', craftTable, size=(1.7, 0.904, 0.89), key='model.craftTable', centre=(0, 0.005),
              motions={'uses': {'scrapbook': 'book_open'}}, paint=[('craft_top', 'Wood'), ('craft_metal', 'Metal')])],
-    comment='Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and science. '
-            'Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder '
-            'is kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so a '
-            'model costs one draw call per finish group. The piano lifts its fallboard, the drums\' cymbals and the '
-            'foosball rods move while played, the darts, the painting, the jigsaw patch, the pot and the liquid '
-            'grow, and the other hobbies move a part while a resident uses them.',
+    comment='Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and '
+            'science. Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so '
+            'a model costs one draw call per finish group. The piano lifts its fallboard, the drums\' '
+            'cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, '
+            'the pot and the liquid grow, and the other hobbies move a part while a resident uses them.',
 )
 
 if __name__ == '__main__':

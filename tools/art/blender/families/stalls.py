@@ -1,9 +1,8 @@
 # The town's food stalls and vending machines (CM3): the ice cream cart (`model.iceCreamCart`), the hot dog
 # stand (`model.hotDogStand`), the snack machine (`model.vendingSnack`), the drinks machine
-# (`model.vendingDrink`) and the market stall (`model.marketStall`), over their primitive-part placeholders
-# (`tools/art/community.py`, "Carts and machines"), which stay the fallback. Notes: stalls.md.
+# (`model.vendingDrink`) and the market stall (`model.marketStall`). Notes: stalls.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the carts and the stall across their 2 x 1 tiles, the machines against the back of their tile.
 # The moving parts: the cart's freezer lid slides across (`lid_open`, held 2 s), the stand's hot-plate lid
 # lifts (`lid_open`), a snack slides down to the machine's tray and a can drops to it (`drop`). The
@@ -389,12 +388,11 @@ FAMILY = G.Family(
              paint=[('drink_blue', 'Body')]),
      G.Model('marketStall', marketStall, size=(1.841, 2.148, 0.983), key='model.marketStall', centre=(0.0005, 0.02),
              far=FAR, paint=[('timber', 'Body'), ('awning_green', 'Awning')])],
-    comment='Blender-built food stalls and vending machines (tools/art/blender/families/stalls.py). Replaces the '
-            'primitive-part placeholders of tools/art/community.py by key; listed in the base manifest\'s packs. The '
-            'placeholder is kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes '
-            'so a model costs one draw call per finish group. The ice cream cart slides its freezer lid open and the '
-            'hot dog stand lifts its hot-plate lid (`lid_open`); a snack and a can drop to the machines\' trays '
-            '(`drop`). Each has a far version for the town overview.',
+    comment='Blender-built food stalls and vending machines (tools/art/blender/families/stalls.py). '
+            'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '
+            'costs one draw call per finish group. The ice cream cart slides its freezer lid open and the '
+            'hot dog stand lifts its hot-plate lid (`lid_open`); a snack and a can drop to the machines\' '
+            'trays (`drop`). Each has a far version for the town overview.',
 )
 
 if __name__ == '__main__':

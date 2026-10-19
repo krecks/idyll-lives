@@ -95,10 +95,7 @@ FAMILY = G.Family(
              motions={'uses': {'fetch': 'lid_open', 'putAway': 'drawer_open'}, 'hold': 2.5},
              # The materials the player's colour goes on.
              paint=[('body', 'Body')],
-             # A key the manifests don't have yet needs a placeholder: simple primitive parts, drawn when
-             # the file fails to load. A key that exists (an object moving to Blender) keeps its own.
-             placeholder=[{'shape': 'box', 'size': [0.8, 0.5, 0.45], 'at': [0, 0.25, 0], 'color': '#7FA7C9',
-                           'material': 'material.finish.satin'}])],
+             )],
     comment='Blender-built example models (tools/art/blender/families/<family>.py): what the family is.',
 )
 

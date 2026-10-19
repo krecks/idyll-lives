@@ -1,10 +1,9 @@
 # The kitchen's cookers (K2): the electric cooker, the gas range, the oven tower, the range cooker, the
-# hob counter and the microwave counter. Each replaces the primitive-part placeholder of `catalog.py`
-# / `catalog2.py`, which stays the fallback if the file fails to load. Notes: kitchen_cooking.md.
+# hob counter and the microwave counter. Notes: kitchen_cooking.md.
 #
 # A cooker is a box on the floor with a hob on top and an oven below; its door drops on a bottom hinge,
 # and a knob turns (with a ring of flame on the gas ones) while a resident cooks. The parts are placed
-# in game axes (`F`): the placeholder's depths are shifted back by the placeholder's depth centre, so
+# in game axes (`F`): the old depths are shifted back by their depth centre, so
 # the model is centred on its tile (see GameFrame).
 #
 # Run:  python3 -B tools/art/blender/build.py kitchen_cooking [--preview]
@@ -305,7 +304,7 @@ def microwave():
 # --- small appliances: a coffee machine, a breakfast counter and two dishwashers ---------------------
 
 def _counter(F, w=1.0, body=None, top=None):
-    """A base unit like the placeholder's `k_base`: a plinth, a carcass and a worktop to 0.95, with a
+    """A base unit like the old part's `k_base`: a plinth, a carcass and a worktop to 0.95, with a
     drawer over two doors on the front (the front face at depth 0.14)."""
     body, top = body or M.cab, top or M.worktop
     F.box('plinth', w - 0.04, 0.10, 0.56, (0, 0.05, -0.18), M.dark, bevel=0.005)
@@ -433,8 +432,8 @@ def dishwasherCompact():
                 body=M.cab, panel=M.steel, top=M.cab)
 
 
-# A floor thing against a wall is centred where its placeholder stands (`centre`): its back on the wall,
-# its top under its content `surface` (catalog2.py TOPS).
+# A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
+# its top under its content `surface`.
 FAMILY = G.Family(
     'kitchen_cooking', M,
     [G.Model('stoveElectric', stoveElectric, size=(0.60, 0.98, 0.661), key='model.stoveElectric', centre=(0, -0.0995),
@@ -478,11 +477,10 @@ FAMILY = G.Family(
              # dishes, as the dishwasher
              motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')])],
-    comment='Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Replaces the '
-            'primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder is '
-            'kept as a fallback if a file fails to load. Each cooker is a box on the floor with a hob on top '
-            'and an oven below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a '
-            'knob turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave '
+    comment='Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Listed in the '
+            'base manifest\'s packs. Each cooker is a box on the floor with a hob on top and an oven '
+            'below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob '
+            'turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave '
             'swings its door (`door_open`) and turns its turntable (`turntable`).',
 )
 

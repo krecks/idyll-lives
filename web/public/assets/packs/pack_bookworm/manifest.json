@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Replaces the primitive-part placeholders of packs/bookworm by key; the placeholder is kept as a fallback if a file fails to load, and the materials map onto the game's finishes so a model costs one draw call per finish group. Each has one moving part its use plays: the nook's cushion sinks, the ladder rolls, the bureau's flap drops, the teapot pours, the fire grows and the top book opens.",
+  "$comment": "Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has one moving part its use plays: the nook's cushion sinks, the ladder rolls, the bureau's flap drops, the teapot pours, the fire grows and the top book opens.",
   "version": 1,
   "entries": {
     "model.bookworm.readingNook": {

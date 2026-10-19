@@ -3845,12 +3845,11 @@ export class BabylonRenderer implements Renderer {
   private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>] {
     const key = this.objectModel(o);
     const def = this.deps.content.object(o.def);
-    const radius = def?.layer === 'surface' ? this.deps.content.radius(def) : undefined;
     const resize = this.objectResize(o);
     const colors = this.objectColors(o);
     const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { radius, resize })];
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize })];
   }
 
   /** Bumped by each world build: an older pass of `warmTemplates` stops. */

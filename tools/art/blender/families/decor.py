@@ -1,10 +1,9 @@
 # The decor: wall art and clocks (D1: `model.printFramed`, `photoPrint`, `paintingClassic`, `canvasAbstract`,
 # `wallClock`, `wallShelf`), ornaments (D2: `grandfatherClock`, `vaseTall`, `urnPorcelain`, `vasePedestal`,
 # `bustMarble`, `statueCat`, `statueHorse`, `coatRack`, `hangingPlant`, `fireplace`) and textiles (D3:
-# `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern`), over their primitive-part
-# placeholders (`catalog.py`), which stay the fallback. Notes: decor.md.
+# `curtains`, `curtainsLong`, `rugRound`, `rugLarge`, `rugRunner`, `rugPattern`). Notes: decor.md.
 #
-# Built where the placeholders stand (`F`, game axes): the wall things at their real height with their back
+# Built where the game places them (`F`, game axes): the wall things at their real height with their back
 # on the wall face (`floor=False`), the hanging plant from the ceiling. What moves:
 #   - the clocks' hour and minute hands tell the game's time (`hour_hand`, `minute_hand`, `motions.clock`); the
 #     grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls;
@@ -899,11 +898,11 @@ FAMILY = G.Family(
      G.Model('rugRunner', rugRunner, size=(0.8, 0.019, 2.8), key='model.rugRunner', paint=[('rug', 'Rug')]),
      G.Model('rugPattern', rugPattern, size=(2.84, 0.024, 1.86), key='model.rugPattern',
              paint=[('rug_ground', 'Rug')])],
-    comment='Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and '
-            'rugs. Replaces the primitive-part placeholders by key; listed in the base manifest\'s packs. The placeholder '
-            'is kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes so a model '
-            'costs one draw call per finish group. The clocks\' hands tell the game\'s time (`clock`); the hanging plant sways when '
-            'watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.',
+    comment='Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, '
+            'curtains and rugs. Listed in the base manifest\'s packs. The materials map onto the game\'s '
+            'finishes so a model costs one draw call per finish group. The clocks\' hands tell the game\'s '
+            'time (`clock`); the hanging plant sways when watered, the fire burns while a resident warms '
+            'up by it, and the curtains are drawn at night.',
 )
 
 if __name__ == '__main__':

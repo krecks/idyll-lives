@@ -1,11 +1,10 @@
 # The things residents carry and cook with: the models of content `items` (`item.*`: a bag of shopping, a
 # prep bowl, a pot of stew, plates of food, dirty plates and pans) and the props drawn on a station's top
-# while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill), over the
-# primitive-part placeholders of `tools/art/items.py`, which stay the fallback. Notes: held.md.
+# while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill). Notes: held.md.
 #
-# Each is drawn as the placeholder was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
+# Each is drawn as the old part was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
 # the middle of its base, front +Z in the game, lifted onto the palms, the top it stands on or the station.
-# So each is built where its placeholder's parts are, in the game's axes (`F`), and stood on the floor
+# So each is built where the game places it, in the game's axes (`F`), and stood on the floor
 # without moving it sideways (`done`); the few that stand off their middle (the pan's handle, the bag)
 # take their measured `centre`.
 #
@@ -88,7 +87,7 @@ M = G.Palette(
     crumb=('#D9B98A', 'matte'),
 )
 
-# Built in the game's axes (x, height, depth; front +depth), as the placeholders are.
+# Built in the game's axes (x, height, depth; front +depth), as the old parts are.
 F = G.GameFrame()
 
 
@@ -559,7 +558,7 @@ def board():
 
 
 def pan():
-    """The frying pan on the stove, its handle to the back (+depth: away from the cook, as the placeholder's,
+    """The frying pan on the stove, its handle to the back (+depth: away from the cook, as the old part's,
     out of the way of the hands): a heap of stir-fry, beef with carrot and greens."""
     lathe('pan', [(0, 0), (0.115, 0), (0.14, 0.045), (0.135, 0.05), (0.113, 0.009), (0, 0.009)],
           [M.iron, M.iron, M.iron, M.iron, M.iron], segments=20)
@@ -613,15 +612,14 @@ FAMILY = G.Family(
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
         I('board', board, (0.34, 0.055, 0.24), 'tool.board'),
-        # the handle reaches 2 cm further back than the placeholder's crossbar: the pan stays on its middle
+        # the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),
         I('grillFood', grillFood, (0.29, 0.045, 0.135), 'tool.grillFood', centre=(-0.015, -0.005)),
     ],
-    comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the models '
-            'of content `items` and the props drawn on a station while cooking. Replaces the primitive-part '
-            'placeholders of tools/art/items.py by key; listed in the base manifest\'s packs. The placeholder is '
-            'kept as a fallback if a file fails to load, and the materials map onto the game\'s finishes, so each '
-            'costs one draw call (the wooden boards two).',
+    comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
+            'models of content `items` and the props drawn on a station while cooking. Listed in the base '
+            'manifest\'s packs. The materials map onto the game\'s finishes, so each costs one draw call '
+            '(the wooden boards two).',
 )
 
 if __name__ == '__main__':

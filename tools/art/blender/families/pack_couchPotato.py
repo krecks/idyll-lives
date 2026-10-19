@@ -1,16 +1,15 @@
 # The couch potato pack (P3): the grand cinema wall, the Pixel Arcade console, the Cloud Nine power recliner, the
-# sofa-side snack fridge, the living-room workout game and the lava glow lamp, over their primitive-part
-# placeholders (`tools/art/pack_couchPotato.py`, `packs/couchPotato/manifest.json`), which stay the fallback.
+# sofa-side snack fridge, the living-room workout game and the lava glow lamp.
 # Notes: pack_couchPotato.md.
 #
-# Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+# Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`). The cinema's two side curtains are drawn apart (`curtains`), the console's disc tray slides out
 # (`tray`), the recliner's back tips and its footrest rises (`recline`), the fridge door swings (`fridge_open`),
 # the balance board tilts (`board`) and the lava lamp's wax rises (`blobs`) while more wax drifts round all the
 # time (`drift`, ambient). The screens the residents watch (the cinema's, the console's) stand on the wall at the
 # back, the seats in front of them, the sitters facing the object's back (content `seat.facing: "back"`, as the
-# piano): each is built as its placeholder first stood (the seats at the back, the screen at the front edge facing
-# them) and turned round (`_turn_round`), as is its placeholder.
+# piano): each is built as its old part first stood (the seats at the back, the screen at the front edge facing
+# them) and turned round (`_turn_round`), as is its old part.
 #
 # Run:  python3 -B tools/art/blender/build.py pack_couchPotato [--only recliner] [--preview]
 import math
@@ -481,11 +480,11 @@ FAMILY = G.Family(
      G.Model('lavaLamp', lavaLamp, size=(0.85, 1.15, 0.89), key='model.couchPotato.lavaLamp',
              centre=(0.005, 0.015), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
              paint=[('lamp_metal', 'Body'), ('pouf', 'Upholstery'), ('vessel', 'Glass')])],
-    comment='Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). Replaces the '
-            'primitive-part placeholders of packs/couchPotato by key; the placeholder is kept as a fallback if a file '
-            'fails to load, and the materials map onto the game\'s finishes so a model costs one draw call per '
-            'finish group. The cinema\'s curtains are drawn apart, the console\'s tray slides out, the recliner '
-            'reclines, the fridge door swings, the balance board tilts and the lava lamp\'s wax rises and drifts.',
+    comment='Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). '
+            'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '
+            'costs one draw call per finish group. The cinema\'s curtains are drawn apart, the console\'s '
+            'tray slides out, the recliner reclines, the fridge door swings, the balance board tilts and '
+            'the lava lamp\'s wax rises and drifts.',
 )
 
 if __name__ == '__main__':

@@ -1,13 +1,12 @@
 # The bedroom's dressing things (BR4): the cheval mirror (`model.mirror`), the dressing table
 # (`model.dressingTable`), the wall mirror (`model.mirrorWall`) and the standing mirror on a brass stand
-# (`model.mirrorFloor`), over their primitive-part placeholders (`furniture.py` / `objects_extra.py`,
-# `catalog.py`, `catalog2.py`), which stay the fallback. Notes: bedroom_dressing.md.
+# (`model.mirrorFloor`). Notes: bedroom_dressing.md.
 #
 # Each mirror's glass is one flat piece of a mirror material (E6), so the game reflects the room in it
 # live: upright, never tilted (the game lays the reflection on the glass's box). The dressing table is
 # one still body plus its right-hand drawer, which slides out to the seated resident while they get
 # ready. The wall mirror is on the wall layer: built at its real height, its back on the wall face.
-# Built to the placeholders' sizes, in their numbers: the parts are placed in game axes (`F`).
+# Built to the old parts' sizes, in their numbers: the parts are placed in game axes (`F`).
 #
 # Run:  python3 -B tools/art/blender/build.py bedroom_dressing [--preview]
 import math
@@ -106,7 +105,7 @@ def _turned(name, x, z, profile, material, segments=16):
 
 
 # --- the cheval mirror: 1x1, a tall swing frame between two turned posts on feet -----------------------
-# The placeholder's frame leans back 6°; this one hangs upright, so the reflection lies on the glass.
+# The old part's frame leaned back 6°; this one hangs upright, so the reflection lies on the glass.
 
 CHEVAL_Y = 0.95                         # the frame's middle and its pivots
 CHEVAL_W, CHEVAL_H = 0.57, 1.57         # the frame's moulding, along its middle
@@ -228,7 +227,7 @@ def dressingTable():
         F.box('drawer_back', 0.24, 0.08, 0.01, (DRAWER_X, y - 0.005, tray_z1 - 0.005), M.table, bevel=0.002)
     drawer = G.join(parts, 'drawer', origin=F.at(DRAWER_X, y, CASE_Z0))
 
-    # Built facing the wall (as the placeholder was), then turned round about the footprint's middle: the
+    # Built facing the wall (as the old part was), then turned round about the footprint's middle: the
     # mirror's back on the wall face, the pouf at the front, where the resident sits facing the mirror.
     half = Matrix.Rotation(math.pi, 4, 'Z')
     for o in (body, drawer):
@@ -242,7 +241,7 @@ def dressingTable():
 
 
 # --- the wall mirror: on the wall layer, a black metal frame and a small ledge --------------------------
-# Its back on the wall face (depth -0.43), at the placeholder's height: the frame from 1.0 to 1.9 m.
+# Its back on the wall face (depth -0.43), at the old part's height: the frame from 1.0 to 1.9 m.
 
 WALL = -0.43
 WM_Y, WM_W, WM_H, WM_RIM, WM_T = 1.45, 0.62, 0.9, 0.03, 0.035
@@ -272,8 +271,8 @@ def mirrorWall():
 
 
 # --- the standing mirror: 1x1, a full-length mirror upright on a brass stand ----------------------------
-# Where its placeholder stands: the frame a little behind the middle, the stand's strut behind it. The
-# placeholder leans back 8°; this one stands upright on two sled feet, held by a strut from behind.
+# Where the game places it: the frame a little behind the middle, the stand's strut behind it. The
+# old part leaned back 8°; this one stands upright on two sled feet, held by a strut from behind.
 
 SM_Z = -0.05            # the frame's middle, in depth
 SM_W, SM_H, SM_RIM, SM_T = 0.56, 1.66, 0.028, 0.035
@@ -314,11 +313,11 @@ FAMILY = G.Family(
              floor=False, paint=[('wall_frame', 'Frame')]),
      G.Model('mirrorFloor', mirrorFloor, size=(0.56, 1.78, 0.45), key='model.mirrorFloor', centre=(0, -0.155),
              paint=[('stand', 'Frame')])],
-    comment='Blender-built bedroom dressing models (tools/art/blender/families/bedroom_dressing.py): the cheval '
-            'mirror, the dressing table, the wall mirror and the standing mirror. Replaces the primitive-part '
-            'placeholders by key; listed in the base manifest\'s packs. The placeholder is kept as a fallback if a '
-            'file fails to load. Each mirror\'s glass maps to a `mirror` material, so the game reflects the room in '
-            'it live. The dressing table slides its drawer out (`drawer_open`) while a resident gets ready.',
+    comment='Blender-built bedroom dressing models (tools/art/blender/families/bedroom_dressing.py): the '
+            'cheval mirror, the dressing table, the wall mirror and the standing mirror. Listed in the '
+            'base manifest\'s packs. Each mirror\'s glass maps to a `mirror` material, so the game reflects '
+            'the room in it live. The dressing table slides its drawer out (`drawer_open`) while a '
+            'resident gets ready.',
 )
 
 if __name__ == '__main__':

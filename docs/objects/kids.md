@@ -13,7 +13,6 @@ Kids' seats and beds keep their heights (`SEATS`, `BEDS` in `web/src/render/baby
 ## KD1. Baby and kids' beds (4)
 
 - **Family:** `tools/art/blender/families/kids.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`, base manifest (`tools/art/furniture.py`, `nature.py`)
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -38,7 +37,6 @@ Kids' seats and beds keep their heights (`SEATS`, `BEDS` in `web/src/render/baby
 ## KD2. Toys (10)
 
 - **Family:** `tools/art/blender/families/kids.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
@@ -66,7 +64,6 @@ Kids' seats and beds keep their heights (`SEATS`, `BEDS` in `web/src/render/baby
 ## KD3. Kids' study and art (6)
 
 - **Family:** `tools/art/blender/families/kids.py`
-- **Placeholders:** `tools/art/catalog.py`, `tools/art/catalog2.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|

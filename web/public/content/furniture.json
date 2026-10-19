@@ -1,5 +1,5 @@
 {
-  "$comment": "The 0.20 catalogue: furniture, lighting, decor, kids' and garden things for every room, from cheap to premium. Models are in assets/catalog/manifest.json (tools/art/catalog.py). `layer` puts things on a wall, the ceiling or the floor's surface (rugs), where they take no floor space; `bunk` makes a bed's second slot the upper bunk. Feelings are prefixed `home.`.",
+  "$comment": "The 0.20 catalogue: furniture, lighting, decor, kids' and garden things for every room, from cheap to premium. Models are in assets/manifest.json and the packs it lists (tools/art/blender/families/). `layer` puts things on a wall, the ceiling or the floor's surface (rugs), where they take no floor space; `bunk` makes a bed's second slot the upper bunk. Feelings are prefixed `home.`.",
   "tags": [
     "toys"
   ],

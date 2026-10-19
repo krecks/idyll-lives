@@ -42,13 +42,14 @@ class Model:
       paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part
                  first (the one the game's quick colour row paints), e.g. [('body', 'Cabinet'),
                  ('stone', 'Worktop')]; a bare material name is its own label
-      placeholder  primitive parts for a key the manifests don't have yet (the fallback)
       parts      primitive parts drawn with the file (a mirror a file can't reflect yet)
       centre     (game x, depth) the model's bounds are centred on at rest, for one that stands off the
                  middle of its footprint (default: the middle); `G.settle()` centres it there. A floor thing
-                 that stands against a wall (a counter, a fridge) takes its placeholder's, so it meets the
-                 wall and its neighbours, and its content `surface` (catalog2.py TOPS) stays on its top
+                 that stands against a wall (a counter, a fridge) takes (0, -0.43), its back on the wall face,
+                 so it meets the wall and its neighbours, and its content `surface` stays on its top
       floor      False for a thing on a wall: built at its real height, not stood on the floor
+      sink       how far the model may reach below the floor (default 0), for the few the game sinks
+                 (the woods' rock, the selection marker the game centres on a resident)
       far        its far version, models/<family>/<id>.far.glb, drawn where it's only seen from afar (the
                  town overview, the far woods): a share of the triangles to keep (0.25: the model at rest,
                  joined, decimated but for what stands on the floor, without what's hidden at rest), or a
@@ -57,12 +58,12 @@ class Model:
                  trees, street props.
     """
 
-    def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, placeholder=None,
-                 parts=None, centre=(0.0, 0.0), floor=True, far=None):
+    def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0):
         self.id, self.build, self.size, self.key = id, build, size, key
-        self.tolerance, self.motions, self.paint, self.placeholder = tolerance, motions, paint, placeholder
+        self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
-        self.centre, self.floor = centre, floor
+        self.centre, self.floor, self.sink = centre, floor, sink
         self.far = far
 
 
@@ -135,10 +136,10 @@ class Family:
                 entry['motions'] = model.motions
             if model.paint:
                 entry['paint'] = paint_slots(model.paint, materials_used(objs))
-            if model.placeholder:
-                entry['placeholder'] = model.placeholder
             if model.parts:
                 entry['parts'] = model.parts
+            if model.sink:
+                entry['sink'] = model.sink
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'

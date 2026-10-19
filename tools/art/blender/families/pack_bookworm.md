@@ -1,20 +1,19 @@
 # Bookworm pack — notes
 
 `pack_bookworm.py` builds the six P1 bookworm models into `web/public/assets/models/pack_bookworm/` and their
-entries in `packs/pack_bookworm/manifest.json`, an override pack listed after `packs/bookworm/manifest.json`. Their
-primitive-part placeholders (`tools/art/pack_bookworm.py`, in `packs/bookworm`) stay as the fallback. Built
+entries in `packs/pack_bookworm/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sit in Validate › Bookworm until checked in play.
 
-Each is built where its placeholder stands (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 with one moving part. Pack families write to a pack of their own (`pack_<trait>`), keyed `model.<trait>.<id>`, so
-the trait's pack keeps its placeholders. The bedside stack stood 3 cm into the wall; it is centred on its `Model`
-`centre` now (`G.settle()`), its back on the wall face at −0.43. The placeholders of the wall-standing ones (`tools/art/pack_bookworm.py`, `pack_shapes.to_wall`) stand with their backs
-on the wall face too, so the fallback, the model and the wall agree within a centimetre.
+the trait's pack keeps the old parts. The bedside stack stood 3 cm into the wall; it is centred on its `Model`
+`centre` now (`G.settle()`), its back on the wall face at −0.43, as the wall-standing ones' old parts stood, so
+the model and the wall agree within a centimetre.
 
 The writer's bureau stands with its back on the wall's face and its chair in front; the writer faces the bureau
 (content `"seat": {"height": 0.45, "forward": 0.12, "facing": "back"}`, as the piano). It is built as the old
-placeholder stood (the chair between the wall and the desk) and turned round (`_turn_round`), so its flap drops the
-other way (+90°); the placeholder (`pack_bookworm.py`, `furniture.turned`, then `to_wall`) is turned the same.
+old part stood (the chair between the wall and the desk) and turned round (`_turn_round`), so its flap drops the
+other way (+90°); the old part was turned the same way.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -30,7 +29,7 @@ more. So that it stays at 3:
 - the nook's back cushions and pillows, the bureau chair's pad and the trolley's cloth are plain satin (the
   nook's seat cushion and throw, alone on their moving part, are `fabric`);
 - the lounge's wood is plain satin (`walnut`), as its chairs and rug take the `fabric` draw;
-- the fire is an open grate under a hood, so the flames show from the room (the placeholder's stove faced the
+- the fire is an open grate under a hood, so the flames show from the room (the old stove faced the
   chairs, its fire hidden from the camera); no glass.
 
 Book spines are plain satin, unbevelled boxes: a wall of books costs no draw call and few triangles.

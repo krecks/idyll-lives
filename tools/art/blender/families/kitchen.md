@@ -3,9 +3,8 @@
 `kitchen.py` builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
 `packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the six **K1 fridges**
 (`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge`) and the two **sinks**
-(`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). They
-replace the primitive-part placeholders, which stay as the fallback. The fridge was first made as an
-evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
+(`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). The fridge was
+first made as an evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
 `fridge.doors.glb`) became this one build, and the two sinks and the five K1 fridges were added.
 
 ## The fridge
@@ -13,8 +12,8 @@ evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kit
 A top-freezer fridge: the **top compartment is the freezer** (frozen food), the **bottom compartment is
 the fridge** (normal food), separated by a real divider.
 
-- 0.740 × 1.800 × 0.722 m (w × h × d): exactly the placeholder's bounds, built in its numbers (`F`, a
-  `GameFrame`) and standing where the placeholder stands (`centre=(0, -0.094)`), its back on the wall
+- 0.740 × 1.800 × 0.722 m (w × h × d): exactly the old part's bounds, built in its numbers (`F`, a
+  `GameFrame`) and standing where the game places it (`centre=(0, -0.094)`), its back on the wall
 - 4,286 triangles, 3 nodes (`cabinet`, `door_freezer`, `door_fridge`), 3 draw calls (one per node), 14
   materials, no UVs
 - `check_glb.py`: ok, with one warning (below). Khronos glTF validator: 0 errors, 0 warnings.
@@ -69,11 +68,12 @@ tag covers both the `wash` and `washUp` interactions).
 | `model.farmhouseSink` | 1.000 × 1.253 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
 | `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
-Both match their placeholder bounds (`check_glb.py`: ok; Khronos validator: 0 errors, 0 warnings).
+`check_glb.py`: 0 failed; its warnings are the fridges' `freezer_open` clip, which no use plays, and 4 draw calls
+on the French-door and wine fridges. Khronos validator: 0 errors, 0 warnings.
 
 ## The K1 fridges
 
-Six more fridges match their placeholders' bounds. Each hinges a door built closed and swings it open
+Six more fridges match the old parts' bounds. Each hinges a door built closed and swings it open
 with a `hold`, so it shuts while the resident is busy; the French-door freezer and the wine fridge's top
 rack slide instead. The clip each use plays is in the pack's `motions`:
 
@@ -101,10 +101,10 @@ python3 -B tools/art/blender/build.py kitchen --preview  # previews/fridge.png, 
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where its placeholder stands (its `Model`'s `centre`, which `G.settle()` uses),
-not on its tile: its back is on the wall face (-0.43), as the placeholder's, a run of counters and
-appliances lines up, and its top is under its content `surface` (`catalog2.py` TOPS). Since the
-2026-10-14 fix-ups the placeholders no longer reach into the wall: both moved forward onto the face.
+Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
+appliances lines up, and its top is under its content `surface`. Since the
+2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-their placeholder's old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
-catalog2.py `shallow`). Islands stand free, centred.
+the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old `shallow`). Islands stand free, centred.

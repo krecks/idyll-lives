@@ -2,19 +2,18 @@
 
 `bedroom_storage.py` builds the bedroom's nightstands and small storage (BR2) and its wardrobes and drawers (BR3)
 into `web/public/assets/models/bedroom_storage/` and their entries in `packs/bedroom_storage/manifest.json`, keyed
-by the existing `model.<id>` keys. They replace the primitive-part placeholders in `catalog.py` (`nightstand`,
-`nightstandLamp`, `dresser`, `wardrobe`) and `catalog2.py` (the rest), which stay as the fallback. Built
+by the existing `model.<id>` keys. Built
 2026-10-14. They sit in Validate › Nightstands and Validate › Wardrobes until checked in play.
 
 ## Shared
 
-- **Built in place.** The parts are placed in game axes with no shift (`F = G.GameFrame()`), where each
-  placeholder stands, and settled with `G.settle(centre=False)` and `centre=` on each `Model`. Most stand at the
-  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several placeholders reached
+- **Built in place.** The parts are placed in game axes with no shift (`F = G.GameFrame()`), where the game places it,
+  and settled with `G.settle(centre=False)` and `centre=` on each `Model`. Most stand at the
+  back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several old parts reached
   3.5–7 cm into the wall (the nightstand and lamp nightstand to -0.465, the tall chest and low dresser to -0.48,
   the armoire to -0.50); they stand on the wall face now too (2026-10-14; the armoire's and the chests' a little
   shallower, as the models), and the content `surface`s of the nightstand, tall chest and low dresser start at
-  the wall face. The drum nightstand, hamper, chest and bench stand where their placeholders do.
+  the wall face. The drum nightstand, hamper, chest and bench stand where the game places them.
 - **Tops are the content's `surface` heights**: nightstand, modern and lamp nightstand 0.56, drum 0.57, three-drawer
   0.60, blanket chest 0.505, dresser 0.89, low dresser 0.80, tall chest 1.16 (catalog2 `TOPS`). The bench's
   cushion top is its seat, 0.47. The lamp's bulb is at 0.935–0.97, around the content's `light.height` 0.95.
@@ -24,7 +23,7 @@ by the existing `model.<id>` keys. They replace the primitive-part placeholders 
 - **Draw calls (at most 3).** A textured finish costs a call per part it's on, so the moving parts are kept to one
   textured finish: the oak dresser's pulls, picture frame, print and vase are `wood` (with the body), and the low
   dresser's black handles are `wood` too (`ebony`). The three-drawer nightstand and the armoire are `satin`
-  (walnut, mahogany: a little lighter than the placeholders' `wood` colours, which the wood texture brightens), so
+  (walnut, mahogany: a little lighter than the old parts' `wood` colours, which the wood texture brightens), so
   their drawer and doors carry brass and the armoire's clothes without more calls.
 - **Drawers** (`_drawer`) are a front, its pulls and a box behind it (inside the solid carcass at rest), with folded
   clothes in it, joined with the origin on the carcass face; `_gap` puts a dark panel on the carcass behind the
@@ -43,9 +42,9 @@ All are played for the `outfit` use (`motions.uses.outfit`):
 | `dresserLow` | `drawer_open` | the middle drawer of the middle column, 30 cm | 2.5 s |
 | `wardrobe` | `doors_open` | both doors swing out 100° in 1.2 s | 3 s |
 | `armoire` | `doors_open` | both doors, 100° | 3 s |
-| `wardrobeSingle` | `door_open` | its door, hinged on the left (the placeholder's handle is on the right), 100° | 3 s |
+| `wardrobeSingle` | `door_open` | its door, hinged on the left (the old part's handle is on the right), 100° | 3 s |
 
-The dresser's placeholder has two columns of three drawers; the model has two small drawers over two wide ones,
+The dresser's old part has two columns of three drawers; the model has two small drawers over two wide ones,
 so "the middle drawer" is one drawer.
 
 ## Lids and drawers for a use (BR2, +use)
@@ -81,8 +80,7 @@ washer would need a laundry loop in the sim.)
 | `model.wardrobeSingle` | 0.90 × 2.28 × 0.62 m | 2,220 | 2 | Body, Handles (a box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
 
-`check_glb.py`: 0 failed (the five "off centre" warnings went with the placeholders' move). Khronos validator: 0
-errors, 0 warnings each.
+`check_glb.py`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
