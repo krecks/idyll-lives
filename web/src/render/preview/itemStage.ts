@@ -17,7 +17,7 @@ import type { PopTarget } from '../babylon/buildFx';
 import { buildModel, motionsOf, painted, partPose, type ModelClip, type ModelTemplate, type Motions } from '../babylon/models';
 import { poseParts, restPoses } from '../babylon/objectMotion';
 import type { ItemStage } from '../types';
-import { boxCorners, contactShadow, studioScene } from './itemScene';
+import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 
 const FOV = 0.5;
 /** Starting view: three-quarter from the front, a little above (radians). */
@@ -164,7 +164,8 @@ export class ItemStageController implements ItemStage {
         const { colors } = this.next;
         this.next = undefined;
         const entry = this.assets.has(this.model, 'model') ? this.assets.get(this.model, 'model') : undefined;
-        const template = await buildModel(this.scene, `stage:${this.model}|${colorsKey(colors)}`, painted(entry, colors), this.footprint);
+        // Without its file, a plain box (built again with each colour asked for, which tries the file again).
+        const template = await buildModel(this.scene, `stage:${this.model}|${colorsKey(colors)}`, painted(entry, colors), this.footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
         const meshes = template.meshes;
         const identity = Matrix.Identity().asArray() as unknown as Float32Array;
         for (const mesh of meshes) {

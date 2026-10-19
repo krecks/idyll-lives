@@ -1,8 +1,8 @@
 /**
  * The order in which assets download. Loads someone is waiting for (the viewed lot, the model in
  * hand, catalog pictures) run at once; files fetched ahead of time (`prefetch`: the other lots'
- * furniture) wait until none of those is running and go a couple at a time, so they never hold
- * up what's on screen.
+ * furniture; `background`: a model file that failed, tried again) wait until none of those is
+ * running and go a couple at a time, so they never hold up what's on screen.
  */
 
 import { withBuild } from './build';
@@ -32,6 +32,22 @@ function next(): void {
   }
 }
 
+/**
+ * Runs a load nobody is waiting for (a file fetched ahead of time, one that failed tried again): it
+ * waits until none of the loads someone is waiting for is running, a couple at a time.
+ */
+export function background<T>(load: () => Promise<T>): Promise<T> {
+  return new Promise<void>((resolve) => {
+    waiting.push(resolve);
+    next();
+  })
+    .then(load)
+    .finally(() => {
+      backgroundLoads--;
+      next();
+    });
+}
+
 const requested = new Set<string>();
 
 /**
@@ -42,18 +58,9 @@ export function prefetch(urls: Iterable<string>): void {
   for (const url of urls) {
     if (requested.has(url)) continue;
     requested.add(url);
-    void new Promise<void>((resolve) => {
-      waiting.push(resolve);
-      next();
-    })
-      .then(async () => {
-        const res = await fetch(withBuild(url), { priority: 'low' });
-        await res.arrayBuffer();
-      })
-      .catch(() => requested.delete(url))
-      .finally(() => {
-        backgroundLoads--;
-        next();
-      });
+    void background(async () => {
+      const res = await fetch(withBuild(url), { priority: 'low' });
+      await res.arrayBuffer();
+    }).catch(() => requested.delete(url));
   }
 }

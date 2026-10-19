@@ -19,7 +19,7 @@ import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel, painted } from '../babylon/models';
 import { shadingFromSettings } from '../babylon/softLook';
 import type { ItemPreviews, ItemStage } from '../types';
-import { boxCorners, contactShadow, studioScene } from './itemScene';
+import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 import { ItemStageController } from './itemStage';
 
 /** Picture sizes in pixels (cards show ~80 CSS px; the detail's turntable ~200). */
@@ -201,17 +201,22 @@ class ItemThumbnails implements ItemPreviews {
         const job = this.next();
         if (!job) continue;
         let encoded: Promise<string[] | null> = Promise.resolve(null);
+        let boxed = false;
         if (studio) {
           try {
             // The images are encoded while the next model is built.
-            encoded = (await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size, job.colors))?.encoded ?? encoded;
+            const drawn = await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size, job.colors);
+            encoded = drawn?.encoded ?? encoded;
+            boxed = !!drawn?.boxed;
           } catch (err) {
             console.warn(`[preview] thumbnail of ${job.model} failed`, err);
           }
         }
         void encoded.then(
           (urls) => {
-            if (urls) this.remember(job, urls);
+            // A box drawn for a file that failed is shown but not kept (here or between visits): the
+            // next request draws the thing again, with its file if it has come.
+            if (urls && !boxed) this.remember(job, urls);
             for (const w of job.waiters) w(urls);
           },
           () => job.waiters.forEach((w) => w(null)),
@@ -331,10 +336,11 @@ class ItemStudio {
   /**
    * Builds `model` and draws it from `frames` angles around it. Resolves once drawn; `encoded`
    * (the image URLs, one per angle) settles later, so the next model can be built meanwhile.
+   * `boxed`: its file failed, and the picture is of a plain box in its place.
    */
-  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]> } | null> {
+  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]>; boxed: boolean } | null> {
     const entry = assets.has(model, 'model') ? assets.get(model, 'model') : undefined;
-    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint);
+    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
     const meshes = template.meshes;
     try {
       const identity = Matrix.Identity().asArray() as unknown as Float32Array;
@@ -368,7 +374,7 @@ class ItemStudio {
         this.scene.render();
         urls.push(this.capture(size));
       }
-      return { encoded: Promise.all(urls) };
+      return { encoded: Promise.all(urls), boxed: !!template.failed };
     } finally {
       for (const mesh of meshes) mesh.dispose(false, false);
     }

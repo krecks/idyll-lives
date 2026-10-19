@@ -102,7 +102,8 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate, type StandIn } from './models';
+import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
+import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -181,6 +182,8 @@ const LAMP_SWITCH_FADE = 0.25;
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
 const PREVIEW_CAPACITY = 128;
+/** How long (ms) after a failed model file comes the world is built again with it (more often come together, after an outage). */
+const FILES_SETTLE_MS = 500;
 
 interface PlacedObject {
   id: number;
@@ -312,9 +315,13 @@ export class BabylonRenderer implements Renderer {
   onFailure: ((why: RenderFailure, error?: unknown) => void) | null = null;
   /**
    * Built model templates by key, kept across lot switches and sessions (building them
-   * is expensive). Templates not used by the current world are disabled, not disposed.
+   * is expensive). Templates not used by the current world are disabled, not disposed. One built
+   * without its file is built again when the file comes (`refreshModels`).
    */
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  private readonly templates = new TemplateCache<ModelTemplate>();
+  /** Files that failed and have since come, waiting for `refreshModels` (a moment later: several often come together). */
+  private readonly filesArrived = new Set<string>();
+  private filesTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
@@ -338,6 +345,8 @@ export class BabylonRenderer implements Renderer {
   private townListener: (() => void) | null = null;
   private townTicket = 0;
   private townQueue: Promise<void> = Promise.resolve();
+  /** The town the overview was last asked to show (built again when a file it was drawn without comes). */
+  private townWorld: WorldStructure | null = null;
   /** Holds the game camera's pose while the overview drives the real camera. */
   private parked!: ArcRotateCamera;
   private warmFrames = 0;
@@ -502,8 +511,14 @@ export class BabylonRenderer implements Renderer {
   // Build mode helpers.
   private ghostRoot!: TransformNode;
   private ghostKey = '';
-  /** Models whose file failed to load for the ghost this session: it's drawn as its box from then on. */
-  private readonly ghostUnfiled = new Set<string>();
+  /**
+   * Models whose file failed to load for the ghost, with the files: it's drawn as its box straight
+   * away from then on, until one of those files comes (`ghostFileArrived`).
+   */
+  private readonly ghostUnfiled = new Map<string, string[]>();
+  /** What the ghost was last built from (`loadGhost`'s arguments), and the files the one shown was built without. */
+  private ghostArgs: Parameters<BabylonRenderer['loadGhost']> | null = null;
+  private ghostFailed: string[] = [];
   /** The model in hand (without its resizing). */
   private ghostModel = '';
   private ghostMeshes: Mesh[] = [];
@@ -754,7 +769,7 @@ export class BabylonRenderer implements Renderer {
     // Public places seen from another lot show their things in the open (as the overview does).
     this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
       const d = this.deps.content.object(def);
-      return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1] };
+      return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: this.standInOf(d) };
     });
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
@@ -775,6 +790,8 @@ export class BabylonRenderer implements Renderer {
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
+    // A model file that failed has come: what was drawn without it (a box, or nothing) is built again.
+    onModelFileArrived(scene, (url) => this.fileArrived(url));
     // Reflections show the game world (not the shadow-only copies or the overview).
     const q = this.quality;
     this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
@@ -2318,6 +2335,7 @@ export class BabylonRenderer implements Renderer {
 
   showTown(world: WorldStructure, minute: number): Promise<void> {
     const ticket = ++this.townTicket;
+    this.townWorld = world;
     const run = this.townQueue.then(async () => {
       // Requests queue up while one builds; only the newest is built.
       if (ticket !== this.townTicket) return;
@@ -3920,28 +3938,66 @@ export class BabylonRenderer implements Renderer {
     const colors = this.objectColors(o);
     const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    // Without its file, a box in its place, so it can still be seen and clicked, until the game is
-    // reloaded. Shaped by the first kind built with this model; no two kinds share one today.
+    // Without its file, a box in its place, so it can still be seen and clicked, until the file comes
+    // (`refreshModels`). Shaped by the first kind built with this model; no two kinds share one today.
     return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) })];
   }
 
   /** The box a kind of thing is drawn as without its model's file (`BuildOptions.standIn`). */
   private standInOf(def: ObjectDef | undefined): StandIn {
-    return { layer: def?.layer, radius: this.deps.content.radius(def) };
+    return standInOf(this.deps.content, def);
   }
 
   /** Cached template by key; marks it as used by the world being built. */
   private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
-    let t = this.templates.get(key);
-    if (!t) {
-      t = build();
-      this.templates.set(key, t);
-    }
+    const t = this.templates.get(key, build);
     this.templatesInUse.add(key);
     return t.then((template) => {
       for (const mesh of template.meshes) mesh.setEnabled(true);
       return template;
     });
+  }
+
+  /** A model file that failed has come: things drawn without it are built again in a moment (`refreshModels`), and the ghost now. */
+  private fileArrived(url: string): void {
+    this.ghostFileArrived(url);
+    this.filesArrived.add(url);
+    if (this.filesTimer) clearTimeout(this.filesTimer);
+    this.filesTimer = setTimeout(() => {
+      this.filesTimer = null;
+      void this.refreshModels();
+    }, FILES_SETTLE_MS);
+  }
+
+  /**
+   * Builds again what was drawn without the files that have come: the world (once no build is
+   * running: one holds the templates it was given), the game's street and the town overview's. The
+   * old templates (the boxes) are disposed once the world is built without them.
+   */
+  private async refreshModels(): Promise<void> {
+    while (this.worldBuilds) await this.worldBuilds.catch(() => {});
+    const urls = [...this.filesArrived];
+    this.filesArrived.clear();
+    if (!urls.length) return;
+    let stale = false;
+    for (const url of urls) {
+      const keys = this.templates.invalidate(url);
+      // The garden's dressing is the lot layer's, kept while the lot is the same: build that again too.
+      if (keys.some((k) => k.startsWith('deco:'))) this.lotKey = '';
+      // (The street builds again with the world, its layout key cleared.)
+      if (this.street.invalidate(url)) stale = true;
+      if (keys.length) stale = true;
+    }
+    // The overview between its builds; built again now if it's on screen, else the next time it's shown.
+    const overview = this.overview;
+    if (overview) {
+      this.townQueue = this.townQueue.then(() => {
+        const town = urls.map((url) => overview.invalidate(url)).some(Boolean);
+        if (town && this.townMode && this.townWorld) void this.showTown(this.townWorld, this.townMinute).catch(() => {});
+      });
+    }
+    if (stale && this.lastWorld) await this.setWorld(this.lastWorld, this.view).catch(() => {});
+    if (this.templates.disposeStale()) this.resetSnapshot();
   }
 
   /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
@@ -3950,7 +4006,7 @@ export class BabylonRenderer implements Renderer {
       if (keep.has(key)) continue;
       void t.then((template) => {
         if (this.templatesInUse.has(key)) return;
-        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
+        if (!this.paintedTemplates.has(key) || this.templates.peek(key) !== t) {
           for (const mesh of withGlows(template)) mesh.setEnabled(false);
           return;
         }
@@ -3964,7 +4020,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Meshes of the templates in use (for shadows and freezing). */
   private async templateMeshes(): Promise<Mesh[]> {
-    const lists = await Promise.all([...this.templatesInUse].map((k) => this.templates.get(k)!));
+    const lists = await Promise.all([...this.templatesInUse].flatMap((k) => this.templates.peek(k) ?? []));
     return lists.flatMap((t) => t.meshes);
   }
 
@@ -4023,18 +4079,22 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
+    this.ghostArgs = [model, kind, resize, colors];
     // Without its file, the box the placed thing would get. A file that failed for the ghost isn't
-    // fetched again for each step of a resize or a colour: the box is built straight away.
+    // fetched again for each step of a resize or a colour: the box is built straight away, until the
+    // file comes (`ghostFileArrived`).
     const def = kind === undefined ? undefined : this.deps.content.object(kind);
-    const entry = this.ghostUnfiled.has(model) ? undefined : painted(this.deps.assets.get(model, 'model'), colors);
+    const unfiled = this.ghostUnfiled.get(model);
+    const entry = unfiled ? undefined : painted(this.deps.assets.get(model, 'model'), colors);
     void buildModel(this.scene, `ghost:${key}`, entry, resize?.from ?? def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) }).then((template) => {
-      if (template.failed) this.ghostUnfiled.add(model);
+      if (template.failed) this.ghostUnfiled.set(model, template.failed);
       // The ghost doesn't glow.
       for (const glow of template.glows ?? []) glow.mesh.dispose(false, false);
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
       }
+      this.ghostFailed = unfiled ?? template.failed ?? [];
       for (const mesh of this.ghostMeshes) mesh.dispose(false, false);
       for (const mesh of template.meshes) {
         mesh.parent = this.ghostRoot;
@@ -4048,6 +4108,16 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = template.meshes.map((mesh) => mesh.material);
       this.setGhostTint();
     });
+  }
+
+  /** A file that failed for the ghost has come: its models are built with it again, and the thing in hand, if it's one, now (its box stays until then). */
+  private ghostFileArrived(url: string): void {
+    for (const [model, files] of this.ghostUnfiled) if (files.includes(url)) this.ghostUnfiled.delete(model);
+    if (!this.ghostFailed.includes(url) || !this.ghostArgs) return;
+    this.ghostFailed = [];
+    if (this.ghostShown) this.loadGhost(...this.ghostArgs);
+    // Put away: built afresh when next taken in hand.
+    else this.ghostKey = '';
   }
 
   private setGhostTint(): void {

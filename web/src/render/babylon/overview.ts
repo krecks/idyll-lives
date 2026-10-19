@@ -23,8 +23,9 @@ import { Geo, type V3 } from './geometry';
 import type { HouseBuilder } from './house';
 import { LAYER_TOWN } from './layers';
 import type { MaterialLibrary } from './materials';
-import { buildModel, placementVariation, type ModelTemplate } from './models';
+import { buildModel, placementVariation, standInOf, type ModelTemplate } from './models';
 import { fieldLayers, Street } from './street';
+import { TemplateCache } from './templateCache';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
 const TOWN_HEIGHT = 7;
@@ -45,7 +46,7 @@ export class TownOverview {
   private readonly streets: [Street, Street];
   private current = 0;
   private ground: Mesh[] = [];
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  private readonly templates = new TemplateCache<ModelTemplate>();
   private readonly templatesInUse = new Set<string>();
   private key = '';
   /** Shadow casters of the overview (without the landscape). */
@@ -94,6 +95,18 @@ export class TownOverview {
     this.rig = new OverviewCamera(camera);
   }
 
+  /**
+   * A model file that failed has come: the next `build` builds the town again (even the same one),
+   * with what was drawn without the file (a box, or nothing) built afresh. Called between builds;
+   * true if anything was drawn without it.
+   */
+  invalidate(url: string): boolean {
+    let stale = this.templates.invalidate(url).length > 0;
+    for (const street of this.streets) stale = street.invalidate(url) || stale;
+    if (stale) this.key = '';
+    return stale;
+  }
+
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. */
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
@@ -115,6 +128,8 @@ export class TownOverview {
         if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
       });
     }
+    // The previous overview's boxes for files that have come since are drawn no more.
+    this.templates.disposeStale();
     this.templatesInUse.clear();
     const objectMeshes: Mesh[] = [];
     for (const [key, { template, matrices }] of objects) {
@@ -233,11 +248,10 @@ export class TownOverview {
     const at = new Vector3();
     for (const [key, list] of groups) {
       await pace?.();
-      let t = this.templates.get(key);
-      if (!t) {
+      const template = await this.templates.get(key, () => {
         const def = this.content.object(list[0].def);
-        // Seen from afar: a file's far version.
-        t = buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true }).then((template) => {
+        // Seen from afar: a file's far version; without a file, the box the lot draws.
+        return buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true, standIn: standInOf(this.content, def) }).then((template) => {
           for (const mesh of template.meshes) {
             mesh.layerMask = LAYER_TOWN;
             mesh.isPickable = false;
@@ -245,9 +259,7 @@ export class TownOverview {
           }
           return template;
         });
-        this.templates.set(key, t);
-      }
-      const template = await t;
+      });
       const matrices = new Float32Array(list.length * 16);
       const vary = this.assets.get(key, 'model')?.vary ?? 0;
       list.forEach((o, i) => {

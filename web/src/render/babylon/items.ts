@@ -13,7 +13,8 @@ import { Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import type { ItemPlacement } from '../../core/protocol';
-import { buildAhead, buildModel, type ModelTemplate } from './models';
+import { buildAhead, buildModel, ITEM_STAND_IN, onModelFileArrived, type ModelTemplate } from './models';
+import { TemplateCache } from './templateCache';
 
 /** Where items show: the storey in view, the storey of a lot row and how high each stands. */
 export interface ItemView {
@@ -44,7 +45,7 @@ export interface PlacedItem {
 const MIN_PICK = 0.3;
 
 export class ItemLayer {
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  private readonly templates = new TemplateCache<ModelTemplate>();
   /** Per model in use: its instance matrices. */
   private readonly buffers = new Map<string, Float32Array>();
   private readonly mold: Mesh;
@@ -74,6 +75,10 @@ export class ItemLayer {
     mold.thinInstanceSetBuffer('matrix', this.moldMatrices, 16, false);
     mold.thinInstanceCount = 0;
     this.mold = mold;
+    // A model file that failed has come: the items drawn without it (a block, or nothing) are built again.
+    onModelFileArrived(scene, (url) => {
+      if (this.templates.invalidate(url).length) void this.rebuild();
+    });
   }
 
   /** New items from the simulation. */
@@ -99,12 +104,8 @@ export class ItemLayer {
   }
 
   private template(key: string): Promise<ModelTemplate> {
-    let t = this.templates.get(key);
-    if (!t) {
-      t = buildModel(this.scene, `item:${key}`, this.assets.get(key, 'model'), [1, 1]);
-      this.templates.set(key, t);
-    }
-    return t;
+    // Without its file, a small block where it stands.
+    return this.templates.get(key, () => buildModel(this.scene, `item:${key}`, this.assets.get(key, 'model'), [1, 1], { standIn: ITEM_STAND_IN }));
   }
 
   private async rebuild(): Promise<void> {
@@ -176,6 +177,8 @@ export class ItemLayer {
     this.mold.setEnabled(count > 0);
     this.drawn = new Set(keys);
     this.placed = placed;
+    // Built since without the blocks of files that came (set aside just before this rebuild began, `onModelFileArrived`): they go.
+    this.templates.disposeStale();
     this.onChange?.();
   }
 
@@ -200,7 +203,8 @@ export class ItemLayer {
 
   dispose(): void {
     this.mold.dispose();
-    for (const t of this.templates.values()) void t.then((template) => template.meshes.forEach((mesh) => mesh.dispose()));
+    for (const [, t] of this.templates) void t.then((template) => template.meshes.forEach((mesh) => mesh.dispose()));
     this.templates.clear();
+    this.templates.disposeStale();
   }
 }
