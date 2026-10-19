@@ -221,9 +221,9 @@
           }
         }
       } else if (screen === 'home' && home) {
-        await host.prepare(home, snapshot, false).catch(() => {});
+        await host.prepare(home, snapshot).catch(() => {});
       } else if (screen === 'play' && play) {
-        await host.prepare(play, snapshot, false).catch(() => {});
+        await host.prepare(play, snapshot).catch(() => {});
       }
     }, settle ? 500 : 250);
     return () => {
