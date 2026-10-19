@@ -12,6 +12,11 @@
  * - House surfaces can carry `WallCutPlugin`: walls drop to stubs in the vertex shader when the
  *   cutaway state says so (driven by a per-vertex attribute, see `geometry.ts`), at no CPU cost.
  *
+ * Every PBR material made or adopted here is shaded in the game's soft look (`softLook.ts`):
+ * the light PBR computed, redrawn as a wide soft ramp in the light's own colour. The Settings'
+ * Shading option (`classic`) draws the PBR shading instead; it applies live, by preparing the
+ * materials again (`refreshSoftLook`).
+ *
  * All materials are frozen once their textures are loaded. Changing the environment intensity
  * (or an emissive glow, via `touch`) thaws them for a couple of frames so the new value reaches
  * their uniform buffers (the renderer re-records its WebGPU snapshot on lighting changes anyway).
@@ -40,6 +45,7 @@ import {
 import { withBuild } from '../../assets/build';
 import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
+import { applySoftLook } from './softLook';
 
 /** Default finish for placeholder parts without a `material`. */
 export const DEFAULT_FINISH = 'material.finish.matte';
@@ -558,6 +564,7 @@ export class MaterialLibrary {
     if (!(material instanceof PBRMaterial) || this.lit.has(material)) return;
     material.maxSimultaneousLights = MAX_LIGHTS;
     new UndergroundPlugin(material, this.dig);
+    applySoftLook(material);
     // (It may have been compiled without it.)
     material.markDirty(true);
     this.lit.add(material);
@@ -716,6 +723,7 @@ export class MaterialLibrary {
     if (options.vertexColors || options.planarUV) new VertexTweaksPlugin(mat, { srgbColors: options.vertexColors, planarUV: options.planarUV });
     if (options.cutaway) new WallCutPlugin(mat, this.wallCut);
     new UndergroundPlugin(mat, this.dig);
+    applySoftLook(mat);
     this.lit.add(mat);
     this.freezeWhenReady(mat);
     return mat;

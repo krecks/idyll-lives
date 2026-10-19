@@ -17,6 +17,7 @@ import type { AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel, painted } from '../babylon/models';
+import { shadingFromSettings } from '../babylon/softLook';
 import type { ItemPreviews, ItemStage } from '../types';
 import { boxCorners, contactShadow, studioScene } from './itemScene';
 import { ItemStageController } from './itemStage';
@@ -57,10 +58,16 @@ const thumbs = new Map<string, string>();
 const turntables = new Map<string, string[]>();
 /**
  * Pictures kept between visits (Cache Storage), in a cache per app version: older versions' caches
- * are deleted when it opens. Bump `v1` to drop old pictures after a look change.
+ * are deleted when it opens. Bump `v3` to drop old pictures after a look change. Pictures are kept
+ * per shading (Settings, Performance, Shading), here and in memory.
  */
 const STORE_PREFIX = 'littlelives-item-pictures-';
-const STORE = `${STORE_PREFIX}v2-${__APP_VERSION__}`;
+const STORE = `${STORE_PREFIX}v3-${__APP_VERSION__}`;
+
+/** A model's picture in the shading the setting asks for now (`thumbs`' key). */
+function thumbKey(model: string): string {
+  return `${shadingFromSettings()}|${model}`;
+}
 
 export function createItemPreviews(assets: AssetRegistry): ItemPreviews {
   return new ItemThumbnails(assets);
@@ -78,19 +85,20 @@ class ItemThumbnails implements ItemPreviews {
   constructor(private readonly assets: AssetRegistry) {}
 
   cachedThumbnail(model: string): string | null {
-    return thumbs.get(model) ?? null;
+    return thumbs.get(thumbKey(model)) ?? null;
   }
 
   thumbnail(model: string, footprint: [number, number], priority: Priority = 'now', signal?: AbortSignal): Promise<string | null> {
-    const hit = thumbs.get(model);
+    const key = thumbKey(model);
+    const hit = thumbs.get(key);
     if (hit) return Promise.resolve(hit);
     return this.stored(model).then((url) => {
       if (url) {
-        thumbs.set(model, url);
+        thumbs.set(key, url);
         return url;
       }
       if (signal?.aborted) return null;
-      return this.request(model, model, footprint, 1, THUMB_PX, priority, signal).then((urls) => urls?.[0] ?? null);
+      return this.request(key, model, footprint, 1, THUMB_PX, priority, signal).then((urls) => urls?.[0] ?? null);
     });
   }
 
@@ -99,11 +107,11 @@ class ItemThumbnails implements ItemPreviews {
   }
 
   cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null {
-    return turntables.get(`${model}|${frames}|${colorsKey(colors)}`) ?? null;
+    return turntables.get(`${thumbKey(model)}|${frames}|${colorsKey(colors)}`) ?? null;
   }
 
   turntable(model: string, footprint: [number, number], frames: number, colors?: PartColors): Promise<string[] | null> {
-    const key = `${model}|${frames}|${colorsKey(colors)}`;
+    const key = `${thumbKey(model)}|${frames}|${colorsKey(colors)}`;
     const hit = turntables.get(key);
     if (hit) {
       turntables.delete(key);
@@ -126,8 +134,8 @@ class ItemThumbnails implements ItemPreviews {
   /** Keeps what was drawn, even if whoever asked has gone meanwhile. */
   private remember(job: Job, urls: string[]): void {
     if (job.frames === 1) {
-      if (thumbs.has(job.model)) return;
-      thumbs.set(job.model, urls[0]);
+      if (thumbs.has(job.key)) return;
+      thumbs.set(job.key, urls[0]);
       void this.keep(job.model, urls[0]);
       return;
     }
@@ -222,10 +230,10 @@ class ItemThumbnails implements ItemPreviews {
     return this.store;
   }
 
-  /** Cache key: changes with the app version and the model's manifest entry (its file, fit, finishes; not the build). */
+  /** Cache key: changes with the app version, the shading and the model's manifest entry (its file, fit, finishes; not the build). */
   private storeKey(model: string): string {
     const entry = this.assets.has(model, 'model') ? withoutBuild(JSON.stringify(this.assets.get(model, 'model'))) : '';
-    return `${location.origin}/__item-pictures/${__APP_VERSION__}/${THUMB_PX}/${hash(model + entry)}.webp`;
+    return `${location.origin}/__item-pictures/${__APP_VERSION__}/${shadingFromSettings()}/${THUMB_PX}/${hash(model + entry)}.webp`;
   }
 
   private async stored(model: string): Promise<string | null> {

@@ -9,6 +9,9 @@
  * close as frames them all, at their middle height (things on a wall included); `?alpha=0.6&beta=1.1&radius=6`
  * and `?target=1.4` (a height) or `?target=x,y,z` (a point) change that. (`alpha=1.571` is straight
  * from the front, `-1.571` from the back.)
+ *
+ * The models are shaded in the game's soft look (`softLook.ts`), as the game draws them;
+ * `?look=classic` (dev only) draws the PBR shading they had before, to compare.
  */
 
 import {

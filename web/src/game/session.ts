@@ -1460,6 +1460,7 @@ export async function startSession(
         resolution: s.resolution,
         cameraSensitivity: s.cameraSensitivity,
         fpsCap: s.fpsCap,
+        shading: s.shading,
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
       if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });

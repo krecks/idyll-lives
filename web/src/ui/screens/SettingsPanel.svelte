@@ -59,7 +59,7 @@
 
   /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
-    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'resolution', 'fpsCap', 'renderer'] },
+    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'shading', 'resolution', 'fpsCap', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
@@ -293,6 +293,20 @@
               { value: 'low', label: 'Low' },
               { value: 'medium', label: 'Medium' },
               { value: 'high', label: 'High' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Shading"
+          hint="Soft: wide, gentle light, closer to a painting. Classic: the shading the game had before."
+          details="Soft draws every lit surface with a wide, soft ramp in the light's own colour, so golden hour stays golden, lamps stay warm and shade takes the sky's tint. Classic is the physically based shading it replaced. Water, the sky and glass that keeps its reflections have their own look either way."
+        >
+          <Segmented
+            label="Shading"
+            bind:value={settings.shading}
+            options={[
+              { value: 'soft', label: 'Soft' },
+              { value: 'classic', label: 'Classic' },
             ]}
           />
         </SettingRow>

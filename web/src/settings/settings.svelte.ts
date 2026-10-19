@@ -5,10 +5,16 @@
 
 import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
 import { MIN_SCALE, type Resolution } from '../render/babylon/resolution';
+import type { Shading } from '../render/types';
 
 export interface Settings {
   /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
   graphics: GraphicsPreset;
+  /**
+   * How lit surfaces are drawn (`render/babylon/softLook.ts`): `soft`, the game's painterly
+   * shading; or `classic`, the PBR shading it replaced. Applies live.
+   */
+  shading: Shading;
   /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/babylon/resolution.ts`). */
   resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
@@ -76,6 +82,7 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 
 export const DEFAULT_SETTINGS: Settings = {
   graphics: 'medium',
+  shading: 'soft',
   resolution: 'auto',
   fpsCap: 60,
   renderer: 'auto',
@@ -195,6 +202,7 @@ function sanitize(s: Settings): Settings {
   s.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
   s.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   s.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
+  s.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
   if (s.resolution !== 'auto' && (typeof s.resolution !== 'number' || !(s.resolution >= MIN_SCALE && s.resolution <= 1))) s.resolution = DEFAULT_SETTINGS.resolution;
   s.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
   s.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
