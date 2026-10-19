@@ -470,6 +470,8 @@ export class Street {
   /** What glows at night on the models drawn (a path light's lens: a template's `glows`), and each instance's strength. */
   private glows: { mesh: Mesh; colors: Float32Array }[] = [];
   private lamps = -1;
+  /** Neighbours' houses (wall box, grid lines) and their window glass, lit while someone is `up` in there. */
+  private homes: { box: [number, number, number, number]; windows: Mesh; up: boolean }[] = [];
   private readonly tmpQ = new Quaternion();
   private readonly tmpM = new Matrix();
   private readonly tmpS = new Vector3();
@@ -568,13 +570,14 @@ export class Street {
       // The player's house is the game's own on its lot; seen from the menus' town it is a shell dressed like it.
       const home = L.kind === 'home' && !view;
       if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
-      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
+      specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' });
     }
     const sil = perfTime('street: silhouettes', () => this.house.silhouettes(specs, world.openings ?? [], world));
     await pace?.();
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
     this.meshes.push(...sil.meshes);
     this.casters.push(...sil.casters);
+    this.homes = sil.homes.map(({ spec, windows }) => ({ box: [spec.x0, spec.z0, spec.x1, spec.z1], windows, up: true }));
     for (const s of specs) if (s.garage) blocked.push({ x: s.garage.x0 - T, z: s.garage.z0 - T, w: s.garage.x1 - s.garage.x0 + 2 * T, d: s.garage.z1 - s.garage.z0 + 2 * T });
     for (const [x, y, z, nx, nz] of sil.lamps) {
       glow.at(x, z).box(-0.06 + nx * 0.02, y - 0.12, -0.06 + nz * 0.02, 0.06 + nx * 0.02, y + 0.08, 0.06 + nz * 0.02);
@@ -947,11 +950,30 @@ export class Street {
     this.drawn = [];
     this.key = '';
     this.glows = [];
+    this.homes = [];
     for (const template of this.templates.values()) {
       void template.then((t) => {
         if (this.key === '') for (const mesh of withGlows(t)) mesh.setEnabled(false);
       });
     }
+  }
+
+  /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
+  get houses(): readonly (readonly [number, number, number, number])[] {
+    return this.homes.map((h) => h.box);
+  }
+
+  /** Which neighbours' houses have someone up in them (as `houses`): only theirs glow at night. True if any changed. */
+  setUp(up: readonly boolean[]): boolean {
+    let changed = false;
+    this.homes.forEach((h, i) => {
+      const now = up[i] ?? true;
+      if (h.up === now) return;
+      h.up = now;
+      h.windows.material = this.house.neighbourGlass(now);
+      changed = true;
+    });
+    return changed;
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level. */

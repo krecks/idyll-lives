@@ -444,6 +444,8 @@ export class BabylonRenderer implements Renderer {
   private windowless = new Set<number>();
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: DoorLeaf; open: number }[] = [];
+  /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
+  private readonly neighboursUp: boolean[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
   private lampsOff: ReadonlySet<number> | null = null;
   private lampsSettled = true;
@@ -988,6 +990,7 @@ export class BabylonRenderer implements Renderer {
     // Lights go out in rooms where everyone is asleep.
     this.findDarkRooms(frame);
     this.swingDoors(frame);
+    this.lightNeighbours(frame);
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.windowless.size > 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
@@ -3455,6 +3458,34 @@ export class BabylonRenderer implements Renderer {
     if (!moved) return;
     this.sunShadows.moved();
     this.resetSnapshot();
+  }
+
+  /**
+   * Neighbours' windows glow at night only while someone is up at home there (not away, not
+   * asleep): after bedtime their houses go dark too.
+   */
+  private lightNeighbours(frame: FrameState): void {
+    const houses = this.townMode ? [] : (this.street?.houses ?? []);
+    if (!houses.length) return;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const sleeping = this.sleepActions?.ids;
+    const up = this.neighboursUp;
+    up.length = houses.length;
+    up.fill(false);
+    // Everyone in town (not only those drawn), as far as the snapshot holds them.
+    const count = Math.min(curr[layout.header.simCount], Math.floor((curr.length - layout.headerLen) / layout.simStride));
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if (curr[o + k.away] !== 0) continue;
+      if (curr[o + k.pose] === Pose.Lie && sleeping?.has(curr[o + k.action] | 0)) continue;
+      const x = curr[o + k.x];
+      // Upstairs is a storey's own rows: back to the ground's.
+      const z = curr[o + k.z] - this.rowOf(this.storeyOf(Math.floor(curr[o + k.z])));
+      const h = houses.findIndex(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
+      if (h >= 0) up[h] = true;
+    }
+    if (this.street?.setUp(up)) this.resetSnapshot();
   }
 
   /** Eases each interior light towards out (its room dark) or on, a lamp as its switch (`lampOn`); true if any changed. */

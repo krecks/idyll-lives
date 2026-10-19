@@ -321,11 +321,15 @@ export interface SilhouetteSpec {
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
   storeys?: number;
+  /** Someone's home: its windows get a mesh of their own, lit only while someone is up (see `SilhouetteBuild.homes`). */
+  lived?: boolean;
 }
 
 export interface SilhouetteBuild {
   meshes: Mesh[];
   casters: Mesh[];
+  /** The window glass of each lived-in house (also in `meshes`), to light or not (`neighbourGlass`). */
+  homes: { spec: SilhouetteSpec; windows: Mesh }[];
   /** Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz). */
   lamps: [number, number, number, number, number][];
 }
@@ -1479,9 +1483,12 @@ export class HouseBuilder {
       }
     };
 
+    const homes: { spec: SilhouetteSpec; panes: Geo }[] = [];
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
+      const panes = b.lived ? new Geo() : glass;
+      if (b.lived) homes.push({ spec: b, panes });
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
       walls.color(s.wall);
       const tall = H * (b.storeys ?? 1);
@@ -1511,7 +1518,7 @@ export class HouseBuilder {
         if (o.kind === 'window') {
           const [g0, g1] = [a + WIN_INSET, a + 1 - WIN_INSET];
           const f = 0.07;
-          glass.poly([P(g0, SILL, 0.006), P(g1, SILL, 0.006), P(g1, HEAD, 0.006), P(g0, HEAD, 0.006)], n);
+          panes.poly([P(g0, SILL, 0.006), P(g1, SILL, 0.006), P(g1, HEAD, 0.006), P(g0, HEAD, 0.006)], n);
           // Curtains drawn to the sides with a valance: dark against the glow at night.
           trim.color(curtain);
           board(g0, g0 + 0.17, SILL + 0.04, HEAD, 0.012);
@@ -1573,7 +1580,7 @@ export class HouseBuilder {
         lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
       }
     }
-    const out: SilhouetteBuild = { meshes: [], casters: [], lamps };
+    const out: SilhouetteBuild = { meshes: [], casters: [], homes: [], lamps };
     const M = HOUSE_MATERIALS;
     for (const [geo, name, key, cast] of [
       [siding, 'silhouetteWalls', M.siding, true],
@@ -1591,7 +1598,21 @@ export class HouseBuilder {
       out.meshes.push(mesh);
       if (cast) out.casters.push(mesh);
     }
+    for (const { spec, panes } of homes) {
+      const windows = panes.toMesh('silhouetteWindows', this.scene, { colors: true, cut: true });
+      if (!windows) continue;
+      windows.material = this.neighbourGlass(true);
+      windows.receiveShadows = true;
+      windows.isPickable = false;
+      out.meshes.push(windows);
+      out.homes.push({ spec, windows });
+    }
     return out;
+  }
+
+  /** Neighbours' window glass: glowing at night as the street's (`lit`), or dark (everyone in asleep, or nobody home). */
+  neighbourGlass(lit: boolean): Material {
+    return lit ? this.material(HOUSE_MATERIALS.glass) : this.lib.surface(HOUSE_MATERIALS.glass, { vertexColors: true, cutaway: true, variant: 'dark' });
   }
 
   /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
