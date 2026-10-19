@@ -1,0 +1,4 @@
+cafeTable: living / tables -> validate / cafe
+new Validate group: cafe
+wrote content/base.json
+wrote content/catalog/one.json

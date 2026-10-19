@@ -1,0 +1,26 @@
+pouf: decor / — -> validate / seed
+gnome: outdoor / yard -> validate / seed
+--- a/content/base.json
++++ b/content/base.json
+@@ -21,7 +21,7 @@
+       "category": "decor",
+       "group": "ornaments"
+     },
+-    {"id": "gnome", "name": "Gnome", "price": 15, "category": "outdoor", "group": "yard"},
++    {"id": "gnome", "name": "Gnome", "price": 15, "category": "validate", "freeRotation": true, "group": "seed"},
+     {
+       "id": "stool",
+       "name": "Stool",
+--- a/content/catalog/one.json
++++ b/content/catalog/one.json
+@@ -12,7 +12,9 @@
+     {
+       "id": "pouf",
+       "name": "Pouf",
+-      "category": "decor"
++      "category": "validate",
++      "freeRotation": true,
++      "group": "seed"
+     },
+     {
+       "id": "lantern",
