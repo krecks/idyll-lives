@@ -44,7 +44,7 @@ import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
-import { WALL_HALF, WALL_HEIGHT } from './house';
+import { WALL_HALF, WALL_HEIGHT } from './walls';
 import type { ObjectDef } from '../../content/content';
 
 export type TintSlot = NonNullable<PrimitivePart['tint']>;
@@ -74,6 +74,8 @@ export interface ModelTemplate {
    * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
+  /** Its file failed to load (it's drawn as nothing, or the box asked for). */
+  failed?: boolean;
 }
 
 /** A template's meshes and its glows' (all it draws). */
@@ -233,7 +235,8 @@ export async function buildModel(
   }
   // No file (the registry said so, once per key) or it failed: nothing, or the box asked for. Either
   // stays for as long as a cache keeps it (the renderer's: until the game is reloaded).
-  return options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
+  const template = options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
+  return entry?.url ? { ...template, failed: true } : template;
 }
 
 /**

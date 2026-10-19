@@ -163,7 +163,7 @@ export class ItemStageController implements ItemStage {
       while (this.next && !this.detached) {
         const { colors } = this.next;
         this.next = undefined;
-        const entry = this.assets.get(this.model, 'model');
+        const entry = this.assets.has(this.model, 'model') ? this.assets.get(this.model, 'model') : undefined;
         const template = await buildModel(this.scene, `stage:${this.model}|${colorsKey(colors)}`, painted(entry, colors), this.footprint);
         const meshes = template.meshes;
         const identity = Matrix.Identity().asArray() as unknown as Float32Array;

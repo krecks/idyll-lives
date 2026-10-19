@@ -26,6 +26,7 @@
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Material, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
+import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
@@ -1097,7 +1098,7 @@ export class Street {
     let template = this.templates.get(key);
     if (!template) {
       // The overview's street (on a layer of its own) is seen from afar: files' far versions.
-      template = buildModel(this.scene, `street:${key}`, this.assets.get(key, 'model'), footprint, { far: this.layerMask !== undefined });
+      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined });
       this.templates.set(key, template);
     }
     const t = await perfTimeAsync(`street: model ${key}`, () => template);

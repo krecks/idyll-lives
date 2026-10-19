@@ -66,6 +66,7 @@ import { Pose } from '../../core/snapshot';
 import { colorsKey, lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type PartColors, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { RenderQuality } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
+import type { ObjectDef } from '../../content/content';
 import { LOOK } from '../look';
 import type {
   BuildEffect,
@@ -101,7 +102,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
+import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate, type StandIn } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -488,6 +489,8 @@ export class BabylonRenderer implements Renderer {
   // Build mode helpers.
   private ghostRoot!: TransformNode;
   private ghostKey = '';
+  /** Models whose file failed to load for the ghost this session: it's drawn as its box from then on. */
+  private readonly ghostUnfiled = new Set<string>();
   /** The model in hand (without its resizing). */
   private ghostModel = '';
   private ghostMeshes: Mesh[] = [];
@@ -3848,8 +3851,12 @@ export class BabylonRenderer implements Renderer {
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
     // Without its file, a box in its place, so it can still be seen and clicked, until the game is
     // reloaded. Shaped by the first kind built with this model; no two kinds share one today.
-    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
-    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn })];
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) })];
+  }
+
+  /** The box a kind of thing is drawn as without its model's file (`BuildOptions.standIn`). */
+  private standInOf(def: ObjectDef | undefined): StandIn {
+    return { layer: def?.layer, radius: this.deps.content.radius(def) };
   }
 
   /** Cached template by key; marks it as used by the world being built. */
@@ -3945,10 +3952,14 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
-    // Without its file, the box the placed thing would get.
+    // Without its file, the box the placed thing would get. A file that failed for the ghost isn't
+    // fetched again for each step of a resize or a colour: the box is built straight away.
     const def = kind === undefined ? undefined : this.deps.content.object(kind);
-    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
-    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), colors), resize?.from ?? def?.footprint ?? [1, 1], { resize, standIn }).then((template) => {
+    const entry = this.ghostUnfiled.has(model) ? undefined : painted(this.deps.assets.get(model, 'model'), colors);
+    void buildModel(this.scene, `ghost:${key}`, entry, resize?.from ?? def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) }).then((template) => {
+      if (template.failed) this.ghostUnfiled.add(model);
+      // The ghost doesn't glow.
+      for (const glow of template.glows ?? []) glow.mesh.dispose(false, false);
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
