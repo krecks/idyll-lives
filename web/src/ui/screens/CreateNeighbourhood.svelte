@@ -85,8 +85,19 @@
     app.screen = 'create';
   }
 
-  /** The other path: take over a household that already lives here. */
+  /** The other path: take over a household that already lives here (the camera flies into their lot). */
   function play(slot: number) {
+    if (!town) return;
+    keep();
+    app.playSlot = slot;
+    const request = app.playRequest(slot);
+    if (!request) return;
+    menuScene.highlight({});
+    app.start(request);
+  }
+
+  /** A closer look at a household before playing it: who they are, their home and neighbours. */
+  function meet(slot: number) {
     if (!town) return;
     keep();
     app.playSlot = slot;
@@ -187,6 +198,7 @@
           <button class="btn" onclick={() => (focus = null)}><Icon name="icon.ui.town" size={16} /> Whole town</button>
           {#if focused}
             {#key focused.slot}
+              <button class="btn" onclick={() => meet(focused.slot)}>Meet the {focused.household.name}s</button>
               <button class="btn primary play-lot" onclick={() => play(focused.slot)}>Play the {focused.household.name}s →</button>
             {/key}
           {/if}
