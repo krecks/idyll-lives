@@ -2,3 +2,11 @@
 # replaces these flags instead of adding to them: the wasm crates then refuse to build without SIMD.
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "target-feature=+simd128"]
+
+# The repo's tools (crates/tools), run from the repo root. Their Python predecessors are gone.
+[alias]
+art = "run -q -p ll-tools --release --bin art --"
+characters = "run -q -p ll-tools --release --bin characters --"
+check-glb = "run -q -p ll-tools --release --bin check-glb --"
+content = "run -q -p ll-tools --release --bin content --"
+tex = "run -q -p ll-tools --release --bin tex --"
