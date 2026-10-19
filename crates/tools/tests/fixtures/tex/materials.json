@@ -1,0 +1,265 @@
+{
+  "environment.sky": {
+    "type": "image",
+    "url": "env/belfast_open_field.env"
+  },
+  "material.wall": {
+    "type": "material",
+    "color": "#F4F0E8",
+    "texture": "textures/wall_plaster/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "normalStrength": 0.7
+  },
+  "material.floor": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/floor_laminate/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.55
+  },
+  "material.ground": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/grass_lush/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "normalStrength": 0.8,
+    "projection": "xz",
+    "sideColor": "#C9B391"
+  },
+  "material.road": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/road_asphalt/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.2,
+    "projection": "xz"
+  },
+  "material.path": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/path_hexpaving/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.7,
+    "projection": "xz"
+  },
+  "material.soil": {
+    "type": "material",
+    "color": "#8A6646",
+    "texture": "textures/grass/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "projection": "xz",
+    "roughness": 1
+  },
+  "material.furrow": {
+    "type": "material",
+    "color": "#664A33",
+    "texture": "textures/grass/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "projection": "xz",
+    "roughness": 1
+  },
+  "material.finish.matte": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.75
+  },
+  "material.finish.satin": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.42
+  },
+  "material.finish.gloss": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.12
+  },
+  "material.finish.metal": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.32,
+    "metallic": 1
+  },
+  "material.finish.chrome": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.1,
+    "metallic": 1
+  },
+  "material.finish.fabric": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/fabric_linen/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 2.5,
+    "roughness": 1,
+    "metallic": 0
+  },
+  "material.finish.wood": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/wood_oak/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.2,
+    "roughness": 0.8,
+    "metallic": 0
+  },
+  "material.finish.bark": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/bark/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.0,
+    "metallic": 0
+  },
+  "material.finish.foliage": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/foliage/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.8,
+    "roughness": 0.9,
+    "metallic": 0
+  },
+  "material.finish.glass": {
+    "type": "material",
+    "color": "#DCE6E8",
+    "roughness": 0.05,
+    "alpha": 0.28
+  },
+  "material.finish.skin": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.48
+  },
+  "material.wall.siding": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/siding_wood/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.4,
+    "roughness": 1,
+    "normalStrength": 1
+  },
+  "material.wall.brick": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/brick/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.0,
+    "roughness": 1,
+    "normalStrength": 1
+  },
+  "material.roof": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/roof_shingles/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.667,
+    "roughness": 1,
+    "normalStrength": 1
+  },
+  "material.wall.stone": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/stone_foundation/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.667,
+    "roughness": 1,
+    "normalStrength": 1
+  },
+  "material.floor.wood": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/floor_wood/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.53,
+    "roughness": 1,
+    "normalStrength": 0.8
+  },
+  "material.floor.tile": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/floor_tile/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "roughness": 0.7,
+    "normalStrength": 1
+  },
+  "material.floor.carpet": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/carpet/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.0,
+    "roughness": 1,
+    "normalStrength": 0.8
+  },
+  "material.wall.interior": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/wallpaper/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "roughness": 1,
+    "normalStrength": 0.5
+  },
+  "material.trim": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/painted_wood/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.0,
+    "roughness": 1,
+    "normalStrength": 0.6
+  },
+  "material.door": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/door_wood/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.0,
+    "roughness": 1,
+    "normalStrength": 0.6
+  },
+  "material.finish.hair": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.34
+  },
+  "material.window": {
+    "type": "material",
+    "color": "#22303E",
+    "roughness": 0.05,
+    "metallic": 0.1
+  },
+  "material.window.inner": {
+    "type": "material",
+    "color": "#D8E8F4",
+    "roughness": 0.25
+  }
+}
