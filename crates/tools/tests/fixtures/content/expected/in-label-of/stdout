@@ -1,0 +1,4 @@
+vase: decor / ornaments -> validate / new_one-two
+sofa: living / seating -> validate / new_one-two
+new Validate group: new_one-two
+wrote content/base.json

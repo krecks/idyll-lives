@@ -1,0 +1,31 @@
+{
+  "objects": [
+    {
+      "id": "cafeTable",
+      "name": "Café table ☕",
+      "description": "A bistro table from a café in Lyon — with a 😀 under the top.",
+      "price": 120,
+      "category": "living",
+      "group": "tables"
+    },
+    {"id": "chairOne", "name": "Chäir", "category": "living", "group": "seating"},
+    {
+      "id": "pouf",
+      "name": "Pouf",
+      "category": "decor"
+    },
+    {
+      "id": "lantern",
+      "name": "Lantérn",
+      "category": "validate",
+      "group": "late"
+    },
+    {
+      "id": "bench",
+      "name": "Bench",
+      "category": "validate",
+      "group": "seed",
+      "freeRotation": false
+    }
+  ]
+}

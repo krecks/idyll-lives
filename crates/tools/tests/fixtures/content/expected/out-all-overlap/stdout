@@ -1,0 +1,6 @@
+stool: validate / seed -> decor / —
+rug: validate / seed -> decor / —
+lantern: validate / late -> decor / —
+dropped the empty Validate group: seed
+dropped the empty Validate group: late
+Validate is empty now: remove the category and its icon (docs/objects/README.md, "Validate").

@@ -1,0 +1,78 @@
+{
+  "include": ["catalog/one.json"],
+  "objectRules": {
+    "freeRotation": ["decor", "outdoor"],
+    "maxQuality": 3
+  },
+  "objects": [
+    {
+      "id": "sofa",
+      "name": "Sofa",
+      "footprint": [2, 1],
+      "price": 300,
+      "category": "living",
+      "group": "seating",
+      "interactions": []
+    },
+    {
+      "id": "vase",
+      "name": "Vase",
+      "price": 20,
+      "category": "decor",
+      "group": "ornaments"
+    },
+    {"id": "gnome", "name": "Gnome", "price": 15, "category": "outdoor", "group": "yard"},
+    {
+      "id": "stool",
+      "name": "Stool",
+      "price": 25,
+      "category": "validate",
+      "freeRotation": true,
+      "group": "seed",
+      "size": [
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "id": "rug",
+      "category": "validate",
+      "group": "seed"
+    }
+  ],
+  "buyCategories": [
+    {
+      "id": "living",
+      "label": "Living",
+      "groups": [
+        {"id": "seating", "label": "Seating"},
+        {"id": "tables", "label": "Tables"}
+      ]
+    },
+    {
+      "id": "decor",
+      "label": "Decor",
+      "groups": [
+        {"id": "ornaments", "label": "Ornaments"},
+        {"id": "textiles", "label": "Rugs & curtains"}
+      ]
+    },
+    {
+      "id": "outdoor",
+      "label": "Outdoor", "outside": true,
+      "groups": [
+        {"id": "yard", "label": "Yard", "outside": true}
+      ]
+    },
+    {
+      "id": "validate",
+      "label": "Validate",
+      "icon": "icon.category.validate",
+      "groups": [
+        {"id": "seed", "label": "Seed"},
+        {"id": "late", "label": "Late"},
+        {"id": "cafe", "label": "Caf\u00e9 \u2615 tables \ud83d\ude00"}
+      ]
+    }
+  ]
+}

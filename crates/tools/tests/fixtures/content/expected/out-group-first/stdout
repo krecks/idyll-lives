@@ -1,0 +1,4 @@
+stool: validate / seed -> living / seating
+rug: validate / seed -> decor / textiles
+dropped the empty Validate group: seed
+wrote content/base.json

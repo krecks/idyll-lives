@@ -1,0 +1,36 @@
+stool: validate / seed -> living / seating
+rug: validate / seed -> decor / textiles
+dropped the empty Validate group: seed
+--- a/content/base.json
++++ b/content/base.json
+@@ -26,9 +26,9 @@
+       "id": "stool",
+       "name": "Stool",
+       "price": 25,
+-      "category": "validate",
++      "category": "living",
+       "freeRotation": true,
+-      "group": "seed",
++      "group": "seating",
+       "size": [
+         0.4,
+         0.4
+@@ -36,8 +36,8 @@
+     },
+     {
+       "id": "rug",
+-      "category": "validate",
+-      "group": "seed"
++      "category": "decor",
++      "group": "textiles"
+     }
+   ],
+   "buyCategories": [
+@@ -69,7 +69,6 @@
+       "label": "Validate",
+       "icon": "icon.category.validate",
+       "groups": [
+-        {"id": "seed", "label": "Seed"},
+         {"id": "late", "label": "Late"}
+       ]
+     }
