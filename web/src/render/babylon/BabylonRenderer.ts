@@ -174,6 +174,8 @@ const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 /** Seconds a door takes to swing open or shut, and how near (metres) someone walking opens it. */
 const DOOR_SWING = 0.45;
 const DOOR_REACH = 1.3;
+/** How much of its opening a sliding door spends stepping out onto the wall's face, before it slides. */
+const DOOR_STEP_OUT = 0.25;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -1649,7 +1651,7 @@ export class BabylonRenderer implements Renderer {
     }
     if (walls.length || diagonals.length) {
       const view = this.view ? { ...this.view, z: this.view.z + this.rowOf(this.storey) } : null;
-      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true, standing: world.diagonals });
+      const house = this.house.build({ ...world, walls, openings, diagonals }, view, { upper: this.storey !== 0, preview: true, standing: world });
       if (house) next.push(...house.meshes);
       hole = this.holeFor(standing);
     }
@@ -3559,6 +3561,7 @@ export class BabylonRenderer implements Renderer {
     if (!this.doors.length) return;
     const movers = this.movers;
     const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
+    const ease = (t: number) => t * t * (3 - 2 * t);
     let moved = false;
     for (const door of this.doors) {
       const { leaf } = door;
@@ -3575,9 +3578,19 @@ export class BabylonRenderer implements Renderer {
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
       door.open = open;
-      // Eased: quick off the frame, slowing as it meets the jamb or the wall.
-      const turn = leaf.close * (1 - leaf.opens * open * open * (3 - 2 * open));
-      for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides
+      // steps out onto the wall's face first, then slides along it; one with no wall to slide
+      // along is hidden while open.
+      const { slide } = leaf;
+      if (slide === 'hide') for (const mesh of leaf.meshes) mesh.isVisible = open < 0.5;
+      else if (slide) {
+        const out = ease(Math.min(1, open / DOOR_STEP_OUT));
+        const by = ease(Math.max(0, (open - DOOR_STEP_OUT) / (1 - DOOR_STEP_OUT)));
+        for (const mesh of leaf.meshes) mesh.position.set(slide.out[0] * out + slide.by[0] * by, 0, slide.out[1] * out + slide.by[1] * by);
+      } else {
+        const turn = leaf.close * (1 - leaf.opens * ease(open));
+        for (const mesh of leaf.meshes) mesh.rotation.y = turn;
+      }
       moved = true;
     }
     if (!moved) return;
