@@ -3736,19 +3736,24 @@ export class BabylonRenderer implements Renderer {
   private writeScreenGlow(g: { mesh: Mesh; colors: Float32Array; ids: number[] }): void {
     const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
     const t = this.screenTime / 1000;
+    let changed = false;
     g.ids.forEach((id, i) => {
       let f = 0;
       if (!this.townMode && this.screenOn.has(id)) {
         const flicker = this.reducedMotion
           ? 1
           : 0.9 + 0.1 * (0.5 + 0.5 * Math.sin(t * 17.3 + id * 1.7)) * (0.6 + 0.4 * Math.sin(t * 41.1 + id * 2.3));
-        f = (0.55 + 0.45 * level) * flicker;
+        f = Math.fround((0.55 + 0.45 * level) * flicker);
       }
+      if (g.colors[i * 4] === f) return;
       g.colors.fill(f, i * 4, i * 4 + 3);
       g.colors[i * 4 + 3] = 1;
+      changed = true;
     });
     if (g.mesh.isDisposed()) return;
-    g.mesh.thinInstanceBufferUpdated('color');
+    // Uploaded only when a brightness changed: every screen off, or held steady (reduced motion),
+    // leaves the buffer as it is.
+    if (changed) g.mesh.thinInstanceBufferUpdated('color');
     // Off (nobody watching) it needn't draw at all; toggled only when that changes, so a still
     // picture isn't re-recorded every frame.
     const on = g.ids.some((id) => this.screenOn.has(id));
