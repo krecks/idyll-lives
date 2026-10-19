@@ -39,7 +39,8 @@ banker's lamp) glow only on their white `liner`, a thin shell just inside the sh
 ## Clips (both ambient, `idle`)
 
 - **Ceiling fan** (`blades`): the five blades and their irons, origin on the axis; `blades_turn` turns them
-  once in 2.5 s (`G.spin`).
+  once in 2.5 s (`G.spin`). The axis is on the tile's middle, so the blades sweep a circle 0.974 m across
+  inside the tile (the fan's box, reaching farther one way, is centred 3.3 cm off: its `centre`).
 - **Paper lantern** (`lantern`): the cord, the paper globe and its ribs, origin on the canopy; `sway` rocks
   them 2.5° in 2 s (`G.rock`), about a pendulum's period for its length.
 
@@ -73,7 +74,7 @@ Not on Low (E2); at rest they look as the old part.
 | ceilingLight | 0.36 × 0.60 × 0.36 | 1,040 | 1 | Body, Shade |
 | chandelier | 0.94 × 0.76 × 0.90 | 3,788 | 1 | Body, Globes |
 | pendantIndustrial | 0.38 × 0.87 × 0.38 | 1,592 | 1 | Body, Shade |
-| ceilingFan | 1.12 × 0.39 × 1.18 | 2,328 | 3 | Body, Blades |
+| ceilingFan | 0.91 × 0.39 × 0.95 | 2,328 | 3 | Body, Blades |
 | trackLights | 0.94 × 0.30 × 0.19 | 936 | 1 | Body, Shade |
 | paperLantern | 0.54 × 1.00 × 0.54 | 2,204 | 3 | Paper, Ribs |
 | wallSconce | 0.20 × 0.25 × 0.27 | 764 | 2 | Body, Shade |
