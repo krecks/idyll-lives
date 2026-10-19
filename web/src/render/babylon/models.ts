@@ -1,6 +1,6 @@
 /**
  * Builds renderable templates from asset entries: glTF files, or nothing when there's no file or
- * it doesn't load (a plain box for the lot's placed objects, `BuildOptions.standIn`). Each template
+ * it doesn't load (a plain box for the lot's placed objects and buy mode's ghost, `BuildOptions.standIn`). Each template
  * is drawn with thin instances (one draw call per mesh, however many copies exist).
  *
  * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
@@ -74,8 +74,6 @@ export interface ModelTemplate {
    * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
-  /** Its file didn't load (it's drawn as nothing, or a stand-in box): a cache may build it again later rather than keep it. */
-  failed?: boolean;
 }
 
 /** A template's meshes and its glows' (all it draws). */
@@ -233,9 +231,9 @@ export async function buildModel(
       }
     }
   }
-  // No file (the registry said so, once per key) or it failed: nothing, or the box asked for.
-  const template = options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
-  return entry?.url ? { ...template, failed: true } : template;
+  // No file (the registry said so, once per key) or it failed: nothing, or the box asked for. Either
+  // stays for as long as a cache keeps it (the renderer's: until the game is reloaded).
+  return options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
 }
 
 /**
@@ -1001,37 +999,15 @@ interface FilePiece {
 /** Files imported per scene, by URL (they go with the scene). */
 const loadedFiles = new WeakMap<Scene, Map<string, Promise<LoadedFile>>>();
 
-/** A file that failed to load is fetched again at most this often (ms) and this many times in all. */
-const FILE_RETRY_MS = 30_000;
-const FILE_TRIES = 3;
-/** Files that failed to load, by URL: how many times, and when last (ms); gone once one loads. */
-const failedFiles = new Map<string, { tries: number; at: number }>();
-
-/**
- * Whether a build of a model whose file is `url` could load it now: it loaded, it's never been
- * asked for, or it failed and is due another try. Until then, builds fail at once without fetching.
- */
-export function fileDue(url: string | undefined): boolean {
-  const failed = url ? failedFiles.get(url) : undefined;
-  return !!url && (!failed || (failed.tries < FILE_TRIES && performance.now() - failed.at >= FILE_RETRY_MS));
-}
-
 function loadFile(scene: Scene, url: string): Promise<LoadedFile> {
   const files = loadedFiles.get(scene) ?? new Map<string, Promise<LoadedFile>>();
   loadedFiles.set(scene, files);
   let file = files.get(url);
   if (!file) {
-    if (!fileDue(url)) return Promise.reject(new Error(`${url} failed to load; not tried again yet`));
     const loading = importFile(scene, url);
     files.set(url, (file = loading));
-    // One that failed is tried again by a later build, when it's due.
-    loading.then(
-      () => failedFiles.delete(url),
-      () => {
-        if (files.get(url) === loading) files.delete(url);
-        failedFiles.set(url, { tries: (failedFiles.get(url)?.tries ?? 0) + 1, at: performance.now() });
-      },
-    );
+    // One that failed is tried again by the next build.
+    loading.catch(() => files.get(url) === loading && files.delete(url));
   }
   return file;
 }

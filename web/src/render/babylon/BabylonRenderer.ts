@@ -101,7 +101,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, fileDue, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
+import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
@@ -180,16 +180,6 @@ const LAMP_SWITCH_FADE = 0.25;
 const ROOF_MIN_DISTANCE = 15;
 /** Capacity of the wall-tool preview buffers (grown on demand). */
 const PREVIEW_CAPACITY = 128;
-/** A cached model template (`BabylonRenderer.template`). */
-interface CachedTemplate {
-  promise: Promise<ModelTemplate>;
-  /** Its file didn't load (it's drawn as a box, or nothing). */
-  failed?: boolean;
-  /** Being built again in the background, its file being due another try (`fileDue`). */
-  retry?: Promise<void>;
-  /** Built again with its file, hidden: the next world build draws it in place of the box. */
-  next?: ModelTemplate;
-}
 
 interface PlacedObject {
   id: number;
@@ -323,7 +313,7 @@ export class BabylonRenderer implements Renderer {
    * Built model templates by key, kept across lot switches and sessions (building them
    * is expensive). Templates not used by the current world are disabled, not disposed.
    */
-  private readonly templates = new Map<string, CachedTemplate>();
+  private readonly templates = new Map<string, Promise<ModelTemplate>>();
   private readonly templatesInUse = new Set<string>();
   /** Keys of templates built in a player's colours: once no world uses one, it is disposed rather than kept (a click through the palette builds one per swatch). */
   private readonly paintedTemplates = new Set<string>();
@@ -1316,7 +1306,7 @@ export class BabylonRenderer implements Renderer {
     }
     // A new thing in hand pops in; the same one resized just changes shape.
     const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
-    if (ghost.model + resizeKey(ghost.resize) + colorsKey(ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.def, ghost.resize, ghost.colors);
+    if (ghostKeyOf(ghost.model, ghost.def, ghost.resize, ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.def, ghost.resize, ghost.colors);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -3540,7 +3530,7 @@ export class BabylonRenderer implements Renderer {
   /** Garden dressing as thin instances of a cached template (`deco:` keys). */
   private async placeDecor(key: string, items: [number, number, number, number][]): Promise<void> {
     if (!items.length) return;
-    const template = await this.template(`deco:${key}`, () => this.decorModel(key), this.deps.assets.get(key, 'model')?.url);
+    const template = await this.template(`deco:${key}`, () => this.decorModel(key));
     const matrices = new Float32Array(items.length * 16);
     items.forEach(([x, z, s, yaw], i) => {
       Matrix.ComposeToRef(this.vScale.setAll(s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.qTmp), this.vTmp.set(x, 0, z), this.mOut);
@@ -3849,76 +3839,46 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** An object's template key, and how to build it. */
-  private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>, string | undefined] {
+  private objectTemplate(o: ObjectPlacement): [string, () => Promise<ModelTemplate>] {
     const key = this.objectModel(o);
     const def = this.deps.content.object(o.def);
-    const entry = this.deps.assets.get(key, 'model');
     const resize = this.objectResize(o);
     const colors = this.objectColors(o);
-    const footprint = def?.footprint ?? [1, 1];
-    // Without its file, a box in its place, so it can still be seen and clicked; shaped by its kind
-    // (two kinds sharing a model get a box each).
-    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
-    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}|${standIn.layer ?? 'floor'}:${standIn.radius}:${footprint.join('x')}`;
+    const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    return [id, () => buildModel(this.scene, key, painted(entry, colors), footprint, { resize, standIn }), entry?.url];
+    // Without its file, a box in its place, so it can still be seen and clicked, until the game is
+    // reloaded. Shaped by the first kind built with this model; no two kinds share one today.
+    const standIn = { layer: def?.layer, radius: this.deps.content.radius(def) };
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn })];
   }
 
-  /**
-   * Cached template by key; marks it as used by the world being built. One whose file (`url`) didn't
-   * load stays as it is (a box) for this build, and is built again in the background when the file is
-   * due another try; a later build draws what that brings.
-   */
-  private template(key: string, build: () => Promise<ModelTemplate>, url?: string): Promise<ModelTemplate> {
-    let cached = this.templates.get(key);
-    if (!cached) cached = this.cache(key, build());
-    else if (cached.failed && !this.templatesInUse.has(key)) {
-      if (cached.next) {
-        // Its file came: drawn from this build on, and the box goes.
-        const old = cached.promise;
-        cached = this.cache(key, Promise.resolve(cached.next));
-        void old.then(disposeTemplate);
-      } else if (!cached.retry && fileDue(url)) this.retry(key, cached, build);
+  /** Cached template by key; marks it as used by the world being built. */
+  private template(key: string, build: () => Promise<ModelTemplate>): Promise<ModelTemplate> {
+    let t = this.templates.get(key);
+    if (!t) {
+      t = build();
+      this.templates.set(key, t);
     }
     this.templatesInUse.add(key);
-    return cached.promise.then((template) => {
+    return t.then((template) => {
       for (const mesh of template.meshes) mesh.setEnabled(true);
       return template;
     });
   }
 
-  /** Caches a template being built under `key`, noting once built whether its file failed. */
-  private cache(key: string, promise: Promise<ModelTemplate>): CachedTemplate {
-    const cached: CachedTemplate = { promise };
-    this.templates.set(key, cached);
-    void promise.then((template) => (cached.failed = !!template.failed));
-    return cached;
-  }
-
-  /** Builds a failed template again without holding up a world build; kept hidden in `next` if its file came. */
-  private retry(key: string, cached: CachedTemplate, build: () => Promise<ModelTemplate>): void {
-    cached.retry = build().then((fresh) => {
-      cached.retry = undefined;
-      if (fresh.failed || this.templates.get(key) !== cached) return disposeTemplate(fresh);
-      for (const mesh of withGlows(fresh)) mesh.setEnabled(false);
-      cached.next = fresh;
-    });
-  }
-
   /** Disables cached templates the current world doesn't use, and disposes those in a player's colours (their materials are shared and stay). */
   private retireTemplates(keep: Set<string>): void {
-    for (const [key, cached] of this.templates) {
+    for (const [key, t] of this.templates) {
       if (keep.has(key)) continue;
-      void cached.promise.then((template) => {
+      void t.then((template) => {
         if (this.templatesInUse.has(key)) return;
-        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== cached) {
+        if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
           for (const mesh of withGlows(template)) mesh.setEnabled(false);
           return;
         }
         this.templates.delete(key);
         this.paintedTemplates.delete(key);
-        disposeTemplate(template);
-        if (cached.next) disposeTemplate(cached.next);
+        for (const mesh of withGlows(template)) mesh.dispose(false, false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -3926,7 +3886,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Meshes of the templates in use (for shadows and freezing). */
   private async templateMeshes(): Promise<Mesh[]> {
-    const lists = await Promise.all([...this.templatesInUse].map((k) => this.templates.get(k)!.promise));
+    const lists = await Promise.all([...this.templatesInUse].map((k) => this.templates.get(k)!));
     return lists.flatMap((t) => t.meshes);
   }
 
@@ -3976,7 +3936,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
   private loadGhost(model: string, kind: string | undefined, resize?: ObjectResize, colors?: PartColors): void {
-    const key = model + resizeKey(resize) + colorsKey(colors);
+    const key = ghostKeyOf(model, kind, resize, colors);
     this.ghostKey = key;
     // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
     if (model !== this.ghostModel) {
@@ -4478,9 +4438,9 @@ function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.target.copyFrom(from.target);
 }
 
-/** Disposes a template's meshes (its materials are shared and stay). */
-function disposeTemplate(template: ModelTemplate): void {
-  for (const mesh of withGlows(template)) mesh.dispose(false, false);
+/** Buy mode's ghost's key: its model, kind (the box it gets without its file), size and colours. */
+function ghostKeyOf(model: string, kind: string | undefined, resize?: ObjectResize, colors?: PartColors): string {
+  return `${model}|${kind ?? ''}${resizeKey(resize)}${colorsKey(colors)}`;
 }
 
 /** Ray vs axis-aligned box (slab test). Returns distance or Infinity. */
